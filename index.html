@@ -1,0 +1,51 @@
+create table clientes (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  cnpj text,
+  contato text,
+  telefone text,
+  email text,
+  created_at timestamp with time zone default now()
+);
+
+create table clinicas (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  cnpj text,
+  telefone text,
+  email text,
+  endereco text,
+  created_at timestamp with time zone default now()
+);
+
+create table agendamentos (
+  id uuid primary key default gen_random_uuid(),
+  data date not null,
+  horario time,
+  cliente_id uuid references clientes(id),
+  colaborador text not null,
+  aso text not null,
+  clinica_id uuid references clinicas(id),
+  responsavel text,
+  observacoes text,
+  aso_enviado_clinica boolean default false,
+  data_aso_enviado_clinica date,
+  aso_assinado boolean default false,
+  data_aso_assinado date,
+  aso_enviado_cliente boolean default false,
+  data_aso_enviado_cliente date,
+  numero_matricula text,
+  envio_esocial boolean default false,
+  data_envio_esocial date,
+  status text default 'rascunho',
+  created_at timestamp with time zone default now()
+);
+
+create table agendamento_exames (
+  id uuid primary key default gen_random_uuid(),
+  agendamento_id uuid references agendamentos(id) on delete cascade,
+  tipo_exame text not null,
+  valor_cliente numeric(10,2) default 0,
+  custo_clinica numeric(10,2) default 0,
+  lucro numeric(10,2) generated always as (valor_cliente - custo_clinica) stored
+);
