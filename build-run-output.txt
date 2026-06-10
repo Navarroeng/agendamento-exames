@@ -1,0 +1,63 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+No linha:1 caractere:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> agendamento-exames@0.1.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.29
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (101kiB) impacts deserialization performance 
+(consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (231kiB) impacts deserialization performance 
+(consider using Buffer instead and decode when needed)
+ Ô£ô Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/18) ...
+   Generating static pages (4/18) 
+   Generating static pages (8/18) 
+   Generating static pages (13/18) 
+ Ô£ô Generating static pages (18/18)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+Ôöî Ôùï /                                    17.8 kB         213 kB
+Ôö£ Ôùï /_not-found                          876 B          88.5 kB
+Ôö£ Ôùï /cargos                              5.67 kB         190 kB
+Ôö£ Ôùï /clientes                            8.05 kB         189 kB
+Ôö£ Ôùï /clinicas                            12.9 kB         193 kB
+Ôö£ Ôùï /custos-clinicas                     154 B           204 kB
+Ôö£ Ôùï /dashboard                           8.07 kB         303 kB
+Ôö£ Ôùï /e-social                            5.22 kB         197 kB
+Ôö£ Ôùï /exames                              4.05 kB         185 kB
+Ôö£ Ôùï /faturas                             139 B          87.7 kB
+Ôö£ Ôùï /faturas-clientes                    154 B           204 kB
+Ôö£ Ôùï /login                               2.56 kB         169 kB
+Ôö£ Ôùï /periodicos-futuros                  5.82 kB         186 kB
+Ôö£ Ôùï /relatorios                          150 kB          445 kB
+Ôö£ Ôùï /sem-permissao                       2.08 kB         104 kB
+Ôöö Ôùï /usuarios                            1.34 kB         173 kB
++ First Load JS shared by all            87.6 kB
+  Ôö£ chunks/117-a65fc0559a432bcc.js       31.8 kB
+  Ôö£ chunks/fd9d1056-b269926aa472f095.js  53.6 kB
+  Ôöö other shared chunks (total)          2.21 kB
+
+
+ãÆ Middleware                             82.4 kB
+
+Ôùï  (Static)  prerendered as static content
+
+npm notice
+npm notice New minor version of npm available! 11.12.1 -> 11.16.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.16.0
+npm notice To update run: npm install -g npm@11.16.0
+npm notice

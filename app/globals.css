@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen font-sans text-app-text antialiased;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79, 99, 255, 0.06), transparent),
+      linear-gradient(160deg, #f8fbff 0%, #f4f6ff 40%, #f8fdff 100%);
+  }
+}
+
+@layer components {
+  .panel-card {
+    @apply rounded-2xl border border-[#e8edf5]/90 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)];
+  }
+
+  .btn {
+    @apply inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-[#e2e8f0] bg-white px-4 py-2 text-sm font-semibold text-navy shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-200 hover:border-[#cbd5e1] hover:bg-[#f8faff] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply border-transparent bg-gradient-to-br from-[#5668ff] to-[#4354e8] text-white shadow-[0_4px_14px_rgba(79,99,255,0.28)] hover:-translate-y-px hover:from-[#5f70ff] hover:to-[#4a5bef] hover:shadow-[0_6px_20px_rgba(79,99,255,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 active:translate-y-0;
+  }
+
+  .btn-muted {
+    @apply border-[#e2e8f0] bg-[#f8fafc] text-[#52617a] hover:border-[#cbd5e1] hover:bg-white;
+  }
+
+  .field label {
+    @apply text-xs font-semibold tracking-wide text-[#64748b];
+  }
+
+  .field-input {
+    @apply h-11 w-full rounded-[10px] border border-[#e2e8f0] bg-white px-3 text-sm text-[#1f2937] outline-none transition-[border-color,box-shadow] placeholder:font-normal placeholder:text-[#94a3b8] focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15;
+  }
+
+  .field-input-compact {
+    @apply h-9 rounded-[8px] px-2.5 text-xs;
+  }
+
+  .table-premium thead th {
+    @apply border-b border-[#e2e8f0] bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-[#64748b] whitespace-nowrap;
+  }
+
+  .table-premium tbody td {
+    @apply border-b border-[#eef2f7]/80 px-3 py-2 text-xs text-[#334155] align-middle;
+  }
+
+  .table-premium tbody tr {
+    @apply transition-colors duration-150 hover:bg-[#f0f4ff]/50;
+  }
+
+  .money-positive {
+    @apply border-[#bdeccc] bg-[#f0fbf4] font-extrabold text-[#087b35];
+  }
+
+  .pill {
+    @apply rounded-full px-[11px] py-[7px] text-xs font-extrabold;
+  }
+
+  .pill-yes {
+    @apply bg-brand-green-soft text-brand-green;
+  }
+
+  .pill-no {
+    @apply bg-brand-red-soft text-brand-red;
+  }
+
+  .pill-pending {
+    @apply bg-brand-orange-soft text-[#c96d00];
+  }
+
+  .hidden-date {
+    @apply hidden flex-col gap-2;
+  }
+
+  .hidden-date.show {
+    @apply flex animate-[fadeIn_0.2s_ease];
+  }
+
+  .placeholder-date:not(.show) {
+    @apply pointer-events-none flex min-h-[58px] flex-col gap-1.5 invisible;
+  }
+
+  .placeholder-date.show {
+    @apply pointer-events-auto visible;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}

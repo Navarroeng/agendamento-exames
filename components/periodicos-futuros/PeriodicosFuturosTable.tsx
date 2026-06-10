@@ -1,0 +1,131 @@
+import {
+  periodicoDisplayStatusClass,
+  periodicoDisplayStatusLabel,
+} from "@/lib/periodicos-futuro";
+import type { PeriodicoFuturoRow } from "@/lib/types";
+
+interface PeriodicosFuturosTableProps {
+  records: PeriodicoFuturoRow[];
+  loading: boolean;
+  error: string | null;
+  saving: boolean;
+  canActOnRecord: (record: PeriodicoFuturoRow) => boolean;
+  onCriarAgendamento: (record: PeriodicoFuturoRow) => void;
+  onMarcarReagendado: (id: string) => void;
+  onCancelarAcompanhamento: (id: string) => void;
+}
+
+export function PeriodicosFuturosTable({
+  records,
+  loading,
+  error,
+  saving,
+  canActOnRecord,
+  onCriarAgendamento,
+  onMarcarReagendado,
+  onCancelarAcompanhamento,
+}: PeriodicosFuturosTableProps) {
+  if (loading) {
+    return (
+      <p className="py-10 text-center text-sm text-app-muted">
+        Carregando periódicos futuros...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="py-10 text-center text-sm text-brand-red">{error}</p>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-app-muted">
+        Nenhum periódico futuro encontrado com os filtros atuais.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
+      <table className="w-full min-w-[960px] text-left text-xs">
+        <thead>
+          <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+            <th className="px-3 py-2.5">Empresa</th>
+            <th className="px-3 py-2.5">Colaborador</th>
+            <th className="px-3 py-2.5">Cargo</th>
+            <th className="px-3 py-2.5">Exame</th>
+            <th className="px-3 py-2.5">Realizado em</th>
+            <th className="px-3 py-2.5">Próxima data</th>
+            <th className="px-3 py-2.5">Status</th>
+            <th className="px-3 py-2.5">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((record) => {
+            const actionable = canActOnRecord(record);
+            return (
+              <tr
+                key={record.id}
+                className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#fafbfc]"
+              >
+                <td className="px-3 py-2.5 font-medium text-navy">
+                  {record.cliente_nome}
+                </td>
+                <td className="px-3 py-2.5">{record.colaborador}</td>
+                <td className="px-3 py-2.5">{record.cargo_nome ?? "—"}</td>
+                <td className="px-3 py-2.5">{record.exame_nome}</td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {record.dataRealizadaBR}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums font-bold">
+                  {record.proximaDataBR}
+                </td>
+                <td className="px-3 py-2.5">
+                  <span
+                    className={`font-bold ${periodicoDisplayStatusClass(record.displayStatus)}`}
+                  >
+                    {periodicoDisplayStatusLabel(record.displayStatus)}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
+                      disabled={saving}
+                      onClick={() => onCriarAgendamento(record)}
+                    >
+                      Criar agendamento
+                    </button>
+                    {actionable && (
+                      <>
+                        <button
+                          type="button"
+                          className="text-[10px] font-bold text-[#475569] disabled:opacity-40"
+                          disabled={saving}
+                          onClick={() => onMarcarReagendado(record.id)}
+                        >
+                          Reagendado
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[10px] font-bold text-brand-red disabled:opacity-40"
+                          disabled={saving}
+                          onClick={() => onCancelarAcompanhamento(record.id)}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

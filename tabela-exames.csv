@@ -1,0 +1,134 @@
+﻿EXAMES;CUSTO;NAVARRO;CUSTOS;NAVARRO
+Clínico SPIX; R$ 40,00 ; R$ 50,00 ; R$ 40,00 ; R$ 50,00 
+Clínico PRIME; R$ 40,00 ; R$ 50,00 ; R$ 40,00 ; R$ 50,00 
+Clínico PREZERVARE; R$ 38,00 ; R$ 50,00 ; R$ 38,00 ; R$ 50,00 
+Clínico PREVINE; R$ 40,00 ; R$ 50,00 ; R$ 40,00 ; R$ 50,00 
+Clínico BC WORK; R$ 26,00 ; R$ 50,00 ; R$ 26,00 ; R$ 50,00 
+Clínico ENGSEGTRA; R$ 32,00 ; R$ 50,00 ; R$ 32,00 ; R$ 50,00 
+Clínico LABORMESP; R$ 40,00 ; R$ 50,00 ; R$ 40,00 ; R$ 50,00 
+Audiometria SPIX; R$ 32,00 ; R$ 38,00 ; R$ 25,00 ; R$ 33,00 
+Audiometria PRIME; R$ 27,50 ; R$ 33,00 ; R$ 32,00 ; R$ 38,00 
+Audiometria PREZERVARE; R$ 32,50 ; R$ 38,00 ; R$ 27,50 ; R$ 33,00 
+Audiometria PREVINE; R$ 18,90 ; R$ 33,00 ; R$ 32,50 ; R$ 38,00 
+Audiometria BC WORK; R$ 21,00 ; R$ 33,00 ; R$ 18,90 ; R$ 33,00 
+Audiometria ENGSEGTRA; R$ 26,00 ; R$ 33,00 ; R$ 21,00 ; R$ 33,00 
+Audiometria LABORMESP;;; R$ 26,00 ; R$ 33,00 
+Acuidade Visual SPIX;;; R$ 20,00 ; R$ 29,00 
+Acuidade Visual PRIME;;; R$ 26,00 ; R$ 29,00 
+Acuidade Visual PREZERVARE;;; R$ 16,50 ; R$ 29,00 
+Acuidade Visual PREVINE;;; R$ 25,00 ; R$ 29,00 
+Acuidade Visual BC WORK;;; R$ 18,20 ; R$ 29,00 
+Acuidade Visual ENGSEGTRA;;; R$ 18,00 ; R$ 29,00 
+Acuidade Visual LABORMESP;;; R$ 21,00 ; R$ 29,00 
+Coprocultura SPIX;;; R$ 32,00 ; R$ 38,00 
+Coprocultura PRIME;;; R$ 20,00 ; R$ 33,00 
+Coprocultura PREZERVARE;;; R$ 28,50 ; R$ 33,00 
+Coprocultura PREVINE;;; R$ 26,00 ; R$ 33,00 
+Coprocultura BC WORK;;; R$ 10,90 ; R$ 33,00 
+Coprocultura ENGSEGTRA;;; R$ 20,00 ; R$ 33,00 
+Coprocultura LABORMESP;;; R$ 16,90 ; R$ 33,00 
+PPF SPIX;;; R$ 15,00 ; R$ 24,00 
+PPF PRIME;;; R$ 14,00 ; R$ 24,00 
+PPF PREZERVARE;;; R$ 11,00 ; R$ 24,00 
+PPF PREVINE;;; R$ 17,00 ; R$ 24,00 
+PPF BC WORK;;; R$ 7,90 ; R$ 24,00 
+PPF ENGSEGTRA;;; R$ 20,00 ; R$ 24,00 
+PPF LABORMESP;;; R$ 9,90 ; R$ 24,00 
+ECG SPIX;;; R$ 50,00 ; R$ 60,00 
+ECG PRIME;;; R$ 42,00 ; R$ 52,00 
+ECG PREZERVARE;;; R$ 28,50 ; R$ 52,00 
+ECG PREVINE;;; R$ 40,00 ; R$ 52,00 
+ECG BC WORK;;; R$ 28,90 ; R$ 52,00 
+ECG ENGSEGTRA;;; R$ 28,00 ; R$ 52,00 
+ECG LABORMESP;;; R$ 47,58 ; R$ 52,00 
+EEG SPIX;;; R$ 80,00 ; R$ 86,00 
+EEG PRIME;;; R$ 55,00 ; R$ 66,00 
+EEG PREZERVARE;;; R$ 40,00 ; R$ 66,00 
+EEG PREVINE;;; R$ 62,00 ; R$ 66,00 
+EEG BC WORK;;; R$ 32,90 ; R$ 66,00 
+EEG ENGSEGTRA;;; R$ 29,00 ; R$ 66,00 
+EEG LABORMESP;;; R$ 57,40 ; R$ 66,00 
+RX Tórax - PA SPIX;;; R$ 76,50 ; R$ 87,00 
+RX Tórax - PA PRIME;;; R$ 60,00 ; R$ 77,00 
+RX Tórax - PA PREZERVARE;;; R$ 70,00 ; R$ 77,00 
+RX Tórax - PA PREVINE;;; R$ 46,00 ; R$ 77,00 
+RX Tórax - PA BC WORK;;; R$ 36,00 ; R$ 77,00 
+RX Tórax - PA ENGSEGTRA;;; R$ 40,00 ; R$ 77,00 
+RX Tórax - PA LABORMESP;;; R$ 70,00 ; R$ 77,00 
+RX Tórax - PA + PERFIL SPIX;;; R$ 153,00 ; R$ 180,00 
+RX Tórax - PA + PERFIL PRIME;;; R$ 60,00 ; R$ 77,00 
+RX Tórax - PA + PERFIL PREZERVARE;;; R$ 70,00 ; R$ 77,00 
+RX Tórax - PA + PERFIL PREVINE;;; R$ 60,00 ; R$ 77,00 
+RX Tórax - PA + PERFIL BC WORK;;; R$ -   ; R$ 77,00 
+RX Tórax - PA + PERFIL ENGSEGTRA;;; R$ 40,00 ; R$ 77,00 
+RX Tórax - PA + PERFIL LABORMESP;;; R$ -   ; R$ 77,00 
+Glicemia SPIX;;; R$ 12,00 ; R$ 18,00 
+Glicemia PRIME;;; R$ 15,00 ; R$ 18,00 
+Glicemia PREZERVARE;;; R$ 12,00 ; R$ 18,00 
+Glicemia PREVINE;;; R$ 12,00 ; R$ 18,00 
+Glicemia BC WORK;;; R$ 7,90 ; R$ 18,00 
+Glicemia ENGSEGTRA;;; R$ 9,00 ; R$ 18,00 
+Glicemia LABORMESP;;; R$ 11,40 ; R$ 18,00 
+Hemograma completo SPIX;;; R$ 14,00 ; R$ 22,00 
+Hemograma completo PRIME;;; R$ 18,00 ; R$ 22,00 
+Hemograma completo PREZERVARE;;; R$ 17,00 ; R$ 22,00 
+Hemograma completo PREVINE;;; R$ 20,00 ; R$ 22,00 
+Hemograma completo BC WORK;;; R$ 10,90 ; R$ 22,00 
+Hemograma completo ENGSEGTRA;;; R$ 10,00 ; R$ 22,00 
+Hemograma completo LABORMESP;;; R$ 14,40 ; R$ 22,00 
+Retorno ao trabalho SPIX;;; R$ 250,00 ; R$ 300,00 
+Retorno ao trabalho PRIME;;; R$ -   ; R$ 100,00 
+Retorno ao trabalho PREZERVARE;;; R$ -   ; R$ 100,00 
+Retorno ao trabalho PREVINE;;; R$ -   ; R$ 100,00 
+Retorno ao trabalho BC WORK;;; R$ -   ; R$ 100,00 
+Retorno ao trabalho ENGSEGTRA;;; R$ -   ; R$ 100,00 
+Retorno ao trabalho LABORMESP;;; R$ -   ; R$ 100,00 
+GAMA GT SPIX;;; R$ 8,00 ; R$ 22,00 
+GAMA GT PRIME;;; R$ 15,00 ; R$ 22,00 
+GAMA GT PREZERVARE;;; R$ 12,00 ; R$ 22,00 
+GAMA GT PREVINE;;; R$ 15,00 ; R$ 22,00 
+GAMA GT BC WORK;;; R$ 7,90 ; R$ 22,00 
+GAMA GT ENGSEGTRA;;; R$ 8,00 ; R$ 22,00 
+GAMA GT LABORMESP;;; R$ 8,00 ; R$ 22,00 
+Avaliação Oftalmológica SPIX;;; R$ 100,00 ; R$ 150,00 
+Avaliação Oftalmológica PRIME;;; R$ -   ; R$ 150,00 
+Avaliação Oftalmológica PREZERVARE;;; R$ -   ; R$ 150,00 
+Avaliação Oftalmológica PREVINE;;; R$ -   ; R$ 150,00 
+Avaliação Oftalmológica BC WORK;;; R$ -   ; R$ 150,00 
+Avaliação Oftalmológica ENGSEGTRA;;; R$ 80,00 ; R$ 150,00 
+Avaliação Oftalmológica LABORMESP;;; R$ -   ; R$ 150,00 
+Hepatite A IGM SPIX;;; R$ 30,00 ; R$ 65,00 
+Hepatite A IGM PRIME;;; R$ 35,00 ; R$ 65,00 
+Hepatite A IGM PREZERVARE;;; R$ 65,00 ; R$ 77,00 
+Hepatite A IGM PREVINE;;; R$ 62,50 ; R$ 65,00 
+Hepatite A IGM BC WORK;;; R$ -   ; R$ 65,00 
+Hepatite A IGM ENGSEGTRA;;; R$ 25,00 ; R$ 65,00 
+Hepatite A IGM LABORMESP;;; R$ 36,00 ; R$ 65,00 
+Hepatite B ANTI HBS SPIX;;; R$ 30,00 ; R$ 65,00 
+Hepatite B ANTI HBS PRIME;;; R$ 35,00 ; R$ 65,00 
+Hepatite B ANTI HBS PREZERVARE;;; R$ 36,00 ; R$ 65,00 
+Hepatite B ANTI HBS PREVINE;;; R$ 48,00 ; R$ 65,00 
+Hepatite B ANTI HBS BC WORK;;; R$ -   ; R$ 65,00 
+Hepatite B ANTI HBS ENGSEGTRA;;; R$ 35,00 ; R$ 65,00 
+Hepatite B ANTI HBS LABORMESP;;; R$ 36,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG SPIX;;; R$ 30,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG PRIME;;; R$ 35,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG PREZERVARE;;; R$ 36,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG PREVINE;;; R$ 37,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG BC WORK;;; R$ -   ; R$ 65,00 
+Hepatite B ANTI HBSAG ENGSEGTRA;;; R$ 25,00 ; R$ 65,00 
+Hepatite B ANTI HBSAG LABORMESP;;; R$ 36,00 ; R$ 65,00 
+Hepatite C SPIX;;; R$ 35,00 ; R$ 65,00 
+Hepatite C PRIME;;; R$ 40,00 ; R$ 65,00 
+Hepatite C PREZERVARE;;; R$ 36,00 ; R$ 65,00 
+Hepatite C PREVINE;;; R$ 110,00 ; R$ 150,00 
+Hepatite C BC WORK;;; R$ -   ; R$ 65,00 
+Hepatite C ENGSEGTRA;;; R$ 62,00 ; R$ 65,00 
+Hepatite C LABORMESP;;; R$ 54,86 ; R$ 65,00 
+Toxicológico SPIX;;; R$ 130,00 ; R$ 260,00 
+Toxicológico PRIME;;; R$ 167,00 ; R$ 260,00 
+Toxicológico PREZERVARE;;; R$ 140,00 ; R$ 260,00 
+Toxicológico PREVINE;;; R$ 125,00 ; R$ 260,00 
+Toxicológico BC WORK;;; R$ 260,00 ; R$ 286,00 
+Toxicológico ENGSEGTRA;;; R$ 105,00 ; R$ 260,00 
+Toxicológico LABORMESP;;; R$ 150,00 ; R$ 260,00 

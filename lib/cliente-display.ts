@@ -1,0 +1,37 @@
+import { formatCNPJ } from "@/lib/cnpj";
+import type { ClienteRecord } from "@/lib/types";
+
+export interface ClienteFilterOption {
+  value: string;
+  label: string;
+}
+
+export function formatClienteSelectLabel(
+  cliente: Pick<ClienteRecord, "nome" | "cnpj">
+): string {
+  const cnpjLabel = cliente.cnpj?.trim()
+    ? formatCNPJ(cliente.cnpj)
+    : "CNPJ não informado";
+  return `${cliente.nome} — ${cnpjLabel}`;
+}
+
+export function buildClienteFilterOptions(
+  clientes: ClienteRecord[]
+): ClienteFilterOption[] {
+  return [...clientes]
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    .map((cliente) => ({
+      value: cliente.nome,
+      label: formatClienteSelectLabel(cliente),
+    }));
+}
+
+export function resolveClienteIdByNome(
+  clientes: ClienteRecord[],
+  nome: string
+): string {
+  const trimmed = nome.trim();
+  if (!trimmed) return "";
+  const found = clientes.find((c) => c.nome === trimmed);
+  return found?.id ?? "";
+}
