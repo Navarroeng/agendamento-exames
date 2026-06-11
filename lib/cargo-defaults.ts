@@ -5,7 +5,7 @@ export function getEmptyCargoForm(): CargoFormValues {
     nome: "",
     descricao: "",
     ativo: "Ativo",
-    validadePeriodicoMeses: "12",
+    validadePeriodicoMeses: "",
     exameIds: [],
   };
 }

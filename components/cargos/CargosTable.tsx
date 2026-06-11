@@ -1,6 +1,5 @@
 import {
-  cargoGeraAlertaPeriodico,
-  formatValidadePeriodicoShort,
+  formatValidadePeriodicoBadge,
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
 import { Panel } from "@/components/ui/Panel";
@@ -50,72 +49,68 @@ export function CargosTable({
               </tr>
             </thead>
             <tbody>
-              {cargos.map((cargo) => (
-                <tr key={cargo.id}>
-                  <td className="font-bold text-navy">{cargo.nome}</td>
-                  <td className="max-w-[240px] truncate text-[#52617a]">
-                    {cargo.descricao?.trim() || "—"}
-                  </td>
-                  <td>
-                    <span className="inline-flex min-w-[28px] items-center justify-center rounded-full bg-brand-blue-soft px-2 py-0.5 text-[10px] font-bold text-brand-blue">
-                      {exameCounts[cargo.id] ?? 0}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        cargoGeraAlertaPeriodico(
-                          parseValidadePeriodicoMeses(
-                            cargo.validade_periodico_meses
-                          )
-                        )
-                          ? "bg-brand-blue-soft text-brand-blue"
-                          : "bg-[#f1f5f9] text-[#64748b]"
-                      }`}
-                    >
-                      {formatValidadePeriodicoShort(
-                        parseValidadePeriodicoMeses(cargo.validade_periodico_meses)
-                      )}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                        cargo.ativo
-                          ? "bg-brand-green-soft text-brand-green"
-                          : "bg-brand-red-soft text-brand-red"
-                      }`}
-                    >
-                      {cargo.ativo ? "Ativo" : "Inativo"}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
-                        onClick={() => onVisualizar(cargo.id)}
+              {cargos.map((cargo) => {
+                const badge = formatValidadePeriodicoBadge(
+                  parseValidadePeriodicoMeses(cargo.validade_periodico_meses)
+                );
+
+                return (
+                  <tr key={cargo.id}>
+                    <td className="font-bold text-navy">{cargo.nome}</td>
+                    <td className="max-w-[240px] truncate text-[#52617a]">
+                      {cargo.descricao?.trim() || "—"}
+                    </td>
+                    <td>
+                      <span className="inline-flex min-w-[28px] items-center justify-center rounded-full bg-brand-blue-soft px-2 py-0.5 text-[10px] font-bold text-brand-blue">
+                        {exameCounts[cargo.id] ?? 0}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${badge.className}`}
                       >
-                        Visualizar
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold text-brand-blue"
-                        onClick={() => onEditar(cargo.id)}
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                          cargo.ativo
+                            ? "bg-brand-green-soft text-brand-green"
+                            : "bg-brand-red-soft text-brand-red"
+                        }`}
                       >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
-                        onClick={() => onToggleAtivo(cargo.id)}
-                      >
-                        {cargo.ativo ? "Desativar" : "Ativar"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {cargo.ativo ? "Ativo" : "Inativo"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
+                          onClick={() => onVisualizar(cargo.id)}
+                        >
+                          Visualizar
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold text-brand-blue"
+                          onClick={() => onEditar(cargo.id)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
+                          onClick={() => onToggleAtivo(cargo.id)}
+                        >
+                          {cargo.ativo ? "Desativar" : "Ativar"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

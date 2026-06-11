@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { parseValidadePeriodicoMeses } from "@/lib/cargo-periodico";
+import {
+  isValidadePeriodicoSelecionada,
+  parseValidadePeriodicoMeses,
+} from "@/lib/cargo-periodico";
 import { getEmptyCargoForm } from "@/lib/cargo-defaults";
 import type { CargoComExames, CargoFormValues, CargoInsert } from "@/lib/types";
 
@@ -52,18 +55,37 @@ export function useCargoForm() {
     });
   }, []);
 
-  const buildPayload = useCallback((): CargoInsert => ({
-    nome: form.nome.trim(),
-    descricao: form.descricao.trim() || null,
-    ativo: form.ativo === "Ativo",
-    validade_periodico_meses: parseValidadePeriodicoMeses(
-      form.validadePeriodicoMeses
-    ),
-  }), [form]);
+  const buildPayload = useCallback((): CargoInsert => {
+    if (!isValidadePeriodicoSelecionada(form.validadePeriodicoMeses)) {
+      throw new Error("Selecione a validade dos exames periódicos.");
+    }
+
+    return {
+      nome: form.nome.trim(),
+      descricao: form.descricao.trim() || null,
+      ativo: form.ativo === "Ativo",
+      validade_periodico_meses: parseValidadePeriodicoMeses(
+        form.validadePeriodicoMeses
+      ),
+    };
+  }, [form]);
+
+  const getValidationError = useCallback((): string | null => {
+    if (form.nome.trim() === "") {
+      return "Informe o nome do cargo.";
+    }
+    if (!isValidadePeriodicoSelecionada(form.validadePeriodicoMeses)) {
+      return "Selecione a validade dos exames periódicos.";
+    }
+    if (form.exameIds.length === 0) {
+      return "Selecione ao menos um exame obrigatório.";
+    }
+    return null;
+  }, [form]);
 
   const validate = useCallback(
-    (): boolean => form.nome.trim() !== "" && form.exameIds.length > 0,
-    [form]
+    (): boolean => getValidationError() === null,
+    [getValidationError]
   );
 
   return {
@@ -74,6 +96,7 @@ export function useCargoForm() {
     reset,
     loadForm,
     buildPayload,
+    getValidationError,
     validate,
     saving,
     setSaving,

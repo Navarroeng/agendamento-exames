@@ -14,9 +14,6 @@ import {
 } from "@/services/cargo.service";
 import type { CargoComExames } from "@/lib/types";
 
-const VALIDATION_MESSAGE =
-  "Informe o nome do cargo e selecione ao menos um exame obrigatório.";
-
 export function useCargosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -35,7 +32,7 @@ export function useCargosPage() {
     reset,
     loadForm,
     buildPayload,
-    validate,
+    getValidationError,
     saving,
     setSaving,
   } = useCargoForm();
@@ -134,8 +131,9 @@ export function useCargosPage() {
   );
 
   const handleSave = useCallback(async () => {
-    if (!validate()) {
-      toast.error(VALIDATION_MESSAGE);
+    const validationError = getValidationError();
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -168,7 +166,7 @@ export function useCargosPage() {
       setSaving(false);
     }
   }, [
-    validate,
+    getValidationError,
     buildPayload,
     editingId,
     form.exameIds,

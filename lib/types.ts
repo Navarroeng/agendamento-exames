@@ -82,8 +82,8 @@ export interface CargoFormValues {
   nome: string;
   descricao: string;
   ativo: string;
-  /** 12 = padrão contratual; 6 = gera alerta em Periódicos Futuros */
-  validadePeriodicoMeses: "12" | "6";
+  /** Vazio até o usuário selecionar; 6 ou 12 após escolha */
+  validadePeriodicoMeses: "" | "12" | "6";
   exameIds: string[];
 }
 

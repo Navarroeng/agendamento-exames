@@ -28,17 +28,36 @@ export function computeProximaDataPeriodico(
 export function formatValidadePeriodicoLabel(
   meses: ValidadePeriodicoMeses
 ): string {
-  if (meses === VALIDADE_PERIODICO_ALERTA) {
-    return "6 meses / gerar alerta de periódico futuro";
-  }
-  return "12 meses / padrão";
+  return meses === VALIDADE_PERIODICO_ALERTA ? "6 meses" : "12 meses";
 }
 
 export function formatValidadePeriodicoShort(
   meses: ValidadePeriodicoMeses
 ): string {
+  return meses === VALIDADE_PERIODICO_ALERTA ? "6 meses" : "12 meses";
+}
+
+export function formatValidadePeriodicoBadge(meses: ValidadePeriodicoMeses): {
+  label: string;
+  className: string;
+} {
   if (meses === VALIDADE_PERIODICO_ALERTA) {
-    return "Alerta 6 meses";
+    return {
+      label: "6 MESES",
+      className:
+        "bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]/80 uppercase tracking-wide",
+    };
   }
-  return "12 meses (padrão)";
+
+  return {
+    label: "12 MESES",
+    className:
+      "bg-brand-blue-soft text-brand-blue border border-brand-blue/20 uppercase tracking-wide",
+  };
+}
+
+export function isValidadePeriodicoSelecionada(
+  value: string
+): value is `${ValidadePeriodicoMeses}` {
+  return value === "6" || value === "12";
 }

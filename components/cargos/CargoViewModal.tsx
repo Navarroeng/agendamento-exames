@@ -2,8 +2,7 @@
 
 import { Modal } from "@/components/ui/Modal";
 import {
-  cargoGeraAlertaPeriodico,
-  formatValidadePeriodicoShort,
+  formatValidadePeriodicoBadge,
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
 import type { CargoComExames } from "@/lib/types";
@@ -17,8 +16,9 @@ export function CargoViewModal({ cargo, onClose }: CargoViewModalProps) {
   if (!cargo) return null;
 
   const exames = cargo.cargo_exames ?? [];
-  const validade = parseValidadePeriodicoMeses(cargo.validade_periodico_meses);
-  const geraAlerta = cargoGeraAlertaPeriodico(validade);
+  const badge = formatValidadePeriodicoBadge(
+    parseValidadePeriodicoMeses(cargo.validade_periodico_meses)
+  );
 
   return (
     <Modal
@@ -36,13 +36,9 @@ export function CargoViewModal({ cargo, onClose }: CargoViewModalProps) {
           Validade periódica:
         </span>
         <span
-          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-            geraAlerta
-              ? "bg-brand-blue-soft text-brand-blue"
-              : "bg-[#f1f5f9] text-[#64748b]"
-          }`}
+          className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${badge.className}`}
         >
-          {formatValidadePeriodicoShort(validade)}
+          {badge.label}
         </span>
       </div>
 
