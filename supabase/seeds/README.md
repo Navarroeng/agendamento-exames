@@ -8,6 +8,7 @@
 4. `seeds/005_exames_seed.sql` — catálogo e custos da matriz `tabela-exames.csv`
 5. `migrations/014_labormesp_unidades.sql` — unidades LABORMESP (bases já populadas)
 6. `migrations/021_previne_unidades.sql` — unidades **PREVINE SANTANA** e **PREVINE SANTO ANDRÉ** (copia exames da PREVINE original)
+7. `migrations/024_spix_pinheiros.sql` — unidade **SPIX PINHEIROS** (copia exames da SPIX original)
 
 ## Regenerar o seed
 
