@@ -15,6 +15,11 @@ export interface ExameComPreparo {
 
 const SEPARATOR = "────────────────────";
 
+/** Nome do exame em destaque (CAIXA ALTA) para mensagens ao colaborador. */
+export function formatExameNomeDestaque(nome: string): string {
+  return nome.trim().toLocaleUpperCase("pt-BR");
+}
+
 function preparoToBulletLines(preparo: string): string[] {
   return preparo
     .split(/\n+/)
@@ -25,7 +30,7 @@ function preparoToBulletLines(preparo: string): string[] {
 }
 
 function formatExamePreparoBlock(item: ExameComPreparo): string {
-  const titulo = item.nome.trim().toUpperCase();
+  const titulo = formatExameNomeDestaque(item.nome);
   const bullets = preparoToBulletLines(item.preparo);
   return [`📋 ${titulo}`, ...bullets].join("\n");
 }
