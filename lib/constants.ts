@@ -82,6 +82,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     title: "Administração",
     items: [
       { iconKey: "user", label: "Usuários", href: "/usuarios" },
+      { iconKey: "shield", label: "Auditoria", href: "/auditoria" },
       { iconKey: "settings", label: "Configurações", href: null },
     ],
   },

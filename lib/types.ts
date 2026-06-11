@@ -501,3 +501,15 @@ export interface FaturaPreviewState {
   status: FaturaStatus | null;
   readonly: boolean;
 }
+
+export interface AuditoriaRecord {
+  id: string;
+  usuario_nome: string;
+  usuario_email: string;
+  modulo: string;
+  acao: string;
+  registro_id: string | null;
+  registro_nome: string | null;
+  descricao: string;
+  created_at: string;
+}

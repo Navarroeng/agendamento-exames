@@ -1,16 +1,27 @@
 import { createClient } from "@/lib/supabase/client";
+import {
+  AUDITORIA_MODULOS,
+  type AuditoriaUsuarioContext,
+} from "@/lib/auditoria";
 import type { ClinicaExameHistoricoRecord } from "@/lib/types";
+import { syncHistoricoEntriesToAuditoria } from "@/services/auditoria.service";
 
 export interface ClinicaExameHistoricoEntryDraft {
   acao: string;
   detalhes: string;
 }
 
+export interface ClinicaExameHistoricoAuditOptions {
+  auditContext?: AuditoriaUsuarioContext;
+  registroNome?: string | null;
+}
+
 export async function registrarHistoricoClinicaExame(
   clinicaId: string,
   usuario: string,
   entries: ClinicaExameHistoricoEntryDraft[],
-  clinicaExameId?: string | null
+  clinicaExameId?: string | null,
+  options?: ClinicaExameHistoricoAuditOptions
 ): Promise<void> {
   if (entries.length === 0) return;
 
@@ -29,6 +40,14 @@ export async function registrarHistoricoClinicaExame(
     .insert(rows);
 
   if (error) throw error;
+
+  await syncHistoricoEntriesToAuditoria(
+    options?.auditContext,
+    AUDITORIA_MODULOS.custos_clinicas,
+    clinicaId,
+    options?.registroNome,
+    entries
+  );
 }
 
 export async function listarHistoricoClinicaExames(

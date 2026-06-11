@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { useClienteContratoForm } from "@/hooks/useClienteContratoForm";
 import {
   getContratoAtual,
@@ -13,6 +15,7 @@ import {
   encerrarContrato,
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
+import { registrarAuditoria } from "@/services/auditoria.service";
 import type { ClienteContratoRecord } from "@/lib/types";
 
 const VALIDATION_MESSAGE = "Informe a data de início do contrato.";
@@ -21,7 +24,11 @@ function todayIsoDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-export function useClienteContratos(clienteId: string | null) {
+export function useClienteContratos(
+  clienteId: string | null,
+  clienteNome?: string | null
+) {
+  const auditContext = useAuditoriaUsuario();
   const [contratos, setContratos] = useState<ClienteContratoRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -107,9 +114,29 @@ export function useClienteContratos(clienteId: string | null) {
       if (editingId) {
         const { cliente_id: _clienteId, ...updatePayload } = payload;
         await atualizarContrato(editingId, updatePayload);
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.clientes,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: clienteId,
+          registroNome: clienteNome ?? undefined,
+          descricao: `${auditContext.usuarioNome} editou contrato do cliente ${clienteNome ?? "—"}.`,
+        });
         toast.success("Contrato atualizado!");
       } else {
         await criarContrato(payload);
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.clientes,
+          acao: AUDITORIA_ACOES.criacao,
+          registroId: clienteId,
+          registroNome: clienteNome ?? undefined,
+          descricao: `${auditContext.usuarioNome} criou contrato para o cliente ${clienteNome ?? "—"}.`,
+        });
         if (hadAtivo && payload.status === "ativo") {
           toast.info("Contrato anterior encerrado automaticamente.");
         }
@@ -135,6 +162,8 @@ export function useClienteContratos(clienteId: string | null) {
     closeForm,
     refresh,
     setSaving,
+    auditContext,
+    clienteNome,
   ]);
 
   const handleEncerrar = useCallback((contrato: ClienteContratoRecord) => {
@@ -148,6 +177,16 @@ export function useClienteContratos(clienteId: string | null) {
     try {
       const dataFim = encerrarTarget.data_fim ?? todayIsoDate();
       await encerrarContrato(encerrarTarget.id, dataFim);
+      await registrarAuditoria({
+        usuarioId: auditContext.usuarioId,
+        usuarioNome: auditContext.usuarioNome,
+        usuarioEmail: auditContext.usuarioEmail,
+        modulo: AUDITORIA_MODULOS.clientes,
+        acao: AUDITORIA_ACOES.cancelamento,
+        registroId: clienteId,
+        registroNome: clienteNome ?? undefined,
+        descricao: `${auditContext.usuarioNome} encerrou contrato do cliente ${clienteNome ?? "—"}.`,
+      });
       toast.success("Contrato encerrado.");
       setEncerrarTarget(null);
       await refresh();
@@ -157,7 +196,7 @@ export function useClienteContratos(clienteId: string | null) {
     } finally {
       setEncerrarSaving(false);
     }
-  }, [encerrarTarget, refresh]);
+  }, [encerrarTarget, refresh, auditContext, clienteId, clienteNome]);
 
   return {
     contratos,

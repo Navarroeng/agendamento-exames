@@ -55,7 +55,7 @@ export function ClienteViewModal({ cliente, onClose }: ClienteViewModalProps) {
     confirmEncerrar,
     closeForm,
     closeEncerrar,
-  } = useClienteContratos(cliente?.id ?? null);
+  } = useClienteContratos(cliente?.id ?? null, cliente?.nome ?? null);
 
   if (!cliente) return null;
 

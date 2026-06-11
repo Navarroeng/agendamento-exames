@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { useCargoForm } from "@/hooks/useCargoForm";
 import { useCargosList } from "@/hooks/useCargosList";
 import { useExamesCatalogOptions } from "@/hooks/useExams";
@@ -12,9 +14,11 @@ import {
   criarCargoComExames,
   setCargoAtivo,
 } from "@/services/cargo.service";
+import { registrarAuditoria } from "@/services/auditoria.service";
 import type { CargoComExames } from "@/lib/types";
 
 export function useCargosPage() {
+  const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewCargo, setViewCargo] = useState<CargoComExames | null>(null);
@@ -121,13 +125,25 @@ export function useCargosPage() {
 
       try {
         await setCargoAtivo(id, !cargo.ativo);
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.cargos,
+          acao: cargo.ativo
+            ? AUDITORIA_ACOES.desativacao
+            : AUDITORIA_ACOES.ativacao,
+          registroId: id,
+          registroNome: cargo.nome,
+          descricao: `${auditContext.usuarioNome} ${cargo.ativo ? "desativou" : "ativou"} o cargo ${cargo.nome}.`,
+        });
         toast.success(cargo.ativo ? "Cargo desativado." : "Cargo ativado.");
         refresh();
       } catch {
         toast.error("Erro ao alterar status do cargo.");
       }
     },
-    [getById, refresh]
+    [getById, refresh, auditContext]
   );
 
   const handleSave = useCallback(async () => {
@@ -146,12 +162,32 @@ export function useCargosPage() {
           payload,
           form.exameIds
         );
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.cargos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: editingId,
+          registroNome: payload.nome,
+          descricao: `${auditContext.usuarioNome} editou o cargo ${payload.nome}.`,
+        });
         toast.success("Cargo atualizado!");
       } else {
-        await criarCargoComExames(
+        const novoId = await criarCargoComExames(
           payload,
           form.exameIds
         );
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.cargos,
+          acao: AUDITORIA_ACOES.criacao,
+          registroId: novoId,
+          registroNome: payload.nome,
+          descricao: `${auditContext.usuarioNome} criou o cargo ${payload.nome}.`,
+        });
         toast.success("Cargo cadastrado!");
       }
       closeForm();
@@ -173,6 +209,7 @@ export function useCargosPage() {
     closeForm,
     refresh,
     setSaving,
+    auditContext,
   ]);
 
   const catalogAtivos = useMemo(

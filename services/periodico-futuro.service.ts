@@ -1,14 +1,20 @@
 import {
-  cargoGeraAlertaPeriodico,
-  computeProximaDataPeriodico,
-  parseValidadePeriodicoMeses,
-} from "@/lib/cargo-periodico";
+  AUDITORIA_ACOES,
+  AUDITORIA_MODULOS,
+  type AuditoriaUsuarioContext,
+} from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
+import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   buscarCargoPorId,
   listarExamesObrigatoriosPorCargo,
 } from "@/services/cargo.service";
+import {
+  cargoGeraAlertaPeriodico,
+  computeProximaDataPeriodico,
+  parseValidadePeriodicoMeses,
+} from "@/lib/cargo-periodico";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
@@ -105,6 +111,46 @@ export async function criarPeriodicosDeAgendamento(
   return data?.length ?? 0;
 }
 
+export interface PeriodicoAuditOptions {
+  auditContext?: AuditoriaUsuarioContext;
+}
+
+async function auditarPeriodico(
+  auditOptions: PeriodicoAuditOptions | undefined,
+  record: Pick<
+    PeriodicoFuturoRecord,
+    "id" | "colaborador" | "cliente_nome" | "exame_nome"
+  >,
+  acao: typeof AUDITORIA_ACOES.reagendamento | typeof AUDITORIA_ACOES.cancelamento,
+  verbo: string
+): Promise<void> {
+  const nome = auditOptions?.auditContext?.usuarioNome ?? "Sistema";
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.periodicos_futuros,
+    acao,
+    registroId: record.id,
+    registroNome: record.colaborador,
+    descricao: `${nome} ${verbo} o acompanhamento periódico de ${record.colaborador} (${record.cliente_nome}) — exame ${record.exame_nome}.`,
+  });
+}
+
+async function buscarPeriodicoPorId(
+  id: string
+): Promise<PeriodicoFuturoRecord | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("periodicos_futuros")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as PeriodicoFuturoRecord | null) ?? null;
+}
+
 export async function cancelarPeriodicosPorAgendamento(
   agendamentoId: string
 ): Promise<void> {
@@ -118,7 +164,12 @@ export async function cancelarPeriodicosPorAgendamento(
   if (error) throw error;
 }
 
-export async function marcarPeriodicoReagendado(id: string): Promise<void> {
+export async function marcarPeriodicoReagendado(
+  id: string,
+  auditOptions?: PeriodicoAuditOptions
+): Promise<void> {
+  const record = await buscarPeriodicoPorId(id);
+
   const supabase = createClient();
   const { error } = await supabase
     .from("periodicos_futuros")
@@ -127,9 +178,23 @@ export async function marcarPeriodicoReagendado(id: string): Promise<void> {
     .eq("status", "ativo");
 
   if (error) throw error;
+
+  if (record) {
+    await auditarPeriodico(
+      auditOptions,
+      record,
+      AUDITORIA_ACOES.reagendamento,
+      "marcou como reagendado"
+    );
+  }
 }
 
-export async function cancelarAcompanhamentoPeriodico(id: string): Promise<void> {
+export async function cancelarAcompanhamentoPeriodico(
+  id: string,
+  auditOptions?: PeriodicoAuditOptions
+): Promise<void> {
+  const record = await buscarPeriodicoPorId(id);
+
   const supabase = createClient();
   const { error } = await supabase
     .from("periodicos_futuros")
@@ -138,4 +203,13 @@ export async function cancelarAcompanhamentoPeriodico(id: string): Promise<void>
     .in("status", ["ativo", "reagendado"]);
 
   if (error) throw error;
+
+  if (record) {
+    await auditarPeriodico(
+      auditOptions,
+      record,
+      AUDITORIA_ACOES.cancelamento,
+      "cancelou o acompanhamento de"
+    );
+  }
 }

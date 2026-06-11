@@ -11,9 +11,11 @@ import { ClinicaHistoricoModal } from "@/components/modals/ClinicaHistoricoModal
 import { ClinicaTopActions } from "./ClinicaTopActions";
 import { ClinicaViewModal } from "@/components/modals/ClinicaViewModal";
 import { ClinicasTable } from "./ClinicasTable";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useClinicasPage } from "@/hooks/useClinicasPage";
 
 export function ClinicasPage() {
+  const auditContext = useAuditoriaUsuario();
   const {
     showForm,
     editingId,
@@ -89,7 +91,9 @@ export function ClinicasPage() {
             <div className="mb-[18px] overflow-hidden rounded-card border border-app-line bg-white/[0.88] p-6 shadow-card">
               <ClinicaExamesTab
                 clinicaId={editingId}
-                usuario={form.responsavel || "Sistema"}
+                usuario={form.responsavel || auditContext.usuarioNome}
+                auditContext={auditContext}
+                clinicaNome={form.nome_fantasia}
               />
             </div>
           ) : null}

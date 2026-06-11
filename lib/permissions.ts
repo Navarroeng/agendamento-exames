@@ -14,7 +14,7 @@ export type ProfilePermissionConfig = {
 export const PROFILE_PERMISSIONS: Record<string, ProfilePermissionConfig> = {
   admin: { fullAccess: true },
   operacional: {
-    deniedPaths: ["/exames", "/relatorios", "/configuracoes"],
+    deniedPaths: ["/exames", "/relatorios", "/configuracoes", "/auditoria"],
   },
 };
 

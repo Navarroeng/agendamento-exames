@@ -24,7 +24,10 @@ import { useClientesList } from "@/hooks/useClientesList";
 
 import { useClientesPage } from "@/hooks/useClientesPage";
 
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { salvarCliente } from "@/services/cliente.service";
+import { registrarAuditoria } from "@/services/auditoria.service";
 
 
 
@@ -35,6 +38,8 @@ const VALIDATION_MESSAGE =
 
 
 export function ClientesPage() {
+
+  const auditContext = useAuditoriaUsuario();
 
   const {
 
@@ -104,8 +109,18 @@ export function ClientesPage() {
 
     try {
 
-      await salvarCliente(buildPayload());
-
+      const payload = buildPayload();
+      const id = await salvarCliente(payload);
+      await registrarAuditoria({
+        usuarioId: auditContext.usuarioId,
+        usuarioNome: auditContext.usuarioNome,
+        usuarioEmail: auditContext.usuarioEmail,
+        modulo: AUDITORIA_MODULOS.clientes,
+        acao: AUDITORIA_ACOES.criacao,
+        registroId: id,
+        registroNome: payload.nome,
+        descricao: `${auditContext.usuarioNome} criou o cliente ${payload.nome}.`,
+      });
       toast.success("Cliente salvo com sucesso!");
 
       resetForm();

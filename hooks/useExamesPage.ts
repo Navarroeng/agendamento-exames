@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useExameCatalogForm } from "@/hooks/useExameCatalogForm";
 import { useExamesList } from "@/hooks/useExamesList";
 import { formatMoney } from "@/lib/money";
@@ -16,6 +17,7 @@ const VALIDATION_MESSAGE =
   "Preencha nome e valor Navarro antes de salvar.";
 
 export function useExamesPage() {
+  const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -78,19 +80,27 @@ export function useExamesPage() {
 
       try {
         await setExameAtivo(id, !exame.ativo);
-        await registrarHistoricoExame(id, "Sistema", [
+        await registrarHistoricoExame(
+          id,
+          auditContext.usuarioNome,
+          [
+            {
+              acao: exame.ativo ? "Desativação" : "Ativação",
+              detalhes: `${auditContext.usuarioNome} ${exame.ativo ? "desativou" : "ativou"} o exame ${exame.nome} no catálogo.`,
+            },
+          ],
           {
-            acao: exame.ativo ? "Desativação" : "Ativação",
-            detalhes: `Exame ${exame.nome} ${exame.ativo ? "desativado" : "ativado"} no catálogo.`,
-          },
-        ]);
+            auditContext,
+            registroNome: exame.nome,
+          }
+        );
         toast.success(exame.ativo ? "Exame desativado." : "Exame ativado.");
         refresh();
       } catch {
         toast.error("Erro ao alterar status.");
       }
     },
-    [getById, refresh]
+    [getById, refresh, auditContext]
   );
 
   const handleSave = useCallback(async () => {
@@ -100,7 +110,7 @@ export function useExamesPage() {
     }
 
     const payload = buildPayload();
-    const usuario = "Sistema";
+    const usuario = auditContext.usuarioNome;
 
     setSaving(true);
     try {
@@ -127,18 +137,29 @@ export function useExamesPage() {
           });
         }
         if (entries.length > 0) {
-          await registrarHistoricoExame(editingId, usuario, entries);
+          await registrarHistoricoExame(editingId, usuario, entries, {
+            auditContext,
+            registroNome: payload.nome,
+          });
         }
 
         toast.success("Exame atualizado!");
       } else {
         const novoId = await criarExame(payload);
-        await registrarHistoricoExame(novoId, usuario, [
+        await registrarHistoricoExame(
+          novoId,
+          usuario,
+          [
+            {
+              acao: "Criação",
+              detalhes: `${usuario} cadastrou o exame ${payload.nome} com valor Navarro ${formatMoney(payload.valor_navarro)}.`,
+            },
+          ],
           {
-            acao: "Criação",
-            detalhes: `Exame ${payload.nome} cadastrado com valor Navarro ${formatMoney(payload.valor_navarro)}.`,
-          },
-        ]);
+            auditContext,
+            registroNome: payload.nome,
+          }
+        );
         toast.success("Exame cadastrado!");
       }
 
@@ -161,6 +182,7 @@ export function useExamesPage() {
     closeForm,
     refresh,
     setSaving,
+    auditContext,
   ]);
 
   return {

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import {
   buildHistoricoAlteracoesClinica,
   buildHistoricoCriacaoClinica,
@@ -22,6 +23,7 @@ const VALIDATION_MESSAGE =
   "Preencha todos os campos obrigatórios antes de salvar.";
 
 export function useClinicasPage() {
+  const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewClinica, setViewClinica] = useState<ClinicaListItem | null>(null);
@@ -156,7 +158,11 @@ export function useClinicasPage() {
       await registrarHistoricoClinica(
         desativarTargetId,
         clinica.responsavel,
-        buildHistoricoStatusClinica(clinica.responsavel, "inativa")
+        buildHistoricoStatusClinica(clinica.responsavel, "inativa"),
+        {
+          auditContext,
+          registroNome: clinica.nome_fantasia,
+        }
       );
       toast.success("Clínica desativada com sucesso.");
       setDesativarOpen(false);
@@ -199,7 +205,10 @@ export function useClinicasPage() {
           usuario
         );
         if (entries.length > 0) {
-          await registrarHistoricoClinica(editingId, usuario, entries);
+          await registrarHistoricoClinica(editingId, usuario, entries, {
+            auditContext,
+            registroNome: payload.nome_fantasia,
+          });
         }
         toast.success("Clínica atualizada com sucesso!");
       } else {
@@ -207,7 +216,11 @@ export function useClinicasPage() {
         await registrarHistoricoClinica(
           novoId,
           usuario,
-          buildHistoricoCriacaoClinica(usuario)
+          buildHistoricoCriacaoClinica(usuario),
+          {
+            auditContext,
+            registroNome: payload.nome_fantasia,
+          }
         );
         toast.success("Clínica salva com sucesso!");
       }

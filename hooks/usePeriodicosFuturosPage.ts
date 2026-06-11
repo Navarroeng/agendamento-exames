@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
 import {
   EMPTY_PERIODICO_FUTURO_FILTERS,
@@ -27,6 +28,8 @@ const PAGE_SIZE = 20;
 
 export function usePeriodicosFuturosPage() {
   const router = useRouter();
+  const auditContext = useAuditoriaUsuario();
+  const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const [records, setRecords] = useState<PeriodicoFuturoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -131,7 +134,7 @@ export function usePeriodicosFuturosPage() {
     async (id: string) => {
       setSaving(true);
       try {
-        await marcarPeriodicoReagendado(id);
+        await marcarPeriodicoReagendado(id, auditOptions);
         toast.success("Marcado como reagendado.");
         await refresh();
       } catch (err) {
@@ -141,14 +144,14 @@ export function usePeriodicosFuturosPage() {
         setSaving(false);
       }
     },
-    [refresh]
+    [refresh, auditOptions]
   );
 
   const handleCancelarAcompanhamento = useCallback(
     async (id: string) => {
       setSaving(true);
       try {
-        await cancelarAcompanhamentoPeriodico(id);
+        await cancelarAcompanhamentoPeriodico(id, auditOptions);
         toast.success("Acompanhamento cancelado.");
         await refresh();
       } catch (err) {
@@ -158,7 +161,7 @@ export function usePeriodicosFuturosPage() {
         setSaving(false);
       }
     },
-    [refresh]
+    [refresh, auditOptions]
   );
 
   const canActOnRecord = useCallback(

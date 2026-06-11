@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useHistoricoUsuario } from "@/contexts/AuthContext";
+import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   INVALID_DATE_TOAST,
   isValidDateBR,
@@ -29,6 +30,7 @@ import type { AgendamentoWithExames } from "@/lib/types";
 
 export function useESocialPage() {
   const usuario = useHistoricoUsuario();
+  const auditContext = useAuditoriaUsuario();
   const {
     agendamentos,
     loading,
@@ -187,7 +189,11 @@ export function useESocialPage() {
           acao: "Alteração",
           detalhes: `${usuario} marcou o envio ao e-Social como Enviado em ${dataEnvioInput} (recibo ${recibo})`,
         },
-      ]);
+      ], {
+        auditContext,
+        auditModulo: AUDITORIA_MODULOS.esocial,
+        registroNome: getById(marcarEnviadoId)?.colaborador,
+      });
       await reloadAgendamentos();
       toast.success("e-Social marcado como enviado.");
       setMarcarEnviadoOpen(false);
@@ -235,7 +241,11 @@ export function useESocialPage() {
             acao: "Alteração",
             detalhes: `${usuario} marcou o envio ao e-Social como Pendente`,
           },
-        ]);
+        ], {
+          auditContext,
+          auditModulo: AUDITORIA_MODULOS.esocial,
+          registroNome: ag.colaborador,
+        });
         await reloadAgendamentos();
         toast.success("e-Social marcado como pendente.");
       } catch (err) {

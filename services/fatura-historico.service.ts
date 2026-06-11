@@ -1,4 +1,8 @@
 import { mesReferenciaIsoFromPeriodoInicio } from "@/lib/duplicidade-validations";
+import {
+  AUDITORIA_ACOES,
+  type AuditoriaUsuarioContext,
+} from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/client";
 import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
@@ -6,6 +10,10 @@ import {
   isAgendamentoElegivelFatura,
 } from "@/lib/fatura-elegibilidade";
 import { assertFaturaMesDisponivel } from "@/services/duplicidade.service";
+import {
+  moduloAuditoriaFromFaturaTipo,
+  registrarAuditoria,
+} from "@/services/auditoria.service";
 import type {  FaturaComItens,
   FaturaItemInsert,
   FaturaRecord,
@@ -81,6 +89,35 @@ interface SalvarFaturaInput {
   itens: FaturaItemInsert[];
 }
 
+export interface FaturaAuditOptions {
+  auditContext?: AuditoriaUsuarioContext;
+}
+
+async function auditarFatura(
+  auditOptions: FaturaAuditOptions | undefined,
+  input: {
+    tipo: FaturaTipo;
+    acao: (typeof AUDITORIA_ACOES)[keyof typeof AUDITORIA_ACOES];
+    registroId: string;
+    registroNome: string;
+    descricao: string;
+  }
+): Promise<void> {
+  const nome =
+    auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: moduloAuditoriaFromFaturaTipo(input.tipo),
+    acao: input.acao,
+    registroId: input.registroId,
+    registroNome: input.registroNome,
+    descricao: input.descricao,
+  });
+}
+
 async function validarItensFaturaElegiveis(
   itens: FaturaItemInsert[]
 ): Promise<FaturaItemInsert[]> {
@@ -118,7 +155,8 @@ async function validarItensFaturaElegiveis(
 }
 
 export async function salvarFatura(
-  input: SalvarFaturaInput
+  input: SalvarFaturaInput,
+  auditOptions?: FaturaAuditOptions
 ): Promise<FaturaComItens> {
   const itens = await validarItensFaturaElegiveis(input.itens);
   const valorTotal = itens.reduce(
@@ -192,6 +230,15 @@ export async function salvarFatura(
 
     const updated = await buscarFaturaComItens(input.faturaId);
     if (!updated) throw new Error("Erro ao recarregar fatura.");
+
+    await auditarFatura(auditOptions, {
+      tipo: input.tipo,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: updated.id,
+      registroNome: updated.numero,
+      descricao: `${auditOptions?.auditContext?.usuarioNome ?? input.gerado_por} editou a fatura ${updated.numero} (${updated.referencia_nome}).`,
+    });
+
     return updated;
   }
 
@@ -230,10 +277,24 @@ export async function salvarFatura(
 
   const created = await buscarFaturaComItens(fatura.id);
   if (!created) throw new Error("Erro ao carregar fatura criada.");
+
+  await auditarFatura(auditOptions, {
+    tipo: input.tipo,
+    acao: AUDITORIA_ACOES.criacao,
+    registroId: created.id,
+    registroNome: created.numero,
+    descricao: `${auditOptions?.auditContext?.usuarioNome ?? input.gerado_por} criou a fatura ${created.numero} (${created.referencia_nome}).`,
+  });
+
   return created;
 }
 
-export async function cancelarFatura(id: string): Promise<void> {
+export async function cancelarFatura(
+  id: string,
+  auditOptions?: FaturaAuditOptions
+): Promise<void> {
+  const existing = await buscarFaturaComItens(id);
+
   const supabase = createClient();
   const { error } = await supabase
     .from("faturas")
@@ -242,6 +303,16 @@ export async function cancelarFatura(id: string): Promise<void> {
     .neq("status", "cancelada");
 
   if (error) throw error;
+
+  if (existing) {
+    await auditarFatura(auditOptions, {
+      tipo: existing.tipo,
+      acao: AUDITORIA_ACOES.cancelamento,
+      registroId: existing.id,
+      registroNome: existing.numero,
+      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} cancelou a fatura ${existing.numero} (${existing.referencia_nome}).`,
+    });
+  }
 }
 
 export interface FaturaPagamentoInput {
@@ -251,8 +322,11 @@ export interface FaturaPagamentoInput {
 
 export async function registrarPagamentoFatura(
   id: string,
-  input: FaturaPagamentoInput
+  input: FaturaPagamentoInput,
+  auditOptions?: FaturaAuditOptions
 ): Promise<void> {
+  const existing = await buscarFaturaComItens(id);
+
   const supabase = createClient();
   const { error } = await supabase
     .from("faturas")
@@ -265,9 +339,24 @@ export async function registrarPagamentoFatura(
     .eq("status", "emitida");
 
   if (error) throw error;
+
+  if (existing) {
+    await auditarFatura(auditOptions, {
+      tipo: existing.tipo,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: existing.id,
+      registroNome: existing.numero,
+      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} registrou pagamento da fatura ${existing.numero}.`,
+    });
+  }
 }
 
-export async function marcarFaturaPendente(id: string): Promise<void> {
+export async function marcarFaturaPendente(
+  id: string,
+  auditOptions?: FaturaAuditOptions
+): Promise<void> {
+  const existing = await buscarFaturaComItens(id);
+
   const supabase = createClient();
   const { error } = await supabase
     .from("faturas")
@@ -280,4 +369,14 @@ export async function marcarFaturaPendente(id: string): Promise<void> {
     .eq("status", "emitida");
 
   if (error) throw error;
+
+  if (existing) {
+    await auditarFatura(auditOptions, {
+      tipo: existing.tipo,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: existing.id,
+      registroNome: existing.numero,
+      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} marcou a fatura ${existing.numero} como pagamento pendente.`,
+    });
+  }
 }

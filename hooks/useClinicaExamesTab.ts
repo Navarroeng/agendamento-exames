@@ -15,11 +15,15 @@ import type { ClinicaExameWithExame, ExameRecord } from "@/lib/types";
 interface UseClinicaExamesTabOptions {
   clinicaId: string;
   usuario: string;
+  auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
+  clinicaNome?: string | null;
 }
 
 export function useClinicaExamesTab({
   clinicaId,
   usuario,
+  auditContext,
+  clinicaNome,
 }: UseClinicaExamesTabOptions) {
   const [items, setItems] = useState<ClinicaExameWithExame[]>([]);
   const [catalogo, setCatalogo] = useState<ExameRecord[]>([]);
@@ -103,7 +107,11 @@ export function useClinicaExamesTab({
             detalhes: `${usuario} vinculou o exame ${exame.nome} com custo ${formatMoney(parseMoney(addCusto))}.`,
           },
         ],
-        id
+        id,
+        {
+          auditContext,
+          registroNome: clinicaNome ?? exame.nome,
+        }
       );
 
       toast.success("Exame adicionado à clínica.");
@@ -181,7 +189,11 @@ export function useClinicaExamesTab({
           clinicaId,
           usuario,
           entries,
-          item.id
+          item.id,
+          {
+            auditContext,
+            registroNome: clinicaNome ?? item.exames.nome,
+          }
         );
       }
 
@@ -222,7 +234,11 @@ export function useClinicaExamesTab({
             detalhes: `${usuario} ${novoAtivo ? "ativou" : "desativou"} o exame ${item.exames.nome} nesta clínica.`,
           },
         ],
-        item.id
+        item.id,
+        {
+          auditContext,
+          registroNome: clinicaNome ?? item.exames.nome,
+        }
       );
 
       toast.success(novoAtivo ? "Exame ativado." : "Exame desativado.");

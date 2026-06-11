@@ -46,7 +46,7 @@ import {
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
-import { useHistoricoUsuario } from "@/contexts/AuthContext";
+import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import {
   buildHistoricoAlteracoes,
   buildHistoricoCancelamento,
@@ -81,6 +81,7 @@ export function useAgendamentosPage() {
   const searchParams = useSearchParams();
   const prefillAppliedRef = useRef(false);
   const historicoUsuario = useHistoricoUsuario();
+  const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewAgendamento, setViewAgendamento] =
@@ -447,7 +448,11 @@ export function useAgendamentosPage() {
         await registrarHistorico(
           cancelTargetId,
           historicoUsuario,
-          buildHistoricoCancelamento(historicoUsuario, motivo)
+          buildHistoricoCancelamento(historicoUsuario, motivo),
+          {
+            auditContext,
+            registroNome: agendamento.colaborador,
+          }
         );
         toast.success("Agendamento cancelado com sucesso!");
         setCancelModalOpen(false);
@@ -584,7 +589,11 @@ export function useAgendamentosPage() {
             await registrarHistorico(
               editingId,
               historicoUsuario,
-              alteracoes
+              alteracoes,
+              {
+                auditContext,
+                registroNome: payload.colaborador,
+              }
             );
           }
           toast.success("Agendamento atualizado com sucesso!");
@@ -593,7 +602,11 @@ export function useAgendamentosPage() {
           await registrarHistorico(
             novoId,
             historicoUsuario,
-            buildHistoricoCriacao(historicoUsuario)
+            buildHistoricoCriacao(historicoUsuario),
+            {
+              auditContext,
+              registroNome: payload.colaborador,
+            }
           );
 
           if (cargoFields.cargo_id && dataIso) {

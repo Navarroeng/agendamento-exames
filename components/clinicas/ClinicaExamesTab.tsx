@@ -1,6 +1,7 @@
 "use client";
 
 import { maskMoneyInput } from "@/lib/money";
+import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 import { ClinicaExamesAddForm } from "./ClinicaExamesAddForm";
 import { ClinicaExamesLinkedTable } from "./ClinicaExamesLinkedTable";
 import { useClinicaExamesTab } from "@/hooks/useClinicaExamesTab";
@@ -8,9 +9,16 @@ import { useClinicaExamesTab } from "@/hooks/useClinicaExamesTab";
 interface ClinicaExamesTabProps {
   clinicaId: string;
   usuario: string;
+  auditContext?: AuditoriaUsuarioContext;
+  clinicaNome?: string | null;
 }
 
-export function ClinicaExamesTab({ clinicaId, usuario }: ClinicaExamesTabProps) {
+export function ClinicaExamesTab({
+  clinicaId,
+  usuario,
+  auditContext,
+  clinicaNome,
+}: ClinicaExamesTabProps) {
   const {
     loading,
     saving,
@@ -38,7 +46,12 @@ export function ClinicaExamesTab({ clinicaId, usuario }: ClinicaExamesTabProps) 
     startEdit,
     handleSaveEdit,
     handleToggleAtivo,
-  } = useClinicaExamesTab({ clinicaId, usuario });
+  } = useClinicaExamesTab({
+    clinicaId,
+    usuario,
+    auditContext,
+    clinicaNome,
+  });
 
   if (loading) {
     return (

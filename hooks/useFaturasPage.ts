@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useHistoricoUsuario } from "@/contexts/AuthContext";
+import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import {
   isValidDateBR,
   parseDateBRToIso,
@@ -100,6 +100,8 @@ function buildPreviewFromAgendamentos(
 
 export function useFaturasPage(pageTipo: FaturaTipo) {
   const geradoPor = useHistoricoUsuario();
+  const auditContext = useAuditoriaUsuario();
+  const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const { clientes } = useClientesList();
 
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>(
@@ -390,7 +392,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         status,
         gerado_por: geradoPor,
         itens: current.itens,
-      });
+      }, auditOptions);
 
       const nextPreview = faturaComItensToPreview(saved, current.readonly);
       previewRef.current = nextPreview;
@@ -523,7 +525,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
       setSaving(true);
       try {
-        await cancelarFatura(id);
+        await cancelarFatura(id, auditOptions);
         toast.success("Fatura cancelada.");
         if (preview?.faturaId === id) {
           setPreview((prev) =>
@@ -584,7 +586,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         await registrarPagamentoFatura(pagamentoFatura.id, {
           data_pagamento: dataPagamentoIso,
           observacao_pagamento: observacao,
-        });
+        }, auditOptions);
         toast.success(
           pagamentoMode === "registrar"
             ? "Pagamento registrado com sucesso"
@@ -615,7 +617,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
       setSaving(true);
       try {
-        await marcarFaturaPendente(id);
+        await marcarFaturaPendente(id, auditOptions);
         toast.success("Fatura marcada como pendente.");
         await reloadHistorico();
       } catch (err) {

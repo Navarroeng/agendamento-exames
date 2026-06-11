@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { ClinicaExamesTab } from "@/components/clinicas/ClinicaExamesTab";
 import { IconBuilding } from "@/components/ui/icons/OutlineIcons";
 import { countExamesAtendidos } from "@/lib/clinica-mappers";
@@ -51,6 +52,7 @@ function SectionBlock({
 }
 
 export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
+  const auditContext = useAuditoriaUsuario();
   const [viewTab, setViewTab] = useState<"dados" | "exames">("dados");
 
   useEffect(() => {
@@ -156,6 +158,8 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
             <ClinicaExamesTab
               clinicaId={clinica.id}
               usuario={clinica.responsavel}
+              auditContext={auditContext}
+              clinicaNome={clinica.nome_fantasia}
             />
           ) : (
           <div className="space-y-4">
