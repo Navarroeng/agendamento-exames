@@ -32,7 +32,6 @@ export function useCargosPage() {
     form,
     setField,
     toggleExame,
-    setExameAlerta,
     reset,
     loadForm,
     buildPayload,
@@ -147,15 +146,13 @@ export function useCargosPage() {
         await atualizarCargoComExames(
           editingId,
           payload,
-          form.exameIds,
-          form.exameAlertas
+          form.exameIds
         );
         toast.success("Cargo atualizado!");
       } else {
         await criarCargoComExames(
           payload,
-          form.exameIds,
-          form.exameAlertas
+          form.exameIds
         );
         toast.success("Cargo cadastrado!");
       }
@@ -175,7 +172,6 @@ export function useCargosPage() {
     buildPayload,
     editingId,
     form.exameIds,
-    form.exameAlertas,
     closeForm,
     refresh,
     setSaving,
@@ -200,7 +196,6 @@ export function useCargosPage() {
     form,
     setField,
     toggleExame,
-    setExameAlerta,
     saving,
     resetForm,
     closeForm,

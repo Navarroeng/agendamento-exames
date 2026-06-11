@@ -1,3 +1,8 @@
+import {
+  cargoGeraAlertaPeriodico,
+  formatValidadePeriodicoShort,
+  parseValidadePeriodicoMeses,
+} from "@/lib/cargo-periodico";
 import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 import type { CargoRecord } from "@/lib/types";
@@ -39,7 +44,7 @@ export function CargosTable({
           <table className="table-premium w-full min-w-[720px]">
             <thead>
               <tr>
-                {["Cargo", "Descrição", "Exames", "Status", "Ações"].map((h) => (
+                {["Cargo", "Descrição", "Exames", "Periódico", "Status", "Ações"].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -54,6 +59,23 @@ export function CargosTable({
                   <td>
                     <span className="inline-flex min-w-[28px] items-center justify-center rounded-full bg-brand-blue-soft px-2 py-0.5 text-[10px] font-bold text-brand-blue">
                       {exameCounts[cargo.id] ?? 0}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        cargoGeraAlertaPeriodico(
+                          parseValidadePeriodicoMeses(
+                            cargo.validade_periodico_meses
+                          )
+                        )
+                          ? "bg-brand-blue-soft text-brand-blue"
+                          : "bg-[#f1f5f9] text-[#64748b]"
+                      }`}
+                    >
+                      {formatValidadePeriodicoShort(
+                        parseValidadePeriodicoMeses(cargo.validade_periodico_meses)
+                      )}
                     </span>
                   </td>
                   <td>

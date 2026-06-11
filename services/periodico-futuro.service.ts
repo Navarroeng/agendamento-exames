@@ -1,7 +1,14 @@
-import { computeProximaData6m } from "@/lib/periodicos-futuro";
+import {
+  cargoGeraAlertaPeriodico,
+  computeProximaDataPeriodico,
+  parseValidadePeriodicoMeses,
+} from "@/lib/cargo-periodico";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
-import { listarExamesComAlerta6mPorCargo } from "@/services/cargo.service";
+import {
+  buscarCargoPorId,
+  listarExamesObrigatoriosPorCargo,
+} from "@/services/cargo.service";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
@@ -12,25 +19,50 @@ export interface CriarPeriodicosAgendamentoParams {
   exames: { tipo_exame: string }[];
 }
 
+type PeriodicoFuturoWithCargo = PeriodicoFuturoRecord & {
+  cargos?: { validade_periodico_meses: number } | null;
+};
+
+function isPeriodicoDeCargoComAlerta(record: PeriodicoFuturoWithCargo): boolean {
+  const validade = record.cargos?.validade_periodico_meses;
+  return cargoGeraAlertaPeriodico(validade);
+}
+
+function stripCargoJoin(
+  record: PeriodicoFuturoWithCargo
+): PeriodicoFuturoRecord {
+  const { cargos: _cargos, ...rest } = record;
+  return rest;
+}
+
 export async function listarPeriodicosFuturos(
   limit = 2000
 ): Promise<PeriodicoFuturoRecord[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("periodicos_futuros")
-    .select("*")
+    .select("*, cargos(validade_periodico_meses)")
     .order("proxima_data", { ascending: true })
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as PeriodicoFuturoRecord[];
+
+  return ((data ?? []) as PeriodicoFuturoWithCargo[])
+    .filter(isPeriodicoDeCargoComAlerta)
+    .map(stripCargoJoin);
 }
 
 export async function criarPeriodicosDeAgendamento(
   agendamentoId: string,
   params: CriarPeriodicosAgendamentoParams
 ): Promise<number> {
-  const examesCargo = await listarExamesComAlerta6mPorCargo(params.cargo_id);
+  const cargo = await buscarCargoPorId(params.cargo_id);
+  if (!cargo || !cargoGeraAlertaPeriodico(cargo.validade_periodico_meses)) {
+    return 0;
+  }
+
+  const validade = parseValidadePeriodicoMeses(cargo.validade_periodico_meses);
+  const examesCargo = await listarExamesObrigatoriosPorCargo(params.cargo_id);
   if (examesCargo.length === 0) return 0;
 
   const tiposAgendamento = new Set(
@@ -40,7 +72,7 @@ export async function criarPeriodicosDeAgendamento(
   );
 
   const dataRealizada = params.data_agendamento.split("T")[0];
-  const proximaData = computeProximaData6m(dataRealizada);
+  const proximaData = computeProximaDataPeriodico(dataRealizada, validade);
 
   const rows = examesCargo
     .filter((exame) => tiposAgendamento.has(exame.nome.trim().toLowerCase()))

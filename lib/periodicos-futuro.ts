@@ -1,4 +1,4 @@
-import { addMonthsToIsoDate } from "@/lib/cliente-contrato-dates";
+import { computeProximaDataPeriodico } from "@/lib/cargo-periodico";
 import { formatDateBR } from "@/lib/format";
 import type {
   PeriodicoFuturoDisplayStatus,
@@ -37,7 +37,7 @@ function addDaysToIsoDate(isoDate: string, days: number): string {
 }
 
 export function computeProximaData6m(dataRealizadaIso: string): string {
-  return addMonthsToIsoDate(dataRealizadaIso.split("T")[0], PERIODICO_FUTURO_MESES);
+  return computeProximaDataPeriodico(dataRealizadaIso, PERIODICO_FUTURO_MESES);
 }
 
 export function computePeriodicoDisplayStatus(

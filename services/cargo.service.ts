@@ -1,4 +1,5 @@
 import { compareByLabel, sortByNome } from "@/lib/sort-by-label";
+import { VALIDADE_PERIODICO_ALERTA } from "@/lib/cargo-periodico";
 import { createClient } from "@/lib/supabase/client";
 import type {
   CargoComExames,
@@ -73,29 +74,6 @@ export async function buscarCargoComExames(
   return row;
 }
 
-export async function listarExamesComAlerta6mPorCargo(
-  cargoId: string
-): Promise<ExameRecord[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("cargo_exames")
-    .select("exames(*)")
-    .eq("cargo_id", cargoId)
-    .eq("ativo", true)
-    .eq("obrigatorio", true)
-    .eq("gerar_alerta_6m", true);
-
-  if (error) throw error;
-
-  return (data ?? [])
-    .map((row) => {
-      const item = row as { exames: ExameRecord | ExameRecord[] | null };
-      return Array.isArray(item.exames) ? item.exames[0] : item.exames;
-    })
-    .filter((exame): exame is ExameRecord => Boolean(exame?.ativo))
-    .sort((a, b) => compareByLabel(a.nome, b.nome));
-}
-
 export async function listarExamesObrigatoriosPorCargo(
   cargoId: string
 ): Promise<ExameRecord[]> {
@@ -116,6 +94,17 @@ export async function listarExamesObrigatoriosPorCargo(
     })
     .filter((exame): exame is ExameRecord => Boolean(exame?.ativo))
     .sort((a, b) => compareByLabel(a.nome, b.nome));
+}
+
+export async function listarExamesPeriodicosPorCargo(
+  cargoId: string
+): Promise<ExameRecord[]> {
+  const cargo = await buscarCargoPorId(cargoId);
+  if (!cargo || cargo.validade_periodico_meses !== VALIDADE_PERIODICO_ALERTA) {
+    return [];
+  }
+
+  return listarExamesObrigatoriosPorCargo(cargoId);
 }
 
 async function sincronizarCargoExames(
@@ -143,27 +132,22 @@ async function sincronizarCargoExames(
       exame_id: item.exame_id,
       obrigatorio: true,
       ativo: true,
-      gerar_alerta_6m: item.gerar_alerta_6m,
+      gerar_alerta_6m: false,
     }))
   );
 
   if (insertError) throw insertError;
 }
 
-function toCargoExameInputs(
-  exameIds: string[],
-  exameAlertas: Record<string, boolean>
-): CargoExameInput[] {
+function toCargoExameInputs(exameIds: string[]): CargoExameInput[] {
   return Array.from(new Set(exameIds.filter(Boolean))).map((exame_id) => ({
     exame_id,
-    gerar_alerta_6m: Boolean(exameAlertas[exame_id]),
   }));
 }
 
 export async function criarCargoComExames(
   cargo: CargoInsert,
-  exameIds: string[],
-  exameAlertas: Record<string, boolean> = {}
+  exameIds: string[]
 ): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -174,18 +158,14 @@ export async function criarCargoComExames(
 
   if (error) throw error;
 
-  await sincronizarCargoExames(
-    data.id,
-    toCargoExameInputs(exameIds, exameAlertas)
-  );
+  await sincronizarCargoExames(data.id, toCargoExameInputs(exameIds));
   return data.id;
 }
 
 export async function atualizarCargoComExames(
   id: string,
   cargo: CargoInsert,
-  exameIds: string[],
-  exameAlertas: Record<string, boolean> = {}
+  exameIds: string[]
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -194,10 +174,7 @@ export async function atualizarCargoComExames(
     .eq("id", id);
 
   if (error) throw error;
-  await sincronizarCargoExames(
-    id,
-    toCargoExameInputs(exameIds, exameAlertas)
-  );
+  await sincronizarCargoExames(id, toCargoExameInputs(exameIds));
 }
 
 export async function setCargoAtivo(id: string, ativo: boolean): Promise<void> {

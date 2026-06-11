@@ -24,7 +24,6 @@ export function CargosPage() {
     form,
     setField,
     toggleExame,
-    setExameAlerta,
     saving,
     resetForm,
     closeForm,
@@ -63,7 +62,6 @@ export function CargosPage() {
             isEditing={!!editingId}
             onChange={setField}
             onToggleExame={toggleExame}
-            onSetExameAlerta={setExameAlerta}
           />
           <CargoFormActions
             saving={saving}

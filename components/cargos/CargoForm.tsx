@@ -1,6 +1,7 @@
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { formatValidadePeriodicoLabel } from "@/lib/cargo-periodico";
 import type { CargoFormField } from "@/hooks/useCargoForm";
 import type { CargoFormValues, ExameRecord } from "@/lib/types";
 
@@ -11,7 +12,6 @@ interface CargoFormProps {
   isEditing: boolean;
   onChange: (field: CargoFormField, value: string) => void;
   onToggleExame: (exameId: string) => void;
-  onSetExameAlerta: (exameId: string, gerarAlerta: boolean) => void;
 }
 
 export function CargoForm({
@@ -21,12 +21,7 @@ export function CargoForm({
   isEditing,
   onChange,
   onToggleExame,
-  onSetExameAlerta,
 }: CargoFormProps) {
-  const selectedExames = catalogExames.filter((exame) =>
-    form.exameIds.includes(exame.id)
-  );
-
   return (
     <Panel
       id="cadastrar-cargo"
@@ -51,6 +46,28 @@ export function CargoForm({
             <option value="Ativo">Ativo</option>
             <option value="Inativo">Inativo</option>
           </select>
+        </Field>
+        <Field
+          label="Validade dos exames periódicos"
+          className="md:col-span-2"
+        >
+          <select
+            className="field-input"
+            value={form.validadePeriodicoMeses}
+            onChange={(e) => onChange("validadePeriodicoMeses", e.target.value)}
+          >
+            <option value="12">
+              {formatValidadePeriodicoLabel(12)}
+            </option>
+            <option value="6">
+              {formatValidadePeriodicoLabel(6)}
+            </option>
+          </select>
+          <p className="mt-1.5 text-[11px] text-[#64748b]">
+            Cargos com validade de 6 meses geram alertas em Periódicos Futuros
+            para todos os exames vinculados. Cargos de 12 meses seguem o
+            padrão contratual e não geram alerta.
+          </p>
         </Field>
         <Field label="Descrição" className="md:col-span-2">
           <textarea
@@ -121,49 +138,6 @@ export function CargoForm({
                       ) : null}
                     </span>
                   </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {selectedExames.length > 0 && (
-          <div className="mt-4 rounded-xl border border-[#e8edf5] bg-white p-3">
-            <p className="mb-3 text-xs font-bold text-navy">
-              Alertas de periódico (repetição em 6 meses)
-            </p>
-            <div className="space-y-2">
-              {selectedExames.map((exame) => {
-                const gerarAlerta = Boolean(form.exameAlertas[exame.id]);
-                return (
-                  <div
-                    key={exame.id}
-                    className="flex flex-col gap-2 rounded-lg border border-[#eef2f7] bg-[#f8fafc] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <span className="text-xs font-bold text-navy">
-                      {exame.nome}
-                    </span>
-                    <div className="flex flex-wrap gap-3">
-                      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#475569]">
-                        <input
-                          type="radio"
-                          name={`alerta-${exame.id}`}
-                          checked={!gerarAlerta}
-                          onChange={() => onSetExameAlerta(exame.id, false)}
-                        />
-                        Não gerar alerta
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#475569]">
-                        <input
-                          type="radio"
-                          name={`alerta-${exame.id}`}
-                          checked={gerarAlerta}
-                          onChange={() => onSetExameAlerta(exame.id, true)}
-                        />
-                        Gerar alerta em 6 meses
-                      </label>
-                    </div>
-                  </div>
                 );
               })}
             </div>

@@ -82,15 +82,18 @@ export interface CargoFormValues {
   nome: string;
   descricao: string;
   ativo: string;
+  /** 12 = padrão contratual; 6 = gera alerta em Periódicos Futuros */
+  validadePeriodicoMeses: "12" | "6";
   exameIds: string[];
-  /** exameId → gerar alerta em 6 meses */
-  exameAlertas: Record<string, boolean>;
 }
+
+export type ValidadePeriodicoMeses = 6 | 12;
 
 export interface CargoInsert {
   nome: string;
   descricao: string | null;
   ativo: boolean;
+  validade_periodico_meses: ValidadePeriodicoMeses;
 }
 
 export interface CargoRecord extends CargoInsert {
@@ -113,7 +116,6 @@ export interface CargoExameRecord {
 
 export interface CargoExameInput {
   exame_id: string;
-  gerar_alerta_6m: boolean;
 }
 
 export type PeriodicoFuturoStoredStatus = "ativo" | "reagendado" | "cancelado";

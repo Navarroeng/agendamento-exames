@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { parseValidadePeriodicoMeses } from "@/lib/cargo-periodico";
 import { getEmptyCargoForm } from "@/lib/cargo-defaults";
 import type { CargoComExames, CargoFormValues, CargoInsert } from "@/lib/types";
 
@@ -17,27 +18,16 @@ export function useCargoForm() {
   const toggleExame = useCallback((exameId: string) => {
     setForm((prev) => {
       const selected = new Set(prev.exameIds);
-      const nextAlertas = { ...prev.exameAlertas };
       if (selected.has(exameId)) {
         selected.delete(exameId);
-        delete nextAlertas[exameId];
       } else {
         selected.add(exameId);
-        nextAlertas[exameId] = false;
       }
       return {
         ...prev,
         exameIds: Array.from(selected),
-        exameAlertas: nextAlertas,
       };
     });
-  }, []);
-
-  const setExameAlerta = useCallback((exameId: string, gerarAlerta: boolean) => {
-    setForm((prev) => ({
-      ...prev,
-      exameAlertas: { ...prev.exameAlertas, [exameId]: gerarAlerta },
-    }));
   }, []);
 
   const setExameIds = useCallback((exameIds: string[]) => {
@@ -50,17 +40,15 @@ export function useCargoForm() {
 
   const loadForm = useCallback((cargo: CargoComExames) => {
     const ativos = (cargo.cargo_exames ?? []).filter((item) => item.ativo);
-    const exameAlertas: Record<string, boolean> = {};
-    ativos.forEach((item) => {
-      exameAlertas[item.exame_id] = Boolean(item.gerar_alerta_6m);
-    });
 
     setForm({
       nome: cargo.nome,
       descricao: cargo.descricao ?? "",
       ativo: cargo.ativo ? "Ativo" : "Inativo",
+      validadePeriodicoMeses: String(
+        parseValidadePeriodicoMeses(cargo.validade_periodico_meses)
+      ) as CargoFormValues["validadePeriodicoMeses"],
       exameIds: ativos.map((item) => item.exame_id),
-      exameAlertas,
     });
   }, []);
 
@@ -68,6 +56,9 @@ export function useCargoForm() {
     nome: form.nome.trim(),
     descricao: form.descricao.trim() || null,
     ativo: form.ativo === "Ativo",
+    validade_periodico_meses: parseValidadePeriodicoMeses(
+      form.validadePeriodicoMeses
+    ),
   }), [form]);
 
   const validate = useCallback(
@@ -79,7 +70,6 @@ export function useCargoForm() {
     form,
     setField,
     toggleExame,
-    setExameAlerta,
     setExameIds,
     reset,
     loadForm,
