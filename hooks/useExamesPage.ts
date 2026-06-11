@@ -6,6 +6,7 @@ import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useExameCatalogForm } from "@/hooks/useExameCatalogForm";
 import { useExamesList } from "@/hooks/useExamesList";
 import { formatMoney } from "@/lib/money";
+import { normalizePreparo } from "@/lib/exame-preparo";
 import {
   atualizarExame,
   criarExame,
@@ -136,6 +137,26 @@ export function useExamesPage() {
             detalhes: `Nome alterado de ${anterior.nome} para ${payload.nome}.`,
           });
         }
+        const preparoAnterior = normalizePreparo(anterior.preparo);
+        const preparoNovo = normalizePreparo(payload.preparo);
+        if (preparoAnterior !== preparoNovo) {
+          if (!preparoAnterior && preparoNovo) {
+            entries.push({
+              acao: "Preparo cadastrado",
+              detalhes: `${usuario} cadastrou o preparo do exame ${payload.nome}.`,
+            });
+          } else if (preparoAnterior && !preparoNovo) {
+            entries.push({
+              acao: "Preparo removido",
+              detalhes: `${usuario} removeu o preparo do exame ${payload.nome}.`,
+            });
+          } else {
+            entries.push({
+              acao: "Alteração de preparo",
+              detalhes: `${usuario} alterou o preparo do exame ${payload.nome}.`,
+            });
+          }
+        }
         if (entries.length > 0) {
           await registrarHistoricoExame(editingId, usuario, entries, {
             auditContext,
@@ -146,15 +167,22 @@ export function useExamesPage() {
         toast.success("Exame atualizado!");
       } else {
         const novoId = await criarExame(payload);
+        const historicoEntries = [
+          {
+            acao: "Criação",
+            detalhes: `${usuario} cadastrou o exame ${payload.nome} com valor Navarro ${formatMoney(payload.valor_navarro)}.`,
+          },
+        ];
+        if (normalizePreparo(payload.preparo)) {
+          historicoEntries.push({
+            acao: "Preparo cadastrado",
+            detalhes: `${usuario} cadastrou o preparo do exame ${payload.nome}.`,
+          });
+        }
         await registrarHistoricoExame(
           novoId,
           usuario,
-          [
-            {
-              acao: "Criação",
-              detalhes: `${usuario} cadastrou o exame ${payload.nome} com valor Navarro ${formatMoney(payload.valor_navarro)}.`,
-            },
-          ],
+          historicoEntries,
           {
             auditContext,
             registroNome: payload.nome,

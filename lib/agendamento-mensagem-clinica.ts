@@ -1,5 +1,9 @@
-import type { AgendamentoFormValues, ClienteRecord, ClinicaRecord } from "@/lib/types";
+import type { AgendamentoFormValues, ClienteRecord, ClinicaRecord, ExameFormItem, ExameRecord } from "@/lib/types";
 import { formatDataDDM } from "@/lib/agendamento-datetime";
+import {
+  collectExamesComPreparo,
+  formatPreparoMensagemClinica,
+} from "@/lib/exame-preparo";
 
 export function formatEnderecoClinica(
   clinica: Pick<
@@ -49,18 +53,25 @@ export interface MensagemClinicaInput {
   form: AgendamentoFormValues;
   clientes: ClienteRecord[];
   clinicas: ClinicaRecord[];
+  exams: ExameFormItem[];
+  catalogExames: ExameRecord[];
 }
 
 export function buildMensagemClinicaWhatsApp({
   form,
   clientes,
   clinicas,
+  exams,
+  catalogExames,
 }: MensagemClinicaInput): string {
   const clinica = resolveClinica(form.clinica_nome, clinicas);
   const endereco = clinica ? formatEnderecoClinica(clinica).trim() : "";
   const unidade = clinica?.nome_fantasia.trim() || form.clinica_nome.trim();
+  const preparoSection = formatPreparoMensagemClinica(
+    collectExamesComPreparo(exams, catalogExames)
+  );
 
-  return [
+  const base = [
     "AGENDADO:",
     "",
     `🏢 Empresa: ${resolveEmpresaCliente(form.cliente_nome, clientes)}`,
@@ -75,4 +86,6 @@ export function buildMensagemClinicaWhatsApp({
     "",
     "⚠️ *Ao chegar na Clínica o funcionário deve informar que é da empresa NAVARRO* ⚠️",
   ].join("\n");
+
+  return preparoSection ? `${base}\n${preparoSection}` : base;
 }

@@ -63,6 +63,7 @@ export interface ExameCatalogFormValues {
   nome: string;
   valor_navarro: string;
   ativo: string;
+  preparo: string;
 }
 
 export interface ExameCatalogInsert {
@@ -70,6 +71,7 @@ export interface ExameCatalogInsert {
   categoria: string | null;
   valor_navarro: number;
   ativo: boolean;
+  preparo: string | null;
 }
 
 export interface ExameRecord extends ExameCatalogInsert {

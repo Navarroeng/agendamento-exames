@@ -697,6 +697,8 @@ export function useAgendamentosPage() {
       form,
       clientes,
       clinicas: clinicasList,
+      exams,
+      catalogExames,
     });
 
     try {
@@ -706,7 +708,7 @@ export function useAgendamentosPage() {
       console.error("Erro ao copiar mensagem:", err);
       toast.error("Não foi possível copiar a mensagem.");
     }
-  }, [form, clientes, clinicasList]);
+  }, [form, clientes, clinicasList, exams, catalogExames]);
 
   return {
     showForm,

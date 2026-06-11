@@ -50,6 +50,16 @@ export function ExameCatalogForm({
           </select>
         </Field>
       </div>
+      <div className="mt-[18px]">
+        <Field label="Preparo do exame">
+          <textarea
+            className="field-input min-h-[120px] resize-y"
+            value={form.preparo}
+            onChange={(e) => onChange("preparo", e.target.value)}
+            placeholder="Instruções de preparo para o colaborador (opcional)"
+          />
+        </Field>
+      </div>
     </Panel>
   );
 }

@@ -1,3 +1,4 @@
+import { ExamPreparoAlert } from "./ExamPreparoAlert";
 import { Panel } from "@/components/ui/Panel";
 import { IconFlask } from "@/components/ui/icons/OutlineIcons";
 import { ExamTableRow } from "./ExamTableRow";
@@ -89,6 +90,8 @@ export function ExamSection({
           />
         </table>
       </div>
+
+      <ExamPreparoAlert exams={exams} catalogExames={catalogExames} />
     </Panel>
   );
 }
