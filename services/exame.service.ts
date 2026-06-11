@@ -1,3 +1,4 @@
+import { sortByNome } from "@/lib/sort-by-label";
 import { createClient } from "@/lib/supabase/client";
 import type { ExameCatalogInsert, ExameRecord } from "@/lib/types";
 
@@ -11,7 +12,7 @@ export async function listarExamesAtivos(): Promise<ExameRecord[]> {
     .order("nome", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as ExameRecord[];
+  return sortByNome((data ?? []) as ExameRecord[]);
 }
 
 export async function listarExamesCatalogo(limit = 500): Promise<ExameRecord[]> {
@@ -20,11 +21,11 @@ export async function listarExamesCatalogo(limit = 500): Promise<ExameRecord[]> 
   const { data, error } = await supabase
     .from("exames")
     .select("*")
-    .order("created_at", { ascending: false })
+    .order("nome", { ascending: true })
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as ExameRecord[];
+  return sortByNome((data ?? []) as ExameRecord[]);
 }
 
 export async function buscarExamePorId(id: string): Promise<ExameRecord | null> {

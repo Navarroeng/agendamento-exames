@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { CLIENTE_DB_COLUMNS } from "@/lib/cliente-schema";
+import { sortByNome } from "@/lib/sort-by-label";
 import type {
   ClienteComContratos,
   ClienteInsert,
@@ -31,7 +32,7 @@ export async function listarClientes(limit = 100): Promise<ClienteRecord[]> {
 
   if (error) throw error;
 
-  return (data ?? []) as ClienteRecord[];
+  return sortByNome((data ?? []) as ClienteRecord[]);
 }
 
 export async function buscarClientePorId(

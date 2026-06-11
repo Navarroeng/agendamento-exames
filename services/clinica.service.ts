@@ -1,3 +1,4 @@
+import { sortByLabel } from "@/lib/sort-by-label";
 import { contarExamesPorClinica } from "@/services/clinica-exame.service";
 import { createClient } from "@/lib/supabase/client";
 import type { ClinicaInsert, ClinicaListItem, ClinicaRecord } from "@/lib/types";
@@ -60,11 +61,9 @@ export async function listarClinicas(limit = 500): Promise<ClinicaListItem[]> {
 
   if (error) throw error;
 
-  const clinicas = ((data ?? []) as ClinicaRecord[]).sort((a, b) =>
-    (a.nome_fantasia || a.razao_social).localeCompare(
-      b.nome_fantasia || b.razao_social,
-      "pt-BR"
-    )
+  const clinicas = sortByLabel(
+    (data ?? []) as ClinicaRecord[],
+    (c) => c.nome_fantasia || c.razao_social
   );
   const agendamentosMap = await fetchUltimoAgendamentoPorClinica();
   const examesCountMap = await contarExamesPorClinica(

@@ -1,4 +1,5 @@
 import { formatCNPJ } from "@/lib/cnpj";
+import { compareByLabel } from "@/lib/sort-by-label";
 import type { ClienteRecord } from "@/lib/types";
 
 export interface ClienteFilterOption {
@@ -19,7 +20,7 @@ export function buildClienteFilterOptions(
   clientes: ClienteRecord[]
 ): ClienteFilterOption[] {
   return [...clientes]
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    .sort((a, b) => compareByLabel(a.nome, b.nome))
     .map((cliente) => ({
       value: cliente.nome,
       label: formatClienteSelectLabel(cliente),

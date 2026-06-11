@@ -1,3 +1,4 @@
+import { compareByLabel, sortByNome } from "@/lib/sort-by-label";
 import { createClient } from "@/lib/supabase/client";
 import type {
   CargoComExames,
@@ -17,7 +18,7 @@ export async function listarCargos(limit = 500): Promise<CargoRecord[]> {
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []) as CargoRecord[];
+  return sortByNome((data ?? []) as CargoRecord[]);
 }
 
 export async function listarCargosAtivos(): Promise<CargoRecord[]> {
@@ -29,7 +30,7 @@ export async function listarCargosAtivos(): Promise<CargoRecord[]> {
     .order("nome", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as CargoRecord[];
+  return sortByNome((data ?? []) as CargoRecord[]);
 }
 
 export async function buscarCargoPorId(
@@ -66,7 +67,7 @@ export async function buscarCargoComExames(
   row.cargo_exames = (row.cargo_exames ?? [])
     .filter((item) => item.ativo)
     .sort((a, b) =>
-      (a.exames?.nome ?? "").localeCompare(b.exames?.nome ?? "")
+      compareByLabel(a.exames?.nome ?? "", b.exames?.nome ?? "")
     );
 
   return row;
@@ -92,7 +93,7 @@ export async function listarExamesComAlerta6mPorCargo(
       return Array.isArray(item.exames) ? item.exames[0] : item.exames;
     })
     .filter((exame): exame is ExameRecord => Boolean(exame?.ativo))
-    .sort((a, b) => a.nome.localeCompare(b.nome));
+    .sort((a, b) => compareByLabel(a.nome, b.nome));
 }
 
 export async function listarExamesObrigatoriosPorCargo(
@@ -114,7 +115,7 @@ export async function listarExamesObrigatoriosPorCargo(
       return Array.isArray(item.exames) ? item.exames[0] : item.exames;
     })
     .filter((exame): exame is ExameRecord => Boolean(exame?.ativo))
-    .sort((a, b) => a.nome.localeCompare(b.nome));
+    .sort((a, b) => compareByLabel(a.nome, b.nome));
 }
 
 async function sincronizarCargoExames(

@@ -1,3 +1,4 @@
+import { sortByLabel } from "@/lib/sort-by-label";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ClinicaExameRecord,
@@ -27,15 +28,16 @@ export async function listarClinicaExames(
       exames (*)
     `
     )
-    .eq("clinica_id", clinicaId)
-    .order("created_at", { ascending: false });
+    .eq("clinica_id", clinicaId);
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []).map((row) => ({
     ...(row as ClinicaExameRecord),
     exames: (row as { exames: ClinicaExameWithExame["exames"] }).exames,
   }));
+
+  return sortByLabel(rows, (row) => row.exames?.nome ?? "");
 }
 
 export async function contarExamesPorClinica(
