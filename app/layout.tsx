@@ -14,6 +14,13 @@ export const metadata: Metadata = {
   title: "Navarro Engenharia | Agendamento de Exames",
   description:
     "Cadastre e acompanhe exames ocupacionais, ASO, custos e faturamento.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
