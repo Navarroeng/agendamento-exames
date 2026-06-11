@@ -23,6 +23,8 @@ const TARGET_CLINICS = [
   "LABORMESP IPIRANGA",
   "PREZERVARE",
   "PREVINE",
+  "PREVINE SANTANA",
+  "PREVINE SANTO ANDRÉ",
   "PRIME",
   "SPIX",
 ];
@@ -32,6 +34,7 @@ const TARGET_CLINICS = [
  */
 const CLINIC_SEED_UNITS = {
   LABORMESP: ["LABORMESP JABAQUARA", "LABORMESP IPIRANGA"],
+  PREVINE: ["PREVINE", "PREVINE SANTANA", "PREVINE SANTO ANDRÉ"],
 };
 
 /** Preços por unidade quando diferem da matriz genérica LABORMESP. */
