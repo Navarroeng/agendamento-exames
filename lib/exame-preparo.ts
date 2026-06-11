@@ -13,9 +13,39 @@ export interface ExameComPreparo {
   preparo: string;
 }
 
-export interface PreparoAgrupado {
-  nomes: string[];
-  preparo: string;
+const SEPARATOR = "────────────────────";
+
+function preparoToBulletLines(preparo: string): string[] {
+  return preparo
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^\*\s*/, "").trim())
+    .map((line) => `• ${line}`);
+}
+
+function formatExamePreparoBlock(item: ExameComPreparo): string {
+  const titulo = item.nome.trim().toUpperCase();
+  const bullets = preparoToBulletLines(item.preparo);
+  return [`📋 ${titulo}`, ...bullets].join("\n");
+}
+
+export function formatPreparoMensagemClinica(items: ExameComPreparo[]): string {
+  if (items.length === 0) return "";
+
+  const blocks = items.map(formatExamePreparoBlock);
+
+  return [
+    "",
+    "⚠️ ATENÇÃO",
+    "Este agendamento possui exames que exigem preparo prévio.",
+    "Leia atentamente as orientações abaixo.",
+    "",
+    "🧪 PREPARO DOS EXAMES",
+    SEPARATOR,
+    "",
+    blocks.join("\n\n"),
+  ].join("\n");
 }
 
 function resolveExameNome(
@@ -66,36 +96,3 @@ export function collectExamesComPreparo(
   return result.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
-export function agruparPreparosUnicos(
-  items: ExameComPreparo[]
-): PreparoAgrupado[] {
-  const map = new Map<string, string[]>();
-
-  for (const item of items) {
-    const nomes = map.get(item.preparo) ?? [];
-    if (!nomes.includes(item.nome)) {
-      nomes.push(item.nome);
-    }
-    map.set(item.preparo, nomes);
-  }
-
-  return Array.from(map.entries()).map(([preparo, nomes]) => ({
-    preparo,
-    nomes: nomes.sort((a, b) => a.localeCompare(b, "pt-BR")),
-  }));
-}
-
-export function formatPreparoMensagemClinica(items: ExameComPreparo[]): string {
-  if (items.length === 0) return "";
-
-  const grupos = agruparPreparosUnicos(items);
-  const lines = ["", "PREPARO DOS EXAMES", ""];
-
-  for (const grupo of grupos) {
-    lines.push(grupo.nomes.join(" / "));
-    lines.push(grupo.preparo);
-    lines.push("");
-  }
-
-  return lines.join("\n").trimEnd();
-}

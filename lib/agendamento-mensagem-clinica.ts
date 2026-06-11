@@ -71,7 +71,7 @@ export function buildMensagemClinicaWhatsApp({
     collectExamesComPreparo(exams, catalogExames)
   );
 
-  const base = [
+  const parts = [
     "AGENDADO:",
     "",
     `🏢 Empresa: ${resolveEmpresaCliente(form.cliente_nome, clientes)}`,
@@ -81,11 +81,18 @@ export function buildMensagemClinicaWhatsApp({
     `📅 Data: ${formatDataDDM(form.data_agendamento)}`,
     `🕥 Horário: ${form.horario.trim()}`,
     `🏥 Unidade: ${unidade}`,
+  ];
+
+  if (preparoSection) {
+    parts.push(preparoSection);
+  }
+
+  parts.push(
     "",
     `📍 Endereço: ${endereco || "Endereço não informado"}`,
     "",
-    "⚠️ *Ao chegar na Clínica o funcionário deve informar que é da empresa NAVARRO* ⚠️",
-  ].join("\n");
+    "⚠️ *Ao chegar na Clínica o funcionário deve informar que é da empresa NAVARRO* ⚠️"
+  );
 
-  return preparoSection ? `${base}\n${preparoSection}` : base;
+  return parts.join("\n");
 }
