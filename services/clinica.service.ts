@@ -55,12 +55,17 @@ export async function listarClinicas(limit = 500): Promise<ClinicaListItem[]> {
   const { data, error } = await supabase
     .from("clinicas")
     .select("*")
-    .order("created_at", { ascending: false })
+    .order("nome_fantasia", { ascending: true })
     .limit(limit);
 
   if (error) throw error;
 
-  const clinicas = (data ?? []) as ClinicaRecord[];
+  const clinicas = ((data ?? []) as ClinicaRecord[]).sort((a, b) =>
+    (a.nome_fantasia || a.razao_social).localeCompare(
+      b.nome_fantasia || b.razao_social,
+      "pt-BR"
+    )
+  );
   const agendamentosMap = await fetchUltimoAgendamentoPorClinica();
   const examesCountMap = await contarExamesPorClinica(
     clinicas.map((c) => c.id)
