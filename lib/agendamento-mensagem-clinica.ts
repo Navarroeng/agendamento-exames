@@ -81,18 +81,15 @@ export function buildMensagemClinicaWhatsApp({
     `📅 Data: ${formatDataDDM(form.data_agendamento)}`,
     `🕥 Horário: ${form.horario.trim()}`,
     `🏥 Unidade: ${unidade}`,
+    "",
+    `📍 Endereço: ${endereco || "Endereço não informado"}`,
+    "",
+    "⚠️ *Ao chegar na Clínica o funcionário deve informar que é da empresa NAVARRO* ⚠️",
   ];
 
   if (preparoSection) {
     parts.push(preparoSection);
   }
-
-  parts.push(
-    "",
-    `📍 Endereço: ${endereco || "Endereço não informado"}`,
-    "",
-    "⚠️ *Ao chegar na Clínica o funcionário deve informar que é da empresa NAVARRO* ⚠️"
-  );
 
   return parts.join("\n");
 }
