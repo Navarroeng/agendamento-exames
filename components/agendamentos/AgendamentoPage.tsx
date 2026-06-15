@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { IconCalendar } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
+import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
 import { AgendamentoDuplicidadeMesModal } from "@/components/modals/AgendamentoDuplicidadeMesModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
@@ -75,6 +76,10 @@ export function AgendamentoPage() {
     duplicidadeMesInfo,
     closeDuplicidadeMesModal,
     handleConfirmSaveMesmoMes,
+    cargoChangeModalOpen,
+    cargoChangeLoading,
+    closeCargoChangeModal,
+    handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
   } = useAgendamentosPage();
@@ -184,6 +189,12 @@ export function AgendamentoPage() {
         saving={saving}
         onClose={closeDuplicidadeMesModal}
         onConfirm={handleConfirmSaveMesmoMes}
+      />
+      <AgendamentoCargoChangeModal
+        open={cargoChangeModalOpen}
+        loading={cargoChangeLoading}
+        onClose={closeCargoChangeModal}
+        onConfirm={handleConfirmCargoChange}
       />
 
       {saving && (

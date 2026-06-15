@@ -240,6 +240,25 @@ export function buildHistoricoAlteracoes(
     anterior.colaborador,
     novo.colaborador
   );
+
+  const oldCargoId = anterior.cargo_id ?? "";
+  const newCargoId = novo.cargo_id ?? "";
+  if (oldCargoId !== newCargoId) {
+    pushChange(
+      changes,
+      usuario,
+      "Cargo alterado e exames recalculados conforme exames obrigatórios do novo cargo."
+    );
+  } else {
+    compareField(
+      changes,
+      usuario,
+      "o cargo",
+      anterior.cargo_nome ?? "",
+      novo.cargo_nome ?? ""
+    );
+  }
+
   compareField(changes, usuario, "o ASO", anterior.aso, novo.aso);
   compareField(
     changes,

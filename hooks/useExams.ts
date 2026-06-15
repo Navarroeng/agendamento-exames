@@ -324,6 +324,79 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     );
   }, [asoTipo]);
 
+  const buildExamesFromNomes = useCallback(
+    async (exameNomes: string[]): Promise<ExameFormItem[]> => {
+      const novos: ExameFormItem[] = [];
+
+      for (const nome of exameNomes) {
+        if (isExameClinicoManual(nome)) {
+          if (clinicaNome.trim()) {
+            const patch = await fetchPrecoClinico(clinicaNome, nome);
+            const enriched = applyAsoValorClinico(
+              { ...patch, clinicoValorManual: false },
+              asoTipo,
+              false
+            );
+            novos.push({ ...createEmptyExam(), ...enriched });
+          } else {
+            const base = {
+              ...createEmptyExam(),
+              ...clinicoSemClinicaPatch(nome),
+              clinicoValorManual: false,
+            };
+            novos.push({
+              ...base,
+              ...applyAsoValorClinico(base, asoTipo, false),
+            });
+          }
+          continue;
+        }
+
+        const base: ExameFormItem = {
+          ...createEmptyExam(),
+          tipo_exame: nome,
+        };
+
+        if (clinicaNome.trim()) {
+          const patch = await fetchPreco(clinicaNome, nome);
+          novos.push({ ...base, ...patch });
+        } else {
+          novos.push({
+            ...base,
+            aviso: "Selecione a clínica antes do exame.",
+            precoAutomatico: false,
+          });
+        }
+      }
+
+      return novos;
+    },
+    [asoTipo, clinicaNome]
+  );
+
+  const replaceExamesFromCargo = useCallback(
+    async (exameNomes: string[]) => {
+      const normalizedIncoming = exameNomes
+        .map((nome) => nome.trim())
+        .filter(Boolean);
+
+      setPricingLoading(true);
+      try {
+        if (normalizedIncoming.length === 0) {
+          setExams([createEmptyExam()]);
+          return 0;
+        }
+
+        const novos = await buildExamesFromNomes(normalizedIncoming);
+        setExams(novos.length > 0 ? novos : [createEmptyExam()]);
+        return novos.length;
+      } finally {
+        setPricingLoading(false);
+      }
+    },
+    [buildExamesFromNomes]
+  );
+
   const mergeExamesFromCargo = useCallback(
     async (exameNomes: string[]) => {
       const normalizedIncoming = exameNomes
@@ -333,48 +406,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
       setPricingLoading(true);
       try {
-        const novos: ExameFormItem[] = [];
-
-        for (const nome of normalizedIncoming) {
-          if (isExameClinicoManual(nome)) {
-            if (clinicaNome.trim()) {
-              const patch = await fetchPrecoClinico(clinicaNome, nome);
-              const enriched = applyAsoValorClinico(
-                { ...patch, clinicoValorManual: false },
-                asoTipo,
-                false
-              );
-              novos.push({ ...createEmptyExam(), ...enriched });
-            } else {
-              const base = {
-                ...createEmptyExam(),
-                ...clinicoSemClinicaPatch(nome),
-                clinicoValorManual: false,
-              };
-              novos.push({
-                ...base,
-                ...applyAsoValorClinico(base, asoTipo, false),
-              });
-            }
-            continue;
-          }
-
-          const base: ExameFormItem = {
-            ...createEmptyExam(),
-            tipo_exame: nome,
-          };
-
-          if (clinicaNome.trim()) {
-            const patch = await fetchPreco(clinicaNome, nome);
-            novos.push({ ...base, ...patch });
-          } else {
-            novos.push({
-              ...base,
-              aviso: "Selecione a clínica antes do exame.",
-              precoAutomatico: false,
-            });
-          }
-        }
+        const novos = await buildExamesFromNomes(normalizedIncoming);
 
         let added = 0;
         setExams((prev) => {
@@ -403,7 +435,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         setPricingLoading(false);
       }
     },
-    [asoTipo, clinicaNome]
+    [buildExamesFromNomes]
   );
 
   const addExam = useCallback(() => {
@@ -518,6 +550,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     getExamesPayload,
     refreshAllPricing,
     mergeExamesFromCargo,
+    replaceExamesFromCargo,
   };
 }
 

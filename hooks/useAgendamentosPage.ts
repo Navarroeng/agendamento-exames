@@ -81,11 +81,12 @@ import {
   filterAgendamentos,
   type AgendamentoFilters,
 } from "@/lib/agendamento-filters";
-import type { AgendamentoStatus, AgendamentoWithExames, CargoRecord } from "@/lib/types";
+import type { AgendamentoStatus, AgendamentoWithExames, CargoRecord, ExameFormItem } from "@/lib/types";
 
 export function useAgendamentosPage() {
   const searchParams = useSearchParams();
   const prefillAppliedRef = useRef(false);
+  const examsManuallyModifiedRef = useRef(false);
   const historicoUsuario = useHistoricoUsuario();
   const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
@@ -103,6 +104,9 @@ export function useAgendamentosPage() {
     useState<AgendamentoMesmoMesInfo | null>(null);
   const [pendingSaveStatus, setPendingSaveStatus] =
     useState<AgendamentoStatus | null>(null);
+  const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
+  const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
+  const [cargoChangeLoading, setCargoChangeLoading] = useState(false);
   const [clienteId, setClienteId] = useState("");
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
@@ -153,7 +157,35 @@ export function useAgendamentosPage() {
     loadExams,
     getExamesPayload,
     mergeExamesFromCargo,
+    replaceExamesFromCargo,
   } = useExams(form.clinica_nome, form.aso);
+
+  const handleAddExam = useCallback(() => {
+    examsManuallyModifiedRef.current = true;
+    addExam();
+  }, [addExam]);
+
+  const handleRemoveExam = useCallback(
+    (id: string) => {
+      examsManuallyModifiedRef.current = true;
+      removeExam(id);
+    },
+    [removeExam]
+  );
+
+  const handleUpdateExam = useCallback(
+    (id: string, field: keyof ExameFormItem, value: string) => {
+      if (
+        field === "tipo_exame" ||
+        field === "valor_cliente" ||
+        field === "custo_clinica"
+      ) {
+        examsManuallyModifiedRef.current = true;
+      }
+      updateExam(id, field, value);
+    },
+    [updateExam]
+  );
 
   const hasComplementares = useMemo(
     () => agendamentoPossuiComplementares(exams),
@@ -257,10 +289,13 @@ export function useAgendamentosPage() {
   const resetForm = useCallback(() => {
     reset();
     resetExams();
+    examsManuallyModifiedRef.current = false;
     setClienteId("");
     setCargoId("");
     setCargoNomeSalvo("");
     setEditingId(null);
+    setPendingCargoId(null);
+    setCargoChangeModalOpen(false);
   }, [reset, resetExams]);
 
   useEffect(() => {
@@ -354,38 +389,80 @@ export function useAgendamentosPage() {
     [clientes, setField]
   );
 
-  const handleCargoChange = useCallback(
+  const applyCargoChange = useCallback(
     async (nextCargoId: string) => {
-      setCargoId(nextCargoId);
-      if (!nextCargoId) {
-        setCargoNomeSalvo("");
-        return;
-      }
-
       const found = cargosAtivos.find((cargo) => cargo.id === nextCargoId);
+      setCargoId(nextCargoId);
       if (found) setCargoNomeSalvo(found.nome);
 
       try {
-        const exames = await listarExamesObrigatoriosPorCargo(nextCargoId);
-        if (exames.length === 0) {
-          toast.message("Este cargo não possui exames obrigatórios vinculados.");
+        const examesObrigatorios =
+          await listarExamesObrigatoriosPorCargo(nextCargoId);
+
+        if (examesObrigatorios.length === 0) {
+          await replaceExamesFromCargo([]);
+          examsManuallyModifiedRef.current = false;
+          toast.message(
+            "Este cargo não possui exames obrigatórios cadastrados."
+          );
           return;
         }
 
-        const added = await mergeExamesFromCargo(exames.map((exame) => exame.nome));
-        if (added === 0) {
-          toast.error(EXAME_DUPLICADO_TOAST);
-          return;
-        }
-
-        toast.success(`${added} exame(s) do cargo adicionado(s).`);
+        await replaceExamesFromCargo(
+          examesObrigatorios.map((exame) => exame.nome)
+        );
+        examsManuallyModifiedRef.current = false;
       } catch (err) {
         console.error(err);
         toast.error("Erro ao carregar exames do cargo.");
       }
     },
-    [cargosAtivos, mergeExamesFromCargo]
+    [cargosAtivos, replaceExamesFromCargo]
   );
+
+  const handleCargoChange = useCallback(
+    async (nextCargoId: string) => {
+      if (nextCargoId === cargoId) return;
+
+      if (!nextCargoId) {
+        setCargoId("");
+        setCargoNomeSalvo("");
+        return;
+      }
+
+      if (examsManuallyModifiedRef.current) {
+        setPendingCargoId(nextCargoId);
+        setCargoChangeModalOpen(true);
+        return;
+      }
+
+      setCargoChangeLoading(true);
+      try {
+        await applyCargoChange(nextCargoId);
+      } finally {
+        setCargoChangeLoading(false);
+      }
+    },
+    [cargoId, applyCargoChange]
+  );
+
+  const closeCargoChangeModal = useCallback(() => {
+    setCargoChangeModalOpen(false);
+    setPendingCargoId(null);
+  }, []);
+
+  const handleConfirmCargoChange = useCallback(async () => {
+    if (!pendingCargoId) return;
+
+    setCargoChangeLoading(true);
+    try {
+      await applyCargoChange(pendingCargoId);
+      setCargoChangeModalOpen(false);
+      setPendingCargoId(null);
+    } finally {
+      setCargoChangeLoading(false);
+    }
+  }, [applyCargoChange, pendingCargoId]);
 
   const handleEditar = useCallback(
     (id: string) => {
@@ -401,6 +478,7 @@ export function useAgendamentosPage() {
       );
       setCargoId(agendamento.cargo_id ?? "");
       setCargoNomeSalvo(agendamento.cargo_nome ?? "");
+      examsManuallyModifiedRef.current = false;
       setEditingId(id);
       setShowForm(true);
       setFiltersExpanded(false);
@@ -774,9 +852,9 @@ export function useAgendamentosPage() {
     catalogExames,
     catalogLoading,
     pricingLoading,
-    addExam,
-    removeExam,
-    updateExam,
+    addExam: handleAddExam,
+    removeExam: handleRemoveExam,
+    updateExam: handleUpdateExam,
     loading,
     error,
     filters,
@@ -807,6 +885,10 @@ export function useAgendamentosPage() {
     duplicidadeMesInfo,
     closeDuplicidadeMesModal,
     handleConfirmSaveMesmoMes,
+    cargoChangeModalOpen,
+    cargoChangeLoading,
+    closeCargoChangeModal,
+    handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
   };
