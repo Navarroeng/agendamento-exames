@@ -88,7 +88,7 @@ export function buildKpis(
 
   const receitaContratualAnual = contratosAtivos.reduce((s, c) => {
     const valor = Number(c.valor_contrato ?? 0);
-    return s + valor * 12;
+    return s + valor;
   }, 0);
 
   const periodicos = buildPeriodicos(filtered);
