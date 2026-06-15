@@ -17,6 +17,7 @@ interface OrcamentoFormProps {
   clientes: ClienteRecord[];
   servicos: ServicoSstRecord[];
   servicosLoading: boolean;
+  servicosError: string | null;
   subtotal: number;
   valorTotal: number;
   onChange: (field: OrcamentoFormField, value: string) => void;
@@ -38,6 +39,7 @@ export function OrcamentoForm({
   clientes,
   servicos,
   servicosLoading,
+  servicosError,
   subtotal,
   valorTotal,
   onChange,
@@ -185,6 +187,7 @@ export function OrcamentoForm({
           itens={form.itens}
           servicos={servicos}
           servicosLoading={servicosLoading}
+          servicosError={servicosError}
           subtotal={subtotal}
           descontoPercentual={form.desconto_percentual}
           valorTotal={valorTotal}

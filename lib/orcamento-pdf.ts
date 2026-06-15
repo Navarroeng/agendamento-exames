@@ -1,7 +1,13 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCurrency } from "@/lib/money";
 import { formatOrcamentoStatus } from "@/lib/orcamento-filters";
-import type { OrcamentoComItens } from "@/lib/orcamento-types";
+import type {
+  OrcamentoComItens,
+  OrcamentoItemRecord,
+  ServicoSstRecord,
+} from "@/lib/orcamento-types";
+import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
+import { listarServicosSst } from "@/services/servico-sst.service";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
@@ -160,10 +166,47 @@ function drawInfoBlock(
   return y + 42;
 }
 
+function resolveCatalogoServico(
+  item: OrcamentoItemRecord,
+  catalogo: ServicoSstRecord[]
+): ServicoSstRecord | undefined {
+  return (
+    catalogo.find((servico) => servico.id === item.servico_id) ??
+    catalogo.find((servico) => servico.nome === item.servico_nome)
+  );
+}
+
+function measureInclusosBlockHeight(
+  doc: JsPDF,
+  inclusos: string[],
+  maxWidth: number
+): number {
+  if (inclusos.length === 0) return 0;
+
+  let height = 3.5;
+  doc.setFontSize(6.5);
+  inclusos.forEach((line) => {
+    const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
+    height += wrapped.length * 3.2;
+  });
+  return height;
+}
+
+function estimatePdfRowHeight(
+  doc: JsPDF,
+  inclusos: string[],
+  serviceColWidth: number
+): number {
+  const baseHeight = 8;
+  if (inclusos.length === 0) return baseHeight;
+  return baseHeight + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
+}
+
 function drawItemsTable(
   doc: JsPDF,
   y: number,
-  orcamento: OrcamentoComItens
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
 ): number {
   const itens = [...(orcamento.orcamento_itens ?? [])].sort(
     (a, b) => a.ordem - b.ordem
@@ -195,32 +238,57 @@ function drawItemsTable(
   doc.setTextColor(30, 41, 59);
 
   itens.forEach((item, index) => {
-    if (y > 250) {
+    const servico = resolveCatalogoServico(item, catalogo);
+    const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
+    const serviceColWidth = colWidths[0] ?? 78;
+    const rowH = estimatePdfRowHeight(doc, inclusos, serviceColWidth);
+
+    if (y + rowH > 270) {
       doc.addPage();
       y = MARGIN + 10;
     }
 
     if (index % 2 === 0) {
       doc.setFillColor(248, 250, 252);
-      doc.rect(MARGIN, y, CONTENT_W, 8, "F");
+      doc.rect(MARGIN, y, CONTENT_W, rowH, "F");
     }
 
-    colX = MARGIN + 3;
-    const row = [
-      item.servico_nome,
-      String(item.quantidade),
-      formatCurrency(Number(item.valor_unitario)),
-      formatCurrency(Number(item.valor_total)),
-    ];
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(item.servico_nome, MARGIN + 3, y + 4.5);
 
-    row.forEach((cell, cellIndex) => {
-      doc.text(String(cell).slice(0, cellIndex === 0 ? 42 : 18), colX, y + 5.5);
-      colX += colWidths[cellIndex] ?? 0;
-    });
+    let detailY = y + 8;
+    if (inclusos.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...MUTED);
+      doc.text("Inclui:", MARGIN + 3, detailY);
+      detailY += 3.5;
+
+      doc.setFont("helvetica", "normal");
+      inclusos.forEach((line) => {
+        const wrapped = doc.splitTextToSize(`• ${line}`, serviceColWidth - 4);
+        doc.text(wrapped, MARGIN + 3, detailY);
+        detailY += wrapped.length * 3.2;
+      });
+    }
+
+    const valueY = y + 5.5;
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(30, 41, 59);
+
+    let colX = MARGIN + 3 + serviceColWidth;
+    doc.text(String(item.quantidade), colX, valueY);
+    colX += colWidths[1] ?? 0;
+    doc.text(formatCurrency(Number(item.valor_unitario)), colX, valueY);
+    colX += colWidths[2] ?? 0;
+    doc.text(formatCurrency(Number(item.valor_total)), colX, valueY);
 
     doc.setDrawColor(...ROW_BORDER);
-    doc.line(MARGIN, y + 8, MARGIN + CONTENT_W, y + 8);
-    y += 8;
+    doc.line(MARGIN, y + rowH, MARGIN + CONTENT_W, y + rowH);
+    y += rowH;
   });
 
   return y + 4;
@@ -340,11 +408,12 @@ export async function gerarPdfOrcamento(
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const logo = await loadLogoAsset();
+  const catalogo = await listarServicosSst();
 
   let y = MARGIN;
   y = drawHeader(doc, logo, y);
   y = drawInfoBlock(doc, y, orcamento);
-  y = drawItemsTable(doc, y, orcamento);
+  y = drawItemsTable(doc, y, orcamento, catalogo);
   y = drawTotals(doc, y, orcamento);
   drawConditions(doc, y, orcamento);
   drawFooter(doc);

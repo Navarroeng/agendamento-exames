@@ -44,7 +44,8 @@ export function useOrcamentosPage() {
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes } = useClientesList();
-  const { servicos, loading: servicosLoading } = useServicosSstList();
+  const { servicos, loading: servicosLoading, error: servicosError } =
+    useServicosSstList();
 
   const {
     form,
@@ -319,6 +320,7 @@ export function useOrcamentosPage() {
     clientes,
     servicos,
     servicosLoading,
+    servicosError,
     viewOrcamento,
     viewLoading,
     actionLoading,

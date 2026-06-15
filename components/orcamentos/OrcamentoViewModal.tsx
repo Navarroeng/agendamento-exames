@@ -7,10 +7,14 @@ import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
   type OrcamentoComItens,
+  type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { OrcamentoPacoteInclusosCard } from "./OrcamentoPacoteInclusosCard";
+import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
 interface OrcamentoViewModalProps {
   orcamento: OrcamentoComItens | null;
+  servicos: ServicoSstRecord[];
   onClose: () => void;
   onEditar?: (id: string) => void;
   onGerarPdf?: (id: string) => void;
@@ -18,6 +22,7 @@ interface OrcamentoViewModalProps {
 
 export function OrcamentoViewModal({
   orcamento,
+  servicos,
   onClose,
   onEditar,
   onGerarPdf,
@@ -96,20 +101,37 @@ export function OrcamentoViewModal({
             </tr>
           </thead>
           <tbody>
-            {itens.map((item) => (
-              <tr key={item.id} className="border-t border-[#eef2f7]">
-                <td className="px-3 py-2 font-medium text-navy">
-                  {item.servico_nome}
-                </td>
-                <td className="px-3 py-2">{item.quantidade}</td>
-                <td className="px-3 py-2">
-                  {formatCurrency(Number(item.valor_unitario))}
-                </td>
-                <td className="px-3 py-2 font-semibold">
-                  {formatCurrency(Number(item.valor_total))}
-                </td>
-              </tr>
-            ))}
+            {itens.map((item) => {
+              const servicoCatalogo = servicos.find(
+                (servico) => servico.id === item.servico_id
+              );
+              const itensInclusos = resolveItensInclusosServico(
+                servicoCatalogo,
+                item.servico_nome
+              );
+
+              return (
+                <tr key={item.id} className="border-t border-[#eef2f7]">
+                  <td className="px-3 py-2 font-medium text-navy">
+                    {item.servico_nome}
+                    {itensInclusos.length > 0 && (
+                      <OrcamentoPacoteInclusosCard
+                        servico={servicoCatalogo}
+                        servicoNome={item.servico_nome}
+                        compact
+                      />
+                    )}
+                  </td>
+                  <td className="px-3 py-2 align-top">{item.quantidade}</td>
+                  <td className="px-3 py-2 align-top">
+                    {formatCurrency(Number(item.valor_unitario))}
+                  </td>
+                  <td className="px-3 py-2 align-top font-semibold">
+                    {formatCurrency(Number(item.valor_total))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t border-[#eef2f7] bg-[#f8fafc]">

@@ -60,6 +60,7 @@ export interface ServicoSstRecord {
   valor_sugerido: number | null;
   ativo: boolean;
   ordem: number;
+  itens_inclusos: string[] | null;
   created_at?: string;
 }
 

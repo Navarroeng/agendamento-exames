@@ -21,6 +21,7 @@ export function OrcamentosPage() {
     clientes,
     servicos,
     servicosLoading,
+    servicosError,
     viewOrcamento,
     viewLoading,
     actionLoading,
@@ -86,6 +87,7 @@ export function OrcamentosPage() {
               clientes={clientes}
               servicos={servicos}
               servicosLoading={servicosLoading}
+              servicosError={servicosError}
               subtotal={totals.subtotal}
               valorTotal={totals.valorTotal}
               onChange={setField}
@@ -108,6 +110,7 @@ export function OrcamentosPage() {
 
       <OrcamentoViewModal
         orcamento={viewOrcamento}
+        servicos={servicos}
         onClose={closeView}
         onEditar={handleEditar}
         onGerarPdf={handleGerarPdf}

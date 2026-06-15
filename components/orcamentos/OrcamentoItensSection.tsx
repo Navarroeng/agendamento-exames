@@ -11,6 +11,7 @@ interface OrcamentoItensSectionProps {
   itens: OrcamentoItemFormItem[];
   servicos: ServicoSstRecord[];
   servicosLoading: boolean;
+  servicosError: string | null;
   subtotal: number;
   descontoPercentual: string;
   valorTotal: number;
@@ -32,6 +33,7 @@ export function OrcamentoItensSection({
   itens,
   servicos,
   servicosLoading,
+  servicosError,
   subtotal,
   descontoPercentual,
   valorTotal,
@@ -51,6 +53,18 @@ export function OrcamentoItensSection({
         </button>
       }
     >
+      {servicosError && (
+        <div className="mb-3 rounded-[10px] border border-brand-red/20 bg-brand-red-soft px-3 py-2 text-[11px] font-medium text-brand-red">
+          {servicosError}
+        </div>
+      )}
+      {!servicosLoading && !servicosError && servicos.length === 0 && (
+        <div className="mb-3 rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-[11px] font-medium text-[#b45309]">
+          Catálogo de serviços SST vazio. Execute o seed SQL no Supabase para
+          popular a tabela servicos_sst.
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-[10px] border border-[#eef2f7]">
         <table className="w-full min-w-[640px] border-collapse">
           <thead>

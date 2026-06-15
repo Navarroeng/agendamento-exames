@@ -4,6 +4,8 @@ import type {
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { calcItemTotal } from "@/lib/orcamento-calculo";
+import { OrcamentoPacoteInclusosCard } from "./OrcamentoPacoteInclusosCard";
+import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
 interface OrcamentoItemTableRowProps {
   item: OrcamentoItemFormItem;
@@ -39,6 +41,11 @@ export function OrcamentoItemTableRow({
 
   const selectedServico = servicos.find((s) => s.id === item.servico_id);
   const isOutros = selectedServico?.nome === "Outros";
+  const itensInclusos = resolveItensInclusosServico(
+    selectedServico,
+    item.servico_nome
+  );
+  const showPacoteCard = itensInclusos.length > 0;
 
   function handleServicoChange(servicoId: string) {
     const servico = servicos.find((s) => s.id === servicoId);
@@ -73,6 +80,13 @@ export function OrcamentoItemTableRow({
             placeholder="Descreva o serviço"
             value={item.servico_nome}
             onChange={(e) => onUpdate("servico_nome", e.target.value)}
+          />
+        )}
+        {showPacoteCard && (
+          <OrcamentoPacoteInclusosCard
+            servico={selectedServico}
+            servicoNome={item.servico_nome}
+            compact
           />
         )}
       </td>
