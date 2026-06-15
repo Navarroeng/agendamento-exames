@@ -1,11 +1,61 @@
 import { createClient } from "@/lib/supabase/client";
-import { CLIENTE_DB_COLUMNS } from "@/lib/cliente-schema";
+import {
+  CLIENTE_DB_COLUMNS,
+  CLIENTE_SELECT_COLUMNS,
+} from "@/lib/cliente-schema";
 import { sortByNome } from "@/lib/sort-by-label";
 import type {
   ClienteComContratos,
   ClienteInsert,
   ClienteRecord,
 } from "@/lib/types";
+
+const SELECT_BATCH_SIZE = 1000;
+
+export interface ListarClientesPaginadosParams {
+  page?: number;
+  pageSize?: number;
+  busca?: string;
+}
+
+export interface ListarClientesPaginadosResult {
+  records: ClienteRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+function escapeIlikeTerm(value: string): string {
+  return value.replace(/[\\%_,]/g, (char) => `\\${char}`);
+}
+
+function applyClienteBuscaFilter<T extends { or: (filters: string) => T }>(
+  query: T,
+  busca: string
+): T {
+  const trimmed = busca.trim();
+  if (!trimmed) return query;
+
+  const escaped = escapeIlikeTerm(trimmed);
+  const pattern = `%${escaped}%`;
+  const digits = trimmed.replace(/\D/g, "");
+
+  const filters = [
+    `nome.ilike.${pattern}`,
+    `email.ilike.${pattern}`,
+    `telefone.ilike.${pattern}`,
+    `contato.ilike.${pattern}`,
+  ];
+
+  if (digits.length >= 2) {
+    filters.push(`cnpj.ilike.%${escapeIlikeTerm(digits)}%`);
+  } else {
+    filters.push(`cnpj.ilike.${pattern}`);
+  }
+
+  return query.or(filters.join(","));
+}
 
 export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
   const supabase = createClient();
@@ -21,9 +71,91 @@ export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
   return data.id;
 }
 
-export async function listarClientes(limit = 100): Promise<ClienteRecord[]> {
-  const supabase = createClient();
+export async function listarClientesPaginados(
+  params: ListarClientesPaginadosParams = {}
+): Promise<ListarClientesPaginadosResult> {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = params.pageSize ?? 30;
+  const busca = params.busca?.trim() ?? "";
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
+  const supabase = createClient();
+  let query = supabase
+    .from("clientes")
+    .select(CLIENTE_DB_COLUMNS, { count: "exact" })
+    .order("nome", { ascending: true })
+    .range(from, to);
+
+  if (busca) {
+    query = applyClienteBuscaFilter(query, busca);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    records: (data ?? []) as ClienteRecord[],
+    total,
+    page,
+    pageSize,
+    totalPages,
+  };
+}
+
+export async function resolverPaginaClientePorNome(
+  nome: string,
+  pageSize = 30
+): Promise<number> {
+  const trimmed = nome.trim();
+  if (!trimmed) return 1;
+
+  const supabase = createClient();
+  const { count, error } = await supabase
+    .from("clientes")
+    .select("id", { count: "exact", head: true })
+    .lt("nome", trimmed);
+
+  if (error) throw error;
+
+  return Math.floor((count ?? 0) / pageSize) + 1;
+}
+
+/** Carrega todos os clientes (id, nome, cnpj) para selects e filtros globais. */
+export async function listarClientesParaSelect(): Promise<ClienteRecord[]> {
+  const supabase = createClient();
+  const all: ClienteRecord[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select(CLIENTE_SELECT_COLUMNS)
+      .order("nome", { ascending: true })
+      .range(from, from + SELECT_BATCH_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = (data ?? []) as ClienteRecord[];
+    all.push(...batch);
+
+    if (batch.length < SELECT_BATCH_SIZE) break;
+    from += SELECT_BATCH_SIZE;
+  }
+
+  return sortByNome(all);
+}
+
+/** @deprecated Use listarClientesParaSelect ou listarClientesPaginados. */
+export async function listarClientes(limit = 100): Promise<ClienteRecord[]> {
+  if (limit >= SELECT_BATCH_SIZE) {
+    return listarClientesParaSelect();
+  }
+
+  const supabase = createClient();
   const { data, error } = await supabase
     .from("clientes")
     .select(CLIENTE_DB_COLUMNS)

@@ -13,3 +13,6 @@
  */
 export const CLIENTE_DB_COLUMNS =
   "id, nome, cnpj, created_at" as const;
+
+/** Colunas mínimas para selects e autocompletes (carrega todos os clientes). */
+export const CLIENTE_SELECT_COLUMNS = "id, nome, cnpj" as const;

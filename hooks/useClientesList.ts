@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ClienteRecord } from "@/lib/types";
-import { listarClientes } from "@/services/cliente.service";
+import { listarClientesParaSelect } from "@/services/cliente.service";
 
 export function useClientesList() {
   const [clientes, setClientes] = useState<ClienteRecord[]>([]);
@@ -22,7 +22,7 @@ export function useClientesList() {
       setError(null);
 
       try {
-        const data = await listarClientes();
+        const data = await listarClientesParaSelect();
         if (!cancelled) {
           setClientes(data);
         }

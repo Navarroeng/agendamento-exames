@@ -1,6 +1,6 @@
 import { listarAgendamentosComExames } from "@/services/agendamento.service";
 import { listarTodosContratos } from "@/services/cliente-contrato.service";
-import { listarClientes } from "@/services/cliente.service";
+import { listarClientesParaSelect } from "@/services/cliente.service";
 import { listarFaturas } from "@/services/fatura-historico.service";
 import type {
   AgendamentoWithExames,
@@ -21,7 +21,7 @@ export async function carregarDadosRelatorios(): Promise<RelatoriosData> {
     listarAgendamentosComExames(1000),
     listarFaturas(500),
     listarTodosContratos(1000),
-    listarClientes(500),
+    listarClientesParaSelect(),
   ]);
 
   return { agendamentos, faturas, contratos, clientes };

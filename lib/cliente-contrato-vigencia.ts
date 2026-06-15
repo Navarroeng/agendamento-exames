@@ -1,5 +1,5 @@
 import { buscarContratoAtivo } from "@/services/cliente-contrato.service";
-import { listarClientes } from "@/services/cliente.service";
+import { listarClientesParaSelect } from "@/services/cliente.service";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
   "Cliente sem contrato vigente. Não é possível agendar exames até renovar o contrato.";
@@ -57,7 +57,7 @@ export async function verificarContratoVigentePorNome(
     return { vigente: false };
   }
 
-  const clientes = await listarClientes(500);
+  const clientes = await listarClientesParaSelect();
   const cliente = clientes.find(
     (c) => c.nome.trim().toLowerCase() === nome.toLowerCase()
   );

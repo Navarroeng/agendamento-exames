@@ -1,6 +1,6 @@
 import { formatCurrency } from "@/lib/money";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { listarClientes } from "@/services/cliente.service";
+import { listarClientesParaSelect } from "@/services/cliente.service";
 import {
   buildResumoPorTipoExame,
   countColaboradoresItens,
@@ -258,7 +258,7 @@ function generateInvoiceNumber(prefix: string, destinatario: string): string {
 async function resolveClienteInfo(nome: string): Promise<ClienteInfo> {
   const fallback: ClienteInfo = { empresa: nome, cnpj: "—", endereco: "—" };
   try {
-    const clientes = await listarClientes(500);
+    const clientes = await listarClientesParaSelect();
     const n = nome.trim().toLowerCase();
     const found = clientes.find(
       (c) =>
