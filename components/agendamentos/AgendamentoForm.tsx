@@ -173,14 +173,6 @@ export function AgendamentoForm({
             ))}
           </select>
         </Field>
-        <Field label="Observações">
-          <input
-            className="field-input"
-            placeholder="Ex.: jejum, documento, pedido médico..."
-            value={form.observacoes}
-            onChange={(e) => onChange("observacoes", e.target.value)}
-          />
-        </Field>
       </div>
       <ContratoVigenciaAlert state={contratoVigencia} />
     </Panel>

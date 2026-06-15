@@ -11,7 +11,6 @@ import {
   IconDoc,
   IconHospital,
   IconId,
-  IconNote,
   IconStethoscope,
   IconUser,
   SectionHeading,
@@ -61,11 +60,6 @@ export function ViewModalGeneralSection({
               icon={<IconUser />}
               label="Responsável"
               value={agendamento.responsavel}
-            />
-            <DataRow
-              icon={<IconNote />}
-              label="Observações"
-              value={agendamento.observacoes ?? "—"}
             />
           </div>
           <div className="divide-y divide-[#eef1f6] px-2">
