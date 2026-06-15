@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { ClinicaExamesTab } from "@/components/clinicas/ClinicaExamesTab";
+import { ClinicaRegrasAtendimentoViewSection } from "@/components/clinicas/ClinicaRegrasAtendimentoViewSection";
 import { IconBuilding } from "@/components/ui/icons/OutlineIcons";
 import { formatDateBR } from "@/lib/format";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
@@ -188,6 +189,8 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
             <SectionBlock title="Endereço">
               <InfoCard label="Endereço completo" value={endereco || "—"} />
             </SectionBlock>
+
+            <ClinicaRegrasAtendimentoViewSection clinica={clinica} />
           </div>
           )}
         </div>
