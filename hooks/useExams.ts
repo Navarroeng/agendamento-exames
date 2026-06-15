@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   assertExamesSemDuplicidade,
@@ -126,6 +126,12 @@ async function fetchPreco(
 export function useExams(clinicaNome: string, asoTipo: string) {
   const [exams, setExams] = useState<ExameFormItem[]>([createEmptyExam()]);
   const [pricingLoading, setPricingLoading] = useState(false);
+  const examsSyncGenerationRef = useRef(0);
+  const examsRef = useRef<ExameFormItem[]>([createEmptyExam()]);
+
+  useEffect(() => {
+    examsRef.current = exams;
+  }, [exams]);
 
   const totals = useMemo(() => {
     let totalCliente = 0;
@@ -261,10 +267,13 @@ export function useExams(clinicaNome: string, asoTipo: string) {
   const refreshAllPricing = useCallback(async () => {
     if (!clinicaNome.trim()) return;
 
+    const generation = examsSyncGenerationRef.current;
+    const snapshot = examsRef.current;
+
     setPricingLoading(true);
     try {
       const updated = await Promise.all(
-        exams.map(async (exam) => {
+        snapshot.map(async (exam) => {
           if (!exam.tipo_exame.trim()) return exam;
           if (isExameClinicoManual(exam.tipo_exame)) {
             const patch = await fetchPrecoClinico(clinicaNome, exam.tipo_exame);
@@ -293,11 +302,14 @@ export function useExams(clinicaNome: string, asoTipo: string) {
           return { ...exam, ...patch };
         })
       );
+      if (generation !== examsSyncGenerationRef.current) return;
       setExams(updated);
     } finally {
-      setPricingLoading(false);
+      if (generation === examsSyncGenerationRef.current) {
+        setPricingLoading(false);
+      }
     }
-  }, [asoTipo, clinicaNome, exams]);
+  }, [asoTipo, clinicaNome]);
 
   useEffect(() => {
     refreshAllPricing();
@@ -376,22 +388,30 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
   const replaceExamesFromCargo = useCallback(
     async (exameNomes: string[]) => {
+      const generation = ++examsSyncGenerationRef.current;
       const normalizedIncoming = exameNomes
         .map((nome) => nome.trim())
         .filter(Boolean);
 
+      setExams([createEmptyExam()]);
       setPricingLoading(true);
       try {
         if (normalizedIncoming.length === 0) {
-          setExams([createEmptyExam()]);
+          if (generation === examsSyncGenerationRef.current) {
+            setExams([createEmptyExam()]);
+          }
           return 0;
         }
 
         const novos = await buildExamesFromNomes(normalizedIncoming);
+        if (generation !== examsSyncGenerationRef.current) return 0;
+
         setExams(novos.length > 0 ? novos : [createEmptyExam()]);
         return novos.length;
       } finally {
-        setPricingLoading(false);
+        if (generation === examsSyncGenerationRef.current) {
+          setPricingLoading(false);
+        }
       }
     },
     [buildExamesFromNomes]
@@ -399,43 +419,9 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
   const mergeExamesFromCargo = useCallback(
     async (exameNomes: string[]) => {
-      const normalizedIncoming = exameNomes
-        .map((nome) => nome.trim())
-        .filter(Boolean);
-      if (normalizedIncoming.length === 0) return 0;
-
-      setPricingLoading(true);
-      try {
-        const novos = await buildExamesFromNomes(normalizedIncoming);
-
-        let added = 0;
-        setExams((prev) => {
-          const existing = new Set(
-            prev
-              .map((e) => chaveExameDuplicidade(e))
-              .filter((key): key is string => Boolean(key))
-          );
-          const toMerge = novos.filter((e) => {
-            const key = chaveExameDuplicidade(e);
-            return key ? !existing.has(key) : false;
-          });
-          added = toMerge.length;
-          if (toMerge.length === 0) return prev;
-
-          const kept =
-            prev.length === 1 && !prev[0]?.tipo_exame.trim()
-              ? []
-              : prev.filter((e) => e.tipo_exame.trim());
-          const next = [...kept, ...toMerge];
-          return next.length > 0 ? next : [createEmptyExam()];
-        });
-
-        return added;
-      } finally {
-        setPricingLoading(false);
-      }
+      return replaceExamesFromCargo(exameNomes);
     },
-    [buildExamesFromNomes]
+    [replaceExamesFromCargo]
   );
 
   const addExam = useCallback(() => {
@@ -497,10 +483,12 @@ export function useExams(clinicaNome: string, asoTipo: string) {
   );
 
   const resetExams = useCallback(() => {
+    examsSyncGenerationRef.current += 1;
     setExams([createEmptyExam()]);
   }, []);
 
   const loadExams = useCallback((items: ExameFormItem[]) => {
+    examsSyncGenerationRef.current += 1;
     setExams(
       items.length > 0
         ? items.map((e) => {

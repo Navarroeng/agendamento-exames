@@ -156,7 +156,6 @@ export function useAgendamentosPage() {
     resetExams,
     loadExams,
     getExamesPayload,
-    mergeExamesFromCargo,
     replaceExamesFromCargo,
   } = useExams(form.clinica_nome, form.aso);
 
@@ -340,14 +339,25 @@ export function useAgendamentosPage() {
     if (prefill.cargo_id) {
       setCargoId(prefill.cargo_id);
       if (prefill.cargo_nome) setCargoNomeSalvo(prefill.cargo_nome);
+
+      void (async () => {
+        try {
+          const examesObrigatorios = await listarExamesObrigatoriosPorCargo(
+            prefill.cargo_id!
+          );
+          await replaceExamesFromCargo(
+            examesObrigatorios.map((exame) => exame.nome)
+          );
+        } catch (err) {
+          console.error("Erro ao carregar exames do cargo (prefill):", err);
+        }
+      })();
+    } else if (prefill.exame_nome) {
+      void replaceExamesFromCargo([prefill.exame_nome]);
     }
 
     setShowForm(true);
     setFiltersExpanded(false);
-
-    if (prefill.exame_nome) {
-      void mergeExamesFromCargo([prefill.exame_nome]);
-    }
 
     requestAnimationFrame(() => {
       document
@@ -359,7 +369,7 @@ export function useAgendamentosPage() {
     clientes,
     resetForm,
     setField,
-    mergeExamesFromCargo,
+    replaceExamesFromCargo,
   ]);
 
   const handleClear = useCallback(() => {
@@ -712,6 +722,29 @@ export function useAgendamentosPage() {
               }
             );
           }
+
+          const cargoAlterou =
+            (anterior.cargo_id ?? "") !== (cargoFields.cargo_id ?? "");
+          if (cargoFields.cargo_id && dataIso && cargoAlterou) {
+            try {
+              const criados = await criarPeriodicosDeAgendamento(editingId, {
+                cliente_nome: payload.cliente_nome,
+                colaborador: payload.colaborador,
+                cargo_id: cargoFields.cargo_id,
+                cargo_nome: cargoFields.cargo_nome ?? null,
+                data_agendamento: dataIso,
+                exames: examesPayload,
+              });
+              if (criados > 0) {
+                toast.message(
+                  `${criados} periódico(s) futuro(s) recalculado(s) conforme o novo cargo.`
+                );
+              }
+            } catch (periodicoErr) {
+              console.error("Erro ao recalcular periódicos futuros:", periodicoErr);
+            }
+          }
+
           toast.success("Agendamento atualizado com sucesso!");
         } else {
           const novoId = await salvarAgendamentoComExames(payload, examesPayload);

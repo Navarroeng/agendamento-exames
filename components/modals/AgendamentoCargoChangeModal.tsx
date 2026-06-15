@@ -43,7 +43,7 @@ export function AgendamentoCargoChangeModal({
             Alterar cargo
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-[#64748b]">
-            Ao alterar o cargo, os exames atuais serão substituídos pelos exames
+            Alterar o cargo irá substituir os exames atuais pelos exames
             obrigatórios do novo cargo. Deseja continuar?
           </p>
         </div>
