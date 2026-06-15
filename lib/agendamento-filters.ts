@@ -1,7 +1,7 @@
 import { buildPendencias } from "@/lib/agendamentos-table";
 import type { AgendamentoWithExames } from "@/lib/types";
 
-export const AGENDAMENTOS_PAGE_SIZE = 20;
+export const AGENDAMENTOS_PAGE_SIZE = 15;
 
 export interface AgendamentoFilters {
   cliente: string;
