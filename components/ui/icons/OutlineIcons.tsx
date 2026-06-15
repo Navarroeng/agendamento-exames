@@ -244,7 +244,8 @@ export type NavIconKey =
   | "external"
   | "user"
   | "shield"
-  | "settings";
+  | "settings"
+  | "document";
 
 const NAV_ICON_MAP: Record<NavIconKey, ComponentType<IconProps>> = {
   home: IconHome,
@@ -262,6 +263,7 @@ const NAV_ICON_MAP: Record<NavIconKey, ComponentType<IconProps>> = {
   user: IconUser,
   shield: IconShield,
   settings: IconSettings,
+  document: IconFileText,
 };
 
 export function NavIcon({

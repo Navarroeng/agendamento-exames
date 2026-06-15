@@ -63,6 +63,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
+    title: "Gestão Comercial",
+    items: [
+      { iconKey: "document", label: "Orçamentos", href: "/orcamentos" },
+    ],
+  },
+  {
     title: "Gestão",
     items: [
       { iconKey: "chart", label: "Relatórios", href: "/relatorios" },

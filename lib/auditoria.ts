@@ -11,6 +11,7 @@ export const AUDITORIA_MODULOS = {
   esocial: "esocial",
   periodicos_futuros: "periodicos_futuros",
   usuarios: "usuarios",
+  orcamentos: "orcamentos",
 } as const;
 
 export type AuditoriaModulo =
@@ -42,6 +43,7 @@ export const AUDITORIA_MODULO_LABELS: Record<AuditoriaModulo, string> = {
   esocial: "e-Social",
   periodicos_futuros: "Periódicos Futuros",
   usuarios: "Usuários",
+  orcamentos: "Orçamentos",
 };
 
 export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
