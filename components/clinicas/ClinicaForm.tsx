@@ -4,9 +4,7 @@ import {
   IconBuilding,
   IconMapPin,
   IconPhone,
-  IconSettings,
 } from "@/components/ui/icons/OutlineIcons";
-import { SIM_NAO } from "@/lib/constants";
 import type { ClinicaFormField } from "@/hooks/useClinicaForm";
 import type { ClinicaFormValues } from "@/lib/types";
 import { ClinicaFormCard } from "./ClinicaFormCard";
@@ -189,69 +187,6 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
         </ClinicaFormCard>
 
         <ClinicaRegrasAtendimentoSection form={form} onChange={onChange} />
-
-        <ClinicaFormCard title="Operacional" icon={<IconSettings />}>
-          <div className={gridClass}>
-            <Field label="Horário de atendimento" className="sm:col-span-2">
-              <input
-                className="field-input"
-                value={form.horario_atendimento}
-                onChange={(e) => onChange("horario_atendimento", e.target.value)}
-                placeholder="Ex.: Seg–Sex 7h–17h"
-              />
-            </Field>
-            <Field label="Possui coleta?">
-              <select
-                className="field-input"
-                value={form.possui_coleta}
-                onChange={(e) => onChange("possui_coleta", e.target.value)}
-              >
-                {SIM_NAO.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Possui sistema online?">
-              <select
-                className="field-input"
-                value={form.possui_sistema_online}
-                onChange={(e) =>
-                  onChange("possui_sistema_online", e.target.value)
-                }
-              >
-                {SIM_NAO.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field
-              label="Atende quais exames?"
-              className="sm:col-span-2 xl:col-span-3"
-            >
-              <textarea
-                className="field-input !h-[92px] resize-none py-3"
-                value={form.exames_atendidos}
-                onChange={(e) => onChange("exames_atendidos", e.target.value)}
-                placeholder="Opcional — use a aba Exames da clínica para vincular ao catálogo"
-              />
-            </Field>
-            <Field
-              label="Observações gerais"
-              className="sm:col-span-2 xl:col-span-3"
-            >
-              <textarea
-                className="field-input !h-[88px] resize-none py-3"
-                value={form.observacoes}
-                onChange={(e) => onChange("observacoes", e.target.value)}
-                placeholder="Informações operacionais adicionais"
-              />
-            </Field>
-          </div>
-        </ClinicaFormCard>
       </div>
     </Panel>
   );

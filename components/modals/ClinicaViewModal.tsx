@@ -4,10 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { ClinicaExamesTab } from "@/components/clinicas/ClinicaExamesTab";
 import { IconBuilding } from "@/components/ui/icons/OutlineIcons";
-import { countExamesAtendidos } from "@/lib/clinica-mappers";
 import { formatDateBR } from "@/lib/format";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
-import { SIM_NAO } from "@/lib/constants";
 import type { ClinicaListItem } from "@/lib/types";
 
 interface ClinicaViewModalProps {
@@ -72,7 +70,7 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
     .filter(Boolean)
     .join(", ");
 
-  const qtdExames = countExamesAtendidos(clinica.exames_atendidos);
+  const qtdExames = clinica.qtdExames ?? 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
@@ -189,69 +187,6 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
 
             <SectionBlock title="Endereço">
               <InfoCard label="Endereço completo" value={endereco || "—"} />
-            </SectionBlock>
-
-            <SectionBlock title="Financeiro">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <InfoCard
-                  label="Forma de pagamento"
-                  value={clinica.forma_pagamento ?? ""}
-                />
-                <InfoCard
-                  label="Prazo de pagamento"
-                  value={clinica.prazo_pagamento ?? ""}
-                />
-              </div>
-              {clinica.observacoes_financeiras && (
-                <p className="mt-3 rounded-xl bg-[#f8faff] p-3 text-sm leading-relaxed text-[#52617a]">
-                  {clinica.observacoes_financeiras}
-                </p>
-              )}
-            </SectionBlock>
-
-            <SectionBlock title="Operacional">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <InfoCard
-                  label="Horário"
-                  value={clinica.horario_atendimento ?? ""}
-                />
-                <InfoCard
-                  label="Coleta"
-                  value={clinica.possui_coleta ? SIM_NAO[1] : SIM_NAO[0]}
-                />
-                <InfoCard
-                  label="Sistema online"
-                  value={
-                    clinica.possui_sistema_online ? SIM_NAO[1] : SIM_NAO[0]
-                  }
-                />
-              </div>
-              {clinica.exames_atendidos && (
-                <div className="mt-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8b95a8]">
-                    Exames atendidos
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {clinica.exames_atendidos
-                      .split(/[,;\n]+/)
-                      .map((e) => e.trim())
-                      .filter(Boolean)
-                      .map((exame) => (
-                        <span
-                          key={exame}
-                          className="rounded-lg bg-[#f3edff] px-2.5 py-1 text-[11px] font-bold text-[#7c3aed]"
-                        >
-                          {exame}
-                        </span>
-                      ))}
-                  </div>
-                </div>
-              )}
-              {clinica.observacoes && (
-                <p className="mt-3 rounded-xl bg-[#f8faff] p-3 text-sm leading-relaxed text-[#52617a]">
-                  {clinica.observacoes}
-                </p>
-              )}
             </SectionBlock>
           </div>
           )}

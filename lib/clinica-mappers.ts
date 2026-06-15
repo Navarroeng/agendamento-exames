@@ -111,11 +111,3 @@ export function formValuesToClinicaInsert(
     observacao_operacional: form.observacao_operacional.trim() || null,
   };
 }
-
-export function countExamesAtendidos(examesAtendidos: string | null): number {
-  if (!examesAtendidos?.trim()) return 0;
-  return examesAtendidos
-    .split(/[,;\n]+/)
-    .map((s) => s.trim())
-    .filter(Boolean).length;
-}
