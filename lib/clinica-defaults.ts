@@ -25,5 +25,16 @@ export function getEmptyClinicaForm(): ClinicaFormValues {
     exames_atendidos: "",
     observacoes: "",
     status: "Ativa",
+    tipo_atendimento: "Horário agendado",
+    dias_atendimento: "",
+    horario_padrao_inicio: "",
+    horario_padrao_fim: "",
+    horario_clinico_inicio: "",
+    horario_clinico_fim: "",
+    horario_complementar_inicio: "",
+    horario_complementar_fim: "",
+    janela_adicional_inicio: "",
+    janela_adicional_fim: "",
+    observacao_operacional: "",
   };
 }

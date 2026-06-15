@@ -1,4 +1,9 @@
 import type { ClinicaInsert, ClinicaRecord } from "@/lib/types";
+import {
+  formatDiasAtendimentoLabel,
+  normalizeHorario,
+  tipoAtendimentoToForm,
+} from "@/lib/clinica-regras-atendimento";
 
 export interface ClinicaHistoricoEntryDraft {
   acao: string;
@@ -182,6 +187,49 @@ export function buildHistoricoAlteracoesClinica(
     "possui sistema online",
     anterior.possui_sistema_online,
     novo.possui_sistema_online
+  );
+
+  compareField(
+    changes,
+    usuario,
+    "tipo de atendimento",
+    tipoAtendimentoToForm(anterior.tipo_atendimento),
+    tipoAtendimentoToForm(novo.tipo_atendimento)
+  );
+  compareField(
+    changes,
+    usuario,
+    "dias permitidos de atendimento",
+    formatDiasAtendimentoLabel(anterior.dias_atendimento),
+    formatDiasAtendimentoLabel(novo.dias_atendimento)
+  );
+  compareField(
+    changes,
+    usuario,
+    "horário padrão",
+    `${normalizeHorario(anterior.horario_padrao_inicio) || "—"} às ${normalizeHorario(anterior.horario_padrao_fim) || "—"}`,
+    `${normalizeHorario(novo.horario_padrao_inicio) || "—"} às ${normalizeHorario(novo.horario_padrao_fim) || "—"}`
+  );
+  compareField(
+    changes,
+    usuario,
+    "horário clínico",
+    `${normalizeHorario(anterior.horario_clinico_inicio) || "—"} às ${normalizeHorario(anterior.horario_clinico_fim) || "—"}`,
+    `${normalizeHorario(novo.horario_clinico_inicio) || "—"} às ${normalizeHorario(novo.horario_clinico_fim) || "—"}`
+  );
+  compareField(
+    changes,
+    usuario,
+    "horário clínico + complementares",
+    `${normalizeHorario(anterior.horario_complementar_inicio) || "—"} às ${normalizeHorario(anterior.horario_complementar_fim) || "—"}`,
+    `${normalizeHorario(novo.horario_complementar_inicio) || "—"} às ${normalizeHorario(novo.horario_complementar_fim) || "—"}`
+  );
+  compareField(
+    changes,
+    usuario,
+    "observação operacional",
+    anterior.observacao_operacional,
+    novo.observacao_operacional
   );
 
   return changes;

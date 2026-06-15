@@ -46,6 +46,12 @@ import {
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
+import {
+  agendamentoPossuiComplementares,
+  isOrdemChegada,
+  suggestHorarioInicio,
+  validateClinicaAtendimento,
+} from "@/lib/clinica-regras-atendimento";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import {
   buildHistoricoAlteracoes,
@@ -124,6 +130,16 @@ export function useAgendamentosPage() {
     () => clinicasList.filter((c) => c.status === "ativa"),
     [clinicasList]
   );
+  const selectedClinica = useMemo(() => {
+    const nome = form.clinica_nome.trim();
+    if (!nome) return null;
+    return (
+      clinicasList.find(
+        (clinica) =>
+          clinica.nome_fantasia === nome || clinica.razao_social === nome
+      ) ?? null
+    );
+  }, [clinicasList, form.clinica_nome]);
 
   const {
     exams,
@@ -138,6 +154,17 @@ export function useAgendamentosPage() {
     getExamesPayload,
     mergeExamesFromCargo,
   } = useExams(form.clinica_nome, form.aso);
+
+  const hasComplementares = useMemo(
+    () => agendamentoPossuiComplementares(exams),
+    [exams]
+  );
+
+  useEffect(() => {
+    if (!selectedClinica || !isOrdemChegada(selectedClinica)) return;
+    const suggested = suggestHorarioInicio(selectedClinica, hasComplementares);
+    if (suggested) setField("horario", suggested);
+  }, [selectedClinica?.id, hasComplementares, setField, selectedClinica]);
 
   const { exames: catalogExames, loading: catalogLoading } =
     useExamesCatalogOptions();
@@ -517,6 +544,17 @@ export function useAgendamentosPage() {
         return;
       }
 
+      const regraClinicaErro = validateClinicaAtendimento({
+        clinica: selectedClinica,
+        dataAgendamento: form.data_agendamento,
+        horario: form.horario,
+        exams,
+      });
+      if (regraClinicaErro) {
+        toast.error(regraClinicaErro);
+        return;
+      }
+
       if (!isAgendamentoCompleto(form, exams)) {
         toast.error(
           getAgendamentoValidationMessage(form, exams) ??
@@ -658,6 +696,7 @@ export function useAgendamentosPage() {
       hasExamWarnings,
       form,
       exams,
+      selectedClinica,
       setSaving,
       buildPayload,
       getExamesPayload,

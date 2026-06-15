@@ -104,6 +104,7 @@ export function AgendamentoPage() {
             onClose={closeForm}
             isEditing={!!editingId}
             contratoVigencia={contratoVigencia}
+            exams={exams}
           />
           <ExamSection
             exams={exams}

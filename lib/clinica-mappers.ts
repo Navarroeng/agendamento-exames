@@ -1,4 +1,12 @@
 import { SIM_NAO } from "@/lib/constants";
+import {
+  formatDiasAtendimentoForm,
+  janelasAdicionaisToJson,
+  normalizeHorario,
+  parseDiasAtendimentoForm,
+  tipoAtendimentoFromForm,
+  tipoAtendimentoToForm,
+} from "@/lib/clinica-regras-atendimento";
 import type { ClinicaFormValues, ClinicaRecord } from "@/lib/types";
 
 function boolToSimNao(value: boolean): string {
@@ -42,6 +50,17 @@ export function clinicaToFormValues(clinica: ClinicaRecord): ClinicaFormValues {
     exames_atendidos: clinica.exames_atendidos ?? "",
     observacoes: clinica.observacoes ?? "",
     status: statusToForm(clinica.status),
+    tipo_atendimento: tipoAtendimentoToForm(clinica.tipo_atendimento),
+    dias_atendimento: formatDiasAtendimentoForm(clinica.dias_atendimento),
+    horario_padrao_inicio: normalizeHorario(clinica.horario_padrao_inicio),
+    horario_padrao_fim: normalizeHorario(clinica.horario_padrao_fim),
+    horario_clinico_inicio: normalizeHorario(clinica.horario_clinico_inicio),
+    horario_clinico_fim: normalizeHorario(clinica.horario_clinico_fim),
+    horario_complementar_inicio: normalizeHorario(clinica.horario_complementar_inicio),
+    horario_complementar_fim: normalizeHorario(clinica.horario_complementar_fim),
+    janela_adicional_inicio: normalizeHorario(clinica.janelas_adicionais?.[0]?.inicio),
+    janela_adicional_fim: normalizeHorario(clinica.janelas_adicionais?.[0]?.fim),
+    observacao_operacional: clinica.observacao_operacional ?? "",
   };
 }
 
@@ -72,6 +91,24 @@ export function formValuesToClinicaInsert(
     exames_atendidos: form.exames_atendidos.trim() || null,
     observacoes: form.observacoes.trim() || null,
     status: statusFromForm(form.status),
+    tipo_atendimento: tipoAtendimentoFromForm(form.tipo_atendimento),
+    dias_atendimento: (() => {
+      const dias = parseDiasAtendimentoForm(form.dias_atendimento);
+      return dias.length ? dias : null;
+    })(),
+    horario_padrao_inicio: normalizeHorario(form.horario_padrao_inicio) || null,
+    horario_padrao_fim: normalizeHorario(form.horario_padrao_fim) || null,
+    horario_clinico_inicio: normalizeHorario(form.horario_clinico_inicio) || null,
+    horario_clinico_fim: normalizeHorario(form.horario_clinico_fim) || null,
+    horario_complementar_inicio:
+      normalizeHorario(form.horario_complementar_inicio) || null,
+    horario_complementar_fim:
+      normalizeHorario(form.horario_complementar_fim) || null,
+    janelas_adicionais: janelasAdicionaisToJson(
+      form.janela_adicional_inicio,
+      form.janela_adicional_fim
+    ),
+    observacao_operacional: form.observacao_operacional.trim() || null,
   };
 }
 

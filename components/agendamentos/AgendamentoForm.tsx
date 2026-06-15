@@ -1,4 +1,8 @@
 import { ContratoVigenciaAlert } from "@/components/agendamentos/ContratoVigenciaAlert";
+import {
+  ClinicaRegrasAlert,
+  getHorarioFieldHint,
+} from "@/components/agendamentos/ClinicaRegrasAlert";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
@@ -7,7 +11,7 @@ import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaChec
 import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
 import type { FormField } from "@/hooks/useAgendamentoForm";
-import type { ClienteRecord, ClinicaRecord } from "@/lib/types";
+import type { ClienteRecord, ClinicaRecord, ExameFormItem } from "@/lib/types";
 
 interface AgendamentoFormProps {
   form: Record<FormField, string>;
@@ -25,6 +29,7 @@ interface AgendamentoFormProps {
   onClose: () => void;
   isEditing?: boolean;
   contratoVigencia: ContratoVigenciaCheckState;
+  exams: ExameFormItem[];
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -45,7 +50,12 @@ export function AgendamentoForm({
   onClose,
   isEditing = false,
   contratoVigencia,
+  exams,
 }: AgendamentoFormProps) {
+  const selectedClinica =
+    clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
+  const horarioHint = getHorarioFieldHint(selectedClinica, exams);
+
   return (
     <Panel
       id="novo-agendamento"
@@ -83,6 +93,9 @@ export function AgendamentoForm({
             value={form.horario}
             onChange={(e) => onChange("horario", maskTime24(e.target.value))}
           />
+          {horarioHint ? (
+            <p className="mt-1.5 text-[11px] font-medium text-[#64748b]">{horarioHint}</p>
+          ) : null}
         </Field>
         <Field label={<>Cliente <RequiredMark /></>}>
           <select
@@ -174,6 +187,7 @@ export function AgendamentoForm({
           </select>
         </Field>
       </div>
+      <ClinicaRegrasAlert clinica={selectedClinica} exams={exams} />
       <ContratoVigenciaAlert state={contratoVigencia} />
     </Panel>
   );

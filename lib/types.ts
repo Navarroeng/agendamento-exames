@@ -311,6 +311,13 @@ export interface ClienteComContratos extends ClienteRecord {
 
 export type ClinicaStatus = "ativa" | "inativa";
 
+export type ClinicaTipoAtendimento = "horario_agendado" | "ordem_chegada";
+
+export interface ClinicaJanelaHorario {
+  inicio: string;
+  fim: string;
+}
+
 export interface ClinicaFormValues {
   razao_social: string;
   nome_fantasia: string;
@@ -335,6 +342,17 @@ export interface ClinicaFormValues {
   exames_atendidos: string;
   observacoes: string;
   status: string;
+  tipo_atendimento: string;
+  dias_atendimento: string;
+  horario_padrao_inicio: string;
+  horario_padrao_fim: string;
+  horario_clinico_inicio: string;
+  horario_clinico_fim: string;
+  horario_complementar_inicio: string;
+  horario_complementar_fim: string;
+  janela_adicional_inicio: string;
+  janela_adicional_fim: string;
+  observacao_operacional: string;
 }
 
 export interface ClinicaInsert {
@@ -361,6 +379,16 @@ export interface ClinicaInsert {
   exames_atendidos: string | null;
   observacoes: string | null;
   status: ClinicaStatus;
+  tipo_atendimento: ClinicaTipoAtendimento;
+  dias_atendimento: number[] | null;
+  horario_padrao_inicio: string | null;
+  horario_padrao_fim: string | null;
+  horario_clinico_inicio: string | null;
+  horario_clinico_fim: string | null;
+  horario_complementar_inicio: string | null;
+  horario_complementar_fim: string | null;
+  janelas_adicionais: ClinicaJanelaHorario[] | null;
+  observacao_operacional: string | null;
 }
 
 export interface ClinicaRecord extends ClinicaInsert {

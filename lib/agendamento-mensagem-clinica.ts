@@ -4,6 +4,7 @@ import {
   collectExamesComPreparo,
   formatPreparoMensagemClinica,
 } from "@/lib/exame-preparo";
+import { formatHorarioMensagemWhatsApp } from "@/lib/clinica-regras-atendimento";
 
 export function formatEnderecoClinica(
   clinica: Pick<
@@ -70,6 +71,11 @@ export function buildMensagemClinicaWhatsApp({
   const preparoSection = formatPreparoMensagemClinica(
     collectExamesComPreparo(exams, catalogExames)
   );
+  const horarioLines = formatHorarioMensagemWhatsApp({
+    clinica,
+    horario: form.horario.trim(),
+    exams,
+  });
 
   const parts = [
     "AGENDADO:",
@@ -79,7 +85,7 @@ export function buildMensagemClinicaWhatsApp({
     `👤 Nome: ${form.colaborador.trim()}`,
     `📋 Tipo de exame: ${form.aso.trim()}`,
     `📅 Data: ${formatDataDDM(form.data_agendamento)}`,
-    `🕥 Horário: ${form.horario.trim()}`,
+    ...horarioLines,
     `🏥 Unidade: ${unidade}`,
     "",
     `📍 Endereço: ${endereco || "Endereço não informado"}`,

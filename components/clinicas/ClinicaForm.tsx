@@ -10,6 +10,7 @@ import { SIM_NAO } from "@/lib/constants";
 import type { ClinicaFormField } from "@/hooks/useClinicaForm";
 import type { ClinicaFormValues } from "@/lib/types";
 import { ClinicaFormCard } from "./ClinicaFormCard";
+import { ClinicaRegrasAtendimentoSection } from "./ClinicaRegrasAtendimentoSection";
 
 const ESTADOS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
@@ -186,6 +187,8 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
             </Field>
           </div>
         </ClinicaFormCard>
+
+        <ClinicaRegrasAtendimentoSection form={form} onChange={onChange} />
 
         <ClinicaFormCard title="Operacional" icon={<IconSettings />}>
           <div className={gridClass}>
