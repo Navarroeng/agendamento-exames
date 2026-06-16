@@ -1,19 +1,32 @@
 "use client";
 
+import { toast } from "sonner";
+
 import { ClienteContratoAtualCard } from "@/components/clientes/ClienteContratoAtualCard";
 import { ClienteContratoFormModal } from "@/components/clientes/ClienteContratoFormModal";
 import { ClienteContratosHistoricoTable } from "@/components/clientes/ClienteContratosHistoricoTable";
 import { ClienteEncerrarContratoModal } from "@/components/clientes/ClienteEncerrarContratoModal";
+import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useClienteContratos } from "@/hooks/useClienteContratos";
+import { useClienteEdit } from "@/hooks/useClienteEdit";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { formatVigenciaContrato } from "@/lib/cliente-contrato-mappers";
-import { formatCNPJ } from "@/lib/cnpj";
+import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
 import type { ClienteRecord } from "@/lib/types";
+import { registrarAuditoria } from "@/services/auditoria.service";
+import { atualizarCliente } from "@/services/cliente.service";
 
 interface ClienteViewModalProps {
   cliente: ClienteRecord | null;
   onClose: () => void;
+  onUpdated?: (cliente: ClienteRecord) => void;
 }
+
+const VALIDATION_MESSAGE =
+  "Preencha Nome da empresa e CNPJ antes de salvar.";
 
 function InfoItem({
   label,
@@ -36,7 +49,25 @@ function InfoItem({
   );
 }
 
-export function ClienteViewModal({ cliente, onClose }: ClienteViewModalProps) {
+export function ClienteViewModal({
+  cliente,
+  onClose,
+  onUpdated,
+}: ClienteViewModalProps) {
+  const auditContext = useAuditoriaUsuario();
+
+  const {
+    editing: editingCliente,
+    form: clienteForm,
+    setField: setClienteField,
+    startEditing,
+    cancelEditing,
+    buildPayload: buildClientePayload,
+    validate: validateCliente,
+    saving: savingCliente,
+    setSaving: setSavingCliente,
+  } = useClienteEdit(cliente);
+
   const {
     contratoAtual,
     historico,
@@ -58,6 +89,51 @@ export function ClienteViewModal({ cliente, onClose }: ClienteViewModalProps) {
   } = useClienteContratos(cliente?.id ?? null, cliente?.nome ?? null);
 
   if (!cliente) return null;
+
+  const handleSaveCliente = async () => {
+    if (!validateCliente()) {
+      toast.error(VALIDATION_MESSAGE);
+      return;
+    }
+
+    setSavingCliente(true);
+    try {
+      const payload = buildClientePayload();
+      const updated = await atualizarCliente(cliente.id, payload);
+      await registrarAuditoria({
+        usuarioId: auditContext.usuarioId,
+        usuarioNome: auditContext.usuarioNome,
+        usuarioEmail: auditContext.usuarioEmail,
+        modulo: AUDITORIA_MODULOS.clientes,
+        acao: AUDITORIA_ACOES.edicao,
+        registroId: updated.id,
+        registroNome: updated.nome,
+        descricao: `${auditContext.usuarioNome} editou o cliente ${updated.nome}.`,
+      });
+      toast.success("Cliente atualizado com sucesso!");
+      cancelEditing();
+      onUpdated?.(updated);
+    } catch (err) {
+      console.error(err);
+      const cnpjMessage = resolveClienteCnpjError(err);
+      if (cnpjMessage) {
+        toast.error(cnpjMessage);
+        return;
+      }
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "";
+      toast.error(message || "Erro ao atualizar cliente");
+    } finally {
+      setSavingCliente(false);
+    }
+  };
+
+  const displayNome = editingCliente ? clienteForm.nome : cliente.nome;
+  const displayCnpj = editingCliente
+    ? clienteForm.cnpj
+    : formatCNPJ(cliente.cnpj);
 
   return (
     <>
@@ -85,10 +161,10 @@ export function ClienteViewModal({ cliente, onClose }: ClienteViewModalProps) {
                     Cliente
                   </p>
                   <h2 className="truncate text-xl font-extrabold text-[#2d2a4a] sm:text-2xl">
-                    {cliente.nome}
+                    {displayNome}
                   </h2>
                   <p className="truncate text-sm text-[#64748b]">
-                    {formatCNPJ(cliente.cnpj)}
+                    {editingCliente ? maskCNPJInput(displayCnpj) : displayCnpj}
                   </p>
                 </div>
               </div>
@@ -104,13 +180,65 @@ export function ClienteViewModal({ cliente, onClose }: ClienteViewModalProps) {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-6">
             <div className="rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] p-5 shadow-[0_6px_22px_rgba(15,23,42,0.04)]">
-              <h4 className="mb-4 text-[15px] font-extrabold text-[#2d2a4a]">
-                Dados do cliente
-              </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <InfoItem label="Nome" value={cliente.nome} />
-                <InfoItem label="CNPJ" value={formatCNPJ(cliente.cnpj)} />
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h4 className="text-[15px] font-extrabold text-[#2d2a4a]">
+                  Dados do cliente
+                </h4>
+                {!editingCliente ? (
+                  <button
+                    type="button"
+                    className="btn !px-4 !py-2 text-xs"
+                    onClick={startEditing}
+                  >
+                    Editar cliente
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn !px-4 !py-2 text-xs"
+                      onClick={cancelEditing}
+                      disabled={savingCliente}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary !px-4 !py-2 text-xs"
+                      onClick={handleSaveCliente}
+                      disabled={savingCliente}
+                    >
+                      {savingCliente ? "Salvando…" : "Salvar"}
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {editingCliente ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Field label={<>Nome da empresa <RequiredMark /></>}>
+                    <input
+                      className="field-input"
+                      value={clienteForm.nome}
+                      onChange={(e) => setClienteField("nome", e.target.value)}
+                    />
+                  </Field>
+                  <Field label={<>CNPJ <RequiredMark /></>}>
+                    <input
+                      className="field-input"
+                      value={clienteForm.cnpj}
+                      onChange={(e) =>
+                        setClienteField("cnpj", maskCNPJInput(e.target.value))
+                      }
+                    />
+                  </Field>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <InfoItem label="Nome" value={cliente.nome} />
+                  <InfoItem label="CNPJ" value={formatCNPJ(cliente.cnpj)} />
+                </div>
+              )}
             </div>
 
             <div className="mt-5 rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] p-5 shadow-[0_6px_22px_rgba(15,23,42,0.04)]">

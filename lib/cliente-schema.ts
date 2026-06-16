@@ -10,6 +10,7 @@
  * - telefone (text, nullable) — legado, não usado no app
  * - email (text, nullable) — legado, não usado no app
  * - created_at (timestamptz)
+ * - cnpj_digits (text, generated) — CNPJ só com dígitos; índice único (migration 031)
  */
 export const CLIENTE_DB_COLUMNS =
   "id, nome, cnpj, created_at" as const;

@@ -31,5 +31,6 @@ export function useClientesPage() {
     viewLoading,
     handleAbrir,
     closeView: () => setViewCliente(null),
+    updateViewCliente: setViewCliente,
   };
 }

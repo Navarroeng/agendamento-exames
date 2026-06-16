@@ -256,6 +256,11 @@ export interface ClienteInsert {
   cnpj: string;
 }
 
+export interface ClienteUpdate {
+  nome: string;
+  cnpj: string;
+}
+
 export interface ClienteRecord extends ClienteInsert {
   id: string;
   created_at?: string | null;

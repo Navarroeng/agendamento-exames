@@ -27,6 +27,7 @@ import { useClientesPage } from "@/hooks/useClientesPage";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { hasActiveClientesListFilters } from "@/lib/cliente-filters";
+import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { salvarCliente } from "@/services/cliente.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
@@ -61,9 +62,11 @@ export function ClientesPage() {
     setFilter,
     clearFilters,
     showClienteAposCadastro,
+    refresh,
   } = useClientesPaginatedList();
 
-  const { viewCliente, viewLoading, handleAbrir, closeView } = useClientesPage();
+  const { viewCliente, viewLoading, handleAbrir, closeView, updateViewCliente } =
+    useClientesPage();
 
   const resetForm = () => {
     reset();
@@ -111,6 +114,11 @@ export function ClientesPage() {
       });
     } catch (err) {
       console.error("Erro completo ao salvar:", err);
+      const cnpjMessage = resolveClienteCnpjError(err);
+      if (cnpjMessage) {
+        toast.error(cnpjMessage);
+        return;
+      }
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: unknown }).message)
@@ -162,7 +170,14 @@ export function ClientesPage() {
         />
       </div>
 
-      <ClienteViewModal cliente={viewCliente} onClose={closeView} />
+      <ClienteViewModal
+        cliente={viewCliente}
+        onClose={closeView}
+        onUpdated={(updated) => {
+          updateViewCliente(updated);
+          refresh();
+        }}
+      />
 
       {saving && (
         <div

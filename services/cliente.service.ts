@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  CLIENTE_CNPJ_DUPLICADO_MSG,
+  normalizeCnpjDigits,
+  resolveClienteCnpjError,
+} from "@/lib/cliente-cnpj";
+import {
   CLIENTE_DB_COLUMNS,
   CLIENTE_SELECT_COLUMNS,
 } from "@/lib/cliente-schema";
@@ -8,6 +13,7 @@ import type {
   ClienteComContratos,
   ClienteInsert,
   ClienteRecord,
+  ClienteUpdate,
 } from "@/lib/types";
 
 const SELECT_BATCH_SIZE = 1000;
@@ -57,7 +63,47 @@ function applyClienteBuscaFilter<T extends { or: (filters: string) => T }>(
   return query.or(filters.join(","));
 }
 
+function throwClienteSaveError(error: unknown): never {
+  const cnpjMessage = resolveClienteCnpjError(error);
+  if (cnpjMessage) {
+    throw new Error(cnpjMessage);
+  }
+  throw error;
+}
+
+async function assertCnpjClienteDisponivel(
+  cnpj: string,
+  excludeId?: string
+): Promise<void> {
+  const digits = normalizeCnpjDigits(cnpj);
+  if (digits.length !== 14) return;
+
+  const existente = await buscarClientePorCnpjDigits(digits);
+  if (existente && existente.id !== excludeId) {
+    throw new Error(CLIENTE_CNPJ_DUPLICADO_MSG);
+  }
+}
+
+export async function buscarClientePorCnpjDigits(
+  digits: string
+): Promise<ClienteRecord | null> {
+  const normalized = normalizeCnpjDigits(digits);
+  if (normalized.length !== 14) return null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .select(CLIENTE_DB_COLUMNS)
+    .eq("cnpj_digits", normalized)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as ClienteRecord | null) ?? null;
+}
+
 export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
+  await assertCnpjClienteDisponivel(cliente.cnpj);
+
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -66,9 +112,29 @@ export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
     .select("id")
     .single();
 
-  if (error) throw error;
+  if (error) throwClienteSaveError(error);
 
   return data.id;
+}
+
+export async function atualizarCliente(
+  id: string,
+  cliente: ClienteUpdate
+): Promise<ClienteRecord> {
+  await assertCnpjClienteDisponivel(cliente.cnpj, id);
+
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("clientes")
+    .update(cliente)
+    .eq("id", id)
+    .select(CLIENTE_DB_COLUMNS)
+    .single();
+
+  if (error) throwClienteSaveError(error);
+
+  return data as ClienteRecord;
 }
 
 export async function listarClientesPaginados(
@@ -203,3 +269,5 @@ export async function buscarClienteComContratos(
 
   return row;
 }
+
+export { resolveClienteCnpjError };

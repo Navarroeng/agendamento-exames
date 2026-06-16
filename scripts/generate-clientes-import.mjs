@@ -143,6 +143,8 @@ order by p.nome;
 -- ============================================================
 -- 2) IMPORTAÇÃO (execute após revisar o diagnóstico)
 -- ============================================================
+-- Novos registros: insere apenas CNPJs que ainda não existem.
+-- Duplicados: atualiza o nome do cliente existente quando diferente.
 
 insert into public.clientes (nome, cnpj)
 select v.nome, v.cnpj
@@ -156,6 +158,44 @@ where not exists (
   where regexp_replace(c.cnpj, '[^0-9]', '', 'g')
       = regexp_replace(v.cnpj, '[^0-9]', '', 'g')
 );
+
+-- Atualiza cadastro existente (mesmo CNPJ, nome diferente na planilha)
+update public.clientes c
+set nome = v.nome
+from (
+  values
+${valuesSql}
+) as v(nome, cnpj)
+where regexp_replace(c.cnpj, '[^0-9]', '', 'g')
+    = regexp_replace(v.cnpj, '[^0-9]', '', 'g')
+  and c.nome is distinct from v.nome;
+
+-- ============================================================
+-- 2b) LOG DE DUPLICADOS / ATUALIZAÇÕES (somente leitura)
+-- ============================================================
+
+-- Registros da planilha cujo CNPJ já existia (inserção ignorada; nome pode ter sido atualizado acima)
+with planilha (nome, cnpj) as (
+  values
+${valuesSql}
+),
+planilha_norm as (
+  select
+    nome,
+    cnpj,
+    regexp_replace(cnpj, '[^0-9]', '', 'g') as cnpj_digits
+  from planilha
+)
+select
+  'duplicado_ignorado_ou_atualizado' as tipo,
+  p.nome as nome_planilha,
+  p.cnpj as cnpj_planilha,
+  c.nome as nome_atual_banco,
+  c.cnpj as cnpj_atual_banco
+from planilha_norm p
+inner join public.clientes c
+  on regexp_replace(c.cnpj, '[^0-9]', '', 'g') = p.cnpj_digits
+order by p.nome;
 
 -- ============================================================
 -- 3) VERIFICAÇÃO PÓS-IMPORTAÇÃO
