@@ -1,4 +1,5 @@
 import { ContratoVigenciaAlert } from "@/components/agendamentos/ContratoVigenciaAlert";
+import { ClienteProcuracaoAlert } from "@/components/agendamentos/ClienteProcuracaoAlert";
 import {
   ClinicaRegrasAlert,
   getHorarioFieldHint,
@@ -29,6 +30,7 @@ interface AgendamentoFormProps {
   onClose: () => void;
   isEditing?: boolean;
   contratoVigencia: ContratoVigenciaCheckState;
+  showClienteProcuracaoAlert?: boolean;
   exams: ExameFormItem[];
 }
 
@@ -50,6 +52,7 @@ export function AgendamentoForm({
   onClose,
   isEditing = false,
   contratoVigencia,
+  showClienteProcuracaoAlert = false,
   exams,
 }: AgendamentoFormProps) {
   const selectedClinica =
@@ -205,6 +208,7 @@ export function AgendamentoForm({
         </div>
       </div>
       <ClinicaRegrasAlert clinica={selectedClinica} exams={exams} />
+      <ClienteProcuracaoAlert visible={showClienteProcuracaoAlert} />
       <ContratoVigenciaAlert state={contratoVigencia} />
     </Panel>
   );

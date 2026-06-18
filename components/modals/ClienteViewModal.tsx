@@ -14,9 +14,15 @@ import { useClienteEdit } from "@/hooks/useClienteEdit";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { formatVigenciaContrato } from "@/lib/cliente-contrato-mappers";
+import {
+  CLIENTE_PROCURACAO_OPTIONS,
+  formatClienteProcuracaoLabel,
+  normalizeClienteProcuracao,
+} from "@/lib/cliente-procuracao";
 import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
 import type { ClienteRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarProcuracaoClienteAlterada } from "@/services/cliente-procuracao-audit.service";
 import { atualizarCliente } from "@/services/cliente.service";
 
 interface ClienteViewModalProps {
@@ -99,7 +105,16 @@ export function ClienteViewModal({
     setSavingCliente(true);
     try {
       const payload = buildClientePayload();
+      const procuracaoAnterior = normalizeClienteProcuracao(cliente.procuracao);
       const updated = await atualizarCliente(cliente.id, payload);
+      if (procuracaoAnterior !== payload.procuracao) {
+        await registrarProcuracaoClienteAlterada(auditContext, {
+          clienteId: updated.id,
+          clienteNome: updated.nome,
+          procuracaoAnterior,
+          procuracaoNova: payload.procuracao,
+        });
+      }
       await registrarAuditoria({
         usuarioId: auditContext.usuarioId,
         usuarioNome: auditContext.usuarioNome,
@@ -232,11 +247,30 @@ export function ClienteViewModal({
                       }
                     />
                   </Field>
+                  <Field label="Procuração">
+                    <select
+                      className="field-input"
+                      value={clienteForm.procuracao}
+                      onChange={(e) =>
+                        setClienteField("procuracao", e.target.value)
+                      }
+                    >
+                      {CLIENTE_PROCURACAO_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   <InfoItem label="Nome" value={cliente.nome} />
                   <InfoItem label="CNPJ" value={formatCNPJ(cliente.cnpj)} />
+                  <InfoItem
+                    label="Procuração"
+                    value={formatClienteProcuracaoLabel(cliente.procuracao)}
+                  />
                 </div>
               )}
             </div>

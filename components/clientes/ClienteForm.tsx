@@ -2,6 +2,7 @@ import { Field, RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconUser } from "@/components/ui/icons/OutlineIcons";
 import type { ClienteFormField } from "@/hooks/useClienteForm";
+import { CLIENTE_PROCURACAO_OPTIONS } from "@/lib/cliente-procuracao";
 import { maskCNPJInput } from "@/lib/cnpj";
 import type { ClienteFormValues } from "@/lib/types";
 
@@ -29,6 +30,19 @@ export function ClienteForm({ form, onChange }: ClienteFormProps) {
             value={form.cnpj}
             onChange={(e) => onChange("cnpj", maskCNPJInput(e.target.value))}
           />
+        </Field>
+        <Field label="Procuração">
+          <select
+            className="field-input"
+            value={form.procuracao}
+            onChange={(e) => onChange("procuracao", e.target.value)}
+          >
+            {CLIENTE_PROCURACAO_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
     </Panel>

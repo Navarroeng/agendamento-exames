@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconCalendar } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
+import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
@@ -81,6 +82,11 @@ export function AgendamentoPage() {
     handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
+    showClienteProcuracaoAlert,
+    clienteProcuracaoModalOpen,
+    clienteProcuracaoConfirmLoading,
+    closeClienteProcuracaoModal,
+    handleConfirmClienteProcuracao,
   } = useAgendamentosPage();
 
   return (
@@ -108,6 +114,7 @@ export function AgendamentoPage() {
             onClose={closeForm}
             isEditing={!!editingId}
             contratoVigencia={contratoVigencia}
+            showClienteProcuracaoAlert={showClienteProcuracaoAlert}
             exams={exams}
           />
           <ExamSection
@@ -192,6 +199,12 @@ export function AgendamentoPage() {
         loading={cargoChangeLoading}
         onClose={closeCargoChangeModal}
         onConfirm={handleConfirmCargoChange}
+      />
+      <AgendamentoClienteProcuracaoModal
+        open={clienteProcuracaoModalOpen}
+        loading={clienteProcuracaoConfirmLoading}
+        onClose={closeClienteProcuracaoModal}
+        onConfirm={handleConfirmClienteProcuracao}
       />
 
       {saving && (

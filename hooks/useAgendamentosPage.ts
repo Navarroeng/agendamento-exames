@@ -51,6 +51,7 @@ import {
   buildClienteFilterOptions,
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
+import { isClienteProcuracaoAtiva } from "@/lib/cliente-procuracao";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
 import {
   agendamentoPossuiComplementares,
@@ -80,6 +81,7 @@ import {
   registrarExameRemovidoAgendamento,
   registrarExamesCarregadosPorCargo,
 } from "@/services/agendamento-form-audit.service";
+import { registrarAgendamentoClienteSemProcuracao } from "@/services/cliente-procuracao-audit.service";
 import {
   cancelarPeriodicosPorAgendamento,
   criarPeriodicosDeAgendamento,
@@ -116,6 +118,11 @@ export function useAgendamentosPage() {
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
   const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
   const [cargoChangeLoading, setCargoChangeLoading] = useState(false);
+  const [clienteProcuracaoModalOpen, setClienteProcuracaoModalOpen] =
+    useState(false);
+  const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
+  const [clienteProcuracaoConfirmLoading, setClienteProcuracaoConfirmLoading] =
+    useState(false);
   const [clienteId, setClienteId] = useState("");
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
@@ -317,6 +324,8 @@ export function useAgendamentosPage() {
     setEditingId(null);
     setPendingCargoId(null);
     setCargoChangeModalOpen(false);
+    setClienteProcuracaoModalOpen(false);
+    setPendingClienteId(null);
   }, [reset, resetExams]);
 
   useEffect(() => {
@@ -415,16 +424,73 @@ export function useAgendamentosPage() {
 
   const handleClienteChange = useCallback(
     (nextClienteId: string) => {
-      setClienteId(nextClienteId);
+      if (nextClienteId === clienteId) return;
+
       if (!nextClienteId) {
+        setClienteId("");
         setField("cliente_nome", "");
         return;
       }
+
       const cliente = clientes.find((c) => c.id === nextClienteId);
+      if (cliente && !isClienteProcuracaoAtiva(cliente.procuracao)) {
+        setPendingClienteId(nextClienteId);
+        setClienteProcuracaoModalOpen(true);
+        return;
+      }
+
+      setClienteId(nextClienteId);
       if (cliente) setField("cliente_nome", cliente.nome);
     },
-    [clientes, setField]
+    [clienteId, clientes, setField]
   );
+
+  const closeClienteProcuracaoModal = useCallback(() => {
+    setClienteProcuracaoModalOpen(false);
+    setPendingClienteId(null);
+    setClienteId("");
+    setField("cliente_nome", "");
+  }, [setField]);
+
+  const handleConfirmClienteProcuracao = useCallback(async () => {
+    if (!pendingClienteId) return;
+
+    const cliente = clientes.find((c) => c.id === pendingClienteId);
+    if (!cliente) {
+      closeClienteProcuracaoModal();
+      return;
+    }
+
+    setClienteProcuracaoConfirmLoading(true);
+    try {
+      setClienteId(pendingClienteId);
+      setField("cliente_nome", cliente.nome);
+      await registrarAgendamentoClienteSemProcuracao(auditContext, {
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        agendamentoId: editingId,
+        colaborador: form.colaborador.trim() || null,
+      });
+      setClienteProcuracaoModalOpen(false);
+      setPendingClienteId(null);
+    } finally {
+      setClienteProcuracaoConfirmLoading(false);
+    }
+  }, [
+    pendingClienteId,
+    clientes,
+    closeClienteProcuracaoModal,
+    setField,
+    auditContext,
+    editingId,
+    form.colaborador,
+  ]);
+
+  const showClienteProcuracaoAlert = useMemo(() => {
+    if (!clienteId) return false;
+    const cliente = clientes.find((c) => c.id === clienteId);
+    return !!cliente && !isClienteProcuracaoAtiva(cliente.procuracao);
+  }, [clienteId, clientes]);
 
   const applyCargoChange = useCallback(
     async (nextCargoId: string) => {
@@ -1006,5 +1072,10 @@ export function useAgendamentosPage() {
     handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
+    showClienteProcuracaoAlert,
+    clienteProcuracaoModalOpen,
+    clienteProcuracaoConfirmLoading,
+    closeClienteProcuracaoModal,
+    handleConfirmClienteProcuracao,
   };
 }

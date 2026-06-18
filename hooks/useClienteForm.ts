@@ -30,6 +30,7 @@ export function useClienteForm() {
   const buildPayload = useCallback((): ClienteInsert => ({
     nome: normalizeUppercaseField(form.nome),
     cnpj: maskCNPJInput(form.cnpj.trim()),
+    procuracao: form.procuracao,
   }), [form]);
 
   const validate = useCallback((): boolean => {

@@ -248,19 +248,24 @@ export interface AgendamentoHistoricoRecord {
   created_at: string;
 }
 
+export type ClienteProcuracao = "ativa" | "inativa";
+
 export interface ClienteFormValues {
   nome: string;
   cnpj: string;
+  procuracao: ClienteProcuracao;
 }
 
 export interface ClienteInsert {
   nome: string;
   cnpj: string;
+  procuracao: ClienteProcuracao;
 }
 
 export interface ClienteUpdate {
   nome: string;
   cnpj: string;
+  procuracao: ClienteProcuracao;
 }
 
 export interface ClienteRecord extends ClienteInsert {
