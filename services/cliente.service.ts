@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  buildClienteBuscaOrFilters,
+  isCnpjDigitsColumnMissing,
+} from "@/lib/cliente-busca";
+import {
   CLIENTE_CNPJ_DUPLICADO_MSG,
   normalizeCnpjDigits,
   resolveClienteCnpjError,
@@ -32,34 +36,13 @@ export interface ListarClientesPaginadosResult {
   totalPages: number;
 }
 
-function escapeIlikeTerm(value: string): string {
-  return value.replace(/[\\%_,]/g, (char) => `\\${char}`);
-}
-
 function applyClienteBuscaFilter<T extends { or: (filters: string) => T }>(
   query: T,
-  busca: string
+  busca: string,
+  useCnpjDigitsColumn = true
 ): T {
-  const trimmed = busca.trim();
-  if (!trimmed) return query;
-
-  const escaped = escapeIlikeTerm(trimmed);
-  const pattern = `%${escaped}%`;
-  const digits = trimmed.replace(/\D/g, "");
-
-  const filters = [
-    `nome.ilike.${pattern}`,
-    `email.ilike.${pattern}`,
-    `telefone.ilike.${pattern}`,
-    `contato.ilike.${pattern}`,
-  ];
-
-  if (digits.length >= 2) {
-    filters.push(`cnpj.ilike.%${escapeIlikeTerm(digits)}%`);
-  } else {
-    filters.push(`cnpj.ilike.${pattern}`);
-  }
-
+  const filters = buildClienteBuscaOrFilters(busca, { useCnpjDigitsColumn });
+  if (filters.length === 0) return query;
   return query.or(filters.join(","));
 }
 
@@ -147,17 +130,26 @@ export async function listarClientesPaginados(
   const to = from + pageSize - 1;
 
   const supabase = createClient();
-  let query = supabase
-    .from("clientes")
-    .select(CLIENTE_DB_COLUMNS, { count: "exact" })
-    .order("nome", { ascending: true })
-    .range(from, to);
+  const runQuery = (useCnpjDigitsColumn: boolean) => {
+    let query = supabase
+      .from("clientes")
+      .select(CLIENTE_DB_COLUMNS, { count: "exact" })
+      .order("nome", { ascending: true })
+      .range(from, to);
 
-  if (busca) {
-    query = applyClienteBuscaFilter(query, busca);
+    if (busca) {
+      query = applyClienteBuscaFilter(query, busca, useCnpjDigitsColumn);
+    }
+
+    return query;
+  };
+
+  let result = await runQuery(true);
+  if (result.error && busca && isCnpjDigitsColumnMissing(result.error)) {
+    result = await runQuery(false);
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = result;
   if (error) throw error;
 
   const total = count ?? 0;

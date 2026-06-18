@@ -54,7 +54,7 @@ export function ClientesTable({
         {!loading && !error && clientes.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
             {hasActiveSearch
-              ? "Nenhum cliente encontrado com os termos informados."
+              ? "Nenhum cliente encontrado."
               : "Nenhum cliente cadastrado."}
           </p>
         )}
