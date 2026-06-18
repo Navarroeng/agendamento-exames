@@ -1,3 +1,10 @@
+import {
+  CARGO_OBRIGATORIO_TOAST,
+  CARGO_SEM_EXAMES_TOAST,
+  getExamesValidosAgendamento,
+  hasCargoSelecionado,
+  hasExamesObrigatoriosCarregados,
+} from "@/lib/agendamento-exames-cargo";
 import { isValidCPF } from "@/lib/cpf";
 import { SIM_NAO } from "@/lib/constants";
 import {
@@ -21,6 +28,11 @@ export const CPF_COLABORADOR_TOAST =
 export const ESOCIAL_RECIBO_TOAST =
   "Informe o Nº Recibo completo do e-Social.";
 
+export {
+  CARGO_OBRIGATORIO_TOAST,
+  CARGO_SEM_EXAMES_TOAST,
+} from "@/lib/agendamento-exames-cargo";
+
 function isFilled(value: string): boolean {
   return value.trim() !== "";
 }
@@ -37,26 +49,6 @@ function requireDateWhenSim(simValue: string, dateValue: string): boolean {
 function requireReciboWhenSim(simValue: string, recibo: string): boolean {
   if (simValue !== "Sim") return true;
   return isFilled(recibo) && isValidEsocialRecibo(recibo);
-}
-
-export function getAgendamentoValidationMessage(
-  form: AgendamentoFormValues,
-  exams: ExameFormItem[]
-): string | null {
-  if (isAgendamentoCompleto(form, exams)) return null;
-
-  if (
-    form.envio_esocial === "Sim" &&
-    !requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
-  ) {
-    return ESOCIAL_RECIBO_TOAST;
-  }
-
-  if (!isFilled(form.colaborador_cpf) || !isValidCPF(form.colaborador_cpf)) {
-    return CPF_COLABORADOR_TOAST;
-  }
-
-  return VALIDATION_TOAST_MESSAGE;
 }
 
 function hasValidValorCliente(exam: ExameFormItem, aso: string): boolean {
@@ -82,10 +74,45 @@ function isExamComplete(exam: ExameFormItem, aso: string): boolean {
   );
 }
 
+export function getAgendamentoValidationMessage(
+  form: AgendamentoFormValues,
+  exams: ExameFormItem[],
+  cargoId: string
+): string | null {
+  if (isAgendamentoCompleto(form, exams, cargoId)) return null;
+
+  if (!hasCargoSelecionado(cargoId)) {
+    return CARGO_OBRIGATORIO_TOAST;
+  }
+
+  if (!hasExamesObrigatoriosCarregados(exams)) {
+    return CARGO_SEM_EXAMES_TOAST;
+  }
+
+  if (
+    form.envio_esocial === "Sim" &&
+    !requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
+  ) {
+    return ESOCIAL_RECIBO_TOAST;
+  }
+
+  if (!isFilled(form.colaborador_cpf) || !isValidCPF(form.colaborador_cpf)) {
+    return CPF_COLABORADOR_TOAST;
+  }
+
+  return VALIDATION_TOAST_MESSAGE;
+}
+
 export function isAgendamentoCompleto(
   form: AgendamentoFormValues,
-  exams: ExameFormItem[]
+  exams: ExameFormItem[],
+  cargoId: string
 ): boolean {
+  if (!hasCargoSelecionado(cargoId)) return false;
+
+  const examesValidos = getExamesValidosAgendamento(exams);
+  if (examesValidos.length === 0) return false;
+
   const formOk =
     isFilled(form.data_agendamento) &&
     isValidDateBR(form.data_agendamento) &&
@@ -114,8 +141,7 @@ export function isAgendamentoCompleto(
     requireDateWhenSim(form.envio_esocial, form.data_envio_esocial) &&
     requireReciboWhenSim(form.envio_esocial, form.esocial_recibo);
 
-  const examsOk =
-    exams.length >= 1 && exams.every((exam) => isExamComplete(exam, form.aso));
+  const examsOk = examesValidos.every((exam) => isExamComplete(exam, form.aso));
 
   return formOk && examsOk;
 }

@@ -393,12 +393,12 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         .map((nome) => nome.trim())
         .filter(Boolean);
 
-      setExams([createEmptyExam()]);
+      setExams([]);
       setPricingLoading(true);
       try {
         if (normalizedIncoming.length === 0) {
           if (generation === examsSyncGenerationRef.current) {
-            setExams([createEmptyExam()]);
+            setExams([]);
           }
           return 0;
         }
@@ -406,7 +406,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         const novos = await buildExamesFromNomes(normalizedIncoming);
         if (generation !== examsSyncGenerationRef.current) return 0;
 
-        setExams(novos.length > 0 ? novos : [createEmptyExam()]);
+        setExams(novos);
         return novos.length;
       } finally {
         if (generation === examsSyncGenerationRef.current) {
@@ -417,39 +417,13 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     [buildExamesFromNomes]
   );
 
-  const mergeExamesFromCargo = useCallback(
-    async (exameNomes: string[]) => {
-      return replaceExamesFromCargo(exameNomes);
-    },
-    [replaceExamesFromCargo]
-  );
-
-  const addExam = useCallback(() => {
-    setExams((prev) => [...prev, createEmptyExam()]);
-  }, []);
-
   const removeExam = useCallback((id: string) => {
-    setExams((prev) => {
-      if (prev.length === 1) return prev;
-      return prev.filter((e) => e.id !== id);
-    });
+    setExams((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
   const updateExam = useCallback(
     (id: string, field: keyof ExameFormItem, value: string) => {
-      if (field === "tipo_exame") {
-        if (
-          value.trim() &&
-          hasDuplicateExam(exams, id, {
-            tipo_exame: value,
-          })
-        ) {
-          toast.error(EXAME_DUPLICADO_TOAST);
-          return;
-        }
-        void applyPricingToExam(id, value);
-        return;
-      }
+      if (field === "tipo_exame") return;
 
       setExams((prev) =>
         prev.map((exam) => {
@@ -479,12 +453,12 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         })
       );
     },
-    [applyPricingToExam, hasDuplicateExam, exams]
+    [exams]
   );
 
   const resetExams = useCallback(() => {
     examsSyncGenerationRef.current += 1;
-    setExams([createEmptyExam()]);
+    setExams([]);
   }, []);
 
   const loadExams = useCallback((items: ExameFormItem[]) => {
@@ -505,7 +479,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
                 : false,
             };
           })
-        : [createEmptyExam()]
+        : []
     );
   }, []);
 
@@ -530,14 +504,12 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     totals,
     pricingLoading,
     hasExamWarnings,
-    addExam,
     removeExam,
     updateExam,
     resetExams,
     loadExams,
     getExamesPayload,
     refreshAllPricing,
-    mergeExamesFromCargo,
     replaceExamesFromCargo,
   };
 }

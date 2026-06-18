@@ -1,9 +1,10 @@
 import { ExamPreparoAlert } from "./ExamPreparoAlert";
 import { Panel } from "@/components/ui/Panel";
 import { IconFlask } from "@/components/ui/icons/OutlineIcons";
+import { CARGO_SEM_EXAMES_TOAST } from "@/lib/agendamento-exames-cargo";
+import type { ExameFormItem, ExameRecord } from "@/lib/types";
 import { ExamTableRow } from "./ExamTableRow";
 import { ExamTotals } from "./ExamTotals";
-import type { ExameFormItem, ExameRecord } from "@/lib/types";
 
 interface ExamSectionProps {
   exams: ExameFormItem[];
@@ -13,10 +14,10 @@ interface ExamSectionProps {
     totalLucro: number;
   };
   clinicaNome: string;
+  cargoId: string;
+  cargoSemExames: boolean;
   catalogExames: ExameRecord[];
-  catalogLoading: boolean;
   pricingLoading: boolean;
-  onAdd: () => void;
   onRemove: (id: string) => void;
   onUpdate: (id: string, field: keyof ExameFormItem, value: string) => void;
 }
@@ -28,30 +29,35 @@ export function ExamSection({
   exams,
   totals,
   clinicaNome,
+  cargoId,
+  cargoSemExames,
   catalogExames,
-  catalogLoading,
   pricingLoading,
-  onAdd,
   onRemove,
   onUpdate,
 }: ExamSectionProps) {
+  const examesComTipo = exams.filter((exam) => exam.tipo_exame.trim());
+
   return (
-    <Panel
-      title="Exames"
-      icon={<IconFlask />}
-      iconTone="green"
-      action={
-        <button type="button" className="btn btn-primary text-xs" onClick={onAdd}>
-          + Acrescentar exame
-        </button>
-      }
-    >
+    <Panel title="Exames" icon={<IconFlask />} iconTone="green">
       <p className="mb-3 text-[11px] font-medium text-[#94a3b8]">
-        Os valores são preenchidos automaticamente com base na clínica e no
-        catálogo de exames.
+        Os exames são carregados automaticamente conforme o cargo selecionado.
+        Você pode remover itens da lista, se necessário.
       </p>
 
-      {!clinicaNome.trim() && (
+      {!cargoId.trim() && (
+        <div className="mb-3 rounded-[10px] border border-[#e8edf5] bg-[#f8fafc] px-3 py-2 text-[11px] font-medium text-[#64748b]">
+          Selecione um cargo para carregar os exames obrigatórios.
+        </div>
+      )}
+
+      {cargoSemExames && (
+        <div className="mb-3 rounded-[10px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-[11px] font-medium text-[#b91c1c]">
+          {CARGO_SEM_EXAMES_TOAST}
+        </div>
+      )}
+
+      {!clinicaNome.trim() && cargoId.trim() && (
         <div className="mb-3 rounded-[10px] border border-[#e8edf5] bg-[#f8fafc] px-3 py-1.5 text-[11px] font-medium text-[#64748b]">
           Selecione a clínica no formulário acima para carregar os preços.
         </div>
@@ -70,24 +76,37 @@ export function ExamSection({
             </tr>
           </thead>
           <tbody>
-            {exams.map((exam) => (
-              <ExamTableRow
-                key={exam.id}
-                exam={exam}
-                catalogExames={catalogExames}
-                catalogLoading={catalogLoading}
-                pricingLoading={pricingLoading}
-                canRemove={exams.length > 1}
-                onRemove={() => onRemove(exam.id)}
-                onUpdate={(field, value) => onUpdate(exam.id, field, value)}
-              />
-            ))}
+            {examesComTipo.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="border-b border-[#eef2f7] px-2.5 py-4 text-center text-xs text-[#94a3b8]"
+                >
+                  {pricingLoading
+                    ? "Carregando exames do cargo..."
+                    : "Nenhum exame na lista."}
+                </td>
+              </tr>
+            ) : (
+              examesComTipo.map((exam) => (
+                <ExamTableRow
+                  key={exam.id}
+                  exam={exam}
+                  pricingLoading={pricingLoading}
+                  canRemove
+                  onRemove={() => onRemove(exam.id)}
+                  onUpdate={(field, value) => onUpdate(exam.id, field, value)}
+                />
+              ))
+            )}
           </tbody>
-          <ExamTotals
-            totalCliente={totals.totalCliente}
-            totalCusto={totals.totalCusto}
-            totalLucro={totals.totalLucro}
-          />
+          {examesComTipo.length > 0 ? (
+            <ExamTotals
+              totalCliente={totals.totalCliente}
+              totalCusto={totals.totalCusto}
+              totalLucro={totals.totalLucro}
+            />
+          ) : null}
         </table>
       </div>
 

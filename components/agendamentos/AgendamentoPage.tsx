@@ -44,7 +44,6 @@ export function AgendamentoPage() {
     catalogExames,
     catalogLoading,
     pricingLoading,
-    addExam,
     removeExam,
     updateExam,
     loading,
@@ -72,6 +71,7 @@ export function AgendamentoPage() {
     handleConfirmarCancelamento,
     handleSave,
     handleCopyMensagemClinica,
+    cargoSemExames,
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
@@ -114,10 +114,10 @@ export function AgendamentoPage() {
             exams={exams}
             totals={totals}
             clinicaNome={form.clinica_nome}
+            cargoId={cargoId}
+            cargoSemExames={cargoSemExames}
             catalogExames={catalogExames}
-            catalogLoading={catalogLoading}
             pricingLoading={pricingLoading}
-            onAdd={addExam}
             onRemove={removeExam}
             onUpdate={updateExam}
           />

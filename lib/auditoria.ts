@@ -28,6 +28,9 @@ export const AUDITORIA_ACOES = {
   envio: "envio",
   reagendamento: "reagendamento",
   tentativa_bloqueada_duplicidade: "tentativa_bloqueada_duplicidade",
+  exames_carregados_cargo: "exames_carregados_cargo",
+  exame_removido_agendamento: "exame_removido_agendamento",
+  cargo_alterado_exames_recalculados: "cargo_alterado_exames_recalculados",
 } as const;
 
 export type AuditoriaAcao =
@@ -58,6 +61,9 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   envio: "Envio",
   reagendamento: "Reagendamento",
   tentativa_bloqueada_duplicidade: "Tentativa bloqueada (duplicidade)",
+  exames_carregados_cargo: "Exames carregados pelo cargo",
+  exame_removido_agendamento: "Exame removido do agendamento",
+  cargo_alterado_exames_recalculados: "Cargo alterado — exames recalculados",
 };
 
 export interface AuditoriaUsuarioContext {

@@ -1,11 +1,10 @@
-import { formatCPF, maskCPFInput } from "@/lib/cpf";
+import { maskCPFInput } from "@/lib/cpf";
 import {
   formatDateIsoToBR,
   formatHorarioForForm,
 } from "@/lib/agendamento-datetime";
 import { isExameClinicoManual } from "@/lib/exame-pricing";
 import { formatEsocialReciboForDisplay } from "@/lib/esocial-recibo";
-import { createEmptyExam } from "@/lib/form-defaults";
 import { formatMoney } from "@/lib/money";
 import type {
   AgendamentoFormValues,
@@ -49,7 +48,7 @@ export function agendamentoToExams(
   const exames = agendamento.agendamento_exames ?? [];
 
   if (exames.length === 0) {
-    return [createEmptyExam()];
+    return [];
   }
 
   return exames.map((exam) => {

@@ -16,6 +16,7 @@ import {
   isAgendamentoCompleto,
   VALIDATION_TOAST_MESSAGE,
 } from "@/lib/validate-agendamento";
+import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
 import {
   INVALID_DATE_TOAST,
   INVALID_TIME_TOAST,
@@ -74,6 +75,11 @@ import {
 } from "@/services/agendamento.service";
 import { listarCargosAtivos, listarExamesObrigatoriosPorCargo } from "@/services/cargo.service";
 import { registrarHistorico } from "@/services/historico.service";
+import {
+  registrarCargoAlteradoExamesRecalculados,
+  registrarExameRemovidoAgendamento,
+  registrarExamesCarregadosPorCargo,
+} from "@/services/agendamento-form-audit.service";
 import {
   cancelarPeriodicosPorAgendamento,
   criarPeriodicosDeAgendamento,
@@ -153,7 +159,6 @@ export function useAgendamentosPage() {
     totals,
     pricingLoading,
     hasExamWarnings,
-    addExam,
     removeExam,
     updateExam,
     resetExams,
@@ -162,28 +167,32 @@ export function useAgendamentosPage() {
     replaceExamesFromCargo,
   } = useExams(form.clinica_nome, form.aso);
 
-  const handleAddExam = useCallback(() => {
-    examsManuallyModifiedRef.current = true;
-    addExam();
-  }, [addExam]);
-
   const handleRemoveExam = useCallback(
     (id: string) => {
+      const exam = exams.find((item) => item.id === id);
       examsManuallyModifiedRef.current = true;
       removeExam(id);
+      if (exam?.tipo_exame.trim()) {
+        void registrarExameRemovidoAgendamento(auditContext, {
+          exameNome: exam.tipo_exame,
+          cargoNome: cargoNomeSalvo,
+          colaborador: form.colaborador,
+          agendamentoId: editingId,
+        });
+      }
     },
-    [removeExam]
+    [
+      exams,
+      removeExam,
+      auditContext,
+      cargoNomeSalvo,
+      form.colaborador,
+      editingId,
+    ]
   );
 
   const handleUpdateExam = useCallback(
     (id: string, field: keyof ExameFormItem, value: string) => {
-      if (
-        field === "tipo_exame" ||
-        field === "valor_cliente" ||
-        field === "custo_clinica"
-      ) {
-        examsManuallyModifiedRef.current = true;
-      }
       updateExam(id, field, value);
     },
     [updateExam]
@@ -288,6 +297,16 @@ export function useAgendamentosPage() {
     [cargosAtivos, cargoId, cargoNomeSalvo]
   );
 
+  const cargoSemExames = useMemo(
+    () =>
+      cargoSemExamesVinculados(
+        cargoId,
+        exams,
+        pricingLoading || cargosLoading
+      ),
+    [cargoId, exams, pricingLoading, cargosLoading]
+  );
+
   const resetForm = useCallback(() => {
     reset();
     resetExams();
@@ -348,15 +367,19 @@ export function useAgendamentosPage() {
           const examesObrigatorios = await listarExamesObrigatoriosPorCargo(
             prefill.cargo_id!
           );
-          await replaceExamesFromCargo(
-            examesObrigatorios.map((exame) => exame.nome)
-          );
+          const nomes = examesObrigatorios.map((exame) => exame.nome);
+          await replaceExamesFromCargo(nomes);
+          if (nomes.length > 0 && prefill.cargo_nome) {
+            await registrarExamesCarregadosPorCargo(auditContext, {
+              cargoNome: prefill.cargo_nome,
+              exames: nomes,
+              colaborador: prefill.colaborador,
+            });
+          }
         } catch (err) {
           console.error("Erro ao carregar exames do cargo (prefill):", err);
         }
       })();
-    } else if (prefill.exame_nome) {
-      void replaceExamesFromCargo([prefill.exame_nome]);
     }
 
     setShowForm(true);
@@ -373,6 +396,7 @@ export function useAgendamentosPage() {
     resetForm,
     setField,
     replaceExamesFromCargo,
+    auditContext,
   ]);
 
   const handleClear = useCallback(() => {
@@ -404,6 +428,10 @@ export function useAgendamentosPage() {
 
   const applyCargoChange = useCallback(
     async (nextCargoId: string) => {
+      const previousCargoId = cargoId;
+      const cargoAnteriorNome =
+        cargosAtivos.find((cargo) => cargo.id === previousCargoId)?.nome ??
+        cargoNomeSalvo;
       const found = cargosAtivos.find((cargo) => cargo.id === nextCargoId);
       setCargoId(nextCargoId);
       if (found) setCargoNomeSalvo(found.nome);
@@ -411,26 +439,52 @@ export function useAgendamentosPage() {
       try {
         const examesObrigatorios =
           await listarExamesObrigatoriosPorCargo(nextCargoId);
+        const nomes = examesObrigatorios.map((exame) => exame.nome);
 
-        if (examesObrigatorios.length === 0) {
+        if (nomes.length === 0) {
           await replaceExamesFromCargo([]);
           examsManuallyModifiedRef.current = false;
-          toast.message(
-            "Este cargo não possui exames obrigatórios cadastrados."
-          );
           return;
         }
 
-        await replaceExamesFromCargo(
-          examesObrigatorios.map((exame) => exame.nome)
-        );
+        await replaceExamesFromCargo(nomes);
         examsManuallyModifiedRef.current = false;
+
+        const cargoNovoNome = found?.nome ?? cargoNomeSalvo;
+        if (
+          previousCargoId &&
+          previousCargoId !== nextCargoId &&
+          cargoAnteriorNome
+        ) {
+          await registrarCargoAlteradoExamesRecalculados(auditContext, {
+            cargoAnterior: cargoAnteriorNome,
+            cargoNovo: cargoNovoNome,
+            exames: nomes,
+            colaborador: form.colaborador,
+            agendamentoId: editingId,
+          });
+        } else if (cargoNovoNome) {
+          await registrarExamesCarregadosPorCargo(auditContext, {
+            cargoNome: cargoNovoNome,
+            exames: nomes,
+            colaborador: form.colaborador,
+            agendamentoId: editingId,
+          });
+        }
       } catch (err) {
         console.error(err);
         toast.error("Erro ao carregar exames do cargo.");
       }
     },
-    [cargosAtivos, replaceExamesFromCargo]
+    [
+      cargosAtivos,
+      replaceExamesFromCargo,
+      cargoId,
+      cargoNomeSalvo,
+      auditContext,
+      form.colaborador,
+      editingId,
+    ]
   );
 
   const handleCargoChange = useCallback(
@@ -440,6 +494,8 @@ export function useAgendamentosPage() {
       if (!nextCargoId) {
         setCargoId("");
         setCargoNomeSalvo("");
+        await replaceExamesFromCargo([]);
+        examsManuallyModifiedRef.current = false;
         return;
       }
 
@@ -456,7 +512,7 @@ export function useAgendamentosPage() {
         setCargoChangeLoading(false);
       }
     },
-    [cargoId, applyCargoChange]
+    [cargoId, applyCargoChange, replaceExamesFromCargo]
   );
 
   const closeCargoChangeModal = useCallback(() => {
@@ -664,9 +720,9 @@ export function useAgendamentosPage() {
         return;
       }
 
-      if (!isAgendamentoCompleto(form, exams)) {
+      if (!isAgendamentoCompleto(form, exams, cargoId)) {
         toast.error(
-          getAgendamentoValidationMessage(form, exams) ??
+          getAgendamentoValidationMessage(form, exams, cargoId) ??
             VALIDATION_TOAST_MESSAGE
         );
         return;
@@ -852,6 +908,7 @@ export function useAgendamentosPage() {
       refresh,
       historicoUsuario,
       auditContext,
+      cargoId,
       bloquearDuplicidade90Dias,
     ]
   );
@@ -911,7 +968,7 @@ export function useAgendamentosPage() {
     catalogExames,
     catalogLoading,
     pricingLoading,
-    addExam: handleAddExam,
+    cargoSemExames,
     removeExam: handleRemoveExam,
     updateExam: handleUpdateExam,
     loading,

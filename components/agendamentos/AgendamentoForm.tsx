@@ -148,7 +148,7 @@ export function AgendamentoForm({
             ))}
           </select>
         </Field>
-        <Field label="Cargo">
+        <Field label={<>Cargo <RequiredMark /></>}>
           <select
             className="field-input"
             value={cargoId}
@@ -156,7 +156,7 @@ export function AgendamentoForm({
             onChange={(e) => onCargoChange(e.target.value)}
           >
             <option value="">
-              {cargosLoading ? "Carregando cargos..." : "Selecione um cargo (opcional)"}
+              {cargosLoading ? "Carregando cargos..." : "Selecione um cargo"}
             </option>
             {cargos.map((cargo) => (
               <option key={cargo.id} value={cargo.id}>

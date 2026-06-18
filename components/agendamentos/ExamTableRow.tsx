@@ -1,11 +1,9 @@
 import { isExameClinicoManual } from "@/lib/exame-pricing";
-import type { ExameFormItem, ExameRecord } from "@/lib/types";
+import type { ExameFormItem } from "@/lib/types";
 
 interface ExamTableRowProps {
   exam: ExameFormItem;
   canRemove: boolean;
-  catalogExames: ExameRecord[];
-  catalogLoading: boolean;
   pricingLoading: boolean;
   onRemove: () => void;
   onUpdate: (field: keyof ExameFormItem, value: string) => void;
@@ -49,34 +47,20 @@ function PrecoBadge({ exam }: { exam: ExameFormItem }) {
 export function ExamTableRow({
   exam,
   canRemove,
-  catalogExames,
-  catalogLoading,
   pricingLoading,
   onRemove,
   onUpdate,
 }: ExamTableRowProps) {
   const readOnlyPreco = exam.precoAutomatico && !exam.aviso;
-  const disabled = catalogLoading || pricingLoading;
+  const disabled = pricingLoading;
 
   return (
     <>
       <tr className="transition-colors hover:bg-[#fafbff]">
         <td className={TD}>
-          <select
-            className={`${inputClass} w-full min-w-[132px]`}
-            value={exam.tipo_exame}
-            disabled={disabled}
-            onChange={(e) => onUpdate("tipo_exame", e.target.value)}
-          >
-            <option value="">
-              {catalogLoading ? "Carregando..." : "Selecione..."}
-            </option>
-            {catalogExames.map((tipo) => (
-              <option key={tipo.id} value={tipo.nome}>
-                {tipo.nome}
-              </option>
-            ))}
-          </select>
+          <span className="block min-w-[132px] font-semibold text-[#1f2937]">
+            {exam.tipo_exame || "—"}
+          </span>
         </td>
         <td className={TD}>
           <input
