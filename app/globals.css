@@ -87,6 +87,26 @@
   .placeholder-date.show {
     @apply pointer-events-auto visible;
   }
+
+  .agendamento-form-row1 {
+    @apply grid grid-cols-1 gap-x-4 gap-y-3.5;
+  }
+
+  @screen grid {
+    .agendamento-form-row1 {
+      grid-template-columns: 140px 120px minmax(220px, 1fr) minmax(220px, 1fr) 180px;
+    }
+  }
+
+  .agendamento-form-row2 {
+    @apply grid grid-cols-1 gap-x-4 gap-y-3.5;
+  }
+
+  @screen grid {
+    .agendamento-form-row2 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 }
 
 @keyframes fadeIn {

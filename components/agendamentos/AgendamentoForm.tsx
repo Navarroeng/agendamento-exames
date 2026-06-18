@@ -67,135 +67,142 @@ export function AgendamentoForm({
         </button>
       }
     >
-      <div className="form-grid grid grid-cols-1 gap-x-4 gap-y-3.5 grid:grid-cols-2 xl:grid-cols-4">
-        <Field label={<>Data <RequiredMark /></>}>
-          <input
-            className="field-input"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="DD/MM/AAAA"
-            maxLength={10}
-            value={form.data_agendamento}
-            onChange={(e) =>
-              onChange("data_agendamento", maskDateBR(e.target.value))
-            }
-          />
-        </Field>
-        <Field label={<>Horário <RequiredMark /></>}>
-          <input
-            className="field-input"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="HH:mm"
-            maxLength={5}
-            value={form.horario}
-            onChange={(e) => onChange("horario", maskTime24(e.target.value))}
-          />
-          {horarioHint ? (
-            <p className="mt-1.5 text-[11px] font-medium text-[#64748b]">{horarioHint}</p>
-          ) : null}
-        </Field>
-        <Field label={<>Cliente <RequiredMark /></>}>
-          <select
-            className="field-input"
-            value={clienteId}
-            disabled={clientesLoading}
-            onChange={(e) => onClienteChange(e.target.value)}
-          >
-            <option value="">
-              {clientesLoading
-                ? "Carregando clientes..."
-                : SELECT_PLACEHOLDER}
-            </option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {formatClienteSelectLabel(cliente)}
+      <div className="flex flex-col gap-y-3.5">
+        <div className="agendamento-form-row1">
+          <Field label={<>Data <RequiredMark /></>}>
+            <input
+              className="field-input w-full"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="DD/MM/AAAA"
+              maxLength={10}
+              value={form.data_agendamento}
+              onChange={(e) =>
+                onChange("data_agendamento", maskDateBR(e.target.value))
+              }
+            />
+          </Field>
+          <Field label={<>Horário <RequiredMark /></>}>
+            <input
+              className="field-input w-full"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="HH:mm"
+              maxLength={5}
+              value={form.horario}
+              onChange={(e) => onChange("horario", maskTime24(e.target.value))}
+            />
+            {horarioHint ? (
+              <p className="mt-1.5 text-[11px] font-medium text-[#64748b]">
+                {horarioHint}
+              </p>
+            ) : null}
+          </Field>
+          <Field label={<>Cliente <RequiredMark /></>}>
+            <select
+              className="field-input w-full min-w-0"
+              value={clienteId}
+              disabled={clientesLoading}
+              onChange={(e) => onClienteChange(e.target.value)}
+            >
+              <option value="">
+                {clientesLoading
+                  ? "Carregando clientes..."
+                  : SELECT_PLACEHOLDER}
               </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={<>Colaborador <RequiredMark /></>}>
-          <input
-            className="field-input"
-            placeholder="Nome do colaborador"
-            value={form.colaborador}
-            onChange={(e) => onChange("colaborador", e.target.value)}
-          />
-        </Field>
-        <Field label={<>CPF do colaborador <RequiredMark /></>}>
-          <input
-            className="field-input"
-            placeholder="000.000.000-00"
-            inputMode="numeric"
-            autoComplete="off"
-            value={form.colaborador_cpf}
-            onChange={(e) => onChange("colaborador_cpf", e.target.value)}
-          />
-        </Field>
-        <Field label={<>ASO <RequiredMark /></>}>
-          <select
-            className="field-input"
-            value={form.aso}
-            onChange={(e) => onChange("aso", e.target.value)}
-          >
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {TIPOS_ASO.map((a) => (
-              <option key={a} value={a}>
-                {a}
+              {clientes.map((cliente) => (
+                <option key={cliente.id} value={cliente.id}>
+                  {formatClienteSelectLabel(cliente)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={<>Colaborador <RequiredMark /></>}>
+            <input
+              className="field-input w-full min-w-0"
+              placeholder="Nome do colaborador"
+              value={form.colaborador}
+              onChange={(e) => onChange("colaborador", e.target.value)}
+            />
+          </Field>
+          <Field label={<>CPF do colaborador <RequiredMark /></>}>
+            <input
+              className="field-input w-full"
+              placeholder="000.000.000-00"
+              inputMode="numeric"
+              autoComplete="off"
+              value={form.colaborador_cpf}
+              onChange={(e) => onChange("colaborador_cpf", e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="agendamento-form-row2">
+          <Field label={<>ASO <RequiredMark /></>}>
+            <select
+              className="field-input w-full min-w-0"
+              value={form.aso}
+              onChange={(e) => onChange("aso", e.target.value)}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {TIPOS_ASO.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={<>Cargo <RequiredMark /></>}>
+            <select
+              className="field-input w-full min-w-0"
+              value={cargoId}
+              disabled={cargosLoading}
+              onChange={(e) => onCargoChange(e.target.value)}
+            >
+              <option value="">
+                {cargosLoading ? "Carregando cargos..." : "Selecione um cargo"}
               </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={<>Cargo <RequiredMark /></>}>
-          <select
-            className="field-input"
-            value={cargoId}
-            disabled={cargosLoading}
-            onChange={(e) => onCargoChange(e.target.value)}
-          >
-            <option value="">
-              {cargosLoading ? "Carregando cargos..." : "Selecione um cargo"}
-            </option>
-            {cargos.map((cargo) => (
-              <option key={cargo.id} value={cargo.id}>
-                {cargo.nome}
+              {cargos.map((cargo) => (
+                <option key={cargo.id} value={cargo.id}>
+                  {cargo.nome}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={<>Clínica <RequiredMark /></>}>
+            <select
+              className="field-input w-full min-w-0"
+              value={form.clinica_nome}
+              disabled={clinicasLoading}
+              onChange={(e) => onChange("clinica_nome", e.target.value)}
+            >
+              <option value="">
+                {clinicasLoading ? "Carregando clínicas..." : SELECT_PLACEHOLDER}
               </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={<>Clínica <RequiredMark /></>}>
-          <select
-            className="field-input"
-            value={form.clinica_nome}
-            disabled={clinicasLoading}
-            onChange={(e) => onChange("clinica_nome", e.target.value)}
-          >
-            <option value="">
-              {clinicasLoading ? "Carregando clínicas..." : SELECT_PLACEHOLDER}
-            </option>
-            {clinicas.map((c) => (
-              <option key={c.id} value={c.nome_fantasia}>
-                {c.nome_fantasia}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={<>Responsável <RequiredMark /></>}>
-          <select
-            className="field-input"
-            value={form.responsavel}
-            onChange={(e) => onChange("responsavel", e.target.value)}
-          >
-            <option value="">{SELECT_PLACEHOLDER}</option>
-            {RESPONSAVEIS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </Field>
+              {clinicas.map((c) => (
+                <option key={c.id} value={c.nome_fantasia}>
+                  {c.nome_fantasia}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={<>Responsável <RequiredMark /></>}>
+            <select
+              className="field-input w-full min-w-0"
+              value={form.responsavel}
+              onChange={(e) => onChange("responsavel", e.target.value)}
+            >
+              <option value="">{SELECT_PLACEHOLDER}</option>
+              {RESPONSAVEIS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
       </div>
       <ClinicaRegrasAlert clinica={selectedClinica} exams={exams} />
       <ContratoVigenciaAlert state={contratoVigencia} />
