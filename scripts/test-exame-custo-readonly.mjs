@@ -79,6 +79,33 @@ test("updateExam ignora custo_clinica", () => {
   }
 });
 
+test("exame clinico bloqueia custo no updateExam", () => {
+  const exams = [
+    {
+      id: "1",
+      tipo_exame: "Clínico",
+      precoAutomatico: false,
+      custo_clinica: "45,00",
+    },
+  ];
+  const next = updateExamBlocked(exams, "1", "custo_clinica", "99,99");
+  if (next[0].custo_clinica !== "45,00") {
+    throw new Error("custo clinico não deveria mudar");
+  }
+});
+
+test("exame clinico com aviso de custo bloqueia salvar", () => {
+  const exam = {
+    tipo_exame: "Clínico",
+    valor_cliente: "100,00",
+    custo_clinica: "",
+    aviso: EXAME_SEM_CUSTO_CLINICA_MSG,
+  };
+  if (isExamComplete(exam)) {
+    throw new Error("clinico sem custo deveria bloquear");
+  }
+});
+
 if (failed > 0) {
   process.exit(1);
 }

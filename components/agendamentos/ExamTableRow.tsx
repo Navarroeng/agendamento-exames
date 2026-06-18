@@ -73,15 +73,15 @@ export function ExamTableRow({
           />
         </td>
         <td className={TD}>
-          <input
-            className={`${inputClass} w-full min-w-[92px] cursor-not-allowed bg-[#f8fafc]`}
-            value={exam.custo_clinica}
-            placeholder={pricingLoading ? "..." : "0,00"}
-            readOnly
-            disabled={disabled}
-            tabIndex={-1}
+          <div
+            className={`${inputClass} flex h-9 w-full min-w-[92px] cursor-not-allowed select-none items-center bg-[#f1f5f9] text-[#64748b]`}
             aria-readonly="true"
-          />
+            title="Custo definido no cadastro da clínica"
+          >
+            {pricingLoading && !exam.custo_clinica.trim()
+              ? "..."
+              : exam.custo_clinica || "—"}
+          </div>
         </td>
         <td className={TD}>
           <input

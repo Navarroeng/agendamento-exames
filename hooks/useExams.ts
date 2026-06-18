@@ -281,7 +281,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             const enriched = applyAsoValorClinico(
               {
                 ...patch,
-                custo_clinica: patch.custo_clinica ?? exam.custo_clinica,
+                custo_clinica: patch.custo_clinica ?? "",
               },
               asoTipo,
               manual
@@ -289,7 +289,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             const valor = manual
               ? exam.valor_cliente
               : (enriched.valor_cliente ?? exam.valor_cliente);
-            const custo = enriched.custo_clinica ?? exam.custo_clinica;
+            const custo = enriched.custo_clinica ?? "";
             return {
               ...exam,
               ...enriched,
