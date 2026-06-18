@@ -28,8 +28,13 @@ import {
   verificarDuplicidadeExamesNoFormulario,
 } from "@/lib/duplicidade-validations";
 import {
-  verificarAgendamentoMesmoMes,
-  type AgendamentoMesmoMesInfo,
+  isAgendamentoDuplicidade90DiasError,
+  AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
+} from "@/lib/agendamento-duplicidade-90dias";
+import {
+  verificarDuplicidadeAgendamento90Dias,
+  registrarTentativaBloqueadaDuplicidadeAgendamento,
+  type AgendamentoDuplicidade90DiasInfo,
 } from "@/services/duplicidade.service";
 import { useAgendamentoForm } from "@/hooks/useAgendamentoForm";
 import { useContratoVigenciaCheck } from "@/hooks/useContratoVigenciaCheck";
@@ -99,11 +104,9 @@ export function useAgendamentosPage() {
   >(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
-  const [duplicidadeMesOpen, setDuplicidadeMesOpen] = useState(false);
-  const [duplicidadeMesInfo, setDuplicidadeMesInfo] =
-    useState<AgendamentoMesmoMesInfo | null>(null);
-  const [pendingSaveStatus, setPendingSaveStatus] =
-    useState<AgendamentoStatus | null>(null);
+  const [duplicidade90DiasOpen, setDuplicidade90DiasOpen] = useState(false);
+  const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
+    useState<AgendamentoDuplicidade90DiasInfo | null>(null);
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
   const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
   const [cargoChangeLoading, setCargoChangeLoading] = useState(false);
@@ -606,8 +609,26 @@ export function useAgendamentosPage() {
     ]
   );
 
+  const bloquearDuplicidade90Dias = useCallback(
+    async (
+      existente: AgendamentoDuplicidade90DiasInfo,
+      novaDataIso: string
+    ) => {
+      setDuplicidade90DiasInfo(existente);
+      setDuplicidade90DiasOpen(true);
+      await registrarTentativaBloqueadaDuplicidadeAgendamento(auditContext, {
+        existente,
+        novaDataAgendamento: novaDataIso,
+        colaborador: form.colaborador,
+        colaboradorCpf: form.colaborador_cpf,
+        clienteNome: form.cliente_nome,
+      });
+    },
+    [auditContext, form.colaborador, form.colaborador_cpf, form.cliente_nome]
+  );
+
   const executeSave = useCallback(
-    async (status: AgendamentoStatus, skipMesCheck = false) => {
+    async (status: AgendamentoStatus) => {
       if (hasExamWarnings) {
         toast.error(
           "Corrija os exames: há combinações que a clínica não realiza."
@@ -670,21 +691,17 @@ export function useAgendamentosPage() {
         }
       }
 
-      if (!skipMesCheck) {
-        if (dataIso) {
-          const existente = await verificarAgendamentoMesmoMes({
-            clienteNome: form.cliente_nome,
-            colaborador: form.colaborador,
-            dataAgendamentoIso: dataIso,
-            ignorarAgendamentoId: editingId,
-          });
+      if (dataIso) {
+        const existente = await verificarDuplicidadeAgendamento90Dias({
+          clienteNome: form.cliente_nome,
+          colaboradorCpf: form.colaborador_cpf,
+          dataAgendamentoIso: dataIso,
+          ignorarAgendamentoId: editingId,
+        });
 
-          if (existente) {
-            setDuplicidadeMesInfo(existente);
-            setPendingSaveStatus(status);
-            setDuplicidadeMesOpen(true);
-            return;
-          }
+        if (existente) {
+          await bloquearDuplicidade90Dias(existente, dataIso);
+          return;
         }
       }
 
@@ -785,19 +802,34 @@ export function useAgendamentosPage() {
           );
         }
 
-        setDuplicidadeMesOpen(false);
-        setDuplicidadeMesInfo(null);
-        setPendingSaveStatus(null);
+        setDuplicidade90DiasOpen(false);
+        setDuplicidade90DiasInfo(null);
         setShowForm(false);
         resetForm();
         setFiltersExpanded(false);
         refresh();
       } catch (err) {
         console.error("Erro completo ao salvar:", err);
+        if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
+          await bloquearDuplicidade90Dias(err.info, dataIso);
+          return;
+        }
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: unknown }).message)
             : "";
+        if (message === AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG && dataIso) {
+          const existente = await verificarDuplicidadeAgendamento90Dias({
+            clienteNome: form.cliente_nome,
+            colaboradorCpf: form.colaborador_cpf,
+            dataAgendamentoIso: dataIso,
+            ignorarAgendamentoId: editingId,
+          });
+          if (existente) {
+            await bloquearDuplicidade90Dias(existente, dataIso);
+            return;
+          }
+        }
         toast.error(message || "Erro ao salvar agendamento");
       } finally {
         setSaving(false);
@@ -819,6 +851,8 @@ export function useAgendamentosPage() {
       resetForm,
       refresh,
       historicoUsuario,
+      auditContext,
+      bloquearDuplicidade90Dias,
     ]
   );
 
@@ -829,18 +863,10 @@ export function useAgendamentosPage() {
     [executeSave]
   );
 
-  const closeDuplicidadeMesModal = useCallback(() => {
-    setDuplicidadeMesOpen(false);
-    setDuplicidadeMesInfo(null);
-    setPendingSaveStatus(null);
+  const closeDuplicidade90DiasModal = useCallback(() => {
+    setDuplicidade90DiasOpen(false);
+    setDuplicidade90DiasInfo(null);
   }, []);
-
-  const handleConfirmSaveMesmoMes = useCallback(async () => {
-    if (!pendingSaveStatus) return;
-    const status = pendingSaveStatus;
-    setDuplicidadeMesOpen(false);
-    await executeSave(status, true);
-  }, [executeSave, pendingSaveStatus]);
 
   const handleCopyMensagemClinica = useCallback(async () => {
     const message = buildMensagemClinicaWhatsApp({
@@ -914,10 +940,9 @@ export function useAgendamentosPage() {
     handleConfirmarCancelamento,
     handleSave,
     handleCopyMensagemClinica,
-    duplicidadeMesOpen,
-    duplicidadeMesInfo,
-    closeDuplicidadeMesModal,
-    handleConfirmSaveMesmoMes,
+    duplicidade90DiasOpen,
+    duplicidade90DiasInfo,
+    closeDuplicidade90DiasModal,
     cargoChangeModalOpen,
     cargoChangeLoading,
     closeCargoChangeModal,

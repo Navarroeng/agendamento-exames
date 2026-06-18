@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconCalendar } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
-import { AgendamentoDuplicidadeMesModal } from "@/components/modals/AgendamentoDuplicidadeMesModal";
+import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -72,10 +72,9 @@ export function AgendamentoPage() {
     handleConfirmarCancelamento,
     handleSave,
     handleCopyMensagemClinica,
-    duplicidadeMesOpen,
-    duplicidadeMesInfo,
-    closeDuplicidadeMesModal,
-    handleConfirmSaveMesmoMes,
+    duplicidade90DiasOpen,
+    duplicidade90DiasInfo,
+    closeDuplicidade90DiasModal,
     cargoChangeModalOpen,
     cargoChangeLoading,
     closeCargoChangeModal,
@@ -183,12 +182,10 @@ export function AgendamentoPage() {
         onClose={closeCancelModal}
         onConfirm={handleConfirmarCancelamento}
       />
-      <AgendamentoDuplicidadeMesModal
-        open={duplicidadeMesOpen}
-        agendamento={duplicidadeMesInfo}
-        saving={saving}
-        onClose={closeDuplicidadeMesModal}
-        onConfirm={handleConfirmSaveMesmoMes}
+      <AgendamentoDuplicidade90DiasModal
+        open={duplicidade90DiasOpen}
+        agendamento={duplicidade90DiasInfo}
+        onClose={closeDuplicidade90DiasModal}
       />
       <AgendamentoCargoChangeModal
         open={cargoChangeModalOpen}

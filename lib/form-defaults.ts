@@ -7,6 +7,7 @@ export function getEmptyForm(): AgendamentoFormValues {
     horario: "",
     cliente_nome: "",
     colaborador: "",
+    colaborador_cpf: "",
     aso: "",
     clinica_nome: "",
     responsavel: "",

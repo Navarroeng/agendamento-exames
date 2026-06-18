@@ -124,6 +124,16 @@ export function AgendamentoForm({
             onChange={(e) => onChange("colaborador", e.target.value)}
           />
         </Field>
+        <Field label={<>CPF do colaborador <RequiredMark /></>}>
+          <input
+            className="field-input"
+            placeholder="000.000.000-00"
+            inputMode="numeric"
+            autoComplete="off"
+            value={form.colaborador_cpf}
+            onChange={(e) => onChange("colaborador_cpf", e.target.value)}
+          />
+        </Field>
         <Field label={<>ASO <RequiredMark /></>}>
           <select
             className="field-input"

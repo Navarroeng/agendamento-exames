@@ -5,6 +5,7 @@ export interface AgendamentoFormValues {
   horario: string;
   cliente_nome: string;
   colaborador: string;
+  colaborador_cpf: string;
   aso: string;
   clinica_nome: string;
   responsavel: string;
@@ -26,6 +27,7 @@ export interface AgendamentoInsert {
   horario: string | null;
   cliente_nome: string;
   colaborador: string;
+  colaborador_cpf: string;
   aso: string;
   clinica_nome: string;
   responsavel: string;

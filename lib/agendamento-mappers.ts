@@ -1,10 +1,11 @@
-import { createEmptyExam } from "@/lib/form-defaults";
+import { formatCPF, maskCPFInput } from "@/lib/cpf";
 import {
   formatDateIsoToBR,
   formatHorarioForForm,
 } from "@/lib/agendamento-datetime";
 import { isExameClinicoManual } from "@/lib/exame-pricing";
 import { formatEsocialReciboForDisplay } from "@/lib/esocial-recibo";
+import { createEmptyExam } from "@/lib/form-defaults";
 import { formatMoney } from "@/lib/money";
 import type {
   AgendamentoFormValues,
@@ -24,6 +25,7 @@ export function agendamentoToFormValues(
     horario: formatHorarioForForm(agendamento.horario),
     cliente_nome: agendamento.cliente_nome ?? "",
     colaborador: agendamento.colaborador ?? "",
+    colaborador_cpf: maskCPFInput(agendamento.colaborador_cpf ?? ""),
     aso: agendamento.aso ?? "",
     clinica_nome: agendamento.clinica_nome ?? "",
     responsavel: agendamento.responsavel ?? "",

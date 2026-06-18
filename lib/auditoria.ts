@@ -27,6 +27,7 @@ export const AUDITORIA_ACOES = {
   alteracao_preco: "alteracao_preco",
   envio: "envio",
   reagendamento: "reagendamento",
+  tentativa_bloqueada_duplicidade: "tentativa_bloqueada_duplicidade",
 } as const;
 
 export type AuditoriaAcao =
@@ -56,6 +57,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   alteracao_preco: "Alteração de preço",
   envio: "Envio",
   reagendamento: "Reagendamento",
+  tentativa_bloqueada_duplicidade: "Tentativa bloqueada (duplicidade)",
 };
 
 export interface AuditoriaUsuarioContext {

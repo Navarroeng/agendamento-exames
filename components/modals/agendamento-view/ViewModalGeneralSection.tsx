@@ -1,4 +1,5 @@
 import { formatCargoVisualizacao } from "@/lib/agendamento-cargo";
+import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
 import { formatHorarioDisplay } from "@/lib/format-datetime";
 import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
@@ -72,6 +73,11 @@ export function ViewModalGeneralSection({
               icon={<IconUser />}
               label="Colaborador"
               value={agendamento.colaborador}
+            />
+            <DataRow
+              icon={<IconId />}
+              label="CPF"
+              value={formatCPF(agendamento.colaborador_cpf)}
             />
             <DataRow
               icon={<IconHospital />}

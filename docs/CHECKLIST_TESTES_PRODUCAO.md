@@ -42,7 +42,7 @@ Responsável: _______________  Data: _______________
 - [ ] Editar agendamento sem duplicar linhas de exame
 - [ ] Bloqueio: tentar agendar cliente sem contrato vigente
 - [ ] Bloqueio: exame duplicado no mesmo agendamento
-- [ ] Bloqueio: agendamento duplicado no mesmo mês (modal)
+- [ ] Bloqueio: agendamento duplicado em menos de 90 dias (CPF + empresa, modal sem override)
 - [ ] Gerar mensagem WhatsApp para clínica
 - [ ] Cancelar agendamento com motivo — status `cancelado`, histórico registrado
 

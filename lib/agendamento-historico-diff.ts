@@ -240,6 +240,13 @@ export function buildHistoricoAlteracoes(
     anterior.colaborador,
     novo.colaborador
   );
+  compareField(
+    changes,
+    usuario,
+    "o CPF do colaborador",
+    anterior.colaborador_cpf ?? "",
+    novo.colaborador_cpf ?? ""
+  );
 
   const oldCargoId = anterior.cargo_id ?? "";
   const newCargoId = novo.cargo_id ?? "";

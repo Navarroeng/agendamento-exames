@@ -1,14 +1,17 @@
 "use client";
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import type { AgendamentoMesmoMesInfo } from "@/services/duplicidade.service";
+import {
+  AGENDAMENTO_DUPLICIDADE_90_DIAS_COMPLEMENTO,
+  AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
+} from "@/lib/agendamento-duplicidade-90dias";
+import { formatCPF } from "@/lib/cpf";
+import type { AgendamentoDuplicidade90DiasInfo } from "@/services/duplicidade.service";
 
-interface AgendamentoDuplicidadeMesModalProps {
+interface AgendamentoDuplicidade90DiasModalProps {
   open: boolean;
-  agendamento: AgendamentoMesmoMesInfo | null;
-  saving?: boolean;
+  agendamento: AgendamentoDuplicidade90DiasInfo | null;
   onClose: () => void;
-  onConfirm: () => void;
 }
 
 function statusLabel(status: string): string {
@@ -18,26 +21,19 @@ function statusLabel(status: string): string {
   return status;
 }
 
-export function AgendamentoDuplicidadeMesModal({
+export function AgendamentoDuplicidade90DiasModal({
   open,
   agendamento,
-  saving = false,
   onClose,
-  onConfirm,
-}: AgendamentoDuplicidadeMesModalProps) {
+}: AgendamentoDuplicidade90DiasModalProps) {
   if (!open || !agendamento) return null;
-
-  const handleClose = () => {
-    if (saving) return;
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-[#1a1333]/50 backdrop-blur-sm"
-        onClick={handleClose}
+        onClick={onClose}
         aria-label="Fechar"
       />
 
@@ -45,32 +41,35 @@ export function AgendamentoDuplicidadeMesModal({
         className="animate-modal-in relative w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-[0_24px_48px_rgba(45,35,95,0.25)]"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dup-mes-modal-title"
+        aria-labelledby="dup-90d-modal-title"
       >
-        <div className="border-b border-[#e8edf5] bg-gradient-to-br from-[#fffbeb] to-white px-6 py-5">
+        <div className="border-b border-[#e8edf5] bg-gradient-to-br from-[#fef2f2] to-white px-6 py-5">
           <h3
-            id="dup-mes-modal-title"
+            id="dup-90d-modal-title"
             className="text-lg font-extrabold text-[#2d2a4a]"
           >
-            Colaborador já possui agendamento neste mês
+            Agendamento bloqueado
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-[#64748b]">
-            Este colaborador já possui um agendamento registrado para esta
-            empresa no mesmo mês. Revise antes de continuar.
+            {AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-[#64748b]">
+            {AGENDAMENTO_DUPLICIDADE_90_DIAS_COMPLEMENTO}
           </p>
         </div>
 
         <div className="space-y-2 px-6 py-5 text-sm">
           {[
-            ["Cliente", agendamento.cliente_nome],
+            ["Empresa", agendamento.cliente_nome],
             ["Colaborador", agendamento.colaborador],
+            ["CPF", formatCPF(agendamento.colaborador_cpf)],
             [
               "Data do agendamento existente",
               formatDateIsoToBR(agendamento.data_agendamento),
             ],
-            ["Clínica", agendamento.clinica_nome],
-            ["Tipo de ASO", agendamento.tipo_aso],
-            ["Status", statusLabel(agendamento.status)],
+            ["Tipo de ASO existente", agendamento.tipo_aso],
+            ["Clínica existente", agendamento.clinica_nome],
+            ["Status existente", statusLabel(agendamento.status)],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -84,22 +83,9 @@ export function AgendamentoDuplicidadeMesModal({
           ))}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[#e8edf5] bg-[#f8fafc] px-6 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            className="btn"
-            onClick={handleClose}
-            disabled={saving}
-          >
-            Voltar e revisar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onConfirm}
-            disabled={saving}
-          >
-            Salvar mesmo assim
+        <div className="flex justify-end border-t border-[#e8edf5] bg-[#f8fafc] px-6 py-4">
+          <button type="button" className="btn btn-primary" onClick={onClose}>
+            Entendi
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { isValidCPF } from "@/lib/cpf";
 import { SIM_NAO } from "@/lib/constants";
 import {
   isValidDateBR,
@@ -13,6 +14,9 @@ import type { AgendamentoFormValues, ExameFormItem } from "@/lib/types";
 
 export const VALIDATION_TOAST_MESSAGE =
   "Preencha todos os campos obrigatórios antes de salvar.";
+
+export const CPF_COLABORADOR_TOAST =
+  "Informe um CPF válido do colaborador.";
 
 export const ESOCIAL_RECIBO_TOAST =
   "Informe o Nº Recibo completo do e-Social.";
@@ -46,6 +50,10 @@ export function getAgendamentoValidationMessage(
     !requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
   ) {
     return ESOCIAL_RECIBO_TOAST;
+  }
+
+  if (!isFilled(form.colaborador_cpf) || !isValidCPF(form.colaborador_cpf)) {
+    return CPF_COLABORADOR_TOAST;
   }
 
   return VALIDATION_TOAST_MESSAGE;
@@ -85,6 +93,8 @@ export function isAgendamentoCompleto(
     isValidHorario24(form.horario) &&
     isFilled(form.cliente_nome) &&
     isFilled(form.colaborador) &&
+    isFilled(form.colaborador_cpf) &&
+    isValidCPF(form.colaborador_cpf) &&
     isFilled(form.aso) &&
     isFilled(form.clinica_nome) &&
     isFilled(form.responsavel) &&

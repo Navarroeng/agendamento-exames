@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { maskCPFInput } from "@/lib/cpf";
 import { getEmptyForm } from "@/lib/form-defaults";
 import {
   parseDateBRToIso,
@@ -40,6 +41,9 @@ export function useAgendamentoForm() {
       if (field === "esocial_recibo") {
         next.esocial_recibo = maskEsocialRecibo(value);
       }
+      if (field === "colaborador_cpf") {
+        next.colaborador_cpf = maskCPFInput(value);
+      }
       return next;
     });
   }, []);
@@ -64,6 +68,7 @@ export function useAgendamentoForm() {
       ),
       cliente_nome: form.cliente_nome,
       colaborador: form.colaborador,
+      colaborador_cpf: maskCPFInput(form.colaborador_cpf.trim()),
       aso: form.aso,
       clinica_nome: form.clinica_nome,
       responsavel: form.responsavel,
