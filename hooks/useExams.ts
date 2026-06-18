@@ -9,6 +9,7 @@ import {
   verificarDuplicidadeExamesNoFormulario,
 } from "@/lib/duplicidade-validations";
 import { createEmptyExam } from "@/lib/form-defaults";
+import { ordenarExamesAgendamentoComClinicoPrimeiro } from "@/lib/agendamento-exames-order";
 import {
   getClinicoValorNavarroAuto,
   isExameClinicoManual,
@@ -303,7 +304,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         })
       );
       if (generation !== examsSyncGenerationRef.current) return;
-      setExams(updated);
+      setExams(ordenarExamesAgendamentoComClinicoPrimeiro(updated));
     } finally {
       if (generation === examsSyncGenerationRef.current) {
         setPricingLoading(false);
@@ -381,7 +382,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         }
       }
 
-      return novos;
+      return ordenarExamesAgendamentoComClinicoPrimeiro(novos);
     },
     [asoTipo, clinicaNome]
   );
@@ -456,7 +457,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
   const loadExams = useCallback((items: ExameFormItem[]) => {
     examsSyncGenerationRef.current += 1;
-    setExams(
+    const mapped =
       items.length > 0
         ? items.map((e) => {
             const clinicoManual = isExameClinicoManual(e.tipo_exame);
@@ -472,8 +473,8 @@ export function useExams(clinicaNome: string, asoTipo: string) {
                 : false,
             };
           })
-        : []
-    );
+        : [];
+    setExams(ordenarExamesAgendamentoComClinicoPrimeiro(mapped));
   }, []);
 
   const getExamesPayload = useCallback(() => {
