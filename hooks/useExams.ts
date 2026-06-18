@@ -423,7 +423,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
   const updateExam = useCallback(
     (id: string, field: keyof ExameFormItem, value: string) => {
-      if (field === "tipo_exame") return;
+      if (field === "tipo_exame" || field === "custo_clinica") return;
 
       setExams((prev) =>
         prev.map((exam) => {
@@ -438,15 +438,8 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             next.clinicoValorManual = true;
           }
 
-          if (
-            (field === "valor_cliente" || field === "custo_clinica") &&
-            !exam.precoAutomatico
-          ) {
-            const valor =
-              field === "valor_cliente" ? value : exam.valor_cliente;
-            const custo =
-              field === "custo_clinica" ? value : exam.custo_clinica;
-            next.lucro = calcLucro(valor, custo);
+          if (field === "valor_cliente" && !exam.precoAutomatico) {
+            next.lucro = calcLucro(value, exam.custo_clinica);
           }
 
           return next;

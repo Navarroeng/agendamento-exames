@@ -74,12 +74,13 @@ export function ExamTableRow({
         </td>
         <td className={TD}>
           <input
-            className={`${inputClass} w-full min-w-[92px] bg-[#f8fafc]`}
+            className={`${inputClass} w-full min-w-[92px] cursor-not-allowed bg-[#f8fafc]`}
             value={exam.custo_clinica}
             placeholder={pricingLoading ? "..." : "0,00"}
-            readOnly={readOnlyPreco}
-            disabled={disabled && readOnlyPreco}
-            onChange={(e) => onUpdate("custo_clinica", e.target.value)}
+            readOnly
+            disabled={disabled}
+            tabIndex={-1}
+            aria-readonly="true"
           />
         </td>
         <td className={TD}>

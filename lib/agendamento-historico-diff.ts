@@ -155,14 +155,6 @@ function compareExames(
         `alterou o valor do exame ${tipo} de ${formatCurrency(antigo.valor)} para ${formatCurrency(novo.valor)}`
       );
     }
-
-    if (antigo.custo !== novo.custo) {
-      pushChange(
-        changes,
-        usuario,
-        `alterou o custo do exame ${tipo} de ${formatCurrency(antigo.custo)} para ${formatCurrency(novo.custo)}`
-      );
-    }
   });
 
   Array.from(oldMap.entries()).forEach(([tipo, antigo]) => {

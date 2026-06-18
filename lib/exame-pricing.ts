@@ -12,6 +12,9 @@ function normalizeExameNome(nome: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+export const EXAME_SEM_CUSTO_CLINICA_MSG =
+  "Este exame não possui custo cadastrado para a clínica selecionada.";
+
 /** Clínico: valor cliente manual; custo clínica vem de clinica_exames. */
 export function isExameClinicoManual(nome: string): boolean {
   return normalizeExameNome(nome) === normalizeExameNome(EXAME_CLINICO_NOME);

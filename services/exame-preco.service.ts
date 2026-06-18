@@ -1,5 +1,5 @@
+import { EXAME_SEM_CUSTO_CLINICA_MSG } from "@/lib/exame-pricing";
 import { createClient } from "@/lib/supabase/client";
-
 import type { PrecoExameAgendamento } from "@/lib/types";
 
 
@@ -152,7 +152,7 @@ export async function buscarPrecoExameAgendamento(
 
       custoClinica: 0,
 
-      message: "Esta clínica não realiza este exame.",
+      message: EXAME_SEM_CUSTO_CLINICA_MSG,
 
     };
 
