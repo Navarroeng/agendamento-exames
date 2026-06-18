@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import {
+  formatUppercaseInput,
+  isUppercaseField,
+  normalizeUppercaseField,
+} from "@/lib/text-normalize";
 import { getEmptyClinicaForm } from "@/lib/clinica-defaults";
 import {
   clinicaToFormValues,
@@ -15,7 +20,10 @@ export function useClinicaForm() {
   const [saving, setSaving] = useState(false);
 
   const setField = useCallback((field: ClinicaFormField, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue = isUppercaseField("clinica", field)
+      ? formatUppercaseInput(value)
+      : value;
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   }, []);
 
   const reset = useCallback(() => {

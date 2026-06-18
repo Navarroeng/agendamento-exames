@@ -6,6 +6,7 @@ import { CargoFormActions } from "./CargoFormActions";
 import { CargoForm } from "./CargoForm";
 import { CargoTopActions } from "./CargoTopActions";
 import { CargoViewModal } from "./CargoViewModal";
+import { CargosSearchPanel } from "./CargosSearchPanel";
 import { CargosTable } from "./CargosTable";
 import { useCargosPage } from "@/hooks/useCargosPage";
 
@@ -14,6 +15,10 @@ export function CargosPage() {
     showForm,
     editingId,
     cargos,
+    totalFiltrados,
+    filters,
+    setFilter,
+    clearFilters,
     loading,
     error,
     exameCounts,
@@ -42,6 +47,15 @@ export function CargosPage() {
       icon={<IconBriefcase size={20} />}
     >
       <CargoTopActions onNovoCargo={handleNovo} />
+
+      <div className="mb-[18px]">
+        <CargosSearchPanel
+          filters={filters}
+          totalFiltrados={totalFiltrados}
+          onChange={setFilter}
+          onClear={clearFilters}
+        />
+      </div>
 
       <CargosTable
         cargos={cargos}

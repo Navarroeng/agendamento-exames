@@ -2,6 +2,11 @@
 
 import { useCallback, useState } from "react";
 import { maskCPFInput } from "@/lib/cpf";
+import {
+  formatUppercaseInput,
+  isUppercaseField,
+  normalizeUppercaseField,
+} from "@/lib/text-normalize";
 import { getEmptyForm } from "@/lib/form-defaults";
 import {
   parseDateBRToIso,
@@ -24,7 +29,10 @@ export function useAgendamentoForm() {
 
   const setField = useCallback((field: FormField, value: string) => {
     setForm((prev) => {
-      const next = { ...prev, [field]: value };
+      const nextValue = isUppercaseField("agendamento", field)
+        ? formatUppercaseInput(value)
+        : value;
+      const next = { ...prev, [field]: nextValue };
       if (field === "aso_enviado_clinica" && value !== "Sim") {
         next.data_aso_enviado_clinica = "";
       }
@@ -67,7 +75,7 @@ export function useAgendamentoForm() {
         parseHorarioToStorage(form.horario) ?? form.horario
       ),
       cliente_nome: form.cliente_nome,
-      colaborador: form.colaborador,
+      colaborador: normalizeUppercaseField(form.colaborador),
       colaborador_cpf: maskCPFInput(form.colaborador_cpf.trim()),
       aso: form.aso,
       clinica_nome: form.clinica_nome,

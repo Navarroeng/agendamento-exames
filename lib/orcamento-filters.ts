@@ -1,12 +1,9 @@
+import { textsMatchSearch } from "@/lib/text-normalize";
 import type {
   OrcamentoFilters,
   OrcamentoRecord,
   OrcamentoStatus,
 } from "@/lib/orcamento-types";
-
-function normalizeSearch(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 export function hasActiveOrcamentoFilters(filters: OrcamentoFilters): boolean {
   return filters.busca.trim() !== "" || filters.status !== "";
@@ -16,7 +13,7 @@ export function filterOrcamentos(
   orcamentos: OrcamentoRecord[],
   filters: OrcamentoFilters
 ): OrcamentoRecord[] {
-  const busca = normalizeSearch(filters.busca);
+  const busca = filters.busca.trim();
 
   return orcamentos.filter((orcamento) => {
     if (filters.status && orcamento.status !== filters.status) {
@@ -25,19 +22,17 @@ export function filterOrcamentos(
 
     if (!busca) return true;
 
-    const haystack = [
-      orcamento.numero,
-      orcamento.cliente_nome,
-      orcamento.contato,
-      orcamento.email,
-      orcamento.telefone,
-      orcamento.responsavel,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(busca);
+    return textsMatchSearch(
+      [
+        orcamento.numero,
+        orcamento.cliente_nome,
+        orcamento.contato,
+        orcamento.email,
+        orcamento.telefone,
+        orcamento.responsavel,
+      ],
+      busca
+    );
   });
 }
 

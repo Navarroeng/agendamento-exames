@@ -15,5 +15,9 @@
 export const CLIENTE_DB_COLUMNS =
   "id, nome, cnpj, created_at" as const;
 
+/** Colunas para busca normalizada (inclui contatos legados). */
+export const CLIENTE_LIST_COLUMNS =
+  "id, nome, cnpj, email, telefone, contato, created_at" as const;
+
 /** Colunas mínimas para selects e autocompletes (carrega todos os clientes). */
 export const CLIENTE_SELECT_COLUMNS = "id, nome, cnpj" as const;

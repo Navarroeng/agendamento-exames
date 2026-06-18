@@ -2,6 +2,11 @@
 
 import { useCallback, useState } from "react";
 import {
+  formatUppercaseInput,
+  isUppercaseField,
+  normalizeUppercaseField,
+} from "@/lib/text-normalize";
+import {
   isValidadePeriodicoSelecionada,
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
@@ -15,7 +20,10 @@ export function useCargoForm() {
   const [saving, setSaving] = useState(false);
 
   const setField = useCallback((field: CargoFormField, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue = isUppercaseField("cargo", field)
+      ? formatUppercaseInput(value)
+      : value;
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   }, []);
 
   const toggleExame = useCallback((exameId: string) => {
@@ -61,7 +69,7 @@ export function useCargoForm() {
     }
 
     return {
-      nome: form.nome.trim(),
+      nome: normalizeUppercaseField(form.nome),
       descricao: form.descricao.trim() || null,
       ativo: form.ativo === "Ativo",
       validade_periodico_meses: parseValidadePeriodicoMeses(

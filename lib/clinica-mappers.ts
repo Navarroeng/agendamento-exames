@@ -1,3 +1,4 @@
+import { normalizeUppercaseField } from "@/lib/text-normalize";
 import { SIM_NAO } from "@/lib/constants";
 import {
   formatDiasAtendimentoForm,
@@ -68,19 +69,19 @@ export function formValuesToClinicaInsert(
   form: ClinicaFormValues
 ): Omit<ClinicaRecord, "id" | "created_at" | "updated_at"> {
   return {
-    razao_social: form.razao_social.trim(),
-    nome_fantasia: form.nome_fantasia.trim(),
+    razao_social: normalizeUppercaseField(form.razao_social),
+    nome_fantasia: normalizeUppercaseField(form.nome_fantasia),
     cnpj: form.cnpj.trim(),
-    responsavel: form.responsavel.trim(),
+    responsavel: normalizeUppercaseField(form.responsavel),
     telefone: form.telefone.trim(),
     whatsapp: form.whatsapp.trim() || null,
     email: form.email.trim(),
     site: form.site.trim() || null,
     cep: form.cep.trim() || null,
-    rua: form.rua.trim() || null,
+    rua: normalizeUppercaseField(form.rua) || null,
     numero: form.numero.trim() || null,
-    bairro: form.bairro.trim() || null,
-    cidade: form.cidade.trim(),
+    bairro: normalizeUppercaseField(form.bairro) || null,
+    cidade: normalizeUppercaseField(form.cidade),
     estado: form.estado.trim(),
     forma_pagamento: form.forma_pagamento.trim() || null,
     prazo_pagamento: form.prazo_pagamento.trim() || null,

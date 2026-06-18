@@ -1,3 +1,4 @@
+import { textMatchesSearch } from "@/lib/text-normalize";
 import {
   parseMonthYearBRToIsoRange,
 } from "@/lib/agendamento-datetime";
@@ -5,8 +6,7 @@ import type { AgendamentoWithExames } from "@/lib/types";
 import type { RelatoriosFilters } from "./types";
 
 function matchesText(value: string, query: string): boolean {
-  if (!query.trim()) return true;
-  return value.toLowerCase().includes(query.trim().toLowerCase());
+  return textMatchesSearch(value, query);
 }
 
 export function filterAgendamentosRelatorios(

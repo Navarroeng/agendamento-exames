@@ -2,6 +2,11 @@
 
 import { useCallback, useMemo, useState } from "react";
 import {
+  formatUppercaseInput,
+  isUppercaseField,
+  normalizeUppercaseField,
+} from "@/lib/text-normalize";
+import {
   calcItemTotal,
   calcSubtotalItens,
   calcValorTotalOrcamento,
@@ -25,7 +30,10 @@ export function useOrcamentoForm() {
   const [saving, setSaving] = useState(false);
 
   const setField = useCallback((field: OrcamentoFormField, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue = isUppercaseField("orcamento", field)
+      ? formatUppercaseInput(value)
+      : value;
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   }, []);
 
   const addItem = useCallback(() => {
@@ -167,10 +175,10 @@ export function useOrcamentoForm() {
       data_proposta: form.data_proposta,
       cliente_id: form.cliente_id.trim() || null,
       cliente_nome: form.cliente_nome.trim(),
-      contato: emptyToNull(form.contato),
+      contato: emptyToNull(normalizeUppercaseField(form.contato)),
       email: emptyToNull(form.email),
       telefone: emptyToNull(form.telefone),
-      responsavel: form.responsavel.trim(),
+      responsavel: normalizeUppercaseField(form.responsavel),
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual:
         Number(String(form.desconto_percentual).replace(",", ".")) || 0,

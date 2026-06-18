@@ -1,5 +1,37 @@
+import { textsMatchSearch } from "@/lib/text-normalize";
+import type { ClienteRecord } from "@/lib/types";
+
 export function escapeIlikeTerm(value: string): string {
   return value.replace(/[\\%_,]/g, (char) => `\\${char}`);
+}
+
+export function clienteRecordMatchesBusca(
+  record: Pick<ClienteRecord, "nome" | "cnpj"> & {
+    email?: string | null;
+    telefone?: string | null;
+    contato?: string | null;
+  },
+  busca: string
+): boolean {
+  const trimmed = busca.trim();
+  if (!trimmed) return true;
+
+  if (
+    textsMatchSearch(
+      [record.nome, record.cnpj, record.email, record.telefone, record.contato],
+      trimmed
+    )
+  ) {
+    return true;
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 2) {
+    const cnpjDigits = record.cnpj.replace(/\D/g, "");
+    return cnpjDigits.includes(digits);
+  }
+
+  return false;
 }
 
 /** Corresponde dígitos consecutivos em CNPJ com máscara (ex.: 33.476.248/0001-82). */

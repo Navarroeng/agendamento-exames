@@ -1,3 +1,4 @@
+import { normalizeUppercaseField } from "@/lib/text-normalize";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
 import type {
@@ -34,6 +35,19 @@ function pushChange(
     acao: "Alteração",
     detalhes: `${usuario} ${message}`,
   });
+}
+
+function compareUppercaseField(
+  changes: HistoricoEntryDraft[],
+  usuario: string,
+  label: string,
+  oldValue: string,
+  newValue: string
+) {
+  const oldNorm = normalizeUppercaseField(oldValue);
+  const newNorm = normalizeUppercaseField(newValue);
+  if (oldNorm === newNorm) return;
+  compareField(changes, usuario, label, oldNorm, newNorm);
 }
 
 function compareField(
@@ -218,14 +232,14 @@ export function buildHistoricoAlteracoes(
     anterior.horario ?? "",
     novo.horario ?? ""
   );
-  compareField(
+  compareUppercaseField(
     changes,
     usuario,
     "o cliente",
     anterior.cliente_nome,
     novo.cliente_nome
   );
-  compareField(
+  compareUppercaseField(
     changes,
     usuario,
     "o colaborador",
@@ -249,7 +263,7 @@ export function buildHistoricoAlteracoes(
       "Cargo alterado e exames recalculados conforme exames obrigatórios do novo cargo."
     );
   } else {
-    compareField(
+    compareUppercaseField(
       changes,
       usuario,
       "o cargo",
@@ -259,7 +273,7 @@ export function buildHistoricoAlteracoes(
   }
 
   compareField(changes, usuario, "o ASO", anterior.aso, novo.aso);
-  compareField(
+  compareUppercaseField(
     changes,
     usuario,
     "a clínica",

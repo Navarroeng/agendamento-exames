@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { filterClinicaExamesCatalog } from "@/lib/clinica-filters";
 import { formatCurrency, formatMoney, parseMoney } from "@/lib/money";
 import { listarExamesAtivos } from "@/services/exame.service";
 import {
@@ -62,15 +63,10 @@ export function useClinicaExamesTab({
     load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (i) =>
-        i.exames.nome.toLowerCase().includes(q) ||
-        (i.exames.categoria ?? "").toLowerCase().includes(q)
-    );
-  }, [items, search]);
+  const filtered = useMemo(
+    () => filterClinicaExamesCatalog(items, search),
+    [items, search]
+  );
 
   const examesDisponiveis = useMemo(() => {
     const vinculados = new Set(items.map((i) => i.exame_id));

@@ -10,6 +10,7 @@ import { ClinicaFormActions } from "./ClinicaFormActions";
 import { ClinicaHistoricoModal } from "@/components/modals/ClinicaHistoricoModal";
 import { ClinicaTopActions } from "./ClinicaTopActions";
 import { ClinicaViewModal } from "@/components/modals/ClinicaViewModal";
+import { ClinicasSearchPanel } from "./ClinicasSearchPanel";
 import { ClinicasTable } from "./ClinicasTable";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useClinicasPage } from "@/hooks/useClinicasPage";
@@ -32,6 +33,10 @@ export function ClinicasPage() {
     setField,
     saving,
     rows,
+    totalFiltrados,
+    filters,
+    setFilter,
+    clearFilters,
     loading,
     error,
     resetForm,
@@ -54,6 +59,15 @@ export function ClinicasPage() {
       icon={<IconBuilding size={20} />}
     >
       <ClinicaTopActions onNovaClinica={handleNovaClinica} />
+
+      <div className="mb-[18px]">
+        <ClinicasSearchPanel
+          filters={filters}
+          totalFiltrados={totalFiltrados}
+          onChange={setFilter}
+          onClear={clearFilters}
+        />
+      </div>
 
       <ClinicasTable
         rows={rows}

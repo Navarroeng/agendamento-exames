@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import {
-  buildClienteBuscaOrFilters,
-  isCnpjDigitsColumnMissing,
-} from "@/lib/cliente-busca";
+import { clienteRecordMatchesBusca } from "@/lib/cliente-busca";
 import {
   CLIENTE_CNPJ_DUPLICADO_MSG,
   normalizeCnpjDigits,
@@ -10,6 +7,7 @@ import {
 } from "@/lib/cliente-cnpj";
 import {
   CLIENTE_DB_COLUMNS,
+  CLIENTE_LIST_COLUMNS,
   CLIENTE_SELECT_COLUMNS,
 } from "@/lib/cliente-schema";
 import { sortByNome } from "@/lib/sort-by-label";
@@ -34,16 +32,6 @@ export interface ListarClientesPaginadosResult {
   page: number;
   pageSize: number;
   totalPages: number;
-}
-
-function applyClienteBuscaFilter<T extends { or: (filters: string) => T }>(
-  query: T,
-  busca: string,
-  useCnpjDigitsColumn = true
-): T {
-  const filters = buildClienteBuscaOrFilters(busca, { useCnpjDigitsColumn });
-  if (filters.length === 0) return query;
-  return query.or(filters.join(","));
 }
 
 function throwClienteSaveError(error: unknown): never {
@@ -126,30 +114,36 @@ export async function listarClientesPaginados(
   const page = Math.max(1, params.page ?? 1);
   const pageSize = params.pageSize ?? 30;
   const busca = params.busca?.trim() ?? "";
+
+  if (busca) {
+    const all = await listarTodosClientesParaBusca();
+    const filtered = all.filter((record) =>
+      clienteRecordMatchesBusca(record, busca)
+    );
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const from = (safePage - 1) * pageSize;
+
+    return {
+      records: filtered.slice(from, from + pageSize),
+      total,
+      page: safePage,
+      pageSize,
+      totalPages,
+    };
+  }
+
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   const supabase = createClient();
-  const runQuery = (useCnpjDigitsColumn: boolean) => {
-    let query = supabase
-      .from("clientes")
-      .select(CLIENTE_DB_COLUMNS, { count: "exact" })
-      .order("nome", { ascending: true })
-      .range(from, to);
+  const { data, error, count } = await supabase
+    .from("clientes")
+    .select(CLIENTE_DB_COLUMNS, { count: "exact" })
+    .order("nome", { ascending: true })
+    .range(from, to);
 
-    if (busca) {
-      query = applyClienteBuscaFilter(query, busca, useCnpjDigitsColumn);
-    }
-
-    return query;
-  };
-
-  let result = await runQuery(true);
-  if (result.error && busca && isCnpjDigitsColumnMissing(result.error)) {
-    result = await runQuery(false);
-  }
-
-  const { data, error, count } = result;
   if (error) throw error;
 
   const total = count ?? 0;
@@ -162,6 +156,30 @@ export async function listarClientesPaginados(
     pageSize,
     totalPages,
   };
+}
+
+async function listarTodosClientesParaBusca(): Promise<ClienteRecord[]> {
+  const supabase = createClient();
+  const all: ClienteRecord[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select(CLIENTE_LIST_COLUMNS)
+      .order("nome", { ascending: true })
+      .range(from, from + SELECT_BATCH_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = (data ?? []) as ClienteRecord[];
+    all.push(...batch);
+
+    if (batch.length < SELECT_BATCH_SIZE) break;
+    from += SELECT_BATCH_SIZE;
+  }
+
+  return all;
 }
 
 export async function resolverPaginaClientePorNome(

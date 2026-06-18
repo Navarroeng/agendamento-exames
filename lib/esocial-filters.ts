@@ -1,3 +1,4 @@
+import { textMatchesSearch } from "@/lib/text-normalize";
 import {
   parseDateBRToIso,
   parseMonthYearBRToIsoRange,
@@ -85,8 +86,7 @@ export function getESocialVisualStatus(
 }
 
 function matchesText(value: string, query: string): boolean {
-  if (!query.trim()) return true;
-  return value.toLowerCase().includes(query.trim().toLowerCase());
+  return textMatchesSearch(value, query);
 }
 
 function matchesPeriodo(

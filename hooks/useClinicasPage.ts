@@ -4,6 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import {
+  EMPTY_CLINICAS_LIST_FILTERS,
+  filterClinicas,
+  type ClinicasListFilters,
+} from "@/lib/clinica-filters";
+import {
   buildHistoricoAlteracoesClinica,
   buildHistoricoCriacaoClinica,
   buildHistoricoStatusClinica,
@@ -37,6 +42,9 @@ export function useClinicasPage() {
   );
   const [desativando, setDesativando] = useState(false);
   const [formTab, setFormTab] = useState<"dados" | "exames">("dados");
+  const [filters, setFilters] = useState<ClinicasListFilters>(
+    EMPTY_CLINICAS_LIST_FILTERS
+  );
 
   const {
     form,
@@ -51,7 +59,15 @@ export function useClinicasPage() {
 
   const { clinicas, loading, error, refresh, getById } = useClinicasList();
 
-  const rows = useMemo(() => mapClinicasToTableRows(clinicas), [clinicas]);
+  const filteredClinicas = useMemo(
+    () => filterClinicas(clinicas, filters),
+    [clinicas, filters]
+  );
+
+  const rows = useMemo(
+    () => mapClinicasToTableRows(filteredClinicas),
+    [filteredClinicas]
+  );
 
   const resetForm = useCallback(() => {
     reset();
@@ -250,6 +266,14 @@ export function useClinicasPage() {
   const desativarClinicaNome =
     (desativarTargetId && getById(desativarTargetId)?.nome_fantasia) || "";
 
+  const setFilter = useCallback((value: string) => {
+    setFilters({ busca: value });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters(EMPTY_CLINICAS_LIST_FILTERS);
+  }, []);
+
   return {
     showForm,
     editingId,
@@ -266,6 +290,10 @@ export function useClinicasPage() {
     setField,
     saving,
     rows,
+    totalFiltrados: filteredClinicas.length,
+    filters,
+    setFilter,
+    clearFilters,
     loading,
     error,
     resetForm,

@@ -1,3 +1,4 @@
+import { textMatchesSearch } from "@/lib/text-normalize";
 import { buildPendencias } from "@/lib/agendamentos-table";
 import type { AgendamentoWithExames } from "@/lib/types";
 
@@ -82,8 +83,7 @@ function matchesPendenciaFilter(
 }
 
 function matchesText(value: string, query: string): boolean {
-  if (!query.trim()) return true;
-  return value.toLowerCase().includes(query.trim().toLowerCase());
+  return textMatchesSearch(value, query);
 }
 
 export function filterAgendamentos(

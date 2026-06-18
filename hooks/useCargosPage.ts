@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import {
+  EMPTY_CARGOS_LIST_FILTERS,
+  filterCargos,
+  type CargosListFilters,
+} from "@/lib/cargo-filters";
 import { useCargoForm } from "@/hooks/useCargoForm";
 import { useCargosList } from "@/hooks/useCargosList";
 import { useExamesCatalogOptions } from "@/hooks/useExams";
@@ -24,6 +29,9 @@ export function useCargosPage() {
   const [viewCargo, setViewCargo] = useState<CargoComExames | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [exameCounts, setExameCounts] = useState<Record<string, number>>({});
+  const [filters, setFilters] = useState<CargosListFilters>(
+    EMPTY_CARGOS_LIST_FILTERS
+  );
 
   const { cargos, loading, error, refresh, getById } = useCargosList();
   const { exames: catalogExames, loading: catalogLoading } =
@@ -40,6 +48,11 @@ export function useCargosPage() {
     saving,
     setSaving,
   } = useCargoForm();
+
+  const filteredCargos = useMemo(
+    () => filterCargos(cargos, filters),
+    [cargos, filters]
+  );
 
   useEffect(() => {
     if (cargos.length === 0) {
@@ -220,7 +233,11 @@ export function useCargosPage() {
   return {
     showForm,
     editingId,
-    cargos,
+    cargos: filteredCargos,
+    totalFiltrados: filteredCargos.length,
+    filters,
+    setFilter: (value: string) => setFilters({ busca: value }),
+    clearFilters: () => setFilters(EMPTY_CARGOS_LIST_FILTERS),
     loading,
     error,
     exameCounts,
