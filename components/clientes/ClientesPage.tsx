@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -36,6 +37,7 @@ const VALIDATION_MESSAGE =
 
 export function ClientesPage() {
   const auditContext = useAuditoriaUsuario();
+  const [showForm, setShowForm] = useState(false);
 
   const {
     form,
@@ -74,6 +76,7 @@ export function ClientesPage() {
 
   const handleNovoCliente = () => {
     resetForm();
+    setShowForm(true);
 
     requestAnimationFrame(() => {
       document
@@ -105,6 +108,7 @@ export function ClientesPage() {
       toast.success("Cliente salvo com sucesso!");
 
       resetForm();
+      setShowForm(false);
       await showClienteAposCadastro(id, payload.nome);
 
       requestAnimationFrame(() => {
@@ -137,13 +141,17 @@ export function ClientesPage() {
     >
       <ClienteTopActions onNovoCliente={handleNovoCliente} />
 
-      <ClienteForm form={form} onChange={setField} />
+      {showForm && (
+        <>
+          <ClienteForm form={form} onChange={setField} />
 
-      <ClienteFormActions
-        saving={saving}
-        onClear={resetForm}
-        onSave={handleSave}
-      />
+          <ClienteFormActions
+            saving={saving}
+            onClear={resetForm}
+            onSave={handleSave}
+          />
+        </>
+      )}
 
       <div className="mb-[18px]">
         <ClientesSearchPanel
