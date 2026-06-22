@@ -94,13 +94,24 @@ export function formatDateIsoToBR(iso: string | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
+/** Normaliza HH:mm:ss, HH:mm ou variantes do Postgres para HH:mm (comparação/auditoria). */
+export function normalizeHorarioForCompare(
+  horario: string | null | undefined
+): string {
+  if (horario == null) return "";
+  const trimmed = String(horario).trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return trimmed;
+
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
 export function formatHorarioForForm(
   horario: string | null | undefined
 ): string {
-  if (!horario?.trim()) return "";
-  const parts = horario.trim().split(":");
-  if (parts.length < 2) return horario.trim();
-  return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+  return normalizeHorarioForCompare(horario);
 }
 
 export function parseHorarioToStorage(value: string): string | null {

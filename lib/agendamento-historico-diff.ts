@@ -1,4 +1,4 @@
-import { formatHorarioForForm } from "@/lib/agendamento-datetime";
+import { normalizeHorarioForCompare } from "@/lib/agendamento-datetime";
 import { formatCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { normalizeUppercaseField } from "@/lib/text-normalize";
 import { formatDateBR } from "@/lib/format";
@@ -32,11 +32,6 @@ function normalizeIsoDate(value: string | null | undefined): string {
     return `${year}-${month}-${day}`;
   }
   return trimmed.split("T")[0];
-}
-
-function formatHorarioField(value: string | null | undefined): string {
-  const normalized = formatHorarioForForm(value);
-  return normalized || "—";
 }
 
 function formatCpfField(value: string | null | undefined): string {
@@ -77,6 +72,26 @@ function compareUppercaseField(
   const newNorm = normalizeUppercaseField(newValue);
   if (oldNorm === newNorm) return;
   compareField(changes, usuario, label, oldNorm, newNorm);
+}
+
+function compareHorarioField(
+  changes: HistoricoEntryDraft[],
+  usuario: string,
+  oldValue: string | null | undefined,
+  newValue: string | null | undefined
+) {
+  const oldNorm = normalizeHorarioForCompare(oldValue);
+  const newNorm = normalizeHorarioForCompare(newValue);
+  if (oldNorm === newNorm) return;
+
+  compareField(
+    changes,
+    usuario,
+    "o horário",
+    oldNorm,
+    newNorm,
+    (value) => (value ? value : "—")
+  );
 }
 
 function compareField(
@@ -254,14 +269,7 @@ export function buildHistoricoAlteracoes(
     novo.data_agendamento,
     formatDateField
   );
-  compareField(
-    changes,
-    usuario,
-    "o horário",
-    anterior.horario ?? "",
-    novo.horario ?? "",
-    formatHorarioField
-  );
+  compareHorarioField(changes, usuario, anterior.horario, novo.horario);
   compareUppercaseField(
     changes,
     usuario,

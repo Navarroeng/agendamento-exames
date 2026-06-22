@@ -94,6 +94,22 @@ test("não registra alteração de horário quando 08:00:00 e 08:00 são equival
   assert(!hasHorarioChange(changes), `esperado sem horário, recebeu: ${JSON.stringify(changes)}`);
 });
 
+test("não registra horário ao alterar apenas a data", () => {
+  const changes = buildHistoricoAlteracoes(
+    baseAnterior({ data_agendamento: "2026-06-23" }),
+    baseNovo({ data_agendamento: "2026-06-26" }),
+    [],
+    "Bruna"
+  );
+  assert(!hasHorarioChange(changes), `esperado sem horário, recebeu: ${JSON.stringify(changes)}`);
+  assert(
+    changes.some((entry) =>
+      entry.detalhes.includes("alterou a data de 23/06/2026 para 26/06/2026")
+    ),
+    "esperado alteração de data"
+  );
+});
+
 test("não registra horário ao alterar apenas o responsável", () => {
   const changes = buildHistoricoAlteracoes(
     baseAnterior(),

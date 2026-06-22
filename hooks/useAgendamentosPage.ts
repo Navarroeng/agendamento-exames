@@ -843,13 +843,19 @@ export function useAgendamentosPage() {
             toast.error("Agendamento não encontrado.");
             return;
           }
-          await atualizarAgendamentoComExames(editingId, payload, examesPayload);
+          const anteriorParaHistorico: typeof anterior = {
+            ...anterior,
+            agendamento_exames: (anterior.agendamento_exames ?? []).map(
+              (exame) => ({ ...exame })
+            ),
+          };
           const alteracoes = buildHistoricoAlteracoes(
-            anterior,
+            anteriorParaHistorico,
             payload,
             examesPayload,
             historicoUsuario
           );
+          await atualizarAgendamentoComExames(editingId, payload, examesPayload);
           if (alteracoes.length > 0) {
             await registrarHistorico(
               editingId,
