@@ -9,8 +9,16 @@ import {
   verificarDuplicidadeExamesNoFormulario,
 } from "@/lib/duplicidade-validations";
 import { createEmptyExam } from "@/lib/form-defaults";
+import {
+  agendamentoPossuiExamesComplementares,
+  EXAME_CLINICO_NAO_ENCONTRADO_RETORNO_MSG,
+  filtrarNomesExamesParaAso,
+  isAsoRetornoAoTrabalho,
+} from "@/lib/agendamento-aso-retorno-trabalho";
 import { ordenarExamesAgendamentoComClinicoPrimeiro } from "@/lib/agendamento-exames-order";
 import {
+  EXAME_CLINICO_NOME,
+  EXAME_SEM_CUSTO_CLINICA_MSG,
   getClinicoValorNavarroAuto,
   isExameClinicoManual,
   nomeExameParaBuscaPreco,
@@ -121,6 +129,49 @@ async function fetchPreco(
     lucro: calcLucro(valor, custo),
     aviso: "",
     precoAutomatico: true,
+  };
+}
+
+async function fetchPrecoClinicoRetornoTrabalho(
+  clinicaNome: string,
+  exameNome: string
+): Promise<Partial<ExameFormItem>> {
+  const result = await buscarPrecoExameAgendamento(
+    clinicaNome,
+    nomeExameParaBuscaPreco(exameNome)
+  );
+
+  if (!result.ok) {
+    const messageLower = (result.message ?? "").toLowerCase();
+    const catalogoInexistente =
+      !result.exameId || messageLower.includes("não encontrado");
+
+    return {
+      tipo_exame: exameNome,
+      exame_id: result.exameId ?? "",
+      valor_cliente: "",
+      custo_clinica: "",
+      lucro: "",
+      aviso: catalogoInexistente
+        ? EXAME_CLINICO_NAO_ENCONTRADO_RETORNO_MSG
+        : (result.message ?? EXAME_SEM_CUSTO_CLINICA_MSG),
+      precoAutomatico: false,
+      clinicoValorManual: false,
+    };
+  }
+
+  const valor = formatMoney(result.valorNavarro);
+  const custo = formatMoney(result.custoClinica);
+
+  return {
+    tipo_exame: exameNome,
+    exame_id: result.exameId ?? "",
+    valor_cliente: valor,
+    custo_clinica: custo,
+    lucro: calcLucro(valor, custo),
+    aviso: "",
+    precoAutomatico: true,
+    clinicoValorManual: false,
   };
 }
 
@@ -269,7 +320,12 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     if (!clinicaNome.trim()) return;
 
     const generation = examsSyncGenerationRef.current;
-    const snapshot = examsRef.current;
+    const snapshot = isAsoRetornoAoTrabalho(asoTipo)
+      ? examsRef.current.filter(
+          (exam) =>
+            !exam.tipo_exame.trim() || isExameClinicoManual(exam.tipo_exame)
+        )
+      : examsRef.current;
 
     setPricingLoading(true);
     try {
@@ -277,6 +333,13 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         snapshot.map(async (exam) => {
           if (!exam.tipo_exame.trim()) return exam;
           if (isExameClinicoManual(exam.tipo_exame)) {
+            if (isAsoRetornoAoTrabalho(asoTipo)) {
+              const patch = await fetchPrecoClinicoRetornoTrabalho(
+                clinicaNome,
+                exam.tipo_exame
+              );
+              return { ...exam, ...patch };
+            }
             const patch = await fetchPrecoClinico(clinicaNome, exam.tipo_exame);
             const manual = exam.clinicoValorManual ?? false;
             const enriched = applyAsoValorClinico(
@@ -339,10 +402,28 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
   const buildExamesFromNomes = useCallback(
     async (exameNomes: string[]): Promise<ExameFormItem[]> => {
+      const nomesFiltrados = filtrarNomesExamesParaAso(exameNomes, asoTipo);
       const novos: ExameFormItem[] = [];
 
-      for (const nome of exameNomes) {
+      for (const nome of nomesFiltrados) {
         if (isExameClinicoManual(nome)) {
+          if (isAsoRetornoAoTrabalho(asoTipo)) {
+            if (clinicaNome.trim()) {
+              const patch = await fetchPrecoClinicoRetornoTrabalho(
+                clinicaNome,
+                nome
+              );
+              novos.push({ ...createEmptyExam(), ...patch });
+            } else {
+              novos.push({
+                ...createEmptyExam(),
+                ...clinicoSemClinicaPatch(nome),
+                clinicoValorManual: false,
+              });
+            }
+            continue;
+          }
+
           if (clinicaNome.trim()) {
             const patch = await fetchPrecoClinico(clinicaNome, nome);
             const enriched = applyAsoValorClinico(
@@ -390,9 +471,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
   const replaceExamesFromCargo = useCallback(
     async (exameNomes: string[]) => {
       const generation = ++examsSyncGenerationRef.current;
-      const normalizedIncoming = exameNomes
-        .map((nome) => nome.trim())
-        .filter(Boolean);
+      const normalizedIncoming = filtrarNomesExamesParaAso(exameNomes, asoTipo);
 
       setExams([]);
       setPricingLoading(true);
@@ -415,8 +494,52 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         }
       }
     },
-    [buildExamesFromNomes]
+    [buildExamesFromNomes, asoTipo]
   );
+
+  const enforceRetornoTrabalhoExames = useCallback(async (): Promise<boolean> => {
+    if (!isAsoRetornoAoTrabalho(asoTipo)) return false;
+
+    const current = examsRef.current;
+    const hadComplementares = agendamentoPossuiExamesComplementares(current);
+    const validos = current.filter((exam) => exam.tipo_exame.trim());
+    const onlyClinico =
+      validos.length === 1 && isExameClinicoManual(validos[0].tipo_exame);
+
+    if (onlyClinico && !hadComplementares) {
+      if (clinicaNome.trim()) {
+        const generation = ++examsSyncGenerationRef.current;
+        setPricingLoading(true);
+        try {
+          const patch = await fetchPrecoClinicoRetornoTrabalho(
+            clinicaNome,
+            validos[0].tipo_exame
+          );
+          if (generation === examsSyncGenerationRef.current) {
+            setExams([{ ...validos[0], ...patch }]);
+          }
+        } finally {
+          if (generation === examsSyncGenerationRef.current) {
+            setPricingLoading(false);
+          }
+        }
+      }
+      return false;
+    }
+
+    const generation = ++examsSyncGenerationRef.current;
+    setPricingLoading(true);
+    try {
+      const novos = await buildExamesFromNomes([EXAME_CLINICO_NOME]);
+      if (generation !== examsSyncGenerationRef.current) return hadComplementares;
+      setExams(novos);
+      return hadComplementares;
+    } finally {
+      if (generation === examsSyncGenerationRef.current) {
+        setPricingLoading(false);
+      }
+    }
+  }, [asoTipo, buildExamesFromNomes, clinicaNome]);
 
   const removeExam = useCallback((id: string) => {
     setExams((prev) => prev.filter((e) => e.id !== id));
@@ -505,6 +628,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     getExamesPayload,
     refreshAllPricing,
     replaceExamesFromCargo,
+    enforceRetornoTrabalhoExames,
   };
 }
 

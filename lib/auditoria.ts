@@ -31,6 +31,8 @@ export const AUDITORIA_ACOES = {
   exames_carregados_cargo: "exames_carregados_cargo",
   exame_removido_agendamento: "exame_removido_agendamento",
   cargo_alterado_exames_recalculados: "cargo_alterado_exames_recalculados",
+  exames_complementares_removidos_retorno_trabalho:
+    "exames_complementares_removidos_retorno_trabalho",
   procuracao_alterada: "procuracao_alterada",
   agendamento_sem_procuracao_confirmado: "agendamento_sem_procuracao_confirmado",
 } as const;
@@ -66,6 +68,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   exames_carregados_cargo: "Exames carregados pelo cargo",
   exame_removido_agendamento: "Exame removido do agendamento",
   cargo_alterado_exames_recalculados: "Cargo alterado — exames recalculados",
+  exames_complementares_removidos_retorno_trabalho:
+    "Complementares removidos (Retorno ao Trabalho)",
   procuracao_alterada: "Procuração alterada",
   agendamento_sem_procuracao_confirmado:
     "Agendamento confirmado sem procuração ativa",

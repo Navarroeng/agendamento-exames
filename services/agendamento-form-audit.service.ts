@@ -84,3 +84,23 @@ export async function registrarCargoAlteradoExamesRecalculados(
     },
   });
 }
+
+export async function registrarExamesComplementaresRemovidosRetornoTrabalho(
+  context: AuditoriaUsuarioContext,
+  params: {
+    colaborador?: string | null;
+    agendamentoId?: string | null;
+  }
+): Promise<void> {
+  await registrarAuditoria({
+    usuarioId: context.usuarioId,
+    usuarioNome: context.usuarioNome,
+    usuarioEmail: context.usuarioEmail,
+    modulo: AUDITORIA_MODULOS.agendamentos,
+    acao: AUDITORIA_ACOES.exames_complementares_removidos_retorno_trabalho,
+    registroId: params.agendamentoId ?? null,
+    registroNome: params.colaborador ?? null,
+    descricao:
+      "Exames complementares removidos automaticamente porque o ASO selecionado é Retorno ao Trabalho.",
+  });
+}

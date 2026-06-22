@@ -16,6 +16,12 @@ import {
   isAgendamentoCompleto,
   VALIDATION_TOAST_MESSAGE,
 } from "@/lib/validate-agendamento";
+import {
+  CLINICO_NAO_REMOVIVEL_RETORNO_TOAST,
+  filtrarNomesExamesParaAso,
+  isAsoRetornoAoTrabalho,
+  podeRemoverExameAgendamento,
+} from "@/lib/agendamento-aso-retorno-trabalho";
 import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
 import {
   INVALID_DATE_TOAST,
@@ -80,6 +86,7 @@ import {
   registrarCargoAlteradoExamesRecalculados,
   registrarExameRemovidoAgendamento,
   registrarExamesCarregadosPorCargo,
+  registrarExamesComplementaresRemovidosRetornoTrabalho,
 } from "@/services/agendamento-form-audit.service";
 import { registrarAgendamentoClienteSemProcuracao } from "@/services/cliente-procuracao-audit.service";
 import {
@@ -100,6 +107,7 @@ export function useAgendamentosPage() {
   const searchParams = useSearchParams();
   const prefillAppliedRef = useRef(false);
   const examsManuallyModifiedRef = useRef(false);
+  const prevAsoRef = useRef("");
   const historicoUsuario = useHistoricoUsuario();
   const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
@@ -172,11 +180,19 @@ export function useAgendamentosPage() {
     loadExams,
     getExamesPayload,
     replaceExamesFromCargo,
+    enforceRetornoTrabalhoExames,
   } = useExams(form.clinica_nome, form.aso);
 
   const handleRemoveExam = useCallback(
     (id: string) => {
       const exam = exams.find((item) => item.id === id);
+      if (
+        exam?.tipo_exame.trim() &&
+        !podeRemoverExameAgendamento(form.aso, exam.tipo_exame)
+      ) {
+        toast.error(CLINICO_NAO_REMOVIVEL_RETORNO_TOAST);
+        return;
+      }
       examsManuallyModifiedRef.current = true;
       removeExam(id);
       if (exam?.tipo_exame.trim()) {
@@ -195,8 +211,60 @@ export function useAgendamentosPage() {
       cargoNomeSalvo,
       form.colaborador,
       editingId,
+      form.aso,
     ]
   );
+
+  useEffect(() => {
+    const prev = prevAsoRef.current;
+    const next = form.aso;
+    if (prev === next) return;
+    prevAsoRef.current = next;
+
+    if (isAsoRetornoAoTrabalho(next)) {
+      void (async () => {
+        const removed = await enforceRetornoTrabalhoExames();
+        if (removed) {
+          examsManuallyModifiedRef.current = false;
+          await registrarExamesComplementaresRemovidosRetornoTrabalho(
+            auditContext,
+            {
+              colaborador: form.colaborador,
+              agendamentoId: editingId,
+            }
+          );
+        }
+      })();
+      return;
+    }
+
+    if (
+      isAsoRetornoAoTrabalho(prev) &&
+      cargoId &&
+      !examsManuallyModifiedRef.current
+    ) {
+      void (async () => {
+        try {
+          const examesObrigatorios =
+            await listarExamesObrigatoriosPorCargo(cargoId);
+          await replaceExamesFromCargo(
+            examesObrigatorios.map((exame) => exame.nome)
+          );
+        } catch (err) {
+          console.error(err);
+          toast.error("Erro ao recarregar exames do cargo.");
+        }
+      })();
+    }
+  }, [
+    form.aso,
+    form.colaborador,
+    cargoId,
+    enforceRetornoTrabalhoExames,
+    auditContext,
+    editingId,
+    replaceExamesFromCargo,
+  ]);
 
   const handleUpdateExam = useCallback(
     (id: string, field: keyof ExameFormItem, value: string) => {
@@ -326,6 +394,7 @@ export function useAgendamentosPage() {
     setCargoChangeModalOpen(false);
     setClienteProcuracaoModalOpen(false);
     setPendingClienteId(null);
+    prevAsoRef.current = "";
   }, [reset, resetExams]);
 
   useEffect(() => {
@@ -506,6 +575,7 @@ export function useAgendamentosPage() {
         const examesObrigatorios =
           await listarExamesObrigatoriosPorCargo(nextCargoId);
         const nomes = examesObrigatorios.map((exame) => exame.nome);
+        const examesAudit = filtrarNomesExamesParaAso(nomes, form.aso);
 
         if (nomes.length === 0) {
           await replaceExamesFromCargo([]);
@@ -525,14 +595,14 @@ export function useAgendamentosPage() {
           await registrarCargoAlteradoExamesRecalculados(auditContext, {
             cargoAnterior: cargoAnteriorNome,
             cargoNovo: cargoNovoNome,
-            exames: nomes,
+            exames: examesAudit,
             colaborador: form.colaborador,
             agendamentoId: editingId,
           });
         } else if (cargoNovoNome) {
           await registrarExamesCarregadosPorCargo(auditContext, {
             cargoNome: cargoNovoNome,
-            exames: nomes,
+            exames: examesAudit,
             colaborador: form.colaborador,
             agendamentoId: editingId,
           });
@@ -550,6 +620,7 @@ export function useAgendamentosPage() {
       auditContext,
       form.colaborador,
       editingId,
+      form.aso,
     ]
   );
 
@@ -608,6 +679,7 @@ export function useAgendamentosPage() {
       }
       loadForm(agendamentoToFormValues(agendamento));
       loadExams(agendamentoToExams(agendamento));
+      prevAsoRef.current = agendamento.aso ?? "";
       setClienteId(
         resolveClienteIdByNome(clientes, agendamento.cliente_nome ?? "")
       );
@@ -622,8 +694,11 @@ export function useAgendamentosPage() {
           .getElementById("novo-agendamento")
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+      if (isAsoRetornoAoTrabalho(agendamento.aso ?? "")) {
+        void enforceRetornoTrabalhoExames();
+      }
     },
-    [getById, loadForm, loadExams, clientes]
+    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
   );
 
   const handleVisualizar = useCallback(

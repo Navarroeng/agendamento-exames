@@ -5,6 +5,10 @@ import {
   hasCargoSelecionado,
   hasExamesObrigatoriosCarregados,
 } from "@/lib/agendamento-exames-cargo";
+import {
+  EXAME_CLINICO_NAO_ENCONTRADO_RETORNO_MSG,
+  isAsoRetornoAoTrabalho,
+} from "@/lib/agendamento-aso-retorno-trabalho";
 import { isValidCPF } from "@/lib/cpf";
 import { SIM_NAO } from "@/lib/constants";
 import {
@@ -87,6 +91,14 @@ export function getAgendamentoValidationMessage(
 
   if (!hasExamesObrigatoriosCarregados(exams)) {
     return CARGO_SEM_EXAMES_TOAST;
+  }
+
+  if (isAsoRetornoAoTrabalho(form.aso)) {
+    if (
+      exams.some((exam) => exam.aviso === EXAME_CLINICO_NAO_ENCONTRADO_RETORNO_MSG)
+    ) {
+      return EXAME_CLINICO_NAO_ENCONTRADO_RETORNO_MSG;
+    }
   }
 
   if (

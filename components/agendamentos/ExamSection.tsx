@@ -1,6 +1,7 @@
 import { ExamPreparoAlert } from "./ExamPreparoAlert";
 import { Panel } from "@/components/ui/Panel";
 import { IconFlask } from "@/components/ui/icons/OutlineIcons";
+import { isAsoRetornoAoTrabalho, podeRemoverExameAgendamento } from "@/lib/agendamento-aso-retorno-trabalho";
 import { CARGO_SEM_EXAMES_TOAST } from "@/lib/agendamento-exames-cargo";
 import type { ExameFormItem, ExameRecord } from "@/lib/types";
 import { ExamTableRow } from "./ExamTableRow";
@@ -8,6 +9,7 @@ import { ExamTotals } from "./ExamTotals";
 
 interface ExamSectionProps {
   exams: ExameFormItem[];
+  aso: string;
   totals: {
     totalCliente: number;
     totalCusto: number;
@@ -27,6 +29,7 @@ const TH =
 
 export function ExamSection({
   exams,
+  aso,
   totals,
   clinicaNome,
   cargoId,
@@ -41,8 +44,9 @@ export function ExamSection({
   return (
     <Panel title="Exames" icon={<IconFlask />} iconTone="green">
       <p className="mb-3 text-[11px] font-medium text-[#94a3b8]">
-        Os exames são carregados automaticamente conforme o cargo selecionado.
-        Você pode remover itens da lista, se necessário.
+        {isAsoRetornoAoTrabalho(aso)
+          ? "Para ASO Retorno ao Trabalho, apenas o exame Clínico é carregado automaticamente."
+          : "Os exames são carregados automaticamente conforme o cargo selecionado. Você pode remover itens da lista, se necessário."}
       </p>
 
       {!cargoId.trim() && (
@@ -93,7 +97,7 @@ export function ExamSection({
                   key={exam.id}
                   exam={exam}
                   pricingLoading={pricingLoading}
-                  canRemove
+                  canRemove={podeRemoverExameAgendamento(aso, exam.tipo_exame)}
                   onRemove={() => onRemove(exam.id)}
                   onUpdate={(field, value) => onUpdate(exam.id, field, value)}
                 />

@@ -119,6 +119,7 @@ export function AgendamentoPage() {
           />
           <ExamSection
             exams={exams}
+            aso={form.aso}
             totals={totals}
             clinicaNome={form.clinica_nome}
             cargoId={cargoId}

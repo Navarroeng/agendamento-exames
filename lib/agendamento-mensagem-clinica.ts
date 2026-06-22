@@ -1,3 +1,7 @@
+import {
+  filtrarExamesFormParaAso,
+  isAsoRetornoAoTrabalho,
+} from "@/lib/agendamento-aso-retorno-trabalho";
 import type { AgendamentoFormValues, ClienteRecord, ClinicaRecord, ExameFormItem, ExameRecord } from "@/lib/types";
 import { formatDataDDM } from "@/lib/agendamento-datetime";
 import {
@@ -68,13 +72,16 @@ export function buildMensagemClinicaWhatsApp({
   const clinica = resolveClinica(form.clinica_nome, clinicas);
   const endereco = clinica ? formatEnderecoClinica(clinica).trim() : "";
   const unidade = clinica?.nome_fantasia.trim() || form.clinica_nome.trim();
+  const examsParaMensagem = isAsoRetornoAoTrabalho(form.aso)
+    ? filtrarExamesFormParaAso(exams, form.aso)
+    : exams;
   const preparoSection = formatPreparoMensagemClinica(
-    collectExamesComPreparo(exams, catalogExames)
+    collectExamesComPreparo(examsParaMensagem, catalogExames)
   );
   const horarioLines = formatHorarioMensagemWhatsApp({
     clinica,
     horario: form.horario.trim(),
-    exams,
+    exams: examsParaMensagem,
   });
 
   const parts = [
