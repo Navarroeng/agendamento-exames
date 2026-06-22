@@ -1,3 +1,5 @@
+import { formatHorarioForForm } from "@/lib/agendamento-datetime";
+import { formatCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { normalizeUppercaseField } from "@/lib/text-normalize";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
@@ -21,9 +23,36 @@ function displayValue(value: string | null | undefined): string {
   return value;
 }
 
+function normalizeIsoDate(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  const trimmed = value.trim();
+  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const [, day, month, year] = brMatch;
+    return `${year}-${month}-${day}`;
+  }
+  return trimmed.split("T")[0];
+}
+
+function formatHorarioField(value: string | null | undefined): string {
+  const normalized = formatHorarioForForm(value);
+  return normalized || "—";
+}
+
+function formatCpfField(value: string | null | undefined): string {
+  const digits = normalizeCpfDigits(value);
+  if (!digits) return "—";
+  return formatCPF(digits);
+}
+
+function normalizeMoneyAmount(value: number): number {
+  return Math.round(Number(value) * 100) / 100;
+}
+
 function formatDateField(value: string | null | undefined): string {
-  if (!value) return "—";
-  return formatDateBR(value);
+  const iso = normalizeIsoDate(value);
+  if (!iso) return "—";
+  return formatDateBR(iso);
 }
 
 function pushChange(
@@ -162,7 +191,7 @@ function compareExames(
       return;
     }
 
-    if (antigo.valor !== novo.valor) {
+    if (normalizeMoneyAmount(antigo.valor) !== normalizeMoneyAmount(novo.valor)) {
       pushChange(
         changes,
         usuario,
@@ -230,7 +259,8 @@ export function buildHistoricoAlteracoes(
     usuario,
     "o horário",
     anterior.horario ?? "",
-    novo.horario ?? ""
+    novo.horario ?? "",
+    formatHorarioField
   );
   compareUppercaseField(
     changes,
@@ -251,7 +281,8 @@ export function buildHistoricoAlteracoes(
     usuario,
     "o CPF do colaborador",
     anterior.colaborador_cpf ?? "",
-    novo.colaborador_cpf ?? ""
+    novo.colaborador_cpf ?? "",
+    formatCpfField
   );
 
   const oldCargoId = anterior.cargo_id ?? "";
