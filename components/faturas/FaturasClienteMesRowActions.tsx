@@ -1,0 +1,145 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { ClienteFaturaMesRow } from "@/lib/fatura-mes-resumo";
+import type { FaturaRecord } from "@/lib/types";
+import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
+
+interface FaturasClienteMesRowActionsProps {
+  row: ClienteFaturaMesRow;
+  saving: boolean;
+  onVisualizarAgendamentos: (clienteNome: string) => void;
+  onEmitirFatura: (clienteNome: string) => void;
+  onVisualizarFatura: (id: string) => void;
+  onGerarPdf: (id: string) => void;
+  onCancelar: (id: string) => void;
+  onMarcarPago: (id: string) => void;
+  onEditarPagamento: (id: string) => void;
+  onMarcarPendente: (id: string) => void;
+}
+
+type MenuItem = {
+  key: string;
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+};
+
+export function FaturasClienteMesRowActions({
+  row,
+  saving,
+  onVisualizarAgendamentos,
+  onEmitirFatura,
+  onVisualizarFatura,
+  onGerarPdf,
+  onCancelar,
+  onMarcarPago,
+  onEditarPagamento,
+  onMarcarPendente,
+}: FaturasClienteMesRowActionsProps) {
+  const fatura = row.fatura;
+
+  if (fatura) {
+    const faturaComPagamento: FaturaRecord = {
+      ...fatura,
+      pago: fatura.pago ?? false,
+    };
+
+    return (
+      <FaturaRowActionsMenu
+        fatura={faturaComPagamento}
+        onVisualizar={onVisualizarFatura}
+        onGerarPdf={onGerarPdf}
+        onCancelar={onCancelar}
+        onMarcarPago={onMarcarPago}
+        onEditarPagamento={onEditarPagamento}
+        onMarcarPendente={onMarcarPendente}
+      />
+    );
+  }
+
+  return (
+    <AbertaEmissaoActionsMenu
+      clienteNome={row.clienteNome}
+      saving={saving}
+      onVisualizar={() => onVisualizarAgendamentos(row.clienteNome)}
+      onEmitir={() => onEmitirFatura(row.clienteNome)}
+    />
+  );
+}
+
+function AbertaEmissaoActionsMenu({
+  clienteNome,
+  saving,
+  onVisualizar,
+  onEmitir,
+}: {
+  clienteNome: string;
+  saving: boolean;
+  onVisualizar: () => void;
+  onEmitir: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const items: MenuItem[] = [
+    { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
+    { key: "emitir", label: "Emitir fatura", onClick: onEmitir },
+  ];
+
+  function handleAction(item: MenuItem) {
+    setOpen(false);
+    item.onClick();
+  }
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`grid h-7 w-7 place-items-center rounded-[8px] border text-base font-bold leading-none transition-all duration-150 disabled:opacity-50 ${
+          open
+            ? "border-brand-blue/30 bg-brand-blue-soft text-brand-blue"
+            : "border-[#e2e8f0] bg-white text-[#64748b] hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-navy"
+        }`}
+        aria-label={`Ações — ${clienteNome}`}
+        aria-expanded={open}
+      >
+        ⋯
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full z-20 mt-1 min-w-[160px] origin-top-right overflow-hidden rounded-[10px] border border-[#e8edf5] bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.12)] animate-[fadeIn_0.15s_ease]"
+          role="menu"
+        >
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              onClick={() => handleAction(item)}
+              className="block w-full px-3 py-1.5 text-left text-[11px] font-medium text-[#475569] transition-colors hover:bg-[#f0f4ff] hover:text-brand-blue"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

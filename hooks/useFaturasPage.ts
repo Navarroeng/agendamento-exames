@@ -7,6 +7,7 @@ import {
   isValidDateBR,
   parseDateBRToIso,
 } from "@/lib/agendamento-datetime";
+import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
 import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
@@ -18,6 +19,10 @@ import {
   type FaturaFilters,
   type FaturaHistoricoFilters,
 } from "@/lib/fatura-filters";
+import {
+  buildResumoClientesMes,
+  getCurrentMonthYearBR,
+} from "@/lib/fatura-mes-resumo";
 import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
@@ -113,7 +118,14 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const [loading, setLoading] = useState(true);
   const [historicoLoading, setHistoricoLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [filters, setFilters] = useState<FaturaFilters>(EMPTY_FATURA_FILTERS);
+  const [filters, setFilters] = useState<FaturaFilters>(() =>
+    pageTipo === "cliente"
+      ? {
+          ...EMPTY_FATURA_FILTERS,
+          mesReferencia: getCurrentMonthYearBR(),
+        }
+      : EMPTY_FATURA_FILTERS
+  );
   const [historicoFilters, setHistoricoFilters] =
     useState<FaturaHistoricoFilters>(() =>
       emptyHistoricoFiltersForTipo(pageTipo)
@@ -138,6 +150,20 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     previewRef.current = preview;
   }, [preview]);
 
+  const reloadAgendamentos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await listarAgendamentosParaFatura();
+      setAgendamentos(data);
+    } catch (err) {
+      console.error("Erro ao carregar agendamentos para faturas:", err);
+      toast.error("Erro ao carregar dados para faturas.");
+      setAgendamentos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const reloadHistorico = useCallback(async () => {
     setHistoricoLoading(true);
     try {
@@ -151,31 +177,27 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const reloadAll = useCallback(async () => {
+    await Promise.all([reloadAgendamentos(), reloadHistorico()]);
+  }, [reloadAgendamentos, reloadHistorico]);
 
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await listarAgendamentosParaFatura();
-        if (!cancelled) setAgendamentos(data);
-      } catch (err) {
-        console.error("Erro ao carregar agendamentos para faturas:", err);
-        if (!cancelled) {
-          toast.error("Erro ao carregar dados para faturas.");
-          setAgendamentos([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+  useEffect(() => {
+    reloadAll();
+  }, [reloadAll]);
+
+  useEffect(() => {
+    if (pageTipo !== "cliente") return;
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        reloadAll();
       }
     }
 
-    load();
-    reloadHistorico();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadHistorico]);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [pageTipo, reloadAll]);
 
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractFaturaFilterOptions(agendamentos);
@@ -189,6 +211,28 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     () => filterAgendamentosFatura(agendamentos, filters),
     [agendamentos, filters]
   );
+
+  const mesReferenciaValido = useMemo(
+    () => isValidMonthYearBR(filters.mesReferencia),
+    [filters.mesReferencia]
+  );
+
+  const resumoClientesMes = useMemo(() => {
+    if (pageTipo !== "cliente" || !mesReferenciaValido) return null;
+    return buildResumoClientesMes(
+      agendamentos,
+      faturas,
+      filters.mesReferencia,
+      filters.cliente
+    );
+  }, [
+    agendamentos,
+    faturas,
+    filters.cliente,
+    filters.mesReferencia,
+    mesReferenciaValido,
+    pageTipo,
+  ]);
 
   const faturasDoTipo = useMemo(
     () => faturas.filter((f) => f.tipo === pageTipo),
@@ -295,6 +339,72 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [filters.mesReferencia]
   );
 
+  const openPreviewForCliente = useCallback(
+    async (clienteNome: string) => {
+      const referencia = clienteNome.trim();
+      if (!referencia) {
+        toast.error("Cliente inválido para gerar a fatura.");
+        return;
+      }
+      if (!filters.mesReferencia.trim()) {
+        toast.error("Informe o mês de referência para gerar a fatura.");
+        return;
+      }
+      if (!validateVencimento()) return;
+
+      const mesFilters: FaturaFilters = {
+        ...filters,
+        cliente: referencia,
+      };
+      const agsCliente = filterAgendamentosFatura(agendamentos, mesFilters);
+
+      const faturaExistente = resumoClientesMes?.rows.find(
+        (r) =>
+          r.clienteNome.trim().toLowerCase() === referencia.toLowerCase()
+      )?.fatura;
+
+      if (
+        await bloquearFaturaDuplicada(
+          "cliente",
+          referencia,
+          faturaExistente?.status === "rascunho" ? faturaExistente.id : null
+        )
+      ) {
+        return;
+      }
+
+      const itens = buildFaturaItensFromAgendamentos(agsCliente, "cliente");
+      if (itens.length === 0) {
+        toast.error(NO_RECORDS_TOAST);
+        return;
+      }
+
+      const nextPreview = buildPreviewFromAgendamentos(
+        "cliente",
+        referencia,
+        mesFilters,
+        agsCliente,
+        faturaExistente?.status === "rascunho"
+          ? {
+              faturaId: faturaExistente.id,
+              numero: faturaExistente.numero,
+              status: faturaExistente.status,
+            }
+          : undefined
+      );
+      previewRef.current = nextPreview;
+      setPreview(nextPreview);
+      setPreviewOpen(true);
+    },
+    [
+      agendamentos,
+      bloquearFaturaDuplicada,
+      filters,
+      resumoClientesMes?.rows,
+      validateVencimento,
+    ]
+  );
+
   const openPreviewForTipo = useCallback(
     async (tipo: FaturaTipo) => {
       const referencia =
@@ -397,10 +507,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const nextPreview = faturaComItensToPreview(saved, current.readonly);
       previewRef.current = nextPreview;
       setPreview(nextPreview);
-      await reloadHistorico();
+      await reloadAll();
       return saved;
     },
-    [filters.mesReferencia, geradoPor, reloadHistorico]
+    [filters.mesReferencia, geradoPor, reloadAll]
   );
 
   const handleCloseFaturaDuplicidade = useCallback(() => {
@@ -532,7 +642,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
             prev ? { ...prev, status: "cancelada" } : null
           );
         }
-        await reloadHistorico();
+        await reloadAll();
       } catch (err) {
         console.error(err);
         toast.error("Erro ao cancelar fatura.");
@@ -540,7 +650,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         setSaving(false);
       }
     },
-    [faturas, preview?.faturaId, reloadHistorico]
+    [faturas, preview?.faturaId, reloadAll]
   );
 
   const openPagamentoModal = useCallback(
@@ -594,7 +704,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         );
         setPagamentoOpen(false);
         setPagamentoFatura(null);
-        await reloadHistorico();
+        await reloadAll();
       } catch (err) {
         console.error(err);
         toast.error("Erro ao registrar pagamento.");
@@ -602,7 +712,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         setSaving(false);
       }
     },
-    [pagamentoFatura, pagamentoMode, reloadHistorico]
+    [pagamentoFatura, pagamentoMode, reloadAll]
   );
 
   const handleMarcarPendente = useCallback(
@@ -619,7 +729,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       try {
         await marcarFaturaPendente(id, auditOptions);
         toast.success("Fatura marcada como pendente.");
-        await reloadHistorico();
+        await reloadAll();
       } catch (err) {
         console.error(err);
         toast.error("Erro ao marcar fatura como pendente.");
@@ -627,7 +737,21 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         setSaving(false);
       }
     },
-    [faturas, reloadHistorico]
+    [faturas, reloadAll]
+  );
+
+  const handleVisualizarAgendamentosCliente = useCallback(
+    (clienteNome: string) => {
+      openPreviewForCliente(clienteNome);
+    },
+    [openPreviewForCliente]
+  );
+
+  const handleEmitirFaturaCliente = useCallback(
+    (clienteNome: string) => {
+      openPreviewForCliente(clienteNome);
+    },
+    [openPreviewForCliente]
   );
 
   return {
@@ -636,6 +760,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     historicoFilters,
     filterOptions,
     agendamentosFiltrados,
+    mesReferenciaValido,
+    resumoClientesMes,
     faturas: faturasDoTipo,
     faturasFiltradas,
     faturasPaginadas,
@@ -671,5 +797,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     faturaDuplicidadeInfo,
     faturaDuplicidadeTipo,
     handleCloseFaturaDuplicidade,
+    handleVisualizarAgendamentosCliente,
+    handleEmitirFaturaCliente,
   };
 }

@@ -9,6 +9,7 @@ import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
 import { FaturasFiltersPanel } from "./FaturasFiltersPanel";
+import { FaturasClientesMesPanel } from "./FaturasClientesMesPanel";
 import { FaturasHistoricoTable } from "./FaturasHistoricoTable";
 import { useFaturasPage } from "@/hooks/useFaturasPage";
 import type { FaturaTipo } from "@/lib/types";
@@ -20,7 +21,7 @@ const PAGE_META: Record<
   cliente: {
     title: "Faturas Clientes",
     subtitle:
-      "Filtre agendamentos, confira a pré-visualização e emita faturas de clientes.",
+      "Visualize o faturamento mensal por cliente, com valores em tempo real e status das faturas.",
     icon: <IconReceipt size={20} />,
   },
   clinica: {
@@ -42,6 +43,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     historicoFilters,
     filterOptions,
     agendamentosFiltrados,
+    mesReferenciaValido,
+    resumoClientesMes,
     faturas,
     faturasFiltradas,
     faturasPaginadas,
@@ -77,7 +80,11 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     faturaDuplicidadeInfo,
     faturaDuplicidadeTipo,
     handleCloseFaturaDuplicidade,
+    handleVisualizarAgendamentosCliente,
+    handleEmitirFaturaCliente,
   } = useFaturasPage(tipo);
+
+  const isCliente = tipo === "cliente";
 
   return (
     <AppShell
@@ -86,37 +93,60 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
       icon={meta.icon}
     >
       <div className="space-y-5">
-        <FaturasFiltersPanel
-          variant={tipo}
-          filters={filters}
-          options={filterOptions}
-          loading={loading}
-          saving={saving}
-          totalFiltrados={agendamentosFiltrados.length}
-          onChange={handleFilterChange}
-          onClear={handleClearFilters}
-          onPrevia={handlePrevia}
-        />
+        {isCliente ? (
+          <FaturasClientesMesPanel
+            filters={filters}
+            options={{ clientes: filterOptions.clientes }}
+            rows={resumoClientesMes?.rows ?? []}
+            resumo={resumoClientesMes?.resumo ?? null}
+            mesValido={mesReferenciaValido}
+            loading={loading}
+            saving={saving}
+            onChange={handleFilterChange}
+            onVisualizarAgendamentos={handleVisualizarAgendamentosCliente}
+            onEmitirFatura={handleEmitirFaturaCliente}
+            onVisualizarFatura={handleVisualizar}
+            onGerarPdf={handleHistoricoPdf}
+            onCancelar={handleCancelar}
+            onMarcarPago={handleMarcarPago}
+            onEditarPagamento={handleEditarPagamento}
+            onMarcarPendente={handleMarcarPendente}
+          />
+        ) : (
+          <>
+            <FaturasFiltersPanel
+              variant={tipo}
+              filters={filters}
+              options={filterOptions}
+              loading={loading}
+              saving={saving}
+              totalFiltrados={agendamentosFiltrados.length}
+              onChange={handleFilterChange}
+              onClear={handleClearFilters}
+              onPrevia={handlePrevia}
+            />
 
-        <FaturasHistoricoTable
-          variant={tipo}
-          faturas={faturasPaginadas}
-          totalFiltradas={faturasFiltradas.length}
-          totalGeral={faturas.length}
-          historicoFilters={historicoFilters}
-          loading={historicoLoading}
-          page={historicoPage}
-          totalPages={totalHistoricoPages}
-          onPageChange={handleHistoricoPageChange}
-          onHistoricoFilterChange={handleHistoricoFilterChange}
-          onClearHistoricoFilters={handleClearHistoricoFilters}
-          onVisualizar={handleVisualizar}
-          onGerarPdf={handleHistoricoPdf}
-          onCancelar={handleCancelar}
-          onMarcarPago={handleMarcarPago}
-          onEditarPagamento={handleEditarPagamento}
-          onMarcarPendente={handleMarcarPendente}
-        />
+            <FaturasHistoricoTable
+              variant={tipo}
+              faturas={faturasPaginadas}
+              totalFiltradas={faturasFiltradas.length}
+              totalGeral={faturas.length}
+              historicoFilters={historicoFilters}
+              loading={historicoLoading}
+              page={historicoPage}
+              totalPages={totalHistoricoPages}
+              onPageChange={handleHistoricoPageChange}
+              onHistoricoFilterChange={handleHistoricoFilterChange}
+              onClearHistoricoFilters={handleClearHistoricoFilters}
+              onVisualizar={handleVisualizar}
+              onGerarPdf={handleHistoricoPdf}
+              onCancelar={handleCancelar}
+              onMarcarPago={handleMarcarPago}
+              onEditarPagamento={handleEditarPagamento}
+              onMarcarPendente={handleMarcarPendente}
+            />
+          </>
+        )}
       </div>
 
       <FaturaPreviewModal

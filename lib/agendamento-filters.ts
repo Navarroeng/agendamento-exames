@@ -86,11 +86,27 @@ function matchesText(value: string, query: string): boolean {
   return textMatchesSearch(value, query);
 }
 
+export function hasActiveFilters(filters: AgendamentoFilters): boolean {
+  return Object.values(filters).some((v) => v.trim() !== "");
+}
+
+/** Data do exame crescente; desempate por horário. */
+export function compareAgendamentosPorDataExameAsc(
+  a: AgendamentoWithExames,
+  b: AgendamentoWithExames
+): number {
+  const da = a.data_agendamento.split("T")[0];
+  const db = b.data_agendamento.split("T")[0];
+  const dateCmp = da.localeCompare(db);
+  if (dateCmp !== 0) return dateCmp;
+  return (a.horario ?? "").localeCompare(b.horario ?? "");
+}
+
 export function filterAgendamentos(
   agendamentos: AgendamentoWithExames[],
   filters: AgendamentoFilters
 ): AgendamentoWithExames[] {
-  return agendamentos.filter((item) => {
+  const filtered = agendamentos.filter((item) => {
     if (!matchesText(item.cliente_nome, filters.cliente)) return false;
     if (!matchesText(item.colaborador, filters.colaborador)) return false;
     if (!matchesText(item.clinica_nome, filters.clinica)) return false;
@@ -121,10 +137,10 @@ export function filterAgendamentos(
 
     return true;
   });
-}
 
-export function hasActiveFilters(filters: AgendamentoFilters): boolean {
-  return Object.values(filters).some((v) => v.trim() !== "");
+  if (!hasActiveFilters(filters)) return filtered;
+
+  return [...filtered].sort(compareAgendamentosPorDataExameAsc);
 }
 
 export function extractFilterOptions(agendamentos: AgendamentoWithExames[]) {

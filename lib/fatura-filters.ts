@@ -90,7 +90,7 @@ function matchesText(value: string, filter: string): boolean {
   return value.toLowerCase().includes(f);
 }
 
-function faturaMatchesMesReferencia(
+export function faturaMatchesMesReferencia(
   fatura: FaturaRecord,
   mesReferencia: string
 ): boolean {
