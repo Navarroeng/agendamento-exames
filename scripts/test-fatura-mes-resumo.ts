@@ -67,6 +67,7 @@ const ags = [
   ag("1", "Mil Bolhas", "2026-06-10", 80),
   ag("2", "Mil Bolhas", "2026-06-15", 120),
   ag("3", "Empresa X", "2026-06-05", 50),
+  ag("4", "Empresa Zerada", "2026-06-08", 0),
 ];
 
 const faturas = [
@@ -115,5 +116,12 @@ const filtered = buildResumoClientesMes(ags, faturas, "06/2026", "Mil");
 assert.ok(filtered);
 assert.equal(filtered.rows.length, 1);
 assert.equal(filtered.rows[0].clienteNome, "Mil Bolhas");
+
+assert.ok(
+  !result.rows.some((r) => r.clienteNome === "Empresa Zerada"),
+  "cliente com valor zero não deve aparecer"
+);
+assert.equal(result.resumo.totalAgendamentos, 3);
+assert.equal(result.resumo.totalExames, 3);
 
 console.log("test-fatura-mes-resumo: ok");

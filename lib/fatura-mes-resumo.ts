@@ -111,6 +111,11 @@ export function compareClienteFaturaMesNomeAsc(
   });
 }
 
+/** Cliente entra na listagem e no resumo previsto somente com valor a faturar > 0. */
+export function isClienteFaturavelNoMes(valorTotal: number): boolean {
+  return valorTotal > 0;
+}
+
 export function buildResumoClientesMes(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
@@ -158,13 +163,17 @@ export function buildResumoClientesMes(
     }
   );
 
-  rows.sort(compareClienteFaturaMesNomeAsc);
+  const rowsFaturaveis = rows.filter((row) =>
+    isClienteFaturavelNoMes(row.valorTotal)
+  );
+
+  rowsFaturaveis.sort(compareClienteFaturaMesNomeAsc);
 
   let valorEmitido = 0;
   let valorPago = 0;
   let valorEmAberto = 0;
 
-  rows.forEach((row) => {
+  rowsFaturaveis.forEach((row) => {
     if (!row.fatura || row.fatura.status !== "emitida") return;
     const valor = Number(row.fatura.valor_total);
     valorEmitido += valor;
@@ -176,14 +185,14 @@ export function buildResumoClientesMes(
   });
 
   const resumo: FaturaMesResumoGeral = {
-    totalClientes: rows.length,
-    totalAgendamentos: rows.reduce((s, r) => s + r.qtdAgendamentos, 0),
-    totalExames: rows.reduce((s, r) => s + r.qtdExames, 0),
-    valorPrevisto: rows.reduce((s, r) => s + r.valorTotal, 0),
+    totalClientes: rowsFaturaveis.length,
+    totalAgendamentos: rowsFaturaveis.reduce((s, r) => s + r.qtdAgendamentos, 0),
+    totalExames: rowsFaturaveis.reduce((s, r) => s + r.qtdExames, 0),
+    valorPrevisto: rowsFaturaveis.reduce((s, r) => s + r.valorTotal, 0),
     valorEmitido,
     valorPago,
     valorEmAberto,
   };
 
-  return { rows, resumo };
+  return { rows: rowsFaturaveis, resumo };
 }
