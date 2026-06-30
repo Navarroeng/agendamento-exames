@@ -82,10 +82,14 @@ function buildPreviewFromAgendamentos(
             periodo_fim ?? new Date().toISOString().split("T")[0],
           label: "",
         }
-      : {
-          iso: parseDateBRToIso(filters.dataVencimento)!,
-          label: filters.dataVencimento,
-        };
+      : (() => {
+          const label = filters.dataVencimento.trim();
+          const iso = label ? parseDateBRToIso(label) : null;
+          return {
+            iso: iso ?? "",
+            label: label || "A definir",
+          };
+        })();
 
   return {
     tipo,
@@ -340,7 +344,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   );
 
   const openPreviewForCliente = useCallback(
-    async (clienteNome: string) => {
+    async (
+      clienteNome: string,
+      options?: { requireVencimento?: boolean; readonly?: boolean }
+    ) => {
       const referencia = clienteNome.trim();
       if (!referencia) {
         toast.error("Cliente inválido para gerar a fatura.");
@@ -350,7 +357,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Informe o mês de referência para gerar a fatura.");
         return;
       }
-      if (!validateVencimento()) return;
+      if (options?.requireVencimento && !validateVencimento()) return;
 
       const mesFilters: FaturaFilters = {
         ...filters,
@@ -364,11 +371,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       )?.fatura;
 
       if (
-        await bloquearFaturaDuplicada(
+        !options?.readonly &&
+        (await bloquearFaturaDuplicada(
           "cliente",
           referencia,
           faturaExistente?.status === "rascunho" ? faturaExistente.id : null
-        )
+        ))
       ) {
         return;
       }
@@ -384,13 +392,16 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         referencia,
         mesFilters,
         agsCliente,
-        faturaExistente?.status === "rascunho"
-          ? {
-              faturaId: faturaExistente.id,
-              numero: faturaExistente.numero,
-              status: faturaExistente.status,
-            }
-          : undefined
+        {
+          readonly: options?.readonly ?? false,
+          ...(faturaExistente?.status === "rascunho"
+            ? {
+                faturaId: faturaExistente.id,
+                numero: faturaExistente.numero,
+                status: faturaExistente.status,
+              }
+            : {}),
+        }
       );
       previewRef.current = nextPreview;
       setPreview(nextPreview);
@@ -404,6 +415,22 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       validateVencimento,
     ]
   );
+
+  const syncClienteVencimentoNoPreview = useCallback((): boolean => {
+    const current = previewRef.current;
+    if (!current || current.tipo !== "cliente") return true;
+    if (!validateVencimento()) return false;
+
+    const iso = parseDateBRToIso(filters.dataVencimento)!;
+    const updated: FaturaPreviewState = {
+      ...current,
+      data_vencimento: iso,
+      data_vencimento_label: filters.dataVencimento,
+    };
+    previewRef.current = updated;
+    setPreview(updated);
+    return true;
+  }, [filters.dataVencimento, validateVencimento]);
 
   const openPreviewForTipo = useCallback(
     async (tipo: FaturaTipo) => {
@@ -527,6 +554,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const handleSaveDraft = useCallback(async () => {
     const current = previewRef.current;
     if (!current || current.readonly) return;
+    if (current.tipo === "cliente" && !syncClienteVencimentoNoPreview()) return;
     setSaving(true);
     try {
       await persistPreview("rascunho");
@@ -539,11 +567,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setSaving(false);
     }
-  }, [persistPreview]);
+  }, [persistPreview, syncClienteVencimentoNoPreview]);
 
   const handleEmit = useCallback(async () => {
     const current = previewRef.current;
     if (!current || current.status === "cancelada") return;
+    if (current.tipo === "cliente" && !syncClienteVencimentoNoPreview()) return;
     setSaving(true);
     try {
       await persistPreview("emitida");
@@ -556,11 +585,18 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setSaving(false);
     }
-  }, [persistPreview]);
+  }, [persistPreview, syncClienteVencimentoNoPreview]);
 
   const handleGeneratePdf = useCallback(async () => {
     const current = previewRef.current;
     if (!current) return;
+    if (
+      current.tipo === "cliente" &&
+      (!current.faturaId || current.status === "rascunho") &&
+      !syncClienteVencimentoNoPreview()
+    ) {
+      return;
+    }
     setSaving(true);
     try {
       let fatura = current.faturaId
@@ -583,7 +619,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setSaving(false);
     }
-  }, [persistPreview]);
+  }, [persistPreview, syncClienteVencimentoNoPreview]);
 
   const handleVisualizar = useCallback(async (id: string) => {
     setSaving(true);
@@ -742,14 +778,20 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
   const handleVisualizarAgendamentosCliente = useCallback(
     (clienteNome: string) => {
-      openPreviewForCliente(clienteNome);
+      void openPreviewForCliente(clienteNome, {
+        readonly: true,
+        requireVencimento: false,
+      });
     },
     [openPreviewForCliente]
   );
 
   const handleEmitirFaturaCliente = useCallback(
     (clienteNome: string) => {
-      openPreviewForCliente(clienteNome);
+      void openPreviewForCliente(clienteNome, {
+        readonly: false,
+        requireVencimento: true,
+      });
     },
     [openPreviewForCliente]
   );
