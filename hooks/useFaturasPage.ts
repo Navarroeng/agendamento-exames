@@ -3,11 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
-import {
-  isValidDateBR,
-  parseDateBRToIso,
-} from "@/lib/agendamento-datetime";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
+import { calcVencimentoFaturaCliente } from "@/lib/fatura-vencimento";
 import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
@@ -83,12 +80,9 @@ function buildPreviewFromAgendamentos(
           label: "",
         }
       : (() => {
-          const label = filters.dataVencimento.trim();
-          const iso = label ? parseDateBRToIso(label) : null;
-          return {
-            iso: iso ?? "",
-            label: label || "A definir",
-          };
+          const auto = calcVencimentoFaturaCliente(filters.mesReferencia);
+          if (auto) return auto;
+          return { iso: "", label: "—" };
         })();
 
   return {
@@ -303,17 +297,31 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     setHistoricoPage(1);
   }, [pageTipo]);
 
-  const validateVencimento = useCallback((): boolean => {
-    if (!filters.dataVencimento.trim()) {
-      toast.error("Informe a data de vencimento antes de gerar a fatura.");
+  const syncClienteVencimentoNoPreview = useCallback((): boolean => {
+    const current = previewRef.current;
+    if (!current || current.tipo !== "cliente") return true;
+
+    const mesReferencia =
+      filters.mesReferencia.trim() ||
+      (current.periodo_inicio
+        ? `${current.periodo_inicio.split("-")[1]}/${current.periodo_inicio.slice(0, 4)}`
+        : "");
+
+    const vencimento = calcVencimentoFaturaCliente(mesReferencia);
+    if (!vencimento) {
+      toast.error("Não foi possível calcular o vencimento da fatura.");
       return false;
     }
-    if (!isValidDateBR(filters.dataVencimento)) {
-      toast.error("Data de vencimento inválida. Use o formato DD/MM/AAAA.");
-      return false;
-    }
+
+    const updated: FaturaPreviewState = {
+      ...current,
+      data_vencimento: vencimento.iso,
+      data_vencimento_label: vencimento.label,
+    };
+    previewRef.current = updated;
+    setPreview(updated);
     return true;
-  }, [filters.dataVencimento]);
+  }, [filters.mesReferencia]);
 
   const bloquearFaturaDuplicada = useCallback(
     async (
@@ -346,7 +354,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const openPreviewForCliente = useCallback(
     async (
       clienteNome: string,
-      options?: { requireVencimento?: boolean; readonly?: boolean }
+      options?: { readonly?: boolean }
     ) => {
       const referencia = clienteNome.trim();
       if (!referencia) {
@@ -357,7 +365,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Informe o mês de referência para gerar a fatura.");
         return;
       }
-      if (options?.requireVencimento && !validateVencimento()) return;
 
       const mesFilters: FaturaFilters = {
         ...filters,
@@ -412,25 +419,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       bloquearFaturaDuplicada,
       filters,
       resumoClientesMes?.rows,
-      validateVencimento,
     ]
   );
-
-  const syncClienteVencimentoNoPreview = useCallback((): boolean => {
-    const current = previewRef.current;
-    if (!current || current.tipo !== "cliente") return true;
-    if (!validateVencimento()) return false;
-
-    const iso = parseDateBRToIso(filters.dataVencimento)!;
-    const updated: FaturaPreviewState = {
-      ...current,
-      data_vencimento: iso,
-      data_vencimento_label: filters.dataVencimento,
-    };
-    previewRef.current = updated;
-    setPreview(updated);
-    return true;
-  }, [filters.dataVencimento, validateVencimento]);
 
   const openPreviewForTipo = useCallback(
     async (tipo: FaturaTipo) => {
@@ -451,7 +441,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Informe o mês de referência para gerar a fatura.");
         return;
       }
-      if (tipo === "cliente" && !validateVencimento()) return;
 
       if (await bloquearFaturaDuplicada(tipo, referencia)) return;
 
@@ -478,7 +467,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       agendamentosFiltrados,
       bloquearFaturaDuplicada,
       filters,
-      validateVencimento,
     ]
   );
 
@@ -778,22 +766,87 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
   const handleVisualizarAgendamentosCliente = useCallback(
     (clienteNome: string) => {
-      void openPreviewForCliente(clienteNome, {
-        readonly: true,
-        requireVencimento: false,
-      });
+      void openPreviewForCliente(clienteNome, { readonly: true });
     },
     [openPreviewForCliente]
   );
 
   const handleEmitirFaturaCliente = useCallback(
-    (clienteNome: string) => {
-      void openPreviewForCliente(clienteNome, {
-        readonly: false,
-        requireVencimento: true,
-      });
+    async (clienteNome: string) => {
+      const referencia = clienteNome.trim();
+      if (!referencia) {
+        toast.error("Cliente inválido para gerar a fatura.");
+        return;
+      }
+      if (!isValidMonthYearBR(filters.mesReferencia)) {
+        toast.error("Informe um mês de referência válido para emitir a fatura.");
+        return;
+      }
+
+      const mesFilters: FaturaFilters = {
+        ...filters,
+        cliente: referencia,
+      };
+      const agsCliente = filterAgendamentosFatura(agendamentos, mesFilters);
+
+      const faturaExistente = resumoClientesMes?.rows.find(
+        (r) =>
+          r.clienteNome.trim().toLowerCase() === referencia.toLowerCase()
+      )?.fatura;
+
+      if (
+        await bloquearFaturaDuplicada(
+          "cliente",
+          referencia,
+          faturaExistente?.status === "rascunho" ? faturaExistente.id : null
+        )
+      ) {
+        return;
+      }
+
+      const itens = buildFaturaItensFromAgendamentos(agsCliente, "cliente");
+      if (itens.length === 0) {
+        toast.error(NO_RECORDS_TOAST);
+        return;
+      }
+
+      const nextPreview = buildPreviewFromAgendamentos(
+        "cliente",
+        referencia,
+        mesFilters,
+        agsCliente,
+        faturaExistente?.status === "rascunho"
+          ? {
+              faturaId: faturaExistente.id,
+              numero: faturaExistente.numero,
+              status: faturaExistente.status,
+            }
+          : undefined
+      );
+
+      previewRef.current = nextPreview;
+      setSaving(true);
+      try {
+        if (!syncClienteVencimentoNoPreview()) return;
+        await persistPreview("emitida");
+        toast.success("Fatura emitida com sucesso!");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao emitir fatura."
+        );
+      } finally {
+        setSaving(false);
+      }
     },
-    [openPreviewForCliente]
+    [
+      agendamentos,
+      bloquearFaturaDuplicada,
+      filters,
+      persistPreview,
+      resumoClientesMes?.rows,
+      syncClienteVencimentoNoPreview,
+    ]
   );
 
   return {

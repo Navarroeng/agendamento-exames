@@ -3,11 +3,10 @@
 import { Field } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import {
-  IconCalendar,
   IconReceipt,
   IconSearch,
 } from "@/components/ui/icons/OutlineIcons";
-import { maskDateBR, maskMonthYearBR } from "@/lib/agendamento-datetime";
+import { maskMonthYearBR } from "@/lib/agendamento-datetime";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 import type { FaturaFilters } from "@/lib/fatura-filters";
 import {
@@ -127,7 +126,7 @@ export function FaturasClientesMesPanel({
   return (
     <div className="space-y-5">
       <Panel title="Mês de referência" icon={<IconSearch />}>
-        <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2">
           <Field label="Mês de referência">
             <input
               className="field-input"
@@ -161,39 +160,18 @@ export function FaturasClientesMesPanel({
               ))}
             </datalist>
           </Field>
-
-          <div className="field -mt-2.5 flex flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
-            <label className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-[#64748b]">
-              <span className="grid h-4 w-4 shrink-0 place-items-center rounded border border-brand-blue/20 bg-white text-brand-blue">
-                <IconCalendar size={10} />
-              </span>
-              Data de vencimento padrão
-            </label>
-            <div className="overflow-hidden rounded-xl border border-[#c7d7f5]/90 bg-gradient-to-br from-[#f0f4ff] via-[#fafbff] to-[#fffbeb]/50 p-1.5 shadow-[0_4px_16px_rgba(79,99,255,0.1)] ring-1 ring-brand-blue/10">
-              <input
-                className="field-input w-full border-[#c7d7f5] bg-white font-semibold text-navy shadow-[inset_0_1px_2px_rgba(79,99,255,0.06)] focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15"
-                type="text"
-                inputMode="numeric"
-                placeholder="DD/MM/AAAA"
-                maxLength={10}
-                value={filters.dataVencimento}
-                disabled={disabled}
-                onChange={(e) =>
-                  onChange("dataVencimento", maskDateBR(e.target.value))
-                }
-              />
-            </div>
-            <p className="text-[10px] text-[#94a3b8]">
-              Usada ao emitir novas faturas
-            </p>
-          </div>
         </div>
 
         <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]">
           Apenas agendamentos com status{" "}
           <strong className="font-semibold text-navy">agendado</strong> entram
           no faturamento. Os valores são calculados em tempo real a partir dos
-          agendamentos do mês selecionado.
+          agendamentos do mês selecionado. Ao emitir, o vencimento é definido
+          automaticamente para o{" "}
+          <strong className="font-semibold text-navy">
+            5º dia útil do mês seguinte
+          </strong>
+          .
         </p>
       </Panel>
 
