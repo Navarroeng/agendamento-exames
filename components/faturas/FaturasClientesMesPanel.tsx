@@ -197,6 +197,33 @@ export function FaturasClientesMesPanel({
         </p>
       </Panel>
 
+      {mesValido && resumo && (
+        <Panel title="Resumo do mês" icon={<IconReceipt />} iconTone="green">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+            {RESUMO_CARDS.map((card) => {
+              const value = resumo[card.key];
+              const display = card.format
+                ? card.format(value)
+                : String(value);
+
+              return (
+                <div
+                  key={card.key}
+                  className={`rounded-xl border px-3.5 py-3 shadow-[0_2px_12px_rgba(15,23,42,0.04)] ${card.tone}`}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">
+                    {card.label}
+                  </p>
+                  <p className="mt-1 text-lg font-extrabold tabular-nums xl:text-xl">
+                    {display}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+      )}
+
       <Panel
         title="Faturamento por cliente"
         icon={<IconReceipt />}
@@ -291,33 +318,6 @@ export function FaturasClientesMesPanel({
           </div>
         )}
       </Panel>
-
-      {mesValido && resumo && (
-        <Panel title="Resumo do mês" icon={<IconReceipt />} iconTone="green">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
-            {RESUMO_CARDS.map((card) => {
-              const value = resumo[card.key];
-              const display = card.format
-                ? card.format(value)
-                : String(value);
-
-              return (
-                <div
-                  key={card.key}
-                  className={`rounded-xl border px-3.5 py-3 shadow-[0_2px_12px_rgba(15,23,42,0.04)] ${card.tone}`}
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">
-                    {card.label}
-                  </p>
-                  <p className="mt-1 text-lg font-extrabold tabular-nums xl:text-xl">
-                    {display}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      )}
     </div>
   );
 }
