@@ -76,6 +76,10 @@ const faturas = [
 const result = buildResumoClientesMes(ags, faturas, "06/2026");
 assert.ok(result);
 assert.equal(result.rows.length, 2);
+assert.deepEqual(
+  result.rows.map((r) => r.clienteNome),
+  ["Empresa X", "Mil Bolhas"]
+);
 
 const mil = result.rows.find((r) => r.clienteNome === "Mil Bolhas");
 assert.ok(mil);

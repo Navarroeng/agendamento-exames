@@ -101,14 +101,15 @@ export function findFaturaClienteMes(
   return pool[0] ?? null;
 }
 
-const STATUS_SORT_ORDER: Record<FaturaClienteMesStatus, number> = {
-  aberta_emissao: 0,
-  rascunho: 1,
-  em_aberto: 2,
-  emitida: 3,
-  paga: 4,
-  cancelada: 5,
-};
+/** Ordem alfabética por nome do cliente (pt-BR, sem diferenciar maiúsculas). */
+export function compareClienteFaturaMesNomeAsc(
+  a: Pick<ClienteFaturaMesRow, "clienteNome">,
+  b: Pick<ClienteFaturaMesRow, "clienteNome">
+): number {
+  return a.clienteNome.localeCompare(b.clienteNome, "pt-BR", {
+    sensitivity: "base",
+  });
+}
 
 export function buildResumoClientesMes(
   agendamentos: AgendamentoWithExames[],
@@ -157,12 +158,7 @@ export function buildResumoClientesMes(
     }
   );
 
-  rows.sort((a, b) => {
-    const orderDiff =
-      STATUS_SORT_ORDER[a.status] - STATUS_SORT_ORDER[b.status];
-    if (orderDiff !== 0) return orderDiff;
-    return b.valorTotal - a.valorTotal;
-  });
+  rows.sort(compareClienteFaturaMesNomeAsc);
 
   let valorEmitido = 0;
   let valorPago = 0;
