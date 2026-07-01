@@ -1,10 +1,13 @@
 import { textMatchesSearch } from "@/lib/text-normalize";
+import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
+import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
 import { buildPendencias } from "@/lib/agendamentos-table";
 import type { AgendamentoWithExames } from "@/lib/types";
 
 export const AGENDAMENTOS_PAGE_SIZE = 15;
 
 export interface AgendamentoFilters {
+  mesReferencia: string;
   cliente: string;
   colaborador: string;
   clinica: string;
@@ -30,6 +33,7 @@ export const PENDENCIA_SITUACAO_OPTIONS = [
 ] as const;
 
 export const EMPTY_AGENDAMENTO_FILTERS: AgendamentoFilters = {
+  mesReferencia: "",
   cliente: "",
   colaborador: "",
   clinica: "",
@@ -41,6 +45,13 @@ export const EMPTY_AGENDAMENTO_FILTERS: AgendamentoFilters = {
   pendenciaSituacao: "",
   esocial: "",
 };
+
+export function getDefaultAgendamentoFilters(): AgendamentoFilters {
+  return {
+    ...EMPTY_AGENDAMENTO_FILTERS,
+    mesReferencia: getCurrentMonthReferenceBR(),
+  };
+}
 
 function matchesEsocialFilter(
   agendamento: AgendamentoWithExames,
@@ -87,7 +98,8 @@ function matchesText(value: string, query: string): boolean {
 }
 
 export function hasActiveFilters(filters: AgendamentoFilters): boolean {
-  return Object.values(filters).some((v) => v.trim() !== "");
+  const { mesReferencia: _mes, ...rest } = filters;
+  return Object.values(rest).some((v) => v.trim() !== "");
 }
 
 /** Data do exame crescente; desempate por horário. */
@@ -106,7 +118,14 @@ export function filterAgendamentos(
   agendamentos: AgendamentoWithExames[],
   filters: AgendamentoFilters
 ): AgendamentoWithExames[] {
+  const range = filters.mesReferencia.trim()
+    ? parseMonthYearBRToIsoRange(filters.mesReferencia)
+    : null;
+
   const filtered = agendamentos.filter((item) => {
+    const data = item.data_agendamento.split("T")[0];
+    if (range && (data < range.inicio || data > range.fim)) return false;
+
     if (!matchesText(item.cliente_nome, filters.cliente)) return false;
     if (!matchesText(item.colaborador, filters.colaborador)) return false;
     if (!matchesText(item.clinica_nome, filters.clinica)) return false;

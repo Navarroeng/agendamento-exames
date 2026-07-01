@@ -3,9 +3,11 @@
 import { PENDENCIA_LABELS } from "@/lib/agendamentos-table";
 import {
   ESOCIAL_FILTER_OPTIONS,
+  hasActiveFilters,
   PENDENCIA_SITUACAO_OPTIONS,
   type AgendamentoFilters,
 } from "@/lib/agendamento-filters";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 
 interface FilterOptions {
@@ -55,7 +57,7 @@ export function AgendamentosFilters({
   onChange,
   onClear,
 }: AgendamentosFiltersProps) {
-  const hasFilters = Object.values(filters).some((v) => v !== "");
+  const hasFilters = hasActiveFilters(filters);
   const showClear = expanded || hasFilters;
 
   const countLabel = `${totalFiltrados} agendamento${totalFiltrados !== 1 ? "s" : ""} encontrado${totalFiltrados !== 1 ? "s" : ""}`;
@@ -133,6 +135,14 @@ export function AgendamentosFilters({
       {expanded && (
         <div className="border-t border-[#eef2f7] px-4 pb-4 pt-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <FilterField label="Mês de referência">
+              <MonthReferenceSelect
+                className={inputClass}
+                value={filters.mesReferencia}
+                onChange={(value) => onChange("mesReferencia", value)}
+              />
+            </FilterField>
+
             <FilterField label="Empresa (cliente)">
               <input
                 className={inputClass}

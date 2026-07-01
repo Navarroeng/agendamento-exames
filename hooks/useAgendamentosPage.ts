@@ -97,7 +97,7 @@ import {
 import { mapAgendamentosToTableRows } from "@/lib/agendamentos-table";
 import {
   AGENDAMENTOS_PAGE_SIZE,
-  EMPTY_AGENDAMENTO_FILTERS,
+  getDefaultAgendamentoFilters,
   extractFilterOptions,
   filterAgendamentos,
   type AgendamentoFilters,
@@ -295,8 +295,8 @@ export function useAgendamentosPage() {
 
   const { agendamentos, loading, error, refresh, getById } =
     useAgendamentosList();
-  const [filters, setFilters] = useState<AgendamentoFilters>(
-    EMPTY_AGENDAMENTO_FILTERS
+  const [filters, setFilters] = useState<AgendamentoFilters>(() =>
+    getDefaultAgendamentoFilters()
   );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
@@ -378,7 +378,7 @@ export function useAgendamentosPage() {
   );
 
   const handleClearFilters = useCallback(() => {
-    setFilters(EMPTY_AGENDAMENTO_FILTERS);
+    setFilters(getDefaultAgendamentoFilters());
   }, []);
 
   const handleSortColumn = useCallback(

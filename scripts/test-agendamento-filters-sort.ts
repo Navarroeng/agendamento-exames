@@ -58,6 +58,7 @@ function agendamento(
 }
 
 const filtersAtivos = {
+  mesReferencia: "06/2026",
   cliente: "",
   colaborador: "",
   clinica: "",
@@ -99,6 +100,7 @@ test("sem filtro ativo mantém ordem original", () => {
     agendamento("2", "2026-06-15"),
   ];
   const result = filterAgendamentos(items, {
+    mesReferencia: "06/2026",
     cliente: "",
     colaborador: "",
     clinica: "",
@@ -111,6 +113,28 @@ test("sem filtro ativo mantém ordem original", () => {
     esocial: "",
   });
   assert(result.map((item) => item.id).join(",") === "3,1,2", "ordem original");
+});
+
+test("filtra agendamentos pelo mês de referência", () => {
+  const items = [
+    agendamento("1", "2026-06-10"),
+    agendamento("2", "2026-07-05"),
+    agendamento("3", "2026-05-28"),
+  ];
+  const filtered = filterAgendamentos(items, {
+    mesReferencia: "06/2026",
+    cliente: "",
+    colaborador: "",
+    clinica: "",
+    tipoExame: "",
+    aso: "",
+    status: "",
+    responsavel: "",
+    pendencia: "",
+    pendenciaSituacao: "",
+    esocial: "",
+  });
+  assert(filtered.length === 1 && filtered[0].id === "1", "somente junho");
 });
 
 if (failed > 0) {
