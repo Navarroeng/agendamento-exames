@@ -17,7 +17,6 @@ export type FaturaClienteMesStatus =
   | "rascunho"
   | "emitida"
   | "paga"
-  | "em_aberto"
   | "cancelada";
 
 export interface ClienteFaturaMesRow {
@@ -48,7 +47,6 @@ export const FATURA_CLIENTE_MES_STATUS_LABELS: Record<
   rascunho: "Rascunho",
   emitida: "Emitida",
   paga: "Paga",
-  em_aberto: "Em aberto",
   cancelada: "Cancelada",
 };
 
@@ -69,7 +67,7 @@ export function deriveClienteMesStatus(
   if (fatura.status === "cancelada") return "cancelada";
   if (fatura.status === "rascunho") return "rascunho";
   if (fatura.status === "emitida") {
-    return fatura.pago ? "paga" : "em_aberto";
+    return fatura.pago ? "paga" : "emitida";
   }
   return "emitida";
 }

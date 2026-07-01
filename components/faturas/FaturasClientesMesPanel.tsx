@@ -22,9 +22,8 @@ function statusBadge(status: FaturaClienteMesStatus) {
   const styles: Record<FaturaClienteMesStatus, string> = {
     aberta_emissao: "bg-brand-orange-soft text-[#c96d00]",
     rascunho: "bg-[#fef3c7] text-[#b45309]",
-    emitida: "bg-brand-green-soft text-brand-green",
+    emitida: "bg-brand-blue-soft text-brand-blue",
     paga: "bg-brand-green-soft text-brand-green",
-    em_aberto: "bg-brand-orange-soft text-[#c96d00]",
     cancelada: "bg-brand-red-soft text-brand-red",
   };
 

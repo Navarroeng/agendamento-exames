@@ -104,7 +104,7 @@ assert.equal(result.resumo.valorEmAberto, 0);
 assert.equal(deriveClienteMesStatus(null), "aberta_emissao");
 assert.equal(
   deriveClienteMesStatus(fatura("x", "A", "2026-06", "emitida", false)),
-  "em_aberto"
+  "emitida"
 );
 
 assert.equal(
