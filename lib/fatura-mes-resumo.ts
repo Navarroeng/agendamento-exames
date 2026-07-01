@@ -10,27 +10,35 @@ import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
 } from "@/lib/fatura-mappers";
-import type { AgendamentoWithExames, FaturaRecord } from "@/lib/types";
+import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
 
-export type FaturaClienteMesStatus =
+export type FaturaMesStatus =
   | "aberta_emissao"
   | "rascunho"
   | "emitida"
   | "paga"
   | "cancelada";
 
-export interface ClienteFaturaMesRow {
-  clienteNome: string;
+/** @deprecated Use FaturaMesStatus */
+export type FaturaClienteMesStatus = FaturaMesStatus;
+
+export interface FaturaMesRow {
+  referenciaNome: string;
   periodoLabel: string;
   qtdAgendamentos: number;
   qtdExames: number;
   valorTotal: number;
   fatura: FaturaRecord | null;
-  status: FaturaClienteMesStatus;
+  status: FaturaMesStatus;
+}
+
+/** @deprecated Use FaturaMesRow */
+export interface ClienteFaturaMesRow extends FaturaMesRow {
+  clienteNome: string;
 }
 
 export interface FaturaMesResumoGeral {
-  totalClientes: number;
+  totalReferencias: number;
   totalAgendamentos: number;
   totalExames: number;
   valorPrevisto: number;
@@ -39,11 +47,19 @@ export interface FaturaMesResumoGeral {
   valorEmAberto: number;
 }
 
-export const FATURA_CLIENTE_MES_STATUS_LABELS: Record<
-  FaturaClienteMesStatus,
-  string
-> = {
+export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
   aberta_emissao: "Aberta para emissão",
+  rascunho: "Rascunho",
+  emitida: "Emitida",
+  paga: "Paga",
+  cancelada: "Cancelada",
+};
+
+/** @deprecated Use FATURA_MES_STATUS_LABELS */
+export const FATURA_CLIENTE_MES_STATUS_LABELS = FATURA_MES_STATUS_LABELS;
+
+export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> = {
+  aberta_emissao: "Aberta para registro",
   rascunho: "Rascunho",
   emitida: "Emitida",
   paga: "Paga",
@@ -60,9 +76,9 @@ function normalizeReferencia(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export function deriveClienteMesStatus(
+export function deriveFaturaMesStatus(
   fatura: FaturaRecord | null
-): FaturaClienteMesStatus {
+): FaturaMesStatus {
   if (!fatura) return "aberta_emissao";
   if (fatura.status === "cancelada") return "cancelada";
   if (fatura.status === "rascunho") return "rascunho";
@@ -72,16 +88,20 @@ export function deriveClienteMesStatus(
   return "emitida";
 }
 
-export function findFaturaClienteMes(
+/** @deprecated Use deriveFaturaMesStatus */
+export const deriveClienteMesStatus = deriveFaturaMesStatus;
+
+export function findFaturaReferenciaMes(
   faturas: FaturaRecord[],
-  clienteNome: string,
+  tipo: FaturaTipo,
+  referenciaNome: string,
   mesReferencia: string
 ): FaturaRecord | null {
   const matches = faturas.filter(
     (f) =>
-      f.tipo === "cliente" &&
+      f.tipo === tipo &&
       normalizeReferencia(f.referencia_nome) ===
-        normalizeReferencia(clienteNome) &&
+        normalizeReferencia(referenciaNome) &&
       faturaMatchesMesReferencia(f, mesReferencia)
   );
 
@@ -99,73 +119,101 @@ export function findFaturaClienteMes(
   return pool[0] ?? null;
 }
 
-/** Ordem alfabética por nome do cliente (pt-BR, sem diferenciar maiúsculas). */
-export function compareClienteFaturaMesNomeAsc(
-  a: Pick<ClienteFaturaMesRow, "clienteNome">,
-  b: Pick<ClienteFaturaMesRow, "clienteNome">
+/** @deprecated Use findFaturaReferenciaMes */
+export function findFaturaClienteMes(
+  faturas: FaturaRecord[],
+  clienteNome: string,
+  mesReferencia: string
+): FaturaRecord | null {
+  return findFaturaReferenciaMes(
+    faturas,
+    "cliente",
+    clienteNome,
+    mesReferencia
+  );
+}
+
+/** Ordem alfabética por referência (pt-BR, sem diferenciar maiúsculas). */
+export function compareFaturaMesReferenciaAsc(
+  a: Pick<FaturaMesRow, "referenciaNome">,
+  b: Pick<FaturaMesRow, "referenciaNome">
 ): number {
-  return a.clienteNome.localeCompare(b.clienteNome, "pt-BR", {
+  return a.referenciaNome.localeCompare(b.referenciaNome, "pt-BR", {
     sensitivity: "base",
   });
 }
 
-/** Cliente entra na listagem e no resumo previsto somente com valor a faturar > 0. */
-export function isClienteFaturavelNoMes(valorTotal: number): boolean {
+/** @deprecated Use compareFaturaMesReferenciaAsc */
+export const compareClienteFaturaMesNomeAsc = compareFaturaMesReferenciaAsc;
+
+/** Entra na listagem e no resumo previsto somente com valor > 0. */
+export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
   return valorTotal > 0;
 }
 
-export function buildResumoClientesMes(
+/** @deprecated Use isReferenciaFaturavelNoMes */
+export const isClienteFaturavelNoMes = isReferenciaFaturavelNoMes;
+
+function buildResumoMesInterno(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
   mesReferencia: string,
-  clienteFilter = ""
-): { rows: ClienteFaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  tipo: FaturaTipo,
+  referenciaFilter: string,
+  referenciaField: "cliente" | "clinica"
+): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
   if (!isValidMonthYearBR(mesReferencia)) return null;
 
   const filters: FaturaFilters = {
     ...EMPTY_FATURA_FILTERS,
     mesReferencia,
-    cliente: clienteFilter,
+    ...(referenciaField === "cliente"
+      ? { cliente: referenciaFilter }
+      : { clinica: referenciaFilter }),
   };
   const agsDoMes = filterAgendamentosFatura(agendamentos, filters);
-  const byCliente = new Map<string, AgendamentoWithExames[]>();
+  const byReferencia = new Map<string, AgendamentoWithExames[]>();
 
   agsDoMes.forEach((ag) => {
-    const nome = ag.cliente_nome?.trim() || "—";
-    const list = byCliente.get(nome) ?? [];
+    const nome =
+      (referenciaField === "cliente"
+        ? ag.cliente_nome
+        : ag.clinica_nome)?.trim() || "—";
+    const list = byReferencia.get(nome) ?? [];
     list.push(ag);
-    byCliente.set(nome, list);
+    byReferencia.set(nome, list);
   });
 
   const periodoLabel = formatPeriodoFatura(mesReferencia);
-  const faturasCliente = faturas.filter((f) => f.tipo === "cliente");
+  const faturasDoTipo = faturas.filter((f) => f.tipo === tipo);
 
-  const rows: ClienteFaturaMesRow[] = Array.from(byCliente.entries()).map(
-    ([clienteNome, ags]) => {
-      const itens = buildFaturaItensFromAgendamentos(ags, "cliente");
-      const fatura = findFaturaClienteMes(
-        faturasCliente,
-        clienteNome,
+  const rows: FaturaMesRow[] = Array.from(byReferencia.entries()).map(
+    ([referenciaNome, ags]) => {
+      const itens = buildFaturaItensFromAgendamentos(ags, tipo);
+      const fatura = findFaturaReferenciaMes(
+        faturasDoTipo,
+        tipo,
+        referenciaNome,
         mesReferencia
       );
 
       return {
-        clienteNome,
+        referenciaNome,
         periodoLabel,
         qtdAgendamentos: ags.length,
         qtdExames: itens.length,
         valorTotal: calcTotalFaturaItens(itens),
         fatura,
-        status: deriveClienteMesStatus(fatura),
+        status: deriveFaturaMesStatus(fatura),
       };
     }
   );
 
   const rowsFaturaveis = rows.filter((row) =>
-    isClienteFaturavelNoMes(row.valorTotal)
+    isReferenciaFaturavelNoMes(row.valorTotal)
   );
 
-  rowsFaturaveis.sort(compareClienteFaturaMesNomeAsc);
+  rowsFaturaveis.sort(compareFaturaMesReferenciaAsc);
 
   let valorEmitido = 0;
   let valorPago = 0;
@@ -183,7 +231,7 @@ export function buildResumoClientesMes(
   });
 
   const resumo: FaturaMesResumoGeral = {
-    totalClientes: rowsFaturaveis.length,
+    totalReferencias: rowsFaturaveis.length,
     totalAgendamentos: rowsFaturaveis.reduce((s, r) => s + r.qtdAgendamentos, 0),
     totalExames: rowsFaturaveis.reduce((s, r) => s + r.qtdExames, 0),
     valorPrevisto: rowsFaturaveis.reduce((s, r) => s + r.valorTotal, 0),
@@ -193,4 +241,44 @@ export function buildResumoClientesMes(
   };
 
   return { rows: rowsFaturaveis, resumo };
+}
+
+export function buildResumoClientesMes(
+  agendamentos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  mesReferencia: string,
+  clienteFilter = ""
+): { rows: ClienteFaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  const result = buildResumoMesInterno(
+    agendamentos,
+    faturas,
+    mesReferencia,
+    "cliente",
+    clienteFilter,
+    "cliente"
+  );
+  if (!result) return null;
+  return {
+    resumo: result.resumo,
+    rows: result.rows.map((row) => ({
+      ...row,
+      clienteNome: row.referenciaNome,
+    })),
+  };
+}
+
+export function buildResumoClinicasMes(
+  agendamentos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  mesReferencia: string,
+  clinicaFilter = ""
+): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  return buildResumoMesInterno(
+    agendamentos,
+    faturas,
+    mesReferencia,
+    "clinica",
+    clinicaFilter,
+    "clinica"
+  );
 }

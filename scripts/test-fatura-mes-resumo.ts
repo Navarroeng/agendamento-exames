@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import {
   buildResumoClientesMes,
-  deriveClienteMesStatus,
-  findFaturaClienteMes,
+  buildResumoClinicasMes,
+  deriveFaturaMesStatus,
+  findFaturaReferenciaMes,
 } from "../lib/fatura-mes-resumo";
 import type { AgendamentoWithExames, FaturaRecord } from "../lib/types";
 
@@ -78,22 +79,22 @@ const result = buildResumoClientesMes(ags, faturas, "06/2026");
 assert.ok(result);
 assert.equal(result.rows.length, 2);
 assert.deepEqual(
-  result.rows.map((r) => r.clienteNome),
+  result.rows.map((r) => r.referenciaNome),
   ["Empresa X", "Mil Bolhas"]
 );
 
-const mil = result.rows.find((r) => r.clienteNome === "Mil Bolhas");
+const mil = result.rows.find((r) => r.referenciaNome === "Mil Bolhas");
 assert.ok(mil);
 assert.equal(mil.qtdAgendamentos, 2);
 assert.equal(mil.qtdExames, 2);
 assert.equal(mil.valorTotal, 200);
 assert.equal(mil.status, "aberta_emissao");
 
-const emp = result.rows.find((r) => r.clienteNome === "Empresa X");
+const emp = result.rows.find((r) => r.referenciaNome === "Empresa X");
 assert.ok(emp);
 assert.equal(emp.status, "paga");
 
-assert.equal(result.resumo.totalClientes, 2);
+assert.equal(result.resumo.totalReferencias, 2);
 assert.equal(result.resumo.totalAgendamentos, 3);
 assert.equal(result.resumo.totalExames, 3);
 assert.equal(result.resumo.valorPrevisto, 250);
@@ -101,27 +102,45 @@ assert.equal(result.resumo.valorEmitido, 100);
 assert.equal(result.resumo.valorPago, 100);
 assert.equal(result.resumo.valorEmAberto, 0);
 
-assert.equal(deriveClienteMesStatus(null), "aberta_emissao");
+assert.equal(deriveFaturaMesStatus(null), "aberta_emissao");
 assert.equal(
-  deriveClienteMesStatus(fatura("x", "A", "2026-06", "emitida", false)),
+  deriveFaturaMesStatus(fatura("x", "A", "2026-06", "emitida", false)),
   "emitida"
 );
 
 assert.equal(
-  findFaturaClienteMes(faturas, "empresa x", "06/2026")?.id,
+  findFaturaReferenciaMes(faturas, "cliente", "empresa x", "06/2026")?.id,
   "f1"
 );
 
 const filtered = buildResumoClientesMes(ags, faturas, "06/2026", "Mil");
 assert.ok(filtered);
 assert.equal(filtered.rows.length, 1);
-assert.equal(filtered.rows[0].clienteNome, "Mil Bolhas");
+assert.equal(filtered.rows[0].referenciaNome, "Mil Bolhas");
 
 assert.ok(
-  !result.rows.some((r) => r.clienteNome === "Empresa Zerada"),
-  "cliente com valor zero não deve aparecer"
+  !result.rows.some((r) => r.referenciaNome === "Empresa Zerada"),
+  "referência com valor zero não deve aparecer"
 );
 assert.equal(result.resumo.totalAgendamentos, 3);
 assert.equal(result.resumo.totalExames, 3);
+
+const agsClinica = [
+  ag("10", "Cliente A", "2026-06-10", 0),
+  ag("11", "Cliente B", "2026-06-12", 0),
+];
+agsClinica[0].clinica_nome = "Clínica Alpha";
+agsClinica[1].clinica_nome = "Clínica Beta";
+agsClinica[0].agendamento_exames![0].custo_clinica = 40;
+agsClinica[1].agendamento_exames![0].custo_clinica = 60;
+
+const resumoClinica = buildResumoClinicasMes(agsClinica, [], "06/2026");
+assert.ok(resumoClinica);
+assert.equal(resumoClinica.rows.length, 2);
+assert.deepEqual(
+  resumoClinica.rows.map((r) => r.referenciaNome),
+  ["Clínica Alpha", "Clínica Beta"]
+);
+assert.equal(resumoClinica.resumo.valorPrevisto, 100);
 
 console.log("test-fatura-mes-resumo: ok");

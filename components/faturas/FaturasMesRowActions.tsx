@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClienteFaturaMesRow } from "@/lib/fatura-mes-resumo";
-import type { FaturaRecord } from "@/lib/types";
+import type { FaturaMesRow } from "@/lib/fatura-mes-resumo";
+import type { FaturaRecord, FaturaTipo } from "@/lib/types";
 import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
 
-interface FaturasClienteMesRowActionsProps {
-  row: ClienteFaturaMesRow;
+interface FaturasMesRowActionsProps {
+  variant: FaturaTipo;
+  row: FaturaMesRow;
   saving: boolean;
-  onVisualizarAgendamentos: (clienteNome: string) => void;
-  onEmitirFatura: (clienteNome: string) => void;
+  onVisualizarAgendamentos: (referenciaNome: string) => void;
+  onEmitir: (referenciaNome: string) => void;
   onVisualizarFatura: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -18,6 +19,11 @@ interface FaturasClienteMesRowActionsProps {
   onMarcarPendente: (id: string) => void;
 }
 
+const EMIT_LABEL: Record<FaturaTipo, string> = {
+  cliente: "Emitir fatura",
+  clinica: "Emitir registro",
+};
+
 type MenuItem = {
   key: string;
   label: string;
@@ -25,18 +31,19 @@ type MenuItem = {
   onClick: () => void;
 };
 
-export function FaturasClienteMesRowActions({
+export function FaturasMesRowActions({
+  variant,
   row,
   saving,
   onVisualizarAgendamentos,
-  onEmitirFatura,
+  onEmitir,
   onVisualizarFatura,
   onGerarPdf,
   onCancelar,
   onMarcarPago,
   onEditarPagamento,
   onMarcarPendente,
-}: FaturasClienteMesRowActionsProps) {
+}: FaturasMesRowActionsProps) {
   const fatura = row.fatura;
 
   if (fatura) {
@@ -60,21 +67,24 @@ export function FaturasClienteMesRowActions({
 
   return (
     <AbertaEmissaoActionsMenu
-      clienteNome={row.clienteNome}
+      referenciaNome={row.referenciaNome}
+      emitLabel={EMIT_LABEL[variant]}
       saving={saving}
-      onVisualizar={() => onVisualizarAgendamentos(row.clienteNome)}
-      onEmitir={() => onEmitirFatura(row.clienteNome)}
+      onVisualizar={() => onVisualizarAgendamentos(row.referenciaNome)}
+      onEmitir={() => onEmitir(row.referenciaNome)}
     />
   );
 }
 
 function AbertaEmissaoActionsMenu({
-  clienteNome,
+  referenciaNome,
+  emitLabel,
   saving,
   onVisualizar,
   onEmitir,
 }: {
-  clienteNome: string;
+  referenciaNome: string;
+  emitLabel: string;
   saving: boolean;
   onVisualizar: () => void;
   onEmitir: () => void;
@@ -97,7 +107,7 @@ function AbertaEmissaoActionsMenu({
 
   const items: MenuItem[] = [
     { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
-    { key: "emitir", label: "Emitir fatura", onClick: onEmitir },
+    { key: "emitir", label: emitLabel, onClick: onEmitir },
   ];
 
   function handleAction(item: MenuItem) {
@@ -116,7 +126,7 @@ function AbertaEmissaoActionsMenu({
             ? "border-brand-blue/30 bg-brand-blue-soft text-brand-blue"
             : "border-[#e2e8f0] bg-white text-[#64748b] hover:border-[#cbd5e1] hover:bg-[#f8fafc] hover:text-navy"
         }`}
-        aria-label={`Ações — ${clienteNome}`}
+        aria-label={`Ações — ${referenciaNome}`}
         aria-expanded={open}
       >
         ⋯
