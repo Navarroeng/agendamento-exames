@@ -138,9 +138,7 @@ export function filterAgendamentos(
     return true;
   });
 
-  if (!hasActiveFilters(filters)) return filtered;
-
-  return [...filtered].sort(compareAgendamentosPorDataExameAsc);
+  return filtered;
 }
 
 export function extractFilterOptions(agendamentos: AgendamentoWithExames[]) {

@@ -4,6 +4,7 @@ import {
   compareAgendamentosPorDataExameAsc,
   filterAgendamentos,
 } from "../lib/agendamento-filters";
+import { applyDefaultAgendamentoTableOrder } from "../lib/agendamento-table-sort";
 import type { AgendamentoWithExames } from "../lib/types";
 
 let failed = 0;
@@ -56,6 +57,19 @@ function agendamento(
   };
 }
 
+const filtersAtivos = {
+  cliente: "",
+  colaborador: "",
+  clinica: "",
+  tipoExame: "",
+  aso: "",
+  status: "agendado",
+  responsavel: "",
+  pendencia: "",
+  pendenciaSituacao: "",
+  esocial: "",
+};
+
 test("ordena por data do exame crescente", () => {
   const items = [
     agendamento("3", "2026-06-20"),
@@ -66,24 +80,14 @@ test("ordena por data do exame crescente", () => {
   assert(sorted.map((item) => item.id).join(",") === "1,2,3", "ordem incorreta");
 });
 
-test("com filtro ativo retorna lista da data mais antiga primeiro", () => {
+test("com filtro ativo aplica ordem padrão da data mais antiga primeiro", () => {
   const items = [
     agendamento("3", "2026-06-20"),
     agendamento("1", "2026-06-10"),
     agendamento("2", "2026-06-15"),
   ];
-  const result = filterAgendamentos(items, {
-    cliente: "",
-    colaborador: "",
-    clinica: "",
-    tipoExame: "",
-    aso: "",
-    status: "agendado",
-    responsavel: "",
-    pendencia: "",
-    pendenciaSituacao: "",
-    esocial: "",
-  });
+  const filtered = filterAgendamentos(items, filtersAtivos);
+  const result = applyDefaultAgendamentoTableOrder(filtered, filtersAtivos);
   assert(result[0].id === "1", "primeiro deveria ser o mais antigo");
   assert(result[2].id === "3", "último deveria ser o mais recente");
 });

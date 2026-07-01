@@ -101,6 +101,11 @@ import {
   filterAgendamentos,
   type AgendamentoFilters,
 } from "@/lib/agendamento-filters";
+import {
+  cycleAgendamentoTableSort,
+  orderAgendamentosForTable,
+  type AgendamentoTableSortState,
+} from "@/lib/agendamento-table-sort";
 import type { AgendamentoStatus, AgendamentoWithExames, CargoRecord, ExameFormItem } from "@/lib/types";
 
 export function useAgendamentosPage() {
@@ -294,6 +299,9 @@ export function useAgendamentosPage() {
   );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
+  const [tableSort, setTableSort] = useState<AgendamentoTableSortState | null>(
+    null
+  );
 
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractFilterOptions(agendamentos);
@@ -308,23 +316,28 @@ export function useAgendamentosPage() {
     [agendamentos, filters]
   );
 
+  const orderedAgendamentos = useMemo(
+    () => orderAgendamentosForTable(filteredAgendamentos, filters, tableSort),
+    [filteredAgendamentos, filters, tableSort]
+  );
+
   const totalPages = useMemo(
     () =>
       Math.max(
         1,
-        Math.ceil(filteredAgendamentos.length / AGENDAMENTOS_PAGE_SIZE)
+        Math.ceil(orderedAgendamentos.length / AGENDAMENTOS_PAGE_SIZE)
       ),
-    [filteredAgendamentos.length]
+    [orderedAgendamentos.length]
   );
 
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * AGENDAMENTOS_PAGE_SIZE;
-    const slice = filteredAgendamentos.slice(
+    const slice = orderedAgendamentos.slice(
       start,
       start + AGENDAMENTOS_PAGE_SIZE
     );
     return mapAgendamentosToTableRows(slice);
-  }, [filteredAgendamentos, page]);
+  }, [orderedAgendamentos, page]);
 
   useEffect(() => {
     setPage(1);
@@ -366,6 +379,14 @@ export function useAgendamentosPage() {
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_AGENDAMENTO_FILTERS);
   }, []);
+
+  const handleSortColumn = useCallback(
+    (column: AgendamentoTableSortState["column"]) => {
+      setTableSort((prev) => cycleAgendamentoTableSort(prev, column));
+      setPage(1);
+    },
+    []
+  );
 
   const cargosFormOptions = useMemo(
     () => buildCargosFormOptions(cargosAtivos, cargoId, cargoNomeSalvo),
@@ -1130,6 +1151,8 @@ export function useAgendamentosPage() {
     totalPages,
     handleFilterChange,
     handleClearFilters,
+    tableSort,
+    handleSortColumn,
     toggleFilters,
     closeForm,
     setPage,

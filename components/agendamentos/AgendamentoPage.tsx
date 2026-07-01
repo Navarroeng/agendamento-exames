@@ -58,6 +58,8 @@ export function AgendamentoPage() {
     totalPages,
     handleFilterChange,
     handleClearFilters,
+    tableSort,
+    handleSortColumn,
     toggleFilters,
     closeForm,
     setPage,
@@ -158,6 +160,8 @@ export function AgendamentoPage() {
         rows={paginatedRows}
         loading={loading}
         error={error}
+        sort={tableSort}
+        onSortColumn={handleSortColumn}
         paginationSlot={
           !loading && !error && filteredAgendamentos.length > 0 ? (
             <AgendamentosPagination

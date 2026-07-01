@@ -1,7 +1,14 @@
+"use client";
+
 import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
-import { RowActionsMenu } from "./RowActionsMenu";
+import {
+  AGENDAMENTO_TABLE_SORT_COLUMNS,
+  type AgendamentoTableSortColumn,
+  type AgendamentoTableSortState,
+} from "@/lib/agendamento-table-sort";
 import type { AgendamentoTableRow } from "@/lib/types";
+import { RowActionsMenu } from "./RowActionsMenu";
 
 const TH =
   "border-b border-[#e2e8f0] bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.06em] text-[#64748b] whitespace-nowrap";
@@ -9,6 +16,32 @@ const TH_C = `${TH} text-center`;
 const TD =
   "border-b border-[#eef2f7]/80 px-2 py-1.5 text-xs text-[#334155] align-middle";
 const TD_C = `${TD} text-center`;
+
+function SortIndicator({
+  column,
+  sort,
+}: {
+  column: AgendamentoTableSortColumn;
+  sort: AgendamentoTableSortState | null;
+}) {
+  const active = sort?.column === column;
+  const icon = !active
+    ? "↕"
+    : sort.direction === "asc"
+      ? "▲"
+      : "▼";
+
+  return (
+    <span
+      className={`ml-1 inline-block text-[9px] leading-none ${
+        active ? "text-brand-blue" : "text-[#cbd5e1]"
+      }`}
+      aria-hidden
+    >
+      {icon}
+    </span>
+  );
+}
 
 function StatusBadge({
   type,
@@ -49,6 +82,8 @@ interface AgendamentosTableProps {
   rows: AgendamentoTableRow[];
   loading: boolean;
   error: string | null;
+  sort: AgendamentoTableSortState | null;
+  onSortColumn: (column: AgendamentoTableSortColumn) => void;
   paginationSlot?: React.ReactNode;
   onVisualizar: (agendamentoId: string) => void;
   onEditar: (agendamentoId: string) => void;
@@ -56,26 +91,12 @@ interface AgendamentosTableProps {
   onHistorico: (agendamentoId: string) => void;
 }
 
-const HEADERS: { label: string; center?: boolean }[] = [
-  { label: "Data agendada" },
-  { label: "Cliente" },
-  { label: "Colaborador" },
-  { label: "ASO" },
-  { label: "Exames" },
-  { label: "Total Cliente" },
-  { label: "Status" },
-  { label: "ASO Clínica", center: true },
-  { label: "ASO Assinado", center: true },
-  { label: "ASO Cliente", center: true },
-  { label: "Matrícula", center: true },
-  { label: "e-Social", center: true },
-  { label: "Ações", center: true },
-];
-
 export function AgendamentosTable({
   rows,
   loading,
   error,
+  sort,
+  onSortColumn,
   paginationSlot,
   onVisualizar,
   onEditar,
@@ -111,14 +132,22 @@ export function AgendamentosTable({
           <table className="w-full min-w-[1080px] border-collapse">
             <thead>
               <tr>
-                {HEADERS.map((h) => (
-                  <th
-                    key={h.label}
-                    className={h.center ? TH_C : TH}
-                  >
-                    {h.label}
+                {AGENDAMENTO_TABLE_SORT_COLUMNS.map((h) => (
+                  <th key={h.key} className={h.center ? TH_C : TH}>
+                    <button
+                      type="button"
+                      onClick={() => onSortColumn(h.key)}
+                      className={`inline-flex max-w-full items-center gap-0.5 transition-colors hover:text-brand-blue ${
+                        h.center ? "mx-auto" : ""
+                      } ${sort?.column === h.key ? "text-brand-blue" : ""}`}
+                      aria-label={`Ordenar por ${h.label}`}
+                    >
+                      <span>{h.label}</span>
+                      <SortIndicator column={h.key} sort={sort} />
+                    </button>
                   </th>
                 ))}
+                <th className={TH_C}>Ações</th>
               </tr>
             </thead>
             <tbody>
