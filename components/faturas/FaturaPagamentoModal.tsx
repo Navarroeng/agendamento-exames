@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import {
   formatDateIsoToBR,
   isValidDateBR,
   parseDateBRToIso,
 } from "@/lib/agendamento-datetime";
+import {
+  COMPROVANTE_ALLOWED_EXTENSIONS,
+  COMPROVANTE_OBRIGATORIO_MSG,
+  COMPROVANTE_TIPO_INVALIDO_MSG,
+  ComprovanteValidationError,
+  validateComprovanteFile,
+} from "@/lib/fatura-comprovante";
 import type { FaturaRecord } from "@/lib/types";
 
 export type FaturaPagamentoModalMode = "registrar" | "editar";
@@ -17,8 +24,17 @@ interface FaturaPagamentoModalProps {
   fatura: FaturaRecord | null;
   saving?: boolean;
   onClose: () => void;
-  onConfirm: (dataPagamentoIso: string, observacao: string | null) => void;
+  onConfirm: (
+    dataPagamentoIso: string,
+    observacao: string | null,
+    comprovanteFile: File | null
+  ) => void;
+  onVerComprovante?: (faturaId: string) => void;
 }
+
+const ACCEPTED_TYPES = COMPROVANTE_ALLOWED_EXTENSIONS.map(
+  (ext) => `.${ext}`
+).join(",");
 
 export function FaturaPagamentoModal({
   open,
@@ -27,9 +43,17 @@ export function FaturaPagamentoModal({
   saving = false,
   onClose,
   onConfirm,
+  onVerComprovante,
 }: FaturaPagamentoModalProps) {
   const [dataPagamento, setDataPagamento] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
+  const [comprovanteError, setComprovanteError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const temComprovanteExistente = Boolean(
+    fatura?.comprovante_pagamento_path?.trim()
+  );
 
   useEffect(() => {
     if (!open || !fatura) return;
@@ -40,6 +64,11 @@ export function FaturaPagamentoModal({
         : formatDateIsoToBR(new Date().toISOString().split("T")[0])
     );
     setObservacao(fatura.observacao_pagamento ?? "");
+    setComprovanteFile(null);
+    setComprovanteError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }, [open, fatura]);
 
   if (!open || !fatura) return null;
@@ -49,6 +78,23 @@ export function FaturaPagamentoModal({
     onClose();
   };
 
+  const handleFileChange = (file: File | null) => {
+    setComprovanteFile(file);
+    setComprovanteError(null);
+
+    if (!file) return;
+
+    try {
+      validateComprovanteFile(file);
+    } catch (err) {
+      setComprovanteError(
+        err instanceof ComprovanteValidationError
+          ? err.message
+          : COMPROVANTE_TIPO_INVALIDO_MSG
+      );
+    }
+  };
+
   const handleConfirm = () => {
     if (!dataPagamento.trim()) return;
     if (!isValidDateBR(dataPagamento)) return;
@@ -56,7 +102,28 @@ export function FaturaPagamentoModal({
     const iso = parseDateBRToIso(dataPagamento);
     if (!iso) return;
 
-    onConfirm(iso, observacao.trim() || null);
+    const precisaComprovante =
+      mode === "registrar" || !temComprovanteExistente;
+
+    if (precisaComprovante && !comprovanteFile) {
+      setComprovanteError(COMPROVANTE_OBRIGATORIO_MSG);
+      return;
+    }
+
+    if (comprovanteFile) {
+      try {
+        validateComprovanteFile(comprovanteFile);
+      } catch (err) {
+        setComprovanteError(
+          err instanceof ComprovanteValidationError
+            ? err.message
+            : COMPROVANTE_TIPO_INVALIDO_MSG
+        );
+        return;
+      }
+    }
+
+    onConfirm(iso, observacao.trim() || null, comprovanteFile);
   };
 
   const title = mode === "registrar" ? "Registrar pagamento" : "Editar pagamento";
@@ -64,6 +131,15 @@ export function FaturaPagamentoModal({
     mode === "registrar" ? "Confirmar pagamento" : "Salvar alterações";
   const dateInvalid =
     dataPagamento.trim() !== "" && !isValidDateBR(dataPagamento);
+
+  const comprovanteLabel =
+    mode === "registrar" || !temComprovanteExistente ? (
+      <>
+        Comprovante de pagamento <RequiredMark />
+      </>
+    ) : (
+      "Comprovante de pagamento"
+    );
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
@@ -122,6 +198,54 @@ export function FaturaPagamentoModal({
             )}
           </Field>
 
+          <Field label={comprovanteLabel}>
+            {temComprovanteExistente && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+                <span className="text-xs text-[#475569]">
+                  Arquivo atual:{" "}
+                  <span className="font-semibold text-navy">
+                    {fatura.comprovante_pagamento_nome || "Comprovante"}
+                  </span>
+                </span>
+                {onVerComprovante && (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-brand-blue hover:underline"
+                    onClick={() => onVerComprovante(fatura.id)}
+                    disabled={saving}
+                  >
+                    Visualizar
+                  </button>
+                )}
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              className="field-input w-full cursor-pointer file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand-blue-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-blue"
+              disabled={saving}
+              onChange={(e) =>
+                handleFileChange(e.target.files?.[0] ?? null)
+              }
+            />
+            <p className="text-[11px] text-[#94a3b8]">
+              PDF, JPG, JPEG ou PNG — até 5 MB.
+              {mode === "editar" && temComprovanteExistente
+                ? " Envie um novo arquivo apenas se quiser substituir o comprovante."
+                : ""}
+            </p>
+            {comprovanteFile && (
+              <p className="text-xs font-medium text-brand-green">
+                Selecionado: {comprovanteFile.name}
+              </p>
+            )}
+            {comprovanteError && (
+              <p className="text-xs text-brand-red">{comprovanteError}</p>
+            )}
+          </Field>
+
           <Field label="Observação">
             <textarea
               className="field-input !h-[96px] w-full resize-none py-3"
@@ -149,7 +273,8 @@ export function FaturaPagamentoModal({
             disabled={
               saving ||
               !dataPagamento.trim() ||
-              !isValidDateBR(dataPagamento)
+              !isValidDateBR(dataPagamento) ||
+              Boolean(comprovanteError)
             }
           >
             {saving ? "Salvando..." : confirmLabel}

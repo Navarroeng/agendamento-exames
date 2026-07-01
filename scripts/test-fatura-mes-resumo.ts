@@ -59,6 +59,8 @@ function fatura(
     pago,
     data_pagamento: pago ? `${mes}-20` : null,
     observacao_pagamento: null,
+    comprovante_pagamento_path: pago ? `${id}/comprovante.pdf` : null,
+    comprovante_pagamento_nome: pago ? "comprovante.pdf" : null,
     created_at: "",
     updated_at: "",
   };

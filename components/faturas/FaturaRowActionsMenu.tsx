@@ -11,6 +11,7 @@ interface FaturaRowActionsMenuProps {
   onMarcarPago: (id: string) => void;
   onEditarPagamento: (id: string) => void;
   onMarcarPendente: (id: string) => void;
+  onVerComprovante?: (id: string) => void;
 }
 
 type MenuItem = {
@@ -28,6 +29,7 @@ export function FaturaRowActionsMenu({
   onMarcarPago,
   onEditarPagamento,
   onMarcarPendente,
+  onVerComprovante,
 }: FaturaRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -61,6 +63,13 @@ export function FaturaRowActionsMenu({
     });
 
     if (fatura.pago) {
+      if (fatura.comprovante_pagamento_path && onVerComprovante) {
+        items.push({
+          key: "ver-comprovante",
+          label: "Ver comprovante",
+          onClick: () => onVerComprovante(fatura.id),
+        });
+      }
       items.push({
         key: "editar-pagamento",
         label: "Editar pagamento",

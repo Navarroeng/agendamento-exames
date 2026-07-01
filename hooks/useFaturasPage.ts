@@ -37,13 +37,18 @@ import {
   type FaturaExistenteInfo,
 } from "@/services/duplicidade.service";
 import {
+  ComprovanteValidationError,
+} from "@/lib/fatura-comprovante";
+import {
   buscarFaturaComItens,
   cancelarFatura,
   listarFaturas,
   marcarFaturaPendente,
+  atualizarPagamentoFatura,
   registrarPagamentoFatura,
   salvarFatura,
 } from "@/services/fatura-historico.service";
+import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptions } from "@/lib/cliente-display";
@@ -718,15 +723,37 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   }, [saving]);
 
   const handleConfirmPagamento = useCallback(
-    async (dataPagamentoIso: string, observacao: string | null) => {
+    async (
+      dataPagamentoIso: string,
+      observacao: string | null,
+      comprovanteFile: File | null
+    ) => {
       if (!pagamentoFatura) return;
 
       setSaving(true);
       try {
-        await registrarPagamentoFatura(pagamentoFatura.id, {
-          data_pagamento: dataPagamentoIso,
-          observacao_pagamento: observacao,
-        }, auditOptions);
+        if (pagamentoMode === "registrar") {
+          await registrarPagamentoFatura(
+            pagamentoFatura.id,
+            {
+              data_pagamento: dataPagamentoIso,
+              observacao_pagamento: observacao,
+              comprovanteFile,
+            },
+            auditOptions
+          );
+        } else {
+          await atualizarPagamentoFatura(
+            pagamentoFatura.id,
+            {
+              data_pagamento: dataPagamentoIso,
+              observacao_pagamento: observacao,
+              comprovanteFile,
+            },
+            pagamentoFatura.comprovante_pagamento_path,
+            auditOptions
+          );
+        }
         toast.success(
           pagamentoMode === "registrar"
             ? "Pagamento registrado com sucesso"
@@ -737,12 +764,39 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         await reloadAll();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao registrar pagamento.");
+        if (err instanceof ComprovanteValidationError) {
+          toast.error(err.message);
+        } else {
+          toast.error("Erro ao registrar pagamento.");
+        }
       } finally {
         setSaving(false);
       }
     },
-    [pagamentoFatura, pagamentoMode, reloadAll]
+    [pagamentoFatura, pagamentoMode, reloadAll, auditOptions]
+  );
+
+  const handleVerComprovante = useCallback(
+    async (id: string) => {
+      const fatura =
+        faturas.find((f) => f.id === id) ??
+        (pagamentoFatura?.id === id ? pagamentoFatura : null);
+
+      const path = fatura?.comprovante_pagamento_path?.trim();
+      if (!path) {
+        toast.error("Comprovante não encontrado para esta fatura.");
+        return;
+      }
+
+      try {
+        const url = await obterUrlComprovantePagamento(path);
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao abrir o comprovante.");
+      }
+    },
+    [faturas, pagamentoFatura]
   );
 
   const handleMarcarPendente = useCallback(
@@ -751,7 +805,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       if (!fatura) return;
 
       const ok = window.confirm(
-        `Marcar a fatura ${fatura.numero} como pendente? A data e observação de pagamento serão removidas.`
+        `Marcar a fatura ${fatura.numero} como pendente? A data, observação e comprovante de pagamento serão removidos.`
       );
       if (!ok) return;
 
@@ -914,6 +968,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleEditarPagamento,
     handleClosePagamento,
     handleConfirmPagamento,
+    handleVerComprovante,
     handleMarcarPendente,
     faturaDuplicidadeOpen,
     faturaDuplicidadeInfo,

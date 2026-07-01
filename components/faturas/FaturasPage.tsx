@@ -60,6 +60,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleEditarPagamento,
     handleClosePagamento,
     handleConfirmPagamento,
+    handleVerComprovante,
     handleMarcarPendente,
     faturaDuplicidadeOpen,
     faturaDuplicidadeInfo,
@@ -94,6 +95,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onMarcarPago={handleMarcarPago}
           onEditarPagamento={handleEditarPagamento}
           onMarcarPendente={handleMarcarPendente}
+          onVerComprovante={handleVerComprovante}
         />
       </div>
 
@@ -114,6 +116,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         saving={saving}
         onClose={handleClosePagamento}
         onConfirm={handleConfirmPagamento}
+        onVerComprovante={handleVerComprovante}
       />
 
       <FaturaDuplicidadeModal

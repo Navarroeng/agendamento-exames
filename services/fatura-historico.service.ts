@@ -9,7 +9,16 @@ import {
   FATURA_SEM_ELEGIVEIS_MSG,
   isAgendamentoElegivelFatura,
 } from "@/lib/fatura-elegibilidade";
+import {
+  COMPROVANTE_OBRIGATORIO_MSG,
+  ComprovanteValidationError,
+  isComprovantePagamentoDbError,
+} from "@/lib/fatura-comprovante";
 import { assertFaturaMesDisponivel } from "@/services/duplicidade.service";
+import {
+  deleteComprovantePagamento,
+  uploadComprovantePagamento,
+} from "@/services/fatura-comprovante.service";
 import {
   moduloAuditoriaFromFaturaTipo,
   registrarAuditoria,
@@ -318,6 +327,13 @@ export async function cancelarFatura(
 export interface FaturaPagamentoInput {
   data_pagamento: string;
   observacao_pagamento: string | null;
+  comprovanteFile?: File | null;
+}
+
+function assertComprovanteInformado(file: File | null | undefined): asserts file is File {
+  if (!file) {
+    throw new ComprovanteValidationError(COMPROVANTE_OBRIGATORIO_MSG);
+  }
 }
 
 export async function registrarPagamentoFatura(
@@ -325,7 +341,10 @@ export async function registrarPagamentoFatura(
   input: FaturaPagamentoInput,
   auditOptions?: FaturaAuditOptions
 ): Promise<void> {
+  assertComprovanteInformado(input.comprovanteFile);
+
   const existing = await buscarFaturaComItens(id);
+  const uploaded = await uploadComprovantePagamento(id, input.comprovanteFile);
 
   const supabase = createClient();
   const { error } = await supabase
@@ -334,11 +353,19 @@ export async function registrarPagamentoFatura(
       pago: true,
       data_pagamento: input.data_pagamento,
       observacao_pagamento: input.observacao_pagamento?.trim() || null,
+      comprovante_pagamento_path: uploaded.path,
+      comprovante_pagamento_nome: uploaded.nome,
     })
     .eq("id", id)
     .eq("status", "emitida");
 
-  if (error) throw error;
+  if (error) {
+    await deleteComprovantePagamento(uploaded.path).catch(() => undefined);
+    if (isComprovantePagamentoDbError(error)) {
+      throw new ComprovanteValidationError(COMPROVANTE_OBRIGATORIO_MSG);
+    }
+    throw error;
+  }
 
   if (existing) {
     await auditarFatura(auditOptions, {
@@ -351,11 +378,74 @@ export async function registrarPagamentoFatura(
   }
 }
 
+export async function atualizarPagamentoFatura(
+  id: string,
+  input: FaturaPagamentoInput,
+  comprovanteAtualPath: string | null,
+  auditOptions?: FaturaAuditOptions
+): Promise<void> {
+  const existing = await buscarFaturaComItens(id);
+
+  let comprovantePath = comprovanteAtualPath?.trim() || null;
+  let comprovanteNome = existing?.comprovante_pagamento_nome ?? null;
+  let uploadedPath: string | null = null;
+  const previousPath = comprovantePath;
+
+  if (input.comprovanteFile) {
+    const uploaded = await uploadComprovantePagamento(id, input.comprovanteFile);
+    uploadedPath = uploaded.path;
+    comprovantePath = uploaded.path;
+    comprovanteNome = uploaded.nome;
+  }
+
+  if (!comprovantePath) {
+    throw new ComprovanteValidationError(COMPROVANTE_OBRIGATORIO_MSG);
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("faturas")
+    .update({
+      pago: true,
+      data_pagamento: input.data_pagamento,
+      observacao_pagamento: input.observacao_pagamento?.trim() || null,
+      comprovante_pagamento_path: comprovantePath,
+      comprovante_pagamento_nome: comprovanteNome,
+    })
+    .eq("id", id)
+    .eq("status", "emitida");
+
+  if (error) {
+    if (uploadedPath) {
+      await deleteComprovantePagamento(uploadedPath).catch(() => undefined);
+    }
+    if (isComprovantePagamentoDbError(error)) {
+      throw new ComprovanteValidationError(COMPROVANTE_OBRIGATORIO_MSG);
+    }
+    throw error;
+  }
+
+  if (uploadedPath && previousPath && previousPath !== uploadedPath) {
+    await deleteComprovantePagamento(previousPath).catch(() => undefined);
+  }
+
+  if (existing) {
+    await auditarFatura(auditOptions, {
+      tipo: existing.tipo,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: existing.id,
+      registroNome: existing.numero,
+      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} atualizou o pagamento da fatura ${existing.numero}.`,
+    });
+  }
+}
+
 export async function marcarFaturaPendente(
   id: string,
   auditOptions?: FaturaAuditOptions
 ): Promise<void> {
   const existing = await buscarFaturaComItens(id);
+  const comprovantePath = existing?.comprovante_pagamento_path?.trim() || null;
 
   const supabase = createClient();
   const { error } = await supabase
@@ -364,11 +454,17 @@ export async function marcarFaturaPendente(
       pago: false,
       data_pagamento: null,
       observacao_pagamento: null,
+      comprovante_pagamento_path: null,
+      comprovante_pagamento_nome: null,
     })
     .eq("id", id)
     .eq("status", "emitida");
 
   if (error) throw error;
+
+  if (comprovantePath) {
+    await deleteComprovantePagamento(comprovantePath).catch(() => undefined);
+  }
 
   if (existing) {
     await auditarFatura(auditOptions, {

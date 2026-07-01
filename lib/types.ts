@@ -493,6 +493,8 @@ export interface FaturaRecord {
   pago: boolean;
   data_pagamento: string | null;
   observacao_pagamento: string | null;
+  comprovante_pagamento_path: string | null;
+  comprovante_pagamento_nome: string | null;
   created_at: string;
   updated_at: string;
 }
