@@ -1,6 +1,7 @@
 "use client";
 
-import { maskDateBR, maskMonthYearBR } from "@/lib/agendamento-datetime";
+import { maskDateBR } from "@/lib/agendamento-datetime";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import {
   ESOCIAL_STATUS_OPTIONS,
   hasActiveESocialFilters,
@@ -168,16 +169,11 @@ export function ESocialFiltersPanel({
             </FilterField>
 
             <FilterField label="Mês de referência">
-              <input
+              <MonthReferenceSelect
                 className={inputClass}
-                type="text"
-                inputMode="numeric"
-                placeholder="MM/AAAA"
-                maxLength={7}
                 value={filters.mesReferencia}
-                onChange={(e) =>
-                  onChange("mesReferencia", maskMonthYearBR(e.target.value))
-                }
+                allowEmpty
+                onChange={(value) => onChange("mesReferencia", value)}
               />
             </FilterField>
 

@@ -1,13 +1,13 @@
 "use client";
 
 import { Field } from "@/components/ui/Field";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import { Panel } from "@/components/ui/Panel";
 import {
   IconReceipt,
   IconSearch,
   IconWallet,
 } from "@/components/ui/icons/OutlineIcons";
-import { maskMonthYearBR } from "@/lib/agendamento-datetime";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 import type { FaturaFilters } from "@/lib/fatura-filters";
 import {
@@ -222,17 +222,10 @@ export function FaturasMesPanel({
       <Panel title="Mês de referência" icon={<IconSearch />}>
         <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2">
           <Field label="Mês de referência">
-            <input
-              className="field-input"
-              type="text"
-              inputMode="numeric"
-              placeholder="MM/AAAA"
-              maxLength={7}
+            <MonthReferenceSelect
               value={filters.mesReferencia}
               disabled={disabled}
-              onChange={(e) =>
-                onChange("mesReferencia", maskMonthYearBR(e.target.value))
-              }
+              onChange={(value) => onChange("mesReferencia", value)}
             />
             <p className="text-[10px] text-[#94a3b8]">
               Mês completo (ex.: 06/2026 = 01/06 a 30/06)

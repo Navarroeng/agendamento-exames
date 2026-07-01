@@ -1,6 +1,6 @@
 "use client";
 
-import { maskMonthYearBR } from "@/lib/agendamento-datetime";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import type { FaturaHistoricoFilters } from "@/lib/fatura-filters";
 import type { FaturaTipo } from "@/lib/types";
 
@@ -109,17 +109,13 @@ export function FaturasHistoricoFilters({
         </FilterField>
 
         <FilterField label="Período (mês/ano)">
-          <input
+          <MonthReferenceSelect
             className={selectClass}
-            type="text"
-            inputMode="numeric"
-            placeholder="MM/AAAA"
-            maxLength={7}
             value={filters.mesReferencia}
             disabled={disabled}
-            onChange={(e) =>
-              onChange("mesReferencia", maskMonthYearBR(e.target.value))
-            }
+            allowEmpty
+            emptyLabel="Todos"
+            onChange={(value) => onChange("mesReferencia", value)}
           />
         </FilterField>
 

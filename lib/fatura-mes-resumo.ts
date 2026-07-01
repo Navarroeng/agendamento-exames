@@ -1,4 +1,5 @@
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
+import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
 import {
   EMPTY_FATURA_FILTERS,
   faturaMatchesMesReferencia,
@@ -67,9 +68,7 @@ export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
 };
 
 export function getCurrentMonthYearBR(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  return `${mm}/${now.getFullYear()}`;
+  return getCurrentMonthReferenceBR();
 }
 
 function normalizeReferencia(value: string): string {

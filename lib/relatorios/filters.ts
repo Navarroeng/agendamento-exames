@@ -2,6 +2,7 @@ import { textMatchesSearch } from "@/lib/text-normalize";
 import {
   parseMonthYearBRToIsoRange,
 } from "@/lib/agendamento-datetime";
+import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
 import type { AgendamentoWithExames } from "@/lib/types";
 import type { RelatoriosFilters } from "./types";
 
@@ -52,8 +53,5 @@ export function extractRelatoriosFilterOptions(
 }
 
 export function currentMonthReferenciaBR(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  return `${mm}/${yyyy}`;
+  return getCurrentMonthReferenceBR();
 }

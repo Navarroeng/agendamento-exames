@@ -1,10 +1,10 @@
 "use client";
 
 import { Field } from "@/components/ui/Field";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import { Panel } from "@/components/ui/Panel";
 import { IconFilter } from "@/components/ui/icons/OutlineIcons";
 import { CLIENTE_CONTRATO_STATUS_OPTIONS } from "@/lib/cliente-contrato-constants";
-import { maskMonthYearBR } from "@/lib/agendamento-datetime";
 import type { RelatoriosFilters } from "@/lib/relatorios/types";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 
@@ -47,14 +47,9 @@ export function RelatoriosGlobalFilters({
       {expanded ? (
         <div className="form-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Field label="Mês de referência">
-            <input
-              className="field-input"
-              placeholder="MM/AAAA"
-              maxLength={7}
+            <MonthReferenceSelect
               value={filters.mesReferencia}
-              onChange={(e) =>
-                onChange("mesReferencia", maskMonthYearBR(e.target.value))
-              }
+              onChange={(value) => onChange("mesReferencia", value)}
             />
           </Field>
           <Field label="Empresa">
