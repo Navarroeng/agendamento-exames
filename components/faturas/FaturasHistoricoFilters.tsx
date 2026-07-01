@@ -38,6 +38,22 @@ const REFERENCIA_LABEL: Record<FaturaTipo, string> = {
   clinica: "Clínica",
 };
 
+const CLINICA_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "rascunho", label: "Aberta para conferência" },
+  { value: "emitida", label: "Conferido" },
+  { value: "cancelada", label: "Cancelada" },
+  { value: "paga", label: "Pago" },
+  { value: "pendente", label: "Pendente pagamento" },
+];
+
+const CLIENTE_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "rascunho", label: "Rascunho" },
+  { value: "emitida", label: "Emitida" },
+  { value: "cancelada", label: "Cancelada" },
+  { value: "paga", label: "Paga" },
+  { value: "pendente", label: "Pendente" },
+];
+
 export function FaturasHistoricoFilters({
   fixedTipo,
   filters,
@@ -56,7 +72,14 @@ export function FaturasHistoricoFilters({
     ? REFERENCIA_LABEL[fixedTipo]
     : "Cliente / Clínica";
 
-  const countLabel = fixedTipo === "clinica" ? "registro" : "fatura";
+  const countLabel = fixedTipo === "clinica" ? "custo" : "fatura";
+
+  const statusOptions =
+    fixedTipo === "clinica"
+      ? CLINICA_STATUS_OPTIONS
+      : fixedTipo === "cliente"
+        ? CLIENTE_STATUS_OPTIONS
+        : CLIENTE_STATUS_OPTIONS;
 
   return (
     <div className="mb-4 rounded-xl border border-[#e8edf5] bg-[#f8fafc]/80 p-3.5">
@@ -127,11 +150,11 @@ export function FaturasHistoricoFilters({
             onChange={(e) => onChange("status", e.target.value)}
           >
             <option value="">Todos</option>
-            <option value="rascunho">Rascunho</option>
-            <option value="emitida">Emitida</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="paga">Paga</option>
-            <option value="pendente">Pendente</option>
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </FilterField>
       </div>

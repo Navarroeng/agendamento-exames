@@ -1,6 +1,7 @@
 "use client";
 
 import { NavarroLogo } from "@/components/layout/NavarroLogo";
+import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
 import {
   calcTotalFaturaItens,
   countColaboradoresItens,
@@ -12,7 +13,15 @@ import type { FaturaPreviewState, FaturaStatus } from "@/lib/types";
 import { FaturaPagamentoCard } from "./FaturaPagamentoCard";
 import { FaturaResumoPorTipoExame } from "./FaturaResumoPorTipoExame";
 
-function statusLabel(status: FaturaStatus | null): string {
+function statusLabel(
+  status: FaturaStatus | null,
+  tipo: FaturaPreviewState["tipo"],
+  pago?: boolean
+): string {
+  if (tipo === "clinica") {
+    if (!status) return "Pré-visualização";
+    return faturaClinicaHistoricoStatusLabel(status, pago ?? false);
+  }
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Rascunho";
@@ -68,7 +77,7 @@ export function FaturaPreviewContent({ preview }: FaturaPreviewContentProps) {
             <span
               className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold ${statusClass(preview.status)}`}
             >
-              {statusLabel(preview.status)}
+              {statusLabel(preview.status, preview.tipo)}
             </span>
           </div>
         </div>

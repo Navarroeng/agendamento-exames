@@ -25,7 +25,7 @@ const PAGE_META: Record<
   clinica: {
     title: "Custos Clínicas",
     subtitle:
-      "Visualize os custos mensais por clínica, com valores em tempo real e status dos registros.",
+      "Visualize os custos mensais por clínica, com valores em tempo real e fluxo de conferência.",
     icon: <IconWallet size={20} />,
   },
 };
@@ -69,6 +69,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleVisualizarAgendamentos,
     handleEmitirReferencia,
     handleReemitirFatura,
+    handleReabrirConferencia,
   } = useFaturasPage(tipo);
 
   return (
@@ -98,6 +99,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onMarcarPendente={handleMarcarPendente}
           onVerComprovante={handleVerComprovante}
           onReemitir={handleReemitirFatura}
+          onReabrirConferencia={
+            tipo === "clinica" ? handleReabrirConferencia : undefined
+          }
         />
       </div>
 

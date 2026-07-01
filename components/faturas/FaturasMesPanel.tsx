@@ -87,8 +87,8 @@ const PANEL_CONFIG: Record<
         Apenas agendamentos com status{" "}
         <strong className="font-semibold text-navy">agendado</strong> entram no
         cálculo de custos. Os valores são calculados em tempo real a partir dos
-        agendamentos do mês selecionado. Ao emitir, o vencimento é definido
-        automaticamente para o{" "}
+        agendamentos do mês selecionado. Ao marcar como conferido, o vencimento é
+        definido automaticamente para o{" "}
         <strong className="font-semibold text-navy">
           último dia do período de referência
         </strong>
@@ -97,7 +97,7 @@ const PANEL_CONFIG: Record<
     ),
     resumoEntidadeLabel: "Clínicas com custo",
     resumoPrevistoLabel: "Previsto no mês",
-    resumoEmitidoLabel: "Já registrado",
+    resumoEmitidoLabel: "Já conferido",
     statusLabels: FATURA_MES_STATUS_LABELS_CLINICA,
     listIconTone: "purple",
   },
@@ -105,8 +105,12 @@ const PANEL_CONFIG: Record<
 
 function statusBadge(
   status: FaturaMesStatus,
-  labels: Record<FaturaMesStatus, string>
+  labels: Record<FaturaMesStatus, string>,
+  variant: FaturaTipo
 ) {
+  const effectiveStatus =
+    variant === "clinica" && status === "rascunho" ? "aberta_emissao" : status;
+
   const styles: Record<FaturaMesStatus, string> = {
     aberta_emissao: "bg-brand-orange-soft text-[#c96d00]",
     rascunho: "bg-[#fef3c7] text-[#b45309]",
@@ -117,7 +121,7 @@ function statusBadge(
 
   return (
     <span
-      className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${styles[status]}`}
+      className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${styles[effectiveStatus]}`}
     >
       {labels[status]}
     </span>
@@ -144,6 +148,7 @@ interface FaturasMesPanelProps {
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
   onReemitir?: (id: string) => void;
+  onReabrirConferencia?: (id: string) => void;
 }
 
 export function FaturasMesPanel({
@@ -166,6 +171,7 @@ export function FaturasMesPanel({
   onMarcarPendente,
   onVerComprovante,
   onReemitir,
+  onReabrirConferencia,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
@@ -375,7 +381,7 @@ export function FaturasMesPanel({
                       {formatCurrency(row.valorTotal)}
                     </td>
                     <td className="px-2.5 py-2">
-                      {statusBadge(row.status, config.statusLabels)}
+                      {statusBadge(row.status, config.statusLabels, variant)}
                     </td>
                     <td className="px-2.5 py-2">
                       <FaturasMesRowActions
@@ -392,6 +398,7 @@ export function FaturasMesPanel({
                         onMarcarPendente={onMarcarPendente}
                         onVerComprovante={onVerComprovante}
                         onReemitir={onReemitir}
+                        onReabrirConferencia={onReabrirConferencia}
                       />
                     </td>
                   </tr>

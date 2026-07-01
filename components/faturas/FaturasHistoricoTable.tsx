@@ -4,6 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentosPagination } from "@/components/agendamentos/AgendamentosPagination";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
 import { FATURA_HISTORICO_PAGE_SIZE } from "@/lib/fatura-filters";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaHistoricoFilters } from "@/lib/fatura-filters";
@@ -11,22 +12,38 @@ import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
 import { FaturasHistoricoFilters } from "./FaturasHistoricoFilters";
 
-function statusBadge(status: FaturaStatus) {
-  const map = {
+function statusBadge(
+  status: FaturaStatus,
+  variant: FaturaTipo,
+  pago: boolean
+) {
+  const label =
+    variant === "clinica"
+      ? faturaClinicaHistoricoStatusLabel(status, pago)
+      : status === "rascunho"
+        ? "Rascunho"
+        : status === "emitida"
+          ? "Emitida"
+          : status === "cancelada"
+            ? "Cancelada"
+            : status;
+
+  const map: Record<FaturaStatus, string> = {
     rascunho: "bg-brand-orange-soft text-[#c96d00]",
-    emitida: "bg-brand-green-soft text-brand-green",
+    emitida:
+      variant === "clinica" && pago
+        ? "bg-brand-green-soft text-brand-green"
+        : variant === "clinica"
+          ? "bg-brand-blue-soft text-brand-blue"
+          : "bg-brand-green-soft text-brand-green",
     cancelada: "bg-brand-red-soft text-brand-red",
   };
-  const labels = {
-    rascunho: "Rascunho",
-    emitida: "Emitida",
-    cancelada: "Cancelada",
-  };
+
   return (
     <span
       className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${map[status]}`}
     >
-      {labels[status]}
+      {label}
     </span>
   );
 }
@@ -65,7 +82,7 @@ const TABLE_META: Record<
   clinica: {
     title: "Histórico de custos",
     emptyNone:
-      "Nenhum custo registrado ainda. Use os filtros acima para gerar o primeiro registro.",
+      "Nenhum custo conferido ainda. Use os filtros acima para conferir o primeiro custo.",
     emptyFiltered:
       "Nenhum custo encontrado com os filtros selecionados.",
   },
@@ -215,7 +232,13 @@ export function FaturasHistoricoTable({
                     <td className="px-2.5 py-2 text-xs text-[#64748b]">
                       {f.total_exames}
                     </td>
-                    <td className="px-2.5 py-2">{statusBadge(f.status)}</td>
+                    <td className="px-2.5 py-2">
+                      {statusBadge(
+                        f.status,
+                        variant,
+                        faturaComPagamento.pago ?? false
+                      )}
+                    </td>
                     <td className="px-2.5 py-2">
                       {pagamentoBadge(faturaComPagamento)}
                     </td>

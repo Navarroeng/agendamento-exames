@@ -60,10 +60,10 @@ export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
 export const FATURA_CLIENTE_MES_STATUS_LABELS = FATURA_MES_STATUS_LABELS;
 
 export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> = {
-  aberta_emissao: "Aberta para registro",
-  rascunho: "Rascunho",
-  emitida: "Emitida",
-  paga: "Paga",
+  aberta_emissao: "Aberta para conferência",
+  rascunho: "Aberta para conferência",
+  emitida: "Conferido",
+  paga: "Pago",
   cancelada: "Cancelada",
 };
 

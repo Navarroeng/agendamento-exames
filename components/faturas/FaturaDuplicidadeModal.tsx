@@ -2,6 +2,7 @@
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCurrency } from "@/lib/money";
+import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaExistenteInfo } from "@/services/duplicidade.service";
 
 interface FaturaDuplicidadeModalProps {
@@ -11,7 +12,13 @@ interface FaturaDuplicidadeModalProps {
   onClose: () => void;
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, tipo: "cliente" | "clinica"): string {
+  if (tipo === "clinica") {
+    return faturaClinicaHistoricoStatusLabel(
+      status as "rascunho" | "emitida" | "cancelada",
+      false
+    );
+  }
   if (status === "emitida") return "Emitida";
   if (status === "rascunho") return "Rascunho";
   if (status === "cancelada") return "Cancelada";
@@ -29,12 +36,12 @@ export function FaturaDuplicidadeModal({
   const titulo =
     tipo === "cliente"
       ? "Fatura do cliente já existe neste mês"
-      : "Fatura da clínica já existe neste mês";
+      : "Custos da clínica já existem neste mês";
 
   const mensagem =
     tipo === "cliente"
       ? "Já existe uma fatura emitida ou em rascunho para este cliente neste mês de referência."
-      : "Já existe uma fatura emitida ou em rascunho para esta clínica neste mês de referência.";
+      : "Já existem custos conferidos ou abertos para conferência desta clínica neste mês de referência.";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
@@ -66,7 +73,7 @@ export function FaturaDuplicidadeModal({
         <div className="space-y-2 px-6 py-5 text-sm">
           {[
             ["Número", fatura.numero],
-            ["Status", statusLabel(fatura.status)],
+            ["Status", statusLabel(fatura.status, tipo)],
             [
               "Data de emissão",
               fatura.data_emissao
