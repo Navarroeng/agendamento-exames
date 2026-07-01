@@ -60,7 +60,7 @@ export function FaturaRowActionsMenu({
   if (fatura.status === "cancelada" && onReemitir) {
     items.push({
       key: "reemitir",
-      label: "Reemitir fatura",
+      label: "Emitir novamente",
       onClick: () => onReemitir(fatura.id),
     });
   }

@@ -936,7 +936,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     async (id: string) => {
       if (pageTipo !== "cliente") return;
 
-      const fatura = faturas.find((f) => f.id === id);
+      let fatura = faturas.find((f) => f.id === id);
+      if (!fatura) {
+        try {
+          const loaded = await buscarFaturaComItens(id);
+          fatura = loaded ?? undefined;
+        } catch {
+          fatura = undefined;
+        }
+      }
       if (!fatura) {
         toast.error("Fatura não encontrada.");
         return;

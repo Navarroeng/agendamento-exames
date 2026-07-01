@@ -305,10 +305,10 @@ export async function salvarFatura(
       registroId: created.id,
       registroNome: created.numero,
       descricao:
-        `${usuario} reemitiu fatura a partir de fatura cancelada. ` +
+        `Fatura reemitida a partir de fatura cancelada. ` +
         `Cliente: ${created.referencia_nome}. Mês de referência: ${mesLabel}. ` +
         `Fatura cancelada: ${input.reemitida_de_fatura_numero.trim()}. ` +
-        `Nova fatura: ${created.numero}.`,
+        `Nova fatura: ${created.numero}. Usuário: ${usuario}.`,
     });
   } else {
     await auditarFatura(auditOptions, {
