@@ -94,6 +94,16 @@ import {
   cancelarPeriodicosPorAgendamento,
   criarPeriodicosDeAgendamento,
 } from "@/services/periodico-futuro.service";
+import {
+  AGENDAMENTO_BLOQUEADO_FATURA_MSG,
+  isAgendamentoBloqueadoFaturaError,
+  type AgendamentoFaturaBloqueio,
+} from "@/lib/agendamento-fatura-bloqueio";
+import {
+  listarBloqueioFaturaPorAgendamentos,
+  obterBloqueioFaturaAgendamento,
+  registrarTentativaEdicaoBloqueadaFatura,
+} from "@/services/agendamento-fatura-bloqueio.service";
 import { mapAgendamentosToTableRows } from "@/lib/agendamentos-table";
 import {
   AGENDAMENTOS_PAGE_SIZE,
@@ -295,6 +305,7 @@ export function useAgendamentosPage() {
 
   const { agendamentos, loading, error, refresh, getById } =
     useAgendamentosList();
+
   const [filters, setFilters] = useState<AgendamentoFilters>(() =>
     getDefaultAgendamentoFilters()
   );
@@ -302,6 +313,67 @@ export function useAgendamentosPage() {
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<AgendamentoTableSortState | null>(
     null
+  );
+  const [bloqueioPorAgendamento, setBloqueioPorAgendamento] = useState<
+    Map<string, AgendamentoFaturaBloqueio>
+  >(new Map());
+
+  useEffect(() => {
+    const ids = agendamentos.map((agendamento) => agendamento.id);
+    if (ids.length === 0) {
+      setBloqueioPorAgendamento(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    void listarBloqueioFaturaPorAgendamentos(ids)
+      .then((map) => {
+        if (!cancelled) setBloqueioPorAgendamento(map);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar bloqueio por fatura:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agendamentos]);
+
+  const bloquearAcaoAgendamentoFaturado = useCallback(
+    async (id: string): Promise<boolean> => {
+      let bloqueio = bloqueioPorAgendamento.get(id);
+      if (bloqueio === undefined) {
+        bloqueio = await obterBloqueioFaturaAgendamento(id);
+        setBloqueioPorAgendamento((prev) => {
+          const next = new Map(prev);
+          next.set(id, bloqueio!);
+          return next;
+        });
+      }
+
+      if (!bloqueio?.bloqueado) return false;
+
+      toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
+      const agendamento = getById(id);
+      if (
+        agendamento &&
+        bloqueio.faturaNumero &&
+        bloqueio.faturaStatusLabel
+      ) {
+        await registrarTentativaEdicaoBloqueadaFatura(auditContext, {
+          agendamentoId: id,
+          cliente: agendamento.cliente_nome,
+          colaborador: agendamento.colaborador,
+          dataAgendamento: agendamento.data_agendamento,
+          faturaNumero: bloqueio.faturaNumero,
+          faturaStatusLabel: bloqueio.faturaStatusLabel,
+        });
+      }
+
+      return true;
+    },
+    [auditContext, bloqueioPorAgendamento, getById]
   );
 
   const filterOptions = useMemo(() => {
@@ -337,8 +409,21 @@ export function useAgendamentosPage() {
       start,
       start + AGENDAMENTOS_PAGE_SIZE
     );
-    return mapAgendamentosToTableRows(slice);
-  }, [orderedAgendamentos, page]);
+    return mapAgendamentosToTableRows(slice).map((row) => {
+      const bloqueio = bloqueioPorAgendamento.get(row.agendamentoId);
+      return {
+        ...row,
+        bloqueadoPorFatura: bloqueio?.bloqueado ?? false,
+        faturaBloqueioNumero: bloqueio?.faturaNumero ?? null,
+        faturaBloqueioStatus: bloqueio?.faturaStatusLabel ?? null,
+      };
+    });
+  }, [orderedAgendamentos, page, bloqueioPorAgendamento]);
+
+  const viewFaturaBloqueio = useMemo(() => {
+    if (!viewAgendamento) return null;
+    return bloqueioPorAgendamento.get(viewAgendamento.id) ?? null;
+  }, [viewAgendamento, bloqueioPorAgendamento]);
 
   useEffect(() => {
     setPage(1);
@@ -508,6 +593,15 @@ export function useAgendamentosPage() {
     resetForm();
     setFiltersExpanded(false);
   }, [resetForm]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    const bloqueio = bloqueioPorAgendamento.get(editingId);
+    if (bloqueio?.bloqueado) {
+      closeForm();
+      toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
+    }
+  }, [editingId, bloqueioPorAgendamento, closeForm]);
 
   const toggleFilters = useCallback(() => {
     setFiltersExpanded((prev) => !prev);
@@ -693,7 +787,9 @@ export function useAgendamentosPage() {
   }, [applyCargoChange, pendingCargoId]);
 
   const handleEditar = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      if (await bloquearAcaoAgendamentoFaturado(id)) return;
+
       const agendamento = getById(id);
       if (!agendamento) {
         toast.error("Agendamento não encontrado.");
@@ -720,7 +816,7 @@ export function useAgendamentosPage() {
         void enforceRetornoTrabalhoExames();
       }
     },
-    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
+    [bloquearAcaoAgendamentoFaturado, getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
   );
 
   const handleVisualizar = useCallback(
@@ -741,7 +837,9 @@ export function useAgendamentosPage() {
   }, []);
 
   const handleCancelar = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      if (await bloquearAcaoAgendamentoFaturado(id)) return;
+
       const agendamento = getById(id);
       if (!agendamento) {
         toast.error("Agendamento não encontrado.");
@@ -755,7 +853,7 @@ export function useAgendamentosPage() {
       setCancelTargetId(id);
       setCancelModalOpen(true);
     },
-    [getById]
+    [bloquearAcaoAgendamentoFaturado, getById]
   );
 
   const closeHistoricoModal = useCallback(() => {
@@ -771,6 +869,8 @@ export function useAgendamentosPage() {
   const handleConfirmarCancelamento = useCallback(
     async (motivo: string) => {
       if (!cancelTargetId) return;
+
+      if (await bloquearAcaoAgendamentoFaturado(cancelTargetId)) return;
 
       const agendamento = getById(cancelTargetId);
       if (!agendamento) {
@@ -807,6 +907,10 @@ export function useAgendamentosPage() {
         refresh();
       } catch (err) {
         console.error("Erro completo ao cancelar:", err);
+        if (isAgendamentoBloqueadoFaturaError(err)) {
+          toast.error(err.message);
+          return;
+        }
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: unknown }).message)
@@ -818,6 +922,7 @@ export function useAgendamentosPage() {
     },
     [
       cancelTargetId,
+      bloquearAcaoAgendamentoFaturado,
       getById,
       setSaving,
       editingId,
@@ -848,6 +953,10 @@ export function useAgendamentosPage() {
 
   const executeSave = useCallback(
     async (status: AgendamentoStatus) => {
+      if (editingId && (await bloquearAcaoAgendamentoFaturado(editingId))) {
+        return;
+      }
+
       if (hasExamWarnings) {
         toast.error(
           "Corrija os exames: há combinações que a clínica não realiza."
@@ -1049,6 +1158,10 @@ export function useAgendamentosPage() {
         refresh();
       } catch (err) {
         console.error("Erro completo ao salvar:", err);
+        if (isAgendamentoBloqueadoFaturaError(err)) {
+          toast.error(err.message);
+          return;
+        }
         if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
           await bloquearDuplicidade90Dias(err.info, dataIso);
           return;
@@ -1076,6 +1189,7 @@ export function useAgendamentosPage() {
     },
     [
       hasExamWarnings,
+      bloquearAcaoAgendamentoFaturado,
       form,
       exams,
       selectedClinica,
@@ -1131,6 +1245,7 @@ export function useAgendamentosPage() {
     editingId,
     viewAgendamento,
     setViewAgendamento,
+    viewFaturaBloqueio,
     historicoOpen,
     historicoAgendamentoId,
     cancelModalOpen,

@@ -28,6 +28,8 @@ export function ESocialPage() {
     setPage,
     viewAgendamento,
     setViewAgendamento,
+    viewFaturaBloqueio,
+    bloqueioPorAgendamento,
     handleVisualizar,
     openMarcarEnviado,
     closeMarcarEnviado,
@@ -71,11 +73,13 @@ export function ESocialPage() {
           onVisualizar={handleVisualizar}
           onMarcarEnviado={openMarcarEnviado}
           onMarcarPendente={handleMarcarPendente}
+          bloqueioPorAgendamento={bloqueioPorAgendamento}
         />
       </div>
 
       <AgendamentoViewModal
         agendamento={viewAgendamento}
+        faturaBloqueio={viewFaturaBloqueio}
         onClose={() => setViewAgendamento(null)}
       />
 

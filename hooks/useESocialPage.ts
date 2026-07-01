@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
+import {
+  AGENDAMENTO_BLOQUEADO_FATURA_MSG,
+  isAgendamentoBloqueadoFaturaError,
+  type AgendamentoFaturaBloqueio,
+} from "@/lib/agendamento-fatura-bloqueio";
 import { AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   INVALID_DATE_TOAST,
@@ -25,6 +30,11 @@ import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptions } from "@/lib/cliente-display";
 import { atualizarEnvioEsocial } from "@/services/agendamento.service";
+import {
+  listarBloqueioFaturaPorAgendamentos,
+  obterBloqueioFaturaAgendamento,
+  registrarTentativaEdicaoBloqueadaFatura,
+} from "@/services/agendamento-fatura-bloqueio.service";
 import { registrarHistorico } from "@/services/historico.service";
 import type { AgendamentoWithExames } from "@/lib/types";
 
@@ -54,6 +64,67 @@ export function useESocialPage() {
   const [marcarEnviadoId, setMarcarEnviadoId] = useState<string | null>(null);
   const [dataEnvioInput, setDataEnvioInput] = useState("");
   const [reciboInput, setReciboInput] = useState("");
+  const [bloqueioPorAgendamento, setBloqueioPorAgendamento] = useState<
+    Map<string, AgendamentoFaturaBloqueio>
+  >(new Map());
+
+  useEffect(() => {
+    const ids = agendamentos.map((agendamento) => agendamento.id);
+    if (ids.length === 0) {
+      setBloqueioPorAgendamento(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    void listarBloqueioFaturaPorAgendamentos(ids)
+      .then((map) => {
+        if (!cancelled) setBloqueioPorAgendamento(map);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar bloqueio por fatura:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agendamentos]);
+
+  const bloquearAcaoAgendamentoFaturado = useCallback(
+    async (id: string): Promise<boolean> => {
+      let bloqueio = bloqueioPorAgendamento.get(id);
+      if (bloqueio === undefined) {
+        bloqueio = await obterBloqueioFaturaAgendamento(id);
+        setBloqueioPorAgendamento((prev) => {
+          const next = new Map(prev);
+          next.set(id, bloqueio!);
+          return next;
+        });
+      }
+
+      if (!bloqueio?.bloqueado) return false;
+
+      toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
+      const agendamento = getById(id);
+      if (
+        agendamento &&
+        bloqueio.faturaNumero &&
+        bloqueio.faturaStatusLabel
+      ) {
+        await registrarTentativaEdicaoBloqueadaFatura(auditContext, {
+          agendamentoId: id,
+          cliente: agendamento.cliente_nome,
+          colaborador: agendamento.colaborador,
+          dataAgendamento: agendamento.data_agendamento,
+          faturaNumero: bloqueio.faturaNumero,
+          faturaStatusLabel: bloqueio.faturaStatusLabel,
+        });
+      }
+
+      return true;
+    },
+    [auditContext, bloqueioPorAgendamento, getById]
+  );
 
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractESocialFilterOptions(agendamentos);
@@ -135,12 +206,13 @@ export function useESocialPage() {
     [getById]
   );
 
-  const openMarcarEnviado = useCallback((id: string) => {
+  const openMarcarEnviado = useCallback(async (id: string) => {
+    if (await bloquearAcaoAgendamentoFaturado(id)) return;
     setMarcarEnviadoId(id);
     setDataEnvioInput("");
     setReciboInput("");
     setMarcarEnviadoOpen(true);
-  }, []);
+  }, [bloquearAcaoAgendamentoFaturado]);
 
   const closeMarcarEnviado = useCallback(() => {
     if (saving) return;
@@ -152,6 +224,8 @@ export function useESocialPage() {
 
   const handleConfirmMarcarEnviado = useCallback(async () => {
     if (!marcarEnviadoId) return;
+
+    if (await bloquearAcaoAgendamentoFaturado(marcarEnviadoId)) return;
 
     if (!dataEnvioInput.trim()) {
       toast.error("Informe a data de envio ao e-Social.");
@@ -202,21 +276,30 @@ export function useESocialPage() {
       setReciboInput("");
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao atualizar envio ao e-Social.");
+      if (isAgendamentoBloqueadoFaturaError(err)) {
+        toast.error(err.message);
+      } else {
+        toast.error("Erro ao atualizar envio ao e-Social.");
+      }
     } finally {
       setSaving(false);
     }
   }, [
+    bloquearAcaoAgendamentoFaturado,
     dataEnvioInput,
     reciboInput,
     marcarEnviadoId,
     reloadAgendamentos,
     updateAgendamentoInList,
     usuario,
+    auditContext,
+    getById,
   ]);
 
   const handleMarcarPendente = useCallback(
     async (id: string) => {
+      if (await bloquearAcaoAgendamentoFaturado(id)) return;
+
       const ag = getById(id);
       if (!ag) {
         toast.error("Agendamento não encontrado.");
@@ -250,13 +333,22 @@ export function useESocialPage() {
         toast.success("e-Social marcado como pendente.");
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao atualizar status do e-Social.");
+        if (isAgendamentoBloqueadoFaturaError(err)) {
+          toast.error(err.message);
+        } else {
+          toast.error("Erro ao atualizar status do e-Social.");
+        }
       } finally {
         setSaving(false);
       }
     },
-    [getById, reloadAgendamentos, updateAgendamentoInList, usuario]
+    [bloquearAcaoAgendamentoFaturado, getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
   );
+
+  const viewFaturaBloqueio = useMemo(() => {
+    if (!viewAgendamento) return null;
+    return bloqueioPorAgendamento.get(viewAgendamento.id) ?? null;
+  }, [viewAgendamento, bloqueioPorAgendamento]);
 
   return {
     loading,
@@ -276,6 +368,8 @@ export function useESocialPage() {
     setPage,
     viewAgendamento,
     setViewAgendamento,
+    viewFaturaBloqueio,
+    bloqueioPorAgendamento,
     handleVisualizar,
     openMarcarEnviado,
     closeMarcarEnviado,

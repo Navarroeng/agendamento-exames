@@ -462,6 +462,9 @@ export interface AgendamentoTableRow {
   asoCliente: boolean;
   matricula: string;
   esocial: boolean;
+  bloqueadoPorFatura?: boolean;
+  faturaBloqueioNumero?: string | null;
+  faturaBloqueioStatus?: string | null;
 }
 
 export type PerfilUsuarioTipo = "admin" | "operacional" | string;

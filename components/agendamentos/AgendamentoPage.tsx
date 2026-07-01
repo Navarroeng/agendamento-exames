@@ -25,6 +25,7 @@ export function AgendamentoPage() {
     editingId,
     viewAgendamento,
     setViewAgendamento,
+    viewFaturaBloqueio,
     historicoOpen,
     historicoAgendamentoId,
     cancelModalOpen,
@@ -181,6 +182,7 @@ export function AgendamentoPage() {
 
       <AgendamentoViewModal
         agendamento={viewAgendamento}
+        faturaBloqueio={viewFaturaBloqueio}
         onClose={() => setViewAgendamento(null)}
       />
       <AgendamentoHistoricoModal

@@ -5,6 +5,7 @@ import {
   AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
   isPostgresDuplicidade90DiasError,
 } from "@/lib/agendamento-duplicidade-90dias";
+import { assertAgendamentoEditavelPorFatura } from "@/services/agendamento-fatura-bloqueio.service";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
 import type {
@@ -141,6 +142,7 @@ export async function atualizarAgendamentoComExames(
   agendamento: AgendamentoInsert,
   exames: ExamePayload[]
 ): Promise<void> {
+  await assertAgendamentoEditavelPorFatura(id);
   validarExamesPayload(agendamento.aso, exames);
   await assertContratoVigentePorNome(
     agendamento.cliente_nome,
@@ -241,6 +243,7 @@ export async function atualizarEnvioEsocial(
   data_envio_esocial: string | null,
   esocial_recibo: string | null = null
 ): Promise<EnvioEsocialUpdate> {
+  await assertAgendamentoEditavelPorFatura(id);
   const supabase = createClient();
 
   const basePayload = {
@@ -282,6 +285,7 @@ export async function cancelarAgendamento(
   id: string,
   motivoCancelamento: string
 ): Promise<void> {
+  await assertAgendamentoEditavelPorFatura(id);
   const supabase = createClient();
 
   const { error } = await supabase

@@ -1,5 +1,6 @@
 "use client";
 
+import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import type { AgendamentoWithExames } from "@/lib/types";
 import { ViewModalDocumentationSection } from "./agendamento-view/ViewModalDocumentationSection";
 import { ViewModalExamsSection } from "./agendamento-view/ViewModalExamsSection";
@@ -9,12 +10,14 @@ import { ViewModalHeader } from "./agendamento-view/ViewModalHeader";
 
 interface AgendamentoViewModalProps {
   agendamento: AgendamentoWithExames | null;
+  faturaBloqueio?: AgendamentoFaturaBloqueio | null;
   onClose: () => void;
   onEdit?: (agendamentoId: string) => void;
 }
 
 export function AgendamentoViewModal({
   agendamento,
+  faturaBloqueio,
   onClose,
 }: AgendamentoViewModalProps) {
   if (!agendamento) return null;
@@ -38,6 +41,24 @@ export function AgendamentoViewModal({
 
         <div className="flex-1 overflow-y-auto bg-[#f8f9fc] px-6 py-6 sm:px-8">
           <div className="space-y-8">
+            {faturaBloqueio?.bloqueado &&
+              faturaBloqueio.faturaNumero &&
+              faturaBloqueio.faturaStatusLabel && (
+                <div className="rounded-2xl border border-[#fde68a] bg-gradient-to-br from-[#fffbeb] to-white p-5 shadow-[0_6px_20px_rgba(180,83,9,0.08)]">
+                  <p className="text-sm leading-relaxed text-[#92400e]">
+                    Agendamento bloqueado para edição. Fatura vinculada:{" "}
+                    <strong className="font-semibold text-[#78350f]">
+                      {faturaBloqueio.faturaNumero}
+                    </strong>{" "}
+                    — Status:{" "}
+                    <strong className="font-semibold text-[#78350f]">
+                      {faturaBloqueio.faturaStatusLabel}
+                    </strong>
+                    .
+                  </p>
+                </div>
+              )}
+
             {agendamento.status === "cancelado" &&
               agendamento.motivo_cancelamento && (
                 <div className="rounded-2xl border border-[#fecaca] bg-gradient-to-br from-[#fef2f2] to-white p-5 shadow-[0_6px_20px_rgba(220,38,38,0.08)]">

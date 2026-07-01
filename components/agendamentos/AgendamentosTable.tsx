@@ -207,6 +207,7 @@ export function AgendamentosTable({
                   <td className={TD_C}>
                     <RowActionsMenu
                       agendamentoId={row.agendamentoId}
+                      bloqueadoPorFatura={row.bloqueadoPorFatura}
                       onVisualizar={onVisualizar}
                       onEditar={onEditar}
                       onCancelar={onCancelar}

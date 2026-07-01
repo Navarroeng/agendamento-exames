@@ -4,21 +4,24 @@ import { useEffect, useRef, useState } from "react";
 
 interface RowActionsMenuProps {
   agendamentoId: string;
+  bloqueadoPorFatura?: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onCancelar: (id: string) => void;
   onHistorico: (id: string) => void;
 }
 
-const ITEMS = [
-  { key: "visualizar", label: "Visualizar" },
-  { key: "editar", label: "Editar" },
-  { key: "cancelar", label: "Cancelar", danger: true },
-  { key: "historico", label: "Histórico" },
-] as const;
+type MenuItem = {
+  key: string;
+  label: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+};
 
 export function RowActionsMenu({
   agendamentoId,
+  bloqueadoPorFatura = false,
   onVisualizar,
   onEditar,
   onCancelar,
@@ -40,22 +43,38 @@ export function RowActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  function handleAction(key: (typeof ITEMS)[number]["key"]) {
+  const items: MenuItem[] = [
+    { key: "visualizar", label: "Visualizar", onClick: () => onVisualizar(agendamentoId) },
+  ];
+
+  if (bloqueadoPorFatura) {
+    items.push({
+      key: "bloqueado",
+      label: "Bloqueado por fatura",
+      disabled: true,
+    });
+  } else {
+    items.push(
+      { key: "editar", label: "Editar", onClick: () => onEditar(agendamentoId) },
+      {
+        key: "cancelar",
+        label: "Cancelar",
+        danger: true,
+        onClick: () => onCancelar(agendamentoId),
+      }
+    );
+  }
+
+  items.push({
+    key: "historico",
+    label: "Histórico",
+    onClick: () => onHistorico(agendamentoId),
+  });
+
+  function handleAction(item: MenuItem) {
+    if (item.disabled || !item.onClick) return;
     setOpen(false);
-    switch (key) {
-      case "visualizar":
-        onVisualizar(agendamentoId);
-        break;
-      case "editar":
-        onEditar(agendamentoId);
-        break;
-      case "cancelar":
-        onCancelar(agendamentoId);
-        break;
-      case "historico":
-        onHistorico(agendamentoId);
-        break;
-    }
+    item.onClick();
   }
 
   return (
@@ -76,19 +95,22 @@ export function RowActionsMenu({
 
       {open && (
         <div
-          className="absolute right-0 top-full z-20 mt-1 min-w-[136px] origin-top-right overflow-hidden rounded-[10px] border border-[#e8edf5] bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.12)] animate-[fadeIn_0.15s_ease]"
+          className="absolute right-0 top-full z-20 mt-1 min-w-[160px] origin-top-right overflow-hidden rounded-[10px] border border-[#e8edf5] bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.12)] animate-[fadeIn_0.15s_ease]"
           role="menu"
         >
-          {ITEMS.map((item) => (
+          {items.map((item) => (
             <button
               key={item.key}
               type="button"
               role="menuitem"
-              onClick={() => handleAction(item.key)}
-              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
-                "danger" in item && item.danger
-                  ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
-                  : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
+              disabled={item.disabled}
+              onClick={() => handleAction(item)}
+              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                item.disabled
+                  ? "text-[#94a3b8]"
+                  : item.danger
+                    ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
+                    : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
               }`}
             >
               {item.label}
