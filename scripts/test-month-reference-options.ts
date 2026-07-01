@@ -11,9 +11,9 @@ import { currentMonthReferenciaBR } from "../lib/relatorios/filters";
 const options = buildMonthReferenceOptions(new Date(2026, 5, 15)); // Jun/2026
 
 assert.equal(options.length, 24);
-assert.equal(options[12], "06/2026");
-assert.equal(options[0], "06/2025");
-assert.equal(options[23], "05/2027");
+assert.equal(options[0], "06/2026");
+assert.equal(options[12], "06/2027");
+assert.equal(options[23], "05/2028");
 
 assert.equal(formatMonthYearBR(new Date(2026, 0, 1)), "01/2026");
 assert.equal(getCurrentMonthReferenceBR(), getCurrentMonthYearBR());
