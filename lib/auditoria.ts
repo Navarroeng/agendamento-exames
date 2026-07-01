@@ -36,6 +36,7 @@ export const AUDITORIA_ACOES = {
   procuracao_alterada: "procuracao_alterada",
   agendamento_sem_procuracao_confirmado: "agendamento_sem_procuracao_confirmado",
   clinico_zero_demissional: "clinico_zero_demissional",
+  fatura_reemitida: "fatura_reemitida",
 } as const;
 
 export type AuditoriaAcao =
@@ -75,6 +76,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   agendamento_sem_procuracao_confirmado:
     "Agendamento confirmado sem procuração ativa",
   clinico_zero_demissional: "Clínico R$ 0,00 — ASO Demissional",
+  fatura_reemitida: "Fatura reemitida",
 };
 
 export interface AuditoriaUsuarioContext {

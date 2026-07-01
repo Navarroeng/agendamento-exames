@@ -18,6 +18,7 @@ interface FaturasMesRowActionsProps {
   onEditarPagamento: (id: string) => void;
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
+  onReemitir?: (id: string) => void;
 }
 
 const EMIT_LABEL: Record<FaturaTipo, string> = {
@@ -45,6 +46,7 @@ export function FaturasMesRowActions({
   onEditarPagamento,
   onMarcarPendente,
   onVerComprovante,
+  onReemitir,
 }: FaturasMesRowActionsProps) {
   const fatura = row.fatura;
 
@@ -64,6 +66,7 @@ export function FaturasMesRowActions({
         onEditarPagamento={onEditarPagamento}
         onMarcarPendente={onMarcarPendente}
         onVerComprovante={onVerComprovante}
+        onReemitir={variant === "cliente" ? onReemitir : undefined}
       />
     );
   }

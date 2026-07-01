@@ -90,12 +90,15 @@ interface SalvarFaturaInput {
   periodo_inicio: string | null;
   periodo_fim: string | null;
   mes_referencia?: string | null;
+  mes_referencia_label?: string | null;
   data_vencimento: string;
   valor_total: number;
   total_exames: number;
   status: FaturaStatus;
   gerado_por: string;
   itens: FaturaItemInsert[];
+  /** Reemissão: número da fatura cancelada de origem. */
+  reemitida_de_fatura_numero?: string | null;
 }
 
 export interface FaturaAuditOptions {
@@ -287,15 +290,87 @@ export async function salvarFatura(
   const created = await buscarFaturaComItens(fatura.id);
   if (!created) throw new Error("Erro ao carregar fatura criada.");
 
-  await auditarFatura(auditOptions, {
-    tipo: input.tipo,
-    acao: AUDITORIA_ACOES.criacao,
-    registroId: created.id,
-    registroNome: created.numero,
-    descricao: `${auditOptions?.auditContext?.usuarioNome ?? input.gerado_por} criou a fatura ${created.numero} (${created.referencia_nome}).`,
-  });
+  const usuario =
+    auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
+
+  if (input.reemitida_de_fatura_numero?.trim()) {
+    const mesLabel =
+      input.mes_referencia_label?.trim() ||
+      input.mes_referencia?.trim() ||
+      "—";
+
+    await auditarFatura(auditOptions, {
+      tipo: input.tipo,
+      acao: AUDITORIA_ACOES.fatura_reemitida,
+      registroId: created.id,
+      registroNome: created.numero,
+      descricao:
+        `${usuario} reemitiu fatura a partir de fatura cancelada. ` +
+        `Cliente: ${created.referencia_nome}. Mês de referência: ${mesLabel}. ` +
+        `Fatura cancelada: ${input.reemitida_de_fatura_numero.trim()}. ` +
+        `Nova fatura: ${created.numero}.`,
+    });
+  } else {
+    await auditarFatura(auditOptions, {
+      tipo: input.tipo,
+      acao: AUDITORIA_ACOES.criacao,
+      registroId: created.id,
+      registroNome: created.numero,
+      descricao: `${usuario} criou a fatura ${created.numero} (${created.referencia_nome}).`,
+    });
+  }
 
   return created;
+}
+
+export interface ReemitirFaturaClienteInput {
+  faturaCanceladaId: string;
+  periodo_inicio: string | null;
+  periodo_fim: string | null;
+  mes_referencia: string | null;
+  mes_referencia_label: string;
+  data_vencimento: string;
+  gerado_por: string;
+  itens: FaturaItemInsert[];
+}
+
+export async function reemitirFaturaClienteCancelada(
+  input: ReemitirFaturaClienteInput,
+  auditOptions?: FaturaAuditOptions
+): Promise<FaturaComItens> {
+  const cancelada = await buscarFaturaComItens(input.faturaCanceladaId);
+  if (!cancelada) throw new Error("Fatura não encontrada.");
+  if (cancelada.status !== "cancelada") {
+    throw new Error("Somente faturas canceladas podem ser reemitidas.");
+  }
+  if (cancelada.tipo !== "cliente") {
+    throw new Error("Reemissão disponível apenas para faturas de clientes.");
+  }
+
+  const valorTotal = input.itens.reduce(
+    (sum, item) => sum + Number(item.valor_total),
+    0
+  );
+
+  return salvarFatura(
+    {
+      tipo: "cliente",
+      referencia_nome: cancelada.referencia_nome,
+      referencia_id: cancelada.referencia_id,
+      periodo_inicio: input.periodo_inicio,
+      periodo_fim: input.periodo_fim,
+      mes_referencia: input.mes_referencia,
+      mes_referencia_label: input.mes_referencia_label,
+      data_vencimento: input.data_vencimento,
+      valor_total: valorTotal,
+      total_exames: input.itens.length,
+      status: "emitida",
+      gerado_por: input.gerado_por,
+      itens: input.itens,
+      reemitida_de_fatura_numero: cancelada.numero,
+    },
+    auditOptions
+  );
 }
 
 export async function cancelarFatura(

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
 import { calcVencimentoFaturaCliente } from "@/lib/fatura-vencimento";
+import { mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
@@ -46,6 +47,7 @@ import {
   marcarFaturaPendente,
   atualizarPagamentoFatura,
   registrarPagamentoFatura,
+  reemitirFaturaClienteCancelada,
   salvarFatura,
 } from "@/services/fatura-historico.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
@@ -930,6 +932,100 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     ]
   );
 
+  const handleReemitirFatura = useCallback(
+    async (id: string) => {
+      if (pageTipo !== "cliente") return;
+
+      const fatura = faturas.find((f) => f.id === id);
+      if (!fatura) {
+        toast.error("Fatura não encontrada.");
+        return;
+      }
+      if (fatura.status !== "cancelada") {
+        toast.error("Somente faturas canceladas podem ser reemitidas.");
+        return;
+      }
+
+      const mesReferencia =
+        mesReferenciaBRFromFatura(fatura) ?? filters.mesReferencia.trim();
+
+      if (!isValidMonthYearBR(mesReferencia)) {
+        toast.error(
+          "Não foi possível identificar o mês de referência da fatura."
+        );
+        return;
+      }
+
+      const referencia = fatura.referencia_nome.trim();
+      const ok = window.confirm(
+        `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
+          "Será criada uma nova fatura com os agendamentos e valores atuais do mês. " +
+          "A fatura cancelada permanecerá no histórico."
+      );
+      if (!ok) return;
+
+      if (await bloquearFaturaDuplicada(pageTipo, referencia)) {
+        return;
+      }
+
+      const mesFilters: FaturaFilters = {
+        ...filters,
+        mesReferencia,
+        cliente: referencia,
+      };
+      const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
+      const itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
+      if (itens.length === 0) {
+        toast.error(NO_RECORDS_TOAST);
+        return;
+      }
+
+      const vencimento = calcVencimentoFaturaCliente(mesReferencia);
+      if (!vencimento) {
+        toast.error("Não foi possível calcular o vencimento da fatura.");
+        return;
+      }
+
+      const { periodo_inicio, periodo_fim } = parsePeriodoIso(mesReferencia);
+
+      setSaving(true);
+      try {
+        const nova = await reemitirFaturaClienteCancelada(
+          {
+            faturaCanceladaId: id,
+            periodo_inicio,
+            periodo_fim,
+            mes_referencia: fatura.mes_referencia,
+            mes_referencia_label: mesReferencia,
+            data_vencimento: vencimento.iso,
+            gerado_por: geradoPor,
+            itens,
+          },
+          auditOptions
+        );
+        toast.success(`Fatura ${nova.numero} emitida com sucesso!`);
+        await reloadAll();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao reemitir fatura."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      agendamentos,
+      auditOptions,
+      bloquearFaturaDuplicada,
+      faturas,
+      filters,
+      geradoPor,
+      pageTipo,
+      reloadAll,
+    ]
+  );
+
   return {
     pageTipo,
     filters,
@@ -976,5 +1072,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleCloseFaturaDuplicidade,
     handleVisualizarAgendamentos,
     handleEmitirReferencia,
+    handleReemitirFatura,
   };
 }

@@ -12,6 +12,7 @@ interface FaturaRowActionsMenuProps {
   onEditarPagamento: (id: string) => void;
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
+  onReemitir?: (id: string) => void;
 }
 
 type MenuItem = {
@@ -30,6 +31,7 @@ export function FaturaRowActionsMenu({
   onEditarPagamento,
   onMarcarPendente,
   onVerComprovante,
+  onReemitir,
 }: FaturaRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -54,6 +56,14 @@ export function FaturaRowActionsMenu({
       onClick: () => onVisualizar(fatura.id),
     },
   ];
+
+  if (fatura.status === "cancelada" && onReemitir) {
+    items.push({
+      key: "reemitir",
+      label: "Reemitir fatura",
+      onClick: () => onReemitir(fatura.id),
+    });
+  }
 
   if (fatura.status === "emitida") {
     items.push({

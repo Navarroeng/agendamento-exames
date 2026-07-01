@@ -143,6 +143,7 @@ interface FaturasMesPanelProps {
   onEditarPagamento: (id: string) => void;
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
+  onReemitir?: (id: string) => void;
 }
 
 export function FaturasMesPanel({
@@ -164,6 +165,7 @@ export function FaturasMesPanel({
   onEditarPagamento,
   onMarcarPendente,
   onVerComprovante,
+  onReemitir,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
@@ -389,6 +391,7 @@ export function FaturasMesPanel({
                         onEditarPagamento={onEditarPagamento}
                         onMarcarPendente={onMarcarPendente}
                         onVerComprovante={onVerComprovante}
+                        onReemitir={onReemitir}
                       />
                     </td>
                   </tr>

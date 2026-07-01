@@ -68,6 +68,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleCloseFaturaDuplicidade,
     handleVisualizarAgendamentos,
     handleEmitirReferencia,
+    handleReemitirFatura,
   } = useFaturasPage(tipo);
 
   return (
@@ -96,6 +97,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onEditarPagamento={handleEditarPagamento}
           onMarcarPendente={handleMarcarPendente}
           onVerComprovante={handleVerComprovante}
+          onReemitir={tipo === "cliente" ? handleReemitirFatura : undefined}
         />
       </div>
 
