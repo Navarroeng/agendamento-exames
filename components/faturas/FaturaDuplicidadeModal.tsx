@@ -2,7 +2,7 @@
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCurrency } from "@/lib/money";
-import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
+import { historicoStatusLabelClinica } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaExistenteInfo } from "@/services/duplicidade.service";
 
 interface FaturaDuplicidadeModalProps {
@@ -14,7 +14,7 @@ interface FaturaDuplicidadeModalProps {
 
 function statusLabel(status: string, tipo: "cliente" | "clinica"): string {
   if (tipo === "clinica") {
-    return faturaClinicaHistoricoStatusLabel(
+    return historicoStatusLabelClinica(
       status as "rascunho" | "emitida" | "cancelada",
       false
     );

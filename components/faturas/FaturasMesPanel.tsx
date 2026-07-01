@@ -78,7 +78,7 @@ const PANEL_CONFIG: Record<
     datalistId: "fatura-mes-clinicas",
     listTitle: "Custos por clínica",
     entityColumn: "Clínica",
-    emptyNone: "Nenhuma clínica com custos registráveis neste mês",
+    emptyNone: "Nenhuma clínica com custos conferíveis neste mês",
     emptyFiltered: " para o filtro informado",
     invalidMonth:
       "Informe um mês de referência válido (MM/AAAA) para listar as clínicas com custos.",
@@ -87,8 +87,8 @@ const PANEL_CONFIG: Record<
         Apenas agendamentos com status{" "}
         <strong className="font-semibold text-navy">agendado</strong> entram no
         cálculo de custos. Os valores são calculados em tempo real a partir dos
-        agendamentos do mês selecionado. Ao marcar como conferido, o vencimento é
-        definido automaticamente para o{" "}
+        agendamentos do mês selecionado. Ao marcar como conferido, o vencimento
+        é definido automaticamente para o{" "}
         <strong className="font-semibold text-navy">
           último dia do período de referência
         </strong>
@@ -105,12 +105,8 @@ const PANEL_CONFIG: Record<
 
 function statusBadge(
   status: FaturaMesStatus,
-  labels: Record<FaturaMesStatus, string>,
-  variant: FaturaTipo
+  labels: Record<FaturaMesStatus, string>
 ) {
-  const effectiveStatus =
-    variant === "clinica" && status === "rascunho" ? "aberta_emissao" : status;
-
   const styles: Record<FaturaMesStatus, string> = {
     aberta_emissao: "bg-brand-orange-soft text-[#c96d00]",
     rascunho: "bg-[#fef3c7] text-[#b45309]",
@@ -121,7 +117,7 @@ function statusBadge(
 
   return (
     <span
-      className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${styles[effectiveStatus]}`}
+      className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${styles[status]}`}
     >
       {labels[status]}
     </span>
@@ -381,7 +377,7 @@ export function FaturasMesPanel({
                       {formatCurrency(row.valorTotal)}
                     </td>
                     <td className="px-2.5 py-2">
-                      {statusBadge(row.status, config.statusLabels, variant)}
+                      {statusBadge(row.status, config.statusLabels)}
                     </td>
                     <td className="px-2.5 py-2">
                       <FaturasMesRowActions

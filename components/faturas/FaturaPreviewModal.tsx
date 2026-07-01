@@ -2,6 +2,7 @@
 
 import { Modal } from "@/components/ui/Modal";
 import { FaturaPreviewContent } from "./FaturaPreviewContent";
+import { CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaPreviewState } from "@/lib/types";
 
 interface FaturaPreviewModalProps {
@@ -28,14 +29,10 @@ export function FaturaPreviewModal({
   const readonly = preview.readonly;
   const cancelled = preview.status === "cancelada";
   const isClinica = preview.tipo === "clinica";
-  const emitLabel = isClinica ? "Marcar como conferido" : "Emitir fatura";
-  const emitSavingLabel = isClinica ? "Conferindo..." : "Emitindo...";
-  const previewTitle = isClinica
-    ? "Pré-visualização dos custos"
-    : "Pré-visualização da fatura";
-  const readonlyTitle = isClinica
-    ? `Custos ${preview.numero ?? ""}`.trim()
-    : `Fatura ${preview.numero ?? ""}`.trim();
+  const emitLabel = isClinica
+    ? CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO
+    : "Emitir fatura";
+  const emittingLabel = isClinica ? "Conferindo..." : "Emitindo...";
 
   const footer = (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
@@ -64,7 +61,7 @@ export function FaturaPreviewModal({
             disabled={saving}
             onClick={() => void onEmit()}
           >
-            {saving ? emitSavingLabel : emitLabel}
+            {saving ? emittingLabel : emitLabel}
           </button>
           <button
             type="button"
@@ -85,7 +82,7 @@ export function FaturaPreviewModal({
             disabled={saving}
             onClick={() => void onEmit()}
           >
-            {saving ? emitSavingLabel : emitLabel}
+            {saving ? emittingLabel : emitLabel}
           </button>
           <button
             type="button"
@@ -115,7 +112,15 @@ export function FaturaPreviewModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={readonly ? readonlyTitle : previewTitle}
+      title={
+        readonly
+          ? isClinica
+            ? `Custos ${preview.numero ?? ""}`.trim()
+            : `Fatura ${preview.numero ?? ""}`.trim()
+          : isClinica
+            ? "Pré-visualização dos custos"
+            : "Pré-visualização da fatura"
+      }
       extraWide
       footer={footer}
     >

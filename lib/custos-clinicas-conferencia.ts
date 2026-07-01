@@ -1,36 +1,49 @@
 import type { FaturaMesStatus } from "@/lib/fatura-mes-resumo";
-import type { FaturaRecord, FaturaStatus } from "@/lib/types";
 
-export const CUSTOS_CLINICA_STATUS_LABELS: Record<FaturaMesStatus, string> = {
-  aberta_emissao: "Aberta para conferência",
-  rascunho: "Aberta para conferência",
-  emitida: "Conferido",
-  paga: "Pago",
-  cancelada: "Cancelada",
-};
+export const CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO = "Marcar como conferido";
+export const CUSTOS_CLINICA_ACAO_REABRIR = "Reabrir conferência";
+export const CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO = "Registrar pagamento";
 
-export function isCustosClinicaConferido(
-  fatura: Pick<FaturaRecord, "tipo" | "status" | "pago">
-): boolean {
-  return (
-    fatura.tipo === "clinica" &&
-    fatura.status === "emitida" &&
-    !fatura.pago
-  );
-}
+export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
+  {
+    aberta_emissao: "Aberta para conferência",
+    rascunho: "Aberta para conferência",
+    emitida: "Conferido",
+    paga: "Pago",
+    cancelada: "Cancelada",
+  };
 
-export function isCustosClinicaAbertaConferencia(
-  rowStatus: FaturaMesStatus
-): boolean {
-  return rowStatus === "aberta_emissao" || rowStatus === "rascunho";
-}
-
-export function faturaClinicaHistoricoStatusLabel(
-  status: FaturaStatus,
+export function historicoStatusLabelClinica(
+  status: "rascunho" | "emitida" | "cancelada",
   pago: boolean
 ): string {
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Aberta para conferência";
   if (status === "emitida") return pago ? "Pago" : "Conferido";
   return status;
+}
+
+export const HISTORICO_STATUS_FILTER_LABELS_CLINICA: Record<
+  string,
+  string
+> = {
+  rascunho: "Aberta para conferência",
+  emitida: "Conferido",
+  cancelada: "Cancelada",
+  paga: "Pago",
+  pendente: "Conferido (aguardando pagamento)",
+};
+
+export function formatAuditoriaMarcarConferido(
+  usuario: string,
+  clinicaNome: string
+): string {
+  return `${usuario} marcou os custos da clínica ${clinicaNome} como conferidos.`;
+}
+
+export function formatAuditoriaReabrirConferencia(
+  usuario: string,
+  clinicaNome: string
+): string {
+  return `${usuario} reabriu a conferência dos custos da clínica ${clinicaNome}.`;
 }

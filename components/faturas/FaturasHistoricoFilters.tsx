@@ -1,6 +1,7 @@
 "use client";
 
 import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
+import { HISTORICO_STATUS_FILTER_LABELS_CLINICA } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaHistoricoFilters } from "@/lib/fatura-filters";
 import type { FaturaTipo } from "@/lib/types";
 
@@ -38,22 +39,6 @@ const REFERENCIA_LABEL: Record<FaturaTipo, string> = {
   clinica: "Clínica",
 };
 
-const CLINICA_STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "rascunho", label: "Aberta para conferência" },
-  { value: "emitida", label: "Conferido" },
-  { value: "cancelada", label: "Cancelada" },
-  { value: "paga", label: "Pago" },
-  { value: "pendente", label: "Pendente pagamento" },
-];
-
-const CLIENTE_STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "rascunho", label: "Rascunho" },
-  { value: "emitida", label: "Emitida" },
-  { value: "cancelada", label: "Cancelada" },
-  { value: "paga", label: "Paga" },
-  { value: "pendente", label: "Pendente" },
-];
-
 export function FaturasHistoricoFilters({
   fixedTipo,
   filters,
@@ -76,10 +61,20 @@ export function FaturasHistoricoFilters({
 
   const statusOptions =
     fixedTipo === "clinica"
-      ? CLINICA_STATUS_OPTIONS
-      : fixedTipo === "cliente"
-        ? CLIENTE_STATUS_OPTIONS
-        : CLIENTE_STATUS_OPTIONS;
+      ? [
+          { value: "rascunho", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.rascunho },
+          { value: "emitida", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.emitida },
+          { value: "cancelada", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.cancelada },
+          { value: "paga", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.paga },
+          { value: "pendente", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.pendente },
+        ]
+      : [
+          { value: "rascunho", label: "Rascunho" },
+          { value: "emitida", label: "Emitida" },
+          { value: "cancelada", label: "Cancelada" },
+          { value: "paga", label: "Paga" },
+          { value: "pendente", label: "Pendente" },
+        ];
 
   return (
     <div className="mb-4 rounded-xl border border-[#e8edf5] bg-[#f8fafc]/80 p-3.5">

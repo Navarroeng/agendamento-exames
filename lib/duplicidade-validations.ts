@@ -5,7 +5,7 @@ export const FATURA_DUPLICADA_MSG =
   "Já existe uma fatura emitida ou em rascunho para este cliente neste mês de referência.";
 
 export const FATURA_CLINICA_DUPLICADA_MSG =
-  "Já existe uma fatura emitida ou em rascunho para esta clínica neste mês de referência.";
+  "Já existem custos conferidos ou em aberta para conferência desta clínica neste mês de referência.";
 
 export function normalizarNomeExame(nome: string): string {
   return nome

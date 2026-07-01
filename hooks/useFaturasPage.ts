@@ -47,8 +47,8 @@ import {
   marcarFaturaPendente,
   atualizarPagamentoFatura,
   registrarPagamentoFatura,
+  reabrirConferenciaCustosClinica,
   reemitirFaturaClienteCancelada,
-  reabrirConferenciaClinica,
   salvarFatura,
 } from "@/services/fatura-historico.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
@@ -376,7 +376,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error(
           isCliente
             ? "Cliente inválido para gerar a fatura."
-            : "Clínica inválida para conferir os custos."
+            : "Clínica inválida para conferência."
         );
         return;
       }
@@ -384,7 +384,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error(
           isCliente
             ? "Informe o mês de referência para gerar a fatura."
-            : "Informe o mês de referência para conferir os custos."
+            : "Informe o mês de referência para conferência."
         );
         return;
       }
@@ -582,11 +582,19 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     setSaving(true);
     try {
       await persistPreview("emitida");
-      toast.success("Fatura emitida com sucesso!");
+      toast.success(
+        current.tipo === "cliente"
+          ? "Fatura emitida com sucesso!"
+          : "Custos marcados como conferidos."
+      );
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Erro ao emitir fatura."
+        err instanceof Error
+          ? err.message
+          : current.tipo === "cliente"
+            ? "Erro ao emitir fatura."
+            : "Erro ao marcar custos como conferidos."
       );
     } finally {
       setSaving(false);
@@ -703,11 +711,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         return;
       }
       if (fatura.status !== "emitida") {
-        toast.error(
-          fatura.tipo === "clinica"
-            ? "Pagamento só pode ser registrado em custos conferidos."
-            : "Pagamento só pode ser registrado em faturas emitidas."
-        );
+        toast.error("Pagamento só pode ser registrado em faturas emitidas.");
         return;
       }
       setPagamentoMode(mode);
@@ -853,7 +857,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error(
           isCliente
             ? "Cliente inválido para gerar a fatura."
-            : "Clínica inválida para conferir os custos."
+            : "Clínica inválida para conferência."
         );
         return;
       }
@@ -861,7 +865,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error(
           isCliente
             ? "Informe um mês de referência válido para emitir a fatura."
-            : "Informe um mês de referência válido para conferir os custos."
+            : "Informe um mês de referência válido para conferência."
         );
         return;
       }
@@ -915,7 +919,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.success(
           isCliente
             ? "Fatura emitida com sucesso!"
-            : "Custos marcados como conferidos!"
+            : "Custos marcados como conferidos."
         );
       } catch (err) {
         console.error(err);
@@ -939,6 +943,43 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       resumoMes?.rows,
       syncClienteVencimentoNoPreview,
     ]
+  );
+
+  const handleReabrirConferencia = useCallback(
+    async (id: string) => {
+      if (pageTipo !== "clinica") return;
+
+      const fatura = faturas.find((f) => f.id === id);
+      if (!fatura) {
+        toast.error("Registro de custos não encontrado.");
+        return;
+      }
+      if (fatura.status !== "emitida" || fatura.pago) {
+        toast.error("Somente custos conferidos e não pagos podem ser reabertos.");
+        return;
+      }
+
+      const ok = window.confirm(
+        `Reabrir conferência dos custos da clínica ${fatura.referencia_nome}?\n\n` +
+          "O status voltará para aberta para conferência. Valores e histórico serão mantidos."
+      );
+      if (!ok) return;
+
+      setSaving(true);
+      try {
+        await reabrirConferenciaCustosClinica(id, auditOptions);
+        toast.success("Conferência reaberta.");
+        await reloadAll();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao reabrir conferência."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [auditOptions, faturas, pageTipo, reloadAll]
   );
 
   const handleReemitirFatura = useCallback(
@@ -1043,36 +1084,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     ]
   );
 
-  const handleReabrirConferencia = useCallback(
-    async (id: string) => {
-      if (pageTipo !== "clinica") return;
-
-      const fatura = faturas.find((f) => f.id === id);
-      const referencia = fatura?.referencia_nome?.trim() ?? "esta clínica";
-      const ok = window.confirm(
-        `Reabrir a conferência dos custos de ${referencia}?\n\nOs valores permanecem inalterados.`
-      );
-      if (!ok) return;
-
-      setSaving(true);
-      try {
-        await reabrirConferenciaClinica(id, auditOptions);
-        toast.success("Conferência reaberta.");
-        await reloadAll();
-      } catch (err) {
-        console.error(err);
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Erro ao reabrir conferência dos custos."
-        );
-      } finally {
-        setSaving(false);
-      }
-    },
-    [auditOptions, faturas, pageTipo, reloadAll]
-  );
-
   return {
     pageTipo,
     filters,
@@ -1119,7 +1130,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleCloseFaturaDuplicidade,
     handleVisualizarAgendamentos,
     handleEmitirReferencia,
-    handleReemitirFatura,
     handleReabrirConferencia,
+    handleReemitirFatura,
   };
 }

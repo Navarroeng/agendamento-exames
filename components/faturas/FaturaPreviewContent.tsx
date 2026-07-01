@@ -1,13 +1,13 @@
 "use client";
 
 import { NavarroLogo } from "@/components/layout/NavarroLogo";
-import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
 import {
   calcTotalFaturaItens,
   countColaboradoresItens,
 } from "@/lib/fatura-mappers";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
+import { FATURA_MES_STATUS_LABELS_CLINICA } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaPreviewState, FaturaStatus } from "@/lib/types";
 
 import { FaturaPagamentoCard } from "./FaturaPagamentoCard";
@@ -15,12 +15,14 @@ import { FaturaResumoPorTipoExame } from "./FaturaResumoPorTipoExame";
 
 function statusLabel(
   status: FaturaStatus | null,
-  tipo: FaturaPreviewState["tipo"],
-  pago?: boolean
+  tipo: FaturaPreviewState["tipo"]
 ): string {
   if (tipo === "clinica") {
-    if (!status) return "Pré-visualização";
-    return faturaClinicaHistoricoStatusLabel(status, pago ?? false);
+    if (status === "cancelada") return FATURA_MES_STATUS_LABELS_CLINICA.cancelada;
+    if (status === "rascunho")
+      return FATURA_MES_STATUS_LABELS_CLINICA.rascunho;
+    if (status === "emitida") return FATURA_MES_STATUS_LABELS_CLINICA.emitida;
+    return "Pré-visualização";
   }
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";

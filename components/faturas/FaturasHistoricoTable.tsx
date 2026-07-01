@@ -4,7 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentosPagination } from "@/components/agendamentos/AgendamentosPagination";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { faturaClinicaHistoricoStatusLabel } from "@/lib/custos-clinicas-conferencia";
+import { historicoStatusLabelClinica } from "@/lib/custos-clinicas-conferencia";
 import { FATURA_HISTORICO_PAGE_SIZE } from "@/lib/fatura-filters";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaHistoricoFilters } from "@/lib/fatura-filters";
@@ -12,38 +12,29 @@ import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
 import { FaturasHistoricoFilters } from "./FaturasHistoricoFilters";
 
-function statusBadge(
-  status: FaturaStatus,
-  variant: FaturaTipo,
-  pago: boolean
-) {
-  const label =
-    variant === "clinica"
-      ? faturaClinicaHistoricoStatusLabel(status, pago)
-      : status === "rascunho"
-        ? "Rascunho"
-        : status === "emitida"
-          ? "Emitida"
-          : status === "cancelada"
-            ? "Cancelada"
-            : status;
-
-  const map: Record<FaturaStatus, string> = {
+function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
+  const map = {
     rascunho: "bg-brand-orange-soft text-[#c96d00]",
-    emitida:
-      variant === "clinica" && pago
-        ? "bg-brand-green-soft text-brand-green"
-        : variant === "clinica"
-          ? "bg-brand-blue-soft text-brand-blue"
-          : "bg-brand-green-soft text-brand-green",
+    emitida: "bg-brand-green-soft text-brand-green",
     cancelada: "bg-brand-red-soft text-brand-red",
   };
-
+  const labels =
+    variant === "clinica"
+      ? {
+          rascunho: historicoStatusLabelClinica("rascunho", false),
+          emitida: historicoStatusLabelClinica("emitida", pago),
+          cancelada: historicoStatusLabelClinica("cancelada", false),
+        }
+      : {
+          rascunho: "Rascunho",
+          emitida: "Emitida",
+          cancelada: "Cancelada",
+        };
   return (
     <span
       className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${map[status]}`}
     >
-      {label}
+      {labels[status]}
     </span>
   );
 }
@@ -82,7 +73,7 @@ const TABLE_META: Record<
   clinica: {
     title: "Histórico de custos",
     emptyNone:
-      "Nenhum custo conferido ainda. Use os filtros acima para conferir o primeiro custo.",
+      "Nenhum custo conferido ainda. Use os filtros acima para marcar o primeiro como conferido.",
     emptyFiltered:
       "Nenhum custo encontrado com os filtros selecionados.",
   },
@@ -233,11 +224,7 @@ export function FaturasHistoricoTable({
                       {f.total_exames}
                     </td>
                     <td className="px-2.5 py-2">
-                      {statusBadge(
-                        f.status,
-                        variant,
-                        faturaComPagamento.pago ?? false
-                      )}
+                      {statusBadge(f.status, variant, faturaComPagamento.pago ?? false)}
                     </td>
                     <td className="px-2.5 py-2">
                       {pagamentoBadge(faturaComPagamento)}
@@ -251,6 +238,7 @@ export function FaturasHistoricoTable({
                     <td className="px-2.5 py-2">
                       <FaturaRowActionsMenu
                         fatura={faturaComPagamento}
+                        variant={variant}
                         onVisualizar={onVisualizar}
                         onGerarPdf={onGerarPdf}
                         onCancelar={onCancelar}

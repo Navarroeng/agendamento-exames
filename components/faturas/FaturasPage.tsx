@@ -25,7 +25,7 @@ const PAGE_META: Record<
   clinica: {
     title: "Custos Clínicas",
     subtitle:
-      "Visualize os custos mensais por clínica, com valores em tempo real e fluxo de conferência.",
+      "Visualize os custos mensais por clínica, com valores em tempo real e status da conferência.",
     icon: <IconWallet size={20} />,
   },
 };
@@ -68,8 +68,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleCloseFaturaDuplicidade,
     handleVisualizarAgendamentos,
     handleEmitirReferencia,
-    handleReemitirFatura,
     handleReabrirConferencia,
+    handleReemitirFatura,
   } = useFaturasPage(tipo);
 
   return (

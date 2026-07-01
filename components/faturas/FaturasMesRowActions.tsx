@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FaturaMesRow } from "@/lib/fatura-mes-resumo";
 import {
-  isCustosClinicaAbertaConferencia,
-  isCustosClinicaConferido,
+  CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO,
+  CUSTOS_CLINICA_ACAO_REABRIR,
+  CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
 } from "@/lib/custos-clinicas-conferencia";
+import type { FaturaMesRow } from "@/lib/fatura-mes-resumo";
 import { canReemitirFaturaCliente } from "@/lib/fatura-reemissao";
 import type { FaturaRecord, FaturaTipo } from "@/lib/types";
 import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
@@ -29,7 +30,7 @@ interface FaturasMesRowActionsProps {
 
 const EMIT_LABEL: Record<FaturaTipo, string> = {
   cliente: "Emitir fatura",
-  clinica: "Marcar como conferido",
+  clinica: CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO,
 };
 
 type MenuItem = {
@@ -58,6 +59,39 @@ export function FaturasMesRowActions({
   const fatura = row.fatura;
 
   if (
+    variant === "clinica" &&
+    fatura &&
+    fatura.status === "emitida" &&
+    !(fatura.pago ?? false)
+  ) {
+    return (
+      <ClinicaConferidoActionsMenu
+        referenciaNome={row.referenciaNome}
+        saving={saving}
+        onVisualizar={() => onVisualizarFatura(fatura.id)}
+        onRegistrarPagamento={() => onMarcarPago(fatura.id)}
+        onReabrirConferencia={() => onReabrirConferencia?.(fatura.id)}
+      />
+    );
+  }
+
+  if (
+    variant === "clinica" &&
+    fatura &&
+    fatura.status === "rascunho"
+  ) {
+    return (
+      <AbertaEmissaoActionsMenu
+        referenciaNome={row.referenciaNome}
+        emitLabel={CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO}
+        saving={saving}
+        onVisualizar={() => onVisualizarFatura(fatura.id)}
+        onEmitir={() => onEmitir(row.referenciaNome)}
+      />
+    );
+  }
+
+  if (
     fatura &&
     variant === "cliente" &&
     (row.status === "cancelada" || canReemitirFaturaCliente(fatura))
@@ -72,44 +106,6 @@ export function FaturasMesRowActions({
     );
   }
 
-  if (fatura && variant === "clinica") {
-    const faturaComPagamento: FaturaRecord = {
-      ...fatura,
-      pago: fatura.pago ?? false,
-    };
-
-    if (isCustosClinicaConferido(faturaComPagamento)) {
-      return (
-        <ClinicaConferidoActionsMenu
-          referenciaNome={row.referenciaNome}
-          saving={saving}
-          onVisualizar={() => onVisualizarFatura(fatura.id)}
-          onRegistrarPagamento={() => onMarcarPago(fatura.id)}
-          onReabrirConferencia={() => onReabrirConferencia?.(fatura.id)}
-        />
-      );
-    }
-
-    if (
-      isCustosClinicaAbertaConferencia(row.status) ||
-      fatura.status === "rascunho"
-    ) {
-      return (
-        <AbertaEmissaoActionsMenu
-          referenciaNome={row.referenciaNome}
-          emitLabel={EMIT_LABEL.clinica}
-          saving={saving}
-          onVisualizar={() =>
-            fatura.status === "rascunho"
-              ? onVisualizarFatura(fatura.id)
-              : onVisualizarAgendamentos(row.referenciaNome)
-          }
-          onEmitir={() => onEmitir(row.referenciaNome)}
-        />
-      );
-    }
-  }
-
   if (fatura) {
     const faturaComPagamento: FaturaRecord = {
       ...fatura,
@@ -119,6 +115,7 @@ export function FaturasMesRowActions({
     return (
       <FaturaRowActionsMenu
         fatura={faturaComPagamento}
+        variant={variant}
         onVisualizar={onVisualizarFatura}
         onGerarPdf={onGerarPdf}
         onCancelar={onCancelar}
@@ -174,13 +171,13 @@ function ClinicaConferidoActionsMenu({
   const items: MenuItem[] = [
     { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
     {
-      key: "pagamento",
-      label: "Registrar pagamento",
+      key: "registrar-pagamento",
+      label: CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
       onClick: onRegistrarPagamento,
     },
     {
       key: "reabrir",
-      label: "Reabrir conferência",
+      label: CUSTOS_CLINICA_ACAO_REABRIR,
       onClick: onReabrirConferencia,
     },
   ];
@@ -218,11 +215,7 @@ function ClinicaConferidoActionsMenu({
               type="button"
               role="menuitem"
               onClick={() => handleAction(item)}
-              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
-                item.danger
-                  ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
-                  : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
-              }`}
+              className="block w-full px-3 py-1.5 text-left text-[11px] font-medium text-[#475569] transition-colors hover:bg-[#f0f4ff] hover:text-brand-blue"
             >
               {item.label}
             </button>

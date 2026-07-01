@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FaturaRecord } from "@/lib/types";
+import type { FaturaRecord, FaturaTipo } from "@/lib/types";
+import { CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO } from "@/lib/custos-clinicas-conferencia";
 
 interface FaturaRowActionsMenuProps {
   fatura: FaturaRecord;
+  variant?: FaturaTipo;
   onVisualizar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -24,6 +26,7 @@ type MenuItem = {
 
 export function FaturaRowActionsMenu({
   fatura,
+  variant = "cliente",
   onVisualizar,
   onGerarPdf,
   onCancelar,
@@ -94,13 +97,16 @@ export function FaturaRowActionsMenu({
     } else {
       items.push({
         key: "marcar-pago",
-        label: "Marcar como pago",
+        label:
+          variant === "clinica"
+            ? CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO
+            : "Marcar como pago",
         onClick: () => onMarcarPago(fatura.id),
       });
     }
   }
 
-  if (fatura.status !== "cancelada") {
+  if (fatura.status !== "cancelada" && variant === "cliente") {
     items.push({
       key: "cancelar",
       label: "Cancelar fatura",
