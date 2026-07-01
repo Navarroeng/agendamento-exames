@@ -59,13 +59,7 @@ export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
 /** @deprecated Use FATURA_MES_STATUS_LABELS */
 export const FATURA_CLIENTE_MES_STATUS_LABELS = FATURA_MES_STATUS_LABELS;
 
-export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> = {
-  aberta_emissao: "Aberta para conferência",
-  rascunho: "Aberta para conferência",
-  emitida: "Conferido",
-  paga: "Pago",
-  cancelada: "Cancelada",
-};
+export { FATURA_MES_STATUS_LABELS_CLINICA } from "@/lib/custos-clinicas-conferencia";
 
 export function getCurrentMonthYearBR(): string {
   return getCurrentMonthReferenceBR();

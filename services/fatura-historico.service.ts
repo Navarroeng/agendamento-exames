@@ -1,5 +1,9 @@
 import { mesReferenciaIsoFromPeriodoInicio } from "@/lib/duplicidade-validations";
 import {
+  formatAuditoriaMarcarConferido,
+  formatAuditoriaReabrirConferencia,
+} from "@/lib/custos-clinicas-conferencia";
+import {
   AUDITORIA_ACOES,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
@@ -245,18 +249,21 @@ export async function salvarFatura(
 
     const usuario =
       auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
-    const marcouConferido =
+
+    if (
       input.tipo === "clinica" &&
       input.status === "emitida" &&
-      existing.status !== "emitida";
-
-    if (marcouConferido) {
+      existing.status === "rascunho"
+    ) {
       await auditarFatura(auditOptions, {
         tipo: input.tipo,
-        acao: AUDITORIA_ACOES.custo_clinica_conferido,
+        acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
         registroId: updated.id,
         registroNome: updated.numero,
-        descricao: `${usuario} marcou os custos da clínica ${updated.referencia_nome} como conferidos.`,
+        descricao: formatAuditoriaMarcarConferido(
+          usuario,
+          updated.referencia_nome
+        ),
       });
     } else {
       await auditarFatura(auditOptions, {
@@ -330,10 +337,13 @@ export async function salvarFatura(
   } else if (input.tipo === "clinica" && input.status === "emitida") {
     await auditarFatura(auditOptions, {
       tipo: input.tipo,
-      acao: AUDITORIA_ACOES.custo_clinica_conferido,
+      acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
       registroId: created.id,
       registroNome: created.numero,
-      descricao: `${usuario} marcou os custos da clínica ${created.referencia_nome} como conferidos.`,
+      descricao: formatAuditoriaMarcarConferido(
+        usuario,
+        created.referencia_nome
+      ),
     });
   } else {
     await auditarFatura(auditOptions, {
@@ -398,12 +408,12 @@ export async function reemitirFaturaClienteCancelada(
   );
 }
 
-export async function reabrirConferenciaClinica(
+export async function reabrirConferenciaCustosClinica(
   id: string,
   auditOptions?: FaturaAuditOptions
 ): Promise<void> {
   const existing = await buscarFaturaComItens(id);
-  if (!existing) throw new Error("Registro de custo não encontrado.");
+  if (!existing) throw new Error("Registro de custos não encontrado.");
   if (existing.tipo !== "clinica") {
     throw new Error("Reabrir conferência disponível apenas para custos de clínicas.");
   }
@@ -411,7 +421,7 @@ export async function reabrirConferenciaClinica(
     throw new Error("Somente custos conferidos podem ser reabertos.");
   }
   if (existing.pago) {
-    throw new Error("Não é possível reabrir custos já pagos.");
+    throw new Error("Não é possível reabrir conferência de custos já pagos.");
   }
 
   const supabase = createClient();
@@ -422,6 +432,7 @@ export async function reabrirConferenciaClinica(
       data_emissao: null,
     })
     .eq("id", id)
+    .eq("tipo", "clinica")
     .eq("status", "emitida");
 
   if (error) throw error;
@@ -431,10 +442,13 @@ export async function reabrirConferenciaClinica(
 
   await auditarFatura(auditOptions, {
     tipo: "clinica",
-    acao: AUDITORIA_ACOES.custo_clinica_reabrir_conferencia,
+    acao: AUDITORIA_ACOES.custo_clinica_conferencia_reaberta,
     registroId: existing.id,
     registroNome: existing.numero,
-    descricao: `${usuario} reabriu a conferência dos custos da clínica ${existing.referencia_nome}.`,
+    descricao: formatAuditoriaReabrirConferencia(
+      usuario,
+      existing.referencia_nome
+    ),
   });
 }
 
