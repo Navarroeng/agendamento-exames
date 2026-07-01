@@ -59,6 +59,8 @@ export interface ExameFormItem {
   precoAutomatico: boolean;
   /** Clínico: valor cliente editado manualmente (não sobrescrever ao trocar ASO). */
   clinicoValorManual?: boolean;
+  /** ASO Demissional + Clínico R$ 0,00: justificativa obrigatória. */
+  motivo_valor_zero?: string;
 }
 
 export interface ExameCatalogFormValues {
@@ -220,6 +222,7 @@ export interface ExameInsert {
   tipo_exame: string;
   valor_cliente: number;
   custo_clinica: number;
+  motivo_valor_zero?: string | null;
 }
 
 export interface AgendamentoRecord extends AgendamentoInsert {
@@ -233,6 +236,7 @@ export interface AgendamentoExameRecord {
   tipo_exame: string;
   valor_cliente: number;
   custo_clinica: number;
+  motivo_valor_zero?: string | null;
 }
 
 export interface AgendamentoWithExames extends AgendamentoRecord {

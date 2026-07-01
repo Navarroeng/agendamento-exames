@@ -96,6 +96,7 @@ export function ExamSection({
                 <ExamTableRow
                   key={exam.id}
                   exam={exam}
+                  aso={aso}
                   pricingLoading={pricingLoading}
                   canRemove={podeRemoverExameAgendamento(aso, exam.tipo_exame)}
                   onRemove={() => onRemove(exam.id)}

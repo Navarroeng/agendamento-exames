@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { formatCurrency } from "@/lib/money";
 import type { AgendamentoWithExames } from "@/lib/types";
 import { IconFlask, SectionHeading } from "./ViewModalUi";
@@ -64,32 +64,46 @@ export function ViewModalExamsSection({
                 const lucro = valor - custo;
 
                 return (
-                  <tr
-                    key={exam.id}
-                    className="transition-colors hover:bg-[#fafbff]"
-                  >
-                    <td className={`${TD} text-center font-medium text-[#64748b]`}>
-                      {index + 1}
-                    </td>
-                    <td className={`${TD} font-semibold text-navy`}>
-                      {exam.tipo_exame}
-                    </td>
-                    <td
-                      className={`${TD} max-w-[140px] truncate text-[#475569]`}
-                      title={clinicaNome}
-                    >
-                      {clinicaNome}
-                    </td>
-                    <td className={`${TD} whitespace-nowrap font-semibold text-brand-blue`}>
-                      {formatCurrency(valor)}
-                    </td>
-                    <td className={`${TD} whitespace-nowrap font-semibold text-[#c96d00]`}>
-                      {formatCurrency(custo)}
-                    </td>
-                    <td className={`${TD} whitespace-nowrap font-semibold text-brand-green`}>
-                      {formatCurrency(lucro)}
-                    </td>
-                  </tr>
+                  <Fragment key={exam.id}>
+                    <tr className="transition-colors hover:bg-[#fafbff]">
+                      <td className={`${TD} text-center font-medium text-[#64748b]`}>
+                        {index + 1}
+                      </td>
+                      <td className={`${TD} font-semibold text-navy`}>
+                        {exam.tipo_exame}
+                      </td>
+                      <td
+                        className={`${TD} max-w-[140px] truncate text-[#475569]`}
+                        title={clinicaNome}
+                      >
+                        {clinicaNome}
+                      </td>
+                      <td className={`${TD} whitespace-nowrap font-semibold text-brand-blue`}>
+                        {formatCurrency(valor)}
+                      </td>
+                      <td className={`${TD} whitespace-nowrap font-semibold text-[#c96d00]`}>
+                        {formatCurrency(custo)}
+                      </td>
+                      <td className={`${TD} whitespace-nowrap font-semibold text-brand-green`}>
+                        {formatCurrency(lucro)}
+                      </td>
+                    </tr>
+                    {exam.motivo_valor_zero?.trim() ? (
+                      <tr key={`${exam.id}-motivo`}>
+                        <td
+                          colSpan={6}
+                          className="border-b border-[#eef2f7] bg-[#f8fafc] px-2.5 py-2"
+                        >
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                            Motivo do valor zero
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-[#334155]">
+                            {exam.motivo_valor_zero.trim()}
+                          </p>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

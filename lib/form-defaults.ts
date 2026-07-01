@@ -36,5 +36,6 @@ export function createEmptyExam(): ExameFormItem {
     aviso: "",
     precoAutomatico: false,
     clinicoValorManual: false,
+    motivo_valor_zero: "",
   };
 }

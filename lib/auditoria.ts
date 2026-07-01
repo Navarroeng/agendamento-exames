@@ -35,6 +35,7 @@ export const AUDITORIA_ACOES = {
     "exames_complementares_removidos_retorno_trabalho",
   procuracao_alterada: "procuracao_alterada",
   agendamento_sem_procuracao_confirmado: "agendamento_sem_procuracao_confirmado",
+  clinico_zero_demissional: "clinico_zero_demissional",
 } as const;
 
 export type AuditoriaAcao =
@@ -73,6 +74,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   procuracao_alterada: "Procuração alterada",
   agendamento_sem_procuracao_confirmado:
     "Agendamento confirmado sem procuração ativa",
+  clinico_zero_demissional: "Clínico R$ 0,00 — ASO Demissional",
 };
 
 export interface AuditoriaUsuarioContext {

@@ -1,8 +1,16 @@
+"use client";
+
+import { Field, RequiredMark } from "@/components/ui/Field";
+import {
+  exibeCampoMotivoClinicoZeroDemissional,
+  MOTIVO_CLINICO_ZERO_PLACEHOLDER,
+} from "@/lib/agendamento-clinico-zero-demissional";
 import { isExameClinicoManual } from "@/lib/exame-pricing";
 import type { ExameFormItem } from "@/lib/types";
 
 interface ExamTableRowProps {
   exam: ExameFormItem;
+  aso: string;
   canRemove: boolean;
   pricingLoading: boolean;
   onRemove: () => void;
@@ -46,6 +54,7 @@ function PrecoBadge({ exam }: { exam: ExameFormItem }) {
 
 export function ExamTableRow({
   exam,
+  aso,
   canRemove,
   pricingLoading,
   onRemove,
@@ -53,6 +62,7 @@ export function ExamTableRow({
 }: ExamTableRowProps) {
   const readOnlyPreco = exam.precoAutomatico && !exam.aviso;
   const disabled = pricingLoading;
+  const showMotivo = exibeCampoMotivoClinicoZeroDemissional(aso, exam);
 
   return (
     <>
@@ -107,6 +117,32 @@ export function ExamTableRow({
           </button>
         </td>
       </tr>
+      {showMotivo ? (
+        <tr>
+          <td
+            colSpan={6}
+            className="border-b border-[#eef2f7] bg-[#f8fafc] px-2.5 py-2"
+          >
+            <Field
+              label={
+                <>
+                  Motivo do valor zero <RequiredMark />
+                </>
+              }
+            >
+              <textarea
+                className="field-input !h-[72px] w-full resize-none py-2 text-xs"
+                placeholder={MOTIVO_CLINICO_ZERO_PLACEHOLDER}
+                value={exam.motivo_valor_zero ?? ""}
+                disabled={disabled}
+                onChange={(e) =>
+                  onUpdate("motivo_valor_zero", e.target.value)
+                }
+              />
+            </Field>
+          </td>
+        </tr>
+      ) : null}
       {exam.aviso ? (
         <tr>
           <td

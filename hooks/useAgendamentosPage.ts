@@ -87,6 +87,7 @@ import {
   registrarExameRemovidoAgendamento,
   registrarExamesCarregadosPorCargo,
   registrarExamesComplementaresRemovidosRetornoTrabalho,
+  auditarClinicoZeroDemissionalSeNecessario,
 } from "@/services/agendamento-form-audit.service";
 import { registrarAgendamentoClienteSemProcuracao } from "@/services/cliente-procuracao-audit.service";
 import {
@@ -952,6 +953,13 @@ export function useAgendamentosPage() {
             historicoUsuario
           );
           await atualizarAgendamentoComExames(editingId, payload, examesPayload);
+          await auditarClinicoZeroDemissionalSeNecessario(auditContext, {
+            aso: payload.aso,
+            exams,
+            anterior: anteriorParaHistorico,
+            agendamentoId: editingId,
+            colaborador: payload.colaborador,
+          });
           if (alteracoes.length > 0) {
             await registrarHistorico(
               editingId,
@@ -989,6 +997,13 @@ export function useAgendamentosPage() {
           toast.success("Agendamento atualizado com sucesso!");
         } else {
           const novoId = await salvarAgendamentoComExames(payload, examesPayload);
+          await auditarClinicoZeroDemissionalSeNecessario(auditContext, {
+            aso: payload.aso,
+            exams,
+            anterior: null,
+            agendamentoId: novoId,
+            colaborador: payload.colaborador,
+          });
           await registrarHistorico(
             novoId,
             historicoUsuario,

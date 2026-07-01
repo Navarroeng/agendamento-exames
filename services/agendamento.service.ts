@@ -1,3 +1,4 @@
+import { assertExamesValorClientePermitido } from "@/lib/agendamento-clinico-zero-demissional";
 import { assertContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
 import { assertExamesSemDuplicidade } from "@/lib/duplicidade-validations";
 import {
@@ -14,7 +15,7 @@ import type {
 
 export type ExamePayload = Pick<
   ExameInsert,
-  "tipo_exame" | "valor_cliente" | "custo_clinica"
+  "tipo_exame" | "valor_cliente" | "custo_clinica" | "motivo_valor_zero"
 >;
 
 const EXAMES_SAVE_ERROR =
@@ -23,12 +24,13 @@ const EXAMES_SAVE_ERROR =
 const EXAMES_UPDATE_ERROR =
   "Não foi possível atualizar os exames do agendamento. Os exames anteriores foram restaurados.";
 
-function validarExamesPayload(exames: ExamePayload[]): void {
+function validarExamesPayload(aso: string, exames: ExamePayload[]): void {
   assertExamesSemDuplicidade(
     exames.map((exame) => ({
       tipo_exame: exame.tipo_exame,
     }))
   );
+  assertExamesValorClientePermitido(aso, exames);
 }
 
 function toExameInsertRows(
@@ -40,6 +42,7 @@ function toExameInsertRows(
     tipo_exame: exame.tipo_exame.trim(),
     valor_cliente: exame.valor_cliente,
     custo_clinica: exame.custo_clinica,
+    motivo_valor_zero: exame.motivo_valor_zero?.trim() || null,
   }));
 }
 
@@ -68,7 +71,7 @@ export async function salvarAgendamentoComExames(
   agendamento: AgendamentoInsert,
   exames: ExamePayload[]
 ): Promise<string> {
-  validarExamesPayload(exames);
+  validarExamesPayload(agendamento.aso, exames);
   await assertContratoVigentePorNome(
     agendamento.cliente_nome,
     agendamento.data_agendamento
@@ -120,7 +123,8 @@ export async function listarAgendamentosComExames(
         agendamento_id,
         tipo_exame,
         valor_cliente,
-        custo_clinica
+        custo_clinica,
+        motivo_valor_zero
       )
     `
     )
@@ -137,7 +141,7 @@ export async function atualizarAgendamentoComExames(
   agendamento: AgendamentoInsert,
   exames: ExamePayload[]
 ): Promise<void> {
-  validarExamesPayload(exames);
+  validarExamesPayload(agendamento.aso, exames);
   await assertContratoVigentePorNome(
     agendamento.cliente_nome,
     agendamento.data_agendamento
@@ -164,7 +168,7 @@ export async function atualizarAgendamentoComExames(
 
   const { data: examesAnteriores, error: fetchError } = await supabase
     .from("agendamento_exames")
-    .select("tipo_exame, valor_cliente, custo_clinica")
+    .select("tipo_exame, valor_cliente, custo_clinica, motivo_valor_zero")
     .eq("agendamento_id", id);
 
   if (fetchError) throw fetchError;
@@ -173,6 +177,7 @@ export async function atualizarAgendamentoComExames(
     tipo_exame: exame.tipo_exame,
     valor_cliente: Number(exame.valor_cliente),
     custo_clinica: Number(exame.custo_clinica),
+    motivo_valor_zero: exame.motivo_valor_zero ?? null,
   }));
 
   const { error: deleteError } = await supabase

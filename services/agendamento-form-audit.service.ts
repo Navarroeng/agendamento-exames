@@ -3,6 +3,11 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import {
+  exigeMotivoClinicoZeroDemissional,
+} from "@/lib/agendamento-clinico-zero-demissional";
+import { isExameClinicoManual } from "@/lib/exame-pricing";
+import type { AgendamentoWithExames, ExameFormItem } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 export async function registrarExamesCarregadosPorCargo(
@@ -103,4 +108,59 @@ export async function registrarExamesComplementaresRemovidosRetornoTrabalho(
     descricao:
       "Exames complementares removidos automaticamente porque o ASO selecionado é Retorno ao Trabalho.",
   });
+}
+
+export async function registrarClinicoZeroDemissional(
+  context: AuditoriaUsuarioContext,
+  params: {
+    motivo: string;
+    colaborador?: string | null;
+    agendamentoId?: string | null;
+  }
+): Promise<void> {
+  await registrarAuditoria({
+    usuarioId: context.usuarioId,
+    usuarioNome: context.usuarioNome,
+    usuarioEmail: context.usuarioEmail,
+    modulo: AUDITORIA_MODULOS.agendamentos,
+    acao: AUDITORIA_ACOES.clinico_zero_demissional,
+    registroId: params.agendamentoId ?? null,
+    registroNome: params.colaborador ?? null,
+    descricao: `Exame Clínico do ASO Demissional salvo com valor cliente R$ 0,00. Motivo: ${params.motivo.trim()}.`,
+    dadosDepois: {
+      motivo: params.motivo.trim(),
+    },
+  });
+}
+
+export async function auditarClinicoZeroDemissionalSeNecessario(
+  context: AuditoriaUsuarioContext,
+  params: {
+    aso: string;
+    exams: ExameFormItem[];
+    anterior: AgendamentoWithExames | null;
+    agendamentoId: string;
+    colaborador: string;
+  }
+): Promise<void> {
+  const clinico = params.exams.find((exam) =>
+    exigeMotivoClinicoZeroDemissional(params.aso, exam)
+  );
+  if (!clinico) return;
+
+  const motivo = clinico.motivo_valor_zero?.trim();
+  if (!motivo) return;
+
+  const anteriorClinico = params.anterior?.agendamento_exames?.find((exam) =>
+    isExameClinicoManual(exam.tipo_exame)
+  );
+  const motivoAnterior = anteriorClinico?.motivo_valor_zero?.trim() ?? "";
+
+  if (!params.anterior || motivo !== motivoAnterior) {
+    await registrarClinicoZeroDemissional(context, {
+      motivo,
+      agendamentoId: params.agendamentoId,
+      colaborador: params.colaborador,
+    });
+  }
 }

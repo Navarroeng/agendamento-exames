@@ -16,6 +16,10 @@ import {
   isValidHorario24,
 } from "@/lib/agendamento-datetime";
 import {
+  exigeMotivoClinicoZeroDemissional,
+  MOTIVO_CLINICO_ZERO_DEMISSIONAL_TOAST,
+} from "@/lib/agendamento-clinico-zero-demissional";
+import {
   isExameClinicoManual,
   permiteClinicoValorZero,
 } from "@/lib/exame-pricing";
@@ -66,6 +70,10 @@ function hasValidValorCliente(exam: ExameFormItem, aso: string): boolean {
     return valor >= 0;
   }
 
+  if (exigeMotivoClinicoZeroDemissional(aso, exam)) {
+    return valor === 0 && isFilled(exam.motivo_valor_zero ?? "");
+  }
+
   return valor > 0;
 }
 
@@ -77,6 +85,8 @@ function isExamComplete(exam: ExameFormItem, aso: string): boolean {
     !exam.aviso
   );
 }
+
+export { MOTIVO_CLINICO_ZERO_DEMISSIONAL_TOAST };
 
 export function getAgendamentoValidationMessage(
   form: AgendamentoFormValues,
@@ -110,6 +120,16 @@ export function getAgendamentoValidationMessage(
 
   if (!isFilled(form.colaborador_cpf) || !isValidCPF(form.colaborador_cpf)) {
     return CPF_COLABORADOR_TOAST;
+  }
+
+  const examesValidos = getExamesValidosAgendamento(exams);
+  for (const exam of examesValidos) {
+    if (
+      exigeMotivoClinicoZeroDemissional(form.aso, exam) &&
+      !isFilled(exam.motivo_valor_zero ?? "")
+    ) {
+      return MOTIVO_CLINICO_ZERO_DEMISSIONAL_TOAST;
+    }
   }
 
   return VALIDATION_TOAST_MESSAGE;

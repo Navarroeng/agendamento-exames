@@ -16,6 +16,7 @@ import {
   isAsoRetornoAoTrabalho,
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { ordenarExamesAgendamentoComClinicoPrimeiro } from "@/lib/agendamento-exames-order";
+import { resolveMotivoValorZeroPayload } from "@/lib/agendamento-clinico-zero-demissional";
 import {
   EXAME_CLINICO_NOME,
   EXAME_SEM_CUSTO_CLINICA_MSG,
@@ -608,8 +609,9 @@ export function useExams(clinicaNome: string, asoTipo: string) {
       tipo_exame: exam.tipo_exame,
       valor_cliente: parseMoney(exam.valor_cliente),
       custo_clinica: parseMoney(exam.custo_clinica),
+      motivo_valor_zero: resolveMotivoValorZeroPayload(asoTipo, exam),
     }));
-  }, [exams]);
+  }, [exams, asoTipo]);
 
   const hasExamWarnings = useMemo(
     () => exams.some((e) => e.aviso && e.tipo_exame.trim()),

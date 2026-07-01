@@ -65,6 +65,7 @@ export function agendamentoToExams(
       aviso: "",
       precoAutomatico: !clinico,
       clinicoValorManual: clinico,
+      motivo_valor_zero: exam.motivo_valor_zero ?? "",
     };
   });
 }
