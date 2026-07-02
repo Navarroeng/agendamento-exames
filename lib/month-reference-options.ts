@@ -1,7 +1,7 @@
 /** Opções de mês de referência (MM/AAAA) para seleção em lista. */
 
 /** Primeiro mês disponível em todas as listas suspensas. */
-export const MONTH_REFERENCE_MIN = "06/2026";
+export const MONTH_REFERENCE_MIN = "05/2026";
 
 export function formatMonthYearBR(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
