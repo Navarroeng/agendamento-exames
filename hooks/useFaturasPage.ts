@@ -214,7 +214,9 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   );
 
   const mesReferenciaValido = useMemo(
-    () => isValidMonthYearBR(filters.mesReferencia),
+    () =>
+      !filters.mesReferencia.trim() ||
+      isValidMonthYearBR(filters.mesReferencia),
     [filters.mesReferencia]
   );
 

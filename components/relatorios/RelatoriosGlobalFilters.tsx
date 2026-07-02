@@ -49,6 +49,7 @@ export function RelatoriosGlobalFilters({
           <Field label="Mês de referência">
             <MonthReferenceSelect
               value={filters.mesReferencia}
+              allowEmpty
               onChange={(value) => onChange("mesReferencia", value)}
             />
           </Field>

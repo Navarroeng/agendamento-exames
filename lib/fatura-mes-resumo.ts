@@ -144,6 +144,95 @@ export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
   return valorTotal > 0;
 }
 
+export const PERIODO_COMPLETO_LABEL = "Todo o período";
+
+function buildResumoPeriodoCompleto(
+  agendamentos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  tipo: FaturaTipo,
+  referenciaFilter: string,
+  referenciaField: "cliente" | "clinica"
+): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } {
+  const filters: FaturaFilters = {
+    ...EMPTY_FATURA_FILTERS,
+    mesReferencia: "",
+    ...(referenciaField === "cliente"
+      ? { cliente: referenciaFilter }
+      : { clinica: referenciaFilter }),
+  };
+  const ags = filterAgendamentosFatura(agendamentos, filters);
+  const byReferencia = new Map<string, AgendamentoWithExames[]>();
+
+  ags.forEach((ag) => {
+    const nome =
+      (referenciaField === "cliente"
+        ? ag.cliente_nome
+        : ag.clinica_nome)?.trim() || "—";
+    const list = byReferencia.get(nome) ?? [];
+    list.push(ag);
+    byReferencia.set(nome, list);
+  });
+
+  const faturasDoTipo = faturas.filter((f) => f.tipo === tipo);
+
+  const rows: FaturaMesRow[] = Array.from(byReferencia.entries()).map(
+    ([referenciaNome, agsReferencia]) => {
+      const itens = buildFaturaItensFromAgendamentos(agsReferencia, tipo);
+      return {
+        referenciaNome,
+        periodoLabel: PERIODO_COMPLETO_LABEL,
+        qtdAgendamentos: agsReferencia.length,
+        qtdExames: itens.length,
+        valorTotal: calcTotalFaturaItens(itens),
+        fatura: null,
+        status: "aberta_emissao" as const,
+      };
+    }
+  );
+
+  const rowsFaturaveis = rows.filter((row) =>
+    isReferenciaFaturavelNoMes(row.valorTotal)
+  );
+
+  rowsFaturaveis.sort(compareFaturaMesReferenciaAsc);
+
+  let valorEmitido = 0;
+  let valorPago = 0;
+  let valorEmAberto = 0;
+
+  const referenciasVisiveis = new Set(
+    rowsFaturaveis.map((r) => normalizeReferencia(r.referenciaNome))
+  );
+
+  faturasDoTipo.forEach((fatura) => {
+    if (fatura.status !== "emitida") return;
+    if (
+      !referenciasVisiveis.has(normalizeReferencia(fatura.referencia_nome))
+    ) {
+      return;
+    }
+    const valor = Number(fatura.valor_total);
+    valorEmitido += valor;
+    if (fatura.pago) {
+      valorPago += valor;
+    } else {
+      valorEmAberto += valor;
+    }
+  });
+
+  const resumo: FaturaMesResumoGeral = {
+    totalReferencias: rowsFaturaveis.length,
+    totalAgendamentos: rowsFaturaveis.reduce((s, r) => s + r.qtdAgendamentos, 0),
+    totalExames: rowsFaturaveis.reduce((s, r) => s + r.qtdExames, 0),
+    valorPrevisto: rowsFaturaveis.reduce((s, r) => s + r.valorTotal, 0),
+    valorEmitido,
+    valorPago,
+    valorEmAberto,
+  };
+
+  return { rows: rowsFaturaveis, resumo };
+}
+
 /** @deprecated Use isReferenciaFaturavelNoMes */
 export const isClienteFaturavelNoMes = isReferenciaFaturavelNoMes;
 
@@ -242,6 +331,23 @@ export function buildResumoClientesMes(
   mesReferencia: string,
   clienteFilter = ""
 ): { rows: ClienteFaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  if (!mesReferencia.trim()) {
+    const result = buildResumoPeriodoCompleto(
+      agendamentos,
+      faturas,
+      "cliente",
+      clienteFilter,
+      "cliente"
+    );
+    return {
+      resumo: result.resumo,
+      rows: result.rows.map((row) => ({
+        ...row,
+        clienteNome: row.referenciaNome,
+      })),
+    };
+  }
+
   const result = buildResumoMesInterno(
     agendamentos,
     faturas,
@@ -266,6 +372,16 @@ export function buildResumoClinicasMes(
   mesReferencia: string,
   clinicaFilter = ""
 ): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  if (!mesReferencia.trim()) {
+    return buildResumoPeriodoCompleto(
+      agendamentos,
+      faturas,
+      "clinica",
+      clinicaFilter,
+      "clinica"
+    );
+  }
+
   return buildResumoMesInterno(
     agendamentos,
     faturas,

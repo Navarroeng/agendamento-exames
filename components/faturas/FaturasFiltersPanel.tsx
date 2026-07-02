@@ -69,6 +69,7 @@ export function FaturasFiltersPanel({
           <MonthReferenceSelect
             value={filters.mesReferencia}
             disabled={disabled}
+            allowEmpty
             onChange={(value) => onChange("mesReferencia", value)}
           />
           <p className="text-[10px] text-[#94a3b8]">

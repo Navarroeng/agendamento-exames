@@ -137,6 +137,28 @@ test("filtra agendamentos pelo mês de referência", () => {
   assert(filtered.length === 1 && filtered[0].id === "1", "somente junho");
 });
 
+test("sem mês de referência inclui todo o período", () => {
+  const items = [
+    agendamento("1", "2026-06-10"),
+    agendamento("2", "2026-07-05"),
+    agendamento("3", "2026-05-28"),
+  ];
+  const filtered = filterAgendamentos(items, {
+    mesReferencia: "",
+    cliente: "",
+    colaborador: "",
+    clinica: "",
+    tipoExame: "",
+    aso: "",
+    status: "",
+    responsavel: "",
+    pendencia: "",
+    pendenciaSituacao: "",
+    esocial: "",
+  });
+  assert(filtered.length === 3, "todos os agendamentos");
+});
+
 if (failed > 0) {
   process.exit(1);
 }

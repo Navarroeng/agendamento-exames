@@ -1,5 +1,6 @@
 import { Field } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
+import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import { IconFilter } from "@/components/ui/icons/OutlineIcons";
 import type { PeriodicoFuturoFilters } from "@/lib/types";
 
@@ -133,12 +134,11 @@ export function PeriodicosFuturosFilters({
         </Field>
 
         <Field label="Mês (próxima data)">
-          <input
-            className="field-input"
-            type="month"
+          <MonthReferenceSelect
             value={filters.mesReferencia}
             disabled={loading}
-            onChange={(e) => onChange("mesReferencia", e.target.value)}
+            allowEmpty
+            onChange={(value) => onChange("mesReferencia", value)}
           />
         </Field>
       </div>

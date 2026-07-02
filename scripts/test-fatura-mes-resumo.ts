@@ -145,4 +145,11 @@ assert.deepEqual(
 );
 assert.equal(resumoClinica.resumo.valorPrevisto, 100);
 
+const periodoCompleto = buildResumoClientesMes(ags, faturas, "");
+assert.ok(periodoCompleto);
+assert.equal(periodoCompleto.rows.length, 2);
+assert.ok(
+  periodoCompleto.rows.every((r) => r.periodoLabel === "Todo o período")
+);
+
 console.log("test-fatura-mes-resumo: ok");

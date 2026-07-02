@@ -1,4 +1,5 @@
 import { computeProximaDataPeriodico } from "@/lib/cargo-periodico";
+import { mesReferenciaIsoFromBR } from "@/lib/duplicidade-validations";
 import { formatDateBR } from "@/lib/format";
 import type {
   PeriodicoFuturoDisplayStatus,
@@ -148,10 +149,12 @@ export function filterPeriodicosFuturos(
       if (record.displayStatus !== filters.status) return false;
     }
 
-    if (filters.mesReferencia) {
-      const proxima = record.proxima_data.split("T")[0];
-      const mes = proxima.slice(0, 7);
-      if (mes !== filters.mesReferencia) return false;
+    if (filters.mesReferencia.trim()) {
+      const mesIso = mesReferenciaIsoFromBR(filters.mesReferencia);
+      if (mesIso) {
+        const proxima = record.proxima_data.split("T")[0];
+        if (proxima.slice(0, 7) !== mesIso) return false;
+      }
     }
 
     return true;

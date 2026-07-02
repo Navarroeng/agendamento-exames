@@ -139,6 +139,7 @@ export function AgendamentosFilters({
               <MonthReferenceSelect
                 className={inputClass}
                 value={filters.mesReferencia}
+                allowEmpty
                 onChange={(value) => onChange("mesReferencia", value)}
               />
             </FilterField>
