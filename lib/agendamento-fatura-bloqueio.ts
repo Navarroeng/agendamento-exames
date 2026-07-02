@@ -14,7 +14,8 @@ export type FaturaClienteStatusExibicao =
   | "Vencida"
   | "Em aberto"
   | "Necessita reemissão"
-  | "Substituída";
+  | "Substituída"
+  | "Reemitida";
 
 export interface AgendamentoFaturaBloqueio {
   bloqueado: boolean;
@@ -32,6 +33,7 @@ export function deriveFaturaClienteStatusExibicao(
   fatura: Pick<FaturaRecord, "status" | "pago" | "data_vencimento">
 ): FaturaClienteStatusExibicao {
   if (fatura.status === "cancelada") return "Cancelada";
+  if (fatura.status === "reemitida") return "Reemitida";
   if (fatura.status === "substituida") return "Substituída";
   if (fatura.status === "necessita_reemissao") return "Necessita reemissão";
   if (fatura.status === "rascunho") return "Aberta para emissão";

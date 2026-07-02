@@ -3,6 +3,7 @@ import {
   parseMonthYearBRToIsoRange,
 } from "@/lib/agendamento-datetime";
 import { filterAgendamentosElegiveisFatura } from "@/lib/fatura-elegibilidade";
+import { faturaStatusEmissaoAtiva } from "@/lib/fatura-reemissao";
 import { formatDateBR } from "@/lib/format";
 import type { AgendamentoWithExames, FaturaRecord } from "@/lib/types";
 
@@ -152,9 +153,9 @@ export function filterFaturasHistorico(
     }
     if (filters.status) {
       if (filters.status === "paga") {
-        if (fatura.status !== "emitida" || !fatura.pago) return false;
+        if (!faturaStatusEmissaoAtiva(fatura.status) || !fatura.pago) return false;
       } else if (filters.status === "pendente") {
-        if (fatura.status !== "emitida" || fatura.pago) return false;
+        if (!faturaStatusEmissaoAtiva(fatura.status) || fatura.pago) return false;
       } else if (fatura.status !== filters.status) {
         return false;
       }

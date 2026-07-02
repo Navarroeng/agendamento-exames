@@ -13,6 +13,8 @@ import {
 } from "@/lib/fatura-mappers";
 import {
   FATURA_STATUS_INATIVOS,
+  faturaStatusContaNoResumoEmitido,
+  faturaStatusHistoricoInativo,
   mesReferenciaBRFromFatura,
 } from "@/lib/fatura-reemissao";
 import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
@@ -24,7 +26,8 @@ export type FaturaMesStatus =
   | "paga"
   | "cancelada"
   | "necessita_reemissao"
-  | "substituida";
+  | "substituida"
+  | "reemitida";
 
 /** @deprecated Use FaturaMesStatus */
 export type FaturaClienteMesStatus = FaturaMesStatus;
@@ -63,6 +66,7 @@ export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
   cancelada: "Cancelada",
   necessita_reemissao: "Necessita reemissão",
   substituida: "Substituída",
+  reemitida: "Reemitida",
 };
 
 /** @deprecated Use FATURA_MES_STATUS_LABELS */
@@ -90,6 +94,7 @@ export function deriveFaturaMesStatus(
   if (!fatura) return "aberta_emissao";
   if (fatura.status === "cancelada") return "cancelada";
   if (fatura.status === "substituida") return "substituida";
+  if (fatura.status === "reemitida") return "reemitida";
   if (fatura.status === "necessita_reemissao") return "necessita_reemissao";
   if (fatura.status === "rascunho") return "rascunho";
   if (fatura.status === "emitida") {
@@ -265,7 +270,9 @@ function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
   let valorEmAberto = 0;
 
   rows.forEach((row) => {
-    if (!row.fatura || row.fatura.status !== "emitida") return;
+    if (!row.fatura || !faturaStatusContaNoResumoEmitido(row.fatura.status)) {
+      return;
+    }
     const valor = Number(row.fatura.valor_total);
     valorEmitido += valor;
     if (row.fatura.pago) {
@@ -275,11 +282,18 @@ function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
     }
   });
 
+  const valorPrevisto = rows.reduce((sum, row) => {
+    if (row.fatura && faturaStatusHistoricoInativo(row.fatura.status)) {
+      return sum;
+    }
+    return sum + row.valorTotal;
+  }, 0);
+
   return {
     totalReferencias: referencias.size,
     totalAgendamentos: rows.reduce((sum, row) => sum + row.qtdAgendamentos, 0),
     totalExames: rows.reduce((sum, row) => sum + row.qtdExames, 0),
-    valorPrevisto: rows.reduce((sum, row) => sum + row.valorTotal, 0),
+    valorPrevisto,
     valorEmitido,
     valorPago,
     valorEmAberto,

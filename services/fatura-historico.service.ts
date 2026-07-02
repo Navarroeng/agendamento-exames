@@ -201,8 +201,14 @@ export async function salvarFatura(
   if (input.faturaId) {
     const existing = await buscarFaturaComItens(input.faturaId);
     if (!existing) throw new Error("Fatura não encontrada.");
-    if (existing.status === "cancelada" || existing.status === "substituida") {
-      throw new Error("Fatura cancelada ou substituída não pode ser alterada.");
+    if (
+      existing.status === "cancelada" ||
+      existing.status === "substituida" ||
+      existing.status === "reemitida"
+    ) {
+      throw new Error(
+        "Fatura cancelada, reemitida ou substituída não pode ser alterada."
+      );
     }
     if (existing.status === "necessita_reemissao") {
       throw new Error(
@@ -337,9 +343,9 @@ export async function salvarFatura(
       registroId: created.id,
       registroNome: created.numero,
       descricao:
-        `${usuario} reemitiu a fatura ${input.reemitida_de_fatura_numero?.trim() ?? "—"} ` +
-        `para ${created.referencia_nome}. Nova fatura: ${created.numero}. ` +
-        `Mês de referência: ${mesLabel}.`,
+        `${usuario} emitiu a fatura ${created.numero} para ${created.referencia_nome} ` +
+        `em substituição à fatura ${input.reemitida_de_fatura_numero?.trim() ?? "—"} ` +
+        `(marcada como reemitida). Mês de referência: ${mesLabel}.`,
     });
   } else if (input.tipo === "clinica" && input.status === "emitida") {
     await auditarFatura(auditOptions, {
@@ -536,13 +542,26 @@ export async function reemitirFaturaCliente(
     const { error } = await supabase
       .from("faturas")
       .update({
-        status: "substituida",
+        status: "reemitida",
         fatura_substituta_id: nova.id,
       })
       .eq("id", existente.id)
       .eq("status", "necessita_reemissao");
 
     if (error) throw error;
+
+    const usuario =
+      auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
+
+    await auditarFatura(auditOptions, {
+      tipo: "cliente",
+      acao: AUDITORIA_ACOES.fatura_marcada_reemitida,
+      registroId: existente.id,
+      registroNome: existente.numero,
+      descricao:
+        `${usuario} marcou a fatura ${existente.numero} como reemitida. ` +
+        `Nova fatura emitida: ${nova.numero}.`,
+    });
   }
 
   return nova;

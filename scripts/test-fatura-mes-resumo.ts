@@ -144,11 +144,11 @@ assert.equal(julho.rows[0].referenciaNome, "Aluminio Firenze");
 assert.equal(julho.rows[0].status, "rascunho");
 assert.equal(julho.rows[0].fatura?.id, "f2");
 
-const substituida = fatura("f-old", "Empresa X", "2026-06", "substituida");
+const reemitidaAntiga = fatura("f-old", "Empresa X", "2026-06", "reemitida");
 const emitidaNova = fatura("f-new", "Empresa X", "2026-06", "emitida");
 const junhoMultiplas = buildResumoClientesMes(
   ags,
-  [substituida, emitidaNova],
+  [reemitidaAntiga, emitidaNova],
   "06/2026",
   "Empresa X"
 );
@@ -158,6 +158,8 @@ assert.deepEqual(
   junhoMultiplas.rows.map((row) => row.fatura?.id).sort(),
   ["f-new", "f-old"]
 );
+assert.equal(junhoMultiplas.resumo.valorEmitido, 100);
+assert.equal(junhoMultiplas.resumo.valorPrevisto, 50);
 
 const periodoCompleto = buildResumoClientesMes(
   ags,

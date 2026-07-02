@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import {
   canReemitirFaturaCliente,
+  faturaStatusContaNoResumoEmitido,
   faturaStatusPermitePagamento,
 } from "../lib/fatura-reemissao";
 import {
+  buildResumoClientesMes,
   deriveFaturaMesStatus,
   findFaturaReferenciaMes,
 } from "../lib/fatura-mes-resumo";
@@ -28,7 +30,7 @@ function fatura(
     mes_referencia: mes,
     data_emissao: status === "emitida" ? `${mes}-05` : null,
     data_vencimento: `${mes}-15`,
-    valor_total: 100,
+    valor_total: overrides.valor_total ?? 100,
     total_exames: 1,
     status,
     gerado_por: "Teste",
@@ -47,41 +49,45 @@ function fatura(
 
 const necessita = fatura("n1", "Empresa A", "2026-06", "necessita_reemissao");
 const emitida = fatura("e1", "Empresa A", "2026-06", "emitida", {
-  numero: "FAT-EMIT",
+  numero: "FAT-NEW",
+  fatura_origem_id: "r1",
+  valor_total: 120,
 });
-const substituida = fatura("s1", "Empresa A", "2026-06", "substituida", {
+const reemitida = fatura("r1", "Empresa A", "2026-06", "reemitida", {
   numero: "FAT-OLD",
   fatura_substituta_id: "e1",
-});
-const novaEmitida = fatura("e1", "Empresa A", "2026-06", "emitida", {
-  numero: "FAT-NEW",
-  fatura_origem_id: "s1",
+  valor_total: 100,
 });
 
 assert.equal(canReemitirFaturaCliente(necessita), true);
 assert.equal(canReemitirFaturaCliente(emitida), false);
-assert.equal(canReemitirFaturaCliente(substituida), false);
-assert.equal(canReemitirFaturaCliente(fatura("c1", "Empresa A", "2026-06", "cancelada")), true);
+assert.equal(canReemitirFaturaCliente(reemitida), false);
+assert.equal(
+  canReemitirFaturaCliente(fatura("c1", "Empresa A", "2026-06", "cancelada")),
+  true
+);
 
 assert.equal(faturaStatusPermitePagamento("emitida"), true);
+assert.equal(faturaStatusPermitePagamento("reemitida"), false);
 assert.equal(faturaStatusPermitePagamento("necessita_reemissao"), false);
-assert.equal(faturaStatusPermitePagamento("substituida"), false);
+assert.equal(faturaStatusContaNoResumoEmitido("reemitida"), false);
+assert.equal(faturaStatusContaNoResumoEmitido("emitida"), true);
 
 assert.equal(deriveFaturaMesStatus(necessita), "necessita_reemissao");
-assert.equal(deriveFaturaMesStatus(substituida), "substituida");
+assert.equal(deriveFaturaMesStatus(reemitida), "reemitida");
 assert.equal(deriveFaturaMesStatus(emitida), "emitida");
 
 const found = findFaturaReferenciaMes(
-  [substituida, emitida],
+  [reemitida, emitida],
   "cliente",
   "Empresa A",
   "06/2026"
 );
 assert.ok(found);
-assert.equal(found!.id, "e1", "prioriza emitida ativa sobre substituida");
+assert.equal(found!.id, "e1", "prioriza emitida ativa sobre reemitida histórica");
 
 const foundNecessita = findFaturaReferenciaMes(
-  [substituida, necessita],
+  [reemitida, necessita],
   "cliente",
   "Empresa A",
   "06/2026"
@@ -98,11 +104,24 @@ assert.equal(
   true
 );
 assert.equal(
-  faturaClienteEmitidaPossuiAlteracaoPosEmissao(emitida, [{ status: "agendado" }]),
-  false
+  faturaClienteEmitidaPossuiAlteracaoPosEmissao(reemitida, [{ status: "cancelado" }]),
+  false,
+  "fatura histórica reemitida não entra no fluxo ativo"
 );
 
-assert.equal(novaEmitida.fatura_origem_id, "s1");
-assert.equal(substituida.fatura_substituta_id, "e1");
+assert.equal(emitida.fatura_origem_id, "r1");
+assert.equal(reemitida.fatura_substituta_id, "e1");
+
+const resumoReemissao = buildResumoClientesMes(
+  [],
+  [reemitida, emitida],
+  "06/2026",
+  "Empresa A"
+);
+assert.ok(resumoReemissao);
+assert.equal(resumoReemissao.rows.length, 2);
+assert.equal(resumoReemissao.resumo.valorEmitido, 120);
+assert.equal(resumoReemissao.resumo.valorEmAberto, 120);
+assert.equal(resumoReemissao.resumo.valorPrevisto, 120);
 
 console.log("test-fatura-reemissao-fluxo: OK");

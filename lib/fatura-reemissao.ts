@@ -1,11 +1,34 @@
 import type { FaturaRecord, FaturaStatus } from "@/lib/types";
 
-export const FATURA_STATUS_INATIVOS: FaturaStatus[] = ["cancelada", "substituida"];
+/** Status históricos — sem fluxo financeiro ativo. */
+export const FATURA_STATUS_INATIVOS: FaturaStatus[] = [
+  "cancelada",
+  "substituida",
+  "reemitida",
+];
 
-export function faturaStatusPermitePagamento(
-  status: FaturaStatus
-): boolean {
+export function faturaStatusEmissaoAtiva(status: FaturaStatus): boolean {
   return status === "emitida";
+}
+
+export function faturaStatusPermitePagamento(status: FaturaStatus): boolean {
+  return status === "emitida";
+}
+
+export function faturaStatusContaNoResumoEmitido(status: FaturaStatus): boolean {
+  return status === "emitida";
+}
+
+export function faturaStatusHistoricoInativo(status: FaturaStatus): boolean {
+  return (
+    status === "substituida" ||
+    status === "reemitida" ||
+    status === "cancelada"
+  );
+}
+
+export function faturaStatusHistoricoReemissao(status: FaturaStatus): boolean {
+  return status === "substituida" || status === "reemitida";
 }
 
 /** Converte mes_referencia (YYYY-MM) ou periodo_inicio em MM/AAAA. */

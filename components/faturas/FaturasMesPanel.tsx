@@ -116,6 +116,7 @@ function statusBadge(
     cancelada: "bg-brand-red-soft text-brand-red",
     necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",
     substituida: "bg-[#f1f5f9] text-[#64748b]",
+    reemitida: "bg-[#f1f5f9] text-[#64748b]",
   };
 
   return (

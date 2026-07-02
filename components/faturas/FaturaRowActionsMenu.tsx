@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { FaturaRecord, FaturaTipo } from "@/lib/types";
+import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 import { CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO } from "@/lib/custos-clinicas-conferencia";
+import {
+  faturaStatusEmissaoAtiva,
+  faturaStatusHistoricoReemissao,
+} from "@/lib/fatura-reemissao";
 
 interface FaturaRowActionsMenuProps {
   fatura: FaturaRecord;
@@ -76,7 +80,7 @@ export function FaturaRowActionsMenu({
     });
   }
 
-  if (fatura.status === "emitida" || fatura.status === "substituida") {
+  if (faturaStatusEmissaoAtiva(fatura.status)) {
     items.push({
       key: "pdf",
       label: "Gerar PDF",
@@ -84,7 +88,7 @@ export function FaturaRowActionsMenu({
     });
   }
 
-  if (fatura.status === "emitida") {
+  if (faturaStatusEmissaoAtiva(fatura.status)) {
     if (fatura.pago) {
       if (fatura.comprovante_pagamento_path && onVerComprovante) {
         items.push({
@@ -116,9 +120,17 @@ export function FaturaRowActionsMenu({
     }
   }
 
+  if (faturaStatusHistoricoReemissao(fatura.status)) {
+    items.push({
+      key: "pdf",
+      label: "Gerar PDF",
+      onClick: () => onGerarPdf(fatura.id),
+    });
+  }
+
   if (
     fatura.status !== "cancelada" &&
-    fatura.status !== "substituida" &&
+    !faturaStatusHistoricoReemissao(fatura.status) &&
     fatura.status !== "necessita_reemissao" &&
     variant === "cliente"
   ) {

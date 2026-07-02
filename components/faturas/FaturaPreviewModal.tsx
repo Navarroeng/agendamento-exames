@@ -99,6 +99,7 @@ export function FaturaPreviewModal({
 
       {readonly &&
         (preview.status === "emitida" ||
+          preview.status === "reemitida" ||
           preview.status === "substituida" ||
           preview.status === "necessita_reemissao") && (
         <button

@@ -13,6 +13,7 @@ export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
     cancelada: "Cancelada",
     necessita_reemissao: "Necessita reemissão",
     substituida: "Substituída",
+    reemitida: "Reemitida",
   };
 
 export function historicoStatusLabelClinica(

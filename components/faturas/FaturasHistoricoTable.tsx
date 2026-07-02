@@ -22,6 +22,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
     cancelada: "bg-brand-red-soft text-brand-red",
     necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",
     substituida: "bg-[#f1f5f9] text-[#64748b]",
+    reemitida: "bg-[#f1f5f9] text-[#64748b]",
   };
   const labels: Record<FaturaStatus, string> =
     variant === "clinica"
@@ -31,6 +32,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
           cancelada: historicoStatusLabelClinica("cancelada", false),
           necessita_reemissao: historicoStatusLabelClinica("emitida", pago),
           substituida: historicoStatusLabelClinica("cancelada", false),
+          reemitida: historicoStatusLabelClinica("cancelada", false),
         }
       : {
           rascunho: "Rascunho",
@@ -38,6 +40,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
           cancelada: "Cancelada",
           necessita_reemissao: FATURA_MES_STATUS_LABELS.necessita_reemissao,
           substituida: FATURA_MES_STATUS_LABELS.substituida,
+          reemitida: FATURA_MES_STATUS_LABELS.reemitida,
         };
   return (
     <span

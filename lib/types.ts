@@ -486,7 +486,8 @@ export type FaturaStatus =
   | "emitida"
   | "cancelada"
   | "necessita_reemissao"
-  | "substituida";
+  | "substituida"
+  | "reemitida";
 
 export interface FaturaRecord {
   id: string;

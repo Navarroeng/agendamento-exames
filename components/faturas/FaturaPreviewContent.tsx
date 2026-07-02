@@ -28,6 +28,7 @@ function statusLabel(
   if (status === "necessita_reemissao")
     return FATURA_MES_STATUS_LABELS.necessita_reemissao;
   if (status === "substituida") return FATURA_MES_STATUS_LABELS.substituida;
+  if (status === "reemitida") return FATURA_MES_STATUS_LABELS.reemitida;
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Rascunho";
@@ -37,6 +38,7 @@ function statusLabel(
 function statusClass(status: FaturaStatus | null): string {
   if (status === "necessita_reemissao")
     return "bg-brand-orange-soft text-[#c96d00]";
+  if (status === "reemitida") return "bg-[#f1f5f9] text-[#64748b]";
   if (status === "substituida") return "bg-[#f1f5f9] text-[#64748b]";
   if (status === "emitida") return "bg-brand-green-soft text-brand-green";
   if (status === "cancelada") return "bg-brand-red-soft text-brand-red";
@@ -72,9 +74,11 @@ export function FaturaPreviewContent({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
-      {isCliente && preview.status === "substituida" && preview.faturaSubstitutaNumero ? (
+      {isCliente &&
+      (preview.status === "substituida" || preview.status === "reemitida") &&
+      preview.faturaSubstitutaNumero ? (
         <div className="border-b border-[#fde68a] bg-[#fffbeb] px-5 py-3 text-sm font-medium text-[#92400e]">
-          Esta fatura foi substituída pela fatura{" "}
+          Esta fatura foi reemitida. A fatura válida atual é{" "}
           {preview.faturaSubstitutaId && onAbrirFaturaRelacionada ? (
             <button
               type="button"
