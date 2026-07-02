@@ -114,6 +114,8 @@ function statusBadge(
     emitida: "bg-brand-blue-soft text-brand-blue",
     paga: "bg-brand-green-soft text-brand-green",
     cancelada: "bg-brand-red-soft text-brand-red",
+    necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",
+    substituida: "bg-[#f1f5f9] text-[#64748b]",
   };
 
   return (
@@ -381,7 +383,7 @@ export function FaturasMesPanel({
                     <td className="px-2.5 py-2">
                       <div className="space-y-1">
                         {statusBadge(row.status, config.statusLabels)}
-                        {row.alteracaoPosEmissao && (
+                        {row.status === "necessita_reemissao" && (
                           <p className="max-w-[180px] text-[10px] font-medium leading-snug text-[#b45309]">
                             {FATURA_ALTERACAO_POS_EMISSAO_MSG}
                           </p>

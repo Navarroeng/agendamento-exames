@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
 import { calcVencimentoFaturaCliente } from "@/lib/fatura-vencimento";
-import { canReemitirFaturaCliente, mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
+import { canReemitirFaturaCliente, faturaStatusPermitePagamento, mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
@@ -50,6 +50,7 @@ import {
   reabrirConferenciaCustosClinica,
   reemitirFaturaClienteCancelada,
   salvarFatura,
+  sincronizarFaturasClienteNecessitaReemissao,
 } from "@/services/fatura-historico.service";
 import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
@@ -149,38 +150,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     useState<FaturaExistenteInfo | null>(null);
   const [faturaDuplicidadeTipo, setFaturaDuplicidadeTipo] =
     useState<FaturaTipo>("cliente");
-  const [faturasComAlteracaoPosEmissao, setFaturasComAlteracaoPosEmissao] =
-    useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (pageTipo !== "cliente") {
-      setFaturasComAlteracaoPosEmissao(new Set());
-      return;
-    }
-
-    const emitidaIds = faturas
-      .filter((f) => f.tipo === "cliente" && f.status === "emitida")
-      .map((f) => f.id);
-
-    if (emitidaIds.length === 0) {
-      setFaturasComAlteracaoPosEmissao(new Set());
-      return;
-    }
-
-    let cancelled = false;
-
-    void listarFaturasClienteComAlteracaoPosEmissao(emitidaIds)
-      .then((ids) => {
-        if (!cancelled) setFaturasComAlteracaoPosEmissao(ids);
-      })
-      .catch((err) => {
-        console.error("Erro ao verificar alterações pós-emissão:", err);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [faturas, pageTipo]);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -216,6 +185,35 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const reloadAll = useCallback(async () => {
     await Promise.all([reloadAgendamentos(), reloadHistorico()]);
   }, [reloadAgendamentos, reloadHistorico]);
+
+  useEffect(() => {
+    if (pageTipo !== "cliente") return;
+
+    const emitidaIds = faturas
+      .filter((f) => f.tipo === "cliente" && f.status === "emitida")
+      .map((f) => f.id);
+
+    if (emitidaIds.length === 0) return;
+
+    let cancelled = false;
+
+    void listarFaturasClienteComAlteracaoPosEmissao(emitidaIds)
+      .then(async (ids) => {
+        if (cancelled || ids.size === 0) return;
+        await sincronizarFaturasClienteNecessitaReemissao(
+          Array.from(ids),
+          auditOptions
+        );
+        await reloadHistorico();
+      })
+      .catch((err) => {
+        console.error("Erro ao sincronizar faturas que necessitam reemissão:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [faturas, pageTipo, auditOptions, reloadHistorico]);
 
   useEffect(() => {
     reloadAll();
@@ -272,19 +270,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
     if (!base || pageTipo !== "cliente") return base;
 
-    return {
-      ...base,
-      rows: base.rows.map((row) => ({
-        ...row,
-        alteracaoPosEmissao: row.fatura
-          ? faturasComAlteracaoPosEmissao.has(row.fatura.id)
-          : false,
-      })),
-    };
+    return base;
   }, [
     agendamentos,
     faturas,
-    faturasComAlteracaoPosEmissao,
     filters.cliente,
     filters.clinica,
     filters.mesReferencia,
@@ -694,7 +683,26 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Fatura não encontrada.");
         return;
       }
-      const nextPreview = faturaComItensToPreview(fatura, true);
+
+      let faturaOrigemNumero: string | null = null;
+      let faturaSubstitutaNumero: string | null = null;
+
+      if (fatura.fatura_origem_id) {
+        const origem = await buscarFaturaComItens(fatura.fatura_origem_id);
+        faturaOrigemNumero = origem?.numero ?? null;
+      }
+      if (fatura.fatura_substituta_id) {
+        const substituta = await buscarFaturaComItens(fatura.fatura_substituta_id);
+        faturaSubstitutaNumero = substituta?.numero ?? null;
+      }
+
+      const nextPreview: FaturaPreviewState = {
+        ...faturaComItensToPreview(fatura, true),
+        faturaOrigemId: fatura.fatura_origem_id,
+        faturaOrigemNumero,
+        faturaSubstitutaId: fatura.fatura_substituta_id,
+        faturaSubstitutaNumero,
+      };
       previewRef.current = nextPreview;
       setPreview(nextPreview);
       setPreviewOpen(true);
@@ -761,7 +769,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Fatura não encontrada.");
         return;
       }
-      if (fatura.status !== "emitida") {
+      if (!faturaStatusPermitePagamento(fatura.status)) {
         toast.error("Pagamento só pode ser registrado em faturas emitidas.");
         return;
       }
@@ -1050,11 +1058,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Fatura não encontrada.");
         return;
       }
-      if (
-        !canReemitirFaturaCliente(fatura, {
-          alteracaoPosEmissao: faturasComAlteracaoPosEmissao.has(fatura.id),
-        })
-      ) {
+      if (!canReemitirFaturaCliente(fatura)) {
         toast.error("Esta fatura não pode ser reemitida.");
         return;
       }
@@ -1071,9 +1075,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
       const referencia = fatura.referencia_nome.trim();
       const confirmMessage =
-        fatura.status === "emitida"
+        fatura.status === "necessita_reemissao"
           ? `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
-            "A fatura emitida atual será cancelada e substituída por uma nova com os valores atualizados."
+            "Será gerada uma nova fatura emitida com os agendamentos e valores recalculados. " +
+            "A fatura atual ficará como Substituída no histórico."
           : `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
             "Será criada uma nova fatura com os agendamentos e valores atuais do mês. " +
             "A fatura cancelada permanecerá no histórico.";
@@ -1143,7 +1148,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       auditOptions,
       bloquearFaturaDuplicada,
       faturas,
-      faturasComAlteracaoPosEmissao,
       filters,
       geradoPor,
       pageTipo,

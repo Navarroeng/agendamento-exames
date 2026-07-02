@@ -101,8 +101,10 @@ interface SalvarFaturaInput {
   status: FaturaStatus;
   gerado_por: string;
   itens: FaturaItemInsert[];
-  /** Reemissão: número da fatura cancelada de origem. */
+  /** Reemissão: número da fatura substituída de origem. */
   reemitida_de_fatura_numero?: string | null;
+  fatura_origem_id?: string | null;
+  ignorarFaturaId?: string | null;
 }
 
 export interface FaturaAuditOptions {
@@ -190,7 +192,7 @@ export async function salvarFatura(
       referenciaNome: input.referencia_nome,
       referenciaId: input.referencia_id,
       mesReferenciaIso: mesReferencia,
-      ignorarFaturaId: input.faturaId,
+      ignorarFaturaId: input.ignorarFaturaId ?? input.faturaId,
     });
   }
 
@@ -199,8 +201,13 @@ export async function salvarFatura(
   if (input.faturaId) {
     const existing = await buscarFaturaComItens(input.faturaId);
     if (!existing) throw new Error("Fatura não encontrada.");
-    if (existing.status === "cancelada") {
-      throw new Error("Fatura cancelada não pode ser alterada.");
+    if (existing.status === "cancelada" || existing.status === "substituida") {
+      throw new Error("Fatura cancelada ou substituída não pode ser alterada.");
+    }
+    if (existing.status === "necessita_reemissao") {
+      throw new Error(
+        "Fatura que necessita reemissão não pode ser editada. Reemitir a fatura."
+      );
     }
 
     const payload: Record<string, unknown> = {
@@ -296,6 +303,7 @@ export async function salvarFatura(
       status: input.status,
       gerado_por: input.gerado_por,
       data_emissao: input.status === "emitida" ? new Date().toISOString() : null,
+      fatura_origem_id: input.fatura_origem_id ?? null,
     })
     .select("*")
     .single();
@@ -329,10 +337,9 @@ export async function salvarFatura(
       registroId: created.id,
       registroNome: created.numero,
       descricao:
-        `Fatura reemitida a partir de fatura cancelada. ` +
-        `Cliente: ${created.referencia_nome}. Mês de referência: ${mesLabel}. ` +
-        `Fatura cancelada: ${input.reemitida_de_fatura_numero.trim()}. ` +
-        `Nova fatura: ${created.numero}. Usuário: ${usuario}.`,
+        `${usuario} reemitiu a fatura ${input.reemitida_de_fatura_numero?.trim() ?? "—"} ` +
+        `para ${created.referencia_nome}. Nova fatura: ${created.numero}. ` +
+        `Mês de referência: ${mesLabel}.`,
     });
   } else if (input.tipo === "clinica" && input.status === "emitida") {
     await auditarFatura(auditOptions, {
@@ -369,6 +376,99 @@ export interface ReemitirFaturaClienteInput {
   itens: FaturaItemInsert[];
 }
 
+export async function marcarFaturaClienteNecessitaReemissao(
+  faturaId: string,
+  auditOptions?: FaturaAuditOptions,
+  context?: {
+    agendamentoId?: string;
+    cliente?: string;
+    colaborador?: string;
+    motivo?: string;
+  }
+): Promise<boolean> {
+  const existing = await buscarFaturaComItens(faturaId);
+  if (!existing || existing.tipo !== "cliente") return false;
+  if (
+    existing.status !== "emitida" &&
+    existing.status !== "necessita_reemissao"
+  ) {
+    return false;
+  }
+  if (existing.status === "necessita_reemissao") return true;
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("faturas")
+    .update({ status: "necessita_reemissao" })
+    .eq("id", faturaId)
+    .eq("status", "emitida");
+
+  if (error) throw error;
+
+  const usuario =
+    auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+
+  await auditarFatura(auditOptions, {
+    tipo: "cliente",
+    acao: AUDITORIA_ACOES.fatura_necessita_reemissao,
+    registroId: existing.id,
+    registroNome: existing.numero,
+    descricao:
+      `${usuario} alterou a fatura ${existing.numero} para "Necessita reemissão". ` +
+      `Cliente: ${context?.cliente ?? existing.referencia_nome}.` +
+      (context?.colaborador
+        ? ` Colaborador afetado: ${context.colaborador}.`
+        : "") +
+      (context?.motivo ? ` Motivo: ${context.motivo.trim()}.` : ""),
+  });
+
+  return true;
+}
+
+export async function sincronizarFaturasClienteNecessitaReemissao(
+  faturaIds: string[],
+  auditOptions?: FaturaAuditOptions
+): Promise<number> {
+  let atualizadas = 0;
+  for (const id of faturaIds) {
+    const ok = await marcarFaturaClienteNecessitaReemissao(id, auditOptions);
+    if (ok) atualizadas += 1;
+  }
+  return atualizadas;
+}
+
+export async function obterFaturasClienteIdsPorAgendamento(
+  agendamentoId: string
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("fatura_itens")
+    .select("fatura_id, faturas ( id, tipo, status )")
+    .eq("agendamento_id", agendamentoId);
+
+  if (error) throw error;
+
+  const ids = new Set<string>();
+  for (const row of data ?? []) {
+    const faturas = Array.isArray(row.faturas)
+      ? row.faturas
+      : row.faturas
+        ? [row.faturas]
+        : [];
+    for (const fatura of faturas) {
+      const f = fatura as Pick<FaturaRecord, "id" | "tipo" | "status">;
+      if (
+        f.tipo === "cliente" &&
+        (f.status === "emitida" || f.status === "necessita_reemissao")
+      ) {
+        ids.add(f.id);
+      }
+    }
+  }
+
+  return Array.from(ids);
+}
+
 export async function reemitirFaturaClienteCancelada(
   input: ReemitirFaturaClienteInput,
   auditOptions?: FaturaAuditOptions
@@ -387,9 +487,21 @@ export async function reemitirFaturaCliente(
   }
 
   if (existente.status === "emitida") {
-    await cancelarFatura(input.faturaCanceladaId, auditOptions);
-  } else if (existente.status !== "cancelada") {
-    throw new Error("Somente faturas canceladas ou emitidas com alteração podem ser reemitidas.");
+    await marcarFaturaClienteNecessitaReemissao(
+      input.faturaCanceladaId,
+      auditOptions
+    );
+  }
+
+  const statusAtual =
+    existente.status === "emitida"
+      ? ("necessita_reemissao" as FaturaStatus)
+      : existente.status;
+
+  if (statusAtual !== "necessita_reemissao" && statusAtual !== "cancelada") {
+    throw new Error(
+      "Somente faturas que necessitam reemissão ou canceladas podem ser reemitidas."
+    );
   }
 
   const valorTotal = input.itens.reduce(
@@ -397,7 +509,7 @@ export async function reemitirFaturaCliente(
     0
   );
 
-  return salvarFatura(
+  const nova = await salvarFatura(
     {
       tipo: "cliente",
       referencia_nome: existente.referencia_nome,
@@ -413,9 +525,27 @@ export async function reemitirFaturaCliente(
       gerado_por: input.gerado_por,
       itens: input.itens,
       reemitida_de_fatura_numero: existente.numero,
+      fatura_origem_id: existente.id,
+      ignorarFaturaId: existente.id,
     },
     auditOptions
   );
+
+  if (statusAtual === "necessita_reemissao") {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("faturas")
+      .update({
+        status: "substituida",
+        fatura_substituta_id: nova.id,
+      })
+      .eq("id", existente.id)
+      .eq("status", "necessita_reemissao");
+
+    if (error) throw error;
+  }
+
+  return nova;
 }
 
 export async function reabrirConferenciaCustosClinica(

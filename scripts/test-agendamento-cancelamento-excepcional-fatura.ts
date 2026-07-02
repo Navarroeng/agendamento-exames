@@ -31,6 +31,8 @@ function fatura(status: FaturaRecord["status"]): FaturaRecord {
     observacao_pagamento: null,
     comprovante_pagamento_path: null,
     comprovante_pagamento_nome: null,
+    fatura_origem_id: null,
+    fatura_substituta_id: null,
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-01T00:00:00Z",
   };
@@ -74,13 +76,11 @@ assert.equal(
 );
 
 assert.equal(canReemitirFaturaCliente(fatura("cancelada")), true);
+assert.equal(canReemitirFaturaCliente(fatura("necessita_reemissao")), true);
+assert.equal(canReemitirFaturaCliente(fatura("emitida")), false);
 assert.equal(
-  canReemitirFaturaCliente(fatura("emitida"), { alteracaoPosEmissao: true }),
+  faturaClienteEmitidaPossuiAlteracaoPosEmissao(fatura("necessita_reemissao"), []),
   true
-);
-assert.equal(
-  canReemitirFaturaCliente(fatura("emitida"), { alteracaoPosEmissao: false }),
-  false
 );
 
 console.log("test-agendamento-cancelamento-excepcional-fatura: ok");

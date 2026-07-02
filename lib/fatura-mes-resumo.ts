@@ -11,6 +11,7 @@ import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
 } from "@/lib/fatura-mappers";
+import { FATURA_STATUS_INATIVOS } from "@/lib/fatura-reemissao";
 import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
 
 export type FaturaMesStatus =
@@ -18,7 +19,9 @@ export type FaturaMesStatus =
   | "rascunho"
   | "emitida"
   | "paga"
-  | "cancelada";
+  | "cancelada"
+  | "necessita_reemissao"
+  | "substituida";
 
 /** @deprecated Use FaturaMesStatus */
 export type FaturaClienteMesStatus = FaturaMesStatus;
@@ -55,6 +58,8 @@ export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
   emitida: "Emitida",
   paga: "Paga",
   cancelada: "Cancelada",
+  necessita_reemissao: "Necessita reemissão",
+  substituida: "Substituída",
 };
 
 /** @deprecated Use FATURA_MES_STATUS_LABELS */
@@ -75,6 +80,8 @@ export function deriveFaturaMesStatus(
 ): FaturaMesStatus {
   if (!fatura) return "aberta_emissao";
   if (fatura.status === "cancelada") return "cancelada";
+  if (fatura.status === "substituida") return "substituida";
+  if (fatura.status === "necessita_reemissao") return "necessita_reemissao";
   if (fatura.status === "rascunho") return "rascunho";
   if (fatura.status === "emitida") {
     return fatura.pago ? "paga" : "emitida";
@@ -101,11 +108,16 @@ export function findFaturaReferenciaMes(
 
   if (matches.length === 0) return null;
 
-  const active = matches.filter((f) => f.status !== "cancelada");
+  const active = matches.filter(
+    (f) => !FATURA_STATUS_INATIVOS.includes(f.status)
+  );
   const pool = active.length > 0 ? active : matches;
 
   const emitida = pool.find((f) => f.status === "emitida");
   if (emitida) return emitida;
+
+  const necessita = pool.find((f) => f.status === "necessita_reemissao");
+  if (necessita) return necessita;
 
   const rascunho = pool.find((f) => f.status === "rascunho");
   if (rascunho) return rascunho;

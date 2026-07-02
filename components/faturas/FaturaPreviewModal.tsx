@@ -13,6 +13,7 @@ interface FaturaPreviewModalProps {
   onSaveDraft: () => void | Promise<void>;
   onEmit: () => void | Promise<void>;
   onGeneratePdf: () => void | Promise<void>;
+  onAbrirFaturaRelacionada?: (faturaId: string) => void;
 }
 
 export function FaturaPreviewModal({
@@ -23,6 +24,7 @@ export function FaturaPreviewModal({
   onSaveDraft,
   onEmit,
   onGeneratePdf,
+  onAbrirFaturaRelacionada,
 }: FaturaPreviewModalProps) {
   if (!open || !preview) return null;
 
@@ -95,7 +97,10 @@ export function FaturaPreviewModal({
         </>
       )}
 
-      {readonly && preview.status === "emitida" && (
+      {readonly &&
+        (preview.status === "emitida" ||
+          preview.status === "substituida" ||
+          preview.status === "necessita_reemissao") && (
         <button
           type="button"
           className="btn btn-primary"
@@ -124,7 +129,10 @@ export function FaturaPreviewModal({
       extraWide
       footer={footer}
     >
-      <FaturaPreviewContent preview={preview} />
+      <FaturaPreviewContent
+        preview={preview}
+        onAbrirFaturaRelacionada={onAbrirFaturaRelacionada}
+      />
     </Modal>
   );
 }

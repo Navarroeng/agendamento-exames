@@ -15,9 +15,9 @@ export function faturaClienteEmitidaPossuiAlteracaoPosEmissao(
     Pick<AgendamentoWithExames, "status"> | null | undefined
   >
 ): boolean {
-  if (fatura.tipo !== "cliente" || fatura.status !== "emitida") {
-    return false;
-  }
+  if (fatura.tipo !== "cliente") return false;
+  if (fatura.status === "necessita_reemissao") return true;
+  if (fatura.status !== "emitida") return false;
 
   return agendamentosVinculados.some((ag) => agendamentoCanceladoPosEmissao(ag));
 }

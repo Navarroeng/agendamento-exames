@@ -35,6 +35,8 @@ function fatura(
     observacao_pagamento: null,
     comprovante_pagamento_path: null,
     comprovante_pagamento_nome: null,
+    fatura_origem_id: null,
+    fatura_substituta_id: null,
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-01T00:00:00Z",
   };

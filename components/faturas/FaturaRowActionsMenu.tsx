@@ -68,13 +68,23 @@ export function FaturaRowActionsMenu({
     });
   }
 
-  if (fatura.status === "emitida") {
+  if (fatura.status === "necessita_reemissao" && onReemitir) {
+    items.push({
+      key: "reemitir",
+      label: "Reemitir fatura",
+      onClick: () => onReemitir(fatura.id),
+    });
+  }
+
+  if (fatura.status === "emitida" || fatura.status === "substituida") {
     items.push({
       key: "pdf",
       label: "Gerar PDF",
       onClick: () => onGerarPdf(fatura.id),
     });
+  }
 
+  if (fatura.status === "emitida") {
     if (fatura.pago) {
       if (fatura.comprovante_pagamento_path && onVerComprovante) {
         items.push({
@@ -106,7 +116,12 @@ export function FaturaRowActionsMenu({
     }
   }
 
-  if (fatura.status !== "cancelada" && variant === "cliente") {
+  if (
+    fatura.status !== "cancelada" &&
+    fatura.status !== "substituida" &&
+    fatura.status !== "necessita_reemissao" &&
+    variant === "cliente"
+  ) {
     items.push({
       key: "cancelar",
       label: "Cancelar fatura",

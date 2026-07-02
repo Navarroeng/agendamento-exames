@@ -61,6 +61,8 @@ function fatura(
     observacao_pagamento: null,
     comprovante_pagamento_path: pago ? `${id}/comprovante.pdf` : null,
     comprovante_pagamento_nome: pago ? "comprovante.pdf" : null,
+    fatura_origem_id: null,
+    fatura_substituta_id: null,
     created_at: "",
     updated_at: "",
   };

@@ -1,4 +1,12 @@
-import type { FaturaRecord } from "@/lib/types";
+import type { FaturaRecord, FaturaStatus } from "@/lib/types";
+
+export const FATURA_STATUS_INATIVOS: FaturaStatus[] = ["cancelada", "substituida"];
+
+export function faturaStatusPermitePagamento(
+  status: FaturaStatus
+): boolean {
+  return status === "emitida";
+}
 
 /** Converte mes_referencia (YYYY-MM) ou periodo_inicio em MM/AAAA. */
 export function mesReferenciaBRFromFatura(
@@ -14,14 +22,18 @@ export function mesReferenciaBRFromFatura(
   return `${match[2]}/${match[1]}`;
 }
 
-export function canReemitirFaturaCliente(
-  fatura: FaturaRecord,
-  options?: { alteracaoPosEmissao?: boolean }
-): boolean {
+export function canReemitirFaturaCliente(fatura: FaturaRecord): boolean {
   if (fatura.tipo !== "cliente") return false;
-  if (fatura.status === "cancelada") return true;
-  if (fatura.status === "emitida" && options?.alteracaoPosEmissao) {
-    return true;
-  }
-  return false;
+  return (
+    fatura.status === "necessita_reemissao" || fatura.status === "cancelada"
+  );
+}
+
+export function faturaClienteBloqueiaFaturamento(
+  fatura: Pick<FaturaRecord, "status" | "tipo">
+): boolean {
+  return (
+    fatura.tipo === "cliente" &&
+    (fatura.status === "emitida" || fatura.status === "necessita_reemissao")
+  );
 }

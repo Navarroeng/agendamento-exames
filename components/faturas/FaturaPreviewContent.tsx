@@ -8,6 +8,7 @@ import {
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
 import { FATURA_MES_STATUS_LABELS_CLINICA } from "@/lib/custos-clinicas-conferencia";
+import { FATURA_MES_STATUS_LABELS } from "@/lib/fatura-mes-resumo";
 import type { FaturaPreviewState, FaturaStatus } from "@/lib/types";
 
 import { FaturaPagamentoCard } from "./FaturaPagamentoCard";
@@ -24,6 +25,9 @@ function statusLabel(
     if (status === "emitida") return FATURA_MES_STATUS_LABELS_CLINICA.emitida;
     return "Pré-visualização";
   }
+  if (status === "necessita_reemissao")
+    return FATURA_MES_STATUS_LABELS.necessita_reemissao;
+  if (status === "substituida") return FATURA_MES_STATUS_LABELS.substituida;
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Rascunho";
@@ -31,6 +35,9 @@ function statusLabel(
 }
 
 function statusClass(status: FaturaStatus | null): string {
+  if (status === "necessita_reemissao")
+    return "bg-brand-orange-soft text-[#c96d00]";
+  if (status === "substituida") return "bg-[#f1f5f9] text-[#64748b]";
   if (status === "emitida") return "bg-brand-green-soft text-brand-green";
   if (status === "cancelada") return "bg-brand-red-soft text-brand-red";
   if (status === "rascunho") return "bg-brand-orange-soft text-[#c96d00]";
@@ -39,9 +46,13 @@ function statusClass(status: FaturaStatus | null): string {
 
 interface FaturaPreviewContentProps {
   preview: FaturaPreviewState;
+  onAbrirFaturaRelacionada?: (faturaId: string) => void;
 }
 
-export function FaturaPreviewContent({ preview }: FaturaPreviewContentProps) {
+export function FaturaPreviewContent({
+  preview,
+  onAbrirFaturaRelacionada,
+}: FaturaPreviewContentProps) {
   const total = calcTotalFaturaItens(preview.itens);
   const colaboradores = countColaboradoresItens(preview.itens);
   const isCliente = preview.tipo === "cliente";
@@ -61,6 +72,46 @@ export function FaturaPreviewContent({ preview }: FaturaPreviewContentProps) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+      {isCliente && preview.status === "substituida" && preview.faturaSubstitutaNumero ? (
+        <div className="border-b border-[#fde68a] bg-[#fffbeb] px-5 py-3 text-sm font-medium text-[#92400e]">
+          Esta fatura foi substituída pela fatura{" "}
+          {preview.faturaSubstitutaId && onAbrirFaturaRelacionada ? (
+            <button
+              type="button"
+              className="font-bold underline hover:text-[#b45309]"
+              onClick={() => onAbrirFaturaRelacionada(preview.faturaSubstitutaId!)}
+            >
+              {preview.faturaSubstitutaNumero}
+            </button>
+          ) : (
+            preview.faturaSubstitutaNumero
+          )}
+          .
+        </div>
+      ) : null}
+      {isCliente && preview.faturaOrigemNumero ? (
+        <div className="border-b border-[#dbeafe] bg-[#f0f4ff] px-5 py-3 text-sm font-medium text-[#1e40af]">
+          Esta fatura substitui a fatura{" "}
+          {preview.faturaOrigemId && onAbrirFaturaRelacionada ? (
+            <button
+              type="button"
+              className="font-bold underline hover:text-brand-blue"
+              onClick={() => onAbrirFaturaRelacionada(preview.faturaOrigemId!)}
+            >
+              {preview.faturaOrigemNumero}
+            </button>
+          ) : (
+            preview.faturaOrigemNumero
+          )}
+          .
+        </div>
+      ) : null}
+      {isCliente && preview.status === "necessita_reemissao" ? (
+        <div className="border-b border-[#fde68a] bg-[#fffbeb] px-5 py-3 text-sm font-medium text-[#92400e]">
+          Esta fatura possui alteração após emissão. Reemitir a fatura para
+          gerar o PDF correto.
+        </div>
+      ) : null}
       <div className="relative overflow-hidden bg-gradient-to-r from-[#162a6c] to-[#1e3a8a] px-6 py-5 text-white">
         <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/5" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

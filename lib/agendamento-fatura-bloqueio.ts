@@ -1,4 +1,5 @@
 import type { FaturaRecord, FaturaTipo } from "@/lib/types";
+import { faturaClienteBloqueiaFaturamento } from "@/lib/fatura-reemissao";
 
 export const AGENDAMENTO_BLOQUEADO_FATURA_MSG =
   "Este agendamento não pode ser alterado porque já está vinculado a uma fatura emitida/paga/vencida.";
@@ -11,7 +12,9 @@ export type FaturaClienteStatusExibicao =
   | "Emitida"
   | "Paga"
   | "Vencida"
-  | "Em aberto";
+  | "Em aberto"
+  | "Necessita reemissão"
+  | "Substituída";
 
 export interface AgendamentoFaturaBloqueio {
   bloqueado: boolean;
@@ -29,6 +32,8 @@ export function deriveFaturaClienteStatusExibicao(
   fatura: Pick<FaturaRecord, "status" | "pago" | "data_vencimento">
 ): FaturaClienteStatusExibicao {
   if (fatura.status === "cancelada") return "Cancelada";
+  if (fatura.status === "substituida") return "Substituída";
+  if (fatura.status === "necessita_reemissao") return "Necessita reemissão";
   if (fatura.status === "rascunho") return "Aberta para emissão";
   if (fatura.status === "emitida") {
     if (fatura.pago) return "Paga";
@@ -46,7 +51,7 @@ export function deriveFaturaClienteStatusExibicao(
 export function faturaClienteBloqueiaEdicaoAgendamento(
   fatura: Pick<FaturaRecord, "status" | "tipo">
 ): boolean {
-  return fatura.tipo === "cliente" && fatura.status === "emitida";
+  return faturaClienteBloqueiaFaturamento(fatura);
 }
 
 export function podeCancelarExcepcionalAdminPorFatura(
@@ -63,7 +68,9 @@ export function resolverBloqueioAgendamentoFatura(
   faturas: FaturaVinculoAgendamento[]
 ): AgendamentoFaturaBloqueio {
   const faturasCliente = faturas.filter((f) => f.tipo === ("cliente" as FaturaTipo));
-  const bloqueadora = faturasCliente.find((f) => f.status === "emitida");
+  const bloqueadora = faturasCliente.find((f) =>
+    faturaClienteBloqueiaFaturamento(f)
+  );
 
   if (!bloqueadora) {
     return { bloqueado: false };

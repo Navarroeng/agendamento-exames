@@ -94,10 +94,7 @@ export function FaturasMesRowActions({
   if (
     fatura &&
     variant === "cliente" &&
-    (row.status === "cancelada" ||
-      canReemitirFaturaCliente(fatura, {
-        alteracaoPosEmissao: row.alteracaoPosEmissao,
-      }))
+    canReemitirFaturaCliente(fatura)
   ) {
     return (
       <CanceladaClienteActionsMenu
@@ -105,9 +102,7 @@ export function FaturasMesRowActions({
         saving={saving}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
         onReemitir={() => onReemitir?.(fatura.id)}
-        reemitirLabel={
-          fatura.status === "emitida" ? "Reemitir fatura" : "Emitir novamente"
-        }
+        reemitirLabel="Reemitir fatura"
       />
     );
   }

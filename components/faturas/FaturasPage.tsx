@@ -113,6 +113,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         onSaveDraft={handleSaveDraft}
         onEmit={handleEmit}
         onGeneratePdf={handleGeneratePdf}
+        onAbrirFaturaRelacionada={handleVisualizar}
       />
 
       <FaturaPagamentoModal

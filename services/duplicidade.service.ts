@@ -206,7 +206,7 @@ export async function verificarFaturaExistenteMes(params: {
       "id, numero, status, data_emissao, valor_total, referencia_nome, referencia_id, mes_referencia, periodo_inicio"
     )
     .eq("tipo", params.tipo)
-    .in("status", ["rascunho", "emitida"]);
+    .in("status", ["rascunho", "emitida", "necessita_reemissao"]);
 
   if (error) throw error;
 

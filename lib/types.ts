@@ -481,7 +481,12 @@ export interface PerfilUsuario {
 }
 
 export type FaturaTipo = "cliente" | "clinica";
-export type FaturaStatus = "rascunho" | "emitida" | "cancelada";
+export type FaturaStatus =
+  | "rascunho"
+  | "emitida"
+  | "cancelada"
+  | "necessita_reemissao"
+  | "substituida";
 
 export interface FaturaRecord {
   id: string;
@@ -503,6 +508,8 @@ export interface FaturaRecord {
   observacao_pagamento: string | null;
   comprovante_pagamento_path: string | null;
   comprovante_pagamento_nome: string | null;
+  fatura_origem_id: string | null;
+  fatura_substituta_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -552,6 +559,10 @@ export interface FaturaPreviewState {
   faturaId: string | null;
   status: FaturaStatus | null;
   readonly: boolean;
+  faturaOrigemId?: string | null;
+  faturaOrigemNumero?: string | null;
+  faturaSubstitutaId?: string | null;
+  faturaSubstitutaNumero?: string | null;
 }
 
 export interface AuditoriaRecord {

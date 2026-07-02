@@ -5,30 +5,39 @@ import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentosPagination } from "@/components/agendamentos/AgendamentosPagination";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { historicoStatusLabelClinica } from "@/lib/custos-clinicas-conferencia";
-import { FATURA_HISTORICO_PAGE_SIZE } from "@/lib/fatura-filters";
+import {
+  FATURA_HISTORICO_PAGE_SIZE,
+  type FaturaHistoricoFilters,
+} from "@/lib/fatura-filters";
+import { FATURA_MES_STATUS_LABELS } from "@/lib/fatura-mes-resumo";
 import { formatCurrency } from "@/lib/money";
-import type { FaturaHistoricoFilters } from "@/lib/fatura-filters";
 import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 import { FaturaRowActionsMenu } from "./FaturaRowActionsMenu";
 import { FaturasHistoricoFilters } from "./FaturasHistoricoFilters";
 
 function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
-  const map = {
+  const map: Record<FaturaStatus, string> = {
     rascunho: "bg-brand-orange-soft text-[#c96d00]",
     emitida: "bg-brand-green-soft text-brand-green",
     cancelada: "bg-brand-red-soft text-brand-red",
+    necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",
+    substituida: "bg-[#f1f5f9] text-[#64748b]",
   };
-  const labels =
+  const labels: Record<FaturaStatus, string> =
     variant === "clinica"
       ? {
           rascunho: historicoStatusLabelClinica("rascunho", false),
           emitida: historicoStatusLabelClinica("emitida", pago),
           cancelada: historicoStatusLabelClinica("cancelada", false),
+          necessita_reemissao: historicoStatusLabelClinica("emitida", pago),
+          substituida: historicoStatusLabelClinica("cancelada", false),
         }
       : {
           rascunho: "Rascunho",
           emitida: "Emitida",
           cancelada: "Cancelada",
+          necessita_reemissao: FATURA_MES_STATUS_LABELS.necessita_reemissao,
+          substituida: FATURA_MES_STATUS_LABELS.substituida,
         };
   return (
     <span

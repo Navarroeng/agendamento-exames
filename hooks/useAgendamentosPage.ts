@@ -84,6 +84,10 @@ import {
   cancelarAgendamento,
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
+import {
+  marcarFaturaClienteNecessitaReemissao,
+  obterFaturasClienteIdsPorAgendamento,
+} from "@/services/fatura-historico.service";
 import { listarCargosAtivos, listarExamesObrigatoriosPorCargo } from "@/services/cargo.service";
 import { registrarHistorico } from "@/services/historico.service";
 import {
@@ -977,6 +981,21 @@ export function useAgendamentosPage() {
             faturaStatusLabel: bloqueio.faturaStatusLabel,
             motivo,
           });
+
+          const faturaIds = bloqueio.faturaId
+            ? [bloqueio.faturaId]
+            : await obterFaturasClienteIdsPorAgendamento(cancelTargetId);
+
+          for (const faturaId of faturaIds) {
+            await marcarFaturaClienteNecessitaReemissao(faturaId, {
+              auditContext,
+            }, {
+              agendamentoId: cancelTargetId,
+              cliente: agendamento.cliente_nome,
+              colaborador: agendamento.colaborador,
+              motivo,
+            });
+          }
         }
 
         toast.success("Agendamento cancelado com sucesso!");

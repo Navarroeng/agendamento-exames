@@ -36,6 +36,8 @@ function fatura(
     observacao_pagamento: null,
     comprovante_pagamento_path: null,
     comprovante_pagamento_nome: null,
+    fatura_origem_id: null,
+    fatura_substituta_id: null,
     created_at: "",
     updated_at: "",
   };
@@ -49,8 +51,10 @@ assert.equal(
 
 const cancelada = fatura("c1", "Empresa A", "2026-06", "cancelada", "FAT-CANCEL");
 const nova = fatura("n1", "Empresa A", "2026-06", "emitida", "FAT-NOVA");
+const necessita = fatura("r1", "Empresa A", "2026-06", "necessita_reemissao", "FAT-REEM");
 
 assert.equal(canReemitirFaturaCliente(cancelada), true);
+assert.equal(canReemitirFaturaCliente(necessita), true);
 assert.equal(canReemitirFaturaCliente(nova), false);
 assert.equal(canReemitirFaturaCliente({ ...cancelada, tipo: "clinica" }), false);
 
