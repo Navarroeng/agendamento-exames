@@ -11,7 +11,10 @@ import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
 } from "@/lib/fatura-mappers";
-import { FATURA_STATUS_INATIVOS } from "@/lib/fatura-reemissao";
+import {
+  FATURA_STATUS_INATIVOS,
+  mesReferenciaBRFromFatura,
+} from "@/lib/fatura-reemissao";
 import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
 
 export type FaturaMesStatus =
@@ -73,6 +76,12 @@ export function getCurrentMonthYearBR(): string {
 
 function normalizeReferencia(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function matchesReferenciaFilter(nome: string, filter: string): boolean {
+  const f = filter.trim().toLowerCase();
+  if (!f) return true;
+  return nome.toLowerCase().includes(f);
 }
 
 export function deriveFaturaMesStatus(
@@ -152,12 +161,130 @@ export function compareFaturaMesReferenciaAsc(
 /** @deprecated Use compareFaturaMesReferenciaAsc */
 export const compareClienteFaturaMesNomeAsc = compareFaturaMesReferenciaAsc;
 
-/** Entra na listagem e no resumo previsto somente com valor > 0. */
+function compareFaturaMesRows(a: FaturaMesRow, b: FaturaMesRow): number {
+  const byReferencia = compareFaturaMesReferenciaAsc(a, b);
+  if (byReferencia !== 0) return byReferencia;
+
+  const numA = a.fatura?.numero ?? "";
+  const numB = b.fatura?.numero ?? "";
+  if (numA && numB) {
+    const byNumero = numA.localeCompare(numB, "pt-BR", { sensitivity: "base" });
+    if (byNumero !== 0) return byNumero;
+  }
+
+  return a.periodoLabel.localeCompare(b.periodoLabel, "pt-BR", {
+    sensitivity: "base",
+  });
+}
+
+/** Entra na listagem aberta (sem fatura) somente com valor > 0. */
 export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
   return valorTotal > 0;
 }
 
 export const PERIODO_COMPLETO_LABEL = "Todo o período";
+
+/** @deprecated Use isReferenciaFaturavelNoMes */
+export const isClienteFaturavelNoMes = isReferenciaFaturavelNoMes;
+
+function buildMetricsFromAgendamentos(
+  ags: AgendamentoWithExames[],
+  tipo: FaturaTipo
+): Pick<FaturaMesRow, "qtdAgendamentos" | "qtdExames" | "valorTotal"> {
+  const itens = buildFaturaItensFromAgendamentos(ags, tipo);
+  return {
+    qtdAgendamentos: ags.length,
+    qtdExames: itens.length,
+    valorTotal: calcTotalFaturaItens(itens),
+  };
+}
+
+function agendamentosReferenciaMes(
+  agendamentos: AgendamentoWithExames[],
+  mesReferencia: string,
+  referenciaNome: string,
+  referenciaField: "cliente" | "clinica"
+): AgendamentoWithExames[] {
+  const filters: FaturaFilters = {
+    ...EMPTY_FATURA_FILTERS,
+    mesReferencia,
+    ...(referenciaField === "cliente"
+      ? { cliente: referenciaNome }
+      : { clinica: referenciaNome }),
+  };
+  return filterAgendamentosFatura(agendamentos, filters);
+}
+
+function buildRowFromFatura(
+  fatura: FaturaRecord,
+  agendamentos: AgendamentoWithExames[],
+  mesReferencia: string,
+  periodoLabel: string,
+  tipo: FaturaTipo,
+  referenciaField: "cliente" | "clinica"
+): FaturaMesRow {
+  const referenciaNome = fatura.referencia_nome.trim() || "—";
+  const mesAgendamentos =
+    mesReferencia.trim() || mesReferenciaBRFromFatura(fatura) || "";
+  const ags = mesAgendamentos
+    ? agendamentosReferenciaMes(
+        agendamentos,
+        mesAgendamentos,
+        referenciaNome,
+        referenciaField
+      )
+    : [];
+
+  const fromAgendamentos = buildMetricsFromAgendamentos(ags, tipo);
+  const useAgendamentos = ags.length > 0;
+
+  return {
+    referenciaNome,
+    periodoLabel,
+    qtdAgendamentos: useAgendamentos
+      ? fromAgendamentos.qtdAgendamentos
+      : 0,
+    qtdExames: useAgendamentos
+      ? fromAgendamentos.qtdExames
+      : Number(fatura.total_exames ?? 0),
+    valorTotal: useAgendamentos
+      ? fromAgendamentos.valorTotal
+      : Number(fatura.valor_total ?? 0),
+    fatura,
+    status: deriveFaturaMesStatus(fatura),
+  };
+}
+
+function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
+  const referencias = new Set(
+    rows.map((row) => normalizeReferencia(row.referenciaNome))
+  );
+
+  let valorEmitido = 0;
+  let valorPago = 0;
+  let valorEmAberto = 0;
+
+  rows.forEach((row) => {
+    if (!row.fatura || row.fatura.status !== "emitida") return;
+    const valor = Number(row.fatura.valor_total);
+    valorEmitido += valor;
+    if (row.fatura.pago) {
+      valorPago += valor;
+    } else {
+      valorEmAberto += valor;
+    }
+  });
+
+  return {
+    totalReferencias: referencias.size,
+    totalAgendamentos: rows.reduce((sum, row) => sum + row.qtdAgendamentos, 0),
+    totalExames: rows.reduce((sum, row) => sum + row.qtdExames, 0),
+    valorPrevisto: rows.reduce((sum, row) => sum + row.valorTotal, 0),
+    valorEmitido,
+    valorPago,
+    valorEmAberto,
+  };
+}
 
 function buildResumoPeriodoCompleto(
   agendamentos: AgendamentoWithExames[],
@@ -166,88 +293,32 @@ function buildResumoPeriodoCompleto(
   referenciaFilter: string,
   referenciaField: "cliente" | "clinica"
 ): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } {
-  const filters: FaturaFilters = {
-    ...EMPTY_FATURA_FILTERS,
-    mesReferencia: "",
-    ...(referenciaField === "cliente"
-      ? { cliente: referenciaFilter }
-      : { clinica: referenciaFilter }),
-  };
-  const ags = filterAgendamentosFatura(agendamentos, filters);
-  const byReferencia = new Map<string, AgendamentoWithExames[]>();
-
-  ags.forEach((ag) => {
-    const nome =
-      (referenciaField === "cliente"
-        ? ag.cliente_nome
-        : ag.clinica_nome)?.trim() || "—";
-    const list = byReferencia.get(nome) ?? [];
-    list.push(ag);
-    byReferencia.set(nome, list);
-  });
-
   const faturasDoTipo = faturas.filter((f) => f.tipo === tipo);
 
-  const rows: FaturaMesRow[] = Array.from(byReferencia.entries()).map(
-    ([referenciaNome, agsReferencia]) => {
-      const itens = buildFaturaItensFromAgendamentos(agsReferencia, tipo);
-      return {
-        referenciaNome,
-        periodoLabel: PERIODO_COMPLETO_LABEL,
-        qtdAgendamentos: agsReferencia.length,
-        qtdExames: itens.length,
-        valorTotal: calcTotalFaturaItens(itens),
-        fatura: null,
-        status: "aberta_emissao" as const,
-      };
-    }
-  );
+  const rows = faturasDoTipo
+    .filter((fatura) =>
+      matchesReferenciaFilter(fatura.referencia_nome, referenciaFilter)
+    )
+    .map((fatura) => {
+      const mesBR = mesReferenciaBRFromFatura(fatura) ?? "";
+      const periodoLabel = mesBR
+        ? formatPeriodoFatura(mesBR)
+        : PERIODO_COMPLETO_LABEL;
 
-  const rowsFaturaveis = rows.filter((row) =>
-    isReferenciaFaturavelNoMes(row.valorTotal)
-  );
+      return buildRowFromFatura(
+        fatura,
+        agendamentos,
+        mesBR,
+        periodoLabel,
+        tipo,
+        referenciaField
+      );
+    });
 
-  rowsFaturaveis.sort(compareFaturaMesReferenciaAsc);
+  rows.sort(compareFaturaMesRows);
 
-  let valorEmitido = 0;
-  let valorPago = 0;
-  let valorEmAberto = 0;
-
-  const referenciasVisiveis = new Set(
-    rowsFaturaveis.map((r) => normalizeReferencia(r.referenciaNome))
-  );
-
-  faturasDoTipo.forEach((fatura) => {
-    if (fatura.status !== "emitida") return;
-    if (
-      !referenciasVisiveis.has(normalizeReferencia(fatura.referencia_nome))
-    ) {
-      return;
-    }
-    const valor = Number(fatura.valor_total);
-    valorEmitido += valor;
-    if (fatura.pago) {
-      valorPago += valor;
-    } else {
-      valorEmAberto += valor;
-    }
-  });
-
-  const resumo: FaturaMesResumoGeral = {
-    totalReferencias: rowsFaturaveis.length,
-    totalAgendamentos: rowsFaturaveis.reduce((s, r) => s + r.qtdAgendamentos, 0),
-    totalExames: rowsFaturaveis.reduce((s, r) => s + r.qtdExames, 0),
-    valorPrevisto: rowsFaturaveis.reduce((s, r) => s + r.valorTotal, 0),
-    valorEmitido,
-    valorPago,
-    valorEmAberto,
-  };
-
-  return { rows: rowsFaturaveis, resumo };
+  return { rows, resumo: computeResumo(rows) };
 }
-
-/** @deprecated Use isReferenciaFaturavelNoMes */
-export const isClienteFaturavelNoMes = isReferenciaFaturavelNoMes;
 
 function buildResumoMesInterno(
   agendamentos: AgendamentoWithExames[],
@@ -282,60 +353,47 @@ function buildResumoMesInterno(
   const periodoLabel = formatPeriodoFatura(mesReferencia);
   const faturasDoTipo = faturas.filter((f) => f.tipo === tipo);
 
-  const rows: FaturaMesRow[] = Array.from(byReferencia.entries()).map(
-    ([referenciaNome, ags]) => {
-      const itens = buildFaturaItensFromAgendamentos(ags, tipo);
-      const fatura = findFaturaReferenciaMes(
-        faturasDoTipo,
-        tipo,
-        referenciaNome,
-        mesReferencia
-      );
+  const faturasMes = faturasDoTipo.filter(
+    (fatura) =>
+      faturaMatchesMesReferencia(fatura, mesReferencia) &&
+      matchesReferenciaFilter(fatura.referencia_nome, referenciaFilter)
+  );
 
+  const rowsFromFaturas = faturasMes.map((fatura) =>
+    buildRowFromFatura(
+      fatura,
+      agendamentos,
+      mesReferencia,
+      periodoLabel,
+      tipo,
+      referenciaField
+    )
+  );
+
+  const clientesComFatura = new Set(
+    faturasMes.map((fatura) => normalizeReferencia(fatura.referencia_nome))
+  );
+
+  const rowsAbertas: FaturaMesRow[] = Array.from(byReferencia.entries())
+    .filter(([referenciaNome]) => {
+      return !clientesComFatura.has(normalizeReferencia(referenciaNome));
+    })
+    .map(([referenciaNome, ags]) => {
+      const metrics = buildMetricsFromAgendamentos(ags, tipo);
       return {
         referenciaNome,
         periodoLabel,
-        qtdAgendamentos: ags.length,
-        qtdExames: itens.length,
-        valorTotal: calcTotalFaturaItens(itens),
-        fatura,
-        status: deriveFaturaMesStatus(fatura),
+        ...metrics,
+        fatura: null,
+        status: "aberta_emissao" as const,
       };
-    }
-  );
+    })
+    .filter((row) => isReferenciaFaturavelNoMes(row.valorTotal));
 
-  const rowsFaturaveis = rows.filter((row) =>
-    isReferenciaFaturavelNoMes(row.valorTotal)
-  );
+  const rows = [...rowsFromFaturas, ...rowsAbertas];
+  rows.sort(compareFaturaMesRows);
 
-  rowsFaturaveis.sort(compareFaturaMesReferenciaAsc);
-
-  let valorEmitido = 0;
-  let valorPago = 0;
-  let valorEmAberto = 0;
-
-  rowsFaturaveis.forEach((row) => {
-    if (!row.fatura || row.fatura.status !== "emitida") return;
-    const valor = Number(row.fatura.valor_total);
-    valorEmitido += valor;
-    if (row.fatura.pago) {
-      valorPago += valor;
-    } else {
-      valorEmAberto += valor;
-    }
-  });
-
-  const resumo: FaturaMesResumoGeral = {
-    totalReferencias: rowsFaturaveis.length,
-    totalAgendamentos: rowsFaturaveis.reduce((s, r) => s + r.qtdAgendamentos, 0),
-    totalExames: rowsFaturaveis.reduce((s, r) => s + r.qtdExames, 0),
-    valorPrevisto: rowsFaturaveis.reduce((s, r) => s + r.valorTotal, 0),
-    valorEmitido,
-    valorPago,
-    valorEmAberto,
-  };
-
-  return { rows: rowsFaturaveis, resumo };
+  return { rows, resumo: computeResumo(rows) };
 }
 
 export function buildResumoClientesMes(

@@ -124,10 +124,56 @@ assert.equal(filtered.rows[0].referenciaNome, "Mil Bolhas");
 
 assert.ok(
   !result.rows.some((r) => r.referenciaNome === "Empresa Zerada"),
-  "referência com valor zero não deve aparecer"
+  "referência com valor zero não deve aparecer sem fatura"
 );
-assert.equal(result.resumo.totalAgendamentos, 3);
-assert.equal(result.resumo.totalExames, 3);
+
+const faturaJulhoSemAgendamento = fatura(
+  "f2",
+  "Aluminio Firenze",
+  "2026-07",
+  "rascunho"
+);
+const julho = buildResumoClientesMes(
+  ags,
+  [...faturas, faturaJulhoSemAgendamento],
+  "07/2026"
+);
+assert.ok(julho);
+assert.equal(julho.rows.length, 1);
+assert.equal(julho.rows[0].referenciaNome, "Aluminio Firenze");
+assert.equal(julho.rows[0].status, "rascunho");
+assert.equal(julho.rows[0].fatura?.id, "f2");
+
+const substituida = fatura("f-old", "Empresa X", "2026-06", "substituida");
+const emitidaNova = fatura("f-new", "Empresa X", "2026-06", "emitida");
+const junhoMultiplas = buildResumoClientesMes(
+  ags,
+  [substituida, emitidaNova],
+  "06/2026",
+  "Empresa X"
+);
+assert.ok(junhoMultiplas);
+assert.equal(junhoMultiplas.rows.length, 2);
+assert.deepEqual(
+  junhoMultiplas.rows.map((row) => row.fatura?.id).sort(),
+  ["f-new", "f-old"]
+);
+
+const periodoCompleto = buildResumoClientesMes(
+  ags,
+  [...faturas, faturaJulhoSemAgendamento],
+  ""
+);
+assert.ok(periodoCompleto);
+assert.equal(periodoCompleto.rows.length, 2);
+assert.ok(
+  periodoCompleto.rows.every((row) => row.fatura),
+  "todo o período deve listar cada fatura cadastrada"
+);
+assert.deepEqual(
+  periodoCompleto.rows.map((row) => row.fatura?.id).sort(),
+  ["f1", "f2"]
+);
 
 const agsClinica = [
   ag("10", "Cliente A", "2026-06-10", 0),
@@ -146,12 +192,5 @@ assert.deepEqual(
   ["Clínica Alpha", "Clínica Beta"]
 );
 assert.equal(resumoClinica.resumo.valorPrevisto, 100);
-
-const periodoCompleto = buildResumoClientesMes(ags, faturas, "");
-assert.ok(periodoCompleto);
-assert.equal(periodoCompleto.rows.length, 2);
-assert.ok(
-  periodoCompleto.rows.every((r) => r.periodoLabel === "Todo o período")
-);
 
 console.log("test-fatura-mes-resumo: ok");

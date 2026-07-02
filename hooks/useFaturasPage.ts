@@ -69,6 +69,25 @@ import type { FaturaPagamentoModalMode } from "@/components/faturas/FaturaPagame
 
 const NO_RECORDS_TOAST = FATURA_SEM_ELEGIVEIS_MSG;
 
+function findFaturaRascunhoParaReferencia(
+  rows: { referenciaNome: string; fatura: FaturaRecord | null }[] | undefined,
+  referencia: string
+): FaturaRecord | null | undefined {
+  const normalized = referencia.trim().toLowerCase();
+  const clienteRows =
+    rows?.filter(
+      (row) => row.referenciaNome.trim().toLowerCase() === normalized
+    ) ?? [];
+
+  const rascunho = clienteRows.find((row) => row.fatura?.status === "rascunho")
+    ?.fatura;
+  if (rascunho) return rascunho;
+
+  if (clienteRows.some((row) => !row.fatura)) return undefined;
+
+  return null;
+}
+
 function buildPreviewFromAgendamentos(
   tipo: FaturaTipo,
   referenciaNome: string,
@@ -435,10 +454,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       };
       const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
 
-      const faturaExistente = resumoMes?.rows.find(
-        (r) =>
-          r.referenciaNome.trim().toLowerCase() === referencia.toLowerCase()
-      )?.fatura;
+      const faturaExistente = findFaturaRascunhoParaReferencia(
+        resumoMes?.rows,
+        referencia
+      );
 
       if (
         !options?.readonly &&
@@ -935,10 +954,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       };
       const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
 
-      const faturaExistente = resumoMes?.rows.find(
-        (r) =>
-          r.referenciaNome.trim().toLowerCase() === referencia.toLowerCase()
-      )?.fatura;
+      const faturaExistente = findFaturaRascunhoParaReferencia(
+        resumoMes?.rows,
+        referencia
+      );
 
       if (
         await bloquearFaturaDuplicada(

@@ -90,18 +90,26 @@ function matchesText(value: string, filter: string): boolean {
   return value.toLowerCase().includes(f);
 }
 
+/** MM/AAAA → YYYY-MM (competência da fatura). */
+export function mesReferenciaIsoFromBR(mesReferencia: string): string | null {
+  const range = parseMonthYearBRToIsoRange(mesReferencia);
+  if (!range) return null;
+  return range.inicio.slice(0, 7);
+}
+
 export function faturaMatchesMesReferencia(
   fatura: FaturaRecord,
   mesReferencia: string
 ): boolean {
-  const range = parseMonthYearBRToIsoRange(mesReferencia);
-  if (!range) return true;
+  const mesIso = mesReferenciaIsoFromBR(mesReferencia);
+  if (!mesIso) return true;
+
+  const mesRef = fatura.mes_referencia?.trim();
+  if (mesRef) return mesRef === mesIso;
 
   const inicio = fatura.periodo_inicio?.split("T")[0];
-  const fim = fatura.periodo_fim?.split("T")[0] ?? inicio;
   if (!inicio) return false;
-
-  return inicio <= range.fim && (fim ?? inicio) >= range.inicio;
+  return inicio.slice(0, 7) === mesIso;
 }
 
 export function filterAgendamentosFatura(

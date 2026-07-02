@@ -359,7 +359,10 @@ export function FaturasMesPanel({
               <tbody>
                 {rows.map((row) => (
                   <tr
-                    key={row.referenciaNome}
+                    key={
+                      row.fatura?.id ??
+                      `aberta-${row.referenciaNome}-${row.periodoLabel}`
+                    }
                     className="border-b border-[#eef2f7]/80 transition-colors hover:bg-[#f0f4ff]/40"
                   >
                     <td
