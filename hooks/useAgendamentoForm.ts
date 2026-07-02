@@ -7,6 +7,7 @@ import {
   isUppercaseField,
   normalizeUppercaseField,
 } from "@/lib/text-normalize";
+import { buildDocumentacaoPayloadFromForm } from "@/lib/agendamento-documentacao";
 import { getEmptyForm } from "@/lib/form-defaults";
 import {
   parseDateBRToIso,
@@ -108,12 +109,18 @@ export function useAgendamentoForm() {
     [form]
   );
 
+  const buildDocumentacaoPayload = useCallback(
+    () => buildDocumentacaoPayloadFromForm(form),
+    [form]
+  );
+
   return {
     form,
     setField,
     reset,
     loadForm,
     buildPayload,
+    buildDocumentacaoPayload,
     saving,
     setSaving,
   };

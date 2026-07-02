@@ -1,6 +1,7 @@
 interface FormActionsProps {
   saving: boolean;
   contratoInvalido?: boolean;
+  somenteDocumentacao?: boolean;
   onClear: () => void;
   onSaveDraft: () => void;
   onSave: () => void;
@@ -10,12 +11,29 @@ interface FormActionsProps {
 export function FormActions({
   saving,
   contratoInvalido = false,
+  somenteDocumentacao = false,
   onClear,
   onSaveDraft,
   onSave,
   onCopyClinicaMessage,
 }: FormActionsProps) {
-  const saveDisabled = saving || contratoInvalido;
+  const saveDisabled = saving || (!somenteDocumentacao && contratoInvalido);
+
+  if (somenteDocumentacao) {
+    return (
+      <div className="bottom-actions mt-4 flex flex-col justify-end gap-2 border-t border-[#eef2f7] pt-4 sidebar:flex-row sidebar:flex-wrap">
+        <button
+          type="button"
+          className="btn btn-primary justify-center sidebar:w-auto"
+          onClick={onSave}
+          disabled={saving}
+        >
+          {saving ? "Salvando..." : "Salvar documentação"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="bottom-actions mt-4 flex flex-col justify-end gap-2 border-t border-[#eef2f7] pt-4 sidebar:flex-row sidebar:flex-wrap">
       <button

@@ -225,8 +225,6 @@ export function useESocialPage() {
   const handleConfirmMarcarEnviado = useCallback(async () => {
     if (!marcarEnviadoId) return;
 
-    if (await bloquearAcaoAgendamentoFaturado(marcarEnviadoId)) return;
-
     if (!dataEnvioInput.trim()) {
       toast.error("Informe a data de envio ao e-Social.");
       return;
@@ -285,7 +283,6 @@ export function useESocialPage() {
       setSaving(false);
     }
   }, [
-    bloquearAcaoAgendamentoFaturado,
     dataEnvioInput,
     reciboInput,
     marcarEnviadoId,
@@ -298,8 +295,6 @@ export function useESocialPage() {
 
   const handleMarcarPendente = useCallback(
     async (id: string) => {
-      if (await bloquearAcaoAgendamentoFaturado(id)) return;
-
       const ag = getById(id);
       if (!ag) {
         toast.error("Agendamento não encontrado.");
@@ -342,7 +337,7 @@ export function useESocialPage() {
         setSaving(false);
       }
     },
-    [bloquearAcaoAgendamentoFaturado, getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
+    [getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
   );
 
   const viewFaturaBloqueio = useMemo(() => {

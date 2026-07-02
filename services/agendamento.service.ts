@@ -9,6 +9,7 @@ import {
   assertAgendamentoEditavelPorFatura,
   assertCancelamentoExcepcionalAdminPorFatura,
 } from "@/services/agendamento-fatura-bloqueio.service";
+import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
 import type {
@@ -225,6 +226,20 @@ export async function atualizarAgendamentoComExames(
   }
 }
 
+export async function atualizarDocumentacaoAgendamento(
+  id: string,
+  documentacao: AgendamentoDocumentacaoInsert
+): Promise<void> {
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update(documentacao)
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
 export type EnvioEsocialUpdate = Pick<
   AgendamentoWithExames,
   "id" | "envio_esocial" | "data_envio_esocial" | "esocial_recibo"
@@ -246,7 +261,6 @@ export async function atualizarEnvioEsocial(
   data_envio_esocial: string | null,
   esocial_recibo: string | null = null
 ): Promise<EnvioEsocialUpdate> {
-  await assertAgendamentoEditavelPorFatura(id);
   const supabase = createClient();
 
   const basePayload = {

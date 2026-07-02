@@ -38,24 +38,19 @@ export function ESocialRowActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const items = bloqueadoPorFatura
+  const items = enviado
     ? [
         { key: "visualizar", label: "Ver agendamento" },
-        { key: "bloqueado", label: "Bloqueado por fatura", disabled: true },
+        { key: "pendente", label: "Marcar como pendente" },
       ]
-    : enviado
-      ? [
-          { key: "visualizar", label: "Ver agendamento" },
-          { key: "pendente", label: "Marcar como pendente" },
-        ]
-      : [
-          { key: "visualizar", label: "Ver agendamento" },
-          { key: "enviado", label: "Marcar como enviado" },
-        ];
+    : [
+        { key: "visualizar", label: "Ver agendamento" },
+        { key: "enviado", label: "Marcar como enviado" },
+      ];
 
   function handleAction(key: string) {
     setOpen(false);
-    if (disabled || key === "bloqueado") return;
+    if (disabled) return;
     switch (key) {
       case "visualizar":
         onVisualizar(agendamento.id);
@@ -98,13 +93,10 @@ export function ESocialRowActionsMenu({
               role="menuitem"
               onClick={() => handleAction(item.key)}
               className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
-                item.key === "bloqueado"
-                  ? "cursor-not-allowed text-[#94a3b8]"
-                  : item.key === "pendente"
-                    ? "text-[#64748b] hover:bg-brand-orange-soft hover:text-[#c96d00]"
-                    : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
+                item.key === "pendente"
+                  ? "text-[#64748b] hover:bg-brand-orange-soft hover:text-[#c96d00]"
+                  : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
               }`}
-              disabled={item.key === "bloqueado"}
             >
               {item.label}
             </button>

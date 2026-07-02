@@ -49,24 +49,20 @@ export function RowActionsMenu({
     { key: "visualizar", label: "Visualizar", onClick: () => onVisualizar(agendamentoId) },
   ];
 
-  if (bloqueadoPorFatura && !podeCancelarExcepcionalAdmin) {
+  if (bloqueadoPorFatura) {
     items.push({
-      key: "bloqueado",
-      label: "Bloqueado por fatura",
-      disabled: true,
+      key: "editar-doc",
+      label: "Editar documentação",
+      onClick: () => onEditar(agendamentoId),
     });
-  } else if (bloqueadoPorFatura && podeCancelarExcepcionalAdmin) {
-    items.push({
-      key: "bloqueado-editar",
-      label: "Edição bloqueada por fatura",
-      disabled: true,
-    });
-    items.push({
-      key: "cancelar",
-      label: "Cancelar",
-      danger: true,
-      onClick: () => onCancelar(agendamentoId),
-    });
+    if (podeCancelarExcepcionalAdmin) {
+      items.push({
+        key: "cancelar",
+        label: "Cancelar",
+        danger: true,
+        onClick: () => onCancelar(agendamentoId),
+      });
+    }
   } else {
     items.push(
       { key: "editar", label: "Editar", onClick: () => onEditar(agendamentoId) },

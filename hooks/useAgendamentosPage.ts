@@ -13,7 +13,9 @@ import {
 } from "@/lib/agendamento-mappers";
 import {
   getAgendamentoValidationMessage,
+  getDocumentacaoValidationMessage,
   isAgendamentoCompleto,
+  isDocumentacaoCompleta,
   VALIDATION_TOAST_MESSAGE,
 } from "@/lib/validate-agendamento";
 import {
@@ -68,6 +70,7 @@ import {
 import { useHistoricoUsuario, useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import {
   buildHistoricoAlteracoes,
+  buildHistoricoAlteracoesDocumentacao,
   buildHistoricoCancelamento,
   buildHistoricoCriacao,
 } from "@/lib/agendamento-historico-diff";
@@ -77,6 +80,7 @@ import {
 } from "@/lib/cliente-contrato-vigencia";
 import {
   atualizarAgendamentoComExames,
+  atualizarDocumentacaoAgendamento,
   cancelarAgendamento,
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
@@ -134,6 +138,8 @@ export function useAgendamentosPage() {
   const isAdmin = isPerfilAdmin(profile?.perfil);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSomenteDocumentacao, setEditingSomenteDocumentacao] =
+    useState(false);
   const [viewAgendamento, setViewAgendamento] =
     useState<AgendamentoWithExames | null>(null);
   const [historicoOpen, setHistoricoOpen] = useState(false);
@@ -168,6 +174,7 @@ export function useAgendamentosPage() {
     reset,
     loadForm,
     buildPayload,
+    buildDocumentacaoPayload,
     saving,
     setSaving,
   } = useAgendamentoForm();
@@ -524,6 +531,7 @@ export function useAgendamentosPage() {
     setCargoId("");
     setCargoNomeSalvo("");
     setEditingId(null);
+    setEditingSomenteDocumentacao(false);
     setPendingCargoId(null);
     setCargoChangeModalOpen(false);
     setClienteProcuracaoModalOpen(false);
@@ -620,15 +628,6 @@ export function useAgendamentosPage() {
     resetForm();
     setFiltersExpanded(false);
   }, [resetForm]);
-
-  useEffect(() => {
-    if (!editingId) return;
-    const bloqueio = bloqueioPorAgendamento.get(editingId);
-    if (bloqueio?.bloqueado) {
-      closeForm();
-      toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
-    }
-  }, [editingId, bloqueioPorAgendamento, closeForm]);
 
   const toggleFilters = useCallback(() => {
     setFiltersExpanded((prev) => !prev);
@@ -815,7 +814,7 @@ export function useAgendamentosPage() {
 
   const handleEditar = useCallback(
     async (id: string) => {
-      if (await bloquearEdicaoAgendamentoFaturado(id)) return;
+      const bloqueio = await obterBloqueioAtualizado(id);
 
       const agendamento = getById(id);
       if (!agendamento) {
@@ -831,6 +830,7 @@ export function useAgendamentosPage() {
       setCargoId(agendamento.cargo_id ?? "");
       setCargoNomeSalvo(agendamento.cargo_nome ?? "");
       examsManuallyModifiedRef.current = false;
+      setEditingSomenteDocumentacao(bloqueio.bloqueado);
       setEditingId(id);
       setShowForm(true);
       setFiltersExpanded(false);
@@ -843,7 +843,7 @@ export function useAgendamentosPage() {
         void enforceRetornoTrabalhoExames();
       }
     },
-    [bloquearEdicaoAgendamentoFaturado, getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
+    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames, obterBloqueioAtualizado]
   );
 
   const handleVisualizar = useCallback(
@@ -1048,6 +1048,57 @@ export function useAgendamentosPage() {
 
   const executeSave = useCallback(
     async (status: AgendamentoStatus) => {
+      if (editingId && editingSomenteDocumentacao) {
+        if (!isDocumentacaoCompleta(form)) {
+          toast.error(
+            getDocumentacaoValidationMessage(form) ?? VALIDATION_TOAST_MESSAGE
+          );
+          return;
+        }
+
+        setSaving(true);
+        try {
+          const anterior = getById(editingId);
+          if (!anterior) {
+            toast.error("Agendamento não encontrado.");
+            return;
+          }
+          const docPayload = buildDocumentacaoPayload();
+          const alteracoes = buildHistoricoAlteracoesDocumentacao(
+            anterior,
+            docPayload,
+            historicoUsuario
+          );
+          await atualizarDocumentacaoAgendamento(editingId, docPayload);
+          if (alteracoes.length > 0) {
+            await registrarHistorico(
+              editingId,
+              historicoUsuario,
+              alteracoes,
+              {
+                auditContext,
+                registroNome: anterior.colaborador,
+              }
+            );
+          }
+          toast.success("Documentação atualizada com sucesso!");
+          setShowForm(false);
+          resetForm();
+          setFiltersExpanded(false);
+          refresh();
+        } catch (err) {
+          console.error("Erro ao salvar documentação:", err);
+          const message =
+            err && typeof err === "object" && "message" in err
+              ? String((err as { message: unknown }).message)
+              : "";
+          toast.error(message || "Erro ao salvar documentação");
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
+
       if (editingId && (await bloquearEdicaoAgendamentoFaturado(editingId))) {
         return;
       }
@@ -1285,6 +1336,8 @@ export function useAgendamentosPage() {
     [
       hasExamWarnings,
       bloquearEdicaoAgendamentoFaturado,
+      editingSomenteDocumentacao,
+      buildDocumentacaoPayload,
       form,
       exams,
       selectedClinica,
@@ -1300,7 +1353,6 @@ export function useAgendamentosPage() {
       refresh,
       historicoUsuario,
       auditContext,
-      cargoId,
       bloquearDuplicidade90Dias,
     ]
   );
@@ -1338,6 +1390,7 @@ export function useAgendamentosPage() {
   return {
     showForm,
     editingId,
+    editingSomenteDocumentacao,
     viewAgendamento,
     setViewAgendamento,
     viewFaturaBloqueio,

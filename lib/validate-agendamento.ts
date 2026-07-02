@@ -177,3 +177,38 @@ export function isAgendamentoCompleto(
 
   return formOk && examsOk;
 }
+
+export function isDocumentacaoCompleta(form: AgendamentoFormValues): boolean {
+  return (
+    isSimOuNao(form.aso_enviado_clinica) &&
+    isSimOuNao(form.aso_assinado) &&
+    isSimOuNao(form.aso_enviado_cliente) &&
+    isSimOuNao(form.envio_esocial) &&
+    requireDateWhenSim(
+      form.aso_enviado_clinica,
+      form.data_aso_enviado_clinica
+    ) &&
+    requireDateWhenSim(form.aso_assinado, form.data_aso_assinado) &&
+    requireDateWhenSim(
+      form.aso_enviado_cliente,
+      form.data_aso_enviado_cliente
+    ) &&
+    requireDateWhenSim(form.envio_esocial, form.data_envio_esocial) &&
+    requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
+  );
+}
+
+export function getDocumentacaoValidationMessage(
+  form: AgendamentoFormValues
+): string | null {
+  if (isDocumentacaoCompleta(form)) return null;
+
+  if (
+    form.envio_esocial === "Sim" &&
+    !requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
+  ) {
+    return ESOCIAL_RECIBO_TOAST;
+  }
+
+  return VALIDATION_TOAST_MESSAGE;
+}

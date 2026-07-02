@@ -22,6 +22,7 @@ interface ExamSectionProps {
   pricingLoading: boolean;
   onRemove: (id: string) => void;
   onUpdate: (id: string, field: keyof ExameFormItem, value: string) => void;
+  readOnly?: boolean;
 }
 
 const TH =
@@ -38,11 +39,17 @@ export function ExamSection({
   pricingLoading,
   onRemove,
   onUpdate,
+  readOnly = false,
 }: ExamSectionProps) {
   const examesComTipo = exams.filter((exam) => exam.tipo_exame.trim());
 
   return (
-    <Panel title="Exames" icon={<IconFlask />} iconTone="green">
+    <Panel
+      title="Exames"
+      icon={<IconFlask />}
+      iconTone="green"
+      bodyClassName={readOnly ? "pointer-events-none opacity-60" : ""}
+    >
       <p className="mb-3 text-[11px] font-medium text-[#94a3b8]">
         {isAsoRetornoAoTrabalho(aso)
           ? "Para ASO Retorno ao Trabalho, apenas o exame Clínico é carregado automaticamente."
@@ -98,7 +105,9 @@ export function ExamSection({
                   exam={exam}
                   aso={aso}
                   pricingLoading={pricingLoading}
-                  canRemove={podeRemoverExameAgendamento(aso, exam.tipo_exame)}
+                  canRemove={
+                    !readOnly && podeRemoverExameAgendamento(aso, exam.tipo_exame)
+                  }
                   onRemove={() => onRemove(exam.id)}
                   onUpdate={(field, value) => onUpdate(exam.id, field, value)}
                 />

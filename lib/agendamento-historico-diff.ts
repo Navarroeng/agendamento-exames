@@ -3,6 +3,7 @@ import { formatCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { normalizeUppercaseField } from "@/lib/text-normalize";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
+import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
 import type {
   AgendamentoInsert,
   AgendamentoWithExames,
@@ -394,6 +395,74 @@ export function buildHistoricoAlteracoes(
     usuario,
     anterior.agendamento_exames,
     novosExames
+  );
+
+  return changes;
+}
+
+export function buildHistoricoAlteracoesDocumentacao(
+  anterior: AgendamentoWithExames,
+  novo: AgendamentoDocumentacaoInsert,
+  usuarioLogado: string
+): HistoricoEntryDraft[] {
+  const usuario = usuarioLogado;
+  const changes: HistoricoEntryDraft[] = [];
+
+  compareField(
+    changes,
+    usuario,
+    "o número da matrícula",
+    anterior.numero_matricula ?? "",
+    novo.numero_matricula ?? ""
+  );
+
+  compareBoolWithDate(
+    changes,
+    usuario,
+    "ASO enviado para clínica",
+    anterior.aso_enviado_clinica,
+    novo.aso_enviado_clinica,
+    anterior.data_aso_enviado_clinica,
+    novo.data_aso_enviado_clinica,
+    "a data do envio do ASO para a clínica"
+  );
+  compareBoolWithDate(
+    changes,
+    usuario,
+    "ASO assinado",
+    anterior.aso_assinado,
+    novo.aso_assinado,
+    anterior.data_aso_assinado,
+    novo.data_aso_assinado,
+    "a data do ASO assinado"
+  );
+  compareBoolWithDate(
+    changes,
+    usuario,
+    "ASO enviado p/ cliente",
+    anterior.aso_enviado_cliente,
+    novo.aso_enviado_cliente,
+    anterior.data_aso_enviado_cliente,
+    novo.data_aso_enviado_cliente,
+    "a data do envio do ASO para o cliente"
+  );
+  compareBoolWithDate(
+    changes,
+    usuario,
+    "envio ao e-Social",
+    anterior.envio_esocial,
+    novo.envio_esocial,
+    anterior.data_envio_esocial,
+    novo.data_envio_esocial,
+    "a data de envio ao e-Social"
+  );
+
+  compareField(
+    changes,
+    usuario,
+    "o Nº Recibo do e-Social",
+    anterior.esocial_recibo ?? "",
+    novo.esocial_recibo ?? ""
   );
 
   return changes;

@@ -18,11 +18,13 @@ import { StatusDocumentacao } from "./StatusDocumentacao";
 import { TopActions } from "./TopActions";
 import { useAgendamentosPage } from "@/hooks/useAgendamentosPage";
 import { AGENDAMENTOS_PAGE_SIZE } from "@/lib/agendamento-filters";
+import { AGENDAMENTO_FATURA_SOMENTE_DOCUMENTACAO_MSG } from "@/lib/agendamento-documentacao";
 
 export function AgendamentoPage() {
   const {
     showForm,
     editingId,
+    editingSomenteDocumentacao,
     viewAgendamento,
     setViewAgendamento,
     viewFaturaBloqueio,
@@ -103,6 +105,11 @@ export function AgendamentoPage() {
 
       {showForm && (
         <>
+          {editingSomenteDocumentacao ? (
+            <div className="mb-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm font-semibold leading-relaxed text-[#92400e]">
+              {AGENDAMENTO_FATURA_SOMENTE_DOCUMENTACAO_MSG}
+            </div>
+          ) : null}
           <AgendamentoForm
             form={form}
             clinicas={clinicasAtivas}
@@ -117,8 +124,11 @@ export function AgendamentoPage() {
             onChange={setField}
             onClose={closeForm}
             isEditing={!!editingId}
+            readOnly={editingSomenteDocumentacao}
             contratoVigencia={contratoVigencia}
-            showClienteProcuracaoAlert={showClienteProcuracaoAlert}
+            showClienteProcuracaoAlert={
+              showClienteProcuracaoAlert && !editingSomenteDocumentacao
+            }
             exams={exams}
           />
           <ExamSection
@@ -132,11 +142,13 @@ export function AgendamentoPage() {
             pricingLoading={pricingLoading}
             onRemove={removeExam}
             onUpdate={updateExam}
+            readOnly={editingSomenteDocumentacao}
           />
           <StatusDocumentacao form={form} onChange={setField}>
             <FormActions
               saving={saving}
               contratoInvalido={contratoInvalido}
+              somenteDocumentacao={editingSomenteDocumentacao}
               onClear={handleClear}
               onSaveDraft={() => handleSave("rascunho")}
               onSave={() => handleSave("agendado")}

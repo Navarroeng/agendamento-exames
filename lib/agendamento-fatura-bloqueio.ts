@@ -3,6 +3,8 @@ import type { FaturaRecord, FaturaTipo } from "@/lib/types";
 export const AGENDAMENTO_BLOQUEADO_FATURA_MSG =
   "Este agendamento não pode ser alterado porque já está vinculado a uma fatura emitida/paga/vencida.";
 
+export { AGENDAMENTO_FATURA_SOMENTE_DOCUMENTACAO_MSG } from "@/lib/agendamento-documentacao";
+
 export type FaturaClienteStatusExibicao =
   | "Aberta para emissão"
   | "Cancelada"
