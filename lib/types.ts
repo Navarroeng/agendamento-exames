@@ -463,6 +463,7 @@ export interface AgendamentoTableRow {
   matricula: string;
   esocial: boolean;
   bloqueadoPorFatura?: boolean;
+  podeCancelarExcepcionalAdmin?: boolean;
   faturaBloqueioNumero?: string | null;
   faturaBloqueioStatus?: string | null;
 }

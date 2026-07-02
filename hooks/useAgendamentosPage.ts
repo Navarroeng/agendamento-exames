@@ -65,7 +65,7 @@ import {
   suggestHorarioInicio,
   validateClinicaAtendimento,
 } from "@/lib/clinica-regras-atendimento";
-import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useHistoricoUsuario, useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import {
   buildHistoricoAlteracoes,
   buildHistoricoCancelamento,
@@ -96,12 +96,16 @@ import {
 } from "@/services/periodico-futuro.service";
 import {
   AGENDAMENTO_BLOQUEADO_FATURA_MSG,
+  CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST,
   isAgendamentoBloqueadoFaturaError,
   type AgendamentoFaturaBloqueio,
 } from "@/lib/agendamento-fatura-bloqueio";
+import { isPerfilAdmin } from "@/lib/permissions";
 import {
   listarBloqueioFaturaPorAgendamentos,
   obterBloqueioFaturaAgendamento,
+  registrarCancelamentoExcepcionalFaturaEmitida,
+  registrarTentativaCancelamentoBloqueadaFatura,
   registrarTentativaEdicaoBloqueadaFatura,
 } from "@/services/agendamento-fatura-bloqueio.service";
 import { mapAgendamentosToTableRows } from "@/lib/agendamentos-table";
@@ -126,6 +130,8 @@ export function useAgendamentosPage() {
   const prevAsoRef = useRef("");
   const historicoUsuario = useHistoricoUsuario();
   const auditContext = useAuditoriaUsuario();
+  const { profile } = useAuth();
+  const isAdmin = isPerfilAdmin(profile?.perfil);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewAgendamento, setViewAgendamento] =
@@ -135,6 +141,9 @@ export function useAgendamentosPage() {
     string | null
   >(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelModalVariant, setCancelModalVariant] = useState<
+    "normal" | "excepcional"
+  >("normal");
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [duplicidade90DiasOpen, setDuplicidade90DiasOpen] = useState(false);
   const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
@@ -340,7 +349,7 @@ export function useAgendamentosPage() {
     };
   }, [agendamentos]);
 
-  const bloquearAcaoAgendamentoFaturado = useCallback(
+  const bloquearEdicaoAgendamentoFaturado = useCallback(
     async (id: string): Promise<boolean> => {
       let bloqueio = bloqueioPorAgendamento.get(id);
       if (bloqueio === undefined) {
@@ -374,6 +383,22 @@ export function useAgendamentosPage() {
       return true;
     },
     [auditContext, bloqueioPorAgendamento, getById]
+  );
+
+  const obterBloqueioAtualizado = useCallback(
+    async (id: string): Promise<AgendamentoFaturaBloqueio> => {
+      let bloqueio = bloqueioPorAgendamento.get(id);
+      if (bloqueio === undefined) {
+        bloqueio = await obterBloqueioFaturaAgendamento(id);
+        setBloqueioPorAgendamento((prev) => {
+          const next = new Map(prev);
+          next.set(id, bloqueio!);
+          return next;
+        });
+      }
+      return bloqueio ?? { bloqueado: false };
+    },
+    [bloqueioPorAgendamento]
   );
 
   const filterOptions = useMemo(() => {
@@ -414,11 +439,13 @@ export function useAgendamentosPage() {
       return {
         ...row,
         bloqueadoPorFatura: bloqueio?.bloqueado ?? false,
+        podeCancelarExcepcionalAdmin:
+          Boolean(bloqueio?.bloqueado && isAdmin),
         faturaBloqueioNumero: bloqueio?.faturaNumero ?? null,
         faturaBloqueioStatus: bloqueio?.faturaStatusLabel ?? null,
       };
     });
-  }, [orderedAgendamentos, page, bloqueioPorAgendamento]);
+  }, [orderedAgendamentos, page, bloqueioPorAgendamento, isAdmin]);
 
   const viewFaturaBloqueio = useMemo(() => {
     if (!viewAgendamento) return null;
@@ -788,7 +815,7 @@ export function useAgendamentosPage() {
 
   const handleEditar = useCallback(
     async (id: string) => {
-      if (await bloquearAcaoAgendamentoFaturado(id)) return;
+      if (await bloquearEdicaoAgendamentoFaturado(id)) return;
 
       const agendamento = getById(id);
       if (!agendamento) {
@@ -816,7 +843,7 @@ export function useAgendamentosPage() {
         void enforceRetornoTrabalhoExames();
       }
     },
-    [bloquearAcaoAgendamentoFaturado, getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
+    [bloquearEdicaoAgendamentoFaturado, getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames]
   );
 
   const handleVisualizar = useCallback(
@@ -838,8 +865,6 @@ export function useAgendamentosPage() {
 
   const handleCancelar = useCallback(
     async (id: string) => {
-      if (await bloquearAcaoAgendamentoFaturado(id)) return;
-
       const agendamento = getById(id);
       if (!agendamento) {
         toast.error("Agendamento não encontrado.");
@@ -850,10 +875,35 @@ export function useAgendamentosPage() {
         return;
       }
 
+      const bloqueio = await obterBloqueioAtualizado(id);
+
+      if (bloqueio.bloqueado) {
+        if (!isAdmin) {
+          toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
+          if (bloqueio.faturaNumero && bloqueio.faturaStatusLabel) {
+            await registrarTentativaCancelamentoBloqueadaFatura(auditContext, {
+              agendamentoId: id,
+              cliente: agendamento.cliente_nome,
+              colaborador: agendamento.colaborador,
+              dataAgendamento: agendamento.data_agendamento,
+              faturaNumero: bloqueio.faturaNumero,
+              faturaStatusLabel: bloqueio.faturaStatusLabel,
+            });
+          }
+          return;
+        }
+
+        setCancelModalVariant("excepcional");
+        setCancelTargetId(id);
+        setCancelModalOpen(true);
+        return;
+      }
+
+      setCancelModalVariant("normal");
       setCancelTargetId(id);
       setCancelModalOpen(true);
     },
-    [bloquearAcaoAgendamentoFaturado, getById]
+    [auditContext, getById, isAdmin, obterBloqueioAtualizado]
   );
 
   const closeHistoricoModal = useCallback(() => {
@@ -863,14 +913,17 @@ export function useAgendamentosPage() {
 
   const closeCancelModal = useCallback(() => {
     setCancelModalOpen(false);
+    setCancelModalVariant("normal");
     setCancelTargetId(null);
   }, []);
 
   const handleConfirmarCancelamento = useCallback(
     async (motivo: string) => {
       if (!cancelTargetId) return;
-
-      if (await bloquearAcaoAgendamentoFaturado(cancelTargetId)) return;
+      if (!motivo.trim()) {
+        toast.error("Informe o motivo do cancelamento.");
+        return;
+      }
 
       const agendamento = getById(cancelTargetId);
       if (!agendamento) {
@@ -878,9 +931,27 @@ export function useAgendamentosPage() {
         return;
       }
 
+      const isExcepcional = cancelModalVariant === "excepcional";
+      const bloqueio = isExcepcional
+        ? await obterBloqueioAtualizado(cancelTargetId)
+        : null;
+
+      if (!isExcepcional && (await bloquearEdicaoAgendamentoFaturado(cancelTargetId))) {
+        return;
+      }
+
+      if (isExcepcional && !bloqueio?.bloqueado) {
+        toast.error(
+          "Cancelamento excepcional disponível apenas para agendamentos vinculados a fatura emitida."
+        );
+        return;
+      }
+
       setSaving(true);
       try {
-        await cancelarAgendamento(cancelTargetId, motivo);
+        await cancelarAgendamento(cancelTargetId, motivo, {
+          cancelamentoExcepcionalAdmin: isExcepcional,
+        });
         await cancelarPeriodicosPorAgendamento(cancelTargetId);
         await registrarHistorico(
           cancelTargetId,
@@ -891,8 +962,30 @@ export function useAgendamentosPage() {
             registroNome: agendamento.colaborador,
           }
         );
+
+        if (
+          isExcepcional &&
+          bloqueio?.faturaNumero &&
+          bloqueio.faturaStatusLabel
+        ) {
+          await registrarCancelamentoExcepcionalFaturaEmitida(auditContext, {
+            agendamentoId: cancelTargetId,
+            cliente: agendamento.cliente_nome,
+            colaborador: agendamento.colaborador,
+            dataAgendamento: agendamento.data_agendamento,
+            faturaNumero: bloqueio.faturaNumero,
+            faturaStatusLabel: bloqueio.faturaStatusLabel,
+            motivo,
+          });
+        }
+
         toast.success("Agendamento cancelado com sucesso!");
+        if (isExcepcional) {
+          toast.warning(CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST);
+        }
+
         setCancelModalOpen(false);
+        setCancelModalVariant("normal");
         setCancelTargetId(null);
         if (editingId === cancelTargetId) {
           closeForm();
@@ -921,15 +1014,17 @@ export function useAgendamentosPage() {
       }
     },
     [
+      auditContext,
+      cancelModalVariant,
       cancelTargetId,
-      bloquearAcaoAgendamentoFaturado,
-      getById,
-      setSaving,
-      editingId,
       closeForm,
-      viewAgendamento,
-      refresh,
+      editingId,
+      getById,
       historicoUsuario,
+      obterBloqueioAtualizado,
+      refresh,
+      viewAgendamento,
+      bloquearEdicaoAgendamentoFaturado,
     ]
   );
 
@@ -953,7 +1048,7 @@ export function useAgendamentosPage() {
 
   const executeSave = useCallback(
     async (status: AgendamentoStatus) => {
-      if (editingId && (await bloquearAcaoAgendamentoFaturado(editingId))) {
+      if (editingId && (await bloquearEdicaoAgendamentoFaturado(editingId))) {
         return;
       }
 
@@ -1189,7 +1284,7 @@ export function useAgendamentosPage() {
     },
     [
       hasExamWarnings,
-      bloquearAcaoAgendamentoFaturado,
+      bloquearEdicaoAgendamentoFaturado,
       form,
       exams,
       selectedClinica,
@@ -1249,6 +1344,7 @@ export function useAgendamentosPage() {
     historicoOpen,
     historicoAgendamentoId,
     cancelModalOpen,
+    cancelModalVariant,
     saving,
     form,
     setField,

@@ -373,13 +373,23 @@ export async function reemitirFaturaClienteCancelada(
   input: ReemitirFaturaClienteInput,
   auditOptions?: FaturaAuditOptions
 ): Promise<FaturaComItens> {
-  const cancelada = await buscarFaturaComItens(input.faturaCanceladaId);
-  if (!cancelada) throw new Error("Fatura não encontrada.");
-  if (cancelada.status !== "cancelada") {
-    throw new Error("Somente faturas canceladas podem ser reemitidas.");
-  }
-  if (cancelada.tipo !== "cliente") {
+  return reemitirFaturaCliente(input, auditOptions);
+}
+
+export async function reemitirFaturaCliente(
+  input: ReemitirFaturaClienteInput,
+  auditOptions?: FaturaAuditOptions
+): Promise<FaturaComItens> {
+  const existente = await buscarFaturaComItens(input.faturaCanceladaId);
+  if (!existente) throw new Error("Fatura não encontrada.");
+  if (existente.tipo !== "cliente") {
     throw new Error("Reemissão disponível apenas para faturas de clientes.");
+  }
+
+  if (existente.status === "emitida") {
+    await cancelarFatura(input.faturaCanceladaId, auditOptions);
+  } else if (existente.status !== "cancelada") {
+    throw new Error("Somente faturas canceladas ou emitidas com alteração podem ser reemitidas.");
   }
 
   const valorTotal = input.itens.reduce(
@@ -390,8 +400,8 @@ export async function reemitirFaturaClienteCancelada(
   return salvarFatura(
     {
       tipo: "cliente",
-      referencia_nome: cancelada.referencia_nome,
-      referencia_id: cancelada.referencia_id,
+      referencia_nome: existente.referencia_nome,
+      referencia_id: existente.referencia_id,
       periodo_inicio: input.periodo_inicio,
       periodo_fim: input.periodo_fim,
       mes_referencia: input.mes_referencia,
@@ -402,7 +412,7 @@ export async function reemitirFaturaClienteCancelada(
       status: "emitida",
       gerado_por: input.gerado_por,
       itens: input.itens,
-      reemitida_de_fatura_numero: cancelada.numero,
+      reemitida_de_fatura_numero: existente.numero,
     },
     auditOptions
   );

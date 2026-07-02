@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 interface RowActionsMenuProps {
   agendamentoId: string;
   bloqueadoPorFatura?: boolean;
+  podeCancelarExcepcionalAdmin?: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -22,6 +23,7 @@ type MenuItem = {
 export function RowActionsMenu({
   agendamentoId,
   bloqueadoPorFatura = false,
+  podeCancelarExcepcionalAdmin = false,
   onVisualizar,
   onEditar,
   onCancelar,
@@ -47,11 +49,23 @@ export function RowActionsMenu({
     { key: "visualizar", label: "Visualizar", onClick: () => onVisualizar(agendamentoId) },
   ];
 
-  if (bloqueadoPorFatura) {
+  if (bloqueadoPorFatura && !podeCancelarExcepcionalAdmin) {
     items.push({
       key: "bloqueado",
       label: "Bloqueado por fatura",
       disabled: true,
+    });
+  } else if (bloqueadoPorFatura && podeCancelarExcepcionalAdmin) {
+    items.push({
+      key: "bloqueado-editar",
+      label: "Edição bloqueada por fatura",
+      disabled: true,
+    });
+    items.push({
+      key: "cancelar",
+      label: "Cancelar",
+      danger: true,
+      onClick: () => onCancelar(agendamentoId),
     });
   } else {
     items.push(

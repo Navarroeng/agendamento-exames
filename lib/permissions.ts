@@ -45,6 +45,12 @@ export function canExcluirOrcamento(
   return getPermissionsForPerfil(perfil).fullAccess === true;
 }
 
+export function isPerfilAdmin(
+  perfil: PerfilUsuarioTipo | null | undefined
+): boolean {
+  return getPermissionsForPerfil(perfil).fullAccess === true;
+}
+
 export function canAccessPath(
   perfil: PerfilUsuarioTipo | null | undefined,
   pathname: string

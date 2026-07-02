@@ -17,6 +17,7 @@ import {
   type FaturaMesRow,
   type FaturaMesStatus,
 } from "@/lib/fatura-mes-resumo";
+import { FATURA_ALTERACAO_POS_EMISSAO_MSG } from "@/lib/fatura-alteracao-pos-emissao";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaTipo } from "@/lib/types";
 import { FaturasMesRowActions } from "./FaturasMesRowActions";
@@ -378,7 +379,14 @@ export function FaturasMesPanel({
                       {formatCurrency(row.valorTotal)}
                     </td>
                     <td className="px-2.5 py-2">
-                      {statusBadge(row.status, config.statusLabels)}
+                      <div className="space-y-1">
+                        {statusBadge(row.status, config.statusLabels)}
+                        {row.alteracaoPosEmissao && (
+                          <p className="max-w-[180px] text-[10px] font-medium leading-snug text-[#b45309]">
+                            {FATURA_ALTERACAO_POS_EMISSAO_MSG}
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2.5 py-2">
                       <FaturasMesRowActions

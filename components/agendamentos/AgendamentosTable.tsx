@@ -208,6 +208,9 @@ export function AgendamentosTable({
                     <RowActionsMenu
                       agendamentoId={row.agendamentoId}
                       bloqueadoPorFatura={row.bloqueadoPorFatura}
+                      podeCancelarExcepcionalAdmin={
+                        row.podeCancelarExcepcionalAdmin
+                      }
                       onVisualizar={onVisualizar}
                       onEditar={onEditar}
                       onCancelar={onCancelar}

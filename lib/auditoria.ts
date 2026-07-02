@@ -38,6 +38,8 @@ export const AUDITORIA_ACOES = {
   agendamento_sem_procuracao_confirmado: "agendamento_sem_procuracao_confirmado",
   clinico_zero_demissional: "clinico_zero_demissional",
   fatura_reemitida: "fatura_reemitida",
+  cancelamento_excepcional_fatura_emitida:
+    "cancelamento_excepcional_fatura_emitida",
   custo_clinica_marcado_conferido: "custo_clinica_marcado_conferido",
   custo_clinica_conferencia_reaberta: "custo_clinica_conferencia_reaberta",
 } as const;
@@ -81,6 +83,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
     "Agendamento confirmado sem procuração ativa",
   clinico_zero_demissional: "Clínico R$ 0,00 — ASO Demissional",
   fatura_reemitida: "Fatura reemitida",
+  cancelamento_excepcional_fatura_emitida:
+    "Cancelamento excepcional (fatura emitida)",
   custo_clinica_marcado_conferido: "Custo marcado como conferido",
   custo_clinica_conferencia_reaberta: "Conferência reaberta",
 };

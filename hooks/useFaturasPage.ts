@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
 import { calcVencimentoFaturaCliente } from "@/lib/fatura-vencimento";
-import { mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
+import { canReemitirFaturaCliente, mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
@@ -51,6 +51,7 @@ import {
   reemitirFaturaClienteCancelada,
   salvarFatura,
 } from "@/services/fatura-historico.service";
+import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
@@ -148,6 +149,38 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     useState<FaturaExistenteInfo | null>(null);
   const [faturaDuplicidadeTipo, setFaturaDuplicidadeTipo] =
     useState<FaturaTipo>("cliente");
+  const [faturasComAlteracaoPosEmissao, setFaturasComAlteracaoPosEmissao] =
+    useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (pageTipo !== "cliente") {
+      setFaturasComAlteracaoPosEmissao(new Set());
+      return;
+    }
+
+    const emitidaIds = faturas
+      .filter((f) => f.tipo === "cliente" && f.status === "emitida")
+      .map((f) => f.id);
+
+    if (emitidaIds.length === 0) {
+      setFaturasComAlteracaoPosEmissao(new Set());
+      return;
+    }
+
+    let cancelled = false;
+
+    void listarFaturasClienteComAlteracaoPosEmissao(emitidaIds)
+      .then((ids) => {
+        if (!cancelled) setFaturasComAlteracaoPosEmissao(ids);
+      })
+      .catch((err) => {
+        console.error("Erro ao verificar alterações pós-emissão:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [faturas, pageTipo]);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -222,23 +255,36 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
   const resumoMes = useMemo(() => {
     if (!mesReferenciaValido) return null;
-    if (pageTipo === "cliente") {
-      return buildResumoClientesMes(
-        agendamentos,
-        faturas,
-        filters.mesReferencia,
-        filters.cliente
-      );
-    }
-    return buildResumoClinicasMes(
-      agendamentos,
-      faturas,
-      filters.mesReferencia,
-      filters.clinica
-    );
+    const base =
+      pageTipo === "cliente"
+        ? buildResumoClientesMes(
+            agendamentos,
+            faturas,
+            filters.mesReferencia,
+            filters.cliente
+          )
+        : buildResumoClinicasMes(
+            agendamentos,
+            faturas,
+            filters.mesReferencia,
+            filters.clinica
+          );
+
+    if (!base || pageTipo !== "cliente") return base;
+
+    return {
+      ...base,
+      rows: base.rows.map((row) => ({
+        ...row,
+        alteracaoPosEmissao: row.fatura
+          ? faturasComAlteracaoPosEmissao.has(row.fatura.id)
+          : false,
+      })),
+    };
   }, [
     agendamentos,
     faturas,
+    faturasComAlteracaoPosEmissao,
     filters.cliente,
     filters.clinica,
     filters.mesReferencia,
@@ -341,14 +387,17 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     async (
       tipo: FaturaTipo,
       referencia: string,
-      ignorarFaturaId?: string | null
+      ignorarFaturaId?: string | null,
+      mesReferenciaOverride?: string
     ): Promise<boolean> => {
-      if (!filters.mesReferencia.trim()) return false;
+      const mesReferencia =
+        mesReferenciaOverride?.trim() || filters.mesReferencia.trim();
+      if (!mesReferencia) return false;
 
       const existente = await verificarFaturaExistenteMes({
         tipo,
         referenciaNome: referencia,
-        mesReferencia: filters.mesReferencia,
+        mesReferencia,
         ignorarFaturaId,
       });
 
@@ -1001,8 +1050,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Fatura não encontrada.");
         return;
       }
-      if (fatura.status !== "cancelada") {
-        toast.error("Somente faturas canceladas podem ser reemitidas.");
+      if (
+        !canReemitirFaturaCliente(fatura, {
+          alteracaoPosEmissao: faturasComAlteracaoPosEmissao.has(fatura.id),
+        })
+      ) {
+        toast.error("Esta fatura não pode ser reemitida.");
         return;
       }
 
@@ -1017,14 +1070,25 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       }
 
       const referencia = fatura.referencia_nome.trim();
-      const ok = window.confirm(
-        `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
-          "Será criada uma nova fatura com os agendamentos e valores atuais do mês. " +
-          "A fatura cancelada permanecerá no histórico."
-      );
+      const confirmMessage =
+        fatura.status === "emitida"
+          ? `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
+            "A fatura emitida atual será cancelada e substituída por uma nova com os valores atualizados."
+          : `Reemitir fatura ${fatura.numero} para ${referencia} (${mesReferencia})?\n\n` +
+            "Será criada uma nova fatura com os agendamentos e valores atuais do mês. " +
+            "A fatura cancelada permanecerá no histórico.";
+
+      const ok = window.confirm(confirmMessage);
       if (!ok) return;
 
-      if (await bloquearFaturaDuplicada(pageTipo, referencia)) {
+      if (
+        await bloquearFaturaDuplicada(
+          pageTipo,
+          referencia,
+          fatura.id,
+          mesReferencia
+        )
+      ) {
         return;
       }
 
@@ -1079,6 +1143,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       auditOptions,
       bloquearFaturaDuplicada,
       faturas,
+      faturasComAlteracaoPosEmissao,
       filters,
       geradoPor,
       pageTipo,

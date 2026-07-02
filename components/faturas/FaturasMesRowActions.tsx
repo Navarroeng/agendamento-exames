@@ -94,7 +94,10 @@ export function FaturasMesRowActions({
   if (
     fatura &&
     variant === "cliente" &&
-    (row.status === "cancelada" || canReemitirFaturaCliente(fatura))
+    (row.status === "cancelada" ||
+      canReemitirFaturaCliente(fatura, {
+        alteracaoPosEmissao: row.alteracaoPosEmissao,
+      }))
   ) {
     return (
       <CanceladaClienteActionsMenu
@@ -102,6 +105,9 @@ export function FaturasMesRowActions({
         saving={saving}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
         onReemitir={() => onReemitir?.(fatura.id)}
+        reemitirLabel={
+          fatura.status === "emitida" ? "Reemitir fatura" : "Emitir novamente"
+        }
       />
     );
   }
@@ -231,11 +237,13 @@ function CanceladaClienteActionsMenu({
   saving,
   onVisualizar,
   onReemitir,
+  reemitirLabel = "Emitir novamente",
 }: {
   referenciaNome: string;
   saving: boolean;
   onVisualizar: () => void;
   onReemitir: () => void;
+  reemitirLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -255,7 +263,7 @@ function CanceladaClienteActionsMenu({
 
   const items: MenuItem[] = [
     { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
-    { key: "reemitir", label: "Emitir novamente", onClick: onReemitir },
+    { key: "reemitir", label: reemitirLabel, onClick: onReemitir },
   ];
 
   function handleAction(item: MenuItem) {

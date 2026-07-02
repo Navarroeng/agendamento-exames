@@ -14,6 +14,14 @@ export function mesReferenciaBRFromFatura(
   return `${match[2]}/${match[1]}`;
 }
 
-export function canReemitirFaturaCliente(fatura: FaturaRecord): boolean {
-  return fatura.tipo === "cliente" && fatura.status === "cancelada";
+export function canReemitirFaturaCliente(
+  fatura: FaturaRecord,
+  options?: { alteracaoPosEmissao?: boolean }
+): boolean {
+  if (fatura.tipo !== "cliente") return false;
+  if (fatura.status === "cancelada") return true;
+  if (fatura.status === "emitida" && options?.alteracaoPosEmissao) {
+    return true;
+  }
+  return false;
 }

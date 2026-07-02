@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 interface AgendamentoCancelarModalProps {
   open: boolean;
+  variant?: "normal" | "excepcional";
   onClose: () => void;
   onConfirm: (motivo: string) => void;
   saving?: boolean;
@@ -11,11 +12,13 @@ interface AgendamentoCancelarModalProps {
 
 export function AgendamentoCancelarModal({
   open,
+  variant = "normal",
   onClose,
   onConfirm,
   saving = false,
 }: AgendamentoCancelarModalProps) {
   const [motivo, setMotivo] = useState("");
+  const isExcepcional = variant === "excepcional";
 
   useEffect(() => {
     if (open) setMotivo("");
@@ -59,10 +62,14 @@ export function AgendamentoCancelarModal({
                 id="cancel-modal-title"
                 className="text-lg font-extrabold text-[#2d2a4a]"
               >
-                Cancelar agendamento
+                {isExcepcional
+                  ? "Cancelamento excepcional"
+                  : "Cancelar agendamento"}
               </h3>
               <p className="mt-1 text-sm text-[#8b95a8]">
-                Informe o motivo do cancelamento para registro no sistema.
+                {isExcepcional
+                  ? "Este agendamento está vinculado a uma fatura já emitida. O cancelamento irá exigir reemissão ou correção da fatura do cliente. Deseja continuar?"
+                  : "Informe o motivo do cancelamento para registro no sistema."}
               </p>
             </div>
           </div>
@@ -73,7 +80,10 @@ export function AgendamentoCancelarModal({
             htmlFor="motivo-cancelamento"
             className="mb-2 block text-[13px] font-bold text-[#253454]"
           >
-            Motivo do cancelamento <span className="text-brand-red">*</span>
+            {isExcepcional
+              ? "Motivo do cancelamento excepcional"
+              : "Motivo do cancelamento"}{" "}
+            <span className="text-brand-red">*</span>
           </label>
           <textarea
             id="motivo-cancelamento"

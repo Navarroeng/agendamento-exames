@@ -31,6 +31,7 @@ export interface FaturaMesRow {
   valorTotal: number;
   fatura: FaturaRecord | null;
   status: FaturaMesStatus;
+  alteracaoPosEmissao?: boolean;
 }
 
 /** @deprecated Use FaturaMesRow */

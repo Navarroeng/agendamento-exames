@@ -29,6 +29,7 @@ export function AgendamentoPage() {
     historicoOpen,
     historicoAgendamentoId,
     cancelModalOpen,
+    cancelModalVariant,
     saving,
     form,
     setField,
@@ -192,6 +193,7 @@ export function AgendamentoPage() {
       />
       <AgendamentoCancelarModal
         open={cancelModalOpen}
+        variant={cancelModalVariant}
         saving={saving}
         onClose={closeCancelModal}
         onConfirm={handleConfirmarCancelamento}

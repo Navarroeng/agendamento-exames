@@ -47,6 +47,16 @@ export function faturaClienteBloqueiaEdicaoAgendamento(
   return fatura.tipo === "cliente" && fatura.status === "emitida";
 }
 
+export function podeCancelarExcepcionalAdminPorFatura(
+  bloqueio: AgendamentoFaturaBloqueio,
+  isAdmin: boolean
+): boolean {
+  return Boolean(bloqueio.bloqueado && isAdmin);
+}
+
+export const CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST =
+  "Agendamento cancelado. Reemita ou ajuste a fatura do cliente para gerar o PDF correto.";
+
 export function resolverBloqueioAgendamentoFatura(
   faturas: FaturaVinculoAgendamento[]
 ): AgendamentoFaturaBloqueio {
