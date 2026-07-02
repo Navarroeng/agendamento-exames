@@ -57,7 +57,7 @@ import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.serv
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptions } from "@/lib/cliente-display";
-import { FATURA_SEM_ELEGIVEIS_MSG } from "@/lib/fatura-elegibilidade";
+import { FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG, FATURA_SEM_ELEGIVEIS_MSG } from "@/lib/fatura-elegibilidade";
 import type {
   AgendamentoWithExames,
   FaturaPreviewState,
@@ -1124,7 +1124,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
       const itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
       if (itens.length === 0) {
-        toast.error(NO_RECORDS_TOAST);
+        toast.error(FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG);
         return;
       }
 

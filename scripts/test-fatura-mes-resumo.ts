@@ -34,6 +34,15 @@ function ag(
   } as AgendamentoWithExames;
 }
 
+function agCancelado(
+  id: string,
+  cliente: string,
+  data: string,
+  valor: number
+): AgendamentoWithExames {
+  return { ...ag(id, cliente, data, valor), status: "cancelado" };
+}
+
 function fatura(
   id: string,
   cliente: string,
@@ -102,8 +111,8 @@ assert.equal(result.resumo.totalReferencias, 2);
 assert.equal(result.resumo.totalAgendamentos, 3);
 assert.equal(result.resumo.totalExames, 3);
 assert.equal(result.resumo.valorPrevisto, 250);
-assert.equal(result.resumo.valorEmitido, 100);
-assert.equal(result.resumo.valorPago, 100);
+assert.equal(result.resumo.valorEmitido, 50);
+assert.equal(result.resumo.valorPago, 50);
 assert.equal(result.resumo.valorEmAberto, 0);
 
 assert.equal(deriveFaturaMesStatus(null), "aberta_emissao");
@@ -139,10 +148,45 @@ const julho = buildResumoClientesMes(
   "07/2026"
 );
 assert.ok(julho);
-assert.equal(julho.rows.length, 1);
-assert.equal(julho.rows[0].referenciaNome, "Aluminio Firenze");
-assert.equal(julho.rows[0].status, "rascunho");
-assert.equal(julho.rows[0].fatura?.id, "f2");
+assert.equal(
+  julho.rows.length,
+  0,
+  "fatura sem agendamentos válidos no mês não deve aparecer"
+);
+
+const faturaNecessitaSemAg = fatura(
+  "f-club",
+  "Club Coffee",
+  "2026-06",
+  "necessita_reemissao"
+);
+const clubCoffeeCancelado = buildResumoClientesMes(
+  [agCancelado("club-1", "Club Coffee", "2026-06-12", 129)],
+  [faturaNecessitaSemAg],
+  "06/2026",
+  "Club"
+);
+assert.ok(clubCoffeeCancelado);
+assert.equal(
+  clubCoffeeCancelado.rows.length,
+  0,
+  "cliente só com agendamento cancelado não deve aparecer"
+);
+
+const clubCoffeeParcial = buildResumoClientesMes(
+  [
+    agCancelado("club-1", "Club Coffee", "2026-06-12", 129),
+    ag("club-2", "Club Coffee", "2026-06-18", 40),
+  ],
+  [faturaNecessitaSemAg],
+  "06/2026",
+  "Club"
+);
+assert.ok(clubCoffeeParcial);
+assert.equal(clubCoffeeParcial.rows.length, 1);
+assert.equal(clubCoffeeParcial.rows[0].qtdAgendamentos, 1);
+assert.equal(clubCoffeeParcial.rows[0].qtdExames, 1);
+assert.equal(clubCoffeeParcial.rows[0].valorTotal, 40);
 
 const reemitidaAntiga = fatura("f-old", "Empresa X", "2026-06", "reemitida");
 const emitidaNova = fatura("f-new", "Empresa X", "2026-06", "emitida");
@@ -153,12 +197,9 @@ const junhoMultiplas = buildResumoClientesMes(
   "Empresa X"
 );
 assert.ok(junhoMultiplas);
-assert.equal(junhoMultiplas.rows.length, 2);
-assert.deepEqual(
-  junhoMultiplas.rows.map((row) => row.fatura?.id).sort(),
-  ["f-new", "f-old"]
-);
-assert.equal(junhoMultiplas.resumo.valorEmitido, 100);
+assert.equal(junhoMultiplas.rows.length, 1);
+assert.equal(junhoMultiplas.rows[0].fatura?.id, "f-new");
+assert.equal(junhoMultiplas.resumo.valorEmitido, 50);
 assert.equal(junhoMultiplas.resumo.valorPrevisto, 50);
 
 const periodoCompleto = buildResumoClientesMes(
@@ -167,15 +208,8 @@ const periodoCompleto = buildResumoClientesMes(
   ""
 );
 assert.ok(periodoCompleto);
-assert.equal(periodoCompleto.rows.length, 2);
-assert.ok(
-  periodoCompleto.rows.every((row) => row.fatura),
-  "todo o período deve listar cada fatura cadastrada"
-);
-assert.deepEqual(
-  periodoCompleto.rows.map((row) => row.fatura?.id).sort(),
-  ["f1", "f2"]
-);
+assert.equal(periodoCompleto.rows.length, 1);
+assert.equal(periodoCompleto.rows[0].fatura?.id, "f1");
 
 const agsClinica = [
   ag("10", "Cliente A", "2026-06-10", 0),

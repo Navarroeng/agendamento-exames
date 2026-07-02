@@ -187,6 +187,25 @@ export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
   return valorTotal > 0;
 }
 
+/** Linha ativa exige ao menos um agendamento elegível no período. */
+export function rowPossuiAgendamentosValidos(
+  row: Pick<FaturaMesRow, "qtdAgendamentos">
+): boolean {
+  return row.qtdAgendamentos > 0;
+}
+
+function isRowAtivaNoResumo(row: FaturaMesRow): boolean {
+  if (!rowPossuiAgendamentosValidos(row)) return false;
+  if (row.fatura && faturaStatusHistoricoInativo(row.fatura.status)) {
+    return false;
+  }
+  return true;
+}
+
+function filterRowsFaturaveis(rows: FaturaMesRow[]): FaturaMesRow[] {
+  return rows.filter(isRowAtivaNoResumo);
+}
+
 export const PERIODO_COMPLETO_LABEL = "Todo o período";
 
 /** @deprecated Use isReferenciaFaturavelNoMes */
@@ -240,21 +259,14 @@ function buildRowFromFatura(
       )
     : [];
 
-  const fromAgendamentos = buildMetricsFromAgendamentos(ags, tipo);
-  const useAgendamentos = ags.length > 0;
+  const metrics = buildMetricsFromAgendamentos(ags, tipo);
 
   return {
     referenciaNome,
     periodoLabel,
-    qtdAgendamentos: useAgendamentos
-      ? fromAgendamentos.qtdAgendamentos
-      : 0,
-    qtdExames: useAgendamentos
-      ? fromAgendamentos.qtdExames
-      : Number(fatura.total_exames ?? 0),
-    valorTotal: useAgendamentos
-      ? fromAgendamentos.valorTotal
-      : Number(fatura.valor_total ?? 0),
+    qtdAgendamentos: metrics.qtdAgendamentos,
+    qtdExames: metrics.qtdExames,
+    valorTotal: metrics.valorTotal,
     fatura,
     status: deriveFaturaMesStatus(fatura),
   };
@@ -273,7 +285,7 @@ function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
     if (!row.fatura || !faturaStatusContaNoResumoEmitido(row.fatura.status)) {
       return;
     }
-    const valor = Number(row.fatura.valor_total);
+    const valor = Number(row.valorTotal);
     valorEmitido += valor;
     if (row.fatura.pago) {
       valorPago += valor;
@@ -329,9 +341,10 @@ function buildResumoPeriodoCompleto(
       );
     });
 
-  rows.sort(compareFaturaMesRows);
+  const rowsFaturaveis = filterRowsFaturaveis(rows);
+  rowsFaturaveis.sort(compareFaturaMesRows);
 
-  return { rows, resumo: computeResumo(rows) };
+  return { rows: rowsFaturaveis, resumo: computeResumo(rowsFaturaveis) };
 }
 
 function buildResumoMesInterno(
@@ -404,7 +417,7 @@ function buildResumoMesInterno(
     })
     .filter((row) => isReferenciaFaturavelNoMes(row.valorTotal));
 
-  const rows = [...rowsFromFaturas, ...rowsAbertas];
+  const rows = filterRowsFaturaveis([...rowsFromFaturas, ...rowsAbertas]);
   rows.sort(compareFaturaMesRows);
 
   return { rows, resumo: computeResumo(rows) };

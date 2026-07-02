@@ -10,7 +10,34 @@ import {
   findFaturaReferenciaMes,
 } from "../lib/fatura-mes-resumo";
 import { faturaClienteEmitidaPossuiAlteracaoPosEmissao } from "../lib/fatura-alteracao-pos-emissao";
-import type { FaturaRecord } from "../lib/types";
+import type { FaturaRecord, AgendamentoWithExames } from "../lib/types";
+
+function ag(
+  id: string,
+  cliente: string,
+  data: string,
+  valor: number
+): AgendamentoWithExames {
+  return {
+    id,
+    cliente_nome: cliente,
+    data_agendamento: data,
+    status: "agendado",
+    colaborador: "Colab",
+    clinica_nome: "Clínica A",
+    responsavel: "Resp",
+    aso: "Admissional",
+    agendamento_exames: [
+      {
+        id: `${id}-e1`,
+        agendamento_id: id,
+        tipo_exame: "Clínico",
+        valor_cliente: valor,
+        custo_clinica: 0,
+      },
+    ],
+  } as AgendamentoWithExames;
+}
 
 function fatura(
   id: string,
@@ -113,15 +140,29 @@ assert.equal(emitida.fatura_origem_id, "r1");
 assert.equal(reemitida.fatura_substituta_id, "e1");
 
 const resumoReemissao = buildResumoClientesMes(
-  [],
+  [ag("a1", "Empresa A", "2026-06-10", 120)],
   [reemitida, emitida],
   "06/2026",
   "Empresa A"
 );
 assert.ok(resumoReemissao);
-assert.equal(resumoReemissao.rows.length, 2);
+assert.equal(resumoReemissao.rows.length, 1);
+assert.equal(resumoReemissao.rows[0].fatura?.id, "e1");
 assert.equal(resumoReemissao.resumo.valorEmitido, 120);
 assert.equal(resumoReemissao.resumo.valorEmAberto, 120);
 assert.equal(resumoReemissao.resumo.valorPrevisto, 120);
+
+const resumoSemAgendamentos = buildResumoClientesMes(
+  [],
+  [reemitida, emitida],
+  "06/2026",
+  "Empresa A"
+);
+assert.ok(resumoSemAgendamentos);
+assert.equal(
+  resumoSemAgendamentos.rows.length,
+  0,
+  "faturas sem agendamentos válidos não entram na listagem ativa"
+);
 
 console.log("test-fatura-reemissao-fluxo: OK");
