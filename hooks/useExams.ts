@@ -18,6 +18,7 @@ import {
 import { ordenarExamesAgendamentoComClinicoPrimeiro } from "@/lib/agendamento-exames-order";
 import { resolveMotivoValorZeroPayload } from "@/lib/agendamento-clinico-zero-demissional";
 import {
+  CLINICO_VALOR_ASO_RETORNO_TRABALHO,
   EXAME_CLINICO_NOME,
   EXAME_SEM_CUSTO_CLINICA_MSG,
   getClinicoValorNavarroAuto,
@@ -161,7 +162,7 @@ async function fetchPrecoClinicoRetornoTrabalho(
     };
   }
 
-  const valor = formatMoney(result.valorNavarro);
+  const valor = formatMoney(CLINICO_VALOR_ASO_RETORNO_TRABALHO);
   const custo = formatMoney(result.custoClinica);
 
   return {

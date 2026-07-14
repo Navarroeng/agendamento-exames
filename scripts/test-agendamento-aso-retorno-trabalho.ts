@@ -7,6 +7,10 @@ import {
   isAsoRetornoAoTrabalho,
   podeRemoverExameAgendamento,
 } from "../lib/agendamento-aso-retorno-trabalho";
+import {
+  CLINICO_VALOR_ASO_RETORNO_TRABALHO,
+  getClinicoValorNavarroAuto,
+} from "../lib/exame-pricing";
 
 let failed = 0;
 
@@ -52,6 +56,14 @@ test("filtra exames do formulário para somente Clínico", () => {
   const filtered = filtrarExamesFormParaAso(exams as never, ASO_RETORNO_AO_TRABALHO);
   assert(filtered.length === 1, "deveria ter 1 exame");
   assert(filtered[0].tipo_exame === "Clínico", "deveria ser Clínico");
+});
+
+test("valor cliente automático do Clínico é R$ 100", () => {
+  assert(
+    getClinicoValorNavarroAuto(ASO_RETORNO_AO_TRABALHO) ===
+      CLINICO_VALOR_ASO_RETORNO_TRABALHO,
+    "retorno ao trabalho deveria ser 100"
+  );
 });
 
 test("não permite remover Clínico em Retorno ao Trabalho", () => {
