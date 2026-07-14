@@ -21,6 +21,8 @@ import {
   buildResumoClientesMes,
   buildResumoClinicasMes,
   getCurrentMonthYearBR,
+  computeFaturaMesResumo,
+  filterFaturaMesRowsByStatus,
 } from "@/lib/fatura-mes-resumo";
 import {
   buildFaturaItensFromAgendamentos,
@@ -270,26 +272,21 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [filters.mesReferencia]
   );
 
-  const resumoMes = useMemo(() => {
+  const resumoMesBase = useMemo(() => {
     if (!mesReferenciaValido) return null;
-    const base =
-      pageTipo === "cliente"
-        ? buildResumoClientesMes(
-            agendamentos,
-            faturas,
-            filters.mesReferencia,
-            filters.cliente
-          )
-        : buildResumoClinicasMes(
-            agendamentos,
-            faturas,
-            filters.mesReferencia,
-            filters.clinica
-          );
-
-    if (!base || pageTipo !== "cliente") return base;
-
-    return base;
+    return pageTipo === "cliente"
+      ? buildResumoClientesMes(
+          agendamentos,
+          faturas,
+          filters.mesReferencia,
+          filters.cliente
+        )
+      : buildResumoClinicasMes(
+          agendamentos,
+          faturas,
+          filters.mesReferencia,
+          filters.clinica
+        );
   }, [
     agendamentos,
     faturas,
@@ -299,6 +296,22 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     mesReferenciaValido,
     pageTipo,
   ]);
+
+  const resumoMes = useMemo(() => {
+    if (!resumoMesBase) return null;
+    if (pageTipo !== "cliente" || !filters.status.trim()) {
+      return resumoMesBase;
+    }
+
+    const rows = filterFaturaMesRowsByStatus(
+      resumoMesBase.rows,
+      filters.status
+    );
+    return {
+      rows,
+      resumo: computeFaturaMesResumo(rows),
+    };
+  }, [filters.status, pageTipo, resumoMesBase]);
 
   const faturasDoTipo = useMemo(
     () => faturas.filter((f) => f.tipo === pageTipo),
@@ -455,7 +468,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
-        resumoMes?.rows,
+        resumoMesBase?.rows,
         referencia
       );
 
@@ -496,7 +509,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       setPreview(nextPreview);
       setPreviewOpen(true);
     },
-    [agendamentos, bloquearFaturaDuplicada, filters, resumoMes?.rows]
+    [agendamentos, bloquearFaturaDuplicada, filters, resumoMesBase?.rows]
   );
 
   const openPreviewForTipo = useCallback(
@@ -955,7 +968,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
-        resumoMes?.rows,
+        resumoMesBase?.rows,
         referencia
       );
 
@@ -1018,7 +1031,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       filters,
       pageTipo,
       persistPreview,
-      resumoMes?.rows,
+      resumoMesBase?.rows,
       syncClienteVencimentoNoPreview,
     ]
   );

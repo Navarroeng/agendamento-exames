@@ -176,6 +176,7 @@ export function FaturasMesPanel({
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
   const filterValue = filters[config.filterField];
+  const statusFilterActive = variant === "cliente" && filters.status.trim() !== "";
   const ListIcon = variant === "clinica" ? IconWallet : IconReceipt;
 
   const resumoCards: {
@@ -228,7 +229,11 @@ export function FaturasMesPanel({
   return (
     <div className="space-y-5">
       <Panel title="Mês de referência" icon={<IconSearch />}>
-        <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2">
+        <div
+          className={`grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2 ${
+            variant === "cliente" ? "lg:grid-cols-3" : ""
+          }`}
+        >
           <Field label="Mês de referência">
             <MonthReferenceSelect
               value={filters.mesReferencia}
@@ -276,6 +281,26 @@ export function FaturasMesPanel({
               </>
             )}
           </Field>
+
+          {variant === "cliente" && (
+            <Field label="Filtrar status (opcional)">
+              <select
+                className="field-input"
+                value={filters.status}
+                disabled={disabled}
+                onChange={(e) => onChange("status", e.target.value)}
+              >
+                <option value="">Todos os status</option>
+                {(Object.keys(FATURA_MES_STATUS_LABELS) as FaturaMesStatus[]).map(
+                  (status) => (
+                    <option key={status} value={status}>
+                      {FATURA_MES_STATUS_LABELS[status]}
+                    </option>
+                  )
+                )}
+              </select>
+            </Field>
+          )}
         </div>
 
         <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]">
@@ -330,7 +355,7 @@ export function FaturasMesPanel({
         {!loading && mesValido && rows.length === 0 && (
           <p className="py-6 text-center text-sm text-app-muted">
             {config.emptyNone}
-            {filterValue.trim() ? config.emptyFiltered : ""}.
+            {filterValue.trim() || statusFilterActive ? config.emptyFiltered : ""}.
           </p>
         )}
 

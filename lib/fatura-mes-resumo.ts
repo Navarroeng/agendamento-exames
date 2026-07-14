@@ -489,3 +489,18 @@ export function buildResumoClinicasMes(
     "clinica"
   );
 }
+
+export function filterFaturaMesRowsByStatus(
+  rows: FaturaMesRow[],
+  status: string
+): FaturaMesRow[] {
+  const trimmed = status.trim();
+  if (!trimmed) return rows;
+  return rows.filter((row) => row.status === trimmed);
+}
+
+export function computeFaturaMesResumo(
+  rows: FaturaMesRow[]
+): FaturaMesResumoGeral {
+  return computeResumo(rows);
+}

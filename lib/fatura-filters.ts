@@ -7,12 +7,24 @@ import { faturaStatusEmissaoAtiva } from "@/lib/fatura-reemissao";
 import { formatDateBR } from "@/lib/format";
 import type { AgendamentoWithExames, FaturaRecord } from "@/lib/types";
 
+export type FaturaMesStatusFilter =
+  | ""
+  | "aberta_emissao"
+  | "rascunho"
+  | "emitida"
+  | "paga"
+  | "cancelada"
+  | "necessita_reemissao"
+  | "substituida"
+  | "reemitida";
+
 export interface FaturaFilters {
   mesReferencia: string;
   dataVencimento: string;
   cliente: string;
   clinica: string;
   responsavel: string;
+  status: FaturaMesStatusFilter;
 }
 
 export const EMPTY_FATURA_FILTERS: FaturaFilters = {
@@ -21,6 +33,7 @@ export const EMPTY_FATURA_FILTERS: FaturaFilters = {
   cliente: "",
   clinica: "",
   responsavel: "",
+  status: "",
 };
 
 export type FaturaHistoricoStatusFilter =
