@@ -1,6 +1,6 @@
-import { formatCurrency } from "@/lib/money";
 import { formatDateBR } from "@/lib/format";
 import type { FaturaMesStatus } from "@/lib/fatura-mes-resumo";
+import type { FaturaRecord } from "@/lib/types";
 
 export const CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO = "Marcar como conferido";
 export const CUSTOS_CLINICA_ACAO_REABRIR = "Reabrir conferência";
@@ -21,11 +21,11 @@ export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
 
 export function historicoStatusLabelClinica(
   status: "rascunho" | "emitida" | "cancelada",
-  pago: boolean
+  _pago = false
 ): string {
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Aberta para conferência";
-  if (status === "emitida") return pago ? "Pago" : "Conferido";
+  if (status === "emitida") return "Conferido";
   return status;
 }
 
@@ -36,30 +36,39 @@ export const HISTORICO_STATUS_FILTER_LABELS_CLINICA: Record<
   rascunho: "Aberta para conferência",
   emitida: "Conferido",
   cancelada: "Cancelada",
-  paga: "Pago",
-  pendente: "Conferido (aguardando pagamento)",
+  paga: "Conferido",
 };
+
+/** Custos conferidos (status emitida) contam como pagos no resumo. */
+export function custosClinicaConferido(
+  fatura: Pick<FaturaRecord, "status"> | null | undefined
+): boolean {
+  return fatura?.status === "emitida";
+}
+
+/** Aberta para conferência: sem fatura ou rascunho. */
+export function custosClinicaEmAberto(
+  fatura: Pick<FaturaRecord, "status"> | null | undefined
+): boolean {
+  if (!fatura) return true;
+  return fatura.status === "rascunho";
+}
+
+export function deriveFaturaMesStatusClinica(
+  fatura: FaturaRecord | null
+): FaturaMesStatus {
+  if (!fatura) return "aberta_emissao";
+  if (fatura.status === "cancelada") return "cancelada";
+  if (fatura.status === "rascunho") return "rascunho";
+  if (fatura.status === "emitida") return "emitida";
+  return "aberta_emissao";
+}
 
 export function formatAuditoriaMarcarConferido(
   usuario: string,
-  clinicaNome: string,
-  periodoLabel: string,
-  dataConferenciaIso: string,
-  valorTotal: number,
-  faturaNome: string,
-  observacao?: string | null
+  clinicaNome: string
 ): string {
-  const dataLabel = formatDateBR(dataConferenciaIso);
-  const valorLabel = formatCurrency(valorTotal);
-  const obs = observacao?.trim();
-  let message =
-    `${usuario} conferiu os custos da clínica ${clinicaNome} referentes ao período ${periodoLabel}. ` +
-    `Data da conferência: ${dataLabel}. Valor total: ${valorLabel}. ` +
-    `Fatura anexada: ${faturaNome}.`;
-  if (obs) {
-    message += ` Observação: ${obs}.`;
-  }
-  return message;
+  return `${usuario} conferiu os custos da clínica ${clinicaNome}. O valor foi considerado pago.`;
 }
 
 export function periodoLabelCustosClinica(
@@ -83,5 +92,5 @@ export function formatAuditoriaReabrirConferencia(
   usuario: string,
   clinicaNome: string
 ): string {
-  return `${usuario} reabriu a conferência dos custos da clínica ${clinicaNome}.`;
+  return `${usuario} reabriu a conferência dos custos da clínica ${clinicaNome}. O valor voltou para em aberto.`;
 }

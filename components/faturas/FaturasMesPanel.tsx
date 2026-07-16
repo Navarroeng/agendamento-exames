@@ -208,12 +208,16 @@ export function FaturasMesPanel({
       tone: "border-[#e8edf5] bg-white text-navy",
       format: formatCurrency,
     },
-    {
-      key: "valorEmitido",
-      label: config.resumoEmitidoLabel,
-      tone: "border-[#bbf7d0]/80 bg-[#f0fdf4] text-brand-green",
-      format: formatCurrency,
-    },
+    ...(variant === "cliente"
+      ? [
+          {
+            key: "valorEmitido" as const,
+            label: config.resumoEmitidoLabel,
+            tone: "border-[#bbf7d0]/80 bg-[#f0fdf4] text-brand-green",
+            format: formatCurrency,
+          },
+        ]
+      : []),
     {
       key: "valorPago",
       label: "Pago",

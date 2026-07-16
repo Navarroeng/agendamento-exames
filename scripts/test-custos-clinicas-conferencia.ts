@@ -7,16 +7,18 @@ import {
 import {
   CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO,
   CUSTOS_CLINICA_ACAO_REABRIR,
-  CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
   CUSTOS_CLINICA_ACAO_VER_FATURA,
   FATURA_MES_STATUS_LABELS_CLINICA,
+  custosClinicaConferido,
+  custosClinicaEmAberto,
+  deriveFaturaMesStatusClinica,
   formatAuditoriaMarcarConferido,
   formatAuditoriaReabrirConferencia,
   historicoStatusLabelClinica,
   periodoLabelCustosClinica,
 } from "../lib/custos-clinicas-conferencia";
-import { deriveFaturaMesStatus } from "../lib/fatura-mes-resumo";
-import type { FaturaRecord } from "../lib/types";
+import { buildResumoClinicasMes } from "../lib/fatura-mes-resumo";
+import type { AgendamentoWithExames, FaturaRecord } from "../lib/types";
 
 function fatura(
   status: FaturaRecord["status"],
@@ -68,19 +70,24 @@ assert.equal(FATURA_MES_STATUS_LABELS_CLINICA.paga, "Pago");
 
 assert.equal(historicoStatusLabelClinica("rascunho", false), "Aberta para conferência");
 assert.equal(historicoStatusLabelClinica("emitida", false), "Conferido");
-assert.equal(historicoStatusLabelClinica("emitida", true), "Pago");
+assert.equal(historicoStatusLabelClinica("emitida", true), "Conferido");
 
-assert.equal(deriveFaturaMesStatus(null), "aberta_emissao");
-assert.equal(deriveFaturaMesStatus(fatura("rascunho")), "rascunho");
-assert.equal(deriveFaturaMesStatus(fatura("emitida")), "emitida");
-assert.equal(deriveFaturaMesStatus(fatura("emitida", true)), "paga");
+assert.equal(deriveFaturaMesStatusClinica(null), "aberta_emissao");
+assert.equal(deriveFaturaMesStatusClinica(fatura("rascunho")), "rascunho");
+assert.equal(deriveFaturaMesStatusClinica(fatura("emitida")), "emitida");
+assert.equal(deriveFaturaMesStatusClinica(fatura("emitida", true)), "emitida");
+
+assert.equal(custosClinicaConferido(fatura("emitida")), true);
+assert.equal(custosClinicaConferido(fatura("emitida", true)), true);
+assert.equal(custosClinicaConferido(fatura("rascunho")), false);
+assert.equal(custosClinicaConferido(null), false);
+
+assert.equal(custosClinicaEmAberto(null), true);
+assert.equal(custosClinicaEmAberto(fatura("rascunho")), true);
+assert.equal(custosClinicaEmAberto(fatura("emitida")), false);
 
 assert.equal(CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO, "Marcar como conferido");
 assert.equal(CUSTOS_CLINICA_ACAO_REABRIR, "Reabrir conferência");
-assert.equal(
-  CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
-  "Registrar pagamento"
-);
 assert.equal(CUSTOS_CLINICA_ACAO_VER_FATURA, "Ver fatura da clínica");
 
 assert.equal(
@@ -103,54 +110,84 @@ assert.equal(
 );
 
 assert.equal(
-  formatAuditoriaMarcarConferido(
-    "Maria",
-    "Clínica ABC",
-    "01/06/2026 a 30/06/2026",
-    "2026-06-15",
-    500,
-    "fatura-junho.pdf"
-  ),
-  "Maria conferiu os custos da clínica Clínica ABC referentes ao período 01/06/2026 a 30/06/2026. Data da conferência: 15/06/2026. Valor total: R$ 500,00. Fatura anexada: fatura-junho.pdf."
-);
-
-assert.equal(
-  formatAuditoriaMarcarConferido(
-    "Maria",
-    "Clínica ABC",
-    "06/2026",
-    "2026-06-15",
-    500,
-    "fatura-junho.pdf",
-    "Conferido com ajuste"
-  ).includes("Observação: Conferido com ajuste."),
-  true
+  formatAuditoriaMarcarConferido("Maria", "Clínica ABC"),
+  "Maria conferiu os custos da clínica Clínica ABC. O valor foi considerado pago."
 );
 
 assert.equal(
   formatAuditoriaReabrirConferencia("João", "Clínica XYZ"),
-  "João reabriu a conferência dos custos da clínica Clínica XYZ."
+  "João reabriu a conferência dos custos da clínica Clínica XYZ. O valor voltou para em aberto."
 );
 
 function canReabrirConferencia(record: FaturaRecord): boolean {
-  return (
-    record.tipo === "clinica" &&
-    record.status === "emitida" &&
-    !record.pago
-  );
+  return record.tipo === "clinica" && record.status === "emitida";
 }
 
 assert.equal(canReabrirConferencia(fatura("emitida")), true);
-assert.equal(canReabrirConferencia(fatura("emitida", true)), false);
+assert.equal(canReabrirConferencia(fatura("emitida", true)), true);
 assert.equal(canReabrirConferencia(fatura("rascunho")), false);
 
-assert.equal(
-  fatura("rascunho", false, {
-    conferido_em: "2026-06-10",
-    fatura_clinica_path: "uuid-1/faturas/fatura-clinica.pdf",
-    fatura_clinica_nome: "fatura-clinica.pdf",
-  }).fatura_clinica_nome,
-  "fatura-clinica.pdf"
+function agClinica(
+  id: string,
+  clinica: string,
+  custo: number
+): AgendamentoWithExames {
+  return {
+    id,
+    cliente_nome: "Empresa",
+    clinica_nome: clinica,
+    data_agendamento: "2026-06-10",
+    status: "agendado",
+    colaborador: "João",
+    responsavel: "Resp",
+    aso: "Admissional",
+    agendamento_exames: [
+      {
+        id: `${id}-e1`,
+        agendamento_id: id,
+        tipo_exame: "Clínico",
+        valor_cliente: 0,
+        custo_clinica: custo,
+      },
+    ],
+  } as AgendamentoWithExames;
+}
+
+const resumoAberto = buildResumoClinicasMes(
+  [agClinica("ag1", "Clínica Alpha", 200)],
+  [],
+  "06/2026"
 );
+assert.ok(resumoAberto);
+assert.equal(resumoAberto.resumo.valorEmAberto, 200);
+assert.equal(resumoAberto.resumo.valorPago, 0);
+
+const resumoConferido = buildResumoClinicasMes(
+  [agClinica("ag2", "Clínica Beta", 300)],
+  [
+    {
+      ...fatura("emitida"),
+      referencia_nome: "Clínica Beta",
+    },
+  ],
+  "06/2026"
+);
+assert.ok(resumoConferido);
+assert.equal(resumoConferido.resumo.valorPago, 300);
+assert.equal(resumoConferido.resumo.valorEmAberto, 0);
+
+const resumoLegadoPago = buildResumoClinicasMes(
+  [agClinica("ag2", "Clínica Beta", 300)],
+  [
+    {
+      ...fatura("emitida", true),
+      referencia_nome: "Clínica Beta",
+    },
+  ],
+  "06/2026"
+);
+assert.ok(resumoLegadoPago);
+assert.equal(resumoLegadoPago.resumo.valorPago, 300);
+assert.equal(resumoLegadoPago.resumo.valorEmAberto, 0);
 
 console.log("test-custos-clinicas-conferencia: ok");

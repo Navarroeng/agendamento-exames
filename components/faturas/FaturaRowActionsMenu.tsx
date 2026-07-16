@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
-import { CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO } from "@/lib/custos-clinicas-conferencia";
 import {
   faturaStatusEmissaoAtiva,
   faturaStatusHistoricoReemissao,
@@ -88,7 +87,7 @@ export function FaturaRowActionsMenu({
     });
   }
 
-  if (faturaStatusEmissaoAtiva(fatura.status)) {
+  if (faturaStatusEmissaoAtiva(fatura.status) && variant !== "clinica") {
     if (fatura.pago) {
       if (fatura.comprovante_pagamento_path && onVerComprovante) {
         items.push({
@@ -111,10 +110,7 @@ export function FaturaRowActionsMenu({
     } else {
       items.push({
         key: "marcar-pago",
-        label:
-          variant === "clinica"
-            ? CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO
-            : "Marcar como pago",
+        label: "Marcar como pago",
         onClick: () => onMarcarPago(fatura.id),
       });
     }

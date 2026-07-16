@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO,
   CUSTOS_CLINICA_ACAO_REABRIR,
-  CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
   CUSTOS_CLINICA_ACAO_VER_FATURA,
 } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaMesRow } from "@/lib/fatura-mes-resumo";
@@ -64,8 +63,7 @@ export function FaturasMesRowActions({
   if (
     variant === "clinica" &&
     fatura &&
-    fatura.status === "emitida" &&
-    !(fatura.pago ?? false)
+    fatura.status === "emitida"
   ) {
     return (
       <ClinicaConferidoActionsMenu
@@ -74,7 +72,6 @@ export function FaturasMesRowActions({
         temFaturaClinica={Boolean(fatura.fatura_clinica_path?.trim())}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
         onVerFaturaClinica={() => onVerFaturaClinica?.(fatura.id)}
-        onRegistrarPagamento={() => onMarcarPago(fatura.id)}
         onReabrirConferencia={() => onReabrirConferencia?.(fatura.id)}
       />
     );
@@ -151,7 +148,6 @@ function ClinicaConferidoActionsMenu({
   temFaturaClinica,
   onVisualizar,
   onVerFaturaClinica,
-  onRegistrarPagamento,
   onReabrirConferencia,
 }: {
   referenciaNome: string;
@@ -159,7 +155,6 @@ function ClinicaConferidoActionsMenu({
   temFaturaClinica: boolean;
   onVisualizar: () => void;
   onVerFaturaClinica: () => void;
-  onRegistrarPagamento: () => void;
   onReabrirConferencia: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -189,11 +184,6 @@ function ClinicaConferidoActionsMenu({
           },
         ]
       : []),
-    {
-      key: "registrar-pagamento",
-      label: CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
-      onClick: onRegistrarPagamento,
-    },
     {
       key: "reabrir",
       label: CUSTOS_CLINICA_ACAO_REABRIR,

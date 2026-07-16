@@ -2,7 +2,6 @@ import { mesReferenciaIsoFromPeriodoInicio } from "@/lib/duplicidade-validations
 import {
   formatAuditoriaMarcarConferido,
   formatAuditoriaReabrirConferencia,
-  periodoLabelCustosClinica,
 } from "@/lib/custos-clinicas-conferencia";
 import {
   CONFERENCIA_FATURA_OBRIGATORIA_MSG,
@@ -670,22 +669,12 @@ export async function marcarConferenciaCustosClinica(
   const updated = await buscarFaturaComItens(rascunho.id);
   if (!updated) throw new Error("Erro ao recarregar custos conferidos.");
 
-  const periodoLabel = periodoLabelCustosClinica(updated);
-
   await auditarFatura(auditOptions, {
     tipo: "clinica",
     acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
     registroId: updated.id,
     registroNome: updated.numero,
-    descricao: formatAuditoriaMarcarConferido(
-      usuario,
-      updated.referencia_nome,
-      periodoLabel,
-      input.conferido_em,
-      Number(updated.valor_total),
-      faturaNome ?? "—",
-      input.observacao_conferencia
-    ),
+    descricao: formatAuditoriaMarcarConferido(usuario, updated.referencia_nome),
   });
 
   return updated;
@@ -702,9 +691,6 @@ export async function reabrirConferenciaCustosClinica(
   }
   if (existing.status !== "emitida") {
     throw new Error("Somente custos conferidos podem ser reabertos.");
-  }
-  if (existing.pago) {
-    throw new Error("Não é possível reabrir conferência de custos já pagos.");
   }
 
   const supabase = createClient();

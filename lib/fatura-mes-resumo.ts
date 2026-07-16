@@ -18,6 +18,11 @@ import {
   mesReferenciaBRFromFatura,
 } from "@/lib/fatura-reemissao";
 import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
+import {
+  custosClinicaConferido,
+  custosClinicaEmAberto,
+  deriveFaturaMesStatusClinica,
+} from "@/lib/custos-clinicas-conferencia";
 
 export type FaturaMesStatus =
   | "aberta_emissao"
@@ -268,11 +273,17 @@ function buildRowFromFatura(
     qtdExames: metrics.qtdExames,
     valorTotal: metrics.valorTotal,
     fatura,
-    status: deriveFaturaMesStatus(fatura),
+    status:
+      tipo === "clinica"
+        ? deriveFaturaMesStatusClinica(fatura)
+        : deriveFaturaMesStatus(fatura),
   };
 }
 
-function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
+function computeResumo(
+  rows: FaturaMesRow[],
+  tipo: FaturaTipo = "cliente"
+): FaturaMesResumoGeral {
   const referencias = new Set(
     rows.map((row) => normalizeReferencia(row.referenciaNome))
   );
@@ -282,10 +293,20 @@ function computeResumo(rows: FaturaMesRow[]): FaturaMesResumoGeral {
   let valorEmAberto = 0;
 
   rows.forEach((row) => {
+    const valor = Number(row.valorTotal);
+
+    if (tipo === "clinica") {
+      if (custosClinicaConferido(row.fatura)) {
+        valorPago += valor;
+      } else if (custosClinicaEmAberto(row.fatura)) {
+        valorEmAberto += valor;
+      }
+      return;
+    }
+
     if (!row.fatura || !faturaStatusContaNoResumoEmitido(row.fatura.status)) {
       return;
     }
-    const valor = Number(row.valorTotal);
     valorEmitido += valor;
     if (row.fatura.pago) {
       valorPago += valor;
@@ -344,7 +365,7 @@ function buildResumoPeriodoCompleto(
   const rowsFaturaveis = filterRowsFaturaveis(rows);
   rowsFaturaveis.sort(compareFaturaMesRows);
 
-  return { rows: rowsFaturaveis, resumo: computeResumo(rowsFaturaveis) };
+  return { rows: rowsFaturaveis, resumo: computeResumo(rowsFaturaveis, tipo) };
 }
 
 function buildResumoMesInterno(
@@ -420,7 +441,7 @@ function buildResumoMesInterno(
   const rows = filterRowsFaturaveis([...rowsFromFaturas, ...rowsAbertas]);
   rows.sort(compareFaturaMesRows);
 
-  return { rows, resumo: computeResumo(rows) };
+  return { rows, resumo: computeResumo(rows, tipo) };
 }
 
 export function buildResumoClientesMes(
@@ -500,7 +521,8 @@ export function filterFaturaMesRowsByStatus(
 }
 
 export function computeFaturaMesResumo(
-  rows: FaturaMesRow[]
+  rows: FaturaMesRow[],
+  tipo: FaturaTipo = "cliente"
 ): FaturaMesResumoGeral {
-  return computeResumo(rows);
+  return computeResumo(rows, tipo);
 }

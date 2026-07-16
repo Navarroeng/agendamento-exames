@@ -817,6 +817,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
   const openPagamentoModal = useCallback(
     (id: string, mode: FaturaPagamentoModalMode) => {
+      if (pageTipo === "clinica") return;
+
       const fatura = faturas.find((f) => f.id === id);
       if (!fatura) {
         toast.error("Fatura não encontrada.");
@@ -830,7 +832,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       setPagamentoFatura({ ...fatura, pago: fatura.pago ?? false });
       setPagamentoOpen(true);
     },
-    [faturas]
+    [faturas, pageTipo]
   );
 
   const handleMarcarPago = useCallback(
@@ -1175,8 +1177,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error("Registro de custos não encontrado.");
         return;
       }
-      if (fatura.status !== "emitida" || fatura.pago) {
-        toast.error("Somente custos conferidos e não pagos podem ser reabertos.");
+      if (fatura.status !== "emitida") {
+        toast.error("Somente custos conferidos podem ser reabertos.");
         return;
       }
 
