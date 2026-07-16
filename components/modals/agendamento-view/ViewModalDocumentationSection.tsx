@@ -54,6 +54,17 @@ export function ViewModalDocumentationSection({
           extraLabel="Nº Recibo"
         />
       </div>
+
+      {agendamento.observacoes?.trim() ? (
+        <div className="mt-3 rounded-2xl border border-[#e8edf5] bg-white px-4 py-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+            Observação
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#475569]">
+            {agendamento.observacoes.trim()}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }

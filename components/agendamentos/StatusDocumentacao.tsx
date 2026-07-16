@@ -169,6 +169,16 @@ export function StatusDocumentacao({
             </>
           )}
         </div>
+
+        <Field label="Observação" className="min-w-0">
+          <textarea
+            className="field-input min-h-[88px] w-full resize-y"
+            placeholder="Digite uma observação sobre este agendamento…"
+            rows={3}
+            value={form.observacoes}
+            onChange={(e) => onChange("observacoes", e.target.value)}
+          />
+        </Field>
       </div>
 
       {children}

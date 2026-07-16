@@ -17,6 +17,7 @@ export type AgendamentoDocumentacaoInsert = Pick<
   | "envio_esocial"
   | "data_envio_esocial"
   | "esocial_recibo"
+  | "observacoes"
 >;
 
 export function buildDocumentacaoPayloadFromForm(
@@ -43,5 +44,6 @@ export function buildDocumentacaoPayloadFromForm(
     esocial_recibo: isSim(form.envio_esocial)
       ? emptyToNull(maskEsocialRecibo(form.esocial_recibo))
       : null,
+    observacoes: emptyToNull(form.observacoes),
   };
 }

@@ -128,6 +128,24 @@ function compareField(
   );
 }
 
+function compareObservacaoAgendamento(
+  changes: HistoricoEntryDraft[],
+  usuario: string,
+  oldValue: string | null | undefined,
+  newValue: string | null | undefined
+) {
+  const oldNorm = (oldValue ?? "").trim();
+  const newNorm = (newValue ?? "").trim();
+  if (oldNorm === newNorm) return;
+
+  if (!oldNorm && newNorm) {
+    pushChange(changes, usuario, "incluiu a observação do agendamento.");
+    return;
+  }
+
+  pushChange(changes, usuario, "alterou a observação do agendamento.");
+}
+
 function compareBoolField(
   changes: HistoricoEntryDraft[],
   usuario: string,
@@ -327,12 +345,11 @@ export function buildHistoricoAlteracoes(
     anterior.responsavel,
     novo.responsavel
   );
-  compareField(
+  compareObservacaoAgendamento(
     changes,
     usuario,
-    "as observações",
-    anterior.observacoes ?? "",
-    novo.observacoes ?? ""
+    anterior.observacoes,
+    novo.observacoes
   );
   compareField(
     changes,
@@ -463,6 +480,13 @@ export function buildHistoricoAlteracoesDocumentacao(
     "o Nº Recibo do e-Social",
     anterior.esocial_recibo ?? "",
     novo.esocial_recibo ?? ""
+  );
+
+  compareObservacaoAgendamento(
+    changes,
+    usuario,
+    anterior.observacoes,
+    novo.observacoes
   );
 
   return changes;

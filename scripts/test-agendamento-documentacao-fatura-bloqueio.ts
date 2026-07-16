@@ -111,6 +111,15 @@ assert.equal(payload.numero_matricula, "12345");
 assert.equal(payload.envio_esocial, true);
 assert.ok(payload.esocial_recibo?.startsWith("1.2."), "recibo esocial formatado");
 
+const payloadObservacao = buildDocumentacaoPayloadFromForm(
+  formDoc({ observacoes: "Colaborador retorna após afastamento." })
+);
+assert.equal(
+  payloadObservacao.observacoes,
+  "Colaborador retorna após afastamento.",
+  "observacao salva no payload documentacao"
+);
+
 const historico = buildHistoricoAlteracoesDocumentacao(
   agendamentoBase(),
   payload,
@@ -129,6 +138,33 @@ assert.ok(
 assert.ok(
   !historico.some((entry) => entry.detalhes.includes("data do agendamento")),
   "nao registra campos bloqueados"
+);
+
+const historicoObservacao = buildHistoricoAlteracoesDocumentacao(
+  agendamentoBase(),
+  buildDocumentacaoPayloadFromForm(
+    formDoc({ observacoes: "Retorno após licença médica." })
+  ),
+  "Bruna"
+);
+
+assert.ok(
+  historicoObservacao.some((entry) =>
+    entry.detalhes.includes("Bruna incluiu a observação do agendamento.")
+  ),
+  "auditoria ao incluir observacao"
+);
+
+assert.equal(
+  buildHistoricoAlteracoesDocumentacao(
+    agendamentoBase({ observacoes: "Mesma observação." }),
+    buildDocumentacaoPayloadFromForm(
+      formDoc({ observacoes: "Mesma observação." })
+    ),
+    "Bruna"
+  ).length,
+  0,
+  "nao registra observacao sem alteracao"
 );
 
 console.log("test-agendamento-documentacao-fatura-bloqueio: OK");

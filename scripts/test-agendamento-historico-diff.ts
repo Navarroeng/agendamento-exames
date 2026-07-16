@@ -152,6 +152,21 @@ test("não registra alteração de CPF com mesma máscara", () => {
   );
 });
 
+test("registra alteração da observação do agendamento", () => {
+  const changes = buildHistoricoAlteracoes(
+    baseAnterior({ observacoes: "Texto antigo." }),
+    baseNovo({ observacoes: "Texto novo." }),
+    [],
+    "Bruna"
+  );
+  assert(
+    changes.some((entry) =>
+      entry.detalhes.includes("Bruna alterou a observação do agendamento.")
+    ),
+    `esperado mensagem de observação, recebeu: ${JSON.stringify(changes)}`
+  );
+});
+
 if (failed > 0) {
   process.exit(1);
 }
