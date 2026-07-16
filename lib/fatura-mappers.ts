@@ -166,6 +166,23 @@ export function itemToDisplayRow(
   ];
 }
 
+export function faturaItensToInsert(
+  itens: FaturaComItens["fatura_itens"]
+): FaturaItemInsert[] {
+  return (itens ?? []).map((i) => ({
+    agendamento_id: i.agendamento_id,
+    data_agendamento: i.data_agendamento,
+    colaborador: i.colaborador,
+    cliente_nome: i.cliente_nome,
+    clinica_nome: i.clinica_nome,
+    tipo_aso: i.tipo_aso,
+    exame_nome: i.exame_nome,
+    valor_unitario: Number(i.valor_unitario),
+    quantidade: i.quantidade,
+    valor_total: Number(i.valor_total),
+  }));
+}
+
 export function faturaComItensToPreview(
   fatura: FaturaComItens,
   readonly = true
@@ -199,5 +216,13 @@ export function faturaComItensToPreview(
     faturaId: fatura.id,
     status: fatura.status,
     readonly,
+    conferido_em: fatura.conferido_em,
+    conferido_por: fatura.conferido_por,
+    fatura_clinica_path: fatura.fatura_clinica_path,
+    fatura_clinica_nome: fatura.fatura_clinica_nome,
+    fatura_clinica_tipo: fatura.fatura_clinica_tipo,
+    fatura_clinica_tamanho: fatura.fatura_clinica_tamanho,
+    observacao_conferencia: fatura.observacao_conferencia,
+    conferencia_registrada_em: fatura.conferencia_registrada_em,
   };
 }

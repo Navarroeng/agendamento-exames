@@ -49,11 +49,13 @@ function statusClass(status: FaturaStatus | null): string {
 interface FaturaPreviewContentProps {
   preview: FaturaPreviewState;
   onAbrirFaturaRelacionada?: (faturaId: string) => void;
+  onVerFaturaClinica?: (faturaId: string) => void;
 }
 
 export function FaturaPreviewContent({
   preview,
   onAbrirFaturaRelacionada,
+  onVerFaturaClinica,
 }: FaturaPreviewContentProps) {
   const total = calcTotalFaturaItens(preview.itens);
   const colaboradores = countColaboradoresItens(preview.itens);
@@ -249,6 +251,71 @@ export function FaturaPreviewContent({
       </div>
 
       {!isCliente && <FaturaResumoPorTipoExame itens={preview.itens} />}
+
+      {!isCliente &&
+        preview.status === "emitida" &&
+        (preview.conferido_em || preview.fatura_clinica_nome) && (
+          <div className="border-t border-[#eef2f7] px-5 py-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+              Conferência
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {preview.conferido_em && (
+                <div className="rounded-xl border border-[#e8edf5] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase text-[#94a3b8]">
+                    Data da conferência
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    {formatDateBR(preview.conferido_em)}
+                  </p>
+                </div>
+              )}
+              {preview.conferido_por && (
+                <div className="rounded-xl border border-[#e8edf5] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase text-[#94a3b8]">
+                    Conferido por
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    {preview.conferido_por}
+                  </p>
+                </div>
+              )}
+              {preview.fatura_clinica_nome && (
+                <div className="rounded-xl border border-[#e8edf5] bg-white p-3 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-[#94a3b8]">
+                    Fatura da clínica
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-3">
+                    <p className="text-sm font-semibold text-navy">
+                      {preview.fatura_clinica_nome}
+                    </p>
+                    {preview.faturaId &&
+                      preview.fatura_clinica_path &&
+                      onVerFaturaClinica && (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-brand-blue hover:underline"
+                          onClick={() => onVerFaturaClinica(preview.faturaId!)}
+                        >
+                          Ver fatura
+                        </button>
+                      )}
+                  </div>
+                </div>
+              )}
+              {preview.observacao_conferencia?.trim() && (
+                <div className="rounded-xl border border-[#e8edf5] bg-white p-3 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-[#94a3b8]">
+                    Observação da conferência
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-[#475569]">
+                    {preview.observacao_conferencia}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       <div className="flex justify-end border-t border-[#eef2f7] bg-[#f8fafc] px-5 py-3">
         <div className="flex overflow-hidden rounded-lg border border-[#dbeafe]">

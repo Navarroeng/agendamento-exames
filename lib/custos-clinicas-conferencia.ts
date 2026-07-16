@@ -1,8 +1,11 @@
+import { formatCurrency } from "@/lib/money";
+import { formatDateBR } from "@/lib/format";
 import type { FaturaMesStatus } from "@/lib/fatura-mes-resumo";
 
 export const CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO = "Marcar como conferido";
 export const CUSTOS_CLINICA_ACAO_REABRIR = "Reabrir conferência";
 export const CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO = "Registrar pagamento";
+export const CUSTOS_CLINICA_ACAO_VER_FATURA = "Ver fatura da clínica";
 
 export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
   {
@@ -39,9 +42,41 @@ export const HISTORICO_STATUS_FILTER_LABELS_CLINICA: Record<
 
 export function formatAuditoriaMarcarConferido(
   usuario: string,
-  clinicaNome: string
+  clinicaNome: string,
+  periodoLabel: string,
+  dataConferenciaIso: string,
+  valorTotal: number,
+  faturaNome: string,
+  observacao?: string | null
 ): string {
-  return `${usuario} marcou os custos da clínica ${clinicaNome} como conferidos.`;
+  const dataLabel = formatDateBR(dataConferenciaIso);
+  const valorLabel = formatCurrency(valorTotal);
+  const obs = observacao?.trim();
+  let message =
+    `${usuario} conferiu os custos da clínica ${clinicaNome} referentes ao período ${periodoLabel}. ` +
+    `Data da conferência: ${dataLabel}. Valor total: ${valorLabel}. ` +
+    `Fatura anexada: ${faturaNome}.`;
+  if (obs) {
+    message += ` Observação: ${obs}.`;
+  }
+  return message;
+}
+
+export function periodoLabelCustosClinica(
+  fatura: Pick<
+    import("@/lib/types").FaturaRecord,
+    "periodo_inicio" | "periodo_fim" | "mes_referencia"
+  >
+): string {
+  if (fatura.periodo_inicio && fatura.periodo_fim) {
+    return `${formatDateBR(fatura.periodo_inicio)} a ${formatDateBR(fatura.periodo_fim)}`;
+  }
+  const mes = fatura.mes_referencia?.trim();
+  if (mes) {
+    const [y, m] = mes.split("-");
+    if (y && m) return `${m}/${y}`;
+  }
+  return "—";
 }
 
 export function formatAuditoriaReabrirConferencia(

@@ -28,6 +28,7 @@ import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
   faturaComItensToPreview,
+  faturaItensToInsert,
   parsePeriodoIso,
 } from "@/lib/fatura-mappers";
 import {
@@ -46,6 +47,7 @@ import {
   buscarFaturaComItens,
   cancelarFatura,
   listarFaturas,
+  marcarConferenciaCustosClinica,
   marcarFaturaPendente,
   atualizarPagamentoFatura,
   registrarPagamentoFatura,
@@ -56,6 +58,7 @@ import {
 } from "@/services/fatura-historico.service";
 import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
+import { obterUrlFaturaClinicaConferencia } from "@/services/fatura-conferencia-clinica.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptions } from "@/lib/cliente-display";
@@ -166,6 +169,9 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const [pagamentoFatura, setPagamentoFatura] = useState<FaturaRecord | null>(
     null
   );
+  const [conferenciaOpen, setConferenciaOpen] = useState(false);
+  const [conferenciaFatura, setConferenciaFatura] =
+    useState<FaturaRecord | null>(null);
   const [faturaDuplicidadeOpen, setFaturaDuplicidadeOpen] = useState(false);
   const [faturaDuplicidadeInfo, setFaturaDuplicidadeInfo] =
     useState<FaturaExistenteInfo | null>(null);
@@ -650,23 +656,35 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const handleEmit = useCallback(async () => {
     const current = previewRef.current;
     if (!current || current.status === "cancelada") return;
-    if (current.tipo === "cliente" && !syncClienteVencimentoNoPreview()) return;
+
+    if (current.tipo === "cliente") {
+      if (!syncClienteVencimentoNoPreview()) return;
+      setSaving(true);
+      try {
+        await persistPreview("emitida");
+        toast.success("Fatura emitida com sucesso!");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao emitir fatura."
+        );
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     setSaving(true);
     try {
-      await persistPreview("emitida");
-      toast.success(
-        current.tipo === "cliente"
-          ? "Fatura emitida com sucesso!"
-          : "Custos marcados como conferidos."
-      );
+      const saved = await persistPreview("rascunho");
+      setConferenciaFatura(saved);
+      setConferenciaOpen(true);
     } catch (err) {
       console.error(err);
       toast.error(
         err instanceof Error
           ? err.message
-          : current.tipo === "cliente"
-            ? "Erro ao emitir fatura."
-            : "Erro ao marcar custos como conferidos."
+          : "Erro ao preparar conferência dos custos."
       );
     } finally {
       setSaving(false);
@@ -690,7 +708,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         : null;
 
       if (!fatura || fatura.status === "rascunho") {
-        fatura = await persistPreview("emitida");
+        fatura =
+          current.tipo === "clinica"
+            ? await persistPreview("rascunho")
+            : await persistPreview("emitida");
       }
 
       if (!fatura) throw new Error("Fatura não encontrada.");
@@ -905,6 +926,112 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [faturas, pagamentoFatura]
   );
 
+  const handleVerFaturaClinica = useCallback(
+    async (id: string) => {
+      const fatura =
+        faturas.find((f) => f.id === id) ??
+        (conferenciaFatura?.id === id ? conferenciaFatura : null) ??
+        (preview?.faturaId === id
+          ? await buscarFaturaComItens(id).catch(() => null)
+          : null);
+
+      const path = fatura?.fatura_clinica_path?.trim();
+      if (!path) {
+        toast.error("Fatura da clínica não encontrada para este registro.");
+        return;
+      }
+
+      try {
+        const url = await obterUrlFaturaClinicaConferencia(path);
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao abrir a fatura da clínica.");
+      }
+    },
+    [conferenciaFatura, faturas, preview?.faturaId]
+  );
+
+  const handleCloseConferencia = useCallback(() => {
+    if (saving) return;
+    setConferenciaOpen(false);
+    setConferenciaFatura(null);
+  }, [saving]);
+
+  const handleConfirmConferencia = useCallback(
+    async (
+      dataConferenciaIso: string,
+      observacao: string | null,
+      faturaFile: File | null
+    ) => {
+      if (!conferenciaFatura) return;
+
+      setSaving(true);
+      try {
+        const previewCurrent = previewRef.current;
+        const itens =
+          previewCurrent?.faturaId === conferenciaFatura.id &&
+          previewCurrent.itens.length > 0
+            ? previewCurrent.itens
+            : faturaItensToInsert(
+                (
+                  await buscarFaturaComItens(conferenciaFatura.id)
+                )?.fatura_itens ?? []
+              );
+
+        const conferida = await marcarConferenciaCustosClinica(
+          {
+            faturaId: conferenciaFatura.id,
+            referencia_nome: conferenciaFatura.referencia_nome,
+            periodo_inicio:
+              previewCurrent?.periodo_inicio ??
+              conferenciaFatura.periodo_inicio,
+            periodo_fim:
+              previewCurrent?.periodo_fim ?? conferenciaFatura.periodo_fim,
+            data_vencimento:
+              previewCurrent?.data_vencimento ??
+              conferenciaFatura.data_vencimento,
+            gerado_por: geradoPor,
+            itens,
+            conferido_em: dataConferenciaIso,
+            observacao_conferencia: observacao,
+            faturaFile,
+          },
+          auditOptions
+        );
+
+        toast.success("Custos marcados como conferidos.");
+        setConferenciaOpen(false);
+        setConferenciaFatura(null);
+
+        if (previewOpen && preview?.faturaId === conferida.id) {
+          const nextPreview = faturaComItensToPreview(conferida, true);
+          previewRef.current = nextPreview;
+          setPreview(nextPreview);
+        }
+
+        await reloadAll();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao confirmar conferência dos custos."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      auditOptions,
+      conferenciaFatura,
+      geradoPor,
+      preview?.faturaId,
+      previewOpen,
+      reloadAll,
+    ]
+  );
+
   const handleMarcarPendente = useCallback(
     async (id: string) => {
       const fatura = faturas.find((f) => f.id === id);
@@ -1005,13 +1132,16 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       previewRef.current = nextPreview;
       setSaving(true);
       try {
-        if (isCliente && !syncClienteVencimentoNoPreview()) return;
-        await persistPreview("emitida");
-        toast.success(
-          isCliente
-            ? "Fatura emitida com sucesso!"
-            : "Custos marcados como conferidos."
-        );
+        if (isCliente) {
+          if (!syncClienteVencimentoNoPreview()) return;
+          await persistPreview("emitida");
+          toast.success("Fatura emitida com sucesso!");
+          return;
+        }
+
+        const saved = await persistPreview("rascunho");
+        setConferenciaFatura(saved);
+        setConferenciaOpen(true);
       } catch (err) {
         console.error(err);
         toast.error(
@@ -1019,7 +1149,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
             ? err.message
             : isCliente
               ? "Erro ao emitir fatura."
-              : "Erro ao marcar custos como conferidos."
+              : "Erro ao preparar conferência dos custos."
         );
       } finally {
         setSaving(false);
@@ -1226,6 +1356,11 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleClosePagamento,
     handleConfirmPagamento,
     handleVerComprovante,
+    handleVerFaturaClinica,
+    conferenciaOpen,
+    conferenciaFatura,
+    handleCloseConferencia,
+    handleConfirmConferencia,
     handleMarcarPendente,
     faturaDuplicidadeOpen,
     faturaDuplicidadeInfo,

@@ -509,6 +509,14 @@ export interface FaturaRecord {
   observacao_pagamento: string | null;
   comprovante_pagamento_path: string | null;
   comprovante_pagamento_nome: string | null;
+  conferido_em: string | null;
+  conferido_por: string | null;
+  fatura_clinica_path: string | null;
+  fatura_clinica_nome: string | null;
+  fatura_clinica_tipo: string | null;
+  fatura_clinica_tamanho: number | null;
+  observacao_conferencia: string | null;
+  conferencia_registrada_em: string | null;
   fatura_origem_id: string | null;
   fatura_substituta_id: string | null;
   created_at: string;
@@ -564,6 +572,14 @@ export interface FaturaPreviewState {
   faturaOrigemNumero?: string | null;
   faturaSubstitutaId?: string | null;
   faturaSubstitutaNumero?: string | null;
+  conferido_em?: string | null;
+  conferido_por?: string | null;
+  fatura_clinica_path?: string | null;
+  fatura_clinica_nome?: string | null;
+  fatura_clinica_tipo?: string | null;
+  fatura_clinica_tamanho?: number | null;
+  observacao_conferencia?: string | null;
+  conferencia_registrada_em?: string | null;
 }
 
 export interface AuditoriaRecord {

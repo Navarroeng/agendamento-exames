@@ -2,7 +2,11 @@ import { mesReferenciaIsoFromPeriodoInicio } from "@/lib/duplicidade-validations
 import {
   formatAuditoriaMarcarConferido,
   formatAuditoriaReabrirConferencia,
+  periodoLabelCustosClinica,
 } from "@/lib/custos-clinicas-conferencia";
+import {
+  CONFERENCIA_FATURA_OBRIGATORIA_MSG,
+} from "@/lib/fatura-conferencia-clinica";
 import {
   AUDITORIA_ACOES,
   type AuditoriaUsuarioContext,
@@ -23,6 +27,10 @@ import {
   deleteComprovantePagamento,
   uploadComprovantePagamento,
 } from "@/services/fatura-comprovante.service";
+import {
+  deleteFaturaClinicaConferencia,
+  uploadFaturaClinicaConferencia,
+} from "@/services/fatura-conferencia-clinica.service";
 import {
   moduloAuditoriaFromFaturaTipo,
   registrarAuditoria,
@@ -176,6 +184,12 @@ export async function salvarFatura(
   input: SalvarFaturaInput,
   auditOptions?: FaturaAuditOptions
 ): Promise<FaturaComItens> {
+  if (input.tipo === "clinica" && input.status === "emitida") {
+    throw new Error(
+      "Os custos da clínica devem ser conferidos pelo modal de conferência."
+    );
+  }
+
   const itens = await validarItensFaturaElegiveis(input.itens);
   const valorTotal = itens.reduce(
     (sum, item) => sum + Number(item.valor_total),
@@ -263,30 +277,13 @@ export async function salvarFatura(
     const usuario =
       auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
 
-    if (
-      input.tipo === "clinica" &&
-      input.status === "emitida" &&
-      existing.status === "rascunho"
-    ) {
-      await auditarFatura(auditOptions, {
-        tipo: input.tipo,
-        acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
-        registroId: updated.id,
-        registroNome: updated.numero,
-        descricao: formatAuditoriaMarcarConferido(
-          usuario,
-          updated.referencia_nome
-        ),
-      });
-    } else {
-      await auditarFatura(auditOptions, {
-        tipo: input.tipo,
-        acao: AUDITORIA_ACOES.edicao,
-        registroId: updated.id,
-        registroNome: updated.numero,
-        descricao: `${usuario} editou a fatura ${updated.numero} (${updated.referencia_nome}).`,
-      });
-    }
+    await auditarFatura(auditOptions, {
+      tipo: input.tipo,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: updated.id,
+      registroNome: updated.numero,
+      descricao: `${usuario} editou a fatura ${updated.numero} (${updated.referencia_nome}).`,
+    });
 
     return updated;
   }
@@ -346,17 +343,6 @@ export async function salvarFatura(
         `${usuario} emitiu a fatura ${created.numero} para ${created.referencia_nome} ` +
         `em substituição à fatura ${input.reemitida_de_fatura_numero?.trim() ?? "—"} ` +
         `(marcada como reemitida). Mês de referência: ${mesLabel}.`,
-    });
-  } else if (input.tipo === "clinica" && input.status === "emitida") {
-    await auditarFatura(auditOptions, {
-      tipo: input.tipo,
-      acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
-      registroId: created.id,
-      registroNome: created.numero,
-      descricao: formatAuditoriaMarcarConferido(
-        usuario,
-        created.referencia_nome
-      ),
     });
   } else {
     await auditarFatura(auditOptions, {
@@ -565,6 +551,144 @@ export async function reemitirFaturaCliente(
   }
 
   return nova;
+}
+
+export interface MarcarConferenciaCustosClinicaInput {
+  faturaId?: string | null;
+  referencia_nome: string;
+  periodo_inicio: string | null;
+  periodo_fim: string | null;
+  data_vencimento: string;
+  gerado_por: string;
+  itens: FaturaItemInsert[];
+  conferido_em: string;
+  observacao_conferencia?: string | null;
+  faturaFile?: File | null;
+}
+
+export async function marcarConferenciaCustosClinica(
+  input: MarcarConferenciaCustosClinicaInput,
+  auditOptions?: FaturaAuditOptions
+): Promise<FaturaComItens> {
+  if (!input.conferido_em?.trim()) {
+    throw new Error("Informe a data da conferência.");
+  }
+
+  const existing = input.faturaId
+    ? await buscarFaturaComItens(input.faturaId)
+    : null;
+
+  if (existing && existing.tipo !== "clinica") {
+    throw new Error("Conferência disponível apenas para custos de clínicas.");
+  }
+  if (existing && existing.status !== "rascunho") {
+    throw new Error("Somente custos abertos para conferência podem ser conferidos.");
+  }
+
+  const valorTotal = input.itens.reduce(
+    (sum, item) => sum + Number(item.valor_total),
+    0
+  );
+
+  const rascunho = await salvarFatura(
+    {
+      faturaId: input.faturaId,
+      tipo: "clinica",
+      referencia_nome: input.referencia_nome,
+      periodo_inicio: input.periodo_inicio,
+      periodo_fim: input.periodo_fim,
+      data_vencimento: input.data_vencimento,
+      valor_total: valorTotal,
+      total_exames: input.itens.length,
+      status: "rascunho",
+      gerado_por: input.gerado_por,
+      itens: input.itens,
+    },
+    auditOptions
+  );
+
+  let faturaPath = existing?.fatura_clinica_path?.trim() || null;
+  let faturaNome = existing?.fatura_clinica_nome?.trim() || null;
+  let faturaTipo = existing?.fatura_clinica_tipo?.trim() || null;
+  let faturaTamanho = existing?.fatura_clinica_tamanho ?? null;
+  const previousPath = faturaPath;
+
+  if (input.faturaFile) {
+    const uploaded = await uploadFaturaClinicaConferencia(
+      rascunho.id,
+      input.faturaFile
+    );
+    faturaPath = uploaded.path;
+    faturaNome = uploaded.nome;
+    faturaTipo = uploaded.tipo;
+    faturaTamanho = uploaded.tamanho;
+  }
+
+  if (!faturaPath) {
+    throw new Error(CONFERENCIA_FATURA_OBRIGATORIA_MSG);
+  }
+
+  const usuario =
+    auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
+  const agora = new Date().toISOString();
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("faturas")
+    .update({
+      status: "emitida",
+      data_emissao: existing?.data_emissao ?? agora,
+      valor_total: valorTotal,
+      total_exames: input.itens.length,
+      conferido_em: input.conferido_em,
+      conferido_por: usuario,
+      fatura_clinica_path: faturaPath,
+      fatura_clinica_nome: faturaNome,
+      fatura_clinica_tipo: faturaTipo,
+      fatura_clinica_tamanho: faturaTamanho,
+      observacao_conferencia: input.observacao_conferencia?.trim() || null,
+      conferencia_registrada_em: agora,
+    })
+    .eq("id", rascunho.id)
+    .eq("tipo", "clinica");
+
+  if (error) {
+    if (input.faturaFile && faturaPath) {
+      await deleteFaturaClinicaConferencia(faturaPath).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  if (
+    input.faturaFile &&
+    previousPath &&
+    previousPath !== faturaPath
+  ) {
+    await deleteFaturaClinicaConferencia(previousPath).catch(() => undefined);
+  }
+
+  const updated = await buscarFaturaComItens(rascunho.id);
+  if (!updated) throw new Error("Erro ao recarregar custos conferidos.");
+
+  const periodoLabel = periodoLabelCustosClinica(updated);
+
+  await auditarFatura(auditOptions, {
+    tipo: "clinica",
+    acao: AUDITORIA_ACOES.custo_clinica_marcado_conferido,
+    registroId: updated.id,
+    registroNome: updated.numero,
+    descricao: formatAuditoriaMarcarConferido(
+      usuario,
+      updated.referencia_nome,
+      periodoLabel,
+      input.conferido_em,
+      Number(updated.valor_total),
+      faturaNome ?? "—",
+      input.observacao_conferencia
+    ),
+  });
+
+  return updated;
 }
 
 export async function reabrirConferenciaCustosClinica(

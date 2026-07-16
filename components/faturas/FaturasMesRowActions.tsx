@@ -5,6 +5,7 @@ import {
   CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO,
   CUSTOS_CLINICA_ACAO_REABRIR,
   CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,
+  CUSTOS_CLINICA_ACAO_VER_FATURA,
 } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaMesRow } from "@/lib/fatura-mes-resumo";
 import { canReemitirFaturaCliente } from "@/lib/fatura-reemissao";
@@ -24,6 +25,7 @@ interface FaturasMesRowActionsProps {
   onEditarPagamento: (id: string) => void;
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
+  onVerFaturaClinica?: (id: string) => void;
   onReemitir?: (id: string) => void;
   onReabrirConferencia?: (id: string) => void;
 }
@@ -55,6 +57,7 @@ export function FaturasMesRowActions({
   onVerComprovante,
   onReemitir,
   onReabrirConferencia,
+  onVerFaturaClinica,
 }: FaturasMesRowActionsProps) {
   const fatura = row.fatura;
 
@@ -68,7 +71,9 @@ export function FaturasMesRowActions({
       <ClinicaConferidoActionsMenu
         referenciaNome={row.referenciaNome}
         saving={saving}
+        temFaturaClinica={Boolean(fatura.fatura_clinica_path?.trim())}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
+        onVerFaturaClinica={() => onVerFaturaClinica?.(fatura.id)}
         onRegistrarPagamento={() => onMarcarPago(fatura.id)}
         onReabrirConferencia={() => onReabrirConferencia?.(fatura.id)}
       />
@@ -143,13 +148,17 @@ export function FaturasMesRowActions({
 function ClinicaConferidoActionsMenu({
   referenciaNome,
   saving,
+  temFaturaClinica,
   onVisualizar,
+  onVerFaturaClinica,
   onRegistrarPagamento,
   onReabrirConferencia,
 }: {
   referenciaNome: string;
   saving: boolean;
+  temFaturaClinica: boolean;
   onVisualizar: () => void;
+  onVerFaturaClinica: () => void;
   onRegistrarPagamento: () => void;
   onReabrirConferencia: () => void;
 }) {
@@ -171,6 +180,15 @@ function ClinicaConferidoActionsMenu({
 
   const items: MenuItem[] = [
     { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
+    ...(temFaturaClinica
+      ? [
+          {
+            key: "ver-fatura",
+            label: CUSTOS_CLINICA_ACAO_VER_FATURA,
+            onClick: onVerFaturaClinica,
+          },
+        ]
+      : []),
     {
       key: "registrar-pagamento",
       label: CUSTOS_CLINICA_ACAO_REGISTRAR_PAGAMENTO,

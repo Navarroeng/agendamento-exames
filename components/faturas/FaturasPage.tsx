@@ -8,6 +8,7 @@ import {
 import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
+import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
 import { FaturasMesPanel } from "./FaturasMesPanel";
 import { useFaturasPage } from "@/hooks/useFaturasPage";
 import type { FaturaTipo } from "@/lib/types";
@@ -61,6 +62,11 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleClosePagamento,
     handleConfirmPagamento,
     handleVerComprovante,
+    handleVerFaturaClinica,
+    conferenciaOpen,
+    conferenciaFatura,
+    handleCloseConferencia,
+    handleConfirmConferencia,
     handleMarcarPendente,
     faturaDuplicidadeOpen,
     faturaDuplicidadeInfo,
@@ -98,6 +104,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onEditarPagamento={handleEditarPagamento}
           onMarcarPendente={handleMarcarPendente}
           onVerComprovante={handleVerComprovante}
+          onVerFaturaClinica={
+            tipo === "clinica" ? handleVerFaturaClinica : undefined
+          }
           onReemitir={handleReemitirFatura}
           onReabrirConferencia={
             tipo === "clinica" ? handleReabrirConferencia : undefined
@@ -114,6 +123,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         onEmit={handleEmit}
         onGeneratePdf={handleGeneratePdf}
         onAbrirFaturaRelacionada={handleVisualizar}
+        onVerFaturaClinica={
+          tipo === "clinica" ? handleVerFaturaClinica : undefined
+        }
       />
 
       <FaturaPagamentoModal
@@ -125,6 +137,17 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         onConfirm={handleConfirmPagamento}
         onVerComprovante={handleVerComprovante}
       />
+
+      {tipo === "clinica" && (
+        <FaturaConferenciaModal
+          open={conferenciaOpen}
+          fatura={conferenciaFatura}
+          saving={saving}
+          onClose={handleCloseConferencia}
+          onConfirm={handleConfirmConferencia}
+          onVerFatura={handleVerFaturaClinica}
+        />
+      )}
 
       <FaturaDuplicidadeModal
         open={faturaDuplicidadeOpen}

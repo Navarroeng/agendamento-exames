@@ -14,6 +14,7 @@ interface FaturaPreviewModalProps {
   onEmit: () => void | Promise<void>;
   onGeneratePdf: () => void | Promise<void>;
   onAbrirFaturaRelacionada?: (faturaId: string) => void;
+  onVerFaturaClinica?: (faturaId: string) => void;
 }
 
 export function FaturaPreviewModal({
@@ -25,6 +26,7 @@ export function FaturaPreviewModal({
   onEmit,
   onGeneratePdf,
   onAbrirFaturaRelacionada,
+  onVerFaturaClinica,
 }: FaturaPreviewModalProps) {
   if (!open || !preview) return null;
 
@@ -133,6 +135,7 @@ export function FaturaPreviewModal({
       <FaturaPreviewContent
         preview={preview}
         onAbrirFaturaRelacionada={onAbrirFaturaRelacionada}
+        onVerFaturaClinica={onVerFaturaClinica}
       />
     </Modal>
   );
