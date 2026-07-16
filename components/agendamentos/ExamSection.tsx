@@ -22,6 +22,7 @@ interface ExamSectionProps {
   pricingLoading: boolean;
   onRemove: (id: string) => void;
   onUpdate: (id: string, field: keyof ExameFormItem, value: string) => void;
+  onIncluirExamesAdicionais?: () => void;
   readOnly?: boolean;
 }
 
@@ -39,6 +40,7 @@ export function ExamSection({
   pricingLoading,
   onRemove,
   onUpdate,
+  onIncluirExamesAdicionais,
   readOnly = false,
 }: ExamSectionProps) {
   const examesComTipo = exams.filter((exam) => exam.tipo_exame.trim());
@@ -73,6 +75,22 @@ export function ExamSection({
           Selecione a clínica no formulário acima para carregar os preços.
         </div>
       )}
+
+      {!readOnly &&
+        !isAsoRetornoAoTrabalho(aso) &&
+        cargoId.trim() &&
+        onIncluirExamesAdicionais && (
+          <div className="mb-3">
+            <button
+              type="button"
+              className="btn text-xs"
+              disabled={pricingLoading}
+              onClick={onIncluirExamesAdicionais}
+            >
+              + Incluir exames adicionais
+            </button>
+          </div>
+        )}
 
       <div className="overflow-x-auto rounded-[10px] border border-[#eef2f7]">
         <table className="w-full min-w-[680px] border-collapse">

@@ -26,6 +26,11 @@ import {
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
 import {
+  listarExamesDisponiveisParaAdicionar,
+  mensagemExameJaNoAgendamento,
+  separarExamesCatalogoParaAdicionar,
+} from "@/lib/agendamento-exames-adicionais";
+import {
   INVALID_DATE_TOAST,
   INVALID_TIME_TOAST,
   isValidDateBR,
@@ -161,6 +166,9 @@ export function useAgendamentosPage() {
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
   const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
   const [cargoChangeLoading, setCargoChangeLoading] = useState(false);
+  const [examesAdicionaisModalOpen, setExamesAdicionaisModalOpen] =
+    useState(false);
+  const [examesAdicionaisLoading, setExamesAdicionaisLoading] = useState(false);
   const [clienteProcuracaoModalOpen, setClienteProcuracaoModalOpen] =
     useState(false);
   const [pendingClienteId, setPendingClienteId] = useState<string | null>(null);
@@ -216,6 +224,7 @@ export function useAgendamentosPage() {
     loadExams,
     getExamesPayload,
     replaceExamesFromCargo,
+    appendExamesFromNomes,
     enforceRetornoTrabalhoExames,
   } = useExams(form.clinica_nome, form.aso);
 
@@ -322,6 +331,83 @@ export function useAgendamentosPage() {
 
   const { exames: catalogExames, loading: catalogLoading } =
     useExamesCatalogOptions();
+
+  const examesDisponiveisParaAdicionar = useMemo(
+    () => listarExamesDisponiveisParaAdicionar(catalogExames, exams),
+    [catalogExames, exams]
+  );
+
+  const handleOpenExamesAdicionais = useCallback(() => {
+    if (editingSomenteDocumentacao) return;
+    if (!cargoId.trim()) {
+      toast.error("Selecione um cargo antes de incluir exames adicionais.");
+      return;
+    }
+    if (isAsoRetornoAoTrabalho(form.aso)) {
+      toast.error(
+        "Para ASO Retorno ao Trabalho, apenas o exame Clínico é permitido."
+      );
+      return;
+    }
+    setExamesAdicionaisModalOpen(true);
+  }, [cargoId, editingSomenteDocumentacao, form.aso]);
+
+  const closeExamesAdicionaisModal = useCallback(() => {
+    if (examesAdicionaisLoading) return;
+    setExamesAdicionaisModalOpen(false);
+  }, [examesAdicionaisLoading]);
+
+  const handleConfirmExamesAdicionais = useCallback(
+    async (selectedIds: string[]) => {
+      if (selectedIds.length === 0) return;
+
+      const selecionados = catalogExames.filter((exame) =>
+        selectedIds.includes(exame.id)
+      );
+      const { novos, duplicados } = separarExamesCatalogoParaAdicionar(
+        selecionados,
+        exams
+      );
+
+      duplicados.forEach((exame) => {
+        toast.error(mensagemExameJaNoAgendamento(exame.nome));
+      });
+
+      if (novos.length === 0) {
+        setExamesAdicionaisModalOpen(false);
+        return;
+      }
+
+      setExamesAdicionaisLoading(true);
+      try {
+        const { added, duplicates } = await appendExamesFromNomes(
+          novos.map((exame) => exame.nome)
+        );
+
+        duplicates.forEach((nome) => {
+          toast.error(mensagemExameJaNoAgendamento(nome));
+        });
+
+        if (added > 0) {
+          examsManuallyModifiedRef.current = true;
+          toast.success(
+            added === 1
+              ? "1 exame adicional incluído."
+              : `${added} exames adicionais incluídos.`
+          );
+          setExamesAdicionaisModalOpen(false);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao incluir exames adicionais."
+        );
+      } finally {
+        setExamesAdicionaisLoading(false);
+      }
+    },
+    [appendExamesFromNomes, catalogExames, exams]
+  );
 
   const { agendamentos, loading, error, refresh, getById } =
     useAgendamentosList();
@@ -1479,5 +1565,11 @@ export function useAgendamentosPage() {
     clienteProcuracaoConfirmLoading,
     closeClienteProcuracaoModal,
     handleConfirmClienteProcuracao,
+    examesAdicionaisModalOpen,
+    examesAdicionaisLoading,
+    examesDisponiveisParaAdicionar,
+    handleOpenExamesAdicionais,
+    closeExamesAdicionaisModal,
+    handleConfirmExamesAdicionais,
   };
 }

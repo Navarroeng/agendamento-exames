@@ -6,6 +6,7 @@ import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancela
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
+import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -93,6 +94,12 @@ export function AgendamentoPage() {
     clienteProcuracaoConfirmLoading,
     closeClienteProcuracaoModal,
     handleConfirmClienteProcuracao,
+    examesAdicionaisModalOpen,
+    examesAdicionaisLoading,
+    examesDisponiveisParaAdicionar,
+    handleOpenExamesAdicionais,
+    closeExamesAdicionaisModal,
+    handleConfirmExamesAdicionais,
   } = useAgendamentosPage();
 
   return (
@@ -142,6 +149,7 @@ export function AgendamentoPage() {
             pricingLoading={pricingLoading}
             onRemove={removeExam}
             onUpdate={updateExam}
+            onIncluirExamesAdicionais={handleOpenExamesAdicionais}
             readOnly={editingSomenteDocumentacao}
           />
           <StatusDocumentacao form={form} onChange={setField}>
@@ -226,6 +234,14 @@ export function AgendamentoPage() {
         loading={clienteProcuracaoConfirmLoading}
         onClose={closeClienteProcuracaoModal}
         onConfirm={handleConfirmClienteProcuracao}
+      />
+      <AgendamentoExamesAdicionaisModal
+        open={examesAdicionaisModalOpen}
+        loading={examesAdicionaisLoading}
+        catalogLoading={catalogLoading}
+        exames={examesDisponiveisParaAdicionar}
+        onClose={closeExamesAdicionaisModal}
+        onConfirm={handleConfirmExamesAdicionais}
       />
 
       {saving && (

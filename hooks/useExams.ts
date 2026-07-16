@@ -6,6 +6,7 @@ import {
   assertExamesSemDuplicidade,
   chaveExameDuplicidade,
   EXAME_DUPLICADO_TOAST,
+  normalizarNomeExame,
   verificarDuplicidadeExamesNoFormulario,
 } from "@/lib/duplicidade-validations";
 import { createEmptyExam } from "@/lib/form-defaults";
@@ -499,6 +500,77 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     [buildExamesFromNomes, asoTipo]
   );
 
+  const appendExamesFromNomes = useCallback(
+    async (
+      exameNomes: string[]
+    ): Promise<{ added: number; duplicates: string[] }> => {
+      const generation = ++examsSyncGenerationRef.current;
+      const current = examsRef.current.filter((exam) => exam.tipo_exame.trim());
+      const existingKeys = new Set(
+        current
+          .map((exam) => chaveExameDuplicidade(exam))
+          .filter((key): key is string => Boolean(key))
+      );
+
+      const duplicates: string[] = [];
+      const novosNomes: string[] = [];
+
+      for (const nome of exameNomes) {
+        const trimmed = nome.trim();
+        if (!trimmed) continue;
+
+        const keyNome = `nome:${normalizarNomeExame(trimmed)}`;
+        if (existingKeys.has(keyNome)) {
+          duplicates.push(trimmed);
+          continue;
+        }
+
+        if (
+          novosNomes.some(
+            (item) =>
+              normalizarNomeExame(item) === normalizarNomeExame(trimmed)
+          )
+        ) {
+          duplicates.push(trimmed);
+          continue;
+        }
+
+        novosNomes.push(trimmed);
+        existingKeys.add(keyNome);
+      }
+
+      const filtrados = filtrarNomesExamesParaAso(novosNomes, asoTipo);
+      if (filtrados.length === 0) {
+        return { added: 0, duplicates };
+      }
+
+      setPricingLoading(true);
+      try {
+        const novos = await buildExamesFromNomes(filtrados);
+        if (generation !== examsSyncGenerationRef.current) {
+          return { added: 0, duplicates };
+        }
+
+        const merged = ordenarExamesAgendamentoComClinicoPrimeiro([
+          ...current,
+          ...novos,
+        ]);
+        const duplicidade = verificarDuplicidadeExamesNoFormulario(merged);
+        if (duplicidade.duplicado) {
+          throw new Error(duplicidade.mensagem ?? EXAME_DUPLICADO_TOAST);
+        }
+
+        setExams(merged);
+        return { added: novos.length, duplicates };
+      } finally {
+        if (generation === examsSyncGenerationRef.current) {
+          setPricingLoading(false);
+        }
+      }
+    },
+    [asoTipo, buildExamesFromNomes]
+  );
+
   const enforceRetornoTrabalhoExames = useCallback(async (): Promise<boolean> => {
     if (!isAsoRetornoAoTrabalho(asoTipo)) return false;
 
@@ -631,6 +703,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     getExamesPayload,
     refreshAllPricing,
     replaceExamesFromCargo,
+    appendExamesFromNomes,
     enforceRetornoTrabalhoExames,
   };
 }
