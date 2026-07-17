@@ -126,6 +126,7 @@ import {
   isClienteInadimplenteError,
   validarClienteParaNovoAgendamento,
 } from "@/services/fatura-inadimplencia.service";
+import type { InadimplenciaClienteInfo } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
 import {
   CLIENTE_INADIMPLENCIA_VALIDATION_MSG,
   type FaturaPendenciaInadimplencia,
@@ -187,6 +188,8 @@ export function useAgendamentosPage() {
   const [inadimplenciaPendencias, setInadimplenciaPendencias] = useState<
     FaturaPendenciaInadimplencia[]
   >([]);
+  const [inadimplenciaCliente, setInadimplenciaCliente] =
+    useState<InadimplenciaClienteInfo | null>(null);
   const [clienteValidacaoLoading, setClienteValidacaoLoading] = useState(false);
   const clienteValidacaoSeqRef = useRef(0);
   const [clienteId, setClienteId] = useState("");
@@ -652,6 +655,7 @@ export function useAgendamentosPage() {
     setPendingClienteId(null);
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
+    setInadimplenciaCliente(null);
     setClienteValidacaoLoading(false);
     clienteValidacaoSeqRef.current += 1;
     prevAsoRef.current = "";
@@ -667,13 +671,34 @@ export function useAgendamentosPage() {
     examsManuallyModifiedRef.current = false;
   }, [setField, resetExams]);
 
+  const resolverInfoClienteInadimplencia = useCallback(
+    (clienteNome: string): InadimplenciaClienteInfo => {
+      const nome = clienteNome.trim();
+      const found = clientes.find((c) => c.nome.trim() === nome);
+      return {
+        razaoSocial: found?.nome ?? nome,
+        cnpj: found?.cnpj ?? "",
+      };
+    },
+    [clientes]
+  );
+
   const exibirBloqueioInadimplencia = useCallback(
-    (pendencias: FaturaPendenciaInadimplencia[]) => {
+    (
+      pendencias: FaturaPendenciaInadimplencia[],
+      clienteInfo?: InadimplenciaClienteInfo
+    ) => {
       setInadimplenciaPendencias(pendencias);
+      setInadimplenciaCliente(
+        clienteInfo ??
+          (form.cliente_nome.trim()
+            ? resolverInfoClienteInadimplencia(form.cliente_nome)
+            : null)
+      );
       setInadimplenciaModalOpen(true);
       clearFormPorInadimplencia();
     },
-    [clearFormPorInadimplencia]
+    [clearFormPorInadimplencia, form.cliente_nome, resolverInfoClienteInadimplencia]
   );
 
   const validarESelecionarCliente = useCallback(
@@ -696,7 +721,10 @@ export function useAgendamentosPage() {
         if (seq !== clienteValidacaoSeqRef.current) return false;
 
         if (pendencias.length > 0) {
-          exibirBloqueioInadimplencia(pendencias);
+          exibirBloqueioInadimplencia(pendencias, {
+            razaoSocial: cliente.nome,
+            cnpj: cliente.cnpj,
+          });
           return false;
         }
 
@@ -727,6 +755,7 @@ export function useAgendamentosPage() {
   const closeInadimplenciaModal = useCallback(() => {
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
+    setInadimplenciaCliente(null);
     clearFormPorInadimplencia();
   }, [clearFormPorInadimplencia]);
 
@@ -1319,7 +1348,10 @@ export function useAgendamentosPage() {
           await assertClienteSemInadimplencia(clienteNome);
         } catch (err) {
           if (isClienteInadimplenteError(err)) {
-            exibirBloqueioInadimplencia(err.pendencias);
+            exibirBloqueioInadimplencia(
+              err.pendencias,
+              resolverInfoClienteInadimplencia(clienteNome)
+            );
             return;
           }
           toast.error(CLIENTE_INADIMPLENCIA_VALIDATION_MSG);
@@ -1533,7 +1565,10 @@ export function useAgendamentosPage() {
           return;
         }
         if (isClienteInadimplenteError(err)) {
-          exibirBloqueioInadimplencia(err.pendencias);
+          exibirBloqueioInadimplencia(
+            err.pendencias,
+            resolverInfoClienteInadimplencia(form.cliente_nome)
+          );
           return;
         }
         if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
@@ -1584,6 +1619,7 @@ export function useAgendamentosPage() {
       auditContext,
       bloquearDuplicidade90Dias,
       exibirBloqueioInadimplencia,
+      resolverInfoClienteInadimplencia,
     ]
   );
 
@@ -1698,6 +1734,7 @@ export function useAgendamentosPage() {
     handleConfirmExamesAdicionais,
     inadimplenciaModalOpen,
     inadimplenciaPendencias,
+    inadimplenciaCliente,
     closeInadimplenciaModal,
     clienteValidacaoLoading,
     formularioClienteLiberado,

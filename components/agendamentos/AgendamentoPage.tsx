@@ -103,6 +103,7 @@ export function AgendamentoPage() {
     handleConfirmExamesAdicionais,
     inadimplenciaModalOpen,
     inadimplenciaPendencias,
+    inadimplenciaCliente,
     closeInadimplenciaModal,
     clienteValidacaoLoading,
     formularioClienteLiberado,
@@ -247,6 +248,7 @@ export function AgendamentoPage() {
       <AgendamentoClienteInadimplenciaModal
         open={inadimplenciaModalOpen}
         pendencias={inadimplenciaPendencias}
+        cliente={inadimplenciaCliente}
         onClose={closeInadimplenciaModal}
       />
       <AgendamentoExamesAdicionaisModal
