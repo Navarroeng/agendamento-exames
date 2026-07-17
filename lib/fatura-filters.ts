@@ -12,6 +12,7 @@ export type FaturaMesStatusFilter =
   | "aberta_emissao"
   | "rascunho"
   | "emitida"
+  | "vencida"
   | "paga"
   | "cancelada"
   | "necessita_reemissao"
@@ -40,6 +41,7 @@ export type FaturaHistoricoStatusFilter =
   | ""
   | "rascunho"
   | "emitida"
+  | "vencida"
   | "cancelada"
   | "paga"
   | "pendente";

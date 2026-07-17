@@ -50,10 +50,15 @@ assert.equal(paga.bloqueado, true, "fatura paga");
 assert.equal(paga.faturaStatusLabel, "Paga");
 
 const vencida = resolverBloqueioAgendamentoFatura([
-  fatura("emitida", { data_vencimento: "2020-01-01", numero: "FAT-VENC" }),
+  fatura("vencida", { data_vencimento: "2020-01-01", numero: "FAT-VENC" }),
 ]);
 assert.equal(vencida.bloqueado, true, "fatura vencida");
 assert.equal(vencida.faturaStatusLabel, "Vencida");
+
+const emitidaAtraso = resolverBloqueioAgendamentoFatura([
+  fatura("emitida", { data_vencimento: "2020-01-01", numero: "FAT-ATRASO" }),
+]);
+assert.equal(emitidaAtraso.faturaStatusLabel, "Em aberto");
 
 assert.equal(
   resolverBloqueioAgendamentoFatura([

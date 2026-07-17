@@ -19,6 +19,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
   const map: Record<FaturaStatus, string> = {
     rascunho: "bg-brand-orange-soft text-[#c96d00]",
     emitida: "bg-brand-green-soft text-brand-green",
+    vencida: "bg-brand-red-soft text-brand-red",
     cancelada: "bg-brand-red-soft text-brand-red",
     necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",
     substituida: "bg-[#f1f5f9] text-[#64748b]",
@@ -29,6 +30,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
       ? {
           rascunho: historicoStatusLabelClinica("rascunho", false),
           emitida: historicoStatusLabelClinica("emitida", pago),
+          vencida: "Vencida",
           cancelada: historicoStatusLabelClinica("cancelada", false),
           necessita_reemissao: historicoStatusLabelClinica("emitida", pago),
           substituida: historicoStatusLabelClinica("cancelada", false),
@@ -37,6 +39,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
       : {
           rascunho: "Rascunho",
           emitida: "Emitida",
+          vencida: "Vencida",
           cancelada: "Cancelada",
           necessita_reemissao: FATURA_MES_STATUS_LABELS.necessita_reemissao,
           substituida: FATURA_MES_STATUS_LABELS.substituida,
@@ -52,7 +55,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
 }
 
 function pagamentoBadge(fatura: FaturaRecord) {
-  if (fatura.status !== "emitida") {
+  if (fatura.status !== "emitida" && fatura.status !== "vencida") {
     return <span className="text-[10px] text-[#94a3b8]">—</span>;
   }
 

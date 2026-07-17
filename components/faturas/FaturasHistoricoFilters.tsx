@@ -71,6 +71,7 @@ export function FaturasHistoricoFilters({
       : [
           { value: "rascunho", label: "Rascunho" },
           { value: "emitida", label: "Emitida" },
+          { value: "vencida", label: "Vencida" },
           { value: "cancelada", label: "Cancelada" },
           { value: "paga", label: "Paga" },
           { value: "pendente", label: "Pendente" },

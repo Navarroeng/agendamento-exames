@@ -8,15 +8,15 @@ export const FATURA_STATUS_INATIVOS: FaturaStatus[] = [
 ];
 
 export function faturaStatusEmissaoAtiva(status: FaturaStatus): boolean {
-  return status === "emitida";
+  return status === "emitida" || status === "vencida";
 }
 
 export function faturaStatusPermitePagamento(status: FaturaStatus): boolean {
-  return status === "emitida";
+  return status === "emitida" || status === "vencida";
 }
 
 export function faturaStatusContaNoResumoEmitido(status: FaturaStatus): boolean {
-  return status === "emitida";
+  return status === "emitida" || status === "vencida";
 }
 
 export function faturaStatusHistoricoInativo(status: FaturaStatus): boolean {
@@ -57,6 +57,8 @@ export function faturaClienteBloqueiaFaturamento(
 ): boolean {
   return (
     fatura.tipo === "cliente" &&
-    (fatura.status === "emitida" || fatura.status === "necessita_reemissao")
+    (fatura.status === "emitida" ||
+      fatura.status === "vencida" ||
+      fatura.status === "necessita_reemissao")
   );
 }

@@ -56,6 +56,7 @@ import {
   salvarFatura,
   sincronizarFaturasClienteNecessitaReemissao,
 } from "@/services/fatura-historico.service";
+import { sincronizarFaturasVencidas } from "@/services/fatura-inadimplencia.service";
 import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
 import { obterUrlFaturaClinicaConferencia } from "@/services/fatura-conferencia-clinica.service";
@@ -199,6 +200,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const reloadHistorico = useCallback(async () => {
     setHistoricoLoading(true);
     try {
+      await sincronizarFaturasVencidas(auditOptions);
       const data = await listarFaturas();
       setFaturas(data);
     } catch (err) {
@@ -207,7 +209,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setHistoricoLoading(false);
     }
-  }, []);
+  }, [auditOptions]);
 
   const reloadAll = useCallback(async () => {
     await Promise.all([reloadAgendamentos(), reloadHistorico()]);

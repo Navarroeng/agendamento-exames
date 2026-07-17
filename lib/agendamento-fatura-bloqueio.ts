@@ -37,13 +37,9 @@ export function deriveFaturaClienteStatusExibicao(
   if (fatura.status === "substituida") return "Substituída";
   if (fatura.status === "necessita_reemissao") return "Necessita reemissão";
   if (fatura.status === "rascunho") return "Aberta para emissão";
+  if (fatura.status === "vencida") return fatura.pago ? "Paga" : "Vencida";
   if (fatura.status === "emitida") {
     if (fatura.pago) return "Paga";
-
-    const hoje = new Date().toISOString().split("T")[0];
-    const vencimento = fatura.data_vencimento.split("T")[0];
-    if (vencimento < hoje) return "Vencida";
-
     return "Em aberto";
   }
 

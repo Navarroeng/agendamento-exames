@@ -484,6 +484,7 @@ export type FaturaTipo = "cliente" | "clinica";
 export type FaturaStatus =
   | "rascunho"
   | "emitida"
+  | "vencida"
   | "cancelada"
   | "necessita_reemissao"
   | "substituida"

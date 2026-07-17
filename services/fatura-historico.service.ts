@@ -450,7 +450,9 @@ export async function obterFaturasClienteIdsPorAgendamento(
       const f = fatura as Pick<FaturaRecord, "id" | "tipo" | "status">;
       if (
         f.tipo === "cliente" &&
-        (f.status === "emitida" || f.status === "necessita_reemissao")
+        (f.status === "emitida" ||
+          f.status === "vencida" ||
+          f.status === "necessita_reemissao")
       ) {
         ids.add(f.id);
       }
@@ -780,7 +782,7 @@ export async function registrarPagamentoFatura(
       comprovante_pagamento_nome: uploaded.nome,
     })
     .eq("id", id)
-    .eq("status", "emitida");
+    .in("status", ["emitida", "vencida"]);
 
   if (error) {
     await deleteComprovantePagamento(uploaded.path).catch(() => undefined);
@@ -836,7 +838,7 @@ export async function atualizarPagamentoFatura(
       comprovante_pagamento_nome: comprovanteNome,
     })
     .eq("id", id)
-    .eq("status", "emitida");
+    .in("status", ["emitida", "vencida"]);
 
   if (error) {
     if (uploadedPath) {
@@ -881,7 +883,7 @@ export async function marcarFaturaPendente(
       comprovante_pagamento_nome: null,
     })
     .eq("id", id)
-    .eq("status", "emitida");
+    .in("status", ["emitida", "vencida"]);
 
   if (error) throw error;
 

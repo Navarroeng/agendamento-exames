@@ -29,6 +29,8 @@ export const AUDITORIA_ACOES = {
   reagendamento: "reagendamento",
   tentativa_bloqueada_duplicidade: "tentativa_bloqueada_duplicidade",
   tentativa_edicao_bloqueada_fatura: "tentativa_edicao_bloqueada_fatura",
+  agendamento_bloqueado_inadimplencia: "agendamento_bloqueado_inadimplencia",
+  fatura_marcada_vencida: "fatura_marcada_vencida",
   exames_carregados_cargo: "exames_carregados_cargo",
   exame_removido_agendamento: "exame_removido_agendamento",
   cargo_alterado_exames_recalculados: "cargo_alterado_exames_recalculados",
@@ -76,6 +78,9 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   reagendamento: "Reagendamento",
   tentativa_bloqueada_duplicidade: "Tentativa bloqueada (duplicidade)",
   tentativa_edicao_bloqueada_fatura: "Tentativa de edição bloqueada (fatura)",
+  agendamento_bloqueado_inadimplencia:
+    "Novo agendamento bloqueado (inadimplência)",
+  fatura_marcada_vencida: "Fatura marcada como vencida",
   exames_carregados_cargo: "Exames carregados pelo cargo",
   exame_removido_agendamento: "Exame removido do agendamento",
   cargo_alterado_exames_recalculados: "Cargo alterado — exames recalculados",

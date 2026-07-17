@@ -112,6 +112,7 @@ function statusBadge(
     aberta_emissao: "bg-brand-orange-soft text-[#c96d00]",
     rascunho: "bg-[#fef3c7] text-[#b45309]",
     emitida: "bg-brand-blue-soft text-brand-blue",
+    vencida: "bg-brand-red-soft text-brand-red",
     paga: "bg-brand-green-soft text-brand-green",
     cancelada: "bg-brand-red-soft text-brand-red",
     necessita_reemissao: "bg-brand-orange-soft text-[#c96d00]",

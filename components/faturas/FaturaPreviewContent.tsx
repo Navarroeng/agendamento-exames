@@ -29,6 +29,7 @@ function statusLabel(
     return FATURA_MES_STATUS_LABELS.necessita_reemissao;
   if (status === "substituida") return FATURA_MES_STATUS_LABELS.substituida;
   if (status === "reemitida") return FATURA_MES_STATUS_LABELS.reemitida;
+  if (status === "vencida") return FATURA_MES_STATUS_LABELS.vencida;
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";
   if (status === "rascunho") return "Rascunho";
@@ -40,6 +41,7 @@ function statusClass(status: FaturaStatus | null): string {
     return "bg-brand-orange-soft text-[#c96d00]";
   if (status === "reemitida") return "bg-[#f1f5f9] text-[#64748b]";
   if (status === "substituida") return "bg-[#f1f5f9] text-[#64748b]";
+  if (status === "vencida") return "bg-brand-red-soft text-brand-red";
   if (status === "emitida") return "bg-brand-green-soft text-brand-green";
   if (status === "cancelada") return "bg-brand-red-soft text-brand-red";
   if (status === "rascunho") return "bg-brand-orange-soft text-[#c96d00]";

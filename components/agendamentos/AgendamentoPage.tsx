@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconCalendar } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
+import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
@@ -100,6 +101,9 @@ export function AgendamentoPage() {
     handleOpenExamesAdicionais,
     closeExamesAdicionaisModal,
     handleConfirmExamesAdicionais,
+    inadimplenciaModalOpen,
+    inadimplenciaPendencias,
+    closeInadimplenciaModal,
   } = useAgendamentosPage();
 
   return (
@@ -234,6 +238,11 @@ export function AgendamentoPage() {
         loading={clienteProcuracaoConfirmLoading}
         onClose={closeClienteProcuracaoModal}
         onConfirm={handleConfirmClienteProcuracao}
+      />
+      <AgendamentoClienteInadimplenciaModal
+        open={inadimplenciaModalOpen}
+        pendencias={inadimplenciaPendencias}
+        onClose={closeInadimplenciaModal}
       />
       <AgendamentoExamesAdicionaisModal
         open={examesAdicionaisModalOpen}

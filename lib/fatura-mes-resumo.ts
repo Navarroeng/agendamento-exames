@@ -28,6 +28,7 @@ export type FaturaMesStatus =
   | "aberta_emissao"
   | "rascunho"
   | "emitida"
+  | "vencida"
   | "paga"
   | "cancelada"
   | "necessita_reemissao"
@@ -67,6 +68,7 @@ export const FATURA_MES_STATUS_LABELS: Record<FaturaMesStatus, string> = {
   aberta_emissao: "Aberta para emissão",
   rascunho: "Rascunho",
   emitida: "Emitida",
+  vencida: "Vencida",
   paga: "Paga",
   cancelada: "Cancelada",
   necessita_reemissao: "Necessita reemissão",
@@ -102,6 +104,9 @@ export function deriveFaturaMesStatus(
   if (fatura.status === "reemitida") return "reemitida";
   if (fatura.status === "necessita_reemissao") return "necessita_reemissao";
   if (fatura.status === "rascunho") return "rascunho";
+  if (fatura.status === "vencida") {
+    return fatura.pago ? "paga" : "vencida";
+  }
   if (fatura.status === "emitida") {
     return fatura.pago ? "paga" : "emitida";
   }
@@ -134,6 +139,9 @@ export function findFaturaReferenciaMes(
 
   const emitida = pool.find((f) => f.status === "emitida");
   if (emitida) return emitida;
+
+  const vencida = pool.find((f) => f.status === "vencida");
+  if (vencida) return vencida;
 
   const necessita = pool.find((f) => f.status === "necessita_reemissao");
   if (necessita) return necessita;

@@ -12,6 +12,7 @@ export const FATURA_MES_STATUS_LABELS_CLINICA: Record<FaturaMesStatus, string> =
     aberta_emissao: "Aberta para conferência",
     rascunho: "Aberta para conferência",
     emitida: "Conferido",
+    vencida: "Vencida",
     paga: "Pago",
     cancelada: "Cancelada",
     necessita_reemissao: "Necessita reemissão",
