@@ -3,17 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
-import {
-  AGENDAMENTO_BLOQUEADO_FATURA_MSG,
-  isAgendamentoBloqueadoFaturaError,
-  type AgendamentoFaturaBloqueio,
-} from "@/lib/agendamento-fatura-bloqueio";
 import { AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   INVALID_DATE_TOAST,
   isValidDateBR,
   parseDateBRToIso,
 } from "@/lib/agendamento-datetime";
+import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import {
   EMPTY_ESOCIAL_FILTERS,
   ESOCIAL_PAGE_SIZE,
@@ -32,8 +28,6 @@ import { buildClienteFilterOptions } from "@/lib/cliente-display";
 import { atualizarEnvioEsocial } from "@/services/agendamento.service";
 import {
   listarBloqueioFaturaPorAgendamentos,
-  obterBloqueioFaturaAgendamento,
-  registrarTentativaEdicaoBloqueadaFatura,
 } from "@/services/agendamento-fatura-bloqueio.service";
 import { registrarHistorico } from "@/services/historico.service";
 import type { AgendamentoWithExames } from "@/lib/types";
@@ -89,42 +83,6 @@ export function useESocialPage() {
       cancelled = true;
     };
   }, [agendamentos]);
-
-  const bloquearAcaoAgendamentoFaturado = useCallback(
-    async (id: string): Promise<boolean> => {
-      let bloqueio = bloqueioPorAgendamento.get(id);
-      if (bloqueio === undefined) {
-        bloqueio = await obterBloqueioFaturaAgendamento(id);
-        setBloqueioPorAgendamento((prev) => {
-          const next = new Map(prev);
-          next.set(id, bloqueio!);
-          return next;
-        });
-      }
-
-      if (!bloqueio?.bloqueado) return false;
-
-      toast.error(AGENDAMENTO_BLOQUEADO_FATURA_MSG);
-      const agendamento = getById(id);
-      if (
-        agendamento &&
-        bloqueio.faturaNumero &&
-        bloqueio.faturaStatusLabel
-      ) {
-        await registrarTentativaEdicaoBloqueadaFatura(auditContext, {
-          agendamentoId: id,
-          cliente: agendamento.cliente_nome,
-          colaborador: agendamento.colaborador,
-          dataAgendamento: agendamento.data_agendamento,
-          faturaNumero: bloqueio.faturaNumero,
-          faturaStatusLabel: bloqueio.faturaStatusLabel,
-        });
-      }
-
-      return true;
-    },
-    [auditContext, bloqueioPorAgendamento, getById]
-  );
 
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractESocialFilterOptions(agendamentos);
@@ -206,13 +164,12 @@ export function useESocialPage() {
     [getById]
   );
 
-  const openMarcarEnviado = useCallback(async (id: string) => {
-    if (await bloquearAcaoAgendamentoFaturado(id)) return;
+  const openMarcarEnviado = useCallback((id: string) => {
     setMarcarEnviadoId(id);
     setDataEnvioInput("");
     setReciboInput("");
     setMarcarEnviadoOpen(true);
-  }, [bloquearAcaoAgendamentoFaturado]);
+  }, []);
 
   const closeMarcarEnviado = useCallback(() => {
     if (saving) return;
@@ -259,7 +216,7 @@ export function useESocialPage() {
       await registrarHistorico(marcarEnviadoId, usuario, [
         {
           acao: "Alteração",
-          detalhes: `${usuario} marcou o envio ao e-Social como Enviado em ${dataEnvioInput} (recibo ${recibo})`,
+          detalhes: `${usuario} marcou o agendamento como enviado ao eSocial. Data: ${dataEnvioInput}. Recibo: ${recibo}.`,
         },
       ], {
         auditContext,
@@ -274,11 +231,7 @@ export function useESocialPage() {
       setReciboInput("");
     } catch (err) {
       console.error(err);
-      if (isAgendamentoBloqueadoFaturaError(err)) {
-        toast.error(err.message);
-      } else {
-        toast.error("Erro ao atualizar envio ao e-Social.");
-      }
+      toast.error("Erro ao atualizar envio ao e-Social.");
     } finally {
       setSaving(false);
     }
@@ -328,11 +281,7 @@ export function useESocialPage() {
         toast.success("e-Social marcado como pendente.");
       } catch (err) {
         console.error(err);
-        if (isAgendamentoBloqueadoFaturaError(err)) {
-          toast.error(err.message);
-        } else {
-          toast.error("Erro ao atualizar status do e-Social.");
-        }
+        toast.error("Erro ao atualizar status do e-Social.");
       } finally {
         setSaving(false);
       }

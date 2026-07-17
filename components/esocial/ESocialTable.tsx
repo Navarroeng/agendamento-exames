@@ -11,7 +11,6 @@ import {
   type ESocialVisualStatus,
 } from "@/lib/esocial-filters";
 import { formatEsocialReciboForDisplay } from "@/lib/esocial-recibo";
-import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import type { AgendamentoWithExames } from "@/lib/types";
 import { ESocialRowActionsMenu } from "./ESocialRowActionsMenu";
 
@@ -54,7 +53,6 @@ interface ESocialTableProps {
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
   onMarcarPendente: (id: string) => void;
-  bloqueioPorAgendamento?: Map<string, AgendamentoFaturaBloqueio>;
 }
 
 export function ESocialTable({
@@ -69,7 +67,6 @@ export function ESocialTable({
   onVisualizar,
   onMarcarEnviado,
   onMarcarPendente,
-  bloqueioPorAgendamento,
 }: ESocialTableProps) {
   return (
     <section className="panel-card mb-4 scroll-mt-6">
@@ -176,10 +173,6 @@ export function ESocialTable({
                         <td className={TD}>
                           <ESocialRowActionsMenu
                             agendamento={ag}
-                            bloqueadoPorFatura={
-                              bloqueioPorAgendamento?.get(ag.id)?.bloqueado ??
-                              false
-                            }
                             disabled={saving}
                             onVisualizar={onVisualizar}
                             onMarcarEnviado={onMarcarEnviado}

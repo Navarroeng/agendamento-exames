@@ -73,7 +73,6 @@ export function ESocialPage() {
           onVisualizar={handleVisualizar}
           onMarcarEnviado={openMarcarEnviado}
           onMarcarPendente={handleMarcarPendente}
-          bloqueioPorAgendamento={bloqueioPorAgendamento}
         />
       </div>
 

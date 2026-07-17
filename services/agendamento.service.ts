@@ -230,6 +230,7 @@ export async function atualizarDocumentacaoAgendamento(
   id: string,
   documentacao: AgendamentoDocumentacaoInsert
 ): Promise<void> {
+  // Atualização documental: não passa por assertAgendamentoEditavelPorFatura.
   const supabase = createClient();
 
   const { error } = await supabase
@@ -261,6 +262,7 @@ export async function atualizarEnvioEsocial(
   data_envio_esocial: string | null,
   esocial_recibo: string | null = null
 ): Promise<EnvioEsocialUpdate> {
+  // Atualização documental (eSocial): não passa por assertAgendamentoEditavelPorFatura.
   const supabase = createClient();
 
   const basePayload = {

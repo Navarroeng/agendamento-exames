@@ -100,6 +100,7 @@ export async function obterBloqueioFaturaAgendamento(
   return map.get(agendamentoId) ?? { bloqueado: false };
 }
 
+/** Bloqueia edição financeira/principal (exames, valores, cancelamento comum). */
 export async function assertAgendamentoEditavelPorFatura(
   agendamentoId: string
 ): Promise<void> {

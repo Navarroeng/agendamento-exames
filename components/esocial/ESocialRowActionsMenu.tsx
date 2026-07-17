@@ -6,7 +6,6 @@ import type { AgendamentoWithExames } from "@/lib/types";
 
 interface ESocialRowActionsMenuProps {
   agendamento: AgendamentoWithExames;
-  bloqueadoPorFatura?: boolean;
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
   onMarcarPendente: (id: string) => void;
@@ -15,7 +14,6 @@ interface ESocialRowActionsMenuProps {
 
 export function ESocialRowActionsMenu({
   agendamento,
-  bloqueadoPorFatura = false,
   onVisualizar,
   onMarcarEnviado,
   onMarcarPendente,
