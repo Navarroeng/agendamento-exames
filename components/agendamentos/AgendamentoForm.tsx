@@ -33,6 +33,8 @@ interface AgendamentoFormProps {
   contratoVigencia: ContratoVigenciaCheckState;
   showClienteProcuracaoAlert?: boolean;
   exams: ExameFormItem[];
+  clienteValidacaoLoading?: boolean;
+  formularioClienteLiberado?: boolean;
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -56,10 +58,14 @@ export function AgendamentoForm({
   contratoVigencia,
   showClienteProcuracaoAlert = false,
   exams,
+  clienteValidacaoLoading = false,
+  formularioClienteLiberado = true,
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
   const horarioHint = getHorarioFieldHint(selectedClinica, exams);
+  const camposDependentesClienteDesabilitados =
+    readOnly || !formularioClienteLiberado;
 
   return (
     <Panel
@@ -118,11 +124,13 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={clienteId}
-              disabled={readOnly || clientesLoading}
+              disabled={readOnly || clientesLoading || clienteValidacaoLoading}
               onChange={(e) => onClienteChange(e.target.value)}
             >
               <option value="">
-                {clientesLoading
+                {clienteValidacaoLoading
+                  ? "Validando situação financeira..."
+                  : clientesLoading
                   ? "Carregando clientes..."
                   : SELECT_PLACEHOLDER}
               </option>
@@ -138,7 +146,7 @@ export function AgendamentoForm({
               className="field-input w-full min-w-0"
               placeholder="Nome do colaborador"
               value={form.colaborador}
-              disabled={readOnly}
+              disabled={camposDependentesClienteDesabilitados}
               onChange={(e) => onChange("colaborador", e.target.value)}
             />
           </Field>
@@ -149,7 +157,7 @@ export function AgendamentoForm({
               inputMode="numeric"
               autoComplete="off"
               value={form.colaborador_cpf}
-              disabled={readOnly}
+              disabled={camposDependentesClienteDesabilitados}
               onChange={(e) => onChange("colaborador_cpf", e.target.value)}
             />
           </Field>
@@ -160,7 +168,7 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={form.aso}
-              disabled={readOnly}
+              disabled={camposDependentesClienteDesabilitados}
               onChange={(e) => onChange("aso", e.target.value)}
             >
               <option value="">{SELECT_PLACEHOLDER}</option>
@@ -175,7 +183,7 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={cargoId}
-              disabled={readOnly || cargosLoading}
+              disabled={camposDependentesClienteDesabilitados || cargosLoading}
               onChange={(e) => onCargoChange(e.target.value)}
             >
               <option value="">
@@ -192,7 +200,7 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={form.clinica_nome}
-              disabled={readOnly || clinicasLoading}
+              disabled={camposDependentesClienteDesabilitados || clinicasLoading}
               onChange={(e) => onChange("clinica_nome", e.target.value)}
             >
               <option value="">
@@ -209,7 +217,7 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={form.responsavel}
-              disabled={readOnly}
+              disabled={camposDependentesClienteDesabilitados}
               onChange={(e) => onChange("responsavel", e.target.value)}
             >
               <option value="">{SELECT_PLACEHOLDER}</option>

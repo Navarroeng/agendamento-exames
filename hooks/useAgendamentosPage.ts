@@ -122,11 +122,14 @@ import {
   registrarTentativaEdicaoBloqueadaFatura,
 } from "@/services/agendamento-fatura-bloqueio.service";
 import {
-  listarFaturasVencidasCliente,
-  registrarAgendamentoBloqueadoInadimplencia,
-  sincronizarFaturasVencidas,
+  assertClienteSemInadimplencia,
+  isClienteInadimplenteError,
+  validarClienteParaNovoAgendamento,
 } from "@/services/fatura-inadimplencia.service";
-import type { FaturaPendenciaInadimplencia } from "@/lib/fatura-inadimplencia";
+import {
+  CLIENTE_INADIMPLENCIA_VALIDATION_MSG,
+  type FaturaPendenciaInadimplencia,
+} from "@/lib/fatura-inadimplencia";
 import { mapAgendamentosToTableRows } from "@/lib/agendamentos-table";
 import {
   AGENDAMENTOS_PAGE_SIZE,
@@ -184,11 +187,18 @@ export function useAgendamentosPage() {
   const [inadimplenciaPendencias, setInadimplenciaPendencias] = useState<
     FaturaPendenciaInadimplencia[]
   >([]);
+  const [clienteValidacaoLoading, setClienteValidacaoLoading] = useState(false);
+  const clienteValidacaoSeqRef = useRef(0);
   const [clienteId, setClienteId] = useState("");
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
   const [cargosLoading, setCargosLoading] = useState(false);
+
+  const formularioClienteLiberado = useMemo(() => {
+    const isNovo = !editingId && !editingSomenteDocumentacao;
+    return !isNovo || (Boolean(clienteId) && !clienteValidacaoLoading);
+  }, [editingId, editingSomenteDocumentacao, clienteId, clienteValidacaoLoading]);
 
   const {
     form,
@@ -349,6 +359,10 @@ export function useAgendamentosPage() {
 
   const handleOpenExamesAdicionais = useCallback(() => {
     if (editingSomenteDocumentacao) return;
+    if (!formularioClienteLiberado) {
+      toast.error("Selecione e valide o cliente antes de incluir exames.");
+      return;
+    }
     if (!cargoId.trim()) {
       toast.error("Selecione um cargo antes de incluir exames adicionais.");
       return;
@@ -360,7 +374,7 @@ export function useAgendamentosPage() {
       return;
     }
     setExamesAdicionaisModalOpen(true);
-  }, [cargoId, editingSomenteDocumentacao, form.aso]);
+  }, [cargoId, editingSomenteDocumentacao, form.aso, formularioClienteLiberado]);
 
   const closeExamesAdicionaisModal = useCallback(() => {
     if (examesAdicionaisLoading) return;
@@ -638,27 +652,10 @@ export function useAgendamentosPage() {
     setPendingClienteId(null);
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
+    setClienteValidacaoLoading(false);
+    clienteValidacaoSeqRef.current += 1;
     prevAsoRef.current = "";
   }, [reset, resetExams]);
-
-  useEffect(() => {
-    void sincronizarFaturasVencidas({ auditContext }).catch((err) => {
-      console.error("Erro ao sincronizar faturas vencidas:", err);
-    });
-  }, [auditContext]);
-
-  useEffect(() => {
-    function handleVisibility() {
-      if (document.visibilityState !== "visible") return;
-      void sincronizarFaturasVencidas({ auditContext }).catch((err) => {
-        console.error("Erro ao sincronizar faturas vencidas:", err);
-      });
-    }
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibility);
-  }, [auditContext]);
 
   const clearFormPorInadimplencia = useCallback(() => {
     setClienteId("");
@@ -670,31 +667,61 @@ export function useAgendamentosPage() {
     examsManuallyModifiedRef.current = false;
   }, [setField, resetExams]);
 
-  const bloquearClienteInadimplente = useCallback(
-    async (
-      nextClienteId: string,
-      options?: { auditar?: boolean }
-    ): Promise<boolean> => {
-      const cliente = clientes.find((c) => c.id === nextClienteId);
-      if (!cliente) return false;
-
-      const pendencias = await listarFaturasVencidasCliente(cliente.nome);
-      if (pendencias.length === 0) return false;
-
-      if (options?.auditar !== false) {
-        await registrarAgendamentoBloqueadoInadimplencia(auditContext, {
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-          pendencias,
-        });
-      }
-
+  const exibirBloqueioInadimplencia = useCallback(
+    (pendencias: FaturaPendenciaInadimplencia[]) => {
       setInadimplenciaPendencias(pendencias);
       setInadimplenciaModalOpen(true);
       clearFormPorInadimplencia();
-      return true;
     },
-    [clientes, auditContext, clearFormPorInadimplencia]
+    [clearFormPorInadimplencia]
+  );
+
+  const validarESelecionarCliente = useCallback(
+    async (nextClienteId: string): Promise<boolean> => {
+      const cliente = clientes.find((c) => c.id === nextClienteId);
+      if (!cliente) return false;
+
+      const seq = ++clienteValidacaoSeqRef.current;
+      setClienteValidacaoLoading(true);
+
+      try {
+        const pendencias = await validarClienteParaNovoAgendamento(
+          cliente.nome,
+          {
+            auditContext,
+            clienteId: cliente.id,
+          }
+        );
+
+        if (seq !== clienteValidacaoSeqRef.current) return false;
+
+        if (pendencias.length > 0) {
+          exibirBloqueioInadimplencia(pendencias);
+          return false;
+        }
+
+        if (!isClienteProcuracaoAtiva(cliente.procuracao)) {
+          setPendingClienteId(nextClienteId);
+          setClienteProcuracaoModalOpen(true);
+          return false;
+        }
+
+        setClienteId(nextClienteId);
+        setField("cliente_nome", cliente.nome);
+        return true;
+      } catch (err) {
+        if (seq !== clienteValidacaoSeqRef.current) return false;
+        console.error("Erro ao validar situação financeira do cliente:", err);
+        toast.error(CLIENTE_INADIMPLENCIA_VALIDATION_MSG);
+        clearFormPorInadimplencia();
+        return false;
+      } finally {
+        if (seq === clienteValidacaoSeqRef.current) {
+          setClienteValidacaoLoading(false);
+        }
+      }
+    },
+    [clientes, auditContext, setField, clearFormPorInadimplencia, exibirBloqueioInadimplencia]
   );
 
   const closeInadimplenciaModal = useCallback(() => {
@@ -703,11 +730,8 @@ export function useAgendamentosPage() {
     clearFormPorInadimplencia();
   }, [clearFormPorInadimplencia]);
 
-  useEffect(() => {
-    if (!form.cliente_nome.trim() || clienteId) return;
-    const id = resolveClienteIdByNome(clientes, form.cliente_nome);
-    if (id) setClienteId(id);
-  }, [clientes, form.cliente_nome, clienteId]);
+  const isNovoAgendamento = !editingId && !editingSomenteDocumentacao;
+  const formularioDependeClienteValido = isNovoAgendamento;
 
   const openFormForCreate = useCallback(() => {
     resetForm();
@@ -741,12 +765,10 @@ export function useAgendamentosPage() {
 
     const clienteResolved = resolveClienteIdByNome(clientes, prefill.cliente_nome);
     if (clienteResolved) {
-      void bloquearClienteInadimplente(clienteResolved).then((bloqueado) => {
-        if (!bloqueado) setClienteId(clienteResolved);
-      });
+      void validarESelecionarCliente(clienteResolved);
     }
 
-    if (prefill.cargo_id) {
+    if (prefill.cargo_id && clienteResolved) {
       setCargoId(prefill.cargo_id);
       if (prefill.cargo_nome) setCargoNomeSalvo(prefill.cargo_nome);
 
@@ -785,7 +807,7 @@ export function useAgendamentosPage() {
     setField,
     replaceExamesFromCargo,
     auditContext,
-    bloquearClienteInadimplente,
+    validarESelecionarCliente,
   ]);
 
   const handleClear = useCallback(() => {
@@ -804,37 +826,20 @@ export function useAgendamentosPage() {
 
   const handleClienteChange = useCallback(
     (nextClienteId: string) => {
+      if (clienteValidacaoLoading) return;
       if (nextClienteId === clienteId) return;
 
       if (!nextClienteId) {
+        clienteValidacaoSeqRef.current += 1;
+        setClienteValidacaoLoading(false);
         setClienteId("");
         setField("cliente_nome", "");
         return;
       }
 
-      const cliente = clientes.find((c) => c.id === nextClienteId);
-
-      void (async () => {
-        try {
-          if (await bloquearClienteInadimplente(nextClienteId)) return;
-
-          if (cliente && !isClienteProcuracaoAtiva(cliente.procuracao)) {
-            setPendingClienteId(nextClienteId);
-            setClienteProcuracaoModalOpen(true);
-            return;
-          }
-
-          setClienteId(nextClienteId);
-          if (cliente) setField("cliente_nome", cliente.nome);
-        } catch (err) {
-          console.error("Erro ao verificar inadimplência do cliente:", err);
-          toast.error(
-            "Não foi possível verificar pendências financeiras do cliente."
-          );
-        }
-      })();
+      void validarESelecionarCliente(nextClienteId);
     },
-    [clienteId, clientes, setField, bloquearClienteInadimplente]
+    [clienteId, clienteValidacaoLoading, setField, validarESelecionarCliente]
   );
 
   const closeClienteProcuracaoModal = useCallback(() => {
@@ -855,12 +860,6 @@ export function useAgendamentosPage() {
 
     setClienteProcuracaoConfirmLoading(true);
     try {
-      if (await bloquearClienteInadimplente(pendingClienteId)) {
-        setClienteProcuracaoModalOpen(false);
-        setPendingClienteId(null);
-        return;
-      }
-
       setClienteId(pendingClienteId);
       setField("cliente_nome", cliente.nome);
       await registrarAgendamentoClienteSemProcuracao(auditContext, {
@@ -882,7 +881,6 @@ export function useAgendamentosPage() {
     auditContext,
     editingId,
     form.colaborador,
-    bloquearClienteInadimplente,
   ]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
@@ -966,6 +964,11 @@ export function useAgendamentosPage() {
         return;
       }
 
+      if (!formularioClienteLiberado) {
+        toast.error("Selecione e valide o cliente antes de escolher o cargo.");
+        return;
+      }
+
       if (examsManuallyModifiedRef.current) {
         setPendingCargoId(nextCargoId);
         setCargoChangeModalOpen(true);
@@ -979,7 +982,7 @@ export function useAgendamentosPage() {
         setCargoChangeLoading(false);
       }
     },
-    [cargoId, applyCargoChange, replaceExamesFromCargo]
+    [cargoId, applyCargoChange, replaceExamesFromCargo, formularioClienteLiberado]
   );
 
   const closeCargoChangeModal = useCallback(() => {
@@ -1306,8 +1309,20 @@ export function useAgendamentosPage() {
         return;
       }
 
-      if (!editingId && clienteId) {
-        if (await bloquearClienteInadimplente(clienteId)) {
+      if (!editingId && !editingSomenteDocumentacao) {
+        const clienteNome = form.cliente_nome.trim();
+        if (!clienteNome) {
+          toast.error(VALIDATION_TOAST_MESSAGE);
+          return;
+        }
+        try {
+          await assertClienteSemInadimplencia(clienteNome);
+        } catch (err) {
+          if (isClienteInadimplenteError(err)) {
+            exibirBloqueioInadimplencia(err.pendencias);
+            return;
+          }
+          toast.error(CLIENTE_INADIMPLENCIA_VALIDATION_MSG);
           return;
         }
       }
@@ -1517,6 +1532,10 @@ export function useAgendamentosPage() {
           toast.error(err.message);
           return;
         }
+        if (isClienteInadimplenteError(err)) {
+          exibirBloqueioInadimplencia(err.pendencias);
+          return;
+        }
         if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
           await bloquearDuplicidade90Dias(err.info, dataIso);
           return;
@@ -1564,7 +1583,7 @@ export function useAgendamentosPage() {
       historicoUsuario,
       auditContext,
       bloquearDuplicidade90Dias,
-      bloquearClienteInadimplente,
+      exibirBloqueioInadimplencia,
     ]
   );
 
@@ -1680,5 +1699,7 @@ export function useAgendamentosPage() {
     inadimplenciaModalOpen,
     inadimplenciaPendencias,
     closeInadimplenciaModal,
+    clienteValidacaoLoading,
+    formularioClienteLiberado,
   };
 }

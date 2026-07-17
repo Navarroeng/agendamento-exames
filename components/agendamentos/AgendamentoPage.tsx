@@ -104,6 +104,8 @@ export function AgendamentoPage() {
     inadimplenciaModalOpen,
     inadimplenciaPendencias,
     closeInadimplenciaModal,
+    clienteValidacaoLoading,
+    formularioClienteLiberado,
   } = useAgendamentosPage();
 
   return (
@@ -141,6 +143,8 @@ export function AgendamentoPage() {
               showClienteProcuracaoAlert && !editingSomenteDocumentacao
             }
             exams={exams}
+            clienteValidacaoLoading={clienteValidacaoLoading}
+            formularioClienteLiberado={formularioClienteLiberado}
           />
           <ExamSection
             exams={exams}
@@ -154,13 +158,14 @@ export function AgendamentoPage() {
             onRemove={removeExam}
             onUpdate={updateExam}
             onIncluirExamesAdicionais={handleOpenExamesAdicionais}
-            readOnly={editingSomenteDocumentacao}
+            readOnly={editingSomenteDocumentacao || !formularioClienteLiberado}
           />
           <StatusDocumentacao form={form} onChange={setField}>
             <FormActions
               saving={saving}
               contratoInvalido={contratoInvalido}
               somenteDocumentacao={editingSomenteDocumentacao}
+              formularioClienteLiberado={formularioClienteLiberado}
               onClear={handleClear}
               onSaveDraft={() => handleSave("rascunho")}
               onSave={() => handleSave("agendado")}

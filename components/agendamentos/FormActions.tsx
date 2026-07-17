@@ -2,6 +2,7 @@ interface FormActionsProps {
   saving: boolean;
   contratoInvalido?: boolean;
   somenteDocumentacao?: boolean;
+  formularioClienteLiberado?: boolean;
   onClear: () => void;
   onSaveDraft: () => void;
   onSave: () => void;
@@ -12,12 +13,15 @@ export function FormActions({
   saving,
   contratoInvalido = false,
   somenteDocumentacao = false,
+  formularioClienteLiberado = true,
   onClear,
   onSaveDraft,
   onSave,
   onCopyClinicaMessage,
 }: FormActionsProps) {
-  const saveDisabled = saving || (!somenteDocumentacao && contratoInvalido);
+  const saveDisabled =
+    saving ||
+    (!somenteDocumentacao && (contratoInvalido || !formularioClienteLiberado));
 
   if (somenteDocumentacao) {
     return (

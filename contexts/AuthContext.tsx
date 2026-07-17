@@ -111,9 +111,12 @@ export function useHistoricoUsuario() {
 
 export function useAuditoriaUsuario() {
   const { displayName, profile } = useAuth();
-  return {
-    usuarioId: profile?.user_id ?? null,
-    usuarioNome: profile?.nome ?? displayName,
-    usuarioEmail: profile?.email ?? "",
-  };
+  return useMemo(
+    () => ({
+      usuarioId: profile?.user_id ?? null,
+      usuarioNome: profile?.nome ?? displayName,
+      usuarioEmail: profile?.email ?? "",
+    }),
+    [profile?.user_id, profile?.nome, profile?.email, displayName]
+  );
 }

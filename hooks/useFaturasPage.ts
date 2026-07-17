@@ -200,7 +200,6 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const reloadHistorico = useCallback(async () => {
     setHistoricoLoading(true);
     try {
-      await sincronizarFaturasVencidas(auditOptions);
       const data = await listarFaturas();
       setFaturas(data);
     } catch (err) {
@@ -209,11 +208,44 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setHistoricoLoading(false);
     }
-  }, [auditOptions]);
+  }, []);
+
+  const reloadHistoricoRef = useRef(reloadHistorico);
+  reloadHistoricoRef.current = reloadHistorico;
+
+  const syncVencidasToastShownRef = useRef(false);
+  const syncVencidasAttemptedRef = useRef(false);
 
   const reloadAll = useCallback(async () => {
     await Promise.all([reloadAgendamentos(), reloadHistorico()]);
   }, [reloadAgendamentos, reloadHistorico]);
+
+  useEffect(() => {
+    if (pageTipo !== "cliente") return;
+    if (syncVencidasAttemptedRef.current) return;
+
+    syncVencidasAttemptedRef.current = true;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const atualizadas = await sincronizarFaturasVencidas(auditOptions);
+        if (cancelled || atualizadas === 0) return;
+        const data = await listarFaturas();
+        if (!cancelled) setFaturas(data);
+      } catch (err) {
+        console.error("Erro ao sincronizar faturas vencidas:", err);
+        if (!cancelled && !syncVencidasToastShownRef.current) {
+          syncVencidasToastShownRef.current = true;
+          toast.error("Não foi possível atualizar o status de faturas vencidas.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pageTipo, auditOptions]);
 
   useEffect(() => {
     if (pageTipo !== "cliente") return;
@@ -233,7 +265,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           Array.from(ids),
           auditOptions
         );
-        await reloadHistorico();
+        await reloadHistoricoRef.current();
       })
       .catch((err) => {
         console.error("Erro ao sincronizar faturas que necessitam reemissão:", err);
@@ -242,7 +274,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     return () => {
       cancelled = true;
     };
-  }, [faturas, pageTipo, auditOptions, reloadHistorico]);
+  }, [faturas, pageTipo, auditOptions]);
 
   useEffect(() => {
     reloadAll();

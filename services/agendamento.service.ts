@@ -9,6 +9,12 @@ import {
   assertAgendamentoEditavelPorFatura,
   assertCancelamentoExcepcionalAdminPorFatura,
 } from "@/services/agendamento-fatura-bloqueio.service";
+import {
+  assertClienteSemInadimplencia,
+  isClienteInadimplenteError,
+  isClienteInadimplenciaValidationError,
+} from "@/services/fatura-inadimplencia.service";
+import { CLIENTE_INADIMPLENCIA_VALIDATION_MSG } from "@/lib/fatura-inadimplencia";
 import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
@@ -86,6 +92,7 @@ export async function salvarAgendamentoComExames(
     colaboradorCpf: agendamento.colaborador_cpf,
     dataAgendamentoIso: agendamento.data_agendamento,
   });
+  await assertClienteSemInadimplencia(agendamento.cliente_nome);
   const supabase = createClient();
 
   const { data, error } = await supabase

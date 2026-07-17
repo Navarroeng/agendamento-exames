@@ -11,6 +11,12 @@ export interface FaturaPendenciaInadimplencia {
   valorFormatado: string;
 }
 
+export const CLIENTE_INADIMPLENCIA_VALIDATION_MSG =
+  "Não foi possível validar a situação financeira do cliente. Tente novamente.";
+
+export const CLIENTE_INADIMPLENTE_AGENDAMENTO_MSG =
+  "Este cliente possui fatura(s) vencida(s) pendente(s) de pagamento. Novos agendamentos não podem ser realizados.";
+
 /** YYYY-MM a partir de data ISO (YYYY-MM-DD). */
 export function mesAnoFromIsoDate(iso: string): string {
   return iso.split("T")[0].slice(0, 7);
@@ -41,13 +47,24 @@ export function faturaDeveMarcarComoVencida(
 }
 
 export function faturaBloqueiaNovoAgendamento(
-  fatura: Pick<FaturaRecord, "status" | "pago" | "tipo">
+  fatura: Pick<FaturaRecord, "status" | "pago" | "data_vencimento" | "tipo">,
+  dataReferencia: Date = new Date()
 ): boolean {
-  return (
-    fatura.tipo === "cliente" &&
-    fatura.status === "vencida" &&
-    !fatura.pago
-  );
+  return faturaIndicaInadimplenciaAgendamento(fatura, dataReferencia);
+}
+
+/** Bloqueia se vencida persistida ou emitida não paga após o mês do vencimento. */
+export function faturaIndicaInadimplenciaAgendamento(
+  fatura: Pick<FaturaRecord, "status" | "pago" | "data_vencimento" | "tipo">,
+  dataReferencia: Date = new Date()
+): boolean {
+  if (fatura.tipo !== "cliente") return false;
+  if (fatura.pago) return false;
+  if (fatura.status === "vencida") return true;
+  if (fatura.status === "emitida") {
+    return faturaDeveMarcarComoVencida(fatura, dataReferencia);
+  }
+  return false;
 }
 
 export function mapFaturaParaPendenciaInadimplencia(

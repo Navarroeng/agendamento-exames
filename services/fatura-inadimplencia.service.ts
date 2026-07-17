@@ -4,9 +4,11 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import {
+  CLIENTE_INADIMPLENCIA_VALIDATION_MSG,
+  CLIENTE_INADIMPLENTE_AGENDAMENTO_MSG,
   formatAuditoriaAgendamentoBloqueadoInadimplencia,
-  faturaBloqueiaNovoAgendamento,
   faturaDeveMarcarComoVencida,
+  faturaIndicaInadimplenciaAgendamento,
   mapFaturaParaPendenciaInadimplencia,
   type FaturaPendenciaInadimplencia,
 } from "@/lib/fatura-inadimplencia";
@@ -23,7 +25,59 @@ function normalizeReferenciaNome(value: string): string {
   return value.trim();
 }
 
+let syncVencidasInFlight: Promise<number> | null = null;
+
+export class ClienteInadimplenteError extends Error {
+  readonly code = "CLIENTE_INADIMPLENTE" as const;
+  readonly pendencias: FaturaPendenciaInadimplencia[];
+
+  constructor(pendencias: FaturaPendenciaInadimplencia[]) {
+    super(CLIENTE_INADIMPLENTE_AGENDAMENTO_MSG);
+    this.name = "ClienteInadimplenteError";
+    this.pendencias = pendencias;
+  }
+}
+
+export class ClienteInadimplenciaValidationError extends Error {
+  readonly code = "CLIENTE_INADIMPLENCIA_VALIDATION" as const;
+
+  constructor(message = CLIENTE_INADIMPLENCIA_VALIDATION_MSG) {
+    super(message);
+    this.name = "ClienteInadimplenciaValidationError";
+  }
+}
+
+export function isClienteInadimplenteError(
+  err: unknown
+): err is ClienteInadimplenteError {
+  return err instanceof ClienteInadimplenteError;
+}
+
+export function isClienteInadimplenciaValidationError(
+  err: unknown
+): err is ClienteInadimplenciaValidationError {
+  return err instanceof ClienteInadimplenciaValidationError;
+}
+
 export async function sincronizarFaturasVencidas(
+  auditOptions?: FaturaAuditOptions,
+  dataReferencia: Date = new Date()
+): Promise<number> {
+  if (syncVencidasInFlight) {
+    return syncVencidasInFlight;
+  }
+
+  syncVencidasInFlight = sincronizarFaturasVencidasInterno(
+    auditOptions,
+    dataReferencia
+  ).finally(() => {
+    syncVencidasInFlight = null;
+  });
+
+  return syncVencidasInFlight;
+}
+
+async function sincronizarFaturasVencidasInterno(
   auditOptions?: FaturaAuditOptions,
   dataReferencia: Date = new Date()
 ): Promise<number> {
@@ -46,14 +100,16 @@ export async function sincronizarFaturasVencidas(
   let atualizadas = 0;
 
   for (const fatura of candidatas) {
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from("faturas")
       .update({ status: "vencida" })
       .eq("id", fatura.id)
       .eq("status", "emitida")
-      .eq("pago", false);
+      .eq("pago", false)
+      .select("id");
 
     if (updateError) throw updateError;
+    if (!updated || updated.length === 0) continue;
 
     atualizadas += 1;
 
@@ -77,8 +133,9 @@ export async function sincronizarFaturasVencidas(
   return atualizadas;
 }
 
-export async function listarFaturasVencidasCliente(
-  clienteNome: string
+export async function listarPendenciasInadimplenciaCliente(
+  clienteNome: string,
+  dataReferencia: Date = new Date()
 ): Promise<FaturaPendenciaInadimplencia[]> {
   const nome = normalizeReferenciaNome(clienteNome);
   if (!nome) return [];
@@ -88,16 +145,92 @@ export async function listarFaturasVencidasCliente(
     .from("faturas")
     .select("*")
     .eq("tipo", "cliente")
-    .eq("status", "vencida")
     .eq("pago", false)
+    .in("status", ["emitida", "vencida"])
     .eq("referencia_nome", nome)
     .order("data_vencimento", { ascending: true });
 
   if (error) throw error;
 
-  return ((data ?? []) as FaturaRecord[])
-    .filter(faturaBloqueiaNovoAgendamento)
+  const pendencias = ((data ?? []) as FaturaRecord[])
+    .filter((fatura) =>
+      faturaIndicaInadimplenciaAgendamento(fatura, dataReferencia)
+    )
     .map(mapFaturaParaPendenciaInadimplencia);
+
+  const emitidasParaSync = ((data ?? []) as FaturaRecord[]).filter(
+    (fatura) =>
+      fatura.status === "emitida" &&
+      faturaDeveMarcarComoVencida(fatura, dataReferencia)
+  );
+
+  if (emitidasParaSync.length > 0) {
+    void sincronizarFaturasVencidas().catch((err) => {
+      console.error("Erro ao sincronizar status vencida em background:", err);
+    });
+  }
+
+  return pendencias;
+}
+
+/** @deprecated Use listarPendenciasInadimplenciaCliente */
+export async function listarFaturasVencidasCliente(
+  clienteNome: string
+): Promise<FaturaPendenciaInadimplencia[]> {
+  return listarPendenciasInadimplenciaCliente(clienteNome);
+}
+
+export async function assertClienteSemInadimplencia(
+  clienteNome: string
+): Promise<void> {
+  const nome = normalizeReferenciaNome(clienteNome);
+  if (!nome) return;
+
+  const supabase = createClient();
+  const { error } = await supabase.rpc("assert_cliente_sem_inadimplencia", {
+    p_referencia_nome: nome,
+  });
+
+  if (!error) return;
+
+  const message = error.message ?? "";
+  if (
+    message.includes("Could not find the function") ||
+    message.includes("assert_cliente_sem_inadimplencia")
+  ) {
+    const pendencias = await listarPendenciasInadimplenciaCliente(nome);
+    if (pendencias.length > 0) {
+      throw new ClienteInadimplenteError(pendencias);
+    }
+    return;
+  }
+
+  if (message.includes("CLIENTE_INADIMPLENTE")) {
+    const pendencias = await listarPendenciasInadimplenciaCliente(nome).catch(
+      () => []
+    );
+    throw new ClienteInadimplenteError(pendencias);
+  }
+
+  throw new ClienteInadimplenciaValidationError();
+}
+
+export async function validarClienteParaNovoAgendamento(
+  clienteNome: string,
+  auditOptions?: { auditContext: AuditoriaUsuarioContext; clienteId?: string | null }
+): Promise<FaturaPendenciaInadimplencia[]> {
+  const pendencias = await listarPendenciasInadimplenciaCliente(clienteNome);
+  if (pendencias.length === 0) return [];
+
+  if (auditOptions) {
+    await registrarAgendamentoBloqueadoInadimplencia(auditOptions.auditContext, {
+      clienteId: auditOptions.clienteId ?? null,
+      clienteNome,
+      pendencias,
+    });
+  }
+
+  return pendencias;
 }
 
 export async function registrarAgendamentoBloqueadoInadimplencia(
