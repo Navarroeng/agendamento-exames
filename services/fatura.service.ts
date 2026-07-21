@@ -1,5 +1,5 @@
 import {
-  FATURA_STATUS_ELEGIVEL,
+  FATURA_STATUS_ELEGIVEIS,
   filterAgendamentosElegiveisFatura,
 } from "@/lib/fatura-elegibilidade";
 import { createClient } from "@/lib/supabase/client";
@@ -7,7 +7,7 @@ import type { AgendamentoWithExames } from "@/lib/types";
 
 /**
  * Lista agendamentos elegíveis para faturamento.
- * Critério único: status = agendado. Pendências operacionais são ignoradas.
+ * Critério: status agendado ou ASO Retido. Pendências operacionais são ignoradas.
  */
 export async function listarAgendamentosParaFatura(
   limit = 2000
@@ -28,7 +28,7 @@ export async function listarAgendamentosParaFatura(
       )
     `
     )
-    .eq("status", FATURA_STATUS_ELEGIVEL)
+    .in("status", [...FATURA_STATUS_ELEGIVEIS])
     .order("data_agendamento", { ascending: false })
     .limit(limit);
 

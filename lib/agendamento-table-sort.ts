@@ -49,6 +49,7 @@ const STATUS_LABELS: Record<string, string> = {
   rascunho: "Rascunho",
   cancelado: "Cancelado",
   agendado: "Agendado",
+  aso_retido: "ASO Retido",
 };
 
 function statusSortLabel(status: string): string {

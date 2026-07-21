@@ -20,6 +20,9 @@ function statusAgendamento(
   if (status === "agendado") {
     return { statusType: "active", statusLabel: "Agendado" };
   }
+  if (status === "aso_retido") {
+    return { statusType: "asoRetido", statusLabel: "ASO Retido" };
+  }
   return { statusType: "pending", statusLabel: "Pendente" };
 }
 
@@ -100,6 +103,7 @@ export function mapAgendamentosToTableRows(
         exames.length > 0 ? formatCurrency(totalCliente) : "—",
       statusType,
       statusLabel,
+      agendamentoStatus: agendamento.status as AgendamentoTableRow["agendamentoStatus"],
       asoClinica: agendamento.aso_enviado_clinica,
       asoAssinado: agendamento.aso_assinado,
       asoCliente: agendamento.aso_enviado_cliente,

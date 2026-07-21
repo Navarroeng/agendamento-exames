@@ -2,6 +2,8 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconCalendar } from "@/components/ui/icons/OutlineIcons";
+import { AgendamentoAsoRetidoModal } from "@/components/modals/AgendamentoAsoRetidoModal";
+import { AgendamentoLiberarAsoRetidoModal } from "@/components/modals/AgendamentoLiberarAsoRetidoModal";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
 import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
@@ -78,6 +80,15 @@ export function AgendamentoPage() {
     closeHistoricoModal,
     closeCancelModal,
     handleConfirmarCancelamento,
+    asoRetidoModalOpen,
+    closeAsoRetidoModal,
+    handleAsoRetido,
+    handleConfirmarAsoRetido,
+    liberarAsoRetidoModalOpen,
+    closeLiberarAsoRetidoModal,
+    handleLiberarAsoRetido,
+    handleConfirmarLiberarAsoRetido,
+    bloquearCamposAsoDocumentacao,
     handleSave,
     handleCopyMensagemClinica,
     cargoSemExames,
@@ -161,7 +172,11 @@ export function AgendamentoPage() {
             onIncluirExamesAdicionais={handleOpenExamesAdicionais}
             readOnly={editingSomenteDocumentacao || !formularioClienteLiberado}
           />
-          <StatusDocumentacao form={form} onChange={setField}>
+          <StatusDocumentacao
+            form={form}
+            onChange={setField}
+            bloquearCamposAso={bloquearCamposAsoDocumentacao}
+          >
             <FormActions
               saving={saving}
               contratoInvalido={contratoInvalido}
@@ -209,6 +224,8 @@ export function AgendamentoPage() {
         onEditar={handleEditar}
         onCancelar={handleCancelar}
         onHistorico={handleHistorico}
+        onAsoRetido={handleAsoRetido}
+        onLiberarAsoRetido={handleLiberarAsoRetido}
       />
 
       <AgendamentoViewModal
@@ -227,6 +244,18 @@ export function AgendamentoPage() {
         saving={saving}
         onClose={closeCancelModal}
         onConfirm={handleConfirmarCancelamento}
+      />
+      <AgendamentoAsoRetidoModal
+        open={asoRetidoModalOpen}
+        saving={saving}
+        onClose={closeAsoRetidoModal}
+        onConfirm={handleConfirmarAsoRetido}
+      />
+      <AgendamentoLiberarAsoRetidoModal
+        open={liberarAsoRetidoModalOpen}
+        saving={saving}
+        onClose={closeLiberarAsoRetidoModal}
+        onConfirm={handleConfirmarLiberarAsoRetido}
       />
       <AgendamentoDuplicidade90DiasModal
         open={duplicidade90DiasOpen}

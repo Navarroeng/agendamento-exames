@@ -76,9 +76,18 @@ import { useHistoricoUsuario, useAuditoriaUsuario, useAuth } from "@/contexts/Au
 import {
   buildHistoricoAlteracoes,
   buildHistoricoAlteracoesDocumentacao,
+  buildHistoricoAsoRetido,
   buildHistoricoCancelamento,
   buildHistoricoCriacao,
+  buildHistoricoLiberarAsoRetido,
 } from "@/lib/agendamento-historico-diff";
+import { buildDocumentacaoPayloadFromForm } from "@/lib/agendamento-documentacao";
+import { isAgendamentoAsoRetido, AsoRetidoAnexoValidationError } from "@/lib/agendamento-aso-retido-anexo";
+import {
+  liberarAgendamentoAsoRetido,
+  marcarAgendamentoAsoRetido,
+  uploadAsoRetidoAnexo,
+} from "@/services/agendamento-aso-retido.service";
 import {
   CONTRATO_VIGENTE_ERROR_MESSAGE,
   verificarContratoVigentePorNome,
@@ -170,6 +179,18 @@ export function useAgendamentosPage() {
     "normal" | "excepcional"
   >("normal");
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<AgendamentoStatus | null>(
+    null
+  );
+  const [asoRetidoModalOpen, setAsoRetidoModalOpen] = useState(false);
+  const [asoRetidoTargetId, setAsoRetidoTargetId] = useState<string | null>(
+    null
+  );
+  const [liberarAsoRetidoModalOpen, setLiberarAsoRetidoModalOpen] =
+    useState(false);
+  const [liberarAsoRetidoTargetId, setLiberarAsoRetidoTargetId] = useState<
+    string | null
+  >(null);
   const [duplicidade90DiasOpen, setDuplicidade90DiasOpen] = useState(false);
   const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
     useState<AgendamentoDuplicidade90DiasInfo | null>(null);
@@ -648,6 +669,7 @@ export function useAgendamentosPage() {
     setCargoId("");
     setCargoNomeSalvo("");
     setEditingId(null);
+    setEditingStatus(null);
     setEditingSomenteDocumentacao(false);
     setPendingCargoId(null);
     setCargoChangeModalOpen(false);
@@ -1051,6 +1073,7 @@ export function useAgendamentosPage() {
       setCargoNomeSalvo(agendamento.cargo_nome ?? "");
       examsManuallyModifiedRef.current = false;
       setEditingSomenteDocumentacao(bloqueio.bloqueado);
+      setEditingStatus(agendamento.status);
       setEditingId(id);
       setShowForm(true);
       setFiltersExpanded(false);
@@ -1136,6 +1159,149 @@ export function useAgendamentosPage() {
     setCancelModalVariant("normal");
     setCancelTargetId(null);
   }, []);
+
+  const closeAsoRetidoModal = useCallback(() => {
+    setAsoRetidoModalOpen(false);
+    setAsoRetidoTargetId(null);
+  }, []);
+
+  const closeLiberarAsoRetidoModal = useCallback(() => {
+    setLiberarAsoRetidoModalOpen(false);
+    setLiberarAsoRetidoTargetId(null);
+  }, []);
+
+  const handleAsoRetido = useCallback(
+    (id: string) => {
+      const agendamento = getById(id);
+      if (!agendamento) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (agendamento.status !== "agendado") {
+        toast.error("ASO Retido disponível apenas para agendamentos confirmados.");
+        return;
+      }
+      setAsoRetidoTargetId(id);
+      setAsoRetidoModalOpen(true);
+    },
+    [getById]
+  );
+
+  const handleLiberarAsoRetido = useCallback(
+    (id: string) => {
+      const agendamento = getById(id);
+      if (!agendamento) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (agendamento.status !== "aso_retido") {
+        toast.error("Este agendamento não está com status ASO Retido.");
+        return;
+      }
+      setLiberarAsoRetidoTargetId(id);
+      setLiberarAsoRetidoModalOpen(true);
+    },
+    [getById]
+  );
+
+  const handleConfirmarAsoRetido = useCallback(
+    async (file: File, observacao: string) => {
+      if (!asoRetidoTargetId) return;
+
+      const agendamento = getById(asoRetidoTargetId);
+      if (!agendamento) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const { path, nome } = await uploadAsoRetidoAnexo(asoRetidoTargetId, file);
+        await marcarAgendamentoAsoRetido(asoRetidoTargetId, {
+          anexoPath: path,
+          anexoNome: nome,
+          observacao: observacao.trim() || null,
+          usuario: historicoUsuario,
+        });
+        await registrarHistorico(
+          asoRetidoTargetId,
+          historicoUsuario,
+          buildHistoricoAsoRetido(historicoUsuario, nome, observacao),
+          {
+            auditContext,
+            registroNome: agendamento.colaborador,
+          }
+        );
+        toast.success("Agendamento marcado como ASO Retido.");
+        closeAsoRetidoModal();
+        refresh();
+      } catch (err) {
+        console.error("Erro ao marcar ASO Retido:", err);
+        if (err instanceof AsoRetidoAnexoValidationError) {
+          toast.error(err.message);
+          return;
+        }
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "";
+        toast.error(message || "Erro ao marcar ASO Retido.");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      asoRetidoTargetId,
+      auditContext,
+      closeAsoRetidoModal,
+      getById,
+      historicoUsuario,
+      refresh,
+    ]
+  );
+
+  const handleConfirmarLiberarAsoRetido = useCallback(async () => {
+    if (!liberarAsoRetidoTargetId) return;
+
+    const agendamento = getById(liberarAsoRetidoTargetId);
+    if (!agendamento) {
+      toast.error("Agendamento não encontrado.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await liberarAgendamentoAsoRetido(liberarAsoRetidoTargetId);
+      await registrarHistorico(
+        liberarAsoRetidoTargetId,
+        historicoUsuario,
+        buildHistoricoLiberarAsoRetido(historicoUsuario),
+        {
+          auditContext,
+          registroNome: agendamento.colaborador,
+        }
+      );
+      toast.success("ASO Retido liberado. Status voltou para Agendado.");
+      closeLiberarAsoRetidoModal();
+      refresh();
+    } catch (err) {
+      console.error("Erro ao liberar ASO Retido:", err);
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "";
+      toast.error(message || "Erro ao liberar ASO Retido.");
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    auditContext,
+    closeLiberarAsoRetidoModal,
+    getById,
+    historicoUsuario,
+    liberarAsoRetidoTargetId,
+    refresh,
+  ]);
 
   const handleConfirmarCancelamento = useCallback(
     async (motivo: string) => {
@@ -1283,8 +1449,10 @@ export function useAgendamentosPage() {
 
   const executeSave = useCallback(
     async (status: AgendamentoStatus) => {
+      const bloquearCamposAso = isAgendamentoAsoRetido(editingStatus);
+
       if (editingId && editingSomenteDocumentacao) {
-        if (!isDocumentacaoCompleta(form)) {
+        if (!isDocumentacaoCompleta(form, { bloquearCamposAso })) {
           toast.error(
             getDocumentacaoValidationMessage(form) ?? VALIDATION_TOAST_MESSAGE
           );
@@ -1298,11 +1466,15 @@ export function useAgendamentosPage() {
             toast.error("Agendamento não encontrado.");
             return;
           }
-          const docPayload = buildDocumentacaoPayload();
+          const docPayload = buildDocumentacaoPayloadFromForm(form, {
+            bloquearCamposAso,
+            asoFieldsFrom: bloquearCamposAso ? anterior : undefined,
+          });
           const alteracoes = buildHistoricoAlteracoesDocumentacao(
             anterior,
             docPayload,
-            historicoUsuario
+            historicoUsuario,
+            { bloquearCamposAso }
           );
           await atualizarDocumentacaoAgendamento(editingId, docPayload);
           if (alteracoes.length > 0) {
@@ -1394,7 +1566,7 @@ export function useAgendamentosPage() {
         return;
       }
 
-      if (!isAgendamentoCompleto(form, exams, cargoId)) {
+      if (!isAgendamentoCompleto(form, exams, cargoId, { bloquearCamposAso })) {
         toast.error(
           getAgendamentoValidationMessage(form, exams, cargoId) ??
             VALIDATION_TOAST_MESSAGE
@@ -1442,7 +1614,11 @@ export function useAgendamentosPage() {
           cargosAtivos,
           cargoNomeSalvo
         );
-        const payload = buildPayload(status, cargoFields);
+        const payloadStatus =
+          editingId && isAgendamentoAsoRetido(editingStatus)
+            ? "aso_retido"
+            : status;
+        const payload = buildPayload(payloadStatus, cargoFields);
         const examesPayload = getExamesPayload();
 
         if (editingId) {
@@ -1457,6 +1633,14 @@ export function useAgendamentosPage() {
               (exame) => ({ ...exame })
             ),
           };
+          if (bloquearCamposAso) {
+            payload.aso_enviado_clinica = anterior.aso_enviado_clinica;
+            payload.data_aso_enviado_clinica = anterior.data_aso_enviado_clinica;
+            payload.aso_assinado = anterior.aso_assinado;
+            payload.data_aso_assinado = anterior.data_aso_assinado;
+            payload.aso_enviado_cliente = anterior.aso_enviado_cliente;
+            payload.data_aso_enviado_cliente = anterior.data_aso_enviado_cliente;
+          }
           const alteracoes = buildHistoricoAlteracoes(
             anteriorParaHistorico,
             payload,
@@ -1600,7 +1784,7 @@ export function useAgendamentosPage() {
       hasExamWarnings,
       bloquearEdicaoAgendamentoFaturado,
       editingSomenteDocumentacao,
-      buildDocumentacaoPayload,
+      editingStatus,
       form,
       exams,
       selectedClinica,
@@ -1652,6 +1836,8 @@ export function useAgendamentosPage() {
       toast.error("Não foi possível copiar a mensagem.");
     }
   }, [form, clientes, clinicasList, exams, catalogExames]);
+
+  const bloquearCamposAsoDocumentacao = isAgendamentoAsoRetido(editingStatus);
 
   return {
     showForm,
@@ -1710,6 +1896,15 @@ export function useAgendamentosPage() {
     closeHistoricoModal,
     closeCancelModal,
     handleConfirmarCancelamento,
+    asoRetidoModalOpen,
+    closeAsoRetidoModal,
+    handleAsoRetido,
+    handleConfirmarAsoRetido,
+    liberarAsoRetidoModalOpen,
+    closeLiberarAsoRetidoModal,
+    handleLiberarAsoRetido,
+    handleConfirmarLiberarAsoRetido,
+    bloquearCamposAsoDocumentacao,
     handleSave,
     handleCopyMensagemClinica,
     duplicidade90DiasOpen,

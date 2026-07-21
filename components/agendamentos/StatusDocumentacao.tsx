@@ -8,6 +8,7 @@ import type { FormField } from "@/hooks/useAgendamentoForm";
 interface StatusDocumentacaoProps {
   form: Record<FormField, string>;
   onChange: (field: FormField, value: string) => void;
+  bloquearCamposAso?: boolean;
   children?: React.ReactNode;
 }
 
@@ -42,16 +43,29 @@ function DateField({
 export function StatusDocumentacao({
   form,
   onChange,
+  bloquearCamposAso = false,
   children,
 }: StatusDocumentacaoProps) {
+  const asoDisabledClass = bloquearCamposAso
+    ? "pointer-events-none opacity-50"
+    : "";
+
   return (
     <Panel
       title="Status e Documentação"
       icon={<IconShield />}
       iconTone="orange"
     >
+      {bloquearCamposAso ? (
+        <div className="mb-3 rounded-xl border border-[#fed7aa] bg-[#fff7ed] px-4 py-2.5 text-xs font-semibold text-[#9a3412]">
+          Campos de ASO bloqueados enquanto o agendamento estiver com status ASO
+          Retido.
+        </div>
+      ) : null}
       <div className="status-doc-wrapper flex flex-col gap-3">
-        <div className="status-doc-row status-main-row grid grid-cols-1 gap-x-4 gap-y-3 items-end grid:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={`status-doc-row status-main-row grid grid-cols-1 gap-x-4 gap-y-3 items-end grid:grid-cols-2 xl:grid-cols-3 ${asoDisabledClass}`}
+        >
           <Field label="ASO enviado para clínica">
             <select
               className="field-input"
@@ -97,7 +111,9 @@ export function StatusDocumentacao({
           </Field>
         </div>
 
-        <div className="status-doc-row status-date-row grid grid-cols-1 gap-x-4 gap-y-3 items-end grid:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={`status-doc-row status-date-row grid grid-cols-1 gap-x-4 gap-y-3 items-end grid:grid-cols-2 xl:grid-cols-3 ${asoDisabledClass}`}
+        >
           <DateField
             label="Data do envio do ASO para a clínica"
             value={form.data_aso_enviado_clinica}

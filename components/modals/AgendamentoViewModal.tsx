@@ -2,6 +2,7 @@
 
 import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import type { AgendamentoWithExames } from "@/lib/types";
+import { ViewModalAsoRetidoSection } from "./agendamento-view/ViewModalAsoRetidoSection";
 import { ViewModalDocumentationSection } from "./agendamento-view/ViewModalDocumentationSection";
 import { ViewModalExamsSection } from "./agendamento-view/ViewModalExamsSection";
 import { ViewModalFooter } from "./agendamento-view/ViewModalFooter";
@@ -78,6 +79,7 @@ export function AgendamentoViewModal({
 
             <ViewModalGeneralSection agendamento={agendamento} />
             <ViewModalExamsSection agendamento={agendamento} />
+            <ViewModalAsoRetidoSection agendamento={agendamento} />
             <ViewModalDocumentationSection agendamento={agendamento} />
           </div>
         </div>

@@ -1,15 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { AgendamentoStatus } from "@/lib/types";
 
 interface RowActionsMenuProps {
   agendamentoId: string;
+  agendamentoStatus: AgendamentoStatus;
   bloqueadoPorFatura?: boolean;
   podeCancelarExcepcionalAdmin?: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onCancelar: (id: string) => void;
   onHistorico: (id: string) => void;
+  onAsoRetido: (id: string) => void;
+  onLiberarAsoRetido: (id: string) => void;
 }
 
 type MenuItem = {
@@ -22,12 +26,15 @@ type MenuItem = {
 
 export function RowActionsMenu({
   agendamentoId,
+  agendamentoStatus,
   bloqueadoPorFatura = false,
   podeCancelarExcepcionalAdmin = false,
   onVisualizar,
   onEditar,
   onCancelar,
   onHistorico,
+  onAsoRetido,
+  onLiberarAsoRetido,
 }: RowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -63,7 +70,7 @@ export function RowActionsMenu({
         onClick: () => onCancelar(agendamentoId),
       });
     }
-  } else {
+  } else if (agendamentoStatus !== "cancelado" && agendamentoStatus !== "rascunho") {
     items.push(
       { key: "editar", label: "Editar", onClick: () => onEditar(agendamentoId) },
       {
@@ -73,6 +80,12 @@ export function RowActionsMenu({
         onClick: () => onCancelar(agendamentoId),
       }
     );
+  } else if (agendamentoStatus !== "cancelado") {
+    items.push({
+      key: "editar",
+      label: "Editar",
+      onClick: () => onEditar(agendamentoId),
+    });
   }
 
   items.push({
@@ -80,6 +93,22 @@ export function RowActionsMenu({
     label: "Histórico",
     onClick: () => onHistorico(agendamentoId),
   });
+
+  if (agendamentoStatus === "agendado") {
+    items.push({
+      key: "aso-retido",
+      label: "ASO Retido",
+      onClick: () => onAsoRetido(agendamentoId),
+    });
+  }
+
+  if (agendamentoStatus === "aso_retido") {
+    items.push({
+      key: "liberar-aso-retido",
+      label: "Liberar ASO Retido",
+      onClick: () => onLiberarAsoRetido(agendamentoId),
+    });
+  }
 
   function handleAction(item: MenuItem) {
     if (item.disabled || !item.onClick) return;

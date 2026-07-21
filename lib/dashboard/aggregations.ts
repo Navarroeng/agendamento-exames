@@ -83,6 +83,9 @@ function agendaStatus(
   if (agendamento.status === "agendado") {
     return { status: "Agendado", statusTone: "active" };
   }
+  if (agendamento.status === "aso_retido") {
+    return { status: "ASO Retido", statusTone: "pending" };
+  }
   return { status: "Pendente", statusTone: "pending" };
 }
 

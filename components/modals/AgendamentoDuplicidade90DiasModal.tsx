@@ -16,6 +16,7 @@ interface AgendamentoDuplicidade90DiasModalProps {
 
 function statusLabel(status: string): string {
   if (status === "agendado") return "Agendado";
+  if (status === "aso_retido") return "ASO Retido";
   if (status === "rascunho") return "Rascunho";
   if (status === "cancelado") return "Cancelado";
   return status;

@@ -1,7 +1,12 @@
-import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
+import type { AgendamentoWithExames } from "@/lib/types";
 
-/** Único status de agendamento elegível para faturamento. */
-export const FATURA_STATUS_ELEGIVEL: AgendamentoStatus = "agendado";
+/** Status de agendamento elegíveis para faturamento (exame realizado / cobrável). */
+export const FATURA_STATUS_ELEGIVEIS = ["agendado", "aso_retido"] as const;
+
+export type FaturaStatusElegivel = (typeof FATURA_STATUS_ELEGIVEIS)[number];
+
+/** @deprecated Use FATURA_STATUS_ELEGIVEIS */
+export const FATURA_STATUS_ELEGIVEL: FaturaStatusElegivel = "agendado";
 
 export const FATURA_SEM_ELEGIVEIS_MSG =
   "Nenhum agendamento elegível para faturamento encontrado.";
@@ -10,7 +15,7 @@ export const FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG =
   "Não há agendamentos válidos para reemitir esta fatura.";
 
 export const FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG =
-  "Apenas agendamentos com status agendado podem ser faturados.";
+  "Apenas agendamentos com status agendado ou ASO Retido podem ser faturados.";
 
 /**
  * Faturamento usa APENAS o status do agendamento.
@@ -25,7 +30,8 @@ export function normalizeAgendamentoStatusForFatura(
 export function isAgendamentoElegivelFatura(
   status: string | null | undefined
 ): boolean {
-  return normalizeAgendamentoStatusForFatura(status) === FATURA_STATUS_ELEGIVEL;
+  const normalized = normalizeAgendamentoStatusForFatura(status);
+  return (FATURA_STATUS_ELEGIVEIS as readonly string[]).includes(normalized);
 }
 
 export function filterAgendamentosElegiveisFatura(

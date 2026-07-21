@@ -138,12 +138,15 @@ export function getAgendamentoValidationMessage(
 export function isAgendamentoCompleto(
   form: AgendamentoFormValues,
   exams: ExameFormItem[],
-  cargoId: string
+  cargoId: string,
+  options?: { bloquearCamposAso?: boolean }
 ): boolean {
   if (!hasCargoSelecionado(cargoId)) return false;
 
   const examesValidos = getExamesValidosAgendamento(exams);
   if (examesValidos.length === 0) return false;
+
+  const bloquearAso = options?.bloquearCamposAso === true;
 
   const formOk =
     isFilled(form.data_agendamento) &&
@@ -157,19 +160,20 @@ export function isAgendamentoCompleto(
     isFilled(form.aso) &&
     isFilled(form.clinica_nome) &&
     isFilled(form.responsavel) &&
-    isSimOuNao(form.aso_enviado_clinica) &&
-    isSimOuNao(form.aso_assinado) &&
-    isSimOuNao(form.aso_enviado_cliente) &&
+    (bloquearAso ||
+      (isSimOuNao(form.aso_enviado_clinica) &&
+        isSimOuNao(form.aso_assinado) &&
+        isSimOuNao(form.aso_enviado_cliente) &&
+        requireDateWhenSim(
+          form.aso_enviado_clinica,
+          form.data_aso_enviado_clinica
+        ) &&
+        requireDateWhenSim(form.aso_assinado, form.data_aso_assinado) &&
+        requireDateWhenSim(
+          form.aso_enviado_cliente,
+          form.data_aso_enviado_cliente
+        ))) &&
     isSimOuNao(form.envio_esocial) &&
-    requireDateWhenSim(
-      form.aso_enviado_clinica,
-      form.data_aso_enviado_clinica
-    ) &&
-    requireDateWhenSim(form.aso_assinado, form.data_aso_assinado) &&
-    requireDateWhenSim(
-      form.aso_enviado_cliente,
-      form.data_aso_enviado_cliente
-    ) &&
     requireDateWhenSim(form.envio_esocial, form.data_envio_esocial) &&
     requireReciboWhenSim(form.envio_esocial, form.esocial_recibo);
 
@@ -178,21 +182,27 @@ export function isAgendamentoCompleto(
   return formOk && examsOk;
 }
 
-export function isDocumentacaoCompleta(form: AgendamentoFormValues): boolean {
+export function isDocumentacaoCompleta(
+  form: AgendamentoFormValues,
+  options?: { bloquearCamposAso?: boolean }
+): boolean {
+  const bloquearAso = options?.bloquearCamposAso === true;
+
   return (
-    isSimOuNao(form.aso_enviado_clinica) &&
-    isSimOuNao(form.aso_assinado) &&
-    isSimOuNao(form.aso_enviado_cliente) &&
+    (bloquearAso ||
+      (isSimOuNao(form.aso_enviado_clinica) &&
+        isSimOuNao(form.aso_assinado) &&
+        isSimOuNao(form.aso_enviado_cliente) &&
+        requireDateWhenSim(
+          form.aso_enviado_clinica,
+          form.data_aso_enviado_clinica
+        ) &&
+        requireDateWhenSim(form.aso_assinado, form.data_aso_assinado) &&
+        requireDateWhenSim(
+          form.aso_enviado_cliente,
+          form.data_aso_enviado_cliente
+        ))) &&
     isSimOuNao(form.envio_esocial) &&
-    requireDateWhenSim(
-      form.aso_enviado_clinica,
-      form.data_aso_enviado_clinica
-    ) &&
-    requireDateWhenSim(form.aso_assinado, form.data_aso_assinado) &&
-    requireDateWhenSim(
-      form.aso_enviado_cliente,
-      form.data_aso_enviado_cliente
-    ) &&
     requireDateWhenSim(form.envio_esocial, form.data_envio_esocial) &&
     requireReciboWhenSim(form.envio_esocial, form.esocial_recibo)
   );

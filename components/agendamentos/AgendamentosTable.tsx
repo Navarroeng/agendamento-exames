@@ -54,6 +54,7 @@ function StatusBadge({
     draft: "bg-brand-purple-soft text-brand-purple",
     active: "bg-brand-green-soft text-brand-green",
     cancelled: "bg-brand-red-soft text-brand-red",
+    asoRetido: "bg-brand-orange-soft text-[#c96d00]",
     pending: "bg-brand-orange-soft text-[#c96d00]",
   };
 
@@ -89,6 +90,8 @@ interface AgendamentosTableProps {
   onEditar: (agendamentoId: string) => void;
   onCancelar: (agendamentoId: string) => void;
   onHistorico: (agendamentoId: string) => void;
+  onAsoRetido: (agendamentoId: string) => void;
+  onLiberarAsoRetido: (agendamentoId: string) => void;
 }
 
 export function AgendamentosTable({
@@ -102,6 +105,8 @@ export function AgendamentosTable({
   onEditar,
   onCancelar,
   onHistorico,
+  onAsoRetido,
+  onLiberarAsoRetido,
 }: AgendamentosTableProps) {
   return (
     <Panel
@@ -207,6 +212,7 @@ export function AgendamentosTable({
                   <td className={TD_C}>
                     <RowActionsMenu
                       agendamentoId={row.agendamentoId}
+                      agendamentoStatus={row.agendamentoStatus}
                       bloqueadoPorFatura={row.bloqueadoPorFatura}
                       podeCancelarExcepcionalAdmin={
                         row.podeCancelarExcepcionalAdmin
@@ -215,6 +221,8 @@ export function AgendamentosTable({
                       onEditar={onEditar}
                       onCancelar={onCancelar}
                       onHistorico={onHistorico}
+                      onAsoRetido={onAsoRetido}
+                      onLiberarAsoRetido={onLiberarAsoRetido}
                     />
                   </td>
                 </tr>

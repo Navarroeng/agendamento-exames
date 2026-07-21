@@ -21,21 +21,47 @@ export type AgendamentoDocumentacaoInsert = Pick<
 >;
 
 export function buildDocumentacaoPayloadFromForm(
-  form: AgendamentoFormValues
+  form: AgendamentoFormValues,
+  options?: {
+    bloquearCamposAso?: boolean;
+    asoFieldsFrom?: Pick<
+      AgendamentoDocumentacaoInsert,
+      | "aso_enviado_clinica"
+      | "data_aso_enviado_clinica"
+      | "aso_assinado"
+      | "data_aso_assinado"
+      | "aso_enviado_cliente"
+      | "data_aso_enviado_cliente"
+    >;
+  }
 ): AgendamentoDocumentacaoInsert {
+  const asoFromAnterior = options?.bloquearCamposAso && options.asoFieldsFrom;
+
   return {
-    aso_enviado_clinica: isSim(form.aso_enviado_clinica),
-    data_aso_enviado_clinica: isSim(form.aso_enviado_clinica)
-      ? emptyToNull(form.data_aso_enviado_clinica)
-      : null,
-    aso_assinado: isSim(form.aso_assinado),
-    data_aso_assinado: isSim(form.aso_assinado)
-      ? emptyToNull(form.data_aso_assinado)
-      : null,
-    aso_enviado_cliente: isSim(form.aso_enviado_cliente),
-    data_aso_enviado_cliente: isSim(form.aso_enviado_cliente)
-      ? emptyToNull(form.data_aso_enviado_cliente)
-      : null,
+    aso_enviado_clinica: asoFromAnterior
+      ? asoFromAnterior.aso_enviado_clinica
+      : isSim(form.aso_enviado_clinica),
+    data_aso_enviado_clinica: asoFromAnterior
+      ? asoFromAnterior.data_aso_enviado_clinica
+      : isSim(form.aso_enviado_clinica)
+        ? emptyToNull(form.data_aso_enviado_clinica)
+        : null,
+    aso_assinado: asoFromAnterior
+      ? asoFromAnterior.aso_assinado
+      : isSim(form.aso_assinado),
+    data_aso_assinado: asoFromAnterior
+      ? asoFromAnterior.data_aso_assinado
+      : isSim(form.aso_assinado)
+        ? emptyToNull(form.data_aso_assinado)
+        : null,
+    aso_enviado_cliente: asoFromAnterior
+      ? asoFromAnterior.aso_enviado_cliente
+      : isSim(form.aso_enviado_cliente),
+    data_aso_enviado_cliente: asoFromAnterior
+      ? asoFromAnterior.data_aso_enviado_cliente
+      : isSim(form.aso_enviado_cliente)
+        ? emptyToNull(form.data_aso_enviado_cliente)
+        : null,
     numero_matricula: emptyToNull(form.numero_matricula),
     envio_esocial: isSim(form.envio_esocial),
     data_envio_esocial: isSim(form.envio_esocial)

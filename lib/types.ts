@@ -1,4 +1,8 @@
-export type AgendamentoStatus = "rascunho" | "agendado" | "cancelado";
+export type AgendamentoStatus =
+  | "rascunho"
+  | "agendado"
+  | "aso_retido"
+  | "cancelado";
 
 export interface AgendamentoFormValues {
   data_agendamento: string;
@@ -46,6 +50,11 @@ export interface AgendamentoInsert {
   cargo_nome?: string | null;
   status: AgendamentoStatus;
   motivo_cancelamento?: string | null;
+  aso_retido_anexo_path?: string | null;
+  aso_retido_anexo_nome?: string | null;
+  aso_retido_observacao?: string | null;
+  aso_retido_em?: string | null;
+  aso_retido_por?: string | null;
 }
 
 export interface ExameFormItem {
@@ -455,8 +464,9 @@ export interface AgendamentoTableRow {
   aso: string;
   examesResumo: string;
   totalCliente: string;
-  statusType: "draft" | "active" | "cancelled" | "pending";
+  statusType: "draft" | "active" | "cancelled" | "asoRetido" | "pending";
   statusLabel: string;
+  agendamentoStatus: AgendamentoStatus;
   asoClinica: boolean;
   asoAssinado: boolean;
   asoCliente: boolean;

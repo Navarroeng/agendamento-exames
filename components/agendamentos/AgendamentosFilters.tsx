@@ -227,6 +227,7 @@ export function AgendamentosFilters({
               >
                 <option value="">Todos</option>
                 <option value="agendado">Agendado</option>
+                <option value="aso_retido">ASO Retido</option>
                 <option value="rascunho">Rascunho</option>
                 <option value="cancelado">Cancelado</option>
               </select>

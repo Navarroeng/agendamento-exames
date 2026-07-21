@@ -420,10 +420,12 @@ export function buildHistoricoAlteracoes(
 export function buildHistoricoAlteracoesDocumentacao(
   anterior: AgendamentoWithExames,
   novo: AgendamentoDocumentacaoInsert,
-  usuarioLogado: string
+  usuarioLogado: string,
+  options?: { bloquearCamposAso?: boolean }
 ): HistoricoEntryDraft[] {
   const usuario = usuarioLogado;
   const changes: HistoricoEntryDraft[] = [];
+  const bloquearAso = options?.bloquearCamposAso === true;
 
   compareField(
     changes,
@@ -433,36 +435,38 @@ export function buildHistoricoAlteracoesDocumentacao(
     novo.numero_matricula ?? ""
   );
 
-  compareBoolWithDate(
-    changes,
-    usuario,
-    "ASO enviado para clínica",
-    anterior.aso_enviado_clinica,
-    novo.aso_enviado_clinica,
-    anterior.data_aso_enviado_clinica,
-    novo.data_aso_enviado_clinica,
-    "a data do envio do ASO para a clínica"
-  );
-  compareBoolWithDate(
-    changes,
-    usuario,
-    "ASO assinado",
-    anterior.aso_assinado,
-    novo.aso_assinado,
-    anterior.data_aso_assinado,
-    novo.data_aso_assinado,
-    "a data do ASO assinado"
-  );
-  compareBoolWithDate(
-    changes,
-    usuario,
-    "ASO enviado p/ cliente",
-    anterior.aso_enviado_cliente,
-    novo.aso_enviado_cliente,
-    anterior.data_aso_enviado_cliente,
-    novo.data_aso_enviado_cliente,
-    "a data do envio do ASO para o cliente"
-  );
+  if (!bloquearAso) {
+    compareBoolWithDate(
+      changes,
+      usuario,
+      "ASO enviado para clínica",
+      anterior.aso_enviado_clinica,
+      novo.aso_enviado_clinica,
+      anterior.data_aso_enviado_clinica,
+      novo.data_aso_enviado_clinica,
+      "a data do envio do ASO para a clínica"
+    );
+    compareBoolWithDate(
+      changes,
+      usuario,
+      "ASO assinado",
+      anterior.aso_assinado,
+      novo.aso_assinado,
+      anterior.data_aso_assinado,
+      novo.data_aso_assinado,
+      "a data do ASO assinado"
+    );
+    compareBoolWithDate(
+      changes,
+      usuario,
+      "ASO enviado p/ cliente",
+      anterior.aso_enviado_cliente,
+      novo.aso_enviado_cliente,
+      anterior.data_aso_enviado_cliente,
+      novo.data_aso_enviado_cliente,
+      "a data do envio do ASO para o cliente"
+    );
+  }
   compareBoolWithDate(
     changes,
     usuario,
@@ -490,4 +494,31 @@ export function buildHistoricoAlteracoesDocumentacao(
   );
 
   return changes;
+}
+
+export function buildHistoricoAsoRetido(
+  usuario: string,
+  anexoNome: string,
+  observacao?: string | null
+): HistoricoEntryDraft[] {
+  const obs = observacao?.trim()
+    ? ` Observação: ${observacao.trim()}`
+    : "";
+  return [
+    {
+      acao: "ASO Retido",
+      detalhes: `${usuario} marcou o agendamento como ASO Retido. Anexo: ${anexoNome}.${obs}`,
+    },
+  ];
+}
+
+export function buildHistoricoLiberarAsoRetido(
+  usuario: string
+): HistoricoEntryDraft[] {
+  return [
+    {
+      acao: "Liberação ASO Retido",
+      detalhes: `${usuario} liberou o ASO Retido. Status voltou para Agendado. Documento e histórico da retenção foram mantidos.`,
+    },
+  ];
 }

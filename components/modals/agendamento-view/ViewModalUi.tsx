@@ -18,6 +18,12 @@ export function statusBadge(status: AgendamentoStatus) {
       text: "text-[#7c3aed]",
       icon: "◷",
     },
+    aso_retido: {
+      label: "ASO Retido",
+      bg: "bg-[#fff7ed]",
+      text: "text-[#ea580c]",
+      icon: "⏸",
+    },
     cancelado: {
       label: "Cancelado",
       bg: "bg-[#fef2f2]",

@@ -1,6 +1,7 @@
 import { isEnvioEsocialConcluido } from "@/lib/esocial-filters";
 import { formatEsocialReciboForDisplay } from "@/lib/esocial-recibo";
 import type { AgendamentoWithExames } from "@/lib/types";
+import { isAgendamentoAsoRetido } from "@/lib/agendamento-aso-retido-anexo";
 import {
   DocMiniCard,
   IconCloud,
@@ -18,6 +19,8 @@ interface ViewModalDocumentationSectionProps {
 export function ViewModalDocumentationSection({
   agendamento,
 }: ViewModalDocumentationSectionProps) {
+  const bloquearAso = isAgendamentoAsoRetido(agendamento.status);
+
   return (
     <section>
       <SectionHeading
@@ -26,24 +29,28 @@ export function ViewModalDocumentationSection({
         title="Status e documentação"
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <DocMiniCard
-          icon={<IconCloud />}
-          title="ASO enviado para clínica"
-          concluido={agendamento.aso_enviado_clinica}
-          data={agendamento.data_aso_enviado_clinica}
-        />
-        <DocMiniCard
-          icon={<IconPencil />}
-          title="ASO assinado"
-          concluido={agendamento.aso_assinado}
-          data={agendamento.data_aso_assinado}
-        />
-        <DocMiniCard
-          icon={<IconUser />}
-          title="ASO enviado p/ cliente"
-          concluido={agendamento.aso_enviado_cliente}
-          data={agendamento.data_aso_enviado_cliente}
-        />
+        <div
+          className={`flex flex-col gap-3 sm:flex-row sm:flex-wrap ${bloquearAso ? "pointer-events-none opacity-50" : ""}`}
+        >
+          <DocMiniCard
+            icon={<IconCloud />}
+            title="ASO enviado para clínica"
+            concluido={bloquearAso ? false : agendamento.aso_enviado_clinica}
+            data={bloquearAso ? null : agendamento.data_aso_enviado_clinica}
+          />
+          <DocMiniCard
+            icon={<IconPencil />}
+            title="ASO assinado"
+            concluido={bloquearAso ? false : agendamento.aso_assinado}
+            data={bloquearAso ? null : agendamento.data_aso_assinado}
+          />
+          <DocMiniCard
+            icon={<IconUser />}
+            title="ASO enviado p/ cliente"
+            concluido={bloquearAso ? false : agendamento.aso_enviado_cliente}
+            data={bloquearAso ? null : agendamento.data_aso_enviado_cliente}
+          />
+        </div>
         <DocMiniCard
           icon={<IconSend />}
           title="Envio ao e-Social"
