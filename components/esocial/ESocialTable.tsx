@@ -11,6 +11,11 @@ import {
   type ESocialVisualStatus,
 } from "@/lib/esocial-filters";
 import { formatEsocialReciboForDisplay } from "@/lib/esocial-recibo";
+import {
+  ESOCIAL_TABLE_SORT_COLUMNS,
+  type ESocialTableSortColumn,
+  type ESocialTableSortState,
+} from "@/lib/esocial-table-sort";
 import type { AgendamentoWithExames } from "@/lib/types";
 import { ESocialRowActionsMenu } from "./ESocialRowActionsMenu";
 
@@ -18,6 +23,32 @@ const TH =
   "border-b border-[#e2e8f0] bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] whitespace-nowrap";
 const TD =
   "border-b border-[#eef2f7]/80 px-2.5 py-2 text-xs text-[#334155] align-middle";
+
+function SortIndicator({
+  column,
+  sort,
+}: {
+  column: ESocialTableSortColumn;
+  sort: ESocialTableSortState | null;
+}) {
+  const active = sort?.column === column;
+  const icon = !active
+    ? "↕"
+    : sort.direction === "asc"
+      ? "▲"
+      : "▼";
+
+  return (
+    <span
+      className={`ml-1 inline-block text-[9px] leading-none ${
+        active ? "text-brand-blue" : "text-[#cbd5e1]"
+      }`}
+      aria-hidden
+    >
+      {icon}
+    </span>
+  );
+}
 
 function EsocialStatusBadge({ status }: { status: ESocialVisualStatus }) {
   if (status === "enviado") {
@@ -49,6 +80,8 @@ interface ESocialTableProps {
   saving: boolean;
   page: number;
   totalPages: number;
+  sort: ESocialTableSortState | null;
+  onSortColumn: (column: ESocialTableSortColumn) => void;
   onPageChange: (page: number) => void;
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
@@ -63,6 +96,8 @@ export function ESocialTable({
   saving,
   page,
   totalPages,
+  sort,
+  onSortColumn,
   onPageChange,
   onVisualizar,
   onMarcarEnviado,
@@ -102,20 +137,23 @@ export function ESocialTable({
               <table className="w-full min-w-[860px] border-collapse">
                 <thead>
                   <tr>
-                    {[
-                      "Data do exame",
-                      "Empresa / Cliente",
-                      "Colaborador",
-                      "Tipo de ASO",
-                      "Status e-Social",
-                      "Data envio e-Social",
-                      "Nº Recibo",
-                      "Ações",
-                    ].map((h) => (
-                      <th key={h} className={TH}>
-                        {h}
+                    {ESOCIAL_TABLE_SORT_COLUMNS.map((h) => (
+                      <th key={h.key} className={TH}>
+                        <button
+                          type="button"
+                          onClick={() => onSortColumn(h.key)}
+                          className={`inline-flex max-w-full items-center gap-0.5 transition-colors hover:text-brand-blue ${
+                            sort?.column === h.key ? "text-brand-blue" : ""
+                          }`}
+                          aria-label={`Ordenar por ${h.label}`}
+                        >
+                          <span>{h.label}</span>
+                          <SortIndicator column={h.key} sort={sort} />
+                        </button>
                       </th>
                     ))}
+                    <th className={TH}>Nº Recibo</th>
+                    <th className={TH}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>

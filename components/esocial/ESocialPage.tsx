@@ -22,6 +22,8 @@ export function ESocialPage() {
     summary,
     page,
     totalPages,
+    tableSort,
+    handleSortColumn,
     handleFilterChange,
     handleClearFilters,
     toggleFilters,
@@ -69,6 +71,8 @@ export function ESocialPage() {
           saving={saving}
           page={page}
           totalPages={totalPages}
+          sort={tableSort}
+          onSortColumn={handleSortColumn}
           onPageChange={setPage}
           onVisualizar={handleVisualizar}
           onMarcarEnviado={openMarcarEnviado}

@@ -4,6 +4,7 @@ import {
   filterAgendamentosESocial,
   getESocialVisualStatus,
 } from "@/lib/esocial-filters";
+import { orderESocialForTable } from "@/lib/esocial-table-sort";
 import { formatDateBR } from "@/lib/format";
 import {
   isPeriodicoActionable,
@@ -253,14 +254,17 @@ export function buildDashboardAgenda(
 export function buildDashboardEsocial(
   agendamentos: AgendamentoWithExames[]
 ): { summary: DashboardEsocialSummary; rows: DashboardEsocialRow[] } {
-  const filtered = filterAgendamentosESocial(agendamentos, {
-    cliente: "",
-    colaborador: "",
-    statusEsocial: "acao",
-    mesReferencia: "",
-    dataInicio: "",
-    dataFim: "",
-  });
+  const filtered = orderESocialForTable(
+    filterAgendamentosESocial(agendamentos, {
+      cliente: "",
+      colaborador: "",
+      statusEsocial: "acao",
+      mesReferencia: "",
+      dataInicio: "",
+      dataFim: "",
+    }),
+    null
+  );
 
   const allActive = activeAgendamentos(agendamentos);
   const stats = computeESocialSummary(allActive);

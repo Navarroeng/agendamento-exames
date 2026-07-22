@@ -19,6 +19,12 @@ import {
   type ESocialFilters,
 } from "@/lib/esocial-filters";
 import {
+  cycleESocialTableSort,
+  orderESocialForTable,
+  type ESocialTableSortColumn,
+  type ESocialTableSortState,
+} from "@/lib/esocial-table-sort";
+import {
   isValidEsocialRecibo,
   maskEsocialRecibo,
 } from "@/lib/esocial-recibo";
@@ -49,6 +55,7 @@ export function useESocialPage() {
   const [filters, setFilters] = useState<ESocialFilters>(EMPTY_ESOCIAL_FILTERS);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
+  const [tableSort, setTableSort] = useState<ESocialTableSortState | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [viewAgendamento, setViewAgendamento] =
@@ -97,6 +104,11 @@ export function useESocialPage() {
     [agendamentos, filters]
   );
 
+  const orderedAgendamentos = useMemo(
+    () => orderESocialForTable(filteredAgendamentos, tableSort),
+    [filteredAgendamentos, tableSort]
+  );
+
   const periodAgendamentos = useMemo(
     () =>
       filterAgendamentosESocial(agendamentos, {
@@ -119,14 +131,14 @@ export function useESocialPage() {
   );
 
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(filteredAgendamentos.length / ESOCIAL_PAGE_SIZE)),
-    [filteredAgendamentos.length]
+    () => Math.max(1, Math.ceil(orderedAgendamentos.length / ESOCIAL_PAGE_SIZE)),
+    [orderedAgendamentos.length]
   );
 
   const paginatedAgendamentos = useMemo(() => {
     const start = (page - 1) * ESOCIAL_PAGE_SIZE;
-    return filteredAgendamentos.slice(start, start + ESOCIAL_PAGE_SIZE);
-  }, [filteredAgendamentos, page]);
+    return orderedAgendamentos.slice(start, start + ESOCIAL_PAGE_SIZE);
+  }, [orderedAgendamentos, page]);
 
   useEffect(() => {
     setPage(1);
@@ -150,6 +162,11 @@ export function useESocialPage() {
 
   const toggleFilters = useCallback(() => {
     setFiltersExpanded((prev) => !prev);
+  }, []);
+
+  const handleSortColumn = useCallback((column: ESocialTableSortColumn) => {
+    setTableSort((prev) => cycleESocialTableSort(prev, column));
+    setPage(1);
   }, []);
 
   const handleVisualizar = useCallback(
@@ -302,10 +319,13 @@ export function useESocialPage() {
     filtersExpanded,
     filterOptions,
     filteredAgendamentos,
+    orderedAgendamentos,
     paginatedAgendamentos,
     summary,
     page,
     totalPages,
+    tableSort,
+    handleSortColumn,
     handleFilterChange,
     handleClearFilters,
     toggleFilters,

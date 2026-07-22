@@ -136,31 +136,18 @@ function matchesStatusFilter(
   }
 }
 
-function compareAgendamentosESocial(
-  a: AgendamentoWithExames,
-  b: AgendamentoWithExames
-): number {
-  const da = a.data_agendamento.split("T")[0];
-  const db = b.data_agendamento.split("T")[0];
-  const dateCmp = da.localeCompare(db);
-  if (dateCmp !== 0) return dateCmp;
-  return (a.horario ?? "").localeCompare(b.horario ?? "");
-}
-
 export function filterAgendamentosESocial(
   agendamentos: AgendamentoWithExames[],
   filters: ESocialFilters
 ): AgendamentoWithExames[] {
-  return agendamentos
-    .filter((item) => {
-      if (item.status === "cancelado") return false;
-      if (!matchesText(item.cliente_nome, filters.cliente)) return false;
-      if (!matchesText(item.colaborador, filters.colaborador)) return false;
-      if (!matchesStatusFilter(item, filters.statusEsocial)) return false;
-      if (!matchesPeriodo(item.data_agendamento, filters)) return false;
-      return true;
-    })
-    .sort(compareAgendamentosESocial);
+  return agendamentos.filter((item) => {
+    if (item.status === "cancelado") return false;
+    if (!matchesText(item.cliente_nome, filters.cliente)) return false;
+    if (!matchesText(item.colaborador, filters.colaborador)) return false;
+    if (!matchesStatusFilter(item, filters.statusEsocial)) return false;
+    if (!matchesPeriodo(item.data_agendamento, filters)) return false;
+    return true;
+  });
 }
 
 export function hasActiveESocialFilters(filters: ESocialFilters): boolean {
