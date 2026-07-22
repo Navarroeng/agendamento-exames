@@ -62,7 +62,7 @@ import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.serv
 import { obterUrlFaturaClinicaConferencia } from "@/services/fatura-conferencia-clinica.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
-import { buildClienteFilterOptions } from "@/lib/cliente-display";
+import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
 import { FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG, FATURA_SEM_ELEGIVEIS_MSG } from "@/lib/fatura-elegibilidade";
 import type {
   AgendamentoWithExames,
@@ -296,7 +296,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     const fromAgendamentos = extractFaturaFilterOptions(agendamentos);
     return {
       ...fromAgendamentos,
-      clientes: buildClienteFilterOptions(clientes),
+      clientes: buildClienteFilterOptionsHistorico(
+        clientes,
+        agendamentos.map((ag) => ag.cliente_nome)
+      ),
     };
   }, [agendamentos, clientes]);
 

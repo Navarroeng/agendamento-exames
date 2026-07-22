@@ -36,7 +36,7 @@ import {
 } from "@/lib/esocial-recibo-duplicidade";
 import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useClientesList } from "@/hooks/useClientesList";
-import { buildClienteFilterOptions } from "@/lib/cliente-display";
+import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
 import { atualizarEnvioEsocial } from "@/services/agendamento.service";
 import {
   registrarTentativaReciboEsocialDuplicado,
@@ -109,7 +109,10 @@ export function useESocialPage() {
     const fromAgendamentos = extractESocialFilterOptions(agendamentos);
     return {
       ...fromAgendamentos,
-      clientes: buildClienteFilterOptions(clientes),
+      clientes: buildClienteFilterOptionsHistorico(
+        clientes,
+        agendamentos.map((ag) => ag.cliente_nome)
+      ),
     };
   }, [agendamentos, clientes]);
 

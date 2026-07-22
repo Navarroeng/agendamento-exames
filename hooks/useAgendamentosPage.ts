@@ -65,7 +65,7 @@ import {
   buildCargosFormOptions,
 } from "@/lib/agendamento-cargo";
 import {
-  buildClienteFilterOptions,
+  buildClienteFilterOptionsHistorico,
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
 import { isClienteProcuracaoAtiva } from "@/lib/cliente-procuracao";
@@ -572,7 +572,10 @@ export function useAgendamentosPage() {
     const fromAgendamentos = extractFilterOptions(agendamentos);
     return {
       ...fromAgendamentos,
-      clientes: buildClienteFilterOptions(clientes),
+      clientes: buildClienteFilterOptionsHistorico(
+        clientes,
+        agendamentos.map((ag) => ag.cliente_nome)
+      ),
     };
   }, [agendamentos, clientes]);
 
@@ -750,7 +753,15 @@ export function useAgendamentosPage() {
       const cliente = clientes.find((c) => c.id === nextClienteId);
       if (!cliente) return false;
 
-      if (!isClienteDisponivelAgendamento(cliente.disponivel_agendamento)) {
+      const mesmoClienteEmEdicao =
+        Boolean(editingId) &&
+        form.cliente_nome.trim().toLowerCase() ===
+          cliente.nome.trim().toLowerCase();
+
+      if (
+        !isClienteDisponivelAgendamento(cliente.disponivel_agendamento) &&
+        !mesmoClienteEmEdicao
+      ) {
         toast.error(CLIENTE_DISPONIVEL_AGENDAMENTO_MSG);
         return false;
       }
@@ -798,7 +809,7 @@ export function useAgendamentosPage() {
         }
       }
     },
-    [clientes, auditContext, setField, clearFormPorInadimplencia, exibirBloqueioInadimplencia]
+    [clientes, editingId, form.cliente_nome, auditContext, setField, clearFormPorInadimplencia, exibirBloqueioInadimplencia]
   );
 
   const closeInadimplenciaModal = useCallback(() => {
@@ -1904,6 +1915,7 @@ export function useAgendamentosPage() {
     setField,
     clinicasAtivas,
     clientes: clientesParaAgendamento,
+    clientesFormulario: clientesParaAgendamento,
     clientesLoading,
     clienteId,
     handleClienteChange,

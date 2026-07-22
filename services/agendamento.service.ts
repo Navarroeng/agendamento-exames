@@ -177,6 +177,9 @@ export async function atualizarAgendamentoComExames(
     dataAgendamentoIso: agendamento.data_agendamento,
     ignorarAgendamentoId: id,
   });
+  await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome, {
+    agendamentoIdAtual: id,
+  });
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo, id);
   const supabase = createClient();
 

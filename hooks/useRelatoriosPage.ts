@@ -28,7 +28,7 @@ import {
   type RelatoriosFilters,
 } from "@/lib/relatorios/types";
 import { carregarDadosRelatorios } from "@/services/relatorios.service";
-import { buildClienteFilterOptions } from "@/lib/cliente-display";
+import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
 
 export function useRelatoriosPage() {
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,10 @@ export function useRelatoriosPage() {
     const fromAgendamentos = extractRelatoriosFilterOptions(data.agendamentos);
     return {
       ...fromAgendamentos,
-      empresas: buildClienteFilterOptions(data.clientes),
+      empresas: buildClienteFilterOptionsHistorico(
+        data.clientes,
+        data.agendamentos.map((ag) => ag.cliente_nome)
+      ),
     };
   }, [data]);
 

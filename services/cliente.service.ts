@@ -80,7 +80,8 @@ export async function buscarClientePorCnpjDigits(
 }
 
 export async function assertClienteDisponivelParaAgendamento(
-  clienteNome: string
+  clienteNome: string,
+  options?: { agendamentoIdAtual?: string | null }
 ): Promise<void> {
   const trimmed = clienteNome.trim();
   if (!trimmed) return;
@@ -96,6 +97,22 @@ export async function assertClienteDisponivelParaAgendamento(
   if (!data) return;
 
   if (!isClienteDisponivelAgendamento(data.disponivel_agendamento)) {
+    if (options?.agendamentoIdAtual) {
+      const { data: agendamento, error: agError } = await supabase
+        .from("agendamentos")
+        .select("cliente_nome")
+        .eq("id", options.agendamentoIdAtual)
+        .maybeSingle();
+
+      if (agError) throw agError;
+      if (
+        agendamento &&
+        agendamento.cliente_nome.trim().toLowerCase() === trimmed.toLowerCase()
+      ) {
+        return;
+      }
+    }
+
     throw new ClienteIndisponivelAgendamentoError();
   }
 }

@@ -63,7 +63,11 @@ export function filterClientesParaNovoAgendamento<
     if (isClienteDisponivelAgendamento(cliente.disponivel_agendamento)) {
       return true;
     }
-    if (isEditing && nomeAtual && cliente.nome.trim() === nomeAtual) {
+    if (
+      isEditing &&
+      nomeAtual &&
+      cliente.nome.trim().toLowerCase() === nomeAtual.toLowerCase()
+    ) {
       return true;
     }
     return false;

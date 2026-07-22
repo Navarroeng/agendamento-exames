@@ -19,12 +19,36 @@ export function formatClienteSelectLabel(
 export function buildClienteFilterOptions(
   clientes: ClienteRecord[]
 ): ClienteFilterOption[] {
-  return [...clientes]
-    .sort((a, b) => compareByLabel(a.nome, b.nome))
-    .map((cliente) => ({
-      value: cliente.nome,
+  return buildClienteFilterOptionsHistorico(clientes);
+}
+
+/** Opções de filtro histórico: todos os clientes cadastrados + nomes extras (ex.: agendamentos). */
+export function buildClienteFilterOptionsHistorico(
+  clientes: ClienteRecord[],
+  nomesExtras: string[] = []
+): ClienteFilterOption[] {
+  const byKey = new Map<string, ClienteFilterOption>();
+
+  for (const cliente of clientes) {
+    const nome = cliente.nome.trim();
+    if (!nome) continue;
+    byKey.set(nome.toLowerCase(), {
+      value: nome,
       label: formatClienteSelectLabel(cliente),
-    }));
+    });
+  }
+
+  for (const raw of nomesExtras) {
+    const nome = raw.trim();
+    if (!nome) continue;
+    const key = nome.toLowerCase();
+    if (byKey.has(key)) continue;
+    byKey.set(key, { value: nome, label: nome });
+  }
+
+  return Array.from(byKey.values()).sort((a, b) =>
+    compareByLabel(a.label, b.label)
+  );
 }
 
 export function resolveClienteIdByNome(
