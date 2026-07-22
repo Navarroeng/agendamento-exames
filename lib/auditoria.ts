@@ -28,6 +28,7 @@ export const AUDITORIA_ACOES = {
   envio: "envio",
   reagendamento: "reagendamento",
   tentativa_bloqueada_duplicidade: "tentativa_bloqueada_duplicidade",
+  tentativa_recibo_esocial_duplicado: "tentativa_recibo_esocial_duplicado",
   tentativa_edicao_bloqueada_fatura: "tentativa_edicao_bloqueada_fatura",
   agendamento_bloqueado_inadimplencia: "agendamento_bloqueado_inadimplencia",
   fatura_marcada_vencida: "fatura_marcada_vencida",
@@ -79,6 +80,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   envio: "Envio",
   reagendamento: "Reagendamento",
   tentativa_bloqueada_duplicidade: "Tentativa bloqueada (duplicidade)",
+  tentativa_recibo_esocial_duplicado:
+    "Tentativa de recibo e-Social duplicado",
   tentativa_edicao_bloqueada_fatura: "Tentativa de edição bloqueada (fatura)",
   agendamento_bloqueado_inadimplencia:
     "Novo agendamento bloqueado (inadimplência)",

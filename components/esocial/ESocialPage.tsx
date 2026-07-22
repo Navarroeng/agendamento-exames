@@ -38,10 +38,13 @@ export function ESocialPage() {
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
     marcarEnviadoOpen,
+    validatingRecibo,
+    reciboError,
+    reciboDuplicadoInfo,
     dataEnvioInput,
     setDataEnvioInput,
     reciboInput,
-    setReciboInput,
+    handleReciboInputChange,
   } = useESocialPage();
 
   return (
@@ -89,10 +92,13 @@ export function ESocialPage() {
       <ESocialMarcarEnviadoModal
         open={marcarEnviadoOpen}
         saving={saving}
+        validatingRecibo={validatingRecibo}
         dataEnvio={dataEnvioInput}
         recibo={reciboInput}
+        reciboError={reciboError}
+        reciboDuplicadoInfo={reciboDuplicadoInfo}
         onChangeData={setDataEnvioInput}
-        onChangeRecibo={setReciboInput}
+        onChangeRecibo={handleReciboInputChange}
         onClose={closeMarcarEnviado}
         onConfirm={handleConfirmMarcarEnviado}
       />

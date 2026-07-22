@@ -28,10 +28,20 @@ import {
   isValidEsocialRecibo,
   maskEsocialRecibo,
 } from "@/lib/esocial-recibo";
+import {
+  ESOCIAL_RECIBO_DUPLICADO_MSG,
+  ESOCIAL_RECIBO_VALIDATION_ERROR_MSG,
+  isEsocialReciboDuplicadoError,
+  type EsocialReciboDuplicadoInfo,
+} from "@/lib/esocial-recibo-duplicidade";
 import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptions } from "@/lib/cliente-display";
 import { atualizarEnvioEsocial } from "@/services/agendamento.service";
+import {
+  registrarTentativaReciboEsocialDuplicado,
+  verificarReciboEsocialDuplicado,
+} from "@/services/esocial-recibo.service";
 import {
   listarBloqueioFaturaPorAgendamentos,
 } from "@/services/agendamento-fatura-bloqueio.service";
@@ -57,6 +67,10 @@ export function useESocialPage() {
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<ESocialTableSortState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [validatingRecibo, setValidatingRecibo] = useState(false);
+  const [reciboError, setReciboError] = useState<string | null>(null);
+  const [reciboDuplicadoInfo, setReciboDuplicadoInfo] =
+    useState<EsocialReciboDuplicadoInfo | null>(null);
 
   const [viewAgendamento, setViewAgendamento] =
     useState<AgendamentoWithExames | null>(null);
@@ -185,16 +199,26 @@ export function useESocialPage() {
     setMarcarEnviadoId(id);
     setDataEnvioInput("");
     setReciboInput("");
+    setReciboError(null);
+    setReciboDuplicadoInfo(null);
     setMarcarEnviadoOpen(true);
   }, []);
 
   const closeMarcarEnviado = useCallback(() => {
-    if (saving) return;
+    if (saving || validatingRecibo) return;
     setMarcarEnviadoOpen(false);
     setMarcarEnviadoId(null);
     setDataEnvioInput("");
     setReciboInput("");
-  }, [saving]);
+    setReciboError(null);
+    setReciboDuplicadoInfo(null);
+  }, [saving, validatingRecibo]);
+
+  const handleReciboInputChange = useCallback((value: string) => {
+    setReciboInput(value);
+    setReciboError(null);
+    setReciboDuplicadoInfo(null);
+  }, []);
 
   const handleConfirmMarcarEnviado = useCallback(async () => {
     if (!marcarEnviadoId) return;
@@ -216,6 +240,33 @@ export function useESocialPage() {
 
     const dataIso = parseDateBRToIso(dataEnvioInput);
     if (!dataIso) return;
+
+    setReciboError(null);
+    setReciboDuplicadoInfo(null);
+    setValidatingRecibo(true);
+    try {
+      const duplicado = await verificarReciboEsocialDuplicado(
+        recibo,
+        marcarEnviadoId
+      );
+      if (duplicado) {
+        setReciboError(ESOCIAL_RECIBO_DUPLICADO_MSG);
+        setReciboDuplicadoInfo(duplicado);
+        await registrarTentativaReciboEsocialDuplicado(auditContext, {
+          recibo,
+          agendamentoAtualId: marcarEnviadoId,
+          agendamentoAtualColaborador: getById(marcarEnviadoId)?.colaborador,
+          existente: duplicado,
+        });
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      setReciboError(ESOCIAL_RECIBO_VALIDATION_ERROR_MSG);
+      return;
+    } finally {
+      setValidatingRecibo(false);
+    }
 
     setSaving(true);
     try {
@@ -246,8 +297,21 @@ export function useESocialPage() {
       setMarcarEnviadoId(null);
       setDataEnvioInput("");
       setReciboInput("");
+      setReciboError(null);
+      setReciboDuplicadoInfo(null);
     } catch (err) {
       console.error(err);
+      if (isEsocialReciboDuplicadoError(err)) {
+        setReciboError(err.message);
+        setReciboDuplicadoInfo(err.info);
+        await registrarTentativaReciboEsocialDuplicado(auditContext, {
+          recibo: err.recibo,
+          agendamentoAtualId: marcarEnviadoId,
+          agendamentoAtualColaborador: getById(marcarEnviadoId)?.colaborador,
+          existente: err.info,
+        });
+        return;
+      }
       toast.error("Erro ao atualizar envio ao e-Social.");
     } finally {
       setSaving(false);
@@ -340,9 +404,12 @@ export function useESocialPage() {
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
     marcarEnviadoOpen,
+    validatingRecibo,
+    reciboError,
+    reciboDuplicadoInfo,
     dataEnvioInput,
     setDataEnvioInput,
     reciboInput,
-    setReciboInput,
+    handleReciboInputChange,
   };
 }

@@ -30,4 +30,12 @@ export function formatEsocialReciboForDisplay(
   return maskEsocialRecibo(digits);
 }
 
+/** Normaliza para comparação de unicidade (trim + remove espaços, mantém pontos/dígitos). */
+export function normalizeEsocialReciboForCompare(
+  value: string | null | undefined
+): string {
+  if (!value) return "";
+  return value.trim().replace(/\s+/g, "");
+}
+
 export { RECIBO_DIGITS, RECIBO_MASKED_LENGTH };

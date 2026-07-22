@@ -19,6 +19,10 @@ import { CLIENTE_INADIMPLENCIA_VALIDATION_MSG } from "@/lib/fatura-inadimplencia
 import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
+import {
+  assertNumeroReciboDisponivel,
+  assertNumeroReciboDisponivelOuLancarDuplicidadeDb,
+} from "@/services/esocial-recibo.service";
 import type {
   AgendamentoInsert,
   AgendamentoWithExames,
@@ -95,6 +99,7 @@ export async function salvarAgendamentoComExames(
     dataAgendamentoIso: agendamento.data_agendamento,
   });
   await assertClienteSemInadimplencia(agendamento.cliente_nome);
+  await assertNumeroReciboDisponivel(agendamento.esocial_recibo);
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -107,6 +112,11 @@ export async function salvarAgendamentoComExames(
     if (isPostgresDuplicidade90DiasError(error)) {
       throw new Error(AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG);
     }
+    await assertNumeroReciboDisponivelOuLancarDuplicidadeDb(
+      agendamento.esocial_recibo,
+      null,
+      error
+    );
     throw error;
   }
 
@@ -167,6 +177,7 @@ export async function atualizarAgendamentoComExames(
     dataAgendamentoIso: agendamento.data_agendamento,
     ignorarAgendamentoId: id,
   });
+  await assertNumeroReciboDisponivel(agendamento.esocial_recibo, id);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -178,6 +189,11 @@ export async function atualizarAgendamentoComExames(
     if (isPostgresDuplicidade90DiasError(error)) {
       throw new Error(AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG);
     }
+    await assertNumeroReciboDisponivelOuLancarDuplicidadeDb(
+      agendamento.esocial_recibo,
+      id,
+      error
+    );
     throw error;
   }
 
@@ -240,6 +256,7 @@ export async function atualizarDocumentacaoAgendamento(
   documentacao: AgendamentoDocumentacaoInsert
 ): Promise<void> {
   // Atualização documental: não passa por assertAgendamentoEditavelPorFatura.
+  await assertNumeroReciboDisponivel(documentacao.esocial_recibo, id);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -247,7 +264,14 @@ export async function atualizarDocumentacaoAgendamento(
     .update(documentacao)
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    await assertNumeroReciboDisponivelOuLancarDuplicidadeDb(
+      documentacao.esocial_recibo,
+      id,
+      error
+    );
+    throw error;
+  }
 }
 
 export type EnvioEsocialUpdate = Pick<
@@ -272,6 +296,7 @@ export async function atualizarEnvioEsocial(
   esocial_recibo: string | null = null
 ): Promise<EnvioEsocialUpdate> {
   // Atualização documental (eSocial): não passa por assertAgendamentoEditavelPorFatura.
+  await assertNumeroReciboDisponivel(esocial_recibo, id);
   const supabase = createClient();
 
   const basePayload = {
@@ -299,7 +324,14 @@ export async function atualizarEnvioEsocial(
       .single();
   }
 
-  if (result.error) throw result.error;
+  if (result.error) {
+    await assertNumeroReciboDisponivelOuLancarDuplicidadeDb(
+      esocial_recibo,
+      id,
+      result.error
+    );
+    throw result.error;
+  }
   if (!result.data) {
     throw new Error(
       "Não foi possível atualizar o envio ao e-Social. Verifique permissões ou se o agendamento existe."

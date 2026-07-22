@@ -46,6 +46,10 @@ import {
   AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
 } from "@/lib/agendamento-duplicidade-90dias";
 import {
+  ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO,
+  isEsocialReciboDuplicadoError,
+} from "@/lib/esocial-recibo-duplicidade";
+import {
   verificarDuplicidadeAgendamento90Dias,
   registrarTentativaBloqueadaDuplicidadeAgendamento,
   type AgendamentoDuplicidade90DiasInfo,
@@ -1518,6 +1522,12 @@ export function useAgendamentosPage() {
           refresh();
         } catch (err) {
           console.error("Erro ao salvar documentação:", err);
+          if (isEsocialReciboDuplicadoError(err)) {
+            toast.error(
+              `${err.message} ${ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO}`
+            );
+            return;
+          }
           const message =
             err && typeof err === "object" && "message" in err
               ? String((err as { message: unknown }).message)
@@ -1790,6 +1800,12 @@ export function useAgendamentosPage() {
         }
         if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
           await bloquearDuplicidade90Dias(err.info, dataIso);
+          return;
+        }
+        if (isEsocialReciboDuplicadoError(err)) {
+          toast.error(
+            `${err.message} ${ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO}`
+          );
           return;
         }
         const message =

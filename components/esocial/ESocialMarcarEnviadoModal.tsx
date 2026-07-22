@@ -4,6 +4,11 @@ import { Field } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { maskDateBR } from "@/lib/agendamento-datetime";
 import {
+  ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO,
+  formatEsocialReciboDuplicadoDetalhes,
+  type EsocialReciboDuplicadoInfo,
+} from "@/lib/esocial-recibo-duplicidade";
+import {
   RECIBO_MASKED_LENGTH,
   maskEsocialRecibo,
 } from "@/lib/esocial-recibo";
@@ -11,8 +16,11 @@ import {
 interface ESocialMarcarEnviadoModalProps {
   open: boolean;
   saving: boolean;
+  validatingRecibo: boolean;
   dataEnvio: string;
   recibo: string;
+  reciboError: string | null;
+  reciboDuplicadoInfo: EsocialReciboDuplicadoInfo | null;
   onChangeData: (value: string) => void;
   onChangeRecibo: (value: string) => void;
   onClose: () => void;
@@ -22,13 +30,19 @@ interface ESocialMarcarEnviadoModalProps {
 export function ESocialMarcarEnviadoModal({
   open,
   saving,
+  validatingRecibo,
   dataEnvio,
   recibo,
+  reciboError,
+  reciboDuplicadoInfo,
   onChangeData,
   onChangeRecibo,
   onClose,
   onConfirm,
 }: ESocialMarcarEnviadoModalProps) {
+  const confirmDisabled = saving || validatingRecibo;
+  const reciboHasError = Boolean(reciboError);
+
   return (
     <Modal
       open={open}
@@ -39,7 +53,7 @@ export function ESocialMarcarEnviadoModal({
           <button
             type="button"
             className="btn btn-muted"
-            disabled={saving}
+            disabled={confirmDisabled}
             onClick={onClose}
           >
             Cancelar
@@ -47,10 +61,14 @@ export function ESocialMarcarEnviadoModal({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={saving}
+            disabled={confirmDisabled}
             onClick={() => void onConfirm()}
           >
-            {saving ? "Salvando..." : "Confirmar"}
+            {saving
+              ? "Salvando..."
+              : validatingRecibo
+                ? "Validando..."
+                : "Confirmar"}
           </button>
         </div>
       }
@@ -67,22 +85,44 @@ export function ESocialMarcarEnviadoModal({
             placeholder="DD/MM/AAAA"
             maxLength={10}
             value={dataEnvio}
-            disabled={saving}
+            disabled={confirmDisabled}
             onChange={(e) => onChangeData(maskDateBR(e.target.value))}
           />
         </Field>
         <Field label="Nº Recibo">
           <input
-            className="field-input font-mono text-sm tracking-tight"
+            className={`field-input font-mono text-sm tracking-tight ${
+              reciboHasError
+                ? "border-brand-red ring-1 ring-brand-red/30 focus:border-brand-red"
+                : ""
+            }`}
             type="text"
             inputMode="numeric"
             autoComplete="off"
             placeholder="Ex.: 1.1.0000000040734596239"
             maxLength={RECIBO_MASKED_LENGTH}
             value={recibo}
-            disabled={saving}
+            disabled={confirmDisabled}
             onChange={(e) => onChangeRecibo(maskEsocialRecibo(e.target.value))}
+            aria-invalid={reciboHasError}
           />
+          {reciboHasError && (
+            <div className="mt-2 space-y-2">
+              <p className="text-sm font-medium text-brand-red">{reciboError}</p>
+              {reciboDuplicadoInfo && (
+                <div className="rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#7f1d1d]">
+                  {formatEsocialReciboDuplicadoDetalhes(reciboDuplicadoInfo).map(
+                    (line) => (
+                      <p key={line}>{line}</p>
+                    )
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-[#64748b]">
+                {ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO}
+              </p>
+            </div>
+          )}
         </Field>
       </div>
     </Modal>
