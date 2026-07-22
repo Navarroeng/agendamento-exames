@@ -1,5 +1,6 @@
 import { assertExamesValorClientePermitido } from "@/lib/agendamento-clinico-zero-demissional";
 import { assertContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
+import { assertClienteDisponivelParaAgendamento } from "@/services/cliente.service";
 import { assertExamesSemDuplicidade } from "@/lib/duplicidade-validations";
 import {
   AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
@@ -87,6 +88,7 @@ export async function salvarAgendamentoComExames(
     agendamento.cliente_nome,
     agendamento.data_agendamento
   );
+  await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome);
   await assertAgendamentoSemDuplicidade90Dias({
     clienteNome: agendamento.cliente_nome,
     colaboradorCpf: agendamento.colaborador_cpf,

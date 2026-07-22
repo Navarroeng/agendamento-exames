@@ -3,6 +3,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 
 import { formatCNPJ } from "@/lib/cnpj";
+import { formatClienteAgendamentoBadgeLabel } from "@/lib/cliente-disponivel-agendamento";
 import type { ClienteRecord } from "@/lib/types";
 
 import { ClientesPagination } from "./ClientesPagination";
@@ -63,7 +64,7 @@ export function ClientesTable({
           <table className="table-premium w-full min-w-[520px]">
             <thead>
               <tr>
-                {["Nome", "CNPJ", "Ações"].map((h) => (
+                {["Nome", "CNPJ", "Agendamento", "Ações"].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -82,6 +83,26 @@ export function ClientesTable({
                   <td className="font-bold text-navy">{cliente.nome}</td>
 
                   <td>{formatCNPJ(cliente.cnpj)}</td>
+
+                  <td>
+                    {(() => {
+                      const label = formatClienteAgendamentoBadgeLabel(
+                        cliente.disponivel_agendamento
+                      );
+                      const liberado = label === "Agendamento liberado";
+                      return (
+                        <span
+                          className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold leading-tight ${
+                            liberado
+                              ? "bg-brand-green-soft text-brand-green"
+                              : "bg-brand-orange-soft text-[#c96d00]"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      );
+                    })()}
+                  </td>
 
                   <td>
                     <button

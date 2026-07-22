@@ -37,6 +37,8 @@ export const AUDITORIA_ACOES = {
   exames_complementares_removidos_retorno_trabalho:
     "exames_complementares_removidos_retorno_trabalho",
   procuracao_alterada: "procuracao_alterada",
+  agendamento_cliente_liberado: "agendamento_cliente_liberado",
+  agendamento_cliente_bloqueado: "agendamento_cliente_bloqueado",
   agendamento_sem_procuracao_confirmado: "agendamento_sem_procuracao_confirmado",
   clinico_zero_demissional: "clinico_zero_demissional",
   fatura_reemitida: "fatura_reemitida",
@@ -87,6 +89,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   exames_complementares_removidos_retorno_trabalho:
     "Complementares removidos (Retorno ao Trabalho)",
   procuracao_alterada: "Procuração alterada",
+  agendamento_cliente_liberado: "Cliente liberado para agendamentos",
+  agendamento_cliente_bloqueado: "Cliente bloqueado para novos agendamentos",
   agendamento_sem_procuracao_confirmado:
     "Agendamento confirmado sem procuração ativa",
   clinico_zero_demissional: "Clínico R$ 0,00 — ASO Demissional",

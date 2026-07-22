@@ -8,6 +8,10 @@ import {
 } from "@/lib/text-normalize";
 import { getEmptyClienteForm } from "@/lib/cliente-defaults";
 import { normalizeClienteProcuracao } from "@/lib/cliente-procuracao";
+import {
+  boolToDisponivelAgendamentoForm,
+  formToDisponivelAgendamento,
+} from "@/lib/cliente-disponivel-agendamento";
 import { maskCNPJInput, onlyDigits } from "@/lib/cnpj";
 import type { ClienteFormValues, ClienteRecord, ClienteUpdate } from "@/lib/types";
 
@@ -30,8 +34,17 @@ export function useClienteEdit(cliente: ClienteRecord | null) {
       nome: cliente.nome,
       cnpj: maskCNPJInput(cliente.cnpj),
       procuracao: normalizeClienteProcuracao(cliente.procuracao),
+      disponivel_agendamento: boolToDisponivelAgendamentoForm(
+        cliente.disponivel_agendamento
+      ),
     });
-  }, [cliente?.id, cliente?.nome, cliente?.cnpj, cliente?.procuracao]);
+  }, [
+    cliente?.id,
+    cliente?.nome,
+    cliente?.cnpj,
+    cliente?.procuracao,
+    cliente?.disponivel_agendamento,
+  ]);
 
   const setField = useCallback((field: ClienteEditField, value: string) => {
     const nextValue = isUppercaseField("cliente", field)
@@ -46,6 +59,9 @@ export function useClienteEdit(cliente: ClienteRecord | null) {
       nome: cliente.nome,
       cnpj: maskCNPJInput(cliente.cnpj),
       procuracao: normalizeClienteProcuracao(cliente.procuracao),
+      disponivel_agendamento: boolToDisponivelAgendamentoForm(
+        cliente.disponivel_agendamento
+      ),
     });
     setEditing(true);
   }, [cliente]);
@@ -61,6 +77,9 @@ export function useClienteEdit(cliente: ClienteRecord | null) {
       nome: cliente.nome,
       cnpj: maskCNPJInput(cliente.cnpj),
       procuracao: normalizeClienteProcuracao(cliente.procuracao),
+      disponivel_agendamento: boolToDisponivelAgendamentoForm(
+        cliente.disponivel_agendamento
+      ),
     });
     setEditing(false);
   }, [cliente]);
@@ -69,6 +88,9 @@ export function useClienteEdit(cliente: ClienteRecord | null) {
     nome: normalizeUppercaseField(form.nome),
     cnpj: maskCNPJInput(form.cnpj.trim()),
     procuracao: form.procuracao,
+    disponivel_agendamento: formToDisponivelAgendamento(
+      form.disponivel_agendamento
+    ),
   }), [form]);
 
   const validate = useCallback((): boolean => {

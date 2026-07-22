@@ -157,7 +157,8 @@ export function ClientesPage() {
         <ClientesSearchPanel
           filters={filters}
           totalFiltrados={total}
-          onChange={(value) => setFilter("busca", value)}
+          onChangeBusca={(value) => setFilter("busca", value)}
+          onChangeAgendamento={(value) => setFilter("agendamento", value)}
           onClear={clearFilters}
         />
       </div>
@@ -171,7 +172,7 @@ export function ClientesPage() {
           total={total}
           totalPages={totalPages}
           pageSize={pageSize}
-          hasActiveSearch={hasActiveClientesListFilters({ busca: debouncedBusca })}
+          hasActiveSearch={hasActiveClientesListFilters(filters)}
           highlightClienteId={highlightClienteId}
           onAbrir={handleAbrir}
           onPageChange={setPage}

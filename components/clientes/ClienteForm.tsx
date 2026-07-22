@@ -3,6 +3,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconUser } from "@/components/ui/icons/OutlineIcons";
 import type { ClienteFormField } from "@/hooks/useClienteForm";
 import { CLIENTE_PROCURACAO_OPTIONS } from "@/lib/cliente-procuracao";
+import { SIM_NAO } from "@/lib/constants";
 import { maskCNPJInput } from "@/lib/cnpj";
 import type { ClienteFormValues } from "@/lib/types";
 
@@ -40,6 +41,21 @@ export function ClienteForm({ form, onChange }: ClienteFormProps) {
             {CLIENTE_PROCURACAO_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Disponível para agendamento">
+          <select
+            className="field-input"
+            value={form.disponivel_agendamento}
+            onChange={(e) =>
+              onChange("disponivel_agendamento", e.target.value)
+            }
+          >
+            {SIM_NAO.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>

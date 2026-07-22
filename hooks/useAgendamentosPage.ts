@@ -65,6 +65,15 @@ import {
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
 import { isClienteProcuracaoAtiva } from "@/lib/cliente-procuracao";
+import {
+  CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
+  filterClientesParaNovoAgendamento,
+  isClienteDisponivelAgendamento,
+} from "@/lib/cliente-disponivel-agendamento";
+import {
+  assertClienteDisponivelParaAgendamento,
+  isClienteIndisponivelAgendamentoError,
+} from "@/services/cliente.service";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
 import {
   agendamentoPossuiComplementares,
@@ -237,6 +246,15 @@ export function useAgendamentosPage() {
 
   const { clinicas: clinicasList } = useClinicasList();
   const { clientes, loading: clientesLoading } = useClientesList();
+
+  const clientesParaAgendamento = useMemo(
+    () =>
+      filterClientesParaNovoAgendamento(clientes, {
+        editingId,
+        clienteNomeAtual: form.cliente_nome,
+      }),
+    [clientes, editingId, form.cliente_nome]
+  );
   const contratoVigencia = useContratoVigenciaCheck(
     form.cliente_nome,
     form.data_agendamento
@@ -727,6 +745,11 @@ export function useAgendamentosPage() {
     async (nextClienteId: string): Promise<boolean> => {
       const cliente = clientes.find((c) => c.id === nextClienteId);
       if (!cliente) return false;
+
+      if (!isClienteDisponivelAgendamento(cliente.disponivel_agendamento)) {
+        toast.error(CLIENTE_DISPONIVEL_AGENDAMENTO_MSG);
+        return false;
+      }
 
       const seq = ++clienteValidacaoSeqRef.current;
       setClienteValidacaoLoading(true);
@@ -1517,6 +1540,16 @@ export function useAgendamentosPage() {
           return;
         }
         try {
+          await assertClienteDisponivelParaAgendamento(clienteNome);
+        } catch (err) {
+          if (isClienteIndisponivelAgendamentoError(err)) {
+            toast.error(err.message);
+            clearFormPorInadimplencia();
+            return;
+          }
+          throw err;
+        }
+        try {
           await assertClienteSemInadimplencia(clienteNome);
         } catch (err) {
           if (isClienteInadimplenteError(err)) {
@@ -1854,7 +1887,7 @@ export function useAgendamentosPage() {
     form,
     setField,
     clinicasAtivas,
-    clientes,
+    clientes: clientesParaAgendamento,
     clientesLoading,
     clienteId,
     handleClienteChange,

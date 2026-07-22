@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/client";
 import { clienteRecordMatchesBusca } from "@/lib/cliente-busca";
 import {
+  CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
+  isClienteDisponivelAgendamento,
+  matchesClienteAgendamentoFilter,
+  type ClienteAgendamentoFilter,
+} from "@/lib/cliente-disponivel-agendamento";
+import {
   CLIENTE_CNPJ_DUPLICADO_MSG,
   normalizeCnpjDigits,
   resolveClienteCnpjError,
@@ -24,6 +30,7 @@ export interface ListarClientesPaginadosParams {
   page?: number;
   pageSize?: number;
   busca?: string;
+  agendamento?: ClienteAgendamentoFilter;
 }
 
 export interface ListarClientesPaginadosResult {
@@ -72,6 +79,40 @@ export async function buscarClientePorCnpjDigits(
   return (data as ClienteRecord | null) ?? null;
 }
 
+export async function assertClienteDisponivelParaAgendamento(
+  clienteNome: string
+): Promise<void> {
+  const trimmed = clienteNome.trim();
+  if (!trimmed) return;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id, nome, disponivel_agendamento")
+    .eq("nome", trimmed)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return;
+
+  if (!isClienteDisponivelAgendamento(data.disponivel_agendamento)) {
+    throw new ClienteIndisponivelAgendamentoError();
+  }
+}
+
+export class ClienteIndisponivelAgendamentoError extends Error {
+  constructor(message = CLIENTE_DISPONIVEL_AGENDAMENTO_MSG) {
+    super(message);
+    this.name = "ClienteIndisponivelAgendamentoError";
+  }
+}
+
+export function isClienteIndisponivelAgendamentoError(
+  error: unknown
+): error is ClienteIndisponivelAgendamentoError {
+  return error instanceof ClienteIndisponivelAgendamentoError;
+}
+
 export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
   await assertCnpjClienteDisponivel(cliente.cnpj);
 
@@ -114,12 +155,15 @@ export async function listarClientesPaginados(
   const page = Math.max(1, params.page ?? 1);
   const pageSize = params.pageSize ?? 30;
   const busca = params.busca?.trim() ?? "";
+  const agendamento = params.agendamento ?? "";
 
   if (busca) {
     const all = await listarTodosClientesParaBusca();
-    const filtered = all.filter((record) =>
-      clienteRecordMatchesBusca(record, busca)
-    );
+    const filtered = all.filter((record) => {
+      if (!clienteRecordMatchesBusca(record, busca)) return false;
+      if (!matchesClienteAgendamentoFilter(record, agendamento)) return false;
+      return true;
+    });
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const safePage = Math.min(page, totalPages);
@@ -138,11 +182,18 @@ export async function listarClientesPaginados(
   const to = from + pageSize - 1;
 
   const supabase = createClient();
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("clientes")
     .select(CLIENTE_DB_COLUMNS, { count: "exact" })
-    .order("nome", { ascending: true })
-    .range(from, to);
+    .order("nome", { ascending: true });
+
+  if (agendamento === "liberado") {
+    query = query.eq("disponivel_agendamento", true);
+  } else if (agendamento === "bloqueado") {
+    query = query.eq("disponivel_agendamento", false);
+  }
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) throw error;
 

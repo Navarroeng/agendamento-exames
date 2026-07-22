@@ -43,6 +43,11 @@ export function useClientesPaginatedList() {
     return () => window.clearTimeout(timer);
   }, [filters.busca]);
 
+  useEffect(() => {
+    skipPageResetRef.current = false;
+    setPage(1);
+  }, [filters.agendamento]);
+
   const refresh = useCallback(() => {
     setRefreshKey((key) => key + 1);
   }, []);
@@ -59,6 +64,7 @@ export function useClientesPaginatedList() {
           page,
           pageSize: CLIENTES_PAGE_SIZE,
           busca: debouncedBusca,
+          agendamento: filters.agendamento,
         });
 
         if (cancelled) return;
@@ -94,7 +100,7 @@ export function useClientesPaginatedList() {
     return () => {
       cancelled = true;
     };
-  }, [page, debouncedBusca, refreshKey]);
+  }, [page, debouncedBusca, filters.agendamento, refreshKey]);
 
   const setFilter = useCallback(
     (field: keyof ClientesListFilters, value: string) => {

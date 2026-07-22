@@ -267,18 +267,21 @@ export interface ClienteFormValues {
   nome: string;
   cnpj: string;
   procuracao: ClienteProcuracao;
+  disponivel_agendamento: string;
 }
 
 export interface ClienteInsert {
   nome: string;
   cnpj: string;
   procuracao: ClienteProcuracao;
+  disponivel_agendamento: boolean;
 }
 
 export interface ClienteUpdate {
   nome: string;
   cnpj: string;
   procuracao: ClienteProcuracao;
+  disponivel_agendamento: boolean;
 }
 
 export interface ClienteRecord extends ClienteInsert {

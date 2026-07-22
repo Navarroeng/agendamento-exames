@@ -7,6 +7,7 @@ import {
   normalizeUppercaseField,
 } from "@/lib/text-normalize";
 import { getEmptyClienteForm } from "@/lib/cliente-defaults";
+import { formToDisponivelAgendamento } from "@/lib/cliente-disponivel-agendamento";
 import { maskCNPJInput, onlyDigits } from "@/lib/cnpj";
 import type { ClienteFormValues, ClienteInsert } from "@/lib/types";
 
@@ -31,6 +32,9 @@ export function useClienteForm() {
     nome: normalizeUppercaseField(form.nome),
     cnpj: maskCNPJInput(form.cnpj.trim()),
     procuracao: form.procuracao,
+    disponivel_agendamento: formToDisponivelAgendamento(
+      form.disponivel_agendamento
+    ),
   }), [form]);
 
   const validate = useCallback((): boolean => {

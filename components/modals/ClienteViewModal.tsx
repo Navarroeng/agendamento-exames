@@ -19,10 +19,19 @@ import {
   formatClienteProcuracaoLabel,
   normalizeClienteProcuracao,
 } from "@/lib/cliente-procuracao";
+import {
+  boolToDisponivelAgendamentoForm,
+  formatClienteAgendamentoBadgeLabel,
+  isClienteDisponivelAgendamento,
+} from "@/lib/cliente-disponivel-agendamento";
+import { SIM_NAO } from "@/lib/constants";
 import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
 import type { ClienteRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
-import { registrarProcuracaoClienteAlterada } from "@/services/cliente-procuracao-audit.service";
+import {
+  registrarDisponivelAgendamentoClienteAlterada,
+  registrarProcuracaoClienteAlterada,
+} from "@/services/cliente-procuracao-audit.service";
 import { atualizarCliente } from "@/services/cliente.service";
 
 interface ClienteViewModalProps {
@@ -106,6 +115,9 @@ export function ClienteViewModal({
     try {
       const payload = buildClientePayload();
       const procuracaoAnterior = normalizeClienteProcuracao(cliente.procuracao);
+      const disponivelAnterior = isClienteDisponivelAgendamento(
+        cliente.disponivel_agendamento
+      );
       const updated = await atualizarCliente(cliente.id, payload);
       if (procuracaoAnterior !== payload.procuracao) {
         await registrarProcuracaoClienteAlterada(auditContext, {
@@ -113,6 +125,14 @@ export function ClienteViewModal({
           clienteNome: updated.nome,
           procuracaoAnterior,
           procuracaoNova: payload.procuracao,
+        });
+      }
+      if (disponivelAnterior !== payload.disponivel_agendamento) {
+        await registrarDisponivelAgendamentoClienteAlterada(auditContext, {
+          clienteId: updated.id,
+          clienteNome: updated.nome,
+          disponivelAnterior,
+          disponivelNova: payload.disponivel_agendamento,
         });
       }
       await registrarAuditoria({
@@ -262,6 +282,21 @@ export function ClienteViewModal({
                       ))}
                     </select>
                   </Field>
+                  <Field label="Disponível para agendamento">
+                    <select
+                      className="field-input"
+                      value={clienteForm.disponivel_agendamento}
+                      onChange={(e) =>
+                        setClienteField("disponivel_agendamento", e.target.value)
+                      }
+                    >
+                      {SIM_NAO.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
@@ -270,6 +305,12 @@ export function ClienteViewModal({
                   <InfoItem
                     label="Procuração"
                     value={formatClienteProcuracaoLabel(cliente.procuracao)}
+                  />
+                  <InfoItem
+                    label="Disponível para agendamento"
+                    value={formatClienteAgendamentoBadgeLabel(
+                      cliente.disponivel_agendamento
+                    )}
                   />
                 </div>
               )}

@@ -7,6 +7,38 @@ import { formatClienteProcuracaoLabel } from "@/lib/cliente-procuracao";
 import type { ClienteProcuracao } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
+export async function registrarDisponivelAgendamentoClienteAlterada(
+  context: AuditoriaUsuarioContext,
+  params: {
+    clienteId: string;
+    clienteNome: string;
+    disponivelAnterior: boolean;
+    disponivelNova: boolean;
+  }
+): Promise<void> {
+  const liberou = params.disponivelNova;
+  const acao = liberou
+    ? AUDITORIA_ACOES.agendamento_cliente_liberado
+    : AUDITORIA_ACOES.agendamento_cliente_bloqueado;
+
+  const descricao = liberou
+    ? `${context.usuarioNome} liberou o cliente ${params.clienteNome} para agendamentos.`
+    : `${context.usuarioNome} bloqueou o cliente ${params.clienteNome} para novos agendamentos.`;
+
+  await registrarAuditoria({
+    usuarioId: context.usuarioId,
+    usuarioNome: context.usuarioNome,
+    usuarioEmail: context.usuarioEmail,
+    modulo: AUDITORIA_MODULOS.clientes,
+    acao,
+    registroId: params.clienteId,
+    registroNome: params.clienteNome,
+    descricao,
+    dadosAntes: { disponivel_agendamento: params.disponivelAnterior },
+    dadosDepois: { disponivel_agendamento: params.disponivelNova },
+  });
+}
+
 export async function registrarProcuracaoClienteAlterada(
   context: AuditoriaUsuarioContext,
   params: {
