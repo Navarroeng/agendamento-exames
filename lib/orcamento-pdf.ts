@@ -1,4 +1,8 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import {
+  calcPdfContentBottomY,
+  drawNavarroPremiumFooter,
+} from "@/lib/pdf-navarro-footer";
 import { formatCNPJ } from "@/lib/cnpj";
 import {
   resolveItemValorServico,
@@ -56,9 +60,7 @@ const MARGIN = 12;
 const PAGE_W = 210;
 const PAGE_H = 297;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const FOOTER_Y = 283;
-const FOOTER_H = 12;
-const FIRST_PAGE_CONTENT_BOTTOM = FOOTER_Y - 3;
+const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(PAGE_H);
 
 /** Opacidade da marca d'água sobreposta (4–8%). */
 export const ORCAMENTO_WATERMARK_OPACITY = 0.06;
@@ -87,6 +89,8 @@ const NAVARRO = {
   email: "contato@navarroeng.com.br",
   telefone: "(11) 3181-7697",
   whatsapp: "(11) 97706-5599",
+  agradecimento:
+    "Agradecemos a confiança em nossos serviços! Estamos à disposição para quaisquer esclarecimentos.",
   razaoSocial: "Navarro Engenharia de Segurança do Trabalho e Medicina Ocupacional",
   responsavelTecnico: "Equipe Técnica Navarro Engenharia",
 } as const;
@@ -397,7 +401,7 @@ function displayValue(value: string | null | undefined, fallback = "—"): strin
 }
 
 function ensureSpace(doc: JsPDF, y: number, needed: number): number {
-  if (y + needed > FOOTER_Y - 2) {
+  if (y + needed > FIRST_PAGE_CONTENT_BOTTOM) {
     doc.addPage();
     return MARGIN + 4;
   }
@@ -1394,37 +1398,15 @@ function drawObservacoesCard(doc: JsPDF, y: number, texto: string): number {
 
 /* ── Rodapé ────────────────────────────────────────────────────── */
 function drawFooter(doc: JsPDF, pageNumber: number, totalPages: number) {
-  const y = FOOTER_Y;
-
-  doc.setFillColor(...NAVY);
-  doc.rect(0, y - 1, PAGE_W, FOOTER_H + 4, "F");
-
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.5);
-  doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-
-  doc.setFontSize(6.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...GOLD_LIGHT);
-  doc.text(NAVARRO.razaoSocial, PAGE_W / 2, y + 4, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...WHITE);
-  doc.text(
-    `${NAVARRO.site}  ·  ${NAVARRO.email}  ·  WhatsApp ${NAVARRO.whatsapp}  ·  ${NAVARRO.telefone}`,
-    PAGE_W / 2,
-    y + 8,
-    { align: "center" }
-  );
-
-  doc.setFontSize(6);
-  doc.setTextColor(...GOLD_LIGHT);
-  doc.text(
-    `Página ${pageNumber} de ${totalPages}`,
-    MARGIN + CONTENT_W,
-    y + 8,
-    { align: "right" }
-  );
+  drawNavarroPremiumFooter(doc, {
+    pageNumber,
+    totalPages,
+    pageWidth: PAGE_W,
+    pageHeight: PAGE_H,
+    margin: MARGIN,
+    contentWidth: CONTENT_W,
+    navarro: NAVARRO,
+  });
 }
 
 function buildFilename(orcamento: OrcamentoComItens): string {

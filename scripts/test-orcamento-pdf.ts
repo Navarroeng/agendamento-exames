@@ -15,6 +15,7 @@ import {
   calcOrcamentoWatermarkLayout,
   resolveFirstPageCardsRow,
 } from "../lib/orcamento-pdf";
+import { calcPdfContentBottomY } from "../lib/pdf-navarro-footer";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 import {
@@ -131,10 +132,11 @@ assert.equal(watermark.x + watermark.w / 2, PAGE_W / 2);
 assert.ok(watermark.h <= (265 - 95) * 0.92 + 0.1);
 assert.ok(watermark.y >= 95);
 
+const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(297);
 const cardsRow = resolveFirstPageCardsRow(248, 58);
 assert.equal(cardsRow.cardY, 248);
-assert.equal(cardsRow.cardH, 32);
-assert.ok(cardsRow.cardY + cardsRow.cardH <= 280);
+assert.equal(cardsRow.cardH, 26);
+assert.ok(cardsRow.cardY + cardsRow.cardH <= FIRST_PAGE_CONTENT_BOTTOM);
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;

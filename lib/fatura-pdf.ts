@@ -1,5 +1,10 @@
-import { formatCurrency } from "@/lib/money";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { formatCurrency } from "@/lib/money";
+import {
+  drawNavarroPremiumFooter,
+  PDF_FOOTER_BOTTOM_MARGIN,
+  PDF_FOOTER_H,
+} from "@/lib/pdf-navarro-footer";
 import { listarClientesParaSelect } from "@/services/cliente.service";
 import {
   buildResumoPorTipoExame,
@@ -47,8 +52,8 @@ const HEADER_H = 48;
 const HEADER_UPPER_H = 29;
 const HEADER_LOWER_H = 18.5;
 const SUMMARY_BAR_H = 14;
-const FOOTER_H = 13;
-const FOOTER_BOTTOM_MARGIN = 8;
+const FOOTER_H = PDF_FOOTER_H;
+const FOOTER_BOTTOM_MARGIN = PDF_FOOTER_BOTTOM_MARGIN;
 const BOTTOM_SECTION_H = 44;
 const SECTION_GAP = 5;
 const ROWS_PER_PAGE = 25;
@@ -850,52 +855,14 @@ function drawPremiumFooter(
   pageNumber: number,
   totalPages: number
 ) {
-  const y = PAGE_H - FOOTER_BOTTOM_MARGIN - FOOTER_H;
-  const h = FOOTER_H;
-  const pageLabel = `Página ${pageNumber} de ${totalPages}`;
-
-  doc.setFillColor(...NAVY);
-  doc.rect(0, y, PAGE_W, h, "F");
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(200, 210, 225);
-  doc.text(pageLabel, PAGE_W - MARGIN, y + 3.8, { align: "right" });
-
-  const items = [
-    NAVARRO.telefone,
-    `WhatsApp ${NAVARRO.whatsapp}`,
-    NAVARRO.email,
-    NAVARRO.site,
-  ];
-
-  doc.setFontSize(8);
-  doc.setTextColor(...WHITE);
-
-  const widths = items.map((item) => doc.getTextWidth(item));
-  const sepW = 6;
-  const totalW =
-    widths.reduce((sum, w) => sum + w, 0) + sepW * (items.length - 1);
-  let cx = (PAGE_W - totalW) / 2;
-
-  items.forEach((item, i) => {
-    doc.text(item, cx, y + 4.5);
-    cx += widths[i];
-
-    if (i < items.length - 1) {
-      const sepX = cx + sepW / 2;
-      doc.setDrawColor(...GOLD);
-      doc.setLineWidth(0.35);
-      doc.line(sepX, y + 2.2, sepX, y + 6.8);
-      cx += sepW;
-    }
-  });
-
-  doc.setFontSize(7);
-  doc.setTextColor(220, 230, 245);
-  doc.text(NAVARRO.agradecimento, PAGE_W / 2, y + 9.5, {
-    align: "center",
-    maxWidth: CONTENT_W,
+  drawNavarroPremiumFooter(doc, {
+    pageNumber,
+    totalPages,
+    pageWidth: PAGE_W,
+    pageHeight: PAGE_H,
+    margin: MARGIN,
+    contentWidth: CONTENT_W,
+    navarro: NAVARRO,
   });
 }
 
