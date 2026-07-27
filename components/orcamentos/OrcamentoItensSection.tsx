@@ -70,9 +70,8 @@ export function OrcamentoItensSection({
           <thead>
             <tr>
               <th className={TH}>Serviço</th>
-              <th className={TH}>Quantidade</th>
-              <th className={TH}>Valor unitário</th>
-              <th className={TH}>Valor total</th>
+              <th className={TH}>Quantidade de colaboradores</th>
+              <th className={TH}>Valor</th>
               <th className={`${TH} w-10 text-center`}>Ação</th>
             </tr>
           </thead>
@@ -97,7 +96,7 @@ export function OrcamentoItensSection({
           <tfoot>
             <tr className="bg-[#f8fafc]">
               <td
-                colSpan={3}
+                colSpan={2}
                 className="border-t border-[#eef2f7] px-2.5 py-2 text-right text-[11px] font-semibold text-[#64748b]"
               >
                 Subtotal
@@ -109,7 +108,7 @@ export function OrcamentoItensSection({
             </tr>
             <tr className="bg-[#fffbeb]">
               <td
-                colSpan={3}
+                colSpan={2}
                 className="border-t border-[#eef2f7] px-2.5 py-2 text-right text-[11px] font-semibold text-[#64748b]"
               >
                 Desconto ({descontoPercentual || "0"}%)
@@ -121,7 +120,7 @@ export function OrcamentoItensSection({
             </tr>
             <tr className="bg-brand-blue-soft/40">
               <td
-                colSpan={3}
+                colSpan={2}
                 className="border-t border-[#eef2f7] px-2.5 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wide text-navy"
               >
                 Valor total

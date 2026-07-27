@@ -7,9 +7,12 @@ import {
   normalizeUppercaseField,
 } from "@/lib/text-normalize";
 import {
-  calcItemTotal,
   calcSubtotalItens,
   calcValorTotalOrcamento,
+  formatQuantidadeColaboradoresInput,
+  parseQuantidadeColaboradores,
+  resolveItemValorParaFormulario,
+  resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
 import {
   createEmptyOrcamentoItem,
@@ -25,6 +28,13 @@ import type {
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
 
+function syncQuantidadeColaboradores(
+  itens: OrcamentoItemFormItem[],
+  quantidade: string
+): OrcamentoItemFormItem[] {
+  return itens.map((item) => ({ ...item, quantidade }));
+}
+
 export function useOrcamentoForm() {
   const [form, setForm] = useState<OrcamentoFormValues>(getEmptyOrcamentoForm);
   const [saving, setSaving] = useState(false);
@@ -37,10 +47,17 @@ export function useOrcamentoForm() {
   }, []);
 
   const addItem = useCallback(() => {
-    setForm((prev) => ({
-      ...prev,
-      itens: [...prev.itens, createEmptyOrcamentoItem()],
-    }));
+    setForm((prev) => {
+      const quantidadeReferencia =
+        prev.itens.find((item) => item.quantidade.trim())?.quantidade ?? "1";
+      return {
+        ...prev,
+        itens: [
+          ...prev.itens,
+          { ...createEmptyOrcamentoItem(), quantidade: quantidadeReferencia },
+        ],
+      };
+    });
   }, []);
 
   const removeItem = useCallback((id: string) => {
@@ -60,33 +77,38 @@ export function useOrcamentoForm() {
       value: string,
       servicoNome?: string
     ) => {
-      setForm((prev) => ({
-        ...prev,
-        itens: prev.itens.map((item) => {
-          if (item.id !== id) return item;
-
-          const next: OrcamentoItemFormItem = {
-            ...item,
-            [field]:
-              field === "valor_unitario" ? maskMoneyInput(value) : value,
+      setForm((prev) => {
+        if (field === "quantidade") {
+          const quantidade = formatQuantidadeColaboradoresInput(value);
+          return {
+            ...prev,
+            itens: syncQuantidadeColaboradores(prev.itens, quantidade),
           };
+        }
 
-          if (field === "servico_id" && servicoNome !== undefined) {
-            next.servico_nome = servicoNome;
-          }
+        return {
+          ...prev,
+          itens: prev.itens.map((item) => {
+            if (item.id !== id) return item;
 
-          if (
-            field === "quantidade" ||
-            field === "valor_unitario" ||
-            field === "servico_id"
-          ) {
-            const total = calcItemTotal(next.quantidade, next.valor_unitario);
-            next.valor_total = total > 0 ? String(total) : "";
-          }
+            const next: OrcamentoItemFormItem = {
+              ...item,
+              [field]:
+                field === "valor_unitario" ? maskMoneyInput(value) : value,
+            };
 
-          return next;
-        }),
-      }));
+            if (field === "servico_id" && servicoNome !== undefined) {
+              next.servico_nome = servicoNome;
+            }
+
+            if (field === "valor_unitario") {
+              next.valor_total = next.valor_unitario;
+            }
+
+            return next;
+          }),
+        };
+      });
     },
     []
   );
@@ -105,6 +127,13 @@ export function useOrcamentoForm() {
   }, []);
 
   const loadForm = useCallback((orcamento: OrcamentoComItens) => {
+    const itensDb = [...(orcamento.orcamento_itens ?? [])].sort(
+      (a, b) => a.ordem - b.ordem
+    );
+    const quantidadeReferencia = String(
+      resolveQuantidadeColaboradoresOrcamento({ orcamento_itens: itensDb }) || 1
+    );
+
     setForm({
       numero: orcamento.numero,
       data_proposta: orcamento.data_proposta.split("T")[0],
@@ -120,20 +149,21 @@ export function useOrcamentoForm() {
       validade_proposta: orcamento.validade_proposta?.split("T")[0] ?? "",
       status: orcamento.status,
       itens:
-        (orcamento.orcamento_itens ?? []).length > 0
-          ? (orcamento.orcamento_itens ?? []).map((item) => ({
-              id: item.id,
-              servico_id: item.servico_id ?? "",
-              servico_nome: item.servico_nome,
-              quantidade: String(item.quantidade),
-              valor_unitario:
-                Number(item.valor_unitario) > 0
-                  ? maskMoneyInput(
-                      String(Math.round(Number(item.valor_unitario) * 100))
-                    )
-                  : "",
-              valor_total: String(item.valor_total),
-            }))
+        itensDb.length > 0
+          ? itensDb.map((item) => {
+              const valor = resolveItemValorParaFormulario(item);
+              return {
+                id: item.id,
+                servico_id: item.servico_id ?? "",
+                servico_nome: item.servico_nome,
+                quantidade: quantidadeReferencia,
+                valor_unitario:
+                  valor > 0
+                    ? maskMoneyInput(String(Math.round(valor * 100)))
+                    : "",
+                valor_total: valor > 0 ? String(valor) : "",
+              };
+            })
           : [createEmptyOrcamentoItem()],
     });
   }, []);
@@ -151,19 +181,15 @@ export function useOrcamentoForm() {
     const itens = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
-        const quantidade = Number(String(item.quantidade).replace(",", ".")) || 1;
-        const valorUnitario = parseMoney(item.valor_unitario);
-        const valorTotal =
-          item.valor_total.trim() !== ""
-            ? parseMoney(item.valor_total)
-            : calcItemTotal(item.quantidade, item.valor_unitario);
+        const quantidade = parseQuantidadeColaboradores(item.quantidade) || 1;
+        const valor = parseMoney(item.valor_unitario);
 
         return {
           servico_id: item.servico_id.trim() || null,
           servico_nome: item.servico_nome.trim(),
           quantidade,
-          valor_unitario: valorUnitario,
-          valor_total: valorTotal,
+          valor_unitario: valor,
+          valor_total: valor,
           ordem: index,
         };
       });
@@ -210,9 +236,11 @@ export function useOrcamentoForm() {
     }
 
     for (const item of itensValidos) {
-      const qtd = Number(String(item.quantidade).replace(",", "."));
-      if (!qtd || qtd <= 0) {
-        return "Informe quantidade válida para todos os serviços.";
+      if (!parseQuantidadeColaboradores(item.quantidade)) {
+        return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
+      }
+      if (parseMoney(item.valor_unitario) < 0) {
+        return "Informe valor válido para todos os serviços.";
       }
     }
 

@@ -2,6 +2,7 @@
 
 import { Modal } from "@/components/ui/Modal";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { resolveItemValorServico } from "@/lib/orcamento-calculo";
 import { formatCurrency } from "@/lib/money";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -95,9 +96,8 @@ export function OrcamentoViewModal({
           <thead>
             <tr className="bg-[#f8fafc] text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
               <th className="px-3 py-2">Serviço</th>
-              <th className="px-3 py-2">Qtd.</th>
-              <th className="px-3 py-2">Unitário</th>
-              <th className="px-3 py-2">Total</th>
+              <th className="px-3 py-2">Quantidade de colaboradores</th>
+              <th className="px-3 py-2">Valor</th>
             </tr>
           </thead>
           <tbody>
@@ -123,11 +123,8 @@ export function OrcamentoViewModal({
                     )}
                   </td>
                   <td className="px-3 py-2 align-top">{item.quantidade}</td>
-                  <td className="px-3 py-2 align-top">
-                    {formatCurrency(Number(item.valor_unitario))}
-                  </td>
                   <td className="px-3 py-2 align-top font-semibold">
-                    {formatCurrency(Number(item.valor_total))}
+                    {formatCurrency(resolveItemValorServico(item))}
                   </td>
                 </tr>
               );
@@ -135,7 +132,7 @@ export function OrcamentoViewModal({
           </tbody>
           <tfoot>
             <tr className="border-t border-[#eef2f7] bg-[#f8fafc]">
-              <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold">
+              <td colSpan={2} className="px-3 py-2 text-right text-xs font-semibold">
                 Subtotal
               </td>
               <td className="px-3 py-2 font-bold">
@@ -143,7 +140,7 @@ export function OrcamentoViewModal({
               </td>
             </tr>
             <tr className="border-t border-[#eef2f7] bg-brand-blue-soft/30">
-              <td colSpan={3} className="px-3 py-2 text-right text-xs font-extrabold uppercase">
+              <td colSpan={2} className="px-3 py-2 text-right text-xs font-extrabold uppercase">
                 Valor total
               </td>
               <td className="px-3 py-2 text-base font-extrabold text-navy">

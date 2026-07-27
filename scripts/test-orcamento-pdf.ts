@@ -5,6 +5,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { jsPDF } from "jspdf";
+import {
+  resolveItemValorServico,
+  resolveQuantidadeColaboradoresOrcamento,
+} from "../lib/orcamento-calculo";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 import {
@@ -23,44 +27,6 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS = [
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
 
-function wrapDescricaoPropostaLines(
-  doc: jsPDF,
-  text: string,
-  maxWidth: number
-): string[] {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return [];
-  return doc.splitTextToSize(normalized, maxWidth);
-}
-
-function normalizeServicoNome(nome: string): string {
-  return nome
-    .trim()
-    .toLocaleLowerCase("pt-BR")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function isServicoExamesClinicos(nome: string): boolean {
-  const normalized = normalizeServicoNome(nome);
-  return (
-    normalized === "exames ocupacionais" ||
-    normalized === "exame clinico" ||
-    normalized === "exames clinicos" ||
-    normalized.includes("exame clinico")
-  );
-}
-
-function resolveQuantidadeExamesClinicosOrcamento(
-  orcamento: Pick<OrcamentoComItens, "orcamento_itens">
-): number {
-  return (orcamento.orcamento_itens ?? []).reduce((total, item) => {
-    if (!isServicoExamesClinicos(item.servico_nome)) return total;
-    const quantidade = Number(item.quantidade);
-    return total + (Number.isFinite(quantidade) ? quantidade : 0);
-  }, 0);
-}
-
 function buildPacoteCompletoInclusosItens(
   orcamento: Pick<OrcamentoComItens, "orcamento_itens">
 ): string[] {
@@ -69,11 +35,10 @@ function buildPacoteCompletoInclusosItens(
     "Gestão completa e envio ao eSocial.",
   ];
 
-  const quantidadeExamesClinicos = resolveQuantidadeExamesClinicosOrcamento(
-    orcamento
-  );
-  if (quantidadeExamesClinicos > 0) {
-    itens.push(`Exames Clínicos: ${quantidadeExamesClinicos}`);
+  const quantidadeColaboradores =
+    resolveQuantidadeColaboradoresOrcamento(orcamento);
+  if (quantidadeColaboradores > 0) {
+    itens.push(`Exames Clínicos: ${quantidadeColaboradores}`);
   }
 
   itens.push("CAT - Cortesia.");
@@ -90,66 +55,50 @@ function buildFilename(numero: string, clienteNome: string): string {
   return `Proposta-${numero}-${cliente || "Cliente"}.pdf`;
 }
 
+function wrapDescricaoPropostaLines(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number
+): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  return doc.splitTextToSize(normalized, maxWidth);
+}
+
 assert.ok(isPacoteCompletoSst(PACOTE_COMPLETO_SST_NOME));
 const inclusosPacote = resolveItensInclusosServico({
   nome: PACOTE_COMPLETO_SST_NOME,
 });
 assert.deepEqual(inclusosPacote, [...PACOTE_COMPLETO_SST_ITENS]);
 
-const semExames = buildPacoteCompletoInclusosItens({ orcamento_itens: [] });
-assert.equal(semExames.length, 3);
-assert.match(semExames[0], /listados acima/);
-assert.ok(!semExames.some((item) => /Exames Clínicos/.test(item)));
-
-const comExames = buildPacoteCompletoInclusosItens({
+const orcamentoDoisColaboradores = {
   orcamento_itens: [
     {
       id: "1",
       orcamento_id: "o1",
       servico_id: null,
-      servico_nome: "Exames Ocupacionais",
-      quantidade: 3,
-      valor_unitario: 100,
-      valor_total: 300,
-      ordem: 1,
+      servico_nome: PACOTE_COMPLETO_SST_NOME,
+      quantidade: 2,
+      valor_unitario: 1500,
+      valor_total: 1500,
+      ordem: 0,
     },
   ],
-});
-assert.ok(comExames.includes("Exames Clínicos: 3"));
-assert.ok(!comExames.some((item) => /PGR/.test(item)));
+};
 
-function resolveNumeroColaboradoresOrcamento(
-  orcamento: Pick<OrcamentoComItens, "orcamento_itens">
-): string {
-  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
-    (a, b) => a.ordem - b.ordem
-  );
-  if (itens.length === 0) return "—";
-
-  const pacoteItem = itens.find((item) =>
-    isPacoteCompletoSst(item.servico_nome)
-  );
-  const referencia = pacoteItem ?? itens[0];
-  const quantidade = Number(referencia.quantidade);
-  return Number.isFinite(quantidade) ? String(quantidade) : "—";
-}
+const semExames = buildPacoteCompletoInclusosItens(orcamentoDoisColaboradores);
+assert.ok(semExames.includes("Exames Clínicos: 2"));
+assert.match(semExames[0], /listados acima/);
+assert.ok(!semExames.some((item) => /PGR/.test(item)));
 
 assert.equal(
-  resolveNumeroColaboradoresOrcamento({
-    orcamento_itens: [
-      {
-        id: "1",
-        orcamento_id: "o1",
-        servico_id: null,
-        servico_nome: PACOTE_COMPLETO_SST_NOME,
-        quantidade: 25,
-        valor_unitario: 1000,
-        valor_total: 25000,
-        ordem: 0,
-      },
-    ],
-  }),
-  "25"
+  resolveQuantidadeColaboradoresOrcamento(orcamentoDoisColaboradores),
+  2
+);
+
+assert.equal(
+  resolveItemValorServico(orcamentoDoisColaboradores.orcamento_itens[0]),
+  1500
 );
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -184,7 +133,7 @@ PROPOSTA_DESCRICAO_PARAGRAFOS.forEach((paragrafo, index) => {
   doc.text(lines, MARGIN + 5, 60 + index * 20);
 });
 
-comExames.forEach((item, index) => {
+semExames.forEach((item, index) => {
   doc.text(`• ${item}`, MARGIN + 6, 100 + index * 6);
 });
 
@@ -193,7 +142,7 @@ assert.match(filename, /^Proposta-2026-001-Empresa-Sao-Paulo-Ltda\.pdf$/);
 
 doc.setFontSize(11);
 doc.setTextColor(...NAVY);
-doc.text(formatCurrency(12500), MARGIN + CONTENT_W - 5, 130, { align: "right" });
+doc.text(formatCurrency(1500), MARGIN + CONTENT_W - 5, 130, { align: "right" });
 
 const outPath = path.join(os.tmpdir(), filename);
 const buffer = Buffer.from(doc.output("arraybuffer"));

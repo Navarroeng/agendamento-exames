@@ -3,7 +3,6 @@ import type {
   OrcamentoItemFormItem,
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
-import { calcItemTotal } from "@/lib/orcamento-calculo";
 import { OrcamentoPacoteInclusosCard } from "./OrcamentoPacoteInclusosCard";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
@@ -34,11 +33,6 @@ export function OrcamentoItemTableRow({
   onUpdate,
   onApplyValorSugerido,
 }: OrcamentoItemTableRowProps) {
-  const totalDisplay =
-    item.valor_total.trim() !== ""
-      ? formatCurrency(Number(item.valor_total))
-      : formatCurrency(calcItemTotal(item.quantidade, item.valor_unitario));
-
   const selectedServico = servicos.find((s) => s.id === item.servico_id);
   const isOutros = selectedServico?.nome === "Outros";
   const itensInclusos = resolveItensInclusosServico(
@@ -93,7 +87,7 @@ export function OrcamentoItemTableRow({
       <td className={TD}>
         <input
           className={`${inputClass} max-w-[80px]`}
-          inputMode="decimal"
+          inputMode="numeric"
           value={item.quantidade}
           onChange={(e) => onUpdate("quantidade", e.target.value)}
         />
@@ -106,7 +100,6 @@ export function OrcamentoItemTableRow({
           onChange={(e) => onUpdate("valor_unitario", e.target.value)}
         />
       </td>
-      <td className={`${TD} font-semibold text-navy`}>{totalDisplay}</td>
       <td className={`${TD} w-10 text-center`}>
         <button
           type="button"

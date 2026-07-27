@@ -1,5 +1,9 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
+import {
+  resolveItemValorServico,
+  resolveQuantidadeColaboradoresOrcamento,
+} from "@/lib/orcamento-calculo";
 import { formatCurrency } from "@/lib/money";
 import type {
   OrcamentoComItens,
@@ -72,26 +76,6 @@ function isPacoteCompletoNome(nome: string | null | undefined): boolean {
   );
 }
 
-function isServicoExamesClinicos(nome: string): boolean {
-  const normalized = normalizeServicoNome(nome);
-  return (
-    normalized === "exames ocupacionais" ||
-    normalized === "exame clinico" ||
-    normalized === "exames clinicos" ||
-    normalized.includes("exame clinico")
-  );
-}
-
-function resolveQuantidadeExamesClinicosOrcamento(
-  orcamento: OrcamentoComItens
-): number {
-  return (orcamento.orcamento_itens ?? []).reduce((total, item) => {
-    if (!isServicoExamesClinicos(item.servico_nome)) return total;
-    const quantidade = Number(item.quantidade);
-    return total + (Number.isFinite(quantidade) ? quantidade : 0);
-  }, 0);
-}
-
 function buildPacoteCompletoInclusosItens(
   orcamento: OrcamentoComItens
 ): string[] {
@@ -100,11 +84,11 @@ function buildPacoteCompletoInclusosItens(
     "Gestão completa e envio ao eSocial.",
   ];
 
-  const quantidadeExamesClinicos = resolveQuantidadeExamesClinicosOrcamento(
+  const quantidadeColaboradores = resolveQuantidadeColaboradoresOrcamento(
     orcamento
   );
-  if (quantidadeExamesClinicos > 0) {
-    itens.push(`Exames Clínicos: ${quantidadeExamesClinicos}`);
+  if (quantidadeColaboradores > 0) {
+    itens.push(`Exames Clínicos: ${quantidadeColaboradores}`);
   }
 
   itens.push("CAT - Cortesia.");
@@ -120,18 +104,8 @@ function formatQuantidadeOrcamento(quantidade: number): string {
 function resolveNumeroColaboradoresOrcamento(
   orcamento: OrcamentoComItens
 ): string {
-  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
-    (a, b) => a.ordem - b.ordem
-  );
-  if (itens.length === 0) return "—";
-
-  const pacoteItem = itens.find(
-    (item) =>
-      isPacoteCompletoSst(item.servico_nome) ||
-      isPacoteCompletoNome(item.servico_nome)
-  );
-  const referencia = pacoteItem ?? itens[0];
-  return formatQuantidadeOrcamento(Number(referencia.quantidade));
+  const quantidade = resolveQuantidadeColaboradoresOrcamento(orcamento);
+  return quantidade > 0 ? formatQuantidadeOrcamento(quantidade) : "—";
 }
 
 type JsPDF = import("jspdf").jsPDF;
@@ -684,14 +658,13 @@ function drawServicesTable(
 
   y = drawSectionTitle(doc, y, "Serviços propostos");
 
-  const colWidths = [90, 36, 28, 28];
+  const colWidths = [98, 44, 40];
   const colStarts = [
     MARGIN,
     MARGIN + colWidths[0],
     MARGIN + colWidths[0] + colWidths[1],
-    MARGIN + colWidths[0] + colWidths[1] + colWidths[2],
   ];
-  const headers = ["Serviço", "Quantidade de Colaboradores", "Valor unit.", "Total"];
+  const headers = ["Serviço", "Quantidade de Colaboradores", "Valor"];
   const tableHeadH = 10;
 
   const drawTableHead = (startY: number) => {
@@ -775,19 +748,16 @@ function drawServicesTable(
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
-    doc.text(String(item.quantidade), colStarts[1] + colWidths[1] - 2, valueY, {
-      align: "right",
-    });
     doc.text(
-      formatCurrency(Number(item.valor_unitario)),
-      colStarts[2] + colWidths[2] - 2,
+      String(Math.round(Number(item.quantidade))),
+      colStarts[1] + colWidths[1] - 2,
       valueY,
       { align: "right" }
     );
     doc.setFont("helvetica", "bold");
     doc.text(
-      formatCurrency(Number(item.valor_total)),
-      colStarts[3] + colWidths[3] - 2,
+      formatCurrency(resolveItemValorServico(item)),
+      colStarts[2] + colWidths[2] - 2,
       valueY,
       { align: "right" }
     );
