@@ -61,6 +61,7 @@ const TABLE_HEAD_H = 11;
 const CONTINUATION_TABLE_START_Y = MARGIN + 5;
 
 const LOGO_MAX_MM = 24;
+const LOGO_MAX_W_MM = 80;
 
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
@@ -133,16 +134,20 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       const img = new Image();
       img.onload = () =>
         resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: 280, h: 64 });
+      img.onerror = () => resolve({ w: 529, h: 140 });
       img.src = dataUrl;
     });
 
     const ratio = dims.w / dims.h;
-    let width = LOGO_MAX_MM;
+    let width = LOGO_MAX_W_MM;
     let height = width / ratio;
     if (height > LOGO_MAX_MM) {
       height = LOGO_MAX_MM;
       width = height * ratio;
+    }
+    if (width > LOGO_MAX_W_MM) {
+      width = LOGO_MAX_W_MM;
+      height = width / ratio;
     }
 
     return { dataUrl, width, height };
