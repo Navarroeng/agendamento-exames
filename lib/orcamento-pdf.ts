@@ -653,30 +653,36 @@ function drawServicesTable(
 
   y = drawSectionTitle(doc, y, "Serviços propostos");
 
-  const colWidths = [76, 20, 34, 34];
+  const colWidths = [90, 36, 28, 28];
   const colStarts = [
     MARGIN,
     MARGIN + colWidths[0],
     MARGIN + colWidths[0] + colWidths[1],
     MARGIN + colWidths[0] + colWidths[1] + colWidths[2],
   ];
-  const headers = ["Serviço", "Qtd.", "Valor unit.", "Total"];
+  const headers = ["Serviço", "Quantidade de Colaboradores", "Valor unit.", "Total"];
+  const tableHeadH = 10;
 
   const drawTableHead = (startY: number) => {
     doc.setFillColor(...NAVY);
-    doc.roundedRect(MARGIN, startY, CONTENT_W, 8, 1.5, 1.5, "F");
+    doc.roundedRect(MARGIN, startY, CONTENT_W, tableHeadH, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
     doc.setTextColor(...WHITE);
     headers.forEach((header, index) => {
-      const align = index === 0 ? "left" : "right";
+      const colW = colWidths[index] ?? 0;
       const x =
         index === 0
           ? colStarts[index] + 3
-          : colStarts[index] + colWidths[index] - 2;
-      doc.text(header, x, startY + 5.5, { align });
+          : colStarts[index] + colW - 2;
+      const align = index === 0 ? "left" : "right";
+      doc.setFontSize(index === 1 ? 6 : 7);
+      const lines =
+        index === 1
+          ? doc.splitTextToSize(header, colW - 4)
+          : [header];
+      doc.text(lines, x, startY + 5.8, { align });
     });
-    return startY + 8;
+    return startY + tableHeadH;
   };
 
   y = drawTableHead(y);
@@ -764,7 +770,7 @@ function drawServicesTable(
   doc.setDrawColor(...SLATE_200);
   doc.roundedRect(MARGIN, y - 0.5, CONTENT_W, 0.5, 0, 0, "S");
 
-  return y + 5;
+  return y + 11;
 }
 
 /* ── Resumo financeiro + checklist (lado a lado) ─────────────────── */
