@@ -6,16 +6,18 @@
  * - id (uuid)
  * - nome (text) — razão social / nome da empresa
  * - cnpj (text)
- * - contato (text, nullable) — legado, não usado no app
- * - telefone (text, nullable) — legado, não usado no app
- * - email (text, nullable) — legado, não usado no app
+ * - contato (text, nullable)
+ * - telefone (text, nullable)
+ * - email (text, nullable)
+ * - endereco (text, nullable) — migration 045
+ * - setor (text, nullable) — migration 045
  * - created_at (timestamptz)
  * - cnpj_digits (text, generated) — CNPJ só com dígitos; índice único (migration 031)
  * - procuracao (text) — ativa | inativa (migration 033)
  * - disponivel_agendamento (boolean) — migration 043
  */
 export const CLIENTE_DB_COLUMNS =
-  "id, nome, cnpj, procuracao, disponivel_agendamento, created_at" as const;
+  "id, nome, cnpj, procuracao, disponivel_agendamento, contato, telefone, email, endereco, setor, created_at" as const;
 
 /** Colunas para busca normalizada (inclui contatos legados). */
 export const CLIENTE_LIST_COLUMNS =
@@ -23,4 +25,4 @@ export const CLIENTE_LIST_COLUMNS =
 
 /** Colunas mínimas para selects e autocompletes (carrega todos os clientes). */
 export const CLIENTE_SELECT_COLUMNS =
-  "id, nome, cnpj, procuracao, disponivel_agendamento" as const;
+  "id, nome, cnpj, procuracao, disponivel_agendamento, contato, telefone, email, endereco, setor" as const;

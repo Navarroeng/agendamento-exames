@@ -26,6 +26,9 @@ export function filterOrcamentos(
       [
         orcamento.numero,
         orcamento.cliente_nome,
+        orcamento.cliente_cnpj,
+        orcamento.cliente_endereco,
+        orcamento.cliente_setor,
         orcamento.contato,
         orcamento.email,
         orcamento.telefone,

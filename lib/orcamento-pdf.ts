@@ -172,7 +172,7 @@ interface LogoAsset {
 interface ClientePdfInfo {
   cnpj: string;
   endereco: string;
-  cidade: string;
+  setor: string;
 }
 
 function roundRectPath(
@@ -385,23 +385,32 @@ function drawNavarroWatermarkOverlay(
 async function resolveClientePdfInfo(
   orcamento: OrcamentoComItens
 ): Promise<ClientePdfInfo> {
-  if (!orcamento.cliente_id) {
-    return { cnpj: "—", endereco: "—", cidade: "—" };
+  const snapshotCnpj = orcamento.cliente_cnpj?.trim();
+  const snapshotEndereco = orcamento.cliente_endereco?.trim();
+  const snapshotSetor = orcamento.cliente_setor?.trim();
+
+  let cnpj = snapshotCnpj ? formatCNPJ(snapshotCnpj) : null;
+  let endereco = snapshotEndereco || null;
+  let setor = snapshotSetor || null;
+
+  if ((!cnpj || !endereco || !setor) && orcamento.cliente_id) {
+    try {
+      const cliente = await buscarClientePorId(orcamento.cliente_id);
+      if (cliente) {
+        cnpj = cnpj ?? formatCNPJ(cliente.cnpj);
+        endereco = endereco ?? displayValue(cliente.endereco);
+        setor = setor ?? displayValue(cliente.setor);
+      }
+    } catch {
+      // mantém snapshots ou fallback abaixo
+    }
   }
 
-  try {
-    const cliente = await buscarClientePorId(orcamento.cliente_id);
-    if (!cliente) {
-      return { cnpj: "—", endereco: "—", cidade: "—" };
-    }
-    return {
-      cnpj: formatCNPJ(cliente.cnpj),
-      endereco: "—",
-      cidade: "—",
-    };
-  } catch {
-    return { cnpj: "—", endereco: "—", cidade: "—" };
-  }
+  return {
+    cnpj: cnpj ?? "—",
+    endereco: endereco ?? "—",
+    setor: setor ?? "—",
+  };
 }
 
 function displayValue(value: string | null | undefined, fallback = "—"): string {
@@ -1106,19 +1115,20 @@ function drawClientCard(
   const fieldsLeft: [string, string][] = [
     ["Cliente", orcamento.cliente_nome],
     ["CNPJ", clienteInfo.cnpj],
-    ["Contato", displayValue(orcamento.contato)],
-    ["E-mail", displayValue(orcamento.email)],
+    ["Setor", clienteInfo.setor],
+    ["Endereço", clienteInfo.endereco],
   ];
 
   const fieldsRight: [string, string][] = [
+    ["Contato", displayValue(orcamento.contato)],
+    ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
-    ["Endereço", clienteInfo.endereco],
-    ["Cidade", clienteInfo.cidade],
     ["Número de Colaboradores", resolveNumeroColaboradoresOrcamento(orcamento)],
   ];
 
   fieldsLeft.forEach(([label, value], index) => {
     const lineY = rowY + index * rowSpacing;
+    const valueOffset = label === "Endereço" ? 24 : 22;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(CLIENT_LABEL_FONT);
     doc.setTextColor(...SLATE_500);
@@ -1126,7 +1136,7 @@ function drawClientCard(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(CLIENT_VALUE_FONT);
     doc.setTextColor(...SLATE_900);
-    doc.text(String(value).slice(0, 52), col1X + 22, lineY);
+    doc.text(String(value).slice(0, 52), col1X + valueOffset, lineY);
   });
 
   fieldsRight.forEach(([label, value], index) => {

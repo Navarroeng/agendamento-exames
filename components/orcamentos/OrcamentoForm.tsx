@@ -2,7 +2,7 @@ import { RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { RESPONSAVEIS } from "@/lib/constants";
+import { maskCNPJInput } from "@/lib/cnpj";
 import { formatCurrency } from "@/lib/money";
 import { VALIDADE_PROPOSTA_DIAS } from "@/lib/orcamento-validade";
 import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
@@ -57,6 +57,8 @@ export function OrcamentoForm({
   onUpdateItem,
   onApplyValorSugerido,
 }: OrcamentoFormProps) {
+  const clienteBloqueado = Boolean(form.cliente_id.trim());
+
   return (
     <>
       <Panel
@@ -124,10 +126,46 @@ export function OrcamentoForm({
               Cliente <RequiredMark />
             </label>
             <input
-              className="field-input"
+              className={`field-input ${clienteBloqueado ? "bg-[#f8fafc]" : ""}`}
               placeholder="Nome da empresa"
               value={form.cliente_nome}
+              readOnly={clienteBloqueado}
               onChange={(e) => onChange("cliente_nome", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              CNPJ
+            </label>
+            <input
+              className="field-input"
+              placeholder="00.000.000/0000-00"
+              value={form.cliente_cnpj}
+              onChange={(e) =>
+                onChange("cliente_cnpj", maskCNPJInput(e.target.value))
+              }
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Setor
+            </label>
+            <input
+              className="field-input"
+              placeholder="Setor / área"
+              value={form.cliente_setor}
+              onChange={(e) => onChange("cliente_setor", e.target.value)}
+            />
+          </div>
+          <div className="md:col-span-2 lg:col-span-1">
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Endereço
+            </label>
+            <input
+              className="field-input"
+              placeholder="Endereço completo"
+              value={form.cliente_endereco}
+              onChange={(e) => onChange("cliente_endereco", e.target.value)}
             />
           </div>
           <div>
@@ -160,22 +198,6 @@ export function OrcamentoForm({
               value={form.telefone}
               onChange={(e) => onChange("telefone", e.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-navy">
-              Responsável Navarro <RequiredMark />
-            </label>
-            <select
-              className="field-input"
-              value={form.responsavel}
-              onChange={(e) => onChange("responsavel", e.target.value)}
-            >
-              {RESPONSAVEIS.map((nome) => (
-                <option key={nome} value={nome}>
-                  {nome}
-                </option>
-              ))}
-            </select>
           </div>
           <div className="md:col-span-2 lg:col-span-3">
             <label className="mb-1.5 block text-xs font-bold text-navy">

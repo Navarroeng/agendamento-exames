@@ -275,6 +275,11 @@ export interface ClienteInsert {
   cnpj: string;
   procuracao: ClienteProcuracao;
   disponivel_agendamento: boolean;
+  contato?: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  endereco?: string | null;
+  setor?: string | null;
 }
 
 export interface ClienteUpdate {
@@ -282,10 +287,20 @@ export interface ClienteUpdate {
   cnpj: string;
   procuracao: ClienteProcuracao;
   disponivel_agendamento: boolean;
+  contato?: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  endereco?: string | null;
+  setor?: string | null;
 }
 
 export interface ClienteRecord extends ClienteInsert {
   id: string;
+  contato?: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  endereco?: string | null;
+  setor?: string | null;
   created_at?: string | null;
 }
 

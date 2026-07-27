@@ -70,6 +70,9 @@ export interface OrcamentoRecord {
   data_proposta: string;
   cliente_id: string | null;
   cliente_nome: string;
+  cliente_cnpj: string | null;
+  cliente_endereco: string | null;
+  cliente_setor: string | null;
   contato: string | null;
   email: string | null;
   telefone: string | null;
@@ -121,10 +124,12 @@ export interface OrcamentoFormValues {
   data_proposta: string;
   cliente_id: string;
   cliente_nome: string;
+  cliente_cnpj: string;
+  cliente_endereco: string;
+  cliente_setor: string;
   contato: string;
   email: string;
   telefone: string;
-  responsavel: string;
   observacoes: string;
   forma_pagamento: string;
   status: OrcamentoStatus;
@@ -145,6 +150,9 @@ export interface OrcamentoInsertPayload {
   data_proposta: string;
   cliente_id: string | null;
   cliente_nome: string;
+  cliente_cnpj: string | null;
+  cliente_endereco: string | null;
+  cliente_setor: string | null;
   contato: string | null;
   email: string | null;
   telefone: string | null;

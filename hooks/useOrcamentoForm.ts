@@ -29,6 +29,8 @@ import type {
   OrcamentoInsertPayload,
   OrcamentoItemFormItem,
 } from "@/lib/orcamento-types";
+import type { ClienteRecord } from "@/lib/types";
+import { maskCNPJInput } from "@/lib/cnpj";
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
 
@@ -126,6 +128,26 @@ export function useOrcamentoForm() {
     [updateItem]
   );
 
+  const applyClienteSelection = useCallback((cliente: ClienteRecord | null) => {
+    setForm((prev) => {
+      if (!cliente) {
+        return { ...prev, cliente_id: "" };
+      }
+
+      return {
+        ...prev,
+        cliente_id: cliente.id,
+        cliente_nome: cliente.nome,
+        cliente_cnpj: maskCNPJInput(cliente.cnpj ?? ""),
+        cliente_endereco: cliente.endereco ?? "",
+        cliente_setor: cliente.setor ?? "",
+        contato: cliente.contato ?? "",
+        email: cliente.email ?? "",
+        telefone: cliente.telefone ?? "",
+      };
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setForm(getEmptyOrcamentoForm());
   }, []);
@@ -143,10 +165,12 @@ export function useOrcamentoForm() {
       data_proposta: orcamento.data_proposta.split("T")[0],
       cliente_id: orcamento.cliente_id ?? "",
       cliente_nome: orcamento.cliente_nome,
+      cliente_cnpj: orcamento.cliente_cnpj ?? "",
+      cliente_endereco: orcamento.cliente_endereco ?? "",
+      cliente_setor: orcamento.cliente_setor ?? "",
       contato: orcamento.contato ?? "",
       email: orcamento.email ?? "",
       telefone: orcamento.telefone ?? "",
-      responsavel: orcamento.responsavel,
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
       status: orcamento.status,
@@ -180,7 +204,8 @@ export function useOrcamentoForm() {
     return { subtotal, valorTotal, condicoesPagamento, validadeProposta };
   }, [form.data_proposta, form.itens]);
 
-  const buildPayload = useCallback((): OrcamentoInsertPayload => {
+  const buildPayload = useCallback(
+    (responsavel: string): OrcamentoInsertPayload => {
     const itens = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
@@ -204,10 +229,13 @@ export function useOrcamentoForm() {
       data_proposta: form.data_proposta,
       cliente_id: form.cliente_id.trim() || null,
       cliente_nome: form.cliente_nome.trim(),
+      cliente_cnpj: emptyToNull(maskCNPJInput(form.cliente_cnpj.trim())),
+      cliente_endereco: emptyToNull(form.cliente_endereco),
+      cliente_setor: emptyToNull(normalizeUppercaseField(form.cliente_setor)),
       contato: emptyToNull(normalizeUppercaseField(form.contato)),
       email: emptyToNull(form.email),
       telefone: emptyToNull(form.telefone),
-      responsavel: normalizeUppercaseField(form.responsavel),
+      responsavel: normalizeUppercaseField(responsavel),
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual: 0,
       forma_pagamento: null,
@@ -217,14 +245,13 @@ export function useOrcamentoForm() {
       status: form.status,
       itens,
     };
-  }, [form, totals.subtotal, totals.valorTotal]);
+  },
+    [form, totals.subtotal, totals.valorTotal]
+  );
 
   const getValidationError = useCallback((): string | null => {
     if (form.cliente_nome.trim() === "") {
       return "Informe o cliente.";
-    }
-    if (form.responsavel.trim() === "") {
-      return "Informe o responsável Navarro.";
     }
     if (!form.data_proposta.trim()) {
       return "Informe a data da proposta.";
@@ -262,6 +289,7 @@ export function useOrcamentoForm() {
     removeItem,
     updateItem,
     applyServicoSugerido,
+    applyClienteSelection,
     reset,
     loadForm,
     buildPayload,

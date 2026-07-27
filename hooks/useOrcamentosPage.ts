@@ -41,6 +41,7 @@ export function useOrcamentosPage() {
   const [filters, setFilters] = useState<OrcamentoFilters>(
     EMPTY_ORCAMENTO_FILTERS
   );
+  const [editingResponsavel, setEditingResponsavel] = useState("");
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes } = useClientesList();
@@ -55,6 +56,7 @@ export function useOrcamentosPage() {
     removeItem,
     updateItem,
     applyServicoSugerido,
+    applyClienteSelection,
     reset,
     loadForm,
     buildPayload,
@@ -71,6 +73,7 @@ export function useOrcamentosPage() {
   const resetForm = useCallback(() => {
     reset();
     setEditingId(null);
+    setEditingResponsavel("");
   }, [reset]);
 
   const closeForm = useCallback(() => {
@@ -105,6 +108,7 @@ export function useOrcamentosPage() {
           return;
         }
         loadForm(orcamento);
+        setEditingResponsavel(orcamento.responsavel);
         setEditingId(id);
         setShowForm(true);
         requestAnimationFrame(() => {
@@ -152,7 +156,9 @@ export function useOrcamentosPage() {
 
     setSaving(true);
     try {
-      const payload = buildPayload();
+      const payload = buildPayload(
+        editingId ? editingResponsavel : auditContext.usuarioNome
+      );
       const isEditing = Boolean(editingId);
 
       const saved = isEditing
@@ -191,6 +197,7 @@ export function useOrcamentosPage() {
     buildPayload,
     closeForm,
     editingId,
+    editingResponsavel,
     getValidationError,
     refresh,
     setSaving,
@@ -200,7 +207,7 @@ export function useOrcamentosPage() {
     async (id: string) => {
       setActionLoading(true);
       try {
-        const copia = await duplicarOrcamento(id);
+        const copia = await duplicarOrcamento(id, auditContext.usuarioNome);
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
@@ -301,13 +308,14 @@ export function useOrcamentosPage() {
 
   const handleSelectCliente = useCallback(
     (clienteId: string) => {
-      const cliente = clientes.find((item) => item.id === clienteId);
-      setField("cliente_id", clienteId);
-      if (cliente) {
-        setField("cliente_nome", cliente.nome);
+      if (!clienteId) {
+        applyClienteSelection(null);
+        return;
       }
+      const cliente = clientes.find((item) => item.id === clienteId);
+      applyClienteSelection(cliente ?? null);
     },
-    [clientes, setField]
+    [applyClienteSelection, clientes]
   );
 
   return {

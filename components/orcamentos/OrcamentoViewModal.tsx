@@ -61,6 +61,9 @@ export function OrcamentoViewModal({
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         {[
           ["Cliente", orcamento.cliente_nome],
+          ["CNPJ", orcamento.cliente_cnpj ?? "—"],
+          ["Setor", orcamento.cliente_setor ?? "—"],
+          ["Endereço", orcamento.cliente_endereco ?? "—"],
           ["Contato", orcamento.contato ?? "—"],
           ["E-mail", orcamento.email ?? "—"],
           ["Telefone", orcamento.telefone ?? "—"],

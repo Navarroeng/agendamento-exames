@@ -1,4 +1,3 @@
-import { RESPONSAVEIS } from "@/lib/constants";
 import { formatDateIsoToBR, maskDateBR } from "@/lib/agendamento-datetime";
 import type {
   OrcamentoFormValues,
@@ -24,10 +23,12 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     data_proposta: hoje,
     cliente_id: "",
     cliente_nome: "",
+    cliente_cnpj: "",
+    cliente_endereco: "",
+    cliente_setor: "",
     contato: "",
     email: "",
     telefone: "",
-    responsavel: RESPONSAVEIS[0] ?? "",
     observacoes: "",
     forma_pagamento: "",
     status: "em_elaboracao",

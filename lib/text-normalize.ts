@@ -60,7 +60,7 @@ export const UPPERCASE_FIELDS_BY_MODULE = {
     "rua",
     "responsavel",
   ],
-  orcamento: ["contato", "responsavel"],
+  orcamento: ["contato", "cliente_setor"],
 } as const;
 
 export type UppercaseFieldModule = keyof typeof UPPERCASE_FIELDS_BY_MODULE;

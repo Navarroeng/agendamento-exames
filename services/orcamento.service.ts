@@ -102,6 +102,9 @@ export async function criarOrcamento(
       data_proposta: normalized.data_proposta,
       cliente_id: normalized.cliente_id,
       cliente_nome: normalized.cliente_nome,
+      cliente_cnpj: normalized.cliente_cnpj,
+      cliente_endereco: normalized.cliente_endereco,
+      cliente_setor: normalized.cliente_setor,
       contato: normalized.contato,
       email: normalized.email,
       telefone: normalized.telefone,
@@ -140,6 +143,9 @@ export async function atualizarOrcamento(
       data_proposta: normalized.data_proposta,
       cliente_id: normalized.cliente_id,
       cliente_nome: normalized.cliente_nome,
+      cliente_cnpj: normalized.cliente_cnpj,
+      cliente_endereco: normalized.cliente_endereco,
+      cliente_setor: normalized.cliente_setor,
       contato: normalized.contato,
       email: normalized.email,
       telefone: normalized.telefone,
@@ -171,7 +177,8 @@ export async function atualizarOrcamento(
 }
 
 export async function duplicarOrcamento(
-  id: string
+  id: string,
+  responsavel: string
 ): Promise<OrcamentoComItens> {
   const original = await buscarOrcamentoComItens(id);
   if (!original) throw new Error("Orçamento não encontrado.");
@@ -184,10 +191,13 @@ export async function duplicarOrcamento(
     data_proposta: hoje,
     cliente_id: original.cliente_id,
     cliente_nome: original.cliente_nome,
+    cliente_cnpj: original.cliente_cnpj,
+    cliente_endereco: original.cliente_endereco,
+    cliente_setor: original.cliente_setor,
     contato: original.contato,
     email: original.email,
     telefone: original.telefone,
-    responsavel: original.responsavel,
+    responsavel,
     observacoes: original.observacoes,
     desconto_percentual: 0,
     forma_pagamento: original.forma_pagamento,
