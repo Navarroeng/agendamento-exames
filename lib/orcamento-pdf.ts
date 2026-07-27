@@ -49,7 +49,9 @@ const CARD_BODY_PAD = 4;
 const FINANCIAL_CARD_HEADER_H = 12;
 const FINANCIAL_CARD_BODY_PAD = 5.5;
 const FINANCIAL_ROW_ICON_W = 4;
-const COLON_VALUE_GAP = 1.2;
+const FINANCIAL_ROW_SPACING = 4;
+const FINANCIAL_DIVIDER_PAD = 1.5;
+const COLON_VALUE_GAP = 1.5;
 const CARD_ITEM_GAP = 2.5;
 const INCLUSO_LINE_H = 3.5;
 
@@ -660,9 +662,11 @@ function measureFinancialCardContentHeight(): number {
   return (
     FINANCIAL_CARD_BODY_PAD +
     6.5 +
-    1.8 +
+    FINANCIAL_DIVIDER_PAD +
+    FINANCIAL_ROW_SPACING +
     5.5 +
-    1.8 +
+    FINANCIAL_DIVIDER_PAD +
+    FINANCIAL_ROW_SPACING +
     5 +
     FINANCIAL_CARD_BODY_PAD
   );
@@ -834,8 +838,9 @@ function drawResumoFinanceiroCard(
       rowHeight: 6.5,
     }
   );
-  drawFinancialRowDivider(doc, innerX, lineY - 1.2, innerW);
-  lineY += 1.8;
+  lineY += FINANCIAL_DIVIDER_PAD;
+  drawFinancialRowDivider(doc, innerX, lineY, innerW);
+  lineY += FINANCIAL_ROW_SPACING;
 
   lineY = drawFinancialPremiumRow(
     doc,
@@ -851,8 +856,9 @@ function drawResumoFinanceiroCard(
       rowHeight: 5.5,
     }
   );
-  drawFinancialRowDivider(doc, innerX, lineY - 1.2, innerW);
-  lineY += 1.8;
+  lineY += FINANCIAL_DIVIDER_PAD;
+  drawFinancialRowDivider(doc, innerX, lineY, innerW);
+  lineY += FINANCIAL_ROW_SPACING;
 
   drawFinancialPremiumRow(
     doc,
@@ -872,13 +878,45 @@ function drawResumoFinanceiroCard(
   );
 }
 
+function parseInclusoLabelValue(
+  text: string
+): { label: string; value: string; separator: ": " | " - " } | null {
+  const colonSpaceIdx = text.indexOf(": ");
+  if (colonSpaceIdx > 0) {
+    return {
+      label: text.slice(0, colonSpaceIdx),
+      value: text.slice(colonSpaceIdx + 2).trimStart(),
+      separator: ": ",
+    };
+  }
+
+  const colonIdx = text.indexOf(":");
+  if (colonIdx > 0) {
+    return {
+      label: text.slice(0, colonIdx),
+      value: text.slice(colonIdx + 1).trimStart(),
+      separator: ": ",
+    };
+  }
+
+  const dashIdx = text.indexOf(" - ");
+  if (dashIdx > 0) {
+    return {
+      label: text.slice(0, dashIdx),
+      value: text.slice(dashIdx + 3).trimStart(),
+      separator: " - ",
+    };
+  }
+
+  return null;
+}
+
 function measureStructuredInclusoItemHeight(
   doc: JsPDF,
   text: string,
   textWidth: number
 ): number {
-  const separator = text.includes(": ") ? ": " : text.includes(" - ") ? " - " : null;
-  if (separator) {
+  if (parseInclusoLabelValue(text)) {
     return INCLUSO_LINE_H + CARD_ITEM_GAP;
   }
 
@@ -892,46 +930,29 @@ function drawStructuredInclusoItem(
   x: number,
   y: number,
   textWidth: number,
-  text: string
+  text: string,
+  options?: { emphasis?: boolean }
 ): number {
-  const colonIdx = text.indexOf(": ");
-  const dashIdx = text.indexOf(" - ");
+  const parsed = parseInclusoLabelValue(text);
 
-  if (colonIdx > 0) {
-    const label = text.slice(0, colonIdx);
-    const value = text.slice(colonIdx + 2);
+  if (parsed) {
+    const labelText =
+      parsed.separator === ": " ? `${parsed.label}:` : `${parsed.label} -`;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...NAVY);
-    doc.text(`${label}:`, x, y);
+    doc.text(labelText, x, y);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_700);
     doc.text(
-      value,
-      x + doc.getTextWidth(`${label}:`) + COLON_VALUE_GAP,
+      parsed.value,
+      x + doc.getTextWidth(labelText) + COLON_VALUE_GAP,
       y
     );
     return y + INCLUSO_LINE_H + CARD_ITEM_GAP;
   }
 
-  if (dashIdx > 0) {
-    const label = text.slice(0, dashIdx);
-    const value = text.slice(dashIdx + 3);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(...NAVY);
-    doc.text(`${label}:`, x, y);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...SLATE_700);
-    doc.text(
-      value,
-      x + doc.getTextWidth(`${label}:`) + COLON_VALUE_GAP,
-      y
-    );
-    return y + INCLUSO_LINE_H + CARD_ITEM_GAP;
-  }
-
-  doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", options?.emphasis ? "bold" : "normal");
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_700);
   const lines = doc.splitTextToSize(text, textWidth);
@@ -987,8 +1008,10 @@ function drawPacoteCompletoInclusosBlock(
   const textWidth = width - CARD_PAD_X * 2;
   let itemY = bodyY + CARD_BODY_PAD;
 
-  itens.forEach((item) => {
-    itemY = drawStructuredInclusoItem(doc, textX, itemY, textWidth, item);
+  itens.forEach((item, index) => {
+    itemY = drawStructuredInclusoItem(doc, textX, itemY, textWidth, item, {
+      emphasis: index < 2,
+    });
   });
 
   const obsPadding = 2.5;
