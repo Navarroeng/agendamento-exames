@@ -13,7 +13,6 @@ interface OrcamentoItensSectionProps {
   servicosLoading: boolean;
   servicosError: string | null;
   subtotal: number;
-  descontoPercentual: string;
   valorTotal: number;
   onAdd: () => void;
   onRemove: (id: string) => void;
@@ -35,7 +34,6 @@ export function OrcamentoItensSection({
   servicosLoading,
   servicosError,
   subtotal,
-  descontoPercentual,
   valorTotal,
   onAdd,
   onRemove,
@@ -103,18 +101,6 @@ export function OrcamentoItensSection({
               </td>
               <td className="border-t border-[#eef2f7] px-2.5 py-2 text-xs font-bold text-navy">
                 {formatCurrency(subtotal)}
-              </td>
-              <td className="border-t border-[#eef2f7]" />
-            </tr>
-            <tr className="bg-[#fffbeb]">
-              <td
-                colSpan={2}
-                className="border-t border-[#eef2f7] px-2.5 py-2 text-right text-[11px] font-semibold text-[#64748b]"
-              >
-                Desconto ({descontoPercentual || "0"}%)
-              </td>
-              <td className="border-t border-[#eef2f7] px-2.5 py-2 text-xs font-semibold text-[#b45309]">
-                {formatCurrency(subtotal - valorTotal)}
               </td>
               <td className="border-t border-[#eef2f7]" />
             </tr>

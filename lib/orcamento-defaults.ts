@@ -29,9 +29,7 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     telefone: "",
     responsavel: RESPONSAVEIS[0] ?? "",
     observacoes: "",
-    desconto_percentual: "0",
     forma_pagamento: "",
-    validade_proposta: "",
     status: "em_elaboracao",
     itens: [createEmptyOrcamentoItem()],
   };

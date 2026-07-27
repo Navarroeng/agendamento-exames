@@ -126,9 +126,7 @@ export interface OrcamentoFormValues {
   telefone: string;
   responsavel: string;
   observacoes: string;
-  desconto_percentual: string;
   forma_pagamento: string;
-  validade_proposta: string;
   status: OrcamentoStatus;
   itens: OrcamentoItemFormItem[];
 }

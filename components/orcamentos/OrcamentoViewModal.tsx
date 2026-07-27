@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/Modal";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { resolveItemValorServico } from "@/lib/orcamento-calculo";
 import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import { resolveValidadePropostaIso } from "@/lib/orcamento-validade";
 import { formatCurrency } from "@/lib/money";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -66,14 +67,12 @@ export function OrcamentoViewModal({
           ["Responsável", orcamento.responsavel],
           [
             "Validade",
-            formatDateIsoToBR(orcamento.validade_proposta) || "—",
+            formatDateIsoToBR(
+              resolveValidadePropostaIso(orcamento.data_proposta)
+            ) || "—",
           ],
           ["Pagamento parcelado", condicoesPagamento.textoParcelado],
           ["Valor à vista", condicoesPagamento.textoAVista],
-          [
-            "Desconto",
-            `${Number(orcamento.desconto_percentual).toFixed(2).replace(".", ",")}%`,
-          ],
         ].map(([label, value]) => (
           <div
             key={label}

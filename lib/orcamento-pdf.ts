@@ -1,4 +1,5 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { resolveValidadePropostaIso } from "@/lib/orcamento-validade";
 import {
   calcPdfContentBottomY,
   drawNavarroPremiumFooter,
@@ -975,7 +976,7 @@ function drawHeader(
     { align: "right" }
   );
   doc.text(
-    `Validade: ${formatDateIsoToBR(orcamento.validade_proposta) || "30 dias"}`,
+    `Validade: ${formatDateIsoToBR(resolveValidadePropostaIso(orcamento.data_proposta))}`,
     MARGIN + CONTENT_W - 5,
     metaY + 9,
     { align: "right" }

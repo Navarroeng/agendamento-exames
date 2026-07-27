@@ -90,6 +90,7 @@ export function OrcamentosPage() {
               servicosError={servicosError}
               subtotal={totals.subtotal}
               valorTotal={totals.valorTotal}
+              validadeProposta={totals.validadeProposta}
               condicoesPagamento={totals.condicoesPagamento}
               onChange={setField}
               onSelectCliente={handleSelectCliente}

@@ -1,8 +1,10 @@
 import { RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { RESPONSAVEIS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/money";
+import { VALIDADE_PROPOSTA_DIAS } from "@/lib/orcamento-validade";
 import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import type { OrcamentoFormField } from "@/hooks/useOrcamentoForm";
 import {
@@ -22,6 +24,7 @@ interface OrcamentoFormProps {
   servicosError: string | null;
   subtotal: number;
   valorTotal: number;
+  validadeProposta: string;
   condicoesPagamento: CondicoesPagamentoProposta;
   onChange: (field: OrcamentoFormField, value: string) => void;
   onSelectCliente: (clienteId: string) => void;
@@ -45,6 +48,7 @@ export function OrcamentoForm({
   servicosError,
   subtotal,
   valorTotal,
+  validadeProposta,
   condicoesPagamento,
   onChange,
   onSelectCliente,
@@ -193,7 +197,6 @@ export function OrcamentoForm({
           servicosLoading={servicosLoading}
           servicosError={servicosError}
           subtotal={subtotal}
-          descontoPercentual={form.desconto_percentual}
           valorTotal={valorTotal}
           onAdd={onAddItem}
           onRemove={onRemoveItem}
@@ -204,33 +207,22 @@ export function OrcamentoForm({
 
       <div className="mt-[18px]">
         <Panel title="Condições comerciais" icon={<IconFileText />}>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 md:grid-cols-3">
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-navy">
-              Desconto (%)
-            </label>
-            <input
-              className="field-input"
-              inputMode="decimal"
-              placeholder="0"
-              value={form.desconto_percentual}
-              onChange={(e) => onChange("desconto_percentual", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-navy">
-              Validade da proposta
-            </label>
-            <input
-              type="date"
-              className="field-input"
-              value={form.validade_proposta}
-              onChange={(e) => onChange("validade_proposta", e.target.value)}
-            />
-          </div>
-        </div>
+        <p className="mb-4 text-[11px] text-[#64748b]">
+          Validade da proposta:{" "}
+          <span className="font-semibold text-navy">
+            {validadeProposta
+              ? formatDateIsoToBR(validadeProposta)
+              : "—"}
+          </span>
+          {validadeProposta ? (
+            <span className="text-[#94a3b8]">
+              {" "}
+              ({VALIDADE_PROPOSTA_DIAS} dias após a data de emissão)
+            </span>
+          ) : null}
+        </p>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
               Pagamento parcelado

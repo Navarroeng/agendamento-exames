@@ -8,13 +8,16 @@ import {
 } from "@/lib/text-normalize";
 import {
   calcSubtotalItens,
-  calcValorTotalOrcamento,
   formatQuantidadeColaboradoresInput,
   parseQuantidadeColaboradores,
   resolveItemValorParaFormulario,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
 import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  calcValidadePropostaIso,
+  resolveValidadePropostaIso,
+} from "@/lib/orcamento-validade";
 import {
   createEmptyOrcamentoItem,
   getEmptyOrcamentoForm,
@@ -145,9 +148,7 @@ export function useOrcamentoForm() {
       telefone: orcamento.telefone ?? "",
       responsavel: orcamento.responsavel,
       observacoes: orcamento.observacoes ?? "",
-      desconto_percentual: String(Number(orcamento.desconto_percentual)),
       forma_pagamento: orcamento.forma_pagamento ?? "",
-      validade_proposta: orcamento.validade_proposta?.split("T")[0] ?? "",
       status: orcamento.status,
       itens:
         itensDb.length > 0
@@ -171,13 +172,13 @@ export function useOrcamentoForm() {
 
   const totals = useMemo(() => {
     const subtotal = calcSubtotalItens(form.itens);
-    const valorTotal = calcValorTotalOrcamento(
-      subtotal,
-      form.desconto_percentual
-    );
+    const valorTotal = subtotal;
     const condicoesPagamento = calcCondicoesPagamentoProposta(valorTotal);
-    return { subtotal, valorTotal, condicoesPagamento };
-  }, [form.desconto_percentual, form.itens]);
+    const validadeProposta = form.data_proposta.trim()
+      ? calcValidadePropostaIso(form.data_proposta)
+      : "";
+    return { subtotal, valorTotal, condicoesPagamento, validadeProposta };
+  }, [form.data_proposta, form.itens]);
 
   const buildPayload = useCallback((): OrcamentoInsertPayload => {
     const itens = form.itens
@@ -196,7 +197,7 @@ export function useOrcamentoForm() {
         };
       });
 
-    const validadeIso = form.validade_proposta.trim() || null;
+    const validadeIso = resolveValidadePropostaIso(form.data_proposta);
 
     return {
       numero: form.numero.trim(),
@@ -208,8 +209,7 @@ export function useOrcamentoForm() {
       telefone: emptyToNull(form.telefone),
       responsavel: normalizeUppercaseField(form.responsavel),
       observacoes: emptyToNull(form.observacoes),
-      desconto_percentual:
-        Number(String(form.desconto_percentual).replace(",", ".")) || 0,
+      desconto_percentual: 0,
       forma_pagamento: null,
       validade_proposta: validadeIso,
       subtotal: totals.subtotal,

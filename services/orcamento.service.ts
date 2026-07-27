@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { calcValidadePropostaIso } from "@/lib/orcamento-validade";
 import type {
   OrcamentoComItens,
   OrcamentoInsertPayload,
@@ -9,6 +10,17 @@ const ORCAMENTO_SELECT = `
   *,
   orcamento_itens (*)
 `;
+
+function normalizeOrcamentoPayload(
+  payload: OrcamentoInsertPayload
+): OrcamentoInsertPayload {
+  return {
+    ...payload,
+    desconto_percentual: 0,
+    validade_proposta: calcValidadePropostaIso(payload.data_proposta),
+    valor_total: payload.subtotal,
+  };
+}
 
 function sortItens(orcamento: OrcamentoComItens): OrcamentoComItens {
   return {
@@ -78,28 +90,29 @@ async function inserirItens(
 export async function criarOrcamento(
   payload: OrcamentoInsertPayload
 ): Promise<OrcamentoComItens> {
+  const normalized = normalizeOrcamentoPayload(payload);
   const supabase = createClient();
   const numero =
-    payload.numero.trim() || (await gerarNumeroOrcamento());
+    normalized.numero.trim() || (await gerarNumeroOrcamento());
 
   const { data, error } = await supabase
     .from("orcamentos")
     .insert({
       numero,
-      data_proposta: payload.data_proposta,
-      cliente_id: payload.cliente_id,
-      cliente_nome: payload.cliente_nome,
-      contato: payload.contato,
-      email: payload.email,
-      telefone: payload.telefone,
-      responsavel: payload.responsavel,
-      observacoes: payload.observacoes,
-      desconto_percentual: payload.desconto_percentual,
-      forma_pagamento: payload.forma_pagamento,
-      validade_proposta: payload.validade_proposta,
-      subtotal: payload.subtotal,
-      valor_total: payload.valor_total,
-      status: payload.status,
+      data_proposta: normalized.data_proposta,
+      cliente_id: normalized.cliente_id,
+      cliente_nome: normalized.cliente_nome,
+      contato: normalized.contato,
+      email: normalized.email,
+      telefone: normalized.telefone,
+      responsavel: normalized.responsavel,
+      observacoes: normalized.observacoes,
+      desconto_percentual: normalized.desconto_percentual,
+      forma_pagamento: normalized.forma_pagamento,
+      validade_proposta: normalized.validade_proposta,
+      subtotal: normalized.subtotal,
+      valor_total: normalized.valor_total,
+      status: normalized.status,
     })
     .select("*")
     .single();
@@ -107,7 +120,7 @@ export async function criarOrcamento(
   if (error) throw error;
 
   const orcamento = data as OrcamentoRecord;
-  await inserirItens(orcamento.id, payload.itens);
+  await inserirItens(orcamento.id, normalized.itens);
 
   const completo = await buscarOrcamentoComItens(orcamento.id);
   if (!completo) throw new Error("Orçamento não encontrado após criação.");
@@ -118,25 +131,26 @@ export async function atualizarOrcamento(
   id: string,
   payload: OrcamentoInsertPayload
 ): Promise<OrcamentoComItens> {
+  const normalized = normalizeOrcamentoPayload(payload);
   const supabase = createClient();
 
   const { error: updateError } = await supabase
     .from("orcamentos")
     .update({
-      data_proposta: payload.data_proposta,
-      cliente_id: payload.cliente_id,
-      cliente_nome: payload.cliente_nome,
-      contato: payload.contato,
-      email: payload.email,
-      telefone: payload.telefone,
-      responsavel: payload.responsavel,
-      observacoes: payload.observacoes,
-      desconto_percentual: payload.desconto_percentual,
-      forma_pagamento: payload.forma_pagamento,
-      validade_proposta: payload.validade_proposta,
-      subtotal: payload.subtotal,
-      valor_total: payload.valor_total,
-      status: payload.status,
+      data_proposta: normalized.data_proposta,
+      cliente_id: normalized.cliente_id,
+      cliente_nome: normalized.cliente_nome,
+      contato: normalized.contato,
+      email: normalized.email,
+      telefone: normalized.telefone,
+      responsavel: normalized.responsavel,
+      observacoes: normalized.observacoes,
+      desconto_percentual: normalized.desconto_percentual,
+      forma_pagamento: normalized.forma_pagamento,
+      validade_proposta: normalized.validade_proposta,
+      subtotal: normalized.subtotal,
+      valor_total: normalized.valor_total,
+      status: normalized.status,
     })
     .eq("id", id);
 
@@ -149,7 +163,7 @@ export async function atualizarOrcamento(
 
   if (deleteError) throw deleteError;
 
-  await inserirItens(id, payload.itens);
+  await inserirItens(id, normalized.itens);
 
   const completo = await buscarOrcamentoComItens(id);
   if (!completo) throw new Error("Orçamento não encontrado após atualização.");
@@ -175,11 +189,11 @@ export async function duplicarOrcamento(
     telefone: original.telefone,
     responsavel: original.responsavel,
     observacoes: original.observacoes,
-    desconto_percentual: Number(original.desconto_percentual),
+    desconto_percentual: 0,
     forma_pagamento: original.forma_pagamento,
-    validade_proposta: original.validade_proposta,
+    validade_proposta: calcValidadePropostaIso(hoje),
     subtotal: Number(original.subtotal),
-    valor_total: Number(original.valor_total),
+    valor_total: Number(original.subtotal),
     status: "em_elaboracao",
     itens: (original.orcamento_itens ?? []).map((item, index) => ({
       servico_id: item.servico_id,
