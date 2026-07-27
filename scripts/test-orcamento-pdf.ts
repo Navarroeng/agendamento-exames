@@ -125,6 +125,40 @@ const comExames = buildPacoteCompletoInclusosItens({
 assert.ok(comExames.includes("Exames Clínicos: 3"));
 assert.ok(!comExames.some((item) => /PGR/.test(item)));
 
+function resolveNumeroColaboradoresOrcamento(
+  orcamento: Pick<OrcamentoComItens, "orcamento_itens">
+): string {
+  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
+    (a, b) => a.ordem - b.ordem
+  );
+  if (itens.length === 0) return "—";
+
+  const pacoteItem = itens.find((item) =>
+    isPacoteCompletoSst(item.servico_nome)
+  );
+  const referencia = pacoteItem ?? itens[0];
+  const quantidade = Number(referencia.quantidade);
+  return Number.isFinite(quantidade) ? String(quantidade) : "—";
+}
+
+assert.equal(
+  resolveNumeroColaboradoresOrcamento({
+    orcamento_itens: [
+      {
+        id: "1",
+        orcamento_id: "o1",
+        servico_id: null,
+        servico_nome: PACOTE_COMPLETO_SST_NOME,
+        quantidade: 25,
+        valor_unitario: 1000,
+        valor_total: 25000,
+        ordem: 0,
+      },
+    ],
+  }),
+  "25"
+);
+
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
 const CONTENT_W = 210 - MARGIN * 2;

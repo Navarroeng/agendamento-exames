@@ -114,6 +114,29 @@ function buildPacoteCompletoInclusosItens(
   return itens;
 }
 
+function formatQuantidadeOrcamento(quantidade: number): string {
+  if (!Number.isFinite(quantidade)) return "—";
+  if (Number.isInteger(quantidade)) return String(quantidade);
+  return String(quantidade).replace(".", ",");
+}
+
+function resolveNumeroColaboradoresOrcamento(
+  orcamento: OrcamentoComItens
+): string {
+  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
+    (a, b) => a.ordem - b.ordem
+  );
+  if (itens.length === 0) return "—";
+
+  const pacoteItem = itens.find(
+    (item) =>
+      isPacoteCompletoSst(item.servico_nome) ||
+      isPacoteCompletoNome(item.servico_nome)
+  );
+  const referencia = pacoteItem ?? itens[0];
+  return formatQuantidadeOrcamento(Number(referencia.quantidade));
+}
+
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
 
@@ -513,7 +536,7 @@ function drawClientCard(
     ["Telefone", displayValue(orcamento.telefone)],
     ["Endereço", clienteInfo.endereco],
     ["Cidade", clienteInfo.cidade],
-    ["Responsável Navarro", orcamento.responsavel],
+    ["Número de Colaboradores", resolveNumeroColaboradoresOrcamento(orcamento)],
   ];
 
   doc.setFontSize(7);
@@ -530,12 +553,13 @@ function drawClientCard(
 
   fieldsRight.forEach(([label, value], index) => {
     const lineY = rowY + index * rowSpacing;
+    const valueOffset = label === "Número de Colaboradores" ? 38 : 28;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...SLATE_500);
     doc.text(label, col2X, lineY);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
-    doc.text(String(value).slice(0, 52), col2X + 28, lineY);
+    doc.text(String(value).slice(0, 52), col2X + valueOffset, lineY);
   });
 
   return y + cardH + 6;
