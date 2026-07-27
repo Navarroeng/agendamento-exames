@@ -262,7 +262,7 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       );
     }
 
-    const maxMm = 26;
+    const maxMm = 31.2;
     const ratio = loaded.w / loaded.h;
     let width = maxMm;
     let height = width / ratio;
