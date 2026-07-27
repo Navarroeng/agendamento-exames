@@ -34,13 +34,16 @@ const SLATE_700: [number, number, number] = [51, 65, 85];
 const SLATE_900: [number, number, number] = [15, 23, 42];
 const CHECK_GREEN: [number, number, number] = [22, 101, 52];
 
-const PREMIUM_CARD_RADIUS = 3;
+const PREMIUM_CARD_RADIUS = 1.5;
 const PREMIUM_CARD_HEADER_H = 8;
 const PREMIUM_CARD_PADDING = 3.5;
 const CHECKLIST_ITEM_GAP = 1.6;
 const CHECKLIST_LINE_HEIGHT = 3.25;
 const PREMIUM_CARD_BODY_FILL = GOLD_BG;
 const OBS_BOX_FILL: RGB = [248, 238, 218];
+
+/** ~20 px entre o fim de um card e o título da próxima seção. */
+const SECTION_AFTER_CARD_GAP = 7;
 
 const MARGIN = 12;
 const PAGE_W = 210;
@@ -58,10 +61,11 @@ const LOGO_BG_RADIUS_PX = 10;
 const CLIENT_LABEL_FONT = 8;
 const CLIENT_VALUE_FONT = 8.5;
 const TABLE_HEAD_FONT = 8.5;
-const TABLE_SERVICE_FONT = 8.5;
-const TABLE_DETAIL_FONT = 7.5;
+const TABLE_SERVICE_FONT = 9.5;
+const TABLE_DETAIL_FONT = 8;
 const TABLE_CELL_FONT = 8.5;
-const TABLE_DETAIL_LINE_H = 2.85;
+const TABLE_DETAIL_LINE_H = 3;
+const TABLE_ROW_BOTTOM_PAD = 5;
 const NAVARRO_SYMBOL_URL = "/apple-touch-icon.png";
 
 const NAVARRO = {
@@ -329,14 +333,6 @@ export function calcOrcamentoWatermarkLayout(
   return { x, y, w, h };
 }
 
-function measureDescricaoSectionHeight(
-  doc: JsPDF,
-  paragrafos: readonly string[]
-): number {
-  if (paragrafos.length === 0) return 0;
-  return 7 + measureDescricaoPropostaHeight(doc, paragrafos) + 6;
-}
-
 function drawNavarroWatermarkOverlay(
   doc: JsPDF,
   symbol: LogoAsset,
@@ -411,6 +407,42 @@ function drawCard(
   doc.roundedRect(x, y, w, h, radius, radius, "FD");
 }
 
+function drawCardWithSoftShadow(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  options?: { fill?: RGB; stroke?: RGB; radius?: number }
+) {
+  const radius = options?.radius ?? 2.5;
+  doc.setFillColor(220, 226, 235);
+  doc.roundedRect(x + 0.35, y + 0.5, w, h, radius, radius, "F");
+  drawCard(doc, x, y, w, h, options);
+}
+
+function drawThinDivider(doc: JsPDF, x: number, y: number, w: number): void {
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.2);
+  doc.line(x, y, x + w, y);
+}
+
+function drawDiscountBadge(doc: JsPDF, x: number, y: number, text: string): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(5.5);
+  const textW = doc.getTextWidth(text);
+  const padX = 2;
+  const badgeW = textW + padX * 2;
+  const badgeH = 4;
+  doc.setFillColor(...GOLD_BG);
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.15);
+  doc.roundedRect(x - badgeW / 2, y - badgeH + 1, badgeW, badgeH, 0.8, 0.8, "FD");
+  doc.setTextColor(...GOLD);
+  doc.text(text, x, y - 0.5, { align: "center" });
+  return badgeH + 2;
+}
+
 function drawSectionTitle(
   doc: JsPDF,
   y: number,
@@ -433,7 +465,23 @@ function drawSectionTitle(
 }
 
 function measureFinancialCardContentHeight(): number {
-  return 4 + 12 + 4 + 3 + 9.5 + 4 + 3 + 9 + 2;
+  return (
+    4 +
+    3 +
+    12 +
+    3.5 +
+    0.5 +
+    3.5 +
+    3 +
+    10 +
+    3.5 +
+    0.5 +
+    3.5 +
+    3 +
+    5 +
+    10 +
+    6
+  );
 }
 
 export function resolveFirstPageCardsRow(
@@ -581,57 +629,62 @@ function drawResumoFinanceiroCard(
   const innerX = x + PREMIUM_CARD_PADDING;
   const innerW = w - PREMIUM_CARD_PADDING * 2;
   const contentTop = y + PREMIUM_CARD_HEADER_H;
-  const contentH = measureFinancialCardContentHeight();
-  const bodyH = h - PREMIUM_CARD_HEADER_H;
-  let lineY = contentTop + Math.max(PREMIUM_CARD_PADDING, (bodyH - contentH) / 2);
+  let lineY = contentTop + 4;
 
   const valorTotal = Number(orcamento.valor_total);
   const pagamento = calcCondicoesPagamentoProposta(valorTotal);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(...SLATE_500);
-  doc.text("Valor Total", centerX, lineY, { align: "center" });
-  lineY += 4;
+  doc.text("VALOR TOTAL", centerX, lineY, { align: "center" });
+  lineY += 3.5;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
+  doc.setFontSize(13);
   doc.setTextColor(...NAVY);
   doc.text(formatCurrency(valorTotal), centerX, lineY, { align: "center" });
-  lineY += 6;
+  lineY += 5;
 
-  doc.setDrawColor(...SLATE_200);
-  doc.setLineWidth(0.2);
-  doc.line(innerX, lineY, innerX + innerW, lineY);
-  lineY += 4;
+  drawThinDivider(doc, innerX, lineY, innerW);
+  lineY += 3.5;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SLATE_500);
   doc.text("Pagamento parcelado", centerX, lineY, { align: "center" });
-  lineY += 3.5;
+  lineY += 4;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
+  doc.setFontSize(10.5);
   doc.setTextColor(...NAVY);
   doc.text(pagamento.textoParcelado, centerX, lineY, { align: "center" });
-  lineY += 5.5;
+  lineY += 6;
 
-  doc.setDrawColor(...SLATE_200);
-  doc.setLineWidth(0.2);
-  doc.line(innerX, lineY, innerX + innerW, lineY);
-  lineY += 4;
+  drawThinDivider(doc, innerX, lineY, innerW);
+  lineY += 3.5;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SLATE_500);
-  doc.text("Valor à vista", centerX, lineY, { align: "center" });
+  doc.text("À vista com 5% de desconto", centerX, lineY, { align: "center" });
   lineY += 3.5;
+  lineY += drawDiscountBadge(doc, centerX, lineY, "5% de desconto");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...SLATE_700);
+  doc.setFontSize(11);
+  doc.setTextColor(...GOLD);
   doc.text(pagamento.textoAVista, centerX, lineY, { align: "center" });
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(5.5);
+  doc.setTextColor(...SLATE_500);
+  doc.text(
+    "Valores sujeitos à validade da proposta.",
+    centerX,
+    y + h - 3,
+    { align: "center" }
+  );
 }
 
 function measurePacoteCompletoInclusosBlockHeight(
@@ -889,14 +942,10 @@ function drawClientCard(
   const rowSpacing = 5.5;
   const cardPaddingTop = 5;
   const cardH = cardPaddingTop + rowSpacing * 3 + 3.5;
-  drawCard(doc, MARGIN, y, CONTENT_W, cardH, {
+  drawCardWithSoftShadow(doc, MARGIN, y, CONTENT_W, cardH, {
     fill: WHITE,
     stroke: SLATE_200,
   });
-
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.8);
-  doc.line(MARGIN, y, MARGIN, y + cardH);
 
   const col1X = MARGIN + 6;
   const col2X = MARGIN + CONTENT_W / 2 + 2;
@@ -941,7 +990,7 @@ function drawClientCard(
     doc.text(String(value).slice(0, 52), col2X + valueOffset, lineY);
   });
 
-  return y + cardH + 4;
+  return y + cardH + SECTION_AFTER_CARD_GAP;
 }
 
 function measureDesiredCardsRowHeight(
@@ -1021,7 +1070,7 @@ function drawDescricaoProposta(
     textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 2 : 0);
   });
 
-  return y + blockH + 4;
+  return y + blockH + SECTION_AFTER_CARD_GAP;
 }
 
 /* ── Tabela de serviços ────────────────────────────────────────── */
@@ -1038,7 +1087,7 @@ function measureInclusosBlockHeight(
     const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
     height += wrapped.length * TABLE_DETAIL_LINE_H;
   });
-  return height;
+  return height + TABLE_ROW_BOTTOM_PAD;
 }
 
 function estimateServiceRowHeight(
@@ -1063,7 +1112,7 @@ function estimateServiceRowHeight(
     const lines = doc.splitTextToSize(descricao, serviceColWidth - 4);
     h += lines.length * TABLE_DETAIL_LINE_H + 1.5;
   }
-  return h;
+  return h + TABLE_ROW_BOTTOM_PAD;
 }
 
 function drawServicesTable(
@@ -1200,7 +1249,7 @@ function drawServicesTable(
   doc.setDrawColor(...SLATE_200);
   doc.roundedRect(MARGIN, y - 0.5, CONTENT_W, 0.5, 0, 0, "S");
 
-  return y + 5;
+  return y + SECTION_AFTER_CARD_GAP;
 }
 
 /* ── Resumo financeiro + checklist (lado a lado) ─────────────────── */
@@ -1245,7 +1294,7 @@ function drawFinancialAndInclusosRow(
 
   drawResumoFinanceiroCard(doc, boxX, cardY, boxW, cardH, orcamento);
 
-  return cardY + cardH + 4;
+  return cardY + cardH + SECTION_AFTER_CARD_GAP;
 }
 
 /* ── Observações ───────────────────────────────────────────────── */
