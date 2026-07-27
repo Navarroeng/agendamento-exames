@@ -35,9 +35,12 @@ const SLATE_900: [number, number, number] = [15, 23, 42];
 const CHECK_GREEN: [number, number, number] = [22, 101, 52];
 
 const PREMIUM_CARD_RADIUS = 3;
-const PREMIUM_CARD_HEADER_H = 9;
-const PREMIUM_CARD_PADDING = 5;
-const CHECKLIST_ITEM_GAP = 4.2;
+const PREMIUM_CARD_HEADER_H = 8;
+const PREMIUM_CARD_PADDING = 3.5;
+const CHECKLIST_ITEM_GAP = 1.6;
+const CHECKLIST_LINE_HEIGHT = 3.25;
+const PREMIUM_CARD_BODY_FILL = GOLD_BG;
+const OBS_BOX_FILL: RGB = [248, 238, 218];
 
 const MARGIN = 12;
 const PAGE_W = 210;
@@ -45,6 +48,7 @@ const PAGE_H = 297;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 const FOOTER_Y = 283;
 const FOOTER_H = 12;
+const FIRST_PAGE_CONTENT_BOTTOM = FOOTER_Y - 3;
 
 /** Opacidade da marca d'água (5–10%). */
 export const ORCAMENTO_WATERMARK_OPACITY = 0.08;
@@ -363,7 +367,20 @@ function drawSectionTitle(
   doc.setLineWidth(0.6);
   doc.line(x, y + 1.5, x + width, y + 1.5);
 
-  return y + 7;
+  return y + 6;
+}
+
+function measureFinancialCardContentHeight(): number {
+  return 4 + 12 + 4 + 3 + 9.5 + 4 + 3 + 9 + 2;
+}
+
+export function resolveFirstPageCardsRow(
+  y: number,
+  desiredH: number
+): { cardY: number; cardH: number } {
+  const available = FIRST_PAGE_CONTENT_BOTTOM - y;
+  const cardH = Math.min(desiredH, Math.max(available, 0));
+  return { cardY: y, cardH };
 }
 
 function resolveCatalogoServico(
@@ -425,7 +442,7 @@ function drawPremiumCardShell(
   title: string,
   options?: { bodyFill?: RGB }
 ): number {
-  const bodyFill = options?.bodyFill ?? WHITE;
+  const bodyFill = options?.bodyFill ?? PREMIUM_CARD_BODY_FILL;
 
   doc.setFillColor(...bodyFill);
   doc.setDrawColor(...SLATE_200);
@@ -477,21 +494,14 @@ function drawChecklistItem(
   doc.setTextColor(...SLATE_700);
   const lines = doc.splitTextToSize(item, textWidth);
   doc.text(lines, x + 4.5, y);
-  return y + lines.length * 3.6 + CHECKLIST_ITEM_GAP;
+  return y + lines.length * CHECKLIST_LINE_HEIGHT + CHECKLIST_ITEM_GAP;
 }
 
 function measureResumoFinanceiroCardHeight(): number {
   return (
     PREMIUM_CARD_HEADER_H +
-    PREMIUM_CARD_PADDING +
-    14 +
-    2 +
-    5 +
-    12 +
-    2 +
-    5 +
-    12 +
-    PREMIUM_CARD_PADDING
+    PREMIUM_CARD_PADDING * 2 +
+    measureFinancialCardContentHeight()
   );
 }
 
@@ -503,66 +513,63 @@ function drawResumoFinanceiroCard(
   h: number,
   orcamento: OrcamentoComItens
 ): void {
-  const contentY = drawPremiumCardShell(
-    doc,
-    x,
-    y,
-    w,
-    h,
-    "Resumo Financeiro",
-    { bodyFill: WHITE }
-  );
+  drawPremiumCardShell(doc, x, y, w, h, "Resumo Financeiro");
 
+  const centerX = x + w / 2;
   const innerX = x + PREMIUM_CARD_PADDING;
   const innerW = w - PREMIUM_CARD_PADDING * 2;
+  const contentTop = y + PREMIUM_CARD_HEADER_H;
+  const contentH = measureFinancialCardContentHeight();
+  const bodyH = h - PREMIUM_CARD_HEADER_H;
+  let lineY = contentTop + Math.max(PREMIUM_CARD_PADDING, (bodyH - contentH) / 2);
+
   const valorTotal = Number(orcamento.valor_total);
   const pagamento = calcCondicoesPagamentoProposta(valorTotal);
-  let lineY = contentY;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SLATE_500);
-  doc.text("Valor Total", innerX, lineY);
-  lineY += 4.5;
+  doc.text("Valor Total", centerX, lineY, { align: "center" });
+  lineY += 4;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...NAVY);
-  doc.text(formatCurrency(valorTotal), innerX, lineY);
-  lineY += 7;
+  doc.text(formatCurrency(valorTotal), centerX, lineY, { align: "center" });
+  lineY += 6;
 
   doc.setDrawColor(...SLATE_200);
   doc.setLineWidth(0.2);
   doc.line(innerX, lineY, innerX + innerW, lineY);
-  lineY += 5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.8);
-  doc.setTextColor(...SLATE_500);
-  doc.text("Pagamento parcelado", innerX, lineY);
   lineY += 4;
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE_500);
+  doc.text("Pagamento parcelado", centerX, lineY, { align: "center" });
+  lineY += 3.5;
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...SLATE_700);
-  doc.text(pagamento.textoParcelado, innerX, lineY);
-  lineY += 7;
+  doc.setFontSize(9.5);
+  doc.setTextColor(...NAVY);
+  doc.text(pagamento.textoParcelado, centerX, lineY, { align: "center" });
+  lineY += 5.5;
 
   doc.setDrawColor(...SLATE_200);
   doc.setLineWidth(0.2);
   doc.line(innerX, lineY, innerX + innerW, lineY);
-  lineY += 5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.8);
-  doc.setTextColor(...SLATE_500);
-  doc.text("Valor à vista", innerX, lineY);
   lineY += 4;
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE_500);
+  doc.text("Valor à vista", centerX, lineY, { align: "center" });
+  lineY += 3.5;
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(...SLATE_700);
-  doc.text(pagamento.textoAVista, innerX, lineY);
+  doc.text(pagamento.textoAVista, centerX, lineY, { align: "center" });
 }
 
 function measurePacoteCompletoInclusosBlockHeight(
@@ -576,18 +583,17 @@ function measurePacoteCompletoInclusosBlockHeight(
   doc.setFontSize(7.5);
   itens.forEach((item) => {
     const lines = doc.splitTextToSize(item, textWidth);
-    h += lines.length * 3.6 + CHECKLIST_ITEM_GAP;
+    h += lines.length * CHECKLIST_LINE_HEIGHT + CHECKLIST_ITEM_GAP;
   });
 
-  h += 3;
-  h += 4;
-  h += 5;
+  h += 1.5;
+  h += 3.5;
   doc.setFontSize(7);
   PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
-    h += lines.length * 3.5 + 2;
+    h += lines.length * 3.2 + 1.2;
   });
-  h += 5;
+  h += 3;
   h += PREMIUM_CARD_PADDING;
 
   return h;
@@ -601,36 +607,28 @@ function drawPacoteCompletoInclusosBlock(
   height: number,
   itens: string[]
 ): void {
-  const contentY = drawPremiumCardShell(
-    doc,
-    x,
-    y,
-    width,
-    height,
-    "O que está incluso?",
-    { bodyFill: WHITE }
-  );
+  drawPremiumCardShell(doc, x, y, width, height, "O que está incluso?");
 
   const textX = x + PREMIUM_CARD_PADDING;
   const textWidth = width - PREMIUM_CARD_PADDING * 2 - 5;
-  let itemY = contentY;
+  let itemY = y + PREMIUM_CARD_HEADER_H + PREMIUM_CARD_PADDING;
 
   itens.forEach((item) => {
     itemY = drawChecklistItem(doc, textX, itemY, textWidth, item);
   });
 
-  const obsPadding = 3;
-  const obsLabelH = 5;
+  const obsPadding = 2;
+  const obsLabelH = 4;
   doc.setFontSize(7);
   let obsContentH = obsLabelH;
   PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
-    obsContentH += lines.length * 3.5 + 2;
+    obsContentH += lines.length * 3.2 + 1.2;
   });
   const obsBlockH = obsContentH + obsPadding * 2;
   const obsY = y + height - PREMIUM_CARD_PADDING - obsBlockH;
 
-  doc.setFillColor(...SLATE_50);
+  doc.setFillColor(...OBS_BOX_FILL);
   doc.setDrawColor(...SLATE_200);
   doc.setLineWidth(0.2);
   doc.roundedRect(
@@ -643,7 +641,7 @@ function drawPacoteCompletoInclusosBlock(
     "FD"
   );
 
-  let obsTextY = obsY + obsPadding + 3.5;
+  let obsTextY = obsY + obsPadding + 3;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(...SLATE_700);
@@ -656,7 +654,7 @@ function drawPacoteCompletoInclusosBlock(
   PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
     doc.text(lines, textX, obsTextY);
-    obsTextY += lines.length * 3.5 + 2;
+    obsTextY += lines.length * 3.2 + 1.2;
   });
 }
 
@@ -693,7 +691,7 @@ function measureGenericInclusosCardHeight(
   const measureCol = (items: string[]) =>
     items.reduce((sum, item) => {
       const lines = doc.splitTextToSize(item, colW - 5);
-      return sum + lines.length * 3.6 + CHECKLIST_ITEM_GAP;
+      return sum + lines.length * CHECKLIST_LINE_HEIGHT + CHECKLIST_ITEM_GAP;
     }, 0);
   const colH = Math.max(
     measureCol(inclusos.slice(0, itemsPerCol)),
@@ -710,20 +708,13 @@ function drawGenericInclusosCard(
   h: number,
   inclusos: string[]
 ): void {
-  const contentY = drawPremiumCardShell(
-    doc,
-    x,
-    y,
-    w,
-    h,
-    "O que está incluso?",
-    { bodyFill: WHITE }
-  );
+  drawPremiumCardShell(doc, x, y, w, h, "O que está incluso?");
 
   const colW = (w - PREMIUM_CARD_PADDING * 2 - 4) / 2;
   const itemsPerCol = Math.ceil(inclusos.length / 2);
   const leftItems = inclusos.slice(0, itemsPerCol);
   const rightItems = inclusos.slice(itemsPerCol);
+  const contentY = y + PREMIUM_CARD_HEADER_H + PREMIUM_CARD_PADDING;
 
   let leftY = contentY;
   leftItems.forEach((item) => {
@@ -833,9 +824,9 @@ function drawClientCard(
 ): number {
   y = drawSectionTitle(doc, y, "Dados do cliente");
 
-  const rowSpacing = 6;
-  const cardPaddingTop = 5.5;
-  const cardH = cardPaddingTop + rowSpacing * 3 + 4;
+  const rowSpacing = 5.5;
+  const cardPaddingTop = 5;
+  const cardH = cardPaddingTop + rowSpacing * 3 + 3.5;
   drawCard(doc, MARGIN, y, CONTENT_W, cardH, {
     fill: WHITE,
     stroke: SLATE_200,
@@ -886,7 +877,30 @@ function drawClientCard(
     doc.text(String(value).slice(0, 52), col2X + valueOffset, lineY);
   });
 
-  return y + cardH + 6;
+  return y + cardH + 4;
+}
+
+function measureDesiredCardsRowHeight(
+  doc: JsPDF,
+  checklistW: number,
+  hasPacote: boolean,
+  pacoteItens: string[],
+  inclusos: string[]
+): number {
+  let inclusosH = 0;
+  if (hasPacote) {
+    inclusosH = measurePacoteCompletoInclusosBlockHeight(
+      doc,
+      checklistW,
+      pacoteItens
+    );
+  } else if (inclusos.length > 0) {
+    inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
+  }
+
+  const financeiroH = measureResumoFinanceiroCardHeight();
+  const hasInclusosCard = hasPacote || inclusos.length > 0;
+  return hasInclusosCard ? Math.max(inclusosH, financeiroH) : financeiroH;
 }
 
 /* ── Descrição da proposta ─────────────────────────────────────── */
@@ -896,7 +910,7 @@ function measureDescricaoPropostaHeight(
 ): number {
   if (paragrafos.length === 0) return 0;
 
-  const cardPadding = 5;
+  const cardPadding = 4;
   const textWidth = CONTENT_W - DESCRICAO_CARD_PADDING_X * 2;
   let h = cardPadding;
 
@@ -943,7 +957,7 @@ function drawDescricaoProposta(
     textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 2 : 0);
   });
 
-  return y + blockH + 6;
+  return y + blockH + 4;
 }
 
 /* ── Tabela de serviços ────────────────────────────────────────── */
@@ -954,11 +968,11 @@ function measureInclusosBlockHeight(
 ): number {
   if (inclusos.length === 0) return 0;
 
-  let height = 3.5;
+  let height = 2.5;
   doc.setFontSize(6.5);
   inclusos.forEach((line) => {
     const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
-    height += wrapped.length * 3.2;
+    height += wrapped.length * 2.8;
   });
   return height;
 }
@@ -975,7 +989,7 @@ function estimateServiceRowHeight(
     isPacoteCompletoNome(servico?.nome ?? item.servico_nome);
 
   if (isPacote && inclusos.length > 0) {
-    return 8 + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
+    return 7 + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
   }
 
   let h = 7;
@@ -1079,13 +1093,13 @@ function drawServicesTable(
       doc.setFontSize(6.5);
       doc.setTextColor(...SLATE_500);
       doc.text("Inclui:", colStarts[0] + 3, detailY);
-      detailY += 3.5;
+      detailY += 2.8;
 
       doc.setFont("helvetica", "normal");
       inclusos.forEach((line) => {
         const wrapped = doc.splitTextToSize(`• ${line}`, colWidths[0] - 4);
         doc.text(wrapped, colStarts[0] + 3, detailY);
-        detailY += wrapped.length * 3.2;
+        detailY += wrapped.length * 2.8;
       });
     } else {
       const descricao = servico?.descricao?.trim();
@@ -1125,7 +1139,7 @@ function drawServicesTable(
   doc.setDrawColor(...SLATE_200);
   doc.roundedRect(MARGIN, y - 0.5, CONTENT_W, 0.5, 0, 0, "S");
 
-  return y + 11;
+  return y + 5;
 }
 
 /* ── Resumo financeiro + checklist (lado a lado) ─────────────────── */
@@ -1146,26 +1160,14 @@ function drawFinancialAndInclusosRow(
     ? buildPacoteCompletoInclusosItens(orcamento)
     : [];
 
-  const financeiroH = measureResumoFinanceiroCardHeight();
-  let inclusosH = 0;
-
-  if (hasPacote) {
-    inclusosH = measurePacoteCompletoInclusosBlockHeight(
-      doc,
-      checklistW,
-      pacoteInclusosItens
-    );
-  } else if (inclusos.length > 0) {
-    inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
-  }
-
-  const hasInclusosCard = hasPacote || inclusos.length > 0;
-  const cardH = hasInclusosCard
-    ? Math.max(inclusosH, financeiroH)
-    : financeiroH;
-
-  y = ensureSpace(doc, y, cardH + 6);
-  const cardY = y;
+  const desiredH = measureDesiredCardsRowHeight(
+    doc,
+    checklistW,
+    hasPacote,
+    pacoteInclusosItens,
+    inclusos
+  );
+  const { cardY, cardH } = resolveFirstPageCardsRow(y, desiredH);
 
   if (hasPacote) {
     drawPacoteCompletoInclusosBlock(
@@ -1182,7 +1184,7 @@ function drawFinancialAndInclusosRow(
 
   drawResumoFinanceiroCard(doc, boxX, cardY, boxW, cardH, orcamento);
 
-  return cardY + cardH + 6;
+  return cardY + cardH + 4;
 }
 
 /* ── Observações ───────────────────────────────────────────────── */

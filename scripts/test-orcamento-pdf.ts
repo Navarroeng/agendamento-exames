@@ -13,6 +13,7 @@ import {
   ORCAMENTO_WATERMARK_OPACITY,
   ORCAMENTO_WATERMARK_WIDTH_RATIO,
   calcOrcamentoWatermarkLayout,
+  resolveFirstPageCardsRow,
 } from "../lib/orcamento-pdf";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
@@ -128,6 +129,11 @@ assert.equal(watermark.w, CONTENT_W * ORCAMENTO_WATERMARK_WIDTH_RATIO);
 assert.equal(watermark.x, (PAGE_W - watermark.w) / 2);
 assert.equal(watermark.x + watermark.w / 2, PAGE_W / 2);
 assert.equal(watermark.h, watermark.w);
+
+const cardsRow = resolveFirstPageCardsRow(248, 58);
+assert.equal(cardsRow.cardY, 248);
+assert.equal(cardsRow.cardH, 32);
+assert.ok(cardsRow.cardY + cardsRow.cardH <= 280);
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
