@@ -71,8 +71,6 @@ export const ORCAMENTO_WATERMARK_OPACITY = 0.06;
 /** Largura da marca d'água em relação à área útil (~2× o tamanho anterior). */
 export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.8;
 const LOGO_BG_RADIUS_PX = 10;
-const LOGO_MAX_H_MM = 22;
-const LOGO_MAX_W_MM = 72;
 const CLIENT_LABEL_FONT = 8;
 const CLIENT_VALUE_FONT = 8.5;
 const TABLE_HEAD_FONT = 8.5;
@@ -255,16 +253,13 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       );
     }
 
+    const maxMm = 26;
     const ratio = loaded.w / loaded.h;
-    let width = LOGO_MAX_W_MM;
+    let width = maxMm;
     let height = width / ratio;
-    if (height > LOGO_MAX_H_MM) {
-      height = LOGO_MAX_H_MM;
+    if (height > maxMm) {
+      height = maxMm;
       width = height * ratio;
-    }
-    if (width > LOGO_MAX_W_MM) {
-      width = LOGO_MAX_W_MM;
-      height = width / ratio;
     }
 
     return { dataUrl: finalDataUrl, width, height };

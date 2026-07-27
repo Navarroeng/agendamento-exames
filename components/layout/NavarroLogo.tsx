@@ -20,12 +20,12 @@ export function NavarroLogo({
   return (
     <Image
       src="/logo-navarro.png"
-      alt="Navarro Engenharia de Segurança do Trabalho e Medicina Ocupacional"
-      width={529}
-      height={140}
+      alt="Navarro Engenharia"
+      width={280}
+      height={64}
       priority={priority}
       style={{ width: "auto" }}
-      className={`max-w-full rounded-[10px] object-contain ${sizeClasses[size]} ${className}`.trim()}
+      className={`max-w-full object-contain ${sizeClasses[size]} ${className}`.trim()}
     />
   );
 }
