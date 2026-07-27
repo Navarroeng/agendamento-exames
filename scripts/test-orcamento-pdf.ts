@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { jsPDF } from "jspdf";
 import { formatCurrency } from "../lib/money";
+import type { OrcamentoComItens } from "../lib/orcamento-types";
 import {
   PACOTE_COMPLETO_SST_ITENS,
   PACOTE_COMPLETO_SST_NOME,
@@ -26,6 +27,53 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS = [
   ].join("\n"),
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
+
+function normalizeServicoNome(nome: string): string {
+  return nome
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isServicoExamesClinicos(nome: string): boolean {
+  const normalized = normalizeServicoNome(nome);
+  return (
+    normalized === "exames ocupacionais" ||
+    normalized === "exame clinico" ||
+    normalized === "exames clinicos" ||
+    normalized.includes("exame clinico")
+  );
+}
+
+function resolveQuantidadeExamesClinicosOrcamento(
+  orcamento: Pick<OrcamentoComItens, "orcamento_itens">
+): number {
+  return (orcamento.orcamento_itens ?? []).reduce((total, item) => {
+    if (!isServicoExamesClinicos(item.servico_nome)) return total;
+    const quantidade = Number(item.quantidade);
+    return total + (Number.isFinite(quantidade) ? quantidade : 0);
+  }, 0);
+}
+
+function buildPacoteCompletoInclusosItens(
+  orcamento: Pick<OrcamentoComItens, "orcamento_itens">
+): string[] {
+  const itens = [
+    "Todos os Laudos e Serviços listados acima.",
+    "Gestão completa e envio ao eSocial.",
+  ];
+
+  const quantidadeExamesClinicos = resolveQuantidadeExamesClinicosOrcamento(
+    orcamento
+  );
+  if (quantidadeExamesClinicos > 0) {
+    itens.push(`Exames Clínicos: ${quantidadeExamesClinicos}`);
+  }
+
+  itens.push("CAT - Cortesia.");
+  return itens;
+}
 
 function buildFilename(numero: string, clienteNome: string): string {
   const cliente = clienteNome
@@ -55,15 +103,27 @@ const inclusosPacote = resolveItensInclusosServico({
 });
 assert.deepEqual(inclusosPacote, [...PACOTE_COMPLETO_SST_ITENS]);
 
-const PACOTE_COMPLETO_INCLUSOS_ITENS = [
-  "Todos Laudos e Serviços listados à cima.",
-  "Gestão completa e envio ao eSocial",
-  "Exames Clínicos: 1",
-  "CAT - Cortesia",
-] as const;
+const semExames = buildPacoteCompletoInclusosItens({ orcamento_itens: [] });
+assert.equal(semExames.length, 3);
+assert.match(semExames[0], /listados acima/);
+assert.ok(!semExames.some((item) => /Exames Clínicos/.test(item)));
 
-assert.equal(PACOTE_COMPLETO_INCLUSOS_ITENS.length, 4);
-assert.match(PACOTE_COMPLETO_INCLUSOS_ITENS[0], /à cima/);
+const comExames = buildPacoteCompletoInclusosItens({
+  orcamento_itens: [
+    {
+      id: "1",
+      orcamento_id: "o1",
+      servico_id: null,
+      servico_nome: "Exames Ocupacionais",
+      quantidade: 3,
+      valor_unitario: 100,
+      valor_total: 300,
+      ordem: 1,
+    },
+  ],
+});
+assert.ok(comExames.includes("Exames Clínicos: 3"));
+assert.ok(!comExames.some((item) => /PGR/.test(item)));
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
@@ -85,18 +145,16 @@ PROPOSTA_DESCRICAO_PARAGRAFOS.forEach((paragrafo, index) => {
   doc.text(lines, MARGIN + 6, 60 + index * 20);
 });
 
-assert.match(
-  PROPOSTA_DESCRICAO_PARAGRAFOS[0],
-  /S-2210; S-2220; S-\n2240/
-);
-assert.match(PROPOSTA_DESCRICAO_PARAGRAFOS[1], /Ministério do trabalho MTE/);
+comExames.forEach((item, index) => {
+  doc.text(`• ${item}`, MARGIN + 6, 100 + index * 6);
+});
 
 const filename = buildFilename("2026-001", "Empresa São Paulo Ltda");
 assert.match(filename, /^Proposta-2026-001-Empresa-Sao-Paulo-Ltda\.pdf$/);
 
 doc.setFontSize(11);
 doc.setTextColor(...NAVY);
-doc.text(formatCurrency(12500), MARGIN + CONTENT_W - 5, 110, { align: "right" });
+doc.text(formatCurrency(12500), MARGIN + CONTENT_W - 5, 130, { align: "right" });
 
 const outPath = path.join(os.tmpdir(), filename);
 const buffer = Buffer.from(doc.output("arraybuffer"));

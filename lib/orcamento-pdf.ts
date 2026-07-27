@@ -8,6 +8,7 @@ import type {
 } from "@/lib/orcamento-types";
 import {
   isPacoteCompletoSst,
+  PACOTE_COMPLETO_SST_NOME,
   resolveItensInclusosServico,
 } from "@/lib/servico-sst-pacote";
 import { buscarClientePorId } from "@/services/cliente.service";
@@ -54,17 +55,64 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
 
-const PACOTE_COMPLETO_INCLUSOS_ITENS: readonly string[] = [
-  "Todos Laudos e Serviços listados à cima.",
-  "Gestão completa e envio ao eSocial",
-  "Exames Clínicos: 1",
-  "CAT - Cortesia",
+const PACOTE_COMPLETO_INCLUSOS_OBSERVACOES: readonly string[] = [
+  "Se necessário, a realização de Exames Complementares será cobrada à parte.",
+  "ASOs adicionais serão cobrados à parte.",
 ] as const;
 
-const PACOTE_COMPLETO_INCLUSOS_OBSERVACOES: readonly string[] = [
-  "Se necessário a realização de Exames\nComplementares serão cobrados à parte.",
-  "ASO's adicionais serão cobrados à parte.",
-] as const;
+function normalizeServicoNome(nome: string): string {
+  return nome
+    .trim()
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isPacoteCompletoNome(nome: string | null | undefined): boolean {
+  return (
+    normalizeServicoNome(nome ?? "") ===
+    normalizeServicoNome(PACOTE_COMPLETO_SST_NOME)
+  );
+}
+
+function isServicoExamesClinicos(nome: string): boolean {
+  const normalized = normalizeServicoNome(nome);
+  return (
+    normalized === "exames ocupacionais" ||
+    normalized === "exame clinico" ||
+    normalized === "exames clinicos" ||
+    normalized.includes("exame clinico")
+  );
+}
+
+function resolveQuantidadeExamesClinicosOrcamento(
+  orcamento: OrcamentoComItens
+): number {
+  return (orcamento.orcamento_itens ?? []).reduce((total, item) => {
+    if (!isServicoExamesClinicos(item.servico_nome)) return total;
+    const quantidade = Number(item.quantidade);
+    return total + (Number.isFinite(quantidade) ? quantidade : 0);
+  }, 0);
+}
+
+function buildPacoteCompletoInclusosItens(
+  orcamento: OrcamentoComItens
+): string[] {
+  const itens = [
+    "Todos os Laudos e Serviços listados acima.",
+    "Gestão completa e envio ao eSocial.",
+  ];
+
+  const quantidadeExamesClinicos = resolveQuantidadeExamesClinicosOrcamento(
+    orcamento
+  );
+  if (quantidadeExamesClinicos > 0) {
+    itens.push(`Exames Clínicos: ${quantidadeExamesClinicos}`);
+  }
+
+  itens.push("CAT - Cortesia.");
+  return itens;
+}
 
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
@@ -213,6 +261,9 @@ function collectAllInclusos(
 
   for (const item of itens) {
     const servico = resolveCatalogoServico(item, catalogo);
+    const nome = servico?.nome ?? item.servico_nome;
+    if (isPacoteCompletoSst(nome) || isPacoteCompletoNome(nome)) continue;
+
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
     for (const line of inclusos) {
       const key = line.trim().toLowerCase();
@@ -232,19 +283,21 @@ function orcamentoHasPacoteCompleto(
   const itens = orcamento.orcamento_itens ?? [];
   return itens.some((item) => {
     const servico = resolveCatalogoServico(item, catalogo);
-    return isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
+    const nome = servico?.nome ?? item.servico_nome;
+    return isPacoteCompletoSst(nome) || isPacoteCompletoNome(nome);
   });
 }
 
 function measurePacoteCompletoInclusosBlockHeight(
   doc: JsPDF,
-  width: number
+  width: number,
+  itens: string[]
 ): number {
   const textWidth = width - 10;
   let h = 8;
 
   doc.setFontSize(7.5);
-  PACOTE_COMPLETO_INCLUSOS_ITENS.forEach((item) => {
+  itens.forEach((item) => {
     const lines = doc.splitTextToSize(`• ${item}`, textWidth);
     h += lines.length * 3.6 + 1.5;
   });
@@ -266,7 +319,8 @@ function drawPacoteCompletoInclusosBlock(
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  itens: string[]
 ): void {
   drawCard(doc, x, y, width, height, {
     fill: GOLD_BG,
@@ -286,7 +340,7 @@ function drawPacoteCompletoInclusosBlock(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...SLATE_700);
-  PACOTE_COMPLETO_INCLUSOS_ITENS.forEach((item) => {
+  itens.forEach((item) => {
     const lines = doc.splitTextToSize(`• ${item}`, textWidth);
     doc.text(lines, textX, itemY);
     itemY += lines.length * 3.6 + 1.5;
@@ -568,7 +622,9 @@ function estimateServiceRowHeight(
   serviceColWidth: number
 ): number {
   const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-  const isPacote = isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
+  const isPacote =
+    isPacoteCompletoSst(servico?.nome ?? item.servico_nome) ||
+    isPacoteCompletoNome(servico?.nome ?? item.servico_nome);
 
   if (isPacote && inclusos.length > 0) {
     return 8 + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
@@ -628,7 +684,9 @@ function drawServicesTable(
   itens.forEach((item, index) => {
     const servico = resolveCatalogoServico(item, catalogo);
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-    const isPacote = isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
+    const isPacote =
+      isPacoteCompletoSst(servico?.nome ?? item.servico_nome) ||
+      isPacoteCompletoNome(servico?.nome ?? item.servico_nome);
     const rowH = estimateServiceRowHeight(
       doc,
       item,
@@ -728,8 +786,16 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
 
   let checklistBlockH = 0;
+  const pacoteInclusosItens = hasPacote
+    ? buildPacoteCompletoInclusosItens(orcamento)
+    : [];
+
   if (hasPacote) {
-    checklistBlockH = measurePacoteCompletoInclusosBlockHeight(doc, checklistW);
+    checklistBlockH = measurePacoteCompletoInclusosBlockHeight(
+      doc,
+      checklistW,
+      pacoteInclusosItens
+    );
   } else if (inclusos.length > 0) {
     doc.setFontSize(7);
     const itemsPerCol = Math.ceil(inclusos.length / 2);
@@ -763,7 +829,8 @@ function drawFinancialAndInclusosRow(
         MARGIN,
         contentY,
         checklistW,
-        checklistBlockH
+        checklistBlockH,
+        pacoteInclusosItens
       );
     } else {
       drawCard(doc, MARGIN, contentY, checklistW, checklistBlockH, {
