@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { resolveItemValorServico } from "@/lib/orcamento-calculo";
+import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -34,6 +35,9 @@ export function OrcamentoViewModal({
     (a, b) => a.ordem - b.ordem
   );
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
+  const condicoesPagamento = calcCondicoesPagamentoProposta(
+    Number(orcamento.valor_total)
+  );
 
   return (
     <Modal
@@ -64,7 +68,8 @@ export function OrcamentoViewModal({
             "Validade",
             formatDateIsoToBR(orcamento.validade_proposta) || "—",
           ],
-          ["Forma de pagamento", orcamento.forma_pagamento ?? "—"],
+          ["Pagamento parcelado", condicoesPagamento.textoParcelado],
+          ["Valor à vista", condicoesPagamento.textoAVista],
           [
             "Desconto",
             `${Number(orcamento.desconto_percentual).toFixed(2).replace(".", ",")}%`,

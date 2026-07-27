@@ -4,6 +4,7 @@ import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
+import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
 import type {
   OrcamentoComItens,
@@ -379,22 +380,6 @@ function wrapDescricaoPropostaLines(
   return doc.splitTextToSize(normalized, maxWidth);
 }
 
-function parseFormaPagamentoLines(forma: string | null): {
-  condicao: string;
-  parcelamento: string | null;
-  aVista: string | null;
-} {
-  const condicao = forma?.trim() || "A combinar";
-  const lower = condicao.toLowerCase();
-
-  const parcelamento =
-    /parcel|(\d+\s*x)|(\d+x)/i.test(condicao) ? condicao : null;
-  const aVista =
-    /à vista|a vista|vista/i.test(lower) && !parcelamento ? condicao : null;
-
-  return { condicao, parcelamento, aVista };
-}
-
 function calcDescontoValor(orcamento: OrcamentoComItens): number {
   const subtotal = Number(orcamento.subtotal);
   const total = Number(orcamento.valor_total);
@@ -403,6 +388,60 @@ function calcDescontoValor(orcamento: OrcamentoComItens): number {
     return Math.max(0, subtotal - total);
   }
   return Math.max(0, subtotal - total);
+}
+
+function paintResumoFinanceiro(
+  doc: JsPDF,
+  orcamento: OrcamentoComItens,
+  startY: number,
+  labelX: number,
+  valueX: number
+): number {
+  let lineY = startY;
+  const descontoValor = calcDescontoValor(orcamento);
+  const descontoPct = Number(orcamento.desconto_percentual);
+  const valorTotal = Number(orcamento.valor_total);
+  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+
+  const drawLine = (
+    label: string,
+    value: string,
+    options?: { bold?: boolean; size?: number; color?: RGB }
+  ) => {
+    doc.setFont("helvetica", options?.bold ? "bold" : "normal");
+    doc.setFontSize(options?.size ?? 7.5);
+    doc.setTextColor(...(options?.color ?? SLATE_700));
+    doc.text(label, labelX, lineY);
+    doc.text(value, valueX, lineY, { align: "right" });
+    lineY += options?.size && options.size > 8 ? 8 : 5.5;
+  };
+
+  drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
+
+  if (descontoPct > 0 || descontoValor > 0) {
+    drawLine(
+      "Desconto",
+      `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
+    );
+  }
+
+  lineY += 1;
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.3);
+  doc.line(labelX, lineY, valueX, lineY);
+  lineY += 6;
+
+  drawLine("Valor Total", formatCurrency(valorTotal), {
+    bold: true,
+    size: 11,
+    color: NAVY,
+  });
+
+  lineY += 1;
+  drawLine("Pagamento parcelado", pagamento.textoParcelado, { size: 7 });
+  drawLine("Valor à vista", pagamento.textoAVista, { size: 7 });
+
+  return lineY;
 }
 
 /* ── Cabeçalho ─────────────────────────────────────────────────── */
@@ -782,9 +821,6 @@ function drawFinancialAndInclusosRow(
   catalogo: ServicoSstRecord[],
   inclusos: string[]
 ): number {
-  const pagamento = parseFormaPagamentoLines(orcamento.forma_pagamento);
-  const descontoValor = calcDescontoValor(orcamento);
-  const descontoPct = Number(orcamento.desconto_percentual);
   const hasPacote = orcamentoHasPacoteCompleto(orcamento, catalogo);
 
   const boxW = 88;
@@ -879,52 +915,9 @@ function drawFinancialAndInclusosRow(
     doc.setLineWidth(1);
     doc.line(boxX, contentY, boxX, contentY + boxH);
 
-    let lineY = contentY + 8;
     const labelX = boxX + 5;
     const valueX = boxX + boxW - 5;
-
-    const drawLine = (
-      label: string,
-      value: string,
-      options?: { bold?: boolean; size?: number; color?: RGB }
-    ) => {
-      doc.setFont("helvetica", options?.bold ? "bold" : "normal");
-      doc.setFontSize(options?.size ?? 7.5);
-      doc.setTextColor(...(options?.color ?? SLATE_700));
-      doc.text(label, labelX, lineY);
-      doc.text(value, valueX, lineY, { align: "right" });
-      lineY += options?.size && options.size > 8 ? 8 : 5.5;
-    };
-
-    drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
-
-    if (descontoPct > 0 || descontoValor > 0) {
-      drawLine(
-        "Desconto",
-        `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
-      );
-    }
-
-    lineY += 1;
-    doc.setDrawColor(...GOLD);
-    doc.setLineWidth(0.3);
-    doc.line(labelX, lineY, valueX, lineY);
-    lineY += 6;
-
-    drawLine("Valor Total", formatCurrency(Number(orcamento.valor_total)), {
-      bold: true,
-      size: 11,
-      color: NAVY,
-    });
-
-    lineY += 1;
-    drawLine("Condição de pagamento", pagamento.condicao, { size: 7 });
-    if (pagamento.parcelamento && pagamento.parcelamento !== pagamento.condicao) {
-      drawLine("Parcelamento", pagamento.parcelamento, { size: 7 });
-    }
-    if (pagamento.aVista) {
-      drawLine("Valor à vista", pagamento.aVista, { size: 7 });
-    }
+    paintResumoFinanceiro(doc, orcamento, contentY + 8, labelX, valueX);
 
     return Math.max(contentY + checklistBlockH, contentY + boxH) + 6;
   }
@@ -940,52 +933,9 @@ function drawFinancialAndInclusosRow(
   doc.setLineWidth(1);
   doc.line(boxX, y, boxX, y + boxH);
 
-  let lineY = y + 8;
   const labelX = boxX + 5;
   const valueX = boxX + boxW - 5;
-
-  const drawLine = (
-    label: string,
-    value: string,
-    options?: { bold?: boolean; size?: number; color?: RGB }
-  ) => {
-    doc.setFont("helvetica", options?.bold ? "bold" : "normal");
-    doc.setFontSize(options?.size ?? 7.5);
-    doc.setTextColor(...(options?.color ?? SLATE_700));
-    doc.text(label, labelX, lineY);
-    doc.text(value, valueX, lineY, { align: "right" });
-    lineY += options?.size && options.size > 8 ? 8 : 5.5;
-  };
-
-  drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
-
-  if (descontoPct > 0 || descontoValor > 0) {
-    drawLine(
-      "Desconto",
-      `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
-    );
-  }
-
-  lineY += 1;
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.3);
-  doc.line(labelX, lineY, valueX, lineY);
-  lineY += 6;
-
-  drawLine("Valor Total", formatCurrency(Number(orcamento.valor_total)), {
-    bold: true,
-    size: 11,
-    color: NAVY,
-  });
-
-  lineY += 1;
-  drawLine("Condição de pagamento", pagamento.condicao, { size: 7 });
-  if (pagamento.parcelamento && pagamento.parcelamento !== pagamento.condicao) {
-    drawLine("Parcelamento", pagamento.parcelamento, { size: 7 });
-  }
-  if (pagamento.aVista) {
-    drawLine("Valor à vista", pagamento.aVista, { size: 7 });
-  }
+  paintResumoFinanceiro(doc, orcamento, y + 8, labelX, valueX);
 
   return y + boxH + 6;
 }

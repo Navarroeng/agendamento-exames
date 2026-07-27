@@ -2,6 +2,8 @@ import { RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { RESPONSAVEIS } from "@/lib/constants";
+import { formatCurrency } from "@/lib/money";
+import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import type { OrcamentoFormField } from "@/hooks/useOrcamentoForm";
 import {
   ORCAMENTO_STATUS_OPTIONS,
@@ -20,6 +22,7 @@ interface OrcamentoFormProps {
   servicosError: string | null;
   subtotal: number;
   valorTotal: number;
+  condicoesPagamento: CondicoesPagamentoProposta;
   onChange: (field: OrcamentoFormField, value: string) => void;
   onSelectCliente: (clienteId: string) => void;
   onAddItem: () => void;
@@ -42,6 +45,7 @@ export function OrcamentoForm({
   servicosError,
   subtotal,
   valorTotal,
+  condicoesPagamento,
   onChange,
   onSelectCliente,
   onAddItem,
@@ -215,17 +219,6 @@ export function OrcamentoForm({
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold text-navy">
-              Forma de pagamento
-            </label>
-            <input
-              className="field-input"
-              placeholder="Ex.: 30 dias, boleto, PIX..."
-              value={form.forma_pagamento}
-              onChange={(e) => onChange("forma_pagamento", e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-navy">
               Validade da proposta
             </label>
             <input
@@ -234,6 +227,32 @@ export function OrcamentoForm({
               value={form.validade_proposta}
               onChange={(e) => onChange("validade_proposta", e.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+              Pagamento parcelado
+            </p>
+            <p className="mt-1 text-sm font-bold text-navy">
+              {condicoesPagamento.textoParcelado}
+            </p>
+            <p className="mt-1 text-[11px] text-[#64748b]">
+              Calculado automaticamente (parcela mínima de R$ 500,00, até 10x).
+            </p>
+          </div>
+          <div className="rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#b45309]">
+              Valor à vista
+            </p>
+            <p className="mt-1 text-sm font-extrabold text-navy">
+              {condicoesPagamento.textoAVista}
+            </p>
+            <p className="mt-1 text-[11px] text-[#64748b]">
+              5% de desconto sobre {formatCurrency(valorTotal)}, arredondado para
+              baixo na centena.
+            </p>
           </div>
         </div>
         </Panel>

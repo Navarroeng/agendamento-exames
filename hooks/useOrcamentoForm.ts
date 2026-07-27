@@ -14,6 +14,7 @@ import {
   resolveItemValorParaFormulario,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
+import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import {
   createEmptyOrcamentoItem,
   getEmptyOrcamentoForm,
@@ -174,7 +175,8 @@ export function useOrcamentoForm() {
       subtotal,
       form.desconto_percentual
     );
-    return { subtotal, valorTotal };
+    const condicoesPagamento = calcCondicoesPagamentoProposta(valorTotal);
+    return { subtotal, valorTotal, condicoesPagamento };
   }, [form.desconto_percentual, form.itens]);
 
   const buildPayload = useCallback((): OrcamentoInsertPayload => {
@@ -208,7 +210,7 @@ export function useOrcamentoForm() {
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual:
         Number(String(form.desconto_percentual).replace(",", ".")) || 0,
-      forma_pagamento: emptyToNull(form.forma_pagamento),
+      forma_pagamento: null,
       validade_proposta: validadeIso,
       subtotal: totals.subtotal,
       valor_total: totals.valorTotal,
