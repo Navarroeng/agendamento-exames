@@ -1,33 +1,48 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { formatCNPJ } from "@/lib/cnpj";
 import { formatCurrency } from "@/lib/money";
-import { formatOrcamentoStatus } from "@/lib/orcamento-filters";
 import type {
   OrcamentoComItens,
   OrcamentoItemRecord,
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
+import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
+/* ── Paleta Navarro premium ─────────────────────────────────────── */
 const NAVY: [number, number, number] = [8, 43, 99];
+const NAVY_SOFT: [number, number, number] = [21, 52, 108];
 const GOLD: [number, number, number] = [201, 151, 43];
 const GOLD_LIGHT: [number, number, number] = [232, 210, 158];
+const GOLD_BG: [number, number, number] = [252, 246, 232];
 const WHITE: [number, number, number] = [255, 255, 255];
-const MUTED: [number, number, number] = [100, 116, 139];
-const ROW_BORDER: [number, number, number] = [231, 234, 240];
+const SLATE_50: [number, number, number] = [248, 250, 252];
+const SLATE_100: [number, number, number] = [241, 245, 249];
+const SLATE_200: [number, number, number] = [226, 232, 240];
+const SLATE_500: [number, number, number] = [100, 116, 139];
+const SLATE_700: [number, number, number] = [51, 65, 85];
+const SLATE_900: [number, number, number] = [15, 23, 42];
+const CHECK_GREEN: [number, number, number] = [22, 101, 52];
 
-const MARGIN = 14;
+const MARGIN = 12;
 const PAGE_W = 210;
+const PAGE_H = 297;
 const CONTENT_W = PAGE_W - MARGIN * 2;
+const FOOTER_Y = 283;
+const FOOTER_H = 12;
 
 const NAVARRO = {
   site: "www.navarroeng.com.br",
   email: "contato@navarroeng.com.br",
   telefone: "(11) 3181-7697",
   whatsapp: "(11) 97706-5599",
+  razaoSocial: "Navarro Engenharia de Segurança do Trabalho e Medicina Ocupacional",
+  responsavelTecnico: "Equipe Técnica Navarro Engenharia",
 } as const;
 
 type JsPDF = import("jspdf").jsPDF;
+type RGB = [number, number, number];
 
 interface LogoAsset {
   dataUrl: string;
@@ -35,6 +50,13 @@ interface LogoAsset {
   height: number;
 }
 
+interface ClientePdfInfo {
+  cnpj: string;
+  endereco: string;
+  cidade: string;
+}
+
+/* ── Utilitários ─────────────────────────────────────────────────── */
 async function loadLogoAsset(): Promise<LogoAsset | null> {
   try {
     const response = await fetch("/logo-navarro.png");
@@ -55,7 +77,7 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       img.src = dataUrl;
     });
 
-    const maxMm = 22;
+    const maxMm = 26;
     const ratio = dims.w / dims.h;
     let width = maxMm;
     let height = width / ratio;
@@ -70,100 +92,77 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
   }
 }
 
-function drawHeader(doc: JsPDF, logo: LogoAsset | null, y: number): number {
-  doc.setFillColor(...NAVY);
-  doc.rect(MARGIN, y, CONTENT_W, 42, "F");
-
-  doc.setFillColor(...GOLD);
-  doc.triangle(
-    MARGIN + CONTENT_W * 0.62,
-    y,
-    MARGIN + CONTENT_W,
-    y,
-    MARGIN + CONTENT_W,
-    y + 42,
-    "F"
-  );
-
-  const logoX = MARGIN + 6;
-  const logoY = y + 10;
-  if (logo) {
-    doc.addImage(logo.dataUrl, "PNG", logoX, logoY, logo.width, logo.height);
-  } else {
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("NAVARRO", logoX, logoY + 8);
+async function resolveClientePdfInfo(
+  orcamento: OrcamentoComItens
+): Promise<ClientePdfInfo> {
+  if (!orcamento.cliente_id) {
+    return { cnpj: "—", endereco: "—", cidade: "—" };
   }
 
-  doc.setTextColor(...GOLD_LIGHT);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text(NAVARRO.site, MARGIN + CONTENT_W - 6, y + 14, { align: "right" });
-  doc.text(NAVARRO.email, MARGIN + CONTENT_W - 6, y + 20, { align: "right" });
-  doc.text(NAVARRO.telefone, MARGIN + CONTENT_W - 6, y + 26, { align: "right" });
-
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
-  doc.text("PROPOSTA COMERCIAL SST", MARGIN + 6, y + 36);
-
-  return y + 50;
+  try {
+    const cliente = await buscarClientePorId(orcamento.cliente_id);
+    if (!cliente) {
+      return { cnpj: "—", endereco: "—", cidade: "—" };
+    }
+    return {
+      cnpj: formatCNPJ(cliente.cnpj),
+      endereco: "—",
+      cidade: "—",
+    };
+  } catch {
+    return { cnpj: "—", endereco: "—", cidade: "—" };
+  }
 }
 
-function drawInfoBlock(
+function displayValue(value: string | null | undefined, fallback = "—"): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function ensureSpace(doc: JsPDF, y: number, needed: number): number {
+  if (y + needed > FOOTER_Y - 2) {
+    doc.addPage();
+    return MARGIN + 4;
+  }
+  return y;
+}
+
+function drawCard(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  options?: { fill?: RGB; stroke?: RGB; radius?: number }
+) {
+  const fill = options?.fill ?? SLATE_50;
+  const stroke = options?.stroke ?? SLATE_200;
+  const radius = options?.radius ?? 2.5;
+  doc.setFillColor(...fill);
+  doc.setDrawColor(...stroke);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, h, radius, radius, "FD");
+}
+
+function drawSectionTitle(
   doc: JsPDF,
   y: number,
-  orcamento: OrcamentoComItens
+  title: string,
+  options?: { x?: number; width?: number }
 ): number {
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(MARGIN, y, CONTENT_W, 34, 2, 2, "F");
-  doc.setDrawColor(...ROW_BORDER);
-  doc.roundedRect(MARGIN, y, CONTENT_W, 34, 2, 2, "S");
+  const x = options?.x ?? MARGIN;
+  const width = options?.width ?? 22;
 
-  const leftX = MARGIN + 6;
-  const rightX = MARGIN + CONTENT_W / 2 + 4;
-  let rowY = y + 8;
-
-  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
   doc.setTextColor(...NAVY);
+  doc.text(title.toUpperCase(), x, y);
 
-  const fieldsLeft = [
-    ["Proposta nº", orcamento.numero],
-    ["Data", formatDateIsoToBR(orcamento.data_proposta)],
-    ["Cliente", orcamento.cliente_nome],
-    ["Contato", orcamento.contato ?? "—"],
-  ];
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.6);
+  doc.line(x, y + 1.5, x + width, y + 1.5);
 
-  const fieldsRight = [
-    ["E-mail", orcamento.email ?? "—"],
-    ["Telefone", orcamento.telefone ?? "—"],
-    ["Responsável Navarro", orcamento.responsavel],
-    ["Validade", formatDateIsoToBR(orcamento.validade_proposta) || "—"],
-  ];
-
-  fieldsLeft.forEach(([label, value], index) => {
-    const lineY = rowY + index * 7;
-    doc.setFont("helvetica", "bold");
-    doc.text(`${label}:`, leftX, lineY);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...MUTED);
-    doc.text(String(value).slice(0, 48), leftX + 28, lineY);
-    doc.setTextColor(...NAVY);
-  });
-
-  fieldsRight.forEach(([label, value], index) => {
-    const lineY = rowY + index * 7;
-    doc.setFont("helvetica", "bold");
-    doc.text(`${label}:`, rightX, lineY);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...MUTED);
-    doc.text(String(value).slice(0, 48), rightX + 34, lineY);
-    doc.setTextColor(...NAVY);
-  });
-
-  return y + 42;
+  return y + 7;
 }
 
 function resolveCatalogoServico(
@@ -176,33 +175,309 @@ function resolveCatalogoServico(
   );
 }
 
-function measureInclusosBlockHeight(
-  doc: JsPDF,
-  inclusos: string[],
-  maxWidth: number
-): number {
-  if (inclusos.length === 0) return 0;
+function collectAllInclusos(
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
 
-  let height = 3.5;
-  doc.setFontSize(6.5);
-  inclusos.forEach((line) => {
-    const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
-    height += wrapped.length * 3.2;
-  });
-  return height;
+  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
+    (a, b) => a.ordem - b.ordem
+  );
+
+  for (const item of itens) {
+    const servico = resolveCatalogoServico(item, catalogo);
+    const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
+    for (const line of inclusos) {
+      const key = line.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      result.push(line.trim());
+    }
+  }
+
+  return result;
 }
 
-function estimatePdfRowHeight(
+function splitDescricaoEmTopicos(descricao: string): string[] {
+  return descricao
+    .split(/\n+|(?:^|\s)[•·▪-]\s+/g)
+    .map((part) => part.trim().replace(/^[-•·▪]\s*/, ""))
+    .filter(Boolean);
+}
+
+function buildDescricaoProposta(
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
+): string[] {
+  const bullets: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (text: string) => {
+    const normalized = text.trim();
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    bullets.push(normalized);
+  };
+
+  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
+    (a, b) => a.ordem - b.ordem
+  );
+
+  for (const item of itens) {
+    const servico = resolveCatalogoServico(item, catalogo);
+    if (servico?.descricao?.trim()) {
+      splitDescricaoEmTopicos(servico.descricao).forEach(add);
+    }
+  }
+
+  if (bullets.length === 0) {
+    for (const item of itens) {
+      const servico = resolveCatalogoServico(item, catalogo);
+      const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
+      inclusos.forEach((line) => {
+        const short = line.split(" - ")[0]?.split(" — ")[0]?.trim() ?? line;
+        add(short.replace(/\.$/, ""));
+      });
+    }
+  }
+
+  if (bullets.length === 0) {
+    itens.forEach((item) => add(item.servico_nome));
+  }
+
+  return bullets.slice(0, 12);
+}
+
+function parseFormaPagamentoLines(forma: string | null): {
+  condicao: string;
+  parcelamento: string | null;
+  aVista: string | null;
+} {
+  const condicao = forma?.trim() || "A combinar";
+  const lower = condicao.toLowerCase();
+
+  const parcelamento =
+    /parcel|(\d+\s*x)|(\d+x)/i.test(condicao) ? condicao : null;
+  const aVista =
+    /à vista|a vista|vista/i.test(lower) && !parcelamento ? condicao : null;
+
+  return { condicao, parcelamento, aVista };
+}
+
+function calcDescontoValor(orcamento: OrcamentoComItens): number {
+  const subtotal = Number(orcamento.subtotal);
+  const total = Number(orcamento.valor_total);
+  const pct = Number(orcamento.desconto_percentual);
+  if (pct > 0) {
+    return Math.max(0, subtotal - total);
+  }
+  return Math.max(0, subtotal - total);
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────── */
+function drawHeader(
   doc: JsPDF,
-  inclusos: string[],
+  logo: LogoAsset | null,
+  orcamento: OrcamentoComItens
+): number {
+  const headerH = 46;
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(MARGIN, MARGIN, CONTENT_W, headerH, 3, 3, "F");
+
+  doc.setFillColor(...GOLD);
+  doc.triangle(
+    MARGIN + CONTENT_W * 0.68,
+    MARGIN,
+    MARGIN + CONTENT_W,
+    MARGIN,
+    MARGIN + CONTENT_W,
+    MARGIN + headerH * 0.55,
+    "F"
+  );
+
+  const logoX = MARGIN + 5;
+  const logoY = MARGIN + 7;
+  if (logo) {
+    doc.addImage(logo.dataUrl, "PNG", logoX, logoY, logo.width, logo.height);
+  } else {
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("NAVARRO", logoX, logoY + 8);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("PROPOSTA COMERCIAL", MARGIN + CONTENT_W - 5, MARGIN + 16, {
+    align: "right",
+  });
+
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...GOLD_LIGHT);
+  const metaY = MARGIN + 24;
+  doc.text(`Nº ${orcamento.numero}`, MARGIN + CONTENT_W - 5, metaY, {
+    align: "right",
+  });
+  doc.text(
+    `Emissão: ${formatDateIsoToBR(orcamento.data_proposta)}`,
+    MARGIN + CONTENT_W - 5,
+    metaY + 4.5,
+    { align: "right" }
+  );
+  doc.text(
+    `Validade: ${formatDateIsoToBR(orcamento.validade_proposta) || "30 dias"}`,
+    MARGIN + CONTENT_W - 5,
+    metaY + 9,
+    { align: "right" }
+  );
+
+  doc.setFillColor(...NAVY_SOFT);
+  doc.rect(MARGIN, MARGIN + headerH - 11, CONTENT_W, 11, "F");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD_LIGHT);
+  const contactY = MARGIN + headerH - 4;
+  doc.text(
+    `${NAVARRO.telefone}  ·  ${NAVARRO.email}  ·  ${NAVARRO.site}`,
+    MARGIN + 5,
+    contactY
+  );
+  doc.text(NAVARRO.responsavelTecnico, MARGIN + CONTENT_W - 5, contactY, {
+    align: "right",
+  });
+
+  return MARGIN + headerH + 6;
+}
+
+/* ── Card do cliente ───────────────────────────────────────────── */
+function drawClientCard(
+  doc: JsPDF,
+  y: number,
+  orcamento: OrcamentoComItens,
+  clienteInfo: ClientePdfInfo
+): number {
+  y = drawSectionTitle(doc, y, "Dados do cliente");
+
+  const cardH = 36;
+  drawCard(doc, MARGIN, y, CONTENT_W, cardH, {
+    fill: WHITE,
+    stroke: SLATE_200,
+  });
+
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.8);
+  doc.line(MARGIN, y, MARGIN, y + cardH);
+
+  const col1X = MARGIN + 6;
+  const col2X = MARGIN + CONTENT_W / 2 + 2;
+  let rowY = y + 7;
+
+  const fieldsLeft: [string, string][] = [
+    ["Cliente", orcamento.cliente_nome],
+    ["CNPJ", clienteInfo.cnpj],
+    ["Contato", displayValue(orcamento.contato)],
+    ["E-mail", displayValue(orcamento.email)],
+  ];
+
+  const fieldsRight: [string, string][] = [
+    ["Telefone", displayValue(orcamento.telefone)],
+    ["Endereço", clienteInfo.endereco],
+    ["Cidade", clienteInfo.cidade],
+    ["Responsável Navarro", orcamento.responsavel],
+  ];
+
+  doc.setFontSize(7);
+
+  fieldsLeft.forEach(([label, value], index) => {
+    const lineY = rowY + index * 7.5;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...SLATE_500);
+    doc.text(label, col1X, lineY);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...SLATE_900);
+    doc.text(String(value).slice(0, 52), col1X + 22, lineY);
+  });
+
+  fieldsRight.forEach(([label, value], index) => {
+    const lineY = rowY + index * 7.5;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...SLATE_500);
+    doc.text(label, col2X, lineY);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...SLATE_900);
+    doc.text(String(value).slice(0, 52), col2X + 28, lineY);
+  });
+
+  return y + cardH + 6;
+}
+
+/* ── Descrição da proposta ─────────────────────────────────────── */
+function measureBulletsHeight(doc: JsPDF, bullets: string[]): number {
+  if (bullets.length === 0) return 0;
+  doc.setFontSize(7.5);
+  let h = 4;
+  bullets.forEach((bullet) => {
+    const lines = doc.splitTextToSize(bullet, CONTENT_W - 14);
+    h += lines.length * 3.8 + 1.2;
+  });
+  return h + 6;
+}
+
+function drawDescricaoProposta(
+  doc: JsPDF,
+  y: number,
+  bullets: string[]
+): number {
+  if (bullets.length === 0) return y;
+
+  y = ensureSpace(doc, y, measureBulletsHeight(doc, bullets) + 10);
+  y = drawSectionTitle(doc, y, "Descrição da proposta");
+
+  const blockH = measureBulletsHeight(doc, bullets);
+  drawCard(doc, MARGIN, y, CONTENT_W, blockH, {
+    fill: SLATE_50,
+    stroke: SLATE_200,
+  });
+
+  let bulletY = y + 5;
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...SLATE_700);
+
+  bullets.forEach((bullet) => {
+    doc.setFillColor(...GOLD);
+    doc.circle(MARGIN + 5, bulletY - 1, 0.7, "F");
+    const lines = doc.splitTextToSize(bullet, CONTENT_W - 14);
+    doc.text(lines, MARGIN + 8, bulletY);
+    bulletY += lines.length * 3.8 + 1.2;
+  });
+
+  return y + blockH + 6;
+}
+
+/* ── Tabela de serviços ────────────────────────────────────────── */
+function estimateServiceRowHeight(
+  doc: JsPDF,
+  item: OrcamentoItemRecord,
+  servico: ServicoSstRecord | undefined,
   serviceColWidth: number
 ): number {
-  const baseHeight = 8;
-  if (inclusos.length === 0) return baseHeight;
-  return baseHeight + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
+  let h = 7;
+  const descricao = servico?.descricao?.trim();
+  if (descricao) {
+    doc.setFontSize(6.5);
+    const lines = doc.splitTextToSize(descricao, serviceColWidth - 4);
+    h += lines.length * 3.2 + 1.5;
+  }
+  return h;
 }
 
-function drawItemsTable(
+function drawServicesTable(
   doc: JsPDF,
   y: number,
   orcamento: OrcamentoComItens,
@@ -211,184 +486,353 @@ function drawItemsTable(
   const itens = [...(orcamento.orcamento_itens ?? [])].sort(
     (a, b) => a.ordem - b.ordem
   );
+  if (itens.length === 0) return y;
 
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...NAVY);
-  doc.text("Serviços propostos", MARGIN, y);
-  y += 6;
+  y = drawSectionTitle(doc, y, "Serviços propostos");
 
-  const colWidths = [78, 22, 32, 32];
+  const colWidths = [76, 20, 34, 34];
+  const colStarts = [
+    MARGIN,
+    MARGIN + colWidths[0],
+    MARGIN + colWidths[0] + colWidths[1],
+    MARGIN + colWidths[0] + colWidths[1] + colWidths[2],
+  ];
   const headers = ["Serviço", "Qtd.", "Valor unit.", "Total"];
-  const headY = y;
 
-  doc.setFillColor(...NAVY);
-  doc.rect(MARGIN, headY, CONTENT_W, 9, "F");
-  doc.setTextColor(...WHITE);
-  doc.setFontSize(8);
+  const drawTableHead = (startY: number) => {
+    doc.setFillColor(...NAVY);
+    doc.roundedRect(MARGIN, startY, CONTENT_W, 8, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...WHITE);
+    headers.forEach((header, index) => {
+      const align = index === 0 ? "left" : "right";
+      const x =
+        index === 0
+          ? colStarts[index] + 3
+          : colStarts[index] + colWidths[index] - 2;
+      doc.text(header, x, startY + 5.5, { align });
+    });
+    return startY + 8;
+  };
 
-  let colX = MARGIN + 3;
-  headers.forEach((header, index) => {
-    doc.text(header, colX, headY + 6);
-    colX += colWidths[index] ?? 0;
-  });
-
-  y = headY + 9;
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(30, 41, 59);
+  y = drawTableHead(y);
 
   itens.forEach((item, index) => {
     const servico = resolveCatalogoServico(item, catalogo);
-    const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-    const serviceColWidth = colWidths[0] ?? 78;
-    const rowH = estimatePdfRowHeight(doc, inclusos, serviceColWidth);
+    const rowH = estimateServiceRowHeight(
+      doc,
+      item,
+      servico,
+      colWidths[0]
+    );
 
-    if (y + rowH > 270) {
-      doc.addPage();
-      y = MARGIN + 10;
+    y = ensureSpace(doc, y, rowH + 2);
+    if (y <= MARGIN + 10) {
+      y = drawTableHead(y);
     }
 
     if (index % 2 === 0) {
-      doc.setFillColor(248, 250, 252);
+      doc.setFillColor(...SLATE_50);
       doc.rect(MARGIN, y, CONTENT_W, rowH, "F");
     }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text(item.servico_nome, MARGIN + 3, y + 4.5);
+    doc.setTextColor(...SLATE_900);
+    doc.text(item.servico_nome, colStarts[0] + 3, y + 4.5);
 
     let detailY = y + 8;
-    if (inclusos.length > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.5);
-      doc.setTextColor(...MUTED);
-      doc.text("Inclui:", MARGIN + 3, detailY);
-      detailY += 3.5;
-
+    const descricao = servico?.descricao?.trim();
+    if (descricao) {
       doc.setFont("helvetica", "normal");
-      inclusos.forEach((line) => {
-        const wrapped = doc.splitTextToSize(`• ${line}`, serviceColWidth - 4);
-        doc.text(wrapped, MARGIN + 3, detailY);
-        detailY += wrapped.length * 3.2;
-      });
+      doc.setFontSize(6.5);
+      doc.setTextColor(...SLATE_500);
+      const lines = doc.splitTextToSize(descricao, colWidths[0] - 4);
+      doc.text(lines, colStarts[0] + 3, detailY);
     }
 
-    const valueY = y + 5.5;
+    const valueY = y + 5;
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(30, 41, 59);
+    doc.setTextColor(...SLATE_900);
+    doc.text(String(item.quantidade), colStarts[1] + colWidths[1] - 2, valueY, {
+      align: "right",
+    });
+    doc.text(
+      formatCurrency(Number(item.valor_unitario)),
+      colStarts[2] + colWidths[2] - 2,
+      valueY,
+      { align: "right" }
+    );
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      formatCurrency(Number(item.valor_total)),
+      colStarts[3] + colWidths[3] - 2,
+      valueY,
+      { align: "right" }
+    );
 
-    let colX = MARGIN + 3 + serviceColWidth;
-    doc.text(String(item.quantidade), colX, valueY);
-    colX += colWidths[1] ?? 0;
-    doc.text(formatCurrency(Number(item.valor_unitario)), colX, valueY);
-    colX += colWidths[2] ?? 0;
-    doc.text(formatCurrency(Number(item.valor_total)), colX, valueY);
-
-    doc.setDrawColor(...ROW_BORDER);
+    doc.setDrawColor(...SLATE_200);
+    doc.setLineWidth(0.15);
     doc.line(MARGIN, y + rowH, MARGIN + CONTENT_W, y + rowH);
     y += rowH;
   });
 
-  return y + 4;
+  doc.setDrawColor(...SLATE_200);
+  doc.roundedRect(MARGIN, y - 0.5, CONTENT_W, 0.5, 0, 0, "S");
+
+  return y + 5;
 }
 
-function drawTotals(doc: JsPDF, y: number, orcamento: OrcamentoComItens): number {
-  const boxW = 78;
-  const boxX = MARGIN + CONTENT_W - boxW;
+/* ── Resumo financeiro + checklist (lado a lado) ─────────────────── */
+function drawFinancialAndInclusosRow(
+  doc: JsPDF,
+  y: number,
+  orcamento: OrcamentoComItens,
+  inclusos: string[]
+): number {
+  const pagamento = parseFormaPagamentoLines(orcamento.forma_pagamento);
+  const descontoValor = calcDescontoValor(orcamento);
+  const descontoPct = Number(orcamento.desconto_percentual);
 
-  doc.setFillColor(252, 246, 232);
-  doc.roundedRect(boxX, y, boxW, 28, 2, 2, "F");
-  doc.setDrawColor(...GOLD);
-  doc.roundedRect(boxX, y, boxW, 28, 2, 2, "S");
+  const boxW = 88;
+  const boxH = 52;
+  const gap = 5;
+  const checklistW = CONTENT_W - boxW - gap;
 
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text("Subtotal", boxX + 4, y + 8);
-  doc.text("Desconto", boxX + 4, y + 15);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...NAVY);
-  doc.text("Valor total", boxX + 4, y + 23);
-
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(30, 41, 59);
-  doc.text(formatCurrency(Number(orcamento.subtotal)), boxX + boxW - 4, y + 8, {
-    align: "right",
-  });
-  doc.text(
-    `${Number(orcamento.desconto_percentual).toFixed(2).replace(".", ",")}%`,
-    boxX + boxW - 4,
-    y + 15,
-    { align: "right" }
-  );
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...NAVY);
-  doc.text(
-    formatCurrency(Number(orcamento.valor_total)),
-    boxX + boxW - 4,
-    y + 23,
-    { align: "right" }
-  );
-
-  return y + 36;
-}
-
-function drawConditions(doc: JsPDF, y: number, orcamento: OrcamentoComItens): number {
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...NAVY);
-  doc.text("Condições comerciais", MARGIN, y);
-  y += 6;
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...MUTED);
-
-  const lines = [
-    `Forma de pagamento: ${orcamento.forma_pagamento?.trim() || "A combinar"}`,
-    `Validade da proposta: ${formatDateIsoToBR(orcamento.validade_proposta) || "30 dias"}`,
-    `Status: ${formatOrcamentoStatus(orcamento.status)}`,
-  ];
-
-  lines.forEach((line) => {
-    doc.text(line, MARGIN, y);
-    y += 5;
-  });
-
-  if (orcamento.observacoes?.trim()) {
-    y += 2;
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...NAVY);
-    doc.text("Observações", MARGIN, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...MUTED);
-    const obsLines = doc.splitTextToSize(orcamento.observacoes.trim(), CONTENT_W);
-    doc.text(obsLines, MARGIN, y);
-    y += obsLines.length * 4 + 2;
+  let checklistBlockH = 0;
+  if (inclusos.length > 0) {
+    doc.setFontSize(7);
+    const itemsPerCol = Math.ceil(inclusos.length / 2);
+    const colW = (checklistW - 8) / 2;
+    const measureCol = (items: string[]) =>
+      items.reduce((sum, item) => {
+        const lines = doc.splitTextToSize(item, colW - 6);
+        return sum + lines.length * 3.6 + 2;
+      }, 8);
+    checklistBlockH =
+      Math.max(
+        measureCol(inclusos.slice(0, itemsPerCol)),
+        measureCol(inclusos.slice(itemsPerCol))
+      ) + 10;
   }
 
-  return y + 4;
+  const rowH = Math.max(boxH + 8, checklistBlockH + 8);
+  y = ensureSpace(doc, y, rowH);
+
+  const boxX = MARGIN + CONTENT_W - boxW;
+
+  if (inclusos.length > 0) {
+    const contentY = drawSectionTitle(doc, y, "O que está incluso");
+    drawSectionTitle(doc, y, "Resumo financeiro", { x: boxX, width: 28 });
+
+    drawCard(doc, MARGIN, contentY, checklistW, checklistBlockH, {
+      fill: WHITE,
+      stroke: SLATE_200,
+    });
+
+    const colW = (checklistW - 8) / 2;
+    const itemsPerCol = Math.ceil(inclusos.length / 2);
+    const leftItems = inclusos.slice(0, itemsPerCol);
+    const rightItems = inclusos.slice(itemsPerCol);
+
+    const drawColumn = (items: string[], x: number, startItemY: number) => {
+      let itemY = startItemY;
+      items.forEach((item) => {
+        doc.setTextColor(...CHECK_GREEN);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.text("✓", x, itemY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...SLATE_700);
+        const lines = doc.splitTextToSize(item, colW - 6);
+        doc.text(lines, x + 4, itemY);
+        itemY += lines.length * 3.6 + 2;
+      });
+    };
+
+    drawColumn(leftItems, MARGIN + 4, contentY + 5);
+    drawColumn(rightItems, MARGIN + colW + 4, contentY + 5);
+
+    drawCard(doc, boxX, contentY, boxW, boxH, {
+      fill: GOLD_BG,
+      stroke: GOLD,
+      radius: 3,
+    });
+
+    doc.setDrawColor(...GOLD);
+    doc.setLineWidth(1);
+    doc.line(boxX, contentY, boxX, contentY + boxH);
+
+    let lineY = contentY + 8;
+    const labelX = boxX + 5;
+    const valueX = boxX + boxW - 5;
+
+    const drawLine = (
+      label: string,
+      value: string,
+      options?: { bold?: boolean; size?: number; color?: RGB }
+    ) => {
+      doc.setFont("helvetica", options?.bold ? "bold" : "normal");
+      doc.setFontSize(options?.size ?? 7.5);
+      doc.setTextColor(...(options?.color ?? SLATE_700));
+      doc.text(label, labelX, lineY);
+      doc.text(value, valueX, lineY, { align: "right" });
+      lineY += options?.size && options.size > 8 ? 8 : 5.5;
+    };
+
+    drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
+
+    if (descontoPct > 0 || descontoValor > 0) {
+      drawLine(
+        "Desconto",
+        `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
+      );
+    }
+
+    lineY += 1;
+    doc.setDrawColor(...GOLD);
+    doc.setLineWidth(0.3);
+    doc.line(labelX, lineY, valueX, lineY);
+    lineY += 6;
+
+    drawLine("Valor Total", formatCurrency(Number(orcamento.valor_total)), {
+      bold: true,
+      size: 11,
+      color: NAVY,
+    });
+
+    lineY += 1;
+    drawLine("Condição de pagamento", pagamento.condicao, { size: 7 });
+    if (pagamento.parcelamento && pagamento.parcelamento !== pagamento.condicao) {
+      drawLine("Parcelamento", pagamento.parcelamento, { size: 7 });
+    }
+    if (pagamento.aVista) {
+      drawLine("Valor à vista", pagamento.aVista, { size: 7 });
+    }
+
+    return Math.max(contentY + checklistBlockH, contentY + boxH) + 6;
+  }
+
+  y = drawSectionTitle(doc, y, "Resumo financeiro");
+  drawCard(doc, boxX, y, boxW, boxH, {
+    fill: GOLD_BG,
+    stroke: GOLD,
+    radius: 3,
+  });
+
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(1);
+  doc.line(boxX, y, boxX, y + boxH);
+
+  let lineY = y + 8;
+  const labelX = boxX + 5;
+  const valueX = boxX + boxW - 5;
+
+  const drawLine = (
+    label: string,
+    value: string,
+    options?: { bold?: boolean; size?: number; color?: RGB }
+  ) => {
+    doc.setFont("helvetica", options?.bold ? "bold" : "normal");
+    doc.setFontSize(options?.size ?? 7.5);
+    doc.setTextColor(...(options?.color ?? SLATE_700));
+    doc.text(label, labelX, lineY);
+    doc.text(value, valueX, lineY, { align: "right" });
+    lineY += options?.size && options.size > 8 ? 8 : 5.5;
+  };
+
+  drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
+
+  if (descontoPct > 0 || descontoValor > 0) {
+    drawLine(
+      "Desconto",
+      `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
+    );
+  }
+
+  lineY += 1;
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.3);
+  doc.line(labelX, lineY, valueX, lineY);
+  lineY += 6;
+
+  drawLine("Valor Total", formatCurrency(Number(orcamento.valor_total)), {
+    bold: true,
+    size: 11,
+    color: NAVY,
+  });
+
+  lineY += 1;
+  drawLine("Condição de pagamento", pagamento.condicao, { size: 7 });
+  if (pagamento.parcelamento && pagamento.parcelamento !== pagamento.condicao) {
+    drawLine("Parcelamento", pagamento.parcelamento, { size: 7 });
+  }
+  if (pagamento.aVista) {
+    drawLine("Valor à vista", pagamento.aVista, { size: 7 });
+  }
+
+  return y + boxH + 6;
 }
 
-function drawFooter(doc: JsPDF) {
-  const y = 285;
+/* ── Observações ───────────────────────────────────────────────── */
+function drawObservacoesCard(doc: JsPDF, y: number, texto: string): number {
+  const trimmed = texto.trim();
+  if (!trimmed) return y;
+
+  doc.setFontSize(7.5);
+  const lines = doc.splitTextToSize(trimmed, CONTENT_W - 12);
+  const blockH = lines.length * 3.8 + 10;
+
+  y = ensureSpace(doc, y, blockH + 6);
+  y = drawSectionTitle(doc, y, "Observações");
+
+  drawCard(doc, MARGIN, y, CONTENT_W, blockH, {
+    fill: SLATE_50,
+    stroke: SLATE_200,
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SLATE_700);
+  doc.text(lines, MARGIN + 6, y + 6);
+
+  return y + blockH + 6;
+}
+
+/* ── Rodapé ────────────────────────────────────────────────────── */
+function drawFooter(doc: JsPDF, pageNumber: number, totalPages: number) {
+  const y = FOOTER_Y;
+
+  doc.setFillColor(...NAVY);
+  doc.rect(0, y - 1, PAGE_W, FOOTER_H + 4, "F");
+
   doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.5);
   doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-  doc.setFontSize(7);
-  doc.setTextColor(...MUTED);
+
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...GOLD_LIGHT);
+  doc.text(NAVARRO.razaoSocial, PAGE_W / 2, y + 4, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...WHITE);
   doc.text(
-    "Navarro Engenharia — Soluções em Saúde e Segurança do Trabalho",
+    `${NAVARRO.site}  ·  ${NAVARRO.email}  ·  WhatsApp ${NAVARRO.whatsapp}  ·  ${NAVARRO.telefone}`,
     PAGE_W / 2,
-    y + 5,
+    y + 8,
     { align: "center" }
   );
+
+  doc.setFontSize(6);
+  doc.setTextColor(...GOLD_LIGHT);
   doc.text(
-    `${NAVARRO.site} · ${NAVARRO.email} · ${NAVARRO.telefone}`,
-    PAGE_W / 2,
-    y + 9,
-    { align: "center" }
+    `Página ${pageNumber} de ${totalPages}`,
+    MARGIN + CONTENT_W,
+    y + 8,
+    { align: "right" }
   );
 }
 
@@ -402,21 +846,34 @@ function buildFilename(orcamento: OrcamentoComItens): string {
   return `Proposta-${orcamento.numero}-${cliente || "Cliente"}.pdf`;
 }
 
+/* ── Export ──────────────────────────────────────────────────────── */
 export async function gerarPdfOrcamento(
   orcamento: OrcamentoComItens
 ): Promise<void> {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const logo = await loadLogoAsset();
-  const catalogo = await listarServicosSst();
 
-  let y = MARGIN;
-  y = drawHeader(doc, logo, y);
-  y = drawInfoBlock(doc, y, orcamento);
-  y = drawItemsTable(doc, y, orcamento, catalogo);
-  y = drawTotals(doc, y, orcamento);
-  drawConditions(doc, y, orcamento);
-  drawFooter(doc);
+  const [logo, catalogo, clienteInfo] = await Promise.all([
+    loadLogoAsset(),
+    listarServicosSst(),
+    resolveClientePdfInfo(orcamento),
+  ]);
+
+  const descricaoBullets = buildDescricaoProposta(orcamento, catalogo);
+  const inclusos = collectAllInclusos(orcamento, catalogo);
+
+  let y = drawHeader(doc, logo, orcamento);
+  y = drawClientCard(doc, y, orcamento, clienteInfo);
+  y = drawDescricaoProposta(doc, y, descricaoBullets);
+  y = drawServicesTable(doc, y, orcamento, catalogo);
+  y = drawFinancialAndInclusosRow(doc, y, orcamento, inclusos);
+  y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page, totalPages);
+  }
 
   doc.save(buildFilename(orcamento));
 }
