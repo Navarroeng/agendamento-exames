@@ -46,14 +46,11 @@ const NAVARRO = {
 } as const;
 
 const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
-  [
-    "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em",
-    "PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-",
-    "2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o",
-    "Laudo de Riscos Psicossociais conforme a nova NR-01.",
-  ].join("\n"),
+  "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o Laudo de Riscos Psicossociais conforme a nova NR-01.",
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
+
+const DESCRICAO_CARD_PADDING_X = 5;
 
 const PACOTE_COMPLETO_INCLUSOS_OBSERVACOES: readonly string[] = [
   "Se necessário, a realização de Exames Complementares será cobrada à parte.",
@@ -398,6 +395,16 @@ function wrapParagraphLines(
   });
 }
 
+function wrapDescricaoPropostaLines(
+  doc: JsPDF,
+  text: string,
+  maxWidth: number
+): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  return doc.splitTextToSize(normalized, maxWidth);
+}
+
 function parseFormaPagamentoLines(forma: string | null): {
   condicao: string;
   parcelamento: string | null;
@@ -573,14 +580,14 @@ function measureDescricaoPropostaHeight(
   if (paragrafos.length === 0) return 0;
 
   const cardPadding = 5;
-  doc.setFontSize(7.5);
-  const textWidth = CONTENT_W - 12;
+  const textWidth = CONTENT_W - DESCRICAO_CARD_PADDING_X * 2;
   let h = cardPadding;
 
   paragrafos.forEach((paragrafo, index) => {
     const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
+    doc.setFont("helvetica", isNotaLegal ? "italic" : "normal");
     doc.setFontSize(isNotaLegal ? 7 : 7.5);
-    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    const lines = wrapDescricaoPropostaLines(doc, paragrafo, textWidth);
     h += lines.length * 3.8;
     if (index < paragrafos.length - 1) h += 2;
   });
@@ -605,8 +612,8 @@ function drawDescricaoProposta(
   });
 
   let textY = y + 5;
-  const textX = MARGIN + 6;
-  const textWidth = CONTENT_W - 12;
+  const textX = MARGIN + DESCRICAO_CARD_PADDING_X;
+  const textWidth = CONTENT_W - DESCRICAO_CARD_PADDING_X * 2;
 
   paragrafos.forEach((paragrafo, index) => {
     const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
@@ -614,7 +621,7 @@ function drawDescricaoProposta(
     doc.setFontSize(isNotaLegal ? 7 : 7.5);
     doc.setTextColor(...(isNotaLegal ? SLATE_500 : SLATE_700));
 
-    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    const lines = wrapDescricaoPropostaLines(doc, paragrafo, textWidth);
     doc.text(lines, textX, textY);
     textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 2 : 0);
   });

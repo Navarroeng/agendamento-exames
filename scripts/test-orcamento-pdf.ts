@@ -19,14 +19,19 @@ const GOLD: [number, number, number] = [201, 151, 43];
 const WHITE: [number, number, number] = [255, 255, 255];
 
 const PROPOSTA_DESCRICAO_PARAGRAFOS = [
-  [
-    "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em",
-    "PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-",
-    "2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o",
-    "Laudo de Riscos Psicossociais conforme a nova NR-01.",
-  ].join("\n"),
+  "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o Laudo de Riscos Psicossociais conforme a nova NR-01.",
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
+
+function wrapDescricaoPropostaLines(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number
+): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  return doc.splitTextToSize(normalized, maxWidth);
+}
 
 function normalizeServicoNome(nome: string): string {
   return nome
@@ -83,18 +88,6 @@ function buildFilename(numero: string, clienteNome: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, 40);
   return `Proposta-${numero}-${cliente || "Cliente"}.pdf`;
-}
-
-function wrapParagraphLines(
-  doc: jsPDF,
-  text: string,
-  maxWidth: number
-): string[] {
-  return text.split("\n").flatMap((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return [];
-    return doc.splitTextToSize(trimmed, maxWidth);
-  });
 }
 
 assert.ok(isPacoteCompletoSst(PACOTE_COMPLETO_SST_NOME));
@@ -173,10 +166,22 @@ doc.setFontSize(16);
 doc.text("PROPOSTA COMERCIAL", MARGIN + CONTENT_W - 5, MARGIN + 14, { align: "right" });
 
 doc.setFontSize(7.5);
+const descricaoTextWidth = CONTENT_W - 10;
+const descricaoLines = wrapDescricaoPropostaLines(
+  doc,
+  PROPOSTA_DESCRICAO_PARAGRAFOS[0],
+  descricaoTextWidth
+);
+assert.ok(!PROPOSTA_DESCRICAO_PARAGRAFOS[0].includes("\n"));
+assert.ok(
+  descricaoLines.length <= 5,
+  "descrição deve aproveitar largura total com menos quebras"
+);
+
 PROPOSTA_DESCRICAO_PARAGRAFOS.forEach((paragrafo, index) => {
-  const lines = wrapParagraphLines(doc, paragrafo, CONTENT_W - 12);
+  const lines = wrapDescricaoPropostaLines(doc, paragrafo, descricaoTextWidth);
   assert.ok(lines.length > 0, `parágrafo ${index + 1} deve gerar linhas`);
-  doc.text(lines, MARGIN + 6, 60 + index * 20);
+  doc.text(lines, MARGIN + 5, 60 + index * 20);
 });
 
 comExames.forEach((item, index) => {
