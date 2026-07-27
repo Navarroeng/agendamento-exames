@@ -55,6 +55,16 @@ const inclusosPacote = resolveItensInclusosServico({
 });
 assert.deepEqual(inclusosPacote, [...PACOTE_COMPLETO_SST_ITENS]);
 
+const PACOTE_COMPLETO_INCLUSOS_ITENS = [
+  "Todos Laudos e Serviços listados à cima.",
+  "Gestão completa e envio ao eSocial",
+  "Exames Clínicos: 1",
+  "CAT - Cortesia",
+] as const;
+
+assert.equal(PACOTE_COMPLETO_INCLUSOS_ITENS.length, 4);
+assert.match(PACOTE_COMPLETO_INCLUSOS_ITENS[0], /à cima/);
+
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
 const CONTENT_W = 210 - MARGIN * 2;

@@ -54,6 +54,18 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
   "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
 ] as const;
 
+const PACOTE_COMPLETO_INCLUSOS_ITENS: readonly string[] = [
+  "Todos Laudos e Serviços listados à cima.",
+  "Gestão completa e envio ao eSocial",
+  "Exames Clínicos: 1",
+  "CAT - Cortesia",
+] as const;
+
+const PACOTE_COMPLETO_INCLUSOS_OBSERVACOES: readonly string[] = [
+  "Se necessário a realização de Exames\nComplementares serão cobrados à parte.",
+  "ASO's adicionais serão cobrados à parte.",
+] as const;
+
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
 
@@ -211,6 +223,90 @@ function collectAllInclusos(
   }
 
   return result;
+}
+
+function orcamentoHasPacoteCompleto(
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
+): boolean {
+  const itens = orcamento.orcamento_itens ?? [];
+  return itens.some((item) => {
+    const servico = resolveCatalogoServico(item, catalogo);
+    return isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
+  });
+}
+
+function measurePacoteCompletoInclusosBlockHeight(
+  doc: JsPDF,
+  width: number
+): number {
+  const textWidth = width - 10;
+  let h = 8;
+
+  doc.setFontSize(7.5);
+  PACOTE_COMPLETO_INCLUSOS_ITENS.forEach((item) => {
+    const lines = doc.splitTextToSize(`• ${item}`, textWidth);
+    h += lines.length * 3.6 + 1.5;
+  });
+
+  h += 4;
+  h += 5;
+
+  doc.setFontSize(7);
+  PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    h += lines.length * 3.5 + 2;
+  });
+
+  return h + 6;
+}
+
+function drawPacoteCompletoInclusosBlock(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  drawCard(doc, x, y, width, height, {
+    fill: GOLD_BG,
+    stroke: SLATE_200,
+  });
+
+  const textX = x + 5;
+  const textWidth = width - 10;
+  let itemY = y + 6;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  doc.text("O QUE ESTÁ INCLUSO?", textX, itemY);
+  itemY += 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SLATE_700);
+  PACOTE_COMPLETO_INCLUSOS_ITENS.forEach((item) => {
+    const lines = doc.splitTextToSize(`• ${item}`, textWidth);
+    doc.text(lines, textX, itemY);
+    itemY += lines.length * 3.6 + 1.5;
+  });
+
+  itemY += 3;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SLATE_700);
+  doc.text("Observações:", textX, itemY);
+  itemY += 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE_700);
+  PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    doc.text(lines, textX, itemY);
+    itemY += lines.length * 3.5 + 2;
+  });
 }
 
 function wrapParagraphLines(
@@ -613,11 +709,13 @@ function drawFinancialAndInclusosRow(
   doc: JsPDF,
   y: number,
   orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[],
   inclusos: string[]
 ): number {
   const pagamento = parseFormaPagamentoLines(orcamento.forma_pagamento);
   const descontoValor = calcDescontoValor(orcamento);
   const descontoPct = Number(orcamento.desconto_percentual);
+  const hasPacote = orcamentoHasPacoteCompleto(orcamento, catalogo);
 
   const boxW = 88;
   const boxH = 52;
@@ -625,7 +723,9 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
 
   let checklistBlockH = 0;
-  if (inclusos.length > 0) {
+  if (hasPacote) {
+    checklistBlockH = measurePacoteCompletoInclusosBlockHeight(doc, checklistW);
+  } else if (inclusos.length > 0) {
     doc.setFontSize(7);
     const itemsPerCol = Math.ceil(inclusos.length / 2);
     const colW = (checklistW - 8) / 2;
@@ -646,37 +746,49 @@ function drawFinancialAndInclusosRow(
 
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  if (inclusos.length > 0) {
-    const contentY = drawSectionTitle(doc, y, "O que está incluso");
+  if (hasPacote || inclusos.length > 0) {
+    const contentY = hasPacote
+      ? y + 7
+      : drawSectionTitle(doc, y, "O que está incluso");
     drawSectionTitle(doc, y, "Resumo financeiro", { x: boxX, width: 28 });
 
-    drawCard(doc, MARGIN, contentY, checklistW, checklistBlockH, {
-      fill: WHITE,
-      stroke: SLATE_200,
-    });
-
-    const colW = (checklistW - 8) / 2;
-    const itemsPerCol = Math.ceil(inclusos.length / 2);
-    const leftItems = inclusos.slice(0, itemsPerCol);
-    const rightItems = inclusos.slice(itemsPerCol);
-
-    const drawColumn = (items: string[], x: number, startItemY: number) => {
-      let itemY = startItemY;
-      items.forEach((item) => {
-        doc.setTextColor(...CHECK_GREEN);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.text("✓", x, itemY);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...SLATE_700);
-        const lines = doc.splitTextToSize(item, colW - 6);
-        doc.text(lines, x + 4, itemY);
-        itemY += lines.length * 3.6 + 2;
+    if (hasPacote) {
+      drawPacoteCompletoInclusosBlock(
+        doc,
+        MARGIN,
+        contentY,
+        checklistW,
+        checklistBlockH
+      );
+    } else {
+      drawCard(doc, MARGIN, contentY, checklistW, checklistBlockH, {
+        fill: WHITE,
+        stroke: SLATE_200,
       });
-    };
 
-    drawColumn(leftItems, MARGIN + 4, contentY + 5);
-    drawColumn(rightItems, MARGIN + colW + 4, contentY + 5);
+      const colW = (checklistW - 8) / 2;
+      const itemsPerCol = Math.ceil(inclusos.length / 2);
+      const leftItems = inclusos.slice(0, itemsPerCol);
+      const rightItems = inclusos.slice(itemsPerCol);
+
+      const drawColumn = (items: string[], x: number, startItemY: number) => {
+        let itemY = startItemY;
+        items.forEach((item) => {
+          doc.setTextColor(...CHECK_GREEN);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7);
+          doc.text("✓", x, itemY);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...SLATE_700);
+          const lines = doc.splitTextToSize(item, colW - 6);
+          doc.text(lines, x + 4, itemY);
+          itemY += lines.length * 3.6 + 2;
+        });
+      };
+
+      drawColumn(leftItems, MARGIN + 4, contentY + 5);
+      drawColumn(rightItems, MARGIN + colW + 4, contentY + 5);
+    }
 
     drawCard(doc, boxX, contentY, boxW, boxH, {
       fill: GOLD_BG,
@@ -888,7 +1000,7 @@ export async function gerarPdfOrcamento(
   y = drawClientCard(doc, y, orcamento, clienteInfo);
   y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS);
   y = drawServicesTable(doc, y, orcamento, catalogo);
-  y = drawFinancialAndInclusosRow(doc, y, orcamento, inclusos);
+  y = drawFinancialAndInclusosRow(doc, y, orcamento, catalogo, inclusos);
   y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");
 
   const totalPages = doc.getNumberOfPages();
