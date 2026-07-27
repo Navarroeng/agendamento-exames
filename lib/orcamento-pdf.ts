@@ -432,7 +432,9 @@ function drawClientCard(
 ): number {
   y = drawSectionTitle(doc, y, "Dados do cliente");
 
-  const cardH = 36;
+  const rowSpacing = 6;
+  const cardPaddingTop = 5.5;
+  const cardH = cardPaddingTop + rowSpacing * 3 + 4;
   drawCard(doc, MARGIN, y, CONTENT_W, cardH, {
     fill: WHITE,
     stroke: SLATE_200,
@@ -444,7 +446,7 @@ function drawClientCard(
 
   const col1X = MARGIN + 6;
   const col2X = MARGIN + CONTENT_W / 2 + 2;
-  let rowY = y + 7;
+  const rowY = y + cardPaddingTop;
 
   const fieldsLeft: [string, string][] = [
     ["Cliente", orcamento.cliente_nome],
@@ -463,7 +465,7 @@ function drawClientCard(
   doc.setFontSize(7);
 
   fieldsLeft.forEach(([label, value], index) => {
-    const lineY = rowY + index * 7.5;
+    const lineY = rowY + index * rowSpacing;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...SLATE_500);
     doc.text(label, col1X, lineY);
@@ -473,7 +475,7 @@ function drawClientCard(
   });
 
   fieldsRight.forEach(([label, value], index) => {
-    const lineY = rowY + index * 7.5;
+    const lineY = rowY + index * rowSpacing;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...SLATE_500);
     doc.text(label, col2X, lineY);
@@ -492,17 +494,20 @@ function measureDescricaoPropostaHeight(
 ): number {
   if (paragrafos.length === 0) return 0;
 
+  const cardPadding = 5;
   doc.setFontSize(7.5);
   const textWidth = CONTENT_W - 12;
-  let h = 6;
+  let h = cardPadding;
 
   paragrafos.forEach((paragrafo, index) => {
+    const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
+    doc.setFontSize(isNotaLegal ? 7 : 7.5);
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
     h += lines.length * 3.8;
-    if (index < paragrafos.length - 1) h += 4;
+    if (index < paragrafos.length - 1) h += 2;
   });
 
-  return h + 6;
+  return h + cardPadding;
 }
 
 function drawDescricaoProposta(
@@ -521,7 +526,7 @@ function drawDescricaoProposta(
     stroke: SLATE_200,
   });
 
-  let textY = y + 6;
+  let textY = y + 5;
   const textX = MARGIN + 6;
   const textWidth = CONTENT_W - 12;
 
@@ -533,7 +538,7 @@ function drawDescricaoProposta(
 
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
     doc.text(lines, textX, textY);
-    textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 4 : 0);
+    textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 2 : 0);
   });
 
   return y + blockH + 6;
