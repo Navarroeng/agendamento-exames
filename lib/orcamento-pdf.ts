@@ -40,7 +40,6 @@ const SLATE_900: [number, number, number] = [15, 23, 42];
 const CHECK_GREEN: [number, number, number] = [22, 101, 52];
 const GRAY_LINE: [number, number, number] = [217, 221, 229];
 const GOLD_STRONG: [number, number, number] = [168, 118, 18];
-const GOLD_TOTAL_BG: [number, number, number] = [252, 246, 232];
 
 /** Alinhado ao padrão visual dos cards de Fatura (Resumo / Dados Bancários). */
 const CARD_RADIUS = 2;
@@ -104,7 +103,7 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
 const DESCRICAO_CARD_PADDING_X = 5;
 
 const PACOTE_COMPLETO_INCLUSOS_OBSERVACOES: readonly string[] = [
-  "Se necessário, a realização de Exames Complementares será cobrada à parte.",
+  "Se necessário, a realização de Exames Complementares serão cobrados à parte.",
   "ASOs adicionais serão cobrados à parte.",
 ] as const;
 
@@ -440,22 +439,6 @@ function drawCardWithSoftShadow(
   drawCard(doc, x, y, w, h, options);
 }
 
-function drawDiscountBadge(doc: JsPDF, x: number, y: number, text: string): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6);
-  const textW = doc.getTextWidth(text);
-  const padX = 2.2;
-  const badgeW = textW + padX * 2;
-  const badgeH = 4.2;
-  doc.setFillColor(...GOLD_TOTAL_BG);
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(x - badgeW / 2, y - badgeH + 1, badgeW, badgeH, 1, 1, "FD");
-  doc.setTextColor(...GOLD_STRONG);
-  doc.text(text, x, y - 0.4, { align: "center" });
-  return badgeH + 2.5;
-}
-
 function drawSectionTitle(
   doc: JsPDF,
   y: number,
@@ -507,23 +490,38 @@ function drawFaturaStyleCardShell(
 }
 
 function measureFinancialCardContentHeight(): number {
-  return (
-    CARD_BODY_PAD +
-    3 +
-    12 +
-    3.5 +
-    0.5 +
-    3.5 +
-    3 +
-    10 +
-    3.5 +
-    0.5 +
-    3.5 +
-    3 +
-    5.5 +
-    8 +
-    5
-  );
+  return CARD_BODY_PAD + 5.5 + 4.5 + 4.5 + 5;
+}
+
+function drawFinancialSummaryRow(
+  doc: JsPDF,
+  labelX: number,
+  valueX: number,
+  y: number,
+  label: string,
+  value: string,
+  options?: {
+    labelFont?: number;
+    valueFont?: number;
+    valueColor?: RGB;
+    rowHeight?: number;
+  }
+): number {
+  const labelFont = options?.labelFont ?? 7.5;
+  const valueFont = options?.valueFont ?? 9;
+  const rowHeight = options?.rowHeight ?? 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(labelFont);
+  doc.setTextColor(...SLATE_700);
+  doc.text(label, labelX, y);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(valueFont);
+  doc.setTextColor(...(options?.valueColor ?? NAVY));
+  doc.text(value, valueX, y, { align: "right" });
+
+  return y + rowHeight;
 }
 
 export function resolveFirstPageCardsRow(
@@ -631,81 +629,49 @@ function drawResumoFinanceiroCard(
 ): void {
   const bodyY = drawFaturaStyleCardShell(doc, x, y, w, h, "Resumo Financeiro");
 
-  const centerX = x + w / 2;
-  const innerX = x + CARD_PAD_X;
-  const innerW = w - CARD_PAD_X * 2;
+  const labelX = x + CARD_PAD_X;
+  const valueX = x + w - CARD_PAD_X;
   let lineY = bodyY + CARD_BODY_PAD;
 
   const valorTotal = Number(orcamento.valor_total);
   const pagamento = calcCondicoesPagamentoProposta(valorTotal);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(...SLATE_500);
-  doc.text("VALOR TOTAL", centerX, lineY, { align: "center" });
-  lineY += 3.5;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...NAVY);
-  doc.text(formatCurrency(valorTotal), centerX, lineY, { align: "center" });
-  lineY += 5;
-
-  doc.setDrawColor(...GRAY_LINE);
-  doc.setLineWidth(0.2);
-  doc.line(innerX + 1, lineY, innerX + innerW - 1, lineY);
-  lineY += 3.5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SLATE_500);
-  doc.text("Pagamento parcelado", centerX, lineY, { align: "center" });
-  lineY += 4;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.setTextColor(...NAVY);
-  doc.text(pagamento.textoParcelado, centerX, lineY, { align: "center" });
-  lineY += 6;
-
-  doc.setDrawColor(...GRAY_LINE);
-  doc.setLineWidth(0.2);
-  doc.line(innerX + 1, lineY, innerX + innerW - 1, lineY);
-  lineY += 3.5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SLATE_500);
-  doc.text("À vista com 5% de desconto", centerX, lineY, { align: "center" });
-  lineY += 3.5;
-  lineY += drawDiscountBadge(doc, centerX, lineY, "5% OFF");
-
-  const avistaBandH = 7;
-  doc.setFillColor(...GOLD_TOTAL_BG);
-  doc.roundedRect(
-    innerX + 1,
+  lineY = drawFinancialSummaryRow(
+    doc,
+    labelX,
+    valueX,
     lineY,
-    innerW - 2,
-    avistaBandH,
-    1.2,
-    1.2,
-    "F"
+    "Valor Total",
+    formatCurrency(valorTotal),
+    { labelFont: 8, valueFont: 11, rowHeight: 5.5 }
   );
-  doc.setDrawColor(...GOLD_LIGHT);
-  doc.setLineWidth(0.25);
-  doc.line(innerX + 2, lineY, innerX + innerW - 2, lineY);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...GOLD_STRONG);
-  doc.text(pagamento.textoAVista, centerX, lineY + 4.8, { align: "center" });
+  lineY = drawFinancialSummaryRow(
+    doc,
+    labelX,
+    valueX,
+    lineY,
+    "Pagamento parcelado",
+    pagamento.textoParcelado,
+    { valueFont: 9.5, rowHeight: 4.5 }
+  );
+
+  drawFinancialSummaryRow(
+    doc,
+    labelX,
+    valueX,
+    lineY,
+    "À vista (5% de desconto)",
+    pagamento.textoAVista,
+    { valueFont: 10, valueColor: GOLD_STRONG, rowHeight: 4.5 }
+  );
 
   doc.setFont("helvetica", "italic");
   doc.setFontSize(5.5);
   doc.setTextColor(...SLATE_500);
   doc.text(
     "Valores sujeitos à validade da proposta.",
-    centerX,
+    x + w / 2,
     y + h - 3,
     { align: "center" }
   );
@@ -718,7 +684,7 @@ function measureStructuredInclusoItemHeight(
 ): number {
   const separator = text.includes(": ") ? ": " : text.includes(" - ") ? " - " : null;
   if (separator) {
-    return INCLUSO_LINE_H + INCLUSO_LINE_H + CARD_ITEM_GAP;
+    return INCLUSO_LINE_H + CARD_ITEM_GAP;
   }
 
   doc.setFontSize(8);
@@ -742,11 +708,12 @@ function drawStructuredInclusoItem(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...NAVY);
-    doc.text(`${label}:`, x, y);
+    const labelText = `${label}:`;
+    doc.text(labelText, x, y);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_700);
-    doc.text(value, x, y + INCLUSO_LINE_H);
-    return y + INCLUSO_LINE_H * 2 + CARD_ITEM_GAP;
+    doc.text(` ${value}`, x + doc.getTextWidth(`${labelText} `), y);
+    return y + INCLUSO_LINE_H + CARD_ITEM_GAP;
   }
 
   if (dashIdx > 0) {
@@ -755,11 +722,12 @@ function drawStructuredInclusoItem(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...NAVY);
-    doc.text(`${label}:`, x, y);
+    const labelText = `${label}:`;
+    doc.text(labelText, x, y);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_700);
-    doc.text(value, x, y + INCLUSO_LINE_H);
-    return y + INCLUSO_LINE_H * 2 + CARD_ITEM_GAP;
+    doc.text(` ${value}`, x + doc.getTextWidth(`${labelText} `), y);
+    return y + INCLUSO_LINE_H + CARD_ITEM_GAP;
   }
 
   doc.setFont("helvetica", "normal");
