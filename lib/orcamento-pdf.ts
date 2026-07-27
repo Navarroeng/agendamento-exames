@@ -46,6 +46,12 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 const FOOTER_Y = 283;
 const FOOTER_H = 12;
 
+/** Opacidade da marca d'água (5–10%). */
+export const ORCAMENTO_WATERMARK_OPACITY = 0.08;
+/** Largura da marca d'água em relação à área útil (35–45%). */
+export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.4;
+const NAVARRO_SYMBOL_URL = "/apple-touch-icon.png";
+
 const NAVARRO = {
   site: "www.navarroeng.com.br",
   email: "contato@navarroeng.com.br",
@@ -163,6 +169,128 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
   } catch {
     return null;
   }
+}
+
+function tintSymbolImageDataGold(imageData: ImageData): void {
+  const { data } = imageData;
+  const [gr, gg, gb] = GOLD;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const a = data[i + 3];
+
+    if (a < 16 || (r > 242 && g > 242 && b > 242)) {
+      data[i + 3] = 0;
+      continue;
+    }
+
+    data[i] = gr;
+    data[i + 1] = gg;
+    data[i + 2] = gb;
+  }
+}
+
+async function loadNavarroSymbolWatermark(): Promise<LogoAsset | null> {
+  if (typeof document === "undefined") return null;
+
+  try {
+    const response = await fetch(NAVARRO_SYMBOL_URL);
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("symbol load failed"));
+      image.src = objectUrl;
+    });
+
+    const dims = { w: img.naturalWidth, h: img.naturalHeight };
+    const canvas = document.createElement("canvas");
+    canvas.width = dims.w;
+    canvas.height = dims.h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      URL.revokeObjectURL(objectUrl);
+      return null;
+    }
+
+    ctx.drawImage(img, 0, 0, dims.w, dims.h);
+    URL.revokeObjectURL(objectUrl);
+
+    const imageData = ctx.getImageData(0, 0, dims.w, dims.h);
+    tintSymbolImageDataGold(imageData);
+    ctx.putImageData(imageData, 0, 0);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      width: dims.w,
+      height: dims.h,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function calcOrcamentoWatermarkLayout(
+  contentWidth: number,
+  pageWidth: number,
+  yTop: number,
+  yBottom: number,
+  symbolWidth: number,
+  symbolHeight: number
+): { x: number; y: number; w: number; h: number } {
+  const w = contentWidth * ORCAMENTO_WATERMARK_WIDTH_RATIO;
+  const h = (symbolHeight / symbolWidth) * w;
+  const x = (pageWidth - w) / 2;
+  const span = Math.max(yBottom - yTop, 20);
+  const y = yTop + (span - h) / 2;
+  return { x, y, w, h };
+}
+
+function measureDescricaoSectionHeight(
+  doc: JsPDF,
+  paragrafos: readonly string[]
+): number {
+  if (paragrafos.length === 0) return 0;
+  return 7 + measureDescricaoPropostaHeight(doc, paragrafos) + 6;
+}
+
+function calcOrcamentoWatermarkRegion(
+  doc: JsPDF,
+  contentStartY: number,
+  paragrafos: readonly string[]
+): { yTop: number; yBottom: number } {
+  const descricaoSectionH = measureDescricaoSectionHeight(doc, paragrafos);
+  const yTop = contentStartY + Math.max(0, descricaoSectionH - 10);
+  const yBottom = contentStartY + descricaoSectionH + 7 + 34;
+  return { yTop, yBottom };
+}
+
+function drawNavarroWatermark(
+  doc: JsPDF,
+  symbol: LogoAsset,
+  yTop: number,
+  yBottom: number,
+  GStateCtor: new (opts: { opacity: number }) => object
+): void {
+  const { x, y, w, h } = calcOrcamentoWatermarkLayout(
+    CONTENT_W,
+    PAGE_W,
+    yTop,
+    yBottom,
+    symbol.width,
+    symbol.height
+  );
+
+  doc.saveGraphicsState();
+  doc.setGState(new GStateCtor({ opacity: ORCAMENTO_WATERMARK_OPACITY }));
+  doc.addImage(symbol.dataUrl, "PNG", x, y, w, h, undefined, "FAST");
+  doc.restoreGraphicsState();
 }
 
 async function resolveClientePdfInfo(
@@ -1131,11 +1259,12 @@ function buildFilename(orcamento: OrcamentoComItens): string {
 export async function gerarPdfOrcamento(
   orcamento: OrcamentoComItens
 ): Promise<void> {
-  const { jsPDF } = await import("jspdf");
+  const { jsPDF, GState } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-  const [logo, catalogo, clienteInfo] = await Promise.all([
+  const [logo, symbolWatermark, catalogo, clienteInfo] = await Promise.all([
     loadLogoAsset(),
+    loadNavarroSymbolWatermark(),
     listarServicosSst(),
     resolveClientePdfInfo(orcamento),
   ]);
@@ -1144,7 +1273,24 @@ export async function gerarPdfOrcamento(
 
   let y = drawHeader(doc, logo, orcamento);
   y = drawClientCard(doc, y, orcamento, clienteInfo);
-  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS);
+
+  const contentStartY = y;
+  const watermarkRegion = calcOrcamentoWatermarkRegion(
+    doc,
+    contentStartY,
+    PROPOSTA_DESCRICAO_PARAGRAFOS
+  );
+  if (symbolWatermark) {
+    drawNavarroWatermark(
+      doc,
+      symbolWatermark,
+      watermarkRegion.yTop,
+      watermarkRegion.yBottom,
+      GState
+    );
+  }
+
+  y = drawDescricaoProposta(doc, contentStartY, PROPOSTA_DESCRICAO_PARAGRAFOS);
   y = drawServicesTable(doc, y, orcamento, catalogo);
   y = drawFinancialAndInclusosRow(doc, y, orcamento, catalogo, inclusos);
   y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");

@@ -9,6 +9,11 @@ import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
 } from "../lib/orcamento-calculo";
+import {
+  ORCAMENTO_WATERMARK_OPACITY,
+  ORCAMENTO_WATERMARK_WIDTH_RATIO,
+  calcOrcamentoWatermarkLayout,
+} from "../lib/orcamento-pdf";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 import {
@@ -101,9 +106,31 @@ assert.equal(
   1500
 );
 
+assert.ok(
+  ORCAMENTO_WATERMARK_OPACITY >= 0.05 && ORCAMENTO_WATERMARK_OPACITY <= 0.1
+);
+assert.ok(
+  ORCAMENTO_WATERMARK_WIDTH_RATIO >= 0.35 &&
+    ORCAMENTO_WATERMARK_WIDTH_RATIO <= 0.45
+);
+
+const CONTENT_W = 186;
+const PAGE_W = 210;
+const watermark = calcOrcamentoWatermarkLayout(
+  CONTENT_W,
+  PAGE_W,
+  118,
+  178,
+  180,
+  180
+);
+assert.equal(watermark.w, CONTENT_W * ORCAMENTO_WATERMARK_WIDTH_RATIO);
+assert.equal(watermark.x, (PAGE_W - watermark.w) / 2);
+assert.equal(watermark.x + watermark.w / 2, PAGE_W / 2);
+assert.equal(watermark.h, watermark.w);
+
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
-const CONTENT_W = 210 - MARGIN * 2;
 
 doc.setFillColor(...NAVY);
 doc.roundedRect(MARGIN, MARGIN, CONTENT_W, 40, 3, 3, "F");
