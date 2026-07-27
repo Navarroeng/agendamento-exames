@@ -34,6 +34,11 @@ const SLATE_700: [number, number, number] = [51, 65, 85];
 const SLATE_900: [number, number, number] = [15, 23, 42];
 const CHECK_GREEN: [number, number, number] = [22, 101, 52];
 
+const PREMIUM_CARD_RADIUS = 3;
+const PREMIUM_CARD_HEADER_H = 9;
+const PREMIUM_CARD_PADDING = 5;
+const CHECKLIST_ITEM_GAP = 4.2;
+
 const MARGIN = 12;
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -283,30 +288,181 @@ function orcamentoHasPacoteCompleto(
   });
 }
 
+function drawPremiumCardShell(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  title: string,
+  options?: { bodyFill?: RGB }
+): number {
+  const bodyFill = options?.bodyFill ?? WHITE;
+
+  doc.setFillColor(...bodyFill);
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, h, PREMIUM_CARD_RADIUS, PREMIUM_CARD_RADIUS, "FD");
+
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(
+    x,
+    y,
+    w,
+    PREMIUM_CARD_HEADER_H,
+    PREMIUM_CARD_RADIUS,
+    PREMIUM_CARD_RADIUS,
+    "F"
+  );
+
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.55);
+  doc.line(
+    x + 4,
+    y + PREMIUM_CARD_HEADER_H - 0.6,
+    x + w - 4,
+    y + PREMIUM_CARD_HEADER_H - 0.6
+  );
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...WHITE);
+  doc.text(title.toUpperCase(), x + PREMIUM_CARD_PADDING, y + 6.2);
+
+  return y + PREMIUM_CARD_HEADER_H + PREMIUM_CARD_PADDING;
+}
+
+function drawChecklistItem(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  textWidth: number,
+  item: string
+): number {
+  doc.setTextColor(...CHECK_GREEN);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.text("✓", x, y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SLATE_700);
+  const lines = doc.splitTextToSize(item, textWidth);
+  doc.text(lines, x + 4.5, y);
+  return y + lines.length * 3.6 + CHECKLIST_ITEM_GAP;
+}
+
+function measureResumoFinanceiroCardHeight(): number {
+  return (
+    PREMIUM_CARD_HEADER_H +
+    PREMIUM_CARD_PADDING +
+    14 +
+    2 +
+    5 +
+    12 +
+    2 +
+    5 +
+    12 +
+    PREMIUM_CARD_PADDING
+  );
+}
+
+function drawResumoFinanceiroCard(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  orcamento: OrcamentoComItens
+): void {
+  const contentY = drawPremiumCardShell(
+    doc,
+    x,
+    y,
+    w,
+    h,
+    "Resumo Financeiro",
+    { bodyFill: WHITE }
+  );
+
+  const innerX = x + PREMIUM_CARD_PADDING;
+  const innerW = w - PREMIUM_CARD_PADDING * 2;
+  const valorTotal = Number(orcamento.valor_total);
+  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+  let lineY = contentY;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE_500);
+  doc.text("Valor Total", innerX, lineY);
+  lineY += 4.5;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...NAVY);
+  doc.text(formatCurrency(valorTotal), innerX, lineY);
+  lineY += 7;
+
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.2);
+  doc.line(innerX, lineY, innerX + innerW, lineY);
+  lineY += 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.8);
+  doc.setTextColor(...SLATE_500);
+  doc.text("Pagamento parcelado", innerX, lineY);
+  lineY += 4;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...SLATE_700);
+  doc.text(pagamento.textoParcelado, innerX, lineY);
+  lineY += 7;
+
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.2);
+  doc.line(innerX, lineY, innerX + innerW, lineY);
+  lineY += 5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.8);
+  doc.setTextColor(...SLATE_500);
+  doc.text("Valor à vista", innerX, lineY);
+  lineY += 4;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...SLATE_700);
+  doc.text(pagamento.textoAVista, innerX, lineY);
+}
+
 function measurePacoteCompletoInclusosBlockHeight(
   doc: JsPDF,
   width: number,
   itens: string[]
 ): number {
-  const textWidth = width - 10;
-  let h = 8;
+  const textWidth = width - PREMIUM_CARD_PADDING * 2 - 5;
+  let h = PREMIUM_CARD_HEADER_H + PREMIUM_CARD_PADDING;
 
   doc.setFontSize(7.5);
   itens.forEach((item) => {
-    const lines = doc.splitTextToSize(`• ${item}`, textWidth);
-    h += lines.length * 3.6 + 1.5;
+    const lines = doc.splitTextToSize(item, textWidth);
+    h += lines.length * 3.6 + CHECKLIST_ITEM_GAP;
   });
 
+  h += 3;
   h += 4;
   h += 5;
-
   doc.setFontSize(7);
   PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
     h += lines.length * 3.5 + 2;
   });
+  h += 5;
+  h += PREMIUM_CARD_PADDING;
 
-  return h + 6;
+  return h;
 }
 
 function drawPacoteCompletoInclusosBlock(
@@ -317,44 +473,62 @@ function drawPacoteCompletoInclusosBlock(
   height: number,
   itens: string[]
 ): void {
-  drawCard(doc, x, y, width, height, {
-    fill: GOLD_BG,
-    stroke: SLATE_200,
-  });
+  const contentY = drawPremiumCardShell(
+    doc,
+    x,
+    y,
+    width,
+    height,
+    "O que está incluso?",
+    { bodyFill: WHITE }
+  );
 
-  const textX = x + 5;
-  const textWidth = width - 10;
-  let itemY = y + 6;
+  const textX = x + PREMIUM_CARD_PADDING;
+  const textWidth = width - PREMIUM_CARD_PADDING * 2 - 5;
+  let itemY = contentY;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(...NAVY);
-  doc.text("O QUE ESTÁ INCLUSO?", textX, itemY);
-  itemY += 5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...SLATE_700);
   itens.forEach((item) => {
-    const lines = doc.splitTextToSize(`• ${item}`, textWidth);
-    doc.text(lines, textX, itemY);
-    itemY += lines.length * 3.6 + 1.5;
+    itemY = drawChecklistItem(doc, textX, itemY, textWidth, item);
   });
 
-  itemY += 3;
+  const obsPadding = 3;
+  const obsLabelH = 5;
+  doc.setFontSize(7);
+  let obsContentH = obsLabelH;
+  PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    obsContentH += lines.length * 3.5 + 2;
+  });
+  const obsBlockH = obsContentH + obsPadding * 2;
+  const obsY = y + height - PREMIUM_CARD_PADDING - obsBlockH;
+
+  doc.setFillColor(...SLATE_50);
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(
+    textX - 1,
+    obsY,
+    width - PREMIUM_CARD_PADDING * 2 + 2,
+    obsBlockH,
+    2,
+    2,
+    "FD"
+  );
+
+  let obsTextY = obsY + obsPadding + 3.5;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(...SLATE_700);
-  doc.text("Observações:", textX, itemY);
-  itemY += 5;
+  doc.text("Observações:", textX, obsTextY);
+  obsTextY += obsLabelH;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SLATE_700);
   PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, textWidth);
-    doc.text(lines, textX, itemY);
-    itemY += lines.length * 3.5 + 2;
+    doc.text(lines, textX, obsTextY);
+    obsTextY += lines.length * 3.5 + 2;
   });
 }
 
@@ -380,68 +554,70 @@ function wrapDescricaoPropostaLines(
   return doc.splitTextToSize(normalized, maxWidth);
 }
 
-function calcDescontoValor(orcamento: OrcamentoComItens): number {
-  const subtotal = Number(orcamento.subtotal);
-  const total = Number(orcamento.valor_total);
-  const pct = Number(orcamento.desconto_percentual);
-  if (pct > 0) {
-    return Math.max(0, subtotal - total);
-  }
-  return Math.max(0, subtotal - total);
+function measureGenericInclusosCardHeight(
+  doc: JsPDF,
+  width: number,
+  inclusos: string[]
+): number {
+  const colW = (width - PREMIUM_CARD_PADDING * 2 - 4) / 2;
+  const itemsPerCol = Math.ceil(inclusos.length / 2);
+  doc.setFontSize(7.5);
+  const measureCol = (items: string[]) =>
+    items.reduce((sum, item) => {
+      const lines = doc.splitTextToSize(item, colW - 5);
+      return sum + lines.length * 3.6 + CHECKLIST_ITEM_GAP;
+    }, 0);
+  const colH = Math.max(
+    measureCol(inclusos.slice(0, itemsPerCol)),
+    measureCol(inclusos.slice(itemsPerCol))
+  );
+  return PREMIUM_CARD_HEADER_H + PREMIUM_CARD_PADDING + colH + PREMIUM_CARD_PADDING;
 }
 
-function paintResumoFinanceiro(
+function drawGenericInclusosCard(
   doc: JsPDF,
-  orcamento: OrcamentoComItens,
-  startY: number,
-  labelX: number,
-  valueX: number
-): number {
-  let lineY = startY;
-  const descontoValor = calcDescontoValor(orcamento);
-  const descontoPct = Number(orcamento.desconto_percentual);
-  const valorTotal = Number(orcamento.valor_total);
-  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  inclusos: string[]
+): void {
+  const contentY = drawPremiumCardShell(
+    doc,
+    x,
+    y,
+    w,
+    h,
+    "O que está incluso?",
+    { bodyFill: WHITE }
+  );
 
-  const drawLine = (
-    label: string,
-    value: string,
-    options?: { bold?: boolean; size?: number; color?: RGB }
-  ) => {
-    doc.setFont("helvetica", options?.bold ? "bold" : "normal");
-    doc.setFontSize(options?.size ?? 7.5);
-    doc.setTextColor(...(options?.color ?? SLATE_700));
-    doc.text(label, labelX, lineY);
-    doc.text(value, valueX, lineY, { align: "right" });
-    lineY += options?.size && options.size > 8 ? 8 : 5.5;
-  };
+  const colW = (w - PREMIUM_CARD_PADDING * 2 - 4) / 2;
+  const itemsPerCol = Math.ceil(inclusos.length / 2);
+  const leftItems = inclusos.slice(0, itemsPerCol);
+  const rightItems = inclusos.slice(itemsPerCol);
 
-  drawLine("Subtotal", formatCurrency(Number(orcamento.subtotal)));
-
-  if (descontoPct > 0 || descontoValor > 0) {
-    drawLine(
-      "Desconto",
-      `${descontoPct.toFixed(2).replace(".", ",")}% (${formatCurrency(descontoValor)})`
+  let leftY = contentY;
+  leftItems.forEach((item) => {
+    leftY = drawChecklistItem(
+      doc,
+      x + PREMIUM_CARD_PADDING,
+      leftY,
+      colW - 5,
+      item
     );
-  }
-
-  lineY += 1;
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.3);
-  doc.line(labelX, lineY, valueX, lineY);
-  lineY += 6;
-
-  drawLine("Valor Total", formatCurrency(valorTotal), {
-    bold: true,
-    size: 11,
-    color: NAVY,
   });
 
-  lineY += 1;
-  drawLine("Pagamento parcelado", pagamento.textoParcelado, { size: 7 });
-  drawLine("Valor à vista", pagamento.textoAVista, { size: 7 });
-
-  return lineY;
+  let rightY = contentY;
+  rightItems.forEach((item) => {
+    rightY = drawChecklistItem(
+      doc,
+      x + PREMIUM_CARD_PADDING + colW + 4,
+      rightY,
+      colW - 5,
+      item
+    );
+  });
 }
 
 /* ── Cabeçalho ─────────────────────────────────────────────────── */
@@ -704,26 +880,37 @@ function drawServicesTable(
     MARGIN + colWidths[0] + colWidths[1],
   ];
   const headers = ["Serviço", "Quantidade de Colaboradores", "Valor"];
-  const tableHeadH = 10;
+  const tableHeadH = 12;
+  const tableHeadFont = 7;
 
   const drawTableHead = (startY: number) => {
     doc.setFillColor(...NAVY);
     doc.roundedRect(MARGIN, startY, CONTENT_W, tableHeadH, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...WHITE);
+    doc.setFontSize(tableHeadFont);
     headers.forEach((header, index) => {
       const colW = colWidths[index] ?? 0;
+      const headerY = startY + tableHeadH / 2 + 1;
+
+      if (index === 1) {
+        const centerX = colStarts[index] + colW / 2;
+        const lines = doc.splitTextToSize(header, colW - 6);
+        const lineHeight = 3.2;
+        const blockH = lines.length * lineHeight;
+        const textY = startY + (tableHeadH - blockH) / 2 + 2.5;
+        lines.forEach((line: string, lineIndex: number) => {
+          doc.text(line, centerX, textY + lineIndex * lineHeight, {
+            align: "center",
+          });
+        });
+        return;
+      }
+
       const x =
-        index === 0
-          ? colStarts[index] + 3
-          : colStarts[index] + colW - 2;
+        index === 0 ? colStarts[index] + 3 : colStarts[index] + colW - 2;
       const align = index === 0 ? "left" : "right";
-      doc.setFontSize(index === 1 ? 6 : 7);
-      const lines =
-        index === 1
-          ? doc.splitTextToSize(header, colW - 4)
-          : [header];
-      doc.text(lines, x, startY + 5.8, { align });
+      doc.text(header, x, headerY, { align });
     });
     return startY + tableHeadH;
   };
@@ -789,9 +976,9 @@ function drawServicesTable(
     doc.setTextColor(...SLATE_900);
     doc.text(
       String(Math.round(Number(item.quantidade))),
-      colStarts[1] + colWidths[1] - 2,
+      colStarts[1] + colWidths[1] / 2,
       valueY,
-      { align: "right" }
+      { align: "center" }
     );
     doc.setFont("helvetica", "bold");
     doc.text(
@@ -822,122 +1009,52 @@ function drawFinancialAndInclusosRow(
   inclusos: string[]
 ): number {
   const hasPacote = orcamentoHasPacoteCompleto(orcamento, catalogo);
-
   const boxW = 88;
-  const boxH = 52;
   const gap = 5;
   const checklistW = CONTENT_W - boxW - gap;
+  const boxX = MARGIN + CONTENT_W - boxW;
 
-  let checklistBlockH = 0;
   const pacoteInclusosItens = hasPacote
     ? buildPacoteCompletoInclusosItens(orcamento)
     : [];
 
+  const financeiroH = measureResumoFinanceiroCardHeight();
+  let inclusosH = 0;
+
   if (hasPacote) {
-    checklistBlockH = measurePacoteCompletoInclusosBlockHeight(
+    inclusosH = measurePacoteCompletoInclusosBlockHeight(
       doc,
       checklistW,
       pacoteInclusosItens
     );
   } else if (inclusos.length > 0) {
-    doc.setFontSize(7);
-    const itemsPerCol = Math.ceil(inclusos.length / 2);
-    const colW = (checklistW - 8) / 2;
-    const measureCol = (items: string[]) =>
-      items.reduce((sum, item) => {
-        const lines = doc.splitTextToSize(item, colW - 6);
-        return sum + lines.length * 3.6 + 2;
-      }, 8);
-    checklistBlockH =
-      Math.max(
-        measureCol(inclusos.slice(0, itemsPerCol)),
-        measureCol(inclusos.slice(itemsPerCol))
-      ) + 10;
+    inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
   }
 
-  const rowH = Math.max(boxH + 8, checklistBlockH + 8);
-  y = ensureSpace(doc, y, rowH);
+  const hasInclusosCard = hasPacote || inclusos.length > 0;
+  const cardH = hasInclusosCard
+    ? Math.max(inclusosH, financeiroH)
+    : financeiroH;
 
-  const boxX = MARGIN + CONTENT_W - boxW;
+  y = ensureSpace(doc, y, cardH + 6);
+  const cardY = y;
 
-  if (hasPacote || inclusos.length > 0) {
-    const contentY = hasPacote
-      ? y + 7
-      : drawSectionTitle(doc, y, "O que está incluso");
-    drawSectionTitle(doc, y, "Resumo financeiro", { x: boxX, width: 28 });
-
-    if (hasPacote) {
-      drawPacoteCompletoInclusosBlock(
-        doc,
-        MARGIN,
-        contentY,
-        checklistW,
-        checklistBlockH,
-        pacoteInclusosItens
-      );
-    } else {
-      drawCard(doc, MARGIN, contentY, checklistW, checklistBlockH, {
-        fill: WHITE,
-        stroke: SLATE_200,
-      });
-
-      const colW = (checklistW - 8) / 2;
-      const itemsPerCol = Math.ceil(inclusos.length / 2);
-      const leftItems = inclusos.slice(0, itemsPerCol);
-      const rightItems = inclusos.slice(itemsPerCol);
-
-      const drawColumn = (items: string[], x: number, startItemY: number) => {
-        let itemY = startItemY;
-        items.forEach((item) => {
-          doc.setTextColor(...CHECK_GREEN);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
-          doc.text("✓", x, itemY);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...SLATE_700);
-          const lines = doc.splitTextToSize(item, colW - 6);
-          doc.text(lines, x + 4, itemY);
-          itemY += lines.length * 3.6 + 2;
-        });
-      };
-
-      drawColumn(leftItems, MARGIN + 4, contentY + 5);
-      drawColumn(rightItems, MARGIN + colW + 4, contentY + 5);
-    }
-
-    drawCard(doc, boxX, contentY, boxW, boxH, {
-      fill: GOLD_BG,
-      stroke: GOLD,
-      radius: 3,
-    });
-
-    doc.setDrawColor(...GOLD);
-    doc.setLineWidth(1);
-    doc.line(boxX, contentY, boxX, contentY + boxH);
-
-    const labelX = boxX + 5;
-    const valueX = boxX + boxW - 5;
-    paintResumoFinanceiro(doc, orcamento, contentY + 8, labelX, valueX);
-
-    return Math.max(contentY + checklistBlockH, contentY + boxH) + 6;
+  if (hasPacote) {
+    drawPacoteCompletoInclusosBlock(
+      doc,
+      MARGIN,
+      cardY,
+      checklistW,
+      cardH,
+      pacoteInclusosItens
+    );
+  } else if (inclusos.length > 0) {
+    drawGenericInclusosCard(doc, MARGIN, cardY, checklistW, cardH, inclusos);
   }
 
-  y = drawSectionTitle(doc, y, "Resumo financeiro");
-  drawCard(doc, boxX, y, boxW, boxH, {
-    fill: GOLD_BG,
-    stroke: GOLD,
-    radius: 3,
-  });
+  drawResumoFinanceiroCard(doc, boxX, cardY, boxW, cardH, orcamento);
 
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(1);
-  doc.line(boxX, y, boxX, y + boxH);
-
-  const labelX = boxX + 5;
-  const valueX = boxX + boxW - 5;
-  paintResumoFinanceiro(doc, orcamento, y + 8, labelX, valueX);
-
-  return y + boxH + 6;
+  return cardY + cardH + 6;
 }
 
 /* ── Observações ───────────────────────────────────────────────── */
