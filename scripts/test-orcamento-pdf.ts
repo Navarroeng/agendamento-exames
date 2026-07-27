@@ -108,11 +108,11 @@ assert.equal(
 );
 
 assert.ok(
-  ORCAMENTO_WATERMARK_OPACITY >= 0.05 && ORCAMENTO_WATERMARK_OPACITY <= 0.1
+  ORCAMENTO_WATERMARK_OPACITY >= 0.04 && ORCAMENTO_WATERMARK_OPACITY <= 0.08
 );
 assert.ok(
-  ORCAMENTO_WATERMARK_WIDTH_RATIO >= 0.35 &&
-    ORCAMENTO_WATERMARK_WIDTH_RATIO <= 0.45
+  ORCAMENTO_WATERMARK_WIDTH_RATIO >= 0.75 &&
+    ORCAMENTO_WATERMARK_WIDTH_RATIO <= 0.85
 );
 
 const CONTENT_W = 186;
@@ -120,15 +120,16 @@ const PAGE_W = 210;
 const watermark = calcOrcamentoWatermarkLayout(
   CONTENT_W,
   PAGE_W,
-  118,
-  178,
+  95,
+  265,
   180,
   180
 );
 assert.equal(watermark.w, CONTENT_W * ORCAMENTO_WATERMARK_WIDTH_RATIO);
 assert.equal(watermark.x, (PAGE_W - watermark.w) / 2);
 assert.equal(watermark.x + watermark.w / 2, PAGE_W / 2);
-assert.equal(watermark.h, watermark.w);
+assert.ok(watermark.h <= (265 - 95) * 0.92 + 0.1);
+assert.ok(watermark.y >= 95);
 
 const cardsRow = resolveFirstPageCardsRow(248, 58);
 assert.equal(cardsRow.cardY, 248);

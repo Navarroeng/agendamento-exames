@@ -50,10 +50,18 @@ const FOOTER_Y = 283;
 const FOOTER_H = 12;
 const FIRST_PAGE_CONTENT_BOTTOM = FOOTER_Y - 3;
 
-/** Opacidade da marca d'água (5–10%). */
-export const ORCAMENTO_WATERMARK_OPACITY = 0.08;
-/** Largura da marca d'água em relação à área útil (35–45%). */
-export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.4;
+/** Opacidade da marca d'água sobreposta (4–8%). */
+export const ORCAMENTO_WATERMARK_OPACITY = 0.06;
+/** Largura da marca d'água em relação à área útil (~2× o tamanho anterior). */
+export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.8;
+const LOGO_BG_RADIUS_PX = 10;
+const CLIENT_LABEL_FONT = 8;
+const CLIENT_VALUE_FONT = 8.5;
+const TABLE_HEAD_FONT = 8.5;
+const TABLE_SERVICE_FONT = 8.5;
+const TABLE_DETAIL_FONT = 7.5;
+const TABLE_CELL_FONT = 8.5;
+const TABLE_DETAIL_LINE_H = 2.85;
 const NAVARRO_SYMBOL_URL = "/apple-touch-icon.png";
 
 const NAVARRO = {
@@ -139,6 +147,53 @@ interface ClientePdfInfo {
   cidade: string;
 }
 
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+async function applyLogoRoundedBackground(
+  img: HTMLImageElement,
+  radiusPx: number
+): Promise<string> {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return img.src;
+
+  ctx.fillStyle = "#ffffff";
+  roundRectPath(ctx, 0, 0, w, h, radiusPx);
+  ctx.fill();
+
+  ctx.save();
+  roundRectPath(ctx, 0, 0, w, h, radiusPx);
+  ctx.clip();
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.restore();
+
+  return canvas.toDataURL("image/png");
+}
+
 /* ── Utilitários ─────────────────────────────────────────────────── */
 async function loadLogoAsset(): Promise<LogoAsset | null> {
   try {
@@ -152,16 +207,28 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       reader.readAsDataURL(blob);
     });
 
-    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+    const loaded = await new Promise<{
+      w: number;
+      h: number;
+      img: HTMLImageElement;
+    }>((resolve, reject) => {
       const img = new Image();
       img.onload = () =>
-        resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: 280, h: 64 });
+        resolve({ w: img.naturalWidth, h: img.naturalHeight, img });
+      img.onerror = () => reject(new Error("logo load failed"));
       img.src = dataUrl;
     });
 
+    let finalDataUrl = dataUrl;
+    if (typeof document !== "undefined") {
+      finalDataUrl = await applyLogoRoundedBackground(
+        loaded.img,
+        LOGO_BG_RADIUS_PX
+      );
+    }
+
     const maxMm = 26;
-    const ratio = dims.w / dims.h;
+    const ratio = loaded.w / loaded.h;
     let width = maxMm;
     let height = width / ratio;
     if (height > maxMm) {
@@ -169,7 +236,7 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
       width = height * ratio;
     }
 
-    return { dataUrl, width, height };
+    return { dataUrl: finalDataUrl, width, height };
   } catch {
     return null;
   }
@@ -248,10 +315,16 @@ export function calcOrcamentoWatermarkLayout(
   symbolWidth: number,
   symbolHeight: number
 ): { x: number; y: number; w: number; h: number } {
-  const w = contentWidth * ORCAMENTO_WATERMARK_WIDTH_RATIO;
-  const h = (symbolHeight / symbolWidth) * w;
-  const x = (pageWidth - w) / 2;
   const span = Math.max(yBottom - yTop, 20);
+  let w = contentWidth * ORCAMENTO_WATERMARK_WIDTH_RATIO;
+  let h = (symbolHeight / symbolWidth) * w;
+
+  if (h > span * 0.92) {
+    h = span * 0.92;
+    w = (symbolWidth / symbolHeight) * h;
+  }
+
+  const x = (pageWidth - w) / 2;
   const y = yTop + (span - h) / 2;
   return { x, y, w, h };
 }
@@ -264,18 +337,7 @@ function measureDescricaoSectionHeight(
   return 7 + measureDescricaoPropostaHeight(doc, paragrafos) + 6;
 }
 
-function calcOrcamentoWatermarkRegion(
-  doc: JsPDF,
-  contentStartY: number,
-  paragrafos: readonly string[]
-): { yTop: number; yBottom: number } {
-  const descricaoSectionH = measureDescricaoSectionHeight(doc, paragrafos);
-  const yTop = contentStartY + Math.max(0, descricaoSectionH - 10);
-  const yBottom = contentStartY + descricaoSectionH + 7 + 34;
-  return { yTop, yBottom };
-}
-
-function drawNavarroWatermark(
+function drawNavarroWatermarkOverlay(
   doc: JsPDF,
   symbol: LogoAsset,
   yTop: number,
@@ -854,14 +916,14 @@ function drawClientCard(
     ["Número de Colaboradores", resolveNumeroColaboradoresOrcamento(orcamento)],
   ];
 
-  doc.setFontSize(7);
-
   fieldsLeft.forEach(([label, value], index) => {
     const lineY = rowY + index * rowSpacing;
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(CLIENT_LABEL_FONT);
     doc.setTextColor(...SLATE_500);
     doc.text(label, col1X, lineY);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(CLIENT_VALUE_FONT);
     doc.setTextColor(...SLATE_900);
     doc.text(String(value).slice(0, 52), col1X + 22, lineY);
   });
@@ -870,9 +932,11 @@ function drawClientCard(
     const lineY = rowY + index * rowSpacing;
     const valueOffset = label === "Número de Colaboradores" ? 38 : 28;
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(CLIENT_LABEL_FONT);
     doc.setTextColor(...SLATE_500);
     doc.text(label, col2X, lineY);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(CLIENT_VALUE_FONT);
     doc.setTextColor(...SLATE_900);
     doc.text(String(value).slice(0, 52), col2X + valueOffset, lineY);
   });
@@ -969,10 +1033,10 @@ function measureInclusosBlockHeight(
   if (inclusos.length === 0) return 0;
 
   let height = 2.5;
-  doc.setFontSize(6.5);
+  doc.setFontSize(TABLE_DETAIL_FONT);
   inclusos.forEach((line) => {
     const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
-    height += wrapped.length * 2.8;
+    height += wrapped.length * TABLE_DETAIL_LINE_H;
   });
   return height;
 }
@@ -995,9 +1059,9 @@ function estimateServiceRowHeight(
   let h = 7;
   const descricao = servico?.descricao?.trim();
   if (descricao) {
-    doc.setFontSize(6.5);
+    doc.setFontSize(TABLE_DETAIL_FONT);
     const lines = doc.splitTextToSize(descricao, serviceColWidth - 4);
-    h += lines.length * 3.2 + 1.5;
+    h += lines.length * TABLE_DETAIL_LINE_H + 1.5;
   }
   return h;
 }
@@ -1023,14 +1087,13 @@ function drawServicesTable(
   ];
   const headers = ["Serviço", "Quantidade de Colaboradores", "Valor"];
   const tableHeadH = 12;
-  const tableHeadFont = 7;
 
   const drawTableHead = (startY: number) => {
     doc.setFillColor(...NAVY);
     doc.roundedRect(MARGIN, startY, CONTENT_W, tableHeadH, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...WHITE);
-    doc.setFontSize(tableHeadFont);
+    doc.setFontSize(TABLE_HEAD_FONT);
     headers.forEach((header, index) => {
       const colW = colWidths[index] ?? 0;
       const headerY = startY + tableHeadH / 2 + 1;
@@ -1049,10 +1112,7 @@ function drawServicesTable(
         return;
       }
 
-      const x =
-        index === 0 ? colStarts[index] + 3 : colStarts[index] + colW - 2;
-      const align = index === 0 ? "left" : "right";
-      doc.text(header, x, headerY, { align });
+      doc.text(header, colStarts[index] + 3, headerY, { align: "left" });
     });
     return startY + tableHeadH;
   };
@@ -1083,29 +1143,30 @@ function drawServicesTable(
     }
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(TABLE_SERVICE_FONT);
     doc.setTextColor(...SLATE_900);
     doc.text(item.servico_nome, colStarts[0] + 3, y + 4.5);
 
     let detailY = y + 8;
     if (isPacote && inclusos.length > 0) {
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.5);
+      doc.setFontSize(TABLE_DETAIL_FONT);
       doc.setTextColor(...SLATE_500);
       doc.text("Inclui:", colStarts[0] + 3, detailY);
       detailY += 2.8;
 
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(TABLE_DETAIL_FONT);
       inclusos.forEach((line) => {
         const wrapped = doc.splitTextToSize(`• ${line}`, colWidths[0] - 4);
         doc.text(wrapped, colStarts[0] + 3, detailY);
-        detailY += wrapped.length * 2.8;
+        detailY += wrapped.length * TABLE_DETAIL_LINE_H;
       });
     } else {
       const descricao = servico?.descricao?.trim();
       if (descricao) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.5);
+        doc.setFontSize(TABLE_DETAIL_FONT);
         doc.setTextColor(...SLATE_500);
         const lines = doc.splitTextToSize(descricao, colWidths[0] - 4);
         doc.text(lines, colStarts[0] + 3, detailY);
@@ -1113,7 +1174,7 @@ function drawServicesTable(
     }
 
     const valueY = y + 5;
-    doc.setFontSize(7.5);
+    doc.setFontSize(TABLE_CELL_FONT);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
     doc.text(
@@ -1276,25 +1337,23 @@ export async function gerarPdfOrcamento(
   let y = drawHeader(doc, logo, orcamento);
   y = drawClientCard(doc, y, orcamento, clienteInfo);
 
-  const contentStartY = y;
-  const watermarkRegion = calcOrcamentoWatermarkRegion(
-    doc,
-    contentStartY,
-    PROPOSTA_DESCRICAO_PARAGRAFOS
-  );
+  const watermarkYTop = y;
+  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS);
+  y = drawServicesTable(doc, y, orcamento, catalogo);
+  y = drawFinancialAndInclusosRow(doc, y, orcamento, catalogo, inclusos);
+  const watermarkYBottom = y;
+
   if (symbolWatermark) {
-    drawNavarroWatermark(
+    doc.setPage(1);
+    drawNavarroWatermarkOverlay(
       doc,
       symbolWatermark,
-      watermarkRegion.yTop,
-      watermarkRegion.yBottom,
+      watermarkYTop,
+      watermarkYBottom,
       GState
     );
   }
 
-  y = drawDescricaoProposta(doc, contentStartY, PROPOSTA_DESCRICAO_PARAGRAFOS);
-  y = drawServicesTable(doc, y, orcamento, catalogo);
-  y = drawFinancialAndInclusosRow(doc, y, orcamento, catalogo, inclusos);
   y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");
 
   const totalPages = doc.getNumberOfPages();
