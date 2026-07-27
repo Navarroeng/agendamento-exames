@@ -73,6 +73,13 @@ export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.8;
 const LOGO_BG_RADIUS_PX = 10;
 const CLIENT_LABEL_FONT = 8;
 const CLIENT_VALUE_FONT = 8.5;
+const CLIENT_FIELD_LINE_H = 3.5;
+const CLIENT_FIELD_ROW_GAP = 2.5;
+const CLIENT_CARD_PAD_X = 6;
+const CLIENT_CARD_PAD_TOP = 5;
+const CLIENT_CARD_PAD_BOTTOM = 4;
+const CLIENT_LEFT_LABEL_W = 24;
+const CLIENT_RIGHT_LABEL_W = 40;
 const TABLE_HEAD_FONT = 8.5;
 const TABLE_SERVICE_FONT = 9.5;
 const TABLE_DETAIL_FONT = 8;
@@ -471,6 +478,81 @@ function drawSectionTitle(
   doc.line(x, y + 1.5, x + width, y + 1.5);
 
   return y + 6;
+}
+
+function wrapClientFieldValue(
+  doc: JsPDF,
+  value: string,
+  maxWidth: number
+): string[] {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(CLIENT_VALUE_FONT);
+  const normalized = String(value).trim() || "—";
+  if (maxWidth <= 0) return [normalized];
+  return doc.splitTextToSize(normalized, maxWidth);
+}
+
+function measureClientColumnHeight(
+  doc: JsPDF,
+  fields: [string, string][],
+  colWidth: number,
+  labelWidth: number
+): number {
+  const valueMaxW = Math.max(colWidth - labelWidth - 1, 8);
+  let height = 0;
+
+  fields.forEach(([label, value], index) => {
+    const lines = wrapClientFieldValue(doc, value, valueMaxW);
+    const rowH = Math.max(
+      CLIENT_FIELD_LINE_H,
+      lines.length * CLIENT_FIELD_LINE_H
+    );
+    height += rowH;
+    if (index < fields.length - 1) {
+      height += CLIENT_FIELD_ROW_GAP;
+    }
+  });
+
+  return height;
+}
+
+function drawClientColumn(
+  doc: JsPDF,
+  x: number,
+  startY: number,
+  colWidth: number,
+  labelWidth: number,
+  fields: [string, string][]
+): number {
+  const valueMaxW = Math.max(colWidth - labelWidth - 1, 8);
+  let y = startY;
+
+  fields.forEach(([label, value], index) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(CLIENT_LABEL_FONT);
+    doc.setTextColor(...SLATE_500);
+    doc.text(label, x, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(CLIENT_VALUE_FONT);
+    doc.setTextColor(...SLATE_900);
+    const lines = wrapClientFieldValue(doc, value, valueMaxW);
+    const valueX = x + labelWidth;
+    lines.forEach((line, lineIndex) => {
+      doc.text(line, valueX, y + lineIndex * CLIENT_FIELD_LINE_H);
+    });
+
+    const rowH = Math.max(
+      CLIENT_FIELD_LINE_H,
+      lines.length * CLIENT_FIELD_LINE_H
+    );
+    y += rowH;
+    if (index < fields.length - 1) {
+      y += CLIENT_FIELD_ROW_GAP;
+    }
+  });
+
+  return y;
 }
 
 /** Shell visual alinhado aos cards de Fatura (cabeçalho navy + corpo dourado claro). */
@@ -1095,17 +1177,10 @@ function drawClientCard(
 ): number {
   y = drawSectionTitle(doc, y, "Dados do cliente");
 
-  const rowSpacing = 5.5;
-  const cardPaddingTop = 5;
-  const cardH = cardPaddingTop + rowSpacing * 3 + 3.5;
-  drawCardWithSoftShadow(doc, MARGIN, y, CONTENT_W, cardH, {
-    fill: WHITE,
-    stroke: SLATE_200,
-  });
-
-  const col1X = MARGIN + 6;
-  const col2X = MARGIN + CONTENT_W / 2 + 2;
-  const rowY = y + cardPaddingTop;
+  const colGap = 4;
+  const colWidth = (CONTENT_W - CLIENT_CARD_PAD_X * 2 - colGap) / 2;
+  const col1X = MARGIN + CLIENT_CARD_PAD_X;
+  const col2X = col1X + colWidth + colGap;
 
   const fieldsLeft: [string, string][] = [
     ["Cliente", orcamento.cliente_nome],
@@ -1118,34 +1193,42 @@ function drawClientCard(
     ["Contato", displayValue(orcamento.contato)],
     ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
-    ["Número de Colaboradores", resolveNumeroColaboradoresOrcamento(orcamento)],
+    [
+      "Número de Colaboradores",
+      String(resolveNumeroColaboradoresOrcamento(orcamento)),
+    ],
   ];
 
-  fieldsLeft.forEach(([label, value], index) => {
-    const lineY = rowY + index * rowSpacing;
-    const valueOffset = label === "Endereço" ? 24 : 22;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(CLIENT_LABEL_FONT);
-    doc.setTextColor(...SLATE_500);
-    doc.text(label, col1X, lineY);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(CLIENT_VALUE_FONT);
-    doc.setTextColor(...SLATE_900);
-    doc.text(String(value).slice(0, 52), col1X + valueOffset, lineY);
+  const leftH = measureClientColumnHeight(
+    doc,
+    fieldsLeft,
+    colWidth,
+    CLIENT_LEFT_LABEL_W
+  );
+  const rightH = measureClientColumnHeight(
+    doc,
+    fieldsRight,
+    colWidth,
+    CLIENT_RIGHT_LABEL_W
+  );
+  const contentH = Math.max(leftH, rightH);
+  const cardH = CLIENT_CARD_PAD_TOP + contentH + CLIENT_CARD_PAD_BOTTOM;
+
+  drawCardWithSoftShadow(doc, MARGIN, y, CONTENT_W, cardH, {
+    fill: WHITE,
+    stroke: SLATE_200,
   });
 
-  fieldsRight.forEach(([label, value], index) => {
-    const lineY = rowY + index * rowSpacing;
-    const valueOffset = label === "Número de Colaboradores" ? 38 : 28;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(CLIENT_LABEL_FONT);
-    doc.setTextColor(...SLATE_500);
-    doc.text(label, col2X, lineY);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(CLIENT_VALUE_FONT);
-    doc.setTextColor(...SLATE_900);
-    doc.text(String(value).slice(0, 52), col2X + valueOffset, lineY);
-  });
+  const rowY = y + CLIENT_CARD_PAD_TOP;
+  drawClientColumn(doc, col1X, rowY, colWidth, CLIENT_LEFT_LABEL_W, fieldsLeft);
+  drawClientColumn(
+    doc,
+    col2X,
+    rowY,
+    colWidth,
+    CLIENT_RIGHT_LABEL_W,
+    fieldsRight
+  );
 
   return y + cardH + SECTION_AFTER_CARD_GAP;
 }

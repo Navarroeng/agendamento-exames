@@ -173,6 +173,22 @@ semExames.forEach((item, index) => {
   doc.text(`• ${item}`, MARGIN + 6, 100 + index * 6);
 });
 
+const CLIENT_CARD_PAD_X = 6;
+const colGap = 4;
+const colWidth = (CONTENT_W - CLIENT_CARD_PAD_X * 2 - colGap) / 2;
+const CLIENT_LEFT_LABEL_W = 24;
+const valueMaxW = colWidth - CLIENT_LEFT_LABEL_W - 1;
+const docWrap = new jsPDF({ unit: "mm", format: "a4" });
+docWrap.setFont("helvetica", "normal");
+docWrap.setFontSize(8.5);
+const longAddress =
+  "Av. Paulista, 1578, Conjunto 1204, Bela Vista, São Paulo - SP, CEP 01310-200, Edificio Corporate Tower";
+const wrappedAddress = docWrap.splitTextToSize(longAddress, valueMaxW);
+assert.ok(
+  wrappedAddress.length >= 2,
+  "endereco longo deve quebrar em multiplas linhas"
+);
+
 const filename = buildFilename("2026-001", "Empresa São Paulo Ltda");
 assert.match(filename, /^Proposta-2026-001-Empresa-Sao-Paulo-Ltda\.pdf$/);
 
