@@ -1288,8 +1288,6 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
-  y = drawSectionTitle(doc, y, "Serviços propostos");
-
   const colWidths = [98, 44, 40];
   const colStarts = [
     MARGIN,
