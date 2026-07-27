@@ -6,7 +6,10 @@ import type {
   OrcamentoItemRecord,
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
-import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
+import {
+  isPacoteCompletoSst,
+  resolveItensInclusosServico,
+} from "@/lib/servico-sst-pacote";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
@@ -40,6 +43,16 @@ const NAVARRO = {
   razaoSocial: "Navarro Engenharia de Segurança do Trabalho e Medicina Ocupacional",
   responsavelTecnico: "Equipe Técnica Navarro Engenharia",
 } as const;
+
+const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
+  [
+    "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em",
+    "PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-",
+    "2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o",
+    "Laudo de Riscos Psicossociais conforme a nova NR-01.",
+  ].join("\n"),
+  "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
+] as const;
 
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
@@ -200,56 +213,16 @@ function collectAllInclusos(
   return result;
 }
 
-function splitDescricaoEmTopicos(descricao: string): string[] {
-  return descricao
-    .split(/\n+|(?:^|\s)[•·▪-]\s+/g)
-    .map((part) => part.trim().replace(/^[-•·▪]\s*/, ""))
-    .filter(Boolean);
-}
-
-function buildDescricaoProposta(
-  orcamento: OrcamentoComItens,
-  catalogo: ServicoSstRecord[]
+function wrapParagraphLines(
+  doc: JsPDF,
+  text: string,
+  maxWidth: number
 ): string[] {
-  const bullets: string[] = [];
-  const seen = new Set<string>();
-
-  const add = (text: string) => {
-    const normalized = text.trim();
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    bullets.push(normalized);
-  };
-
-  const itens = [...(orcamento.orcamento_itens ?? [])].sort(
-    (a, b) => a.ordem - b.ordem
-  );
-
-  for (const item of itens) {
-    const servico = resolveCatalogoServico(item, catalogo);
-    if (servico?.descricao?.trim()) {
-      splitDescricaoEmTopicos(servico.descricao).forEach(add);
-    }
-  }
-
-  if (bullets.length === 0) {
-    for (const item of itens) {
-      const servico = resolveCatalogoServico(item, catalogo);
-      const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-      inclusos.forEach((line) => {
-        const short = line.split(" - ")[0]?.split(" — ")[0]?.trim() ?? line;
-        add(short.replace(/\.$/, ""));
-      });
-    }
-  }
-
-  if (bullets.length === 0) {
-    itens.forEach((item) => add(item.servico_nome));
-  }
-
-  return bullets.slice(0, 12);
+  return text.split("\n").flatMap((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+    return doc.splitTextToSize(trimmed, maxWidth);
+  });
 }
 
 function parseFormaPagamentoLines(forma: string | null): {
@@ -417,56 +390,89 @@ function drawClientCard(
 }
 
 /* ── Descrição da proposta ─────────────────────────────────────── */
-function measureBulletsHeight(doc: JsPDF, bullets: string[]): number {
-  if (bullets.length === 0) return 0;
+function measureDescricaoPropostaHeight(
+  doc: JsPDF,
+  paragrafos: readonly string[]
+): number {
+  if (paragrafos.length === 0) return 0;
+
   doc.setFontSize(7.5);
-  let h = 4;
-  bullets.forEach((bullet) => {
-    const lines = doc.splitTextToSize(bullet, CONTENT_W - 14);
-    h += lines.length * 3.8 + 1.2;
+  const textWidth = CONTENT_W - 12;
+  let h = 6;
+
+  paragrafos.forEach((paragrafo, index) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    h += lines.length * 3.8;
+    if (index < paragrafos.length - 1) h += 4;
   });
+
   return h + 6;
 }
 
 function drawDescricaoProposta(
   doc: JsPDF,
   y: number,
-  bullets: string[]
+  paragrafos: readonly string[]
 ): number {
-  if (bullets.length === 0) return y;
+  if (paragrafos.length === 0) return y;
 
-  y = ensureSpace(doc, y, measureBulletsHeight(doc, bullets) + 10);
+  y = ensureSpace(doc, y, measureDescricaoPropostaHeight(doc, paragrafos) + 10);
   y = drawSectionTitle(doc, y, "Descrição da proposta");
 
-  const blockH = measureBulletsHeight(doc, bullets);
+  const blockH = measureDescricaoPropostaHeight(doc, paragrafos);
   drawCard(doc, MARGIN, y, CONTENT_W, blockH, {
     fill: SLATE_50,
     stroke: SLATE_200,
   });
 
-  let bulletY = y + 5;
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...SLATE_700);
+  let textY = y + 6;
+  const textX = MARGIN + 6;
+  const textWidth = CONTENT_W - 12;
 
-  bullets.forEach((bullet) => {
-    doc.setFillColor(...GOLD);
-    doc.circle(MARGIN + 5, bulletY - 1, 0.7, "F");
-    const lines = doc.splitTextToSize(bullet, CONTENT_W - 14);
-    doc.text(lines, MARGIN + 8, bulletY);
-    bulletY += lines.length * 3.8 + 1.2;
+  paragrafos.forEach((paragrafo, index) => {
+    const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
+    doc.setFont("helvetica", isNotaLegal ? "italic" : "normal");
+    doc.setFontSize(isNotaLegal ? 7 : 7.5);
+    doc.setTextColor(...(isNotaLegal ? SLATE_500 : SLATE_700));
+
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth);
+    doc.text(lines, textX, textY);
+    textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 4 : 0);
   });
 
   return y + blockH + 6;
 }
 
 /* ── Tabela de serviços ────────────────────────────────────────── */
+function measureInclusosBlockHeight(
+  doc: JsPDF,
+  inclusos: string[],
+  maxWidth: number
+): number {
+  if (inclusos.length === 0) return 0;
+
+  let height = 3.5;
+  doc.setFontSize(6.5);
+  inclusos.forEach((line) => {
+    const wrapped = doc.splitTextToSize(`• ${line}`, maxWidth);
+    height += wrapped.length * 3.2;
+  });
+  return height;
+}
+
 function estimateServiceRowHeight(
   doc: JsPDF,
   item: OrcamentoItemRecord,
   servico: ServicoSstRecord | undefined,
   serviceColWidth: number
 ): number {
+  const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
+  const isPacote = isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
+
+  if (isPacote && inclusos.length > 0) {
+    return 8 + measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4);
+  }
+
   let h = 7;
   const descricao = servico?.descricao?.trim();
   if (descricao) {
@@ -520,6 +526,8 @@ function drawServicesTable(
 
   itens.forEach((item, index) => {
     const servico = resolveCatalogoServico(item, catalogo);
+    const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
+    const isPacote = isPacoteCompletoSst(servico?.nome ?? item.servico_nome);
     const rowH = estimateServiceRowHeight(
       doc,
       item,
@@ -543,13 +551,28 @@ function drawServicesTable(
     doc.text(item.servico_nome, colStarts[0] + 3, y + 4.5);
 
     let detailY = y + 8;
-    const descricao = servico?.descricao?.trim();
-    if (descricao) {
-      doc.setFont("helvetica", "normal");
+    if (isPacote && inclusos.length > 0) {
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
       doc.setTextColor(...SLATE_500);
-      const lines = doc.splitTextToSize(descricao, colWidths[0] - 4);
-      doc.text(lines, colStarts[0] + 3, detailY);
+      doc.text("Inclui:", colStarts[0] + 3, detailY);
+      detailY += 3.5;
+
+      doc.setFont("helvetica", "normal");
+      inclusos.forEach((line) => {
+        const wrapped = doc.splitTextToSize(`• ${line}`, colWidths[0] - 4);
+        doc.text(wrapped, colStarts[0] + 3, detailY);
+        detailY += wrapped.length * 3.2;
+      });
+    } else {
+      const descricao = servico?.descricao?.trim();
+      if (descricao) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...SLATE_500);
+        const lines = doc.splitTextToSize(descricao, colWidths[0] - 4);
+        doc.text(lines, colStarts[0] + 3, detailY);
+      }
     }
 
     const valueY = y + 5;
@@ -859,12 +882,11 @@ export async function gerarPdfOrcamento(
     resolveClientePdfInfo(orcamento),
   ]);
 
-  const descricaoBullets = buildDescricaoProposta(orcamento, catalogo);
   const inclusos = collectAllInclusos(orcamento, catalogo);
 
   let y = drawHeader(doc, logo, orcamento);
   y = drawClientCard(doc, y, orcamento, clienteInfo);
-  y = drawDescricaoProposta(doc, y, descricaoBullets);
+  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS);
   y = drawServicesTable(doc, y, orcamento, catalogo);
   y = drawFinancialAndInclusosRow(doc, y, orcamento, inclusos);
   y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");

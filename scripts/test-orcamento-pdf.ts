@@ -1,4 +1,4 @@
-/** Smoke test: APIs jsPDF usadas no layout premium de orçamentos. */
+/** Smoke test: PDF premium de orçamentos e Pacote Completo SST. */
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -6,10 +6,26 @@ import os from "node:os";
 import path from "node:path";
 import { jsPDF } from "jspdf";
 import { formatCurrency } from "../lib/money";
+import {
+  PACOTE_COMPLETO_SST_ITENS,
+  PACOTE_COMPLETO_SST_NOME,
+  isPacoteCompletoSst,
+  resolveItensInclusosServico,
+} from "../lib/servico-sst-pacote";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
 const WHITE: [number, number, number] = [255, 255, 255];
+
+const PROPOSTA_DESCRICAO_PARAGRAFOS = [
+  [
+    "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em",
+    "PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-",
+    "2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o",
+    "Laudo de Riscos Psicossociais conforme a nova NR-01.",
+  ].join("\n"),
+  "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
+] as const;
 
 function buildFilename(numero: string, clienteNome: string): string {
   const cliente = clienteNome
@@ -21,12 +37,23 @@ function buildFilename(numero: string, clienteNome: string): string {
   return `Proposta-${numero}-${cliente || "Cliente"}.pdf`;
 }
 
-function splitDescricaoEmTopicos(descricao: string): string[] {
-  return descricao
-    .split(/\n+|(?:^|\s)[•·▪-]\s+/g)
-    .map((part) => part.trim().replace(/^[-•·▪]\s*/, ""))
-    .filter(Boolean);
+function wrapParagraphLines(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number
+): string[] {
+  return text.split("\n").flatMap((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+    return doc.splitTextToSize(trimmed, maxWidth);
+  });
 }
+
+assert.ok(isPacoteCompletoSst(PACOTE_COMPLETO_SST_NOME));
+const inclusosPacote = resolveItensInclusosServico({
+  nome: PACOTE_COMPLETO_SST_NOME,
+});
+assert.deepEqual(inclusosPacote, [...PACOTE_COMPLETO_SST_ITENS]);
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
@@ -40,15 +67,19 @@ doc.setTextColor(...WHITE);
 doc.setFont("helvetica", "bold");
 doc.setFontSize(16);
 doc.text("PROPOSTA COMERCIAL", MARGIN + CONTENT_W - 5, MARGIN + 14, { align: "right" });
-doc.setFillColor(248, 250, 252);
-doc.roundedRect(MARGIN, 58, CONTENT_W, 20, 2.5, 2.5, "FD");
-doc.circle(MARGIN + 5, 90, 0.7, "F");
-doc.text("Item de exemplo", MARGIN + 8, 90);
 
-const bullets = splitDescricaoEmTopicos(
-  "Elaboração dos laudos\n• Gestão do eSocial\n- Documentos em PDF"
+doc.setFontSize(7.5);
+PROPOSTA_DESCRICAO_PARAGRAFOS.forEach((paragrafo, index) => {
+  const lines = wrapParagraphLines(doc, paragrafo, CONTENT_W - 12);
+  assert.ok(lines.length > 0, `parágrafo ${index + 1} deve gerar linhas`);
+  doc.text(lines, MARGIN + 6, 60 + index * 20);
+});
+
+assert.match(
+  PROPOSTA_DESCRICAO_PARAGRAFOS[0],
+  /S-2210; S-2220; S-\n2240/
 );
-assert.equal(bullets.length, 3, "splitDescricaoEmTopicos deve separar tópicos");
+assert.match(PROPOSTA_DESCRICAO_PARAGRAFOS[1], /Ministério do trabalho MTE/);
 
 const filename = buildFilename("2026-001", "Empresa São Paulo Ltda");
 assert.match(filename, /^Proposta-2026-001-Empresa-Sao-Paulo-Ltda\.pdf$/);
