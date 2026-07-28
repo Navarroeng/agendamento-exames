@@ -51,6 +51,10 @@ const FINANCIAL_CARD_BODY_PAD = 5.5;
 const FINANCIAL_ROW_ICON_W = 4;
 const FINANCIAL_ROW_SPACING = 4;
 const FINANCIAL_DIVIDER_PAD = 1.5;
+/** ~22 px entre o último valor e a observação de validade. */
+const FINANCIAL_VALIDADE_GAP = 6;
+const FINANCIAL_VALIDADE_FONT = 7.5;
+const FINANCIAL_VALIDADE_COLOR: [number, number, number] = [107, 114, 128];
 const COLON_VALUE_GAP = 1.5;
 const CARD_ITEM_GAP = 2.5;
 const INCLUSO_LINE_H = 3.5;
@@ -668,6 +672,9 @@ function measureFinancialCardContentHeight(): number {
     FINANCIAL_DIVIDER_PAD +
     FINANCIAL_ROW_SPACING +
     5 +
+    FINANCIAL_VALIDADE_GAP +
+    1.2 +
+    3.5 +
     FINANCIAL_CARD_BODY_PAD
   );
 }
@@ -860,7 +867,7 @@ function drawResumoFinanceiroCard(
   drawFinancialRowDivider(doc, innerX, lineY, innerW);
   lineY += FINANCIAL_ROW_SPACING;
 
-  drawFinancialPremiumRow(
+  lineY = drawFinancialPremiumRow(
     doc,
     x,
     w,
@@ -876,6 +883,24 @@ function drawResumoFinanceiroCard(
       rowHeight: 5,
     }
   );
+
+  lineY += FINANCIAL_VALIDADE_GAP;
+  drawFinancialRowDivider(doc, innerX, lineY, innerW);
+  lineY += 3.2;
+
+  const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
+  const validadeLabel = formatDateIsoToBR(validadeIso);
+  if (validadeLabel) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(FINANCIAL_VALIDADE_FONT);
+    doc.setTextColor(...FINANCIAL_VALIDADE_COLOR);
+    doc.text(
+      `Proposta válida até ${validadeLabel}`,
+      x + w / 2,
+      lineY,
+      { align: "center" }
+    );
+  }
 }
 
 function parseInclusoLabelValue(
