@@ -145,7 +145,13 @@ export function OrcamentoAprovarModal({
   const andamentoFinanceiro = resolveFinanceiroAndamento(aprovacao);
   const consultaMode = mode === "consulta";
   const aprovadoLocked = Boolean(aprovacao) || consultaMode;
+  /** Condições comerciais: bloqueadas em consulta / após aprovação. */
   const camposSomenteLeitura = consultaMode || saving;
+  /**
+   * Acompanhamento (Contrato/Financeiro) permanece editável também na consulta,
+   * para registrar envio, assinatura e pagamento após a aprovação.
+   */
+  const acompanhamentoBloqueado = saving;
   const financeiroLiberado = Boolean(aprovacao?.contrato_assinado);
 
   const updateFormField = useCallback(
@@ -688,7 +694,7 @@ export function OrcamentoAprovarModal({
                   <select
                     className="field-input"
                     value={contratoEnviado ? "sim" : "nao"}
-                    disabled={camposSomenteLeitura}
+                    disabled={acompanhamentoBloqueado}
                     onChange={(e) =>
                       setContratoEnviado(e.target.value === "sim")
                     }
@@ -705,7 +711,7 @@ export function OrcamentoAprovarModal({
                     type="date"
                     className="field-input"
                     value={contratoEnviadoEm}
-                    disabled={camposSomenteLeitura || !contratoEnviado}
+                    disabled={acompanhamentoBloqueado || !contratoEnviado}
                     onChange={(e) => setContratoEnviadoEm(e.target.value)}
                   />
                 </Field>
@@ -713,7 +719,7 @@ export function OrcamentoAprovarModal({
                   <select
                     className="field-input"
                     value={contratoAssinado ? "sim" : "nao"}
-                    disabled={camposSomenteLeitura}
+                    disabled={acompanhamentoBloqueado}
                     onChange={(e) =>
                       setContratoAssinado(e.target.value === "sim")
                     }
@@ -730,7 +736,7 @@ export function OrcamentoAprovarModal({
                     type="date"
                     className="field-input"
                     value={contratoAssinadoEm}
-                    disabled={camposSomenteLeitura || !contratoAssinado}
+                    disabled={acompanhamentoBloqueado || !contratoAssinado}
                     onChange={(e) => setContratoAssinadoEm(e.target.value)}
                   />
                 </Field>
@@ -739,7 +745,7 @@ export function OrcamentoAprovarModal({
                     <textarea
                       className="field-input min-h-[72px] resize-y"
                       value={observacaoContrato}
-                      disabled={camposSomenteLeitura}
+                      disabled={acompanhamentoBloqueado}
                       onChange={(e) => setObservacaoContrato(e.target.value)}
                     />
                   </Field>
@@ -767,7 +773,7 @@ export function OrcamentoAprovarModal({
                       type="date"
                       className="field-input"
                       value={boletoVencimento}
-                      disabled={camposSomenteLeitura}
+                      disabled={acompanhamentoBloqueado}
                       onChange={(e) => setBoletoVencimento(e.target.value)}
                     />
                   </Field>
@@ -775,7 +781,7 @@ export function OrcamentoAprovarModal({
                     <select
                       className="field-input"
                       value={boletoPago ? "sim" : "nao"}
-                      disabled={camposSomenteLeitura}
+                      disabled={acompanhamentoBloqueado}
                       onChange={(e) => setBoletoPago(e.target.value === "sim")}
                     >
                       {SIM_NAO.map((opt) => (
@@ -792,7 +798,7 @@ export function OrcamentoAprovarModal({
                           type="date"
                           className="field-input"
                           value={boletoPagoEm}
-                          disabled={camposSomenteLeitura}
+                          disabled={acompanhamentoBloqueado}
                           onChange={(e) => setBoletoPagoEm(e.target.value)}
                         />
                       </Field>
@@ -801,7 +807,7 @@ export function OrcamentoAprovarModal({
                           type="file"
                           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                           className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-                          disabled={camposSomenteLeitura}
+                          disabled={acompanhamentoBloqueado}
                           onChange={(e) =>
                             setComprovanteFile(e.target.files?.[0] ?? null)
                           }
@@ -828,11 +834,17 @@ export function OrcamentoAprovarModal({
                     </>
                   ) : null}
                   <div className="md:col-span-2">
-                    <Field label="Observações do pagamento">
+                    <Field
+                      label={
+                        boletoPago
+                          ? "Observações do pagamento (opcional)"
+                          : "Observações do pagamento"
+                      }
+                    >
                       <textarea
                         className="field-input min-h-[72px] resize-y"
                         value={observacaoPagamento}
-                        disabled={camposSomenteLeitura}
+                        disabled={acompanhamentoBloqueado}
                         onChange={(e) =>
                           setObservacaoPagamento(e.target.value)
                         }
@@ -882,25 +894,22 @@ export function OrcamentoAprovarModal({
               Voltar à edição
             </button>
           ) : null}
-          {tab === "contrato" && aprovacao && !consultaMode ? (
+          {tab === "contrato" && aprovacao ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
               onClick={() => void handleSalvarContratoClick()}
-              disabled={saving}
+              disabled={acompanhamentoBloqueado}
             >
               {saving ? "Salvando..." : "Salvar acompanhamento"}
             </button>
           ) : null}
-          {tab === "financeiro" &&
-          aprovacao &&
-          financeiroLiberado &&
-          !consultaMode ? (
+          {tab === "financeiro" && aprovacao && financeiroLiberado ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
               onClick={() => void handleSalvarFinanceiroClick()}
-              disabled={saving}
+              disabled={acompanhamentoBloqueado}
             >
               {saving ? "Salvando..." : "Salvar financeiro"}
             </button>
