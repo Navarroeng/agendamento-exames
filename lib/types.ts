@@ -308,7 +308,8 @@ export type ClienteContratoStatus =
   | "ativo"
   | "encerrado"
   | "em_renovacao"
-  | "cancelado";
+  | "cancelado"
+  | "aguardando_envio";
 
 export type ClienteContratoTipo =
   | "mensal"
@@ -339,11 +340,27 @@ export interface ClienteContratoInsert {
   reajuste_percentual: number | null;
   observacoes: string | null;
   status: ClienteContratoStatus;
+  orcamento_id?: string | null;
+  numero_orcamento?: string | null;
+  quantidade_parcelas?: number | null;
+  valor_parcela?: number | null;
+  valor_avista?: number | null;
+  desconto_percentual?: number | null;
+  aprovado_em?: string | null;
+  aprovado_por?: string | null;
 }
 
 export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "cliente_id"> {
   id: string;
   cliente_id: string;
+  orcamento_id?: string | null;
+  numero_orcamento?: string | null;
+  quantidade_parcelas?: number | null;
+  valor_parcela?: number | null;
+  valor_avista?: number | null;
+  desconto_percentual?: number | null;
+  aprovado_em?: string | null;
+  aprovado_por?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

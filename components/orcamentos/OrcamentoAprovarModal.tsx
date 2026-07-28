@@ -19,6 +19,10 @@ import {
   type OrcamentoAprovacaoRecord,
   type OrcamentoContratoUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
+import {
+  ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG,
+  resolveOrcamentoCnpjDigits,
+} from "@/lib/orcamento-aprovacao-integracao";
 import { calcValorParcela } from "@/lib/orcamento-pagamento";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -145,6 +149,11 @@ export function OrcamentoAprovarModal({
 
   async function handleSalvarAprovacaoClick() {
     if (!form || !orcamento) return;
+
+    if (!resolveOrcamentoCnpjDigits(orcamento.cliente_cnpj)) {
+      toast.error(ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG);
+      return;
+    }
 
     if (!form.condicoes_iguais) {
       if (
@@ -374,6 +383,13 @@ export function OrcamentoAprovarModal({
                   alterados.
                 </p>
               </section>
+
+              {!resolveOrcamentoCnpjDigits(orcamento.cliente_cnpj) &&
+              !aprovacao ? (
+                <p className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-[12px] font-medium text-[#b91c1c]">
+                  {ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG}
+                </p>
+              ) : null}
 
               {aprovacao ? (
                 <section className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">

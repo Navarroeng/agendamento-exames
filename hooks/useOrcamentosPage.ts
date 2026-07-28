@@ -37,6 +37,11 @@ import {
   marcarOrcamentoComoEnviado,
 } from "@/services/orcamento.service";
 import {
+  assertOrcamentoCnpjParaAprovacao,
+  formatCnpjAuditoria,
+  ORCAMENTO_CONTRATO_JA_VINCULADO_MSG,
+} from "@/lib/orcamento-aprovacao-integracao";
+import {
   atualizarAcompanhamentoContrato,
   buscarAprovacaoPorOrcamentoId,
   cancelarOrcamento,
@@ -464,6 +469,8 @@ export function useOrcamentosPage() {
       if (!aprovarOrcamento) return;
       setAprovarSaving(true);
       try {
+        assertOrcamentoCnpjParaAprovacao(aprovarOrcamento.cliente_cnpj);
+
         const payload = buildAprovacaoInsertPayload(
           aprovarOrcamento,
           formValues,
@@ -476,9 +483,10 @@ export function useOrcamentosPage() {
           parseMoney
         ).filter((d) => d.changed);
 
-        const saved = await salvarAprovacaoOrcamento(
+        const { aprovacao: saved, integracao } = await salvarAprovacaoOrcamento(
           aprovarOrcamento.id,
-          payload
+          payload,
+          aprovarOrcamento.cliente_cnpj
         );
 
         await registrarAuditoria({
@@ -495,6 +503,8 @@ export function useOrcamentosPage() {
             valor_final: payload.valor_final,
             quantidade_colaboradores: payload.quantidade_colaboradores,
             condicoes_iguais: formValues.condicoes_iguais,
+            cliente_id: integracao.cliente_id,
+            contrato_id: integracao.contrato_id,
           },
         });
 
@@ -511,14 +521,64 @@ export function useOrcamentosPage() {
           });
         }
 
+        const cnpjFmt = formatCnpjAuditoria(integracao.cnpj_digits);
+        if (integracao.cliente_localizado) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.clientes,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: integracao.cliente_id,
+            registroNome: integracao.cliente_nome,
+            descricao: `Cliente localizado pelo CNPJ ${cnpjFmt}.`,
+          });
+        }
+        if (integracao.cliente_criado) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.clientes,
+            acao: AUDITORIA_ACOES.criacao,
+            registroId: integracao.cliente_id,
+            registroNome: integracao.cliente_nome,
+            descricao: `Cliente ${integracao.cliente_nome} criado automaticamente a partir do orçamento ${integracao.numero_orcamento}.`,
+          });
+        }
+        if (integracao.contrato_criado) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.clientes,
+            acao: AUDITORIA_ACOES.criacao,
+            registroId: integracao.contrato_id,
+            registroNome: integracao.cliente_nome,
+            descricao: `Novo contrato criado para o cliente ${integracao.cliente_nome} a partir do orçamento ${integracao.numero_orcamento}.`,
+          });
+        } else if (integracao.contrato_ja_existia) {
+          toast.message(ORCAMENTO_CONTRATO_JA_VINCULADO_MSG);
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.clientes,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: integracao.contrato_id,
+            registroNome: integracao.cliente_nome,
+            descricao: `Contrato já vinculado ao orçamento ${integracao.numero_orcamento} foi atualizado com as condições aprovadas.`,
+          });
+        }
+
         const refreshed = await buscarOrcamentoComItens(aprovarOrcamento.id);
         if (refreshed) setAprovarOrcamento(refreshed);
         setAprovarAprovacao(saved);
-        toast.success("Aprovação salva. Aba Contrato liberada.");
+        toast.success(
+          integracao.cliente_criado
+            ? "Aprovação salva. Cliente e contrato criados."
+            : "Aprovação salva. Contrato vinculado ao cliente."
+        );
         refresh();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao salvar aprovação.");
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao salvar aprovação."
+        );
         throw err;
       } finally {
         setAprovarSaving(false);

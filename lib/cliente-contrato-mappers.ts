@@ -36,6 +36,8 @@ export function clienteContratoStatusBadgeClass(
       return "bg-brand-green-soft text-brand-green";
     case "em_renovacao":
       return "bg-[#fef3c7] text-[#b45309]";
+    case "aguardando_envio":
+      return "bg-[#e0e7ff] text-[#3730a3]";
     case "encerrado":
       return "bg-[#f4f6fb] text-[#52617a]";
     case "cancelado":

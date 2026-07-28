@@ -2,7 +2,6 @@ import {
   clienteContratoStatusBadgeClass,
   formatValorContrato,
   labelClienteContratoStatus,
-  labelClienteContratoTipo,
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord } from "@/lib/types";
@@ -38,16 +37,15 @@ export function ClienteContratosHistoricoTable({
 
   return (
     <div className="table-wrap -mx-1 overflow-x-auto px-1">
-      <table className="table-premium w-full min-w-[820px]">
+      <table className="table-premium w-full min-w-[980px]">
         <thead>
           <tr>
             {[
-              "Início",
-              "Fim",
+              "Orçamento",
+              "Aprovação",
               "Colaboradores",
               "Valor",
               "Condição",
-              "Tipo",
               "Status",
               "Ações",
             ].map((h) => (
@@ -58,18 +56,23 @@ export function ClienteContratosHistoricoTable({
         <tbody>
           {contratos.map((contrato) => (
             <tr key={contrato.id}>
-              <td>{formatDateBR(contrato.data_inicio)}</td>
-              <td>{formatDateBR(contrato.data_fim)}</td>
+              <td className="font-semibold text-navy">
+                {contrato.numero_orcamento?.trim() || "—"}
+              </td>
+              <td>
+                {contrato.aprovado_em
+                  ? formatDateBR(contrato.aprovado_em.split("T")[0])
+                  : formatDateBR(contrato.data_inicio)}
+              </td>
               <td className="tabular-nums">
                 {contrato.quantidade_colaboradores ?? "—"}
               </td>
               <td className="tabular-nums">
                 {formatValorContrato(contrato.valor_contrato)}
               </td>
-              <td className="max-w-[140px] truncate">
+              <td className="max-w-[160px] truncate">
                 {contrato.condicao_pagamento?.trim() || "—"}
               </td>
-              <td>{labelClienteContratoTipo(contrato.tipo_contrato)}</td>
               <td>
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
@@ -84,7 +87,7 @@ export function ClienteContratosHistoricoTable({
                     className="rounded-lg bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold text-brand-blue"
                     onClick={() => onEditar(contrato)}
                   >
-                    Editar
+                    Visualizar
                   </button>
                   {contrato.status === "ativo" ||
                   contrato.status === "em_renovacao" ? (

@@ -4,6 +4,11 @@ import type {
   OrcamentoAprovacaoRecord,
   OrcamentoContratoUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
+import {
+  assertOrcamentoCnpjParaAprovacao,
+  parseAprovacaoIntegracaoError,
+  type OrcamentoAprovacaoIntegracaoResult,
+} from "@/lib/orcamento-aprovacao-integracao";
 
 const APROVACAO_SELECT = `
   *,
@@ -36,19 +41,28 @@ export async function buscarAprovacaoPorOrcamentoId(
   return sortAprovacao(data as OrcamentoAprovacaoRecord);
 }
 
+export interface SalvarAprovacaoOrcamentoResult {
+  aprovacao: OrcamentoAprovacaoRecord;
+  integracao: OrcamentoAprovacaoIntegracaoResult;
+}
+
+/**
+ * Aprova o orçamento e integra cliente/contrato de forma atômica (RPC).
+ * Exige CNPJ válido no orçamento.
+ */
 export async function salvarAprovacaoOrcamento(
   orcamentoId: string,
-  payload: OrcamentoAprovacaoInsertPayload
-): Promise<OrcamentoAprovacaoRecord> {
+  payload: OrcamentoAprovacaoInsertPayload,
+  orcamentoCnpj: string | null | undefined
+): Promise<SalvarAprovacaoOrcamentoResult> {
+  assertOrcamentoCnpjParaAprovacao(orcamentoCnpj);
+
   const supabase = createClient();
-  const existente = await buscarAprovacaoPorOrcamentoId(orcamentoId);
-
-  let aprovacaoId: string;
-
-  if (existente) {
-    const { error } = await supabase
-      .from("orcamento_aprovacoes")
-      .update({
+  const { data, error } = await supabase.rpc(
+    "aprovar_orcamento_integrar_cliente",
+    {
+      p_orcamento_id: orcamentoId,
+      p_aprovacao: {
         quantidade_colaboradores: payload.quantidade_colaboradores,
         valor_final: payload.valor_final,
         condicao_pagamento: payload.condicao_pagamento,
@@ -58,66 +72,29 @@ export async function salvarAprovacaoOrcamento(
         valor_avista: payload.valor_avista,
         observacoes: payload.observacoes,
         aprovado_por: payload.aprovado_por,
-        aprovado_em: new Date().toISOString(),
-      })
-      .eq("id", existente.id);
+      },
+      p_itens: payload.itens.map((item) => ({
+        servico_id: item.servico_id,
+        servico_nome: item.servico_nome,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total,
+        ordem: item.ordem,
+      })),
+    }
+  );
 
-    if (error) throw error;
-    aprovacaoId = existente.id;
-
-    const { error: deleteError } = await supabase
-      .from("orcamento_aprovacao_itens")
-      .delete()
-      .eq("aprovacao_id", aprovacaoId);
-    if (deleteError) throw deleteError;
-  } else {
-    const { data, error } = await supabase
-      .from("orcamento_aprovacoes")
-      .insert({
-        orcamento_id: orcamentoId,
-        quantidade_colaboradores: payload.quantidade_colaboradores,
-        valor_final: payload.valor_final,
-        condicao_pagamento: payload.condicao_pagamento,
-        quantidade_parcelas: payload.quantidade_parcelas,
-        valor_parcela: payload.valor_parcela,
-        desconto_percentual: payload.desconto_percentual,
-        valor_avista: payload.valor_avista,
-        observacoes: payload.observacoes,
-        aprovado_por: payload.aprovado_por,
-      })
-      .select("id")
-      .single();
-
-    if (error) throw error;
-    aprovacaoId = data.id as string;
+  if (error) {
+    throw new Error(parseAprovacaoIntegracaoError(error));
   }
 
-  if (payload.itens.length > 0) {
-    const { error: itensError } = await supabase
-      .from("orcamento_aprovacao_itens")
-      .insert(
-        payload.itens.map((item) => ({
-          aprovacao_id: aprovacaoId,
-          servico_id: item.servico_id,
-          servico_nome: item.servico_nome,
-          quantidade: item.quantidade,
-          valor_unitario: item.valor_unitario,
-          valor_total: item.valor_total,
-          ordem: item.ordem,
-        }))
-      );
-    if (itensError) throw itensError;
+  const integracao = data as OrcamentoAprovacaoIntegracaoResult;
+  const aprovacao = await buscarAprovacaoPorOrcamentoId(orcamentoId);
+  if (!aprovacao) {
+    throw new Error("Aprovação não encontrada após salvar.");
   }
 
-  const { error: statusError } = await supabase
-    .from("orcamentos")
-    .update({ status: "aprovado" })
-    .eq("id", orcamentoId);
-  if (statusError) throw statusError;
-
-  const saved = await buscarAprovacaoPorOrcamentoId(orcamentoId);
-  if (!saved) throw new Error("Aprovação não encontrada após salvar.");
-  return saved;
+  return { aprovacao, integracao };
 }
 
 export async function atualizarAcompanhamentoContrato(
