@@ -115,6 +115,15 @@ export function IconWallet(props: IconProps) {
   );
 }
 
+export function IconTag(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M20.6 13.4 12.7 21.3a1.5 1.5 0 0 1-2.1 0L2.7 13.4a1.5 1.5 0 0 1 0-2.1L10.6 3.4A1.5 1.5 0 0 1 11.7 3H19a2 2 0 0 1 2 2v7.3a1.5 1.5 0 0 1-.4 1.1z" />
+      <circle cx="16" cy="8" r="1.2" />
+    </IconBase>
+  );
+}
+
 export function IconExternal(props: IconProps) {
   return (
     <IconBase {...props}>
