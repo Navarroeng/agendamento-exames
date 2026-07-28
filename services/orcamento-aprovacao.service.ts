@@ -45,8 +45,7 @@ function resolveStatusContratoFromAprovacao(payload: {
 }
 
 async function syncClienteContratoFromAprovacao(
-  aprovacao: OrcamentoAprovacaoRecord,
-  options?: { liberadoParaAgendamento?: boolean }
+  aprovacao: OrcamentoAprovacaoRecord
 ): Promise<void> {
   const supabase = createClient();
   const statusContrato = resolveStatusContratoFromAprovacao({
@@ -56,6 +55,7 @@ async function syncClienteContratoFromAprovacao(
     boleto_vencimento: aprovacao.boleto_vencimento,
   });
 
+  // Contratos de orçamento: liberação = boleto pago (única regra financeira).
   const update: Record<string, unknown> = {
     status: statusContrato,
     contrato_enviado_em: aprovacao.contrato_enviado_em,
@@ -63,17 +63,14 @@ async function syncClienteContratoFromAprovacao(
     boleto_vencimento: aprovacao.boleto_vencimento,
     boleto_pago: aprovacao.boleto_pago,
     boleto_pago_em: aprovacao.boleto_pago_em,
+    liberado_para_agendamento: Boolean(aprovacao.boleto_pago),
   };
-
-  if (typeof options?.liberadoParaAgendamento === "boolean") {
-    update.liberado_para_agendamento = options.liberadoParaAgendamento;
-  }
 
   const { data: contratos, error: syncError } = await supabase
     .from("cliente_contratos")
     .update(update)
     .eq("orcamento_id", aprovacao.orcamento_id)
-    .not("status", "in", "(ativo,encerrado,em_renovacao,cancelado)")
+    .not("status", "in", "(encerrado,cancelado)")
     .select("id, cliente_id");
 
   if (syncError) {
@@ -81,7 +78,19 @@ async function syncClienteContratoFromAprovacao(
     return;
   }
 
-  const clienteId = contratos?.[0]?.cliente_id as string | undefined;
+  let clienteId = contratos?.[0]?.cliente_id as string | undefined;
+
+  // Se o filtro de status não atualizou linhas, ainda tenta recomputar pelo orçamento.
+  if (!clienteId) {
+    const { data: fallback } = await supabase
+      .from("cliente_contratos")
+      .select("id, cliente_id")
+      .eq("orcamento_id", aprovacao.orcamento_id)
+      .limit(1)
+      .maybeSingle();
+    clienteId = fallback?.cliente_id as string | undefined;
+  }
+
   if (clienteId) {
     const { error: recomputeError } = await supabase.rpc(
       "recompute_cliente_disponivel_agendamento",
@@ -236,9 +245,7 @@ export async function atualizarAcompanhamentoFinanceiro(
   if (error) throw error;
 
   const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
-  await syncClienteContratoFromAprovacao(aprovacao, {
-    liberadoParaAgendamento: Boolean(aprovacao.boleto_pago),
-  });
+  await syncClienteContratoFromAprovacao(aprovacao);
   return aprovacao;
 }
 

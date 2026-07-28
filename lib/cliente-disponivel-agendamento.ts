@@ -1,3 +1,10 @@
+/**
+ * Disponibilidade para novos agendamentos.
+ *
+ * Fonte de verdade no cadastro: `clientes.disponivel_agendamento`,
+ * mantida por `recompute_cliente_disponivel_agendamento` com a regra de
+ * `lib/cliente-pode-agendar.ts` (orçamento só libera com boleto pago).
+ */
 import { SIM_NAO } from "@/lib/constants";
 
 export const CLIENTE_DISPONIVEL_AGENDAMENTO_MSG =

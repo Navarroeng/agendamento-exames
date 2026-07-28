@@ -3,6 +3,7 @@ import {
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
 import { listarClientesParaSelect } from "@/services/cliente.service";
+import { contratoLiberaAgendamento } from "@/lib/cliente-pode-agendar";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
   "Cliente sem contrato vigente. Não é possível agendar exames até renovar o contrato.";
@@ -51,7 +52,13 @@ export async function verificarContratoVigente(
 
   // Contratos originados de orçamento liberados após pagamento inicial
   const contratos = await listarContratosPorCliente(clienteId);
-  const liberado = contratos.find((c) => c.liberado_para_agendamento);
+  const liberado = contratos.find((c) =>
+    contratoLiberaAgendamento({
+      orcamento_id: c.orcamento_id,
+      boleto_pago: c.boleto_pago,
+      liberado_para_agendamento: c.liberado_para_agendamento,
+    })
+  );
   if (liberado) {
     return {
       vigente: true,

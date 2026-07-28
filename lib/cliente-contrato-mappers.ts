@@ -2,6 +2,10 @@ import {
   CLIENTE_CONTRATO_STATUS_OPTIONS,
   CLIENTE_CONTRATO_TIPO_OPTIONS,
 } from "@/lib/cliente-contrato-constants";
+import {
+  contratoLiberaAgendamento,
+  labelAgendamentoLiberacao,
+} from "@/lib/cliente-pode-agendar";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency, formatCurrencyBRL } from "@/lib/money";
 import type {
@@ -88,9 +92,12 @@ export function labelFinanceiroContrato(
 }
 
 export function labelAgendamentoContrato(
-  contrato: Pick<ClienteContratoRecord, "liberado_para_agendamento">
+  contrato: Pick<
+    ClienteContratoRecord,
+    "orcamento_id" | "boleto_pago" | "liberado_para_agendamento"
+  >
 ): "Liberado" | "Bloqueado" {
-  return contrato.liberado_para_agendamento ? "Liberado" : "Bloqueado";
+  return labelAgendamentoLiberacao(contratoLiberaAgendamento(contrato));
 }
 
 export function labelVencimentoBoletoContrato(

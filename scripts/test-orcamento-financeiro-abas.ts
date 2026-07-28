@@ -61,11 +61,19 @@ assert.equal(
   "Aguardando vencimento"
 );
 assert.equal(
-  labelAgendamentoContrato({ liberado_para_agendamento: false }),
+  labelAgendamentoContrato({
+    orcamento_id: "o1",
+    boleto_pago: false,
+    liberado_para_agendamento: false,
+  }),
   "Bloqueado"
 );
 assert.equal(
-  labelAgendamentoContrato({ liberado_para_agendamento: true }),
+  labelAgendamentoContrato({
+    orcamento_id: "o1",
+    boleto_pago: true,
+    liberado_para_agendamento: true,
+  }),
   "Liberado"
 );
 
