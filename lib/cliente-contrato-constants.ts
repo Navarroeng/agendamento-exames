@@ -5,6 +5,10 @@ export const CLIENTE_CONTRATO_STATUS_OPTIONS: {
   label: string;
 }[] = [
   { value: "aguardando_envio", label: "Aguardando envio" },
+  { value: "enviado", label: "Enviado" },
+  { value: "assinado", label: "Assinado" },
+  { value: "aguardando_pagamento", label: "Aguardando pagamento" },
+  { value: "pago", label: "Pago" },
   { value: "ativo", label: "Ativo" },
   { value: "encerrado", label: "Encerrado" },
   { value: "em_renovacao", label: "Em renovação" },

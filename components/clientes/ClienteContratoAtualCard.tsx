@@ -5,6 +5,8 @@ import {
   formatVigenciaContrato,
   labelClienteContratoStatus,
   labelClienteContratoTipo,
+  labelPagamentoContrato,
+  labelVencimentoBoletoContrato,
 } from "@/lib/cliente-contrato-mappers";
 import type { ClienteContratoRecord } from "@/lib/types";
 
@@ -35,10 +37,10 @@ export function ClienteContratoAtualCard({
   if (!contrato) {
     return (
       <div className="rounded-2xl border border-dashed border-[#d7deec] bg-gradient-to-br from-[#fbfcff] to-[#f6f8fc] px-5 py-8 text-center">
-        <p className="text-sm font-bold text-[#52617a]">Nenhum contrato ativo</p>
+        <p className="text-sm font-bold text-[#52617a]">Nenhum contrato</p>
         <p className="mt-1 text-xs text-[#8b95a8]">
-          Cadastre um novo contrato para acompanhar vigência, valores e
-          colaboradores.
+          Ao aprovar um orçamento, o pré-cadastro e o contrato são criados
+          automaticamente.
         </p>
       </div>
     );
@@ -52,8 +54,14 @@ export function ClienteContratoAtualCard({
             Contrato atual
           </p>
           <p className="mt-0.5 text-sm font-extrabold text-navy">
-            {formatVigenciaContrato(contrato.data_inicio, contrato.data_fim)}
+            {contrato.numero?.trim() ||
+              formatVigenciaContrato(contrato.data_inicio, contrato.data_fim)}
           </p>
+          {contrato.numero_orcamento?.trim() ? (
+            <p className="mt-0.5 text-xs font-semibold text-[#52617a]">
+              Orçamento: {contrato.numero_orcamento}
+            </p>
+          ) : null}
         </div>
         <span
           className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
@@ -76,8 +84,12 @@ export function ClienteContratoAtualCard({
           }
         />
         <Metric
-          label="Condição pagamento"
-          value={contrato.condicao_pagamento?.trim() || "—"}
+          label="Pagamento"
+          value={labelPagamentoContrato(contrato)}
+        />
+        <Metric
+          label="Venc. boleto"
+          value={labelVencimentoBoletoContrato(contrato.boleto_vencimento)}
         />
         <Metric
           label="Tipo contrato"
@@ -86,10 +98,6 @@ export function ClienteContratoAtualCard({
         <Metric
           label="Reajuste"
           value={formatReajusteContrato(contrato.reajuste_percentual)}
-        />
-        <Metric
-          label="Vigência"
-          value={formatVigenciaContrato(contrato.data_inicio, contrato.data_fim)}
         />
       </div>
     </div>

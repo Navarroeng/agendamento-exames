@@ -97,6 +97,22 @@ export async function salvarAprovacaoOrcamento(
   return { aprovacao, integracao };
 }
 
+function resolveStatusContratoFromAprovacao(payload: {
+  contrato_enviado: boolean;
+  contrato_assinado: boolean;
+  boleto_pago: boolean;
+  boleto_vencimento: string | null;
+}): string {
+  if (payload.boleto_pago) return "pago";
+  if (payload.contrato_assinado) {
+    return payload.boleto_vencimento
+      ? "aguardando_pagamento"
+      : "assinado";
+  }
+  if (payload.contrato_enviado) return "enviado";
+  return "aguardando_envio";
+}
+
 export async function atualizarAcompanhamentoContrato(
   aprovacaoId: string,
   payload: OrcamentoContratoUpdatePayload
@@ -124,7 +140,57 @@ export async function atualizarAcompanhamentoContrato(
     .single();
 
   if (error) throw error;
-  return sortAprovacao(data as OrcamentoAprovacaoRecord);
+
+  const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
+  const statusContrato = resolveStatusContratoFromAprovacao({
+    contrato_enviado: aprovacao.contrato_enviado,
+    contrato_assinado: aprovacao.contrato_assinado,
+    boleto_pago: aprovacao.boleto_pago,
+    boleto_vencimento: aprovacao.boleto_vencimento,
+  });
+
+  const { error: syncError } = await supabase
+    .from("cliente_contratos")
+    .update({
+      status: statusContrato,
+      contrato_enviado_em: aprovacao.contrato_enviado_em,
+      contrato_assinado_em: aprovacao.contrato_assinado_em,
+      boleto_vencimento: aprovacao.boleto_vencimento,
+      boleto_pago: aprovacao.boleto_pago,
+      boleto_pago_em: aprovacao.boleto_pago_em,
+    })
+    .eq("orcamento_id", aprovacao.orcamento_id)
+    .not("status", "in", "(ativo,encerrado,em_renovacao,cancelado)");
+
+  if (syncError) {
+    console.error("Falha ao sincronizar status do contrato do cliente:", syncError);
+  }
+
+  return aprovacao;
+}
+
+/** Regulariza orçamentos já aprovados sem cliente/contrato (idempotente). */
+export async function backfillOrcamentosAprovadosClientes(): Promise<{
+  clientes_criados: number;
+  clientes_localizados: number;
+  contratos_criados: number;
+  contratos_atualizados: number;
+  pulados_sem_cnpj: number;
+  orcamentos_ja_vinculados: number;
+}> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc(
+    "backfill_orcamentos_aprovados_clientes"
+  );
+  if (error) throw error;
+  return data as {
+    clientes_criados: number;
+    clientes_localizados: number;
+    contratos_criados: number;
+    contratos_atualizados: number;
+    pulados_sem_cnpj: number;
+    orcamentos_ja_vinculados: number;
+  };
 }
 
 export async function cancelarOrcamento(params: {

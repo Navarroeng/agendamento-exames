@@ -309,7 +309,11 @@ export type ClienteContratoStatus =
   | "encerrado"
   | "em_renovacao"
   | "cancelado"
-  | "aguardando_envio";
+  | "aguardando_envio"
+  | "enviado"
+  | "assinado"
+  | "aguardando_pagamento"
+  | "pago";
 
 export type ClienteContratoTipo =
   | "mensal"
@@ -363,6 +367,11 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   desconto_percentual?: number | null;
   aprovado_em?: string | null;
   aprovado_por?: string | null;
+  contrato_enviado_em?: string | null;
+  contrato_assinado_em?: string | null;
+  boleto_vencimento?: string | null;
+  boleto_pago?: boolean;
+  boleto_pago_em?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

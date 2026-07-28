@@ -2,6 +2,8 @@ import {
   clienteContratoStatusBadgeClass,
   formatValorContrato,
   labelClienteContratoStatus,
+  labelPagamentoContrato,
+  labelVencimentoBoletoContrato,
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord } from "@/lib/types";
@@ -37,7 +39,7 @@ export function ClienteContratosHistoricoTable({
 
   return (
     <div className="table-wrap -mx-1 overflow-x-auto px-1">
-      <table className="table-premium w-full min-w-[1080px]">
+      <table className="table-premium w-full min-w-[1180px]">
         <thead>
           <tr>
             {[
@@ -46,8 +48,9 @@ export function ClienteContratosHistoricoTable({
               "Aprovação",
               "Colaboradores",
               "Valor",
-              "Condição",
               "Status",
+              "Pagamento",
+              "Venc. boleto",
               "Ações",
             ].map((h) => (
               <th key={h}>{h}</th>
@@ -74,15 +77,18 @@ export function ClienteContratosHistoricoTable({
               <td className="tabular-nums">
                 {formatValorContrato(contrato.valor_contrato)}
               </td>
-              <td className="max-w-[160px] truncate">
-                {contrato.condicao_pagamento?.trim() || "—"}
-              </td>
               <td>
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
                 >
                   {labelClienteContratoStatus(contrato.status)}
                 </span>
+              </td>
+              <td className="text-xs font-semibold text-[#52617a]">
+                {labelPagamentoContrato(contrato)}
+              </td>
+              <td className="text-xs text-[#52617a]">
+                {labelVencimentoBoletoContrato(contrato.boleto_vencimento)}
               </td>
               <td>
                 <div className="flex flex-wrap gap-1.5">
