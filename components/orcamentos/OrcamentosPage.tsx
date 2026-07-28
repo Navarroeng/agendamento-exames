@@ -7,7 +7,6 @@ import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
 import { OrcamentoFormModal } from "./OrcamentoFormModal";
 import { OrcamentoSearchPanel } from "./OrcamentoSearchPanel";
 import { OrcamentoTopActions } from "./OrcamentoTopActions";
-import { OrcamentoViewModal } from "./OrcamentoViewModal";
 import { OrcamentosTable } from "./OrcamentosTable";
 import { useOrcamentosPage } from "@/hooks/useOrcamentosPage";
 
@@ -23,7 +22,6 @@ export function OrcamentosPage() {
     servicos,
     servicosLoading,
     servicosError,
-    viewOrcamento,
     viewLoading,
     actionLoading,
     form,
@@ -33,6 +31,7 @@ export function OrcamentosPage() {
     cancelTarget,
     cancelSaving,
     aprovarOpen,
+    aprovarMode,
     aprovarOrcamento,
     aprovarAprovacao,
     aprovarSaving,
@@ -63,7 +62,6 @@ export function OrcamentosPage() {
     handleFilterChange,
     clearFilters,
     handleSelectCliente,
-    closeView,
   } = useOrcamentosPage();
 
   return (
@@ -122,19 +120,6 @@ export function OrcamentosPage() {
         onDiscardAndClose={discardAndClose}
       />
 
-      <OrcamentoViewModal
-        orcamento={viewOrcamento}
-        servicos={servicos}
-        onClose={closeView}
-        onEditar={handleEditar}
-        onGerarPdf={handleGerarPdf}
-        onAprovar={
-          viewOrcamento && viewOrcamento.status !== "cancelado"
-            ? handleOpenAprovar
-            : undefined
-        }
-      />
-
       <OrcamentoCancelarModal
         open={Boolean(cancelTarget)}
         numero={cancelTarget?.numero ?? ""}
@@ -147,6 +132,7 @@ export function OrcamentosPage() {
 
       <OrcamentoAprovarModal
         open={aprovarOpen}
+        mode={aprovarMode}
         orcamento={aprovarOrcamento}
         aprovacao={aprovarAprovacao}
         servicos={servicos}

@@ -28,6 +28,7 @@ type TabId = "resumo" | "aprovado" | "contrato";
 
 interface OrcamentoAprovarModalProps {
   open: boolean;
+  mode?: "consulta" | "aprovacao";
   orcamento: OrcamentoComItens | null;
   aprovacao: OrcamentoAprovacaoRecord | null;
   servicos: ServicoSstRecord[];
@@ -50,6 +51,7 @@ const SIM_NAO = [
 
 export function OrcamentoAprovarModal({
   open,
+  mode = "aprovacao",
   orcamento,
   aprovacao,
   servicos,
@@ -81,7 +83,7 @@ export function OrcamentoAprovarModal({
 
   useEffect(() => {
     if (!open || !orcamento) return;
-    setTab(aprovacao ? "contrato" : "resumo");
+    setTab("resumo");
     setShowDiffConfirm(false);
     setForm(
       aprovacao
@@ -98,7 +100,7 @@ export function OrcamentoAprovarModal({
     setBoletoPagoEm(aprovacao?.boleto_pago_em ?? "");
     setObservacaoPagamento(aprovacao?.observacao_pagamento ?? "");
     setComprovanteFile(null);
-  }, [open, orcamento, aprovacao]);
+  }, [open, orcamento, aprovacao, mode]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,7 +125,9 @@ export function OrcamentoAprovarModal({
   }, [orcamento, form]);
 
   const andamento = resolveContratoAndamento(aprovacao);
-  const aprovadoLocked = Boolean(aprovacao);
+  const consultaMode = mode === "consulta";
+  const aprovadoLocked = Boolean(aprovacao) || consultaMode;
+  const camposSomenteLeitura = consultaMode || saving;
 
   const updateFormField = useCallback(
     (field: keyof Omit<OrcamentoAprovacaoFormValues, "itens">, value: string) => {
@@ -232,13 +236,24 @@ export function OrcamentoAprovarModal({
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const tabs: Array<{ id: TabId; label: string; disabled?: boolean }> = [
     { id: "resumo", label: "Resumo" },
-    { id: "aprovado", label: "Orçamento aprovado" },
-    {
+  ];
+  if (consultaMode) {
+    if (aprovacao) {
+      tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
+      tabs.push({ id: "contrato", label: "Contrato" });
+    }
+  } else {
+    tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
+    tabs.push({
       id: "contrato",
       label: "Contrato",
       disabled: !aprovacao,
-    },
-  ];
+    });
+  }
+
+  const tituloModal = consultaMode
+    ? `Orçamento · ${orcamento.numero}`
+    : `Aprovar · ${orcamento.numero}`;
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
@@ -262,7 +277,7 @@ export function OrcamentoAprovarModal({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
                 <h3 className="text-lg font-extrabold sm:text-xl">
-                  Aprovar · {orcamento.numero}
+                  {tituloModal}
                 </h3>
                 <span
                   className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${badge.className}`}
@@ -531,7 +546,7 @@ export function OrcamentoAprovarModal({
                   <select
                     className="field-input"
                     value={contratoEnviado ? "sim" : "nao"}
-                    disabled={saving}
+                    disabled={camposSomenteLeitura}
                     onChange={(e) =>
                       setContratoEnviado(e.target.value === "sim")
                     }
@@ -548,7 +563,7 @@ export function OrcamentoAprovarModal({
                     type="date"
                     className="field-input"
                     value={contratoEnviadoEm}
-                    disabled={saving || !contratoEnviado}
+                    disabled={camposSomenteLeitura || !contratoEnviado}
                     onChange={(e) => setContratoEnviadoEm(e.target.value)}
                   />
                 </Field>
@@ -556,7 +571,7 @@ export function OrcamentoAprovarModal({
                   <select
                     className="field-input"
                     value={contratoAssinado ? "sim" : "nao"}
-                    disabled={saving}
+                    disabled={camposSomenteLeitura}
                     onChange={(e) => {
                       const sim = e.target.value === "sim";
                       setContratoAssinado(sim);
@@ -578,7 +593,7 @@ export function OrcamentoAprovarModal({
                     type="date"
                     className="field-input"
                     value={contratoAssinadoEm}
-                    disabled={saving || !contratoAssinado}
+                    disabled={camposSomenteLeitura || !contratoAssinado}
                     onChange={(e) => setContratoAssinadoEm(e.target.value)}
                   />
                 </Field>
@@ -587,7 +602,7 @@ export function OrcamentoAprovarModal({
                     <textarea
                       className="field-input min-h-[72px] resize-y"
                       value={observacaoContrato}
-                      disabled={saving}
+                      disabled={camposSomenteLeitura}
                       onChange={(e) => setObservacaoContrato(e.target.value)}
                     />
                   </Field>
@@ -605,7 +620,7 @@ export function OrcamentoAprovarModal({
                         type="date"
                         className="field-input"
                         value={boletoVencimento}
-                        disabled={saving}
+                        disabled={camposSomenteLeitura}
                         onChange={(e) => setBoletoVencimento(e.target.value)}
                       />
                     </Field>
@@ -613,7 +628,7 @@ export function OrcamentoAprovarModal({
                       <select
                         className="field-input"
                         value={boletoPago ? "sim" : "nao"}
-                        disabled={saving}
+                        disabled={camposSomenteLeitura}
                         onChange={(e) =>
                           setBoletoPago(e.target.value === "sim")
                         }
@@ -632,7 +647,7 @@ export function OrcamentoAprovarModal({
                             type="date"
                             className="field-input"
                             value={boletoPagoEm}
-                            disabled={saving}
+                            disabled={camposSomenteLeitura}
                             onChange={(e) => setBoletoPagoEm(e.target.value)}
                           />
                         </Field>
@@ -641,7 +656,7 @@ export function OrcamentoAprovarModal({
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                             className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-                            disabled={saving}
+                            disabled={camposSomenteLeitura}
                             onChange={(e) =>
                               setComprovanteFile(e.target.files?.[0] ?? null)
                             }
@@ -672,7 +687,7 @@ export function OrcamentoAprovarModal({
                         <textarea
                           className="field-input min-h-[72px] resize-y"
                           value={observacaoPagamento}
-                          disabled={saving}
+                          disabled={camposSomenteLeitura}
                           onChange={(e) =>
                             setObservacaoPagamento(e.target.value)
                           }
@@ -695,7 +710,7 @@ export function OrcamentoAprovarModal({
           >
             Fechar
           </button>
-          {tab === "aprovado" && !aprovadoLocked ? (
+          {tab === "aprovado" && !aprovadoLocked && !consultaMode ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
@@ -709,7 +724,7 @@ export function OrcamentoAprovarModal({
                   : "Salvar aprovação"}
             </button>
           ) : null}
-          {tab === "aprovado" && showDiffConfirm && !aprovadoLocked ? (
+          {tab === "aprovado" && showDiffConfirm && !aprovadoLocked && !consultaMode ? (
             <button
               type="button"
               className="btn justify-center sm:w-auto"
@@ -719,7 +734,7 @@ export function OrcamentoAprovarModal({
               Voltar à edição
             </button>
           ) : null}
-          {tab === "contrato" && aprovacao ? (
+          {tab === "contrato" && aprovacao && !consultaMode ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"

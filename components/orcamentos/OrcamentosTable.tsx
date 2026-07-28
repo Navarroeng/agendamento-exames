@@ -1,7 +1,7 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCurrency } from "@/lib/money";
 import { Panel } from "@/components/ui/Panel";
-import { IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
@@ -50,21 +50,18 @@ export function OrcamentosTable({
           </p>
         )}
         {!loading && !error && orcamentos.length > 0 && (
-          <table className="table-premium w-full min-w-[960px]">
+          <table className="table-premium w-full min-w-[1020px]">
             <thead>
               <tr>
-                {[
-                  "Número",
-                  "Data",
-                  "Cliente",
-                  "Origem",
-                  "Responsável",
-                  "Valor total",
-                  "Status",
-                  "Ações",
-                ].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
+                <th>Número</th>
+                <th>Data</th>
+                <th>Cliente</th>
+                <th>Origem</th>
+                <th>Responsável</th>
+                <th>Valor total</th>
+                <th>Status</th>
+                <th className="w-[88px] text-center">Visualizar</th>
+                <th className="w-[72px] text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -91,10 +88,20 @@ export function OrcamentosTable({
                         {ORCAMENTO_STATUS_LABELS[orcamento.status]}
                       </span>
                     </td>
-                    <td>
+                    <td className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => onVisualizar(orcamento.id)}
+                        className="mx-auto grid h-7 w-7 place-items-center rounded-[8px] border border-[#e2e8f0] bg-white text-[#64748b] transition-all duration-150 hover:border-brand-blue/30 hover:bg-brand-blue-soft hover:text-brand-blue"
+                        aria-label={`Visualizar orçamento ${orcamento.numero}`}
+                        title="Visualizar"
+                      >
+                        <IconEye size={15} />
+                      </button>
+                    </td>
+                    <td className="text-center">
                       <OrcamentoRowActionsMenu
                         orcamento={orcamento}
-                        onVisualizar={onVisualizar}
                         onEditar={onEditar}
                         onGerarPdf={onGerarPdf}
                         onCancelar={onCancelar}

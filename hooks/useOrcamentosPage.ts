@@ -61,9 +61,6 @@ export function useOrcamentosPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [viewOrcamento, setViewOrcamento] = useState<OrcamentoComItens | null>(
-    null
-  );
   const [viewLoading, setViewLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [filters, setFilters] = useState<OrcamentoFilters>(
@@ -87,6 +84,9 @@ export function useOrcamentosPage() {
   const [aprovarAprovacao, setAprovarAprovacao] =
     useState<OrcamentoAprovacaoRecord | null>(null);
   const [aprovarOpen, setAprovarOpen] = useState(false);
+  const [aprovarMode, setAprovarMode] = useState<"consulta" | "aprovacao">(
+    "aprovacao"
+  );
   const [aprovarSaving, setAprovarSaving] = useState(false);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
@@ -206,7 +206,6 @@ export function useOrcamentosPage() {
         setEditingResponsavel(orcamento.responsavel);
         setEditingOrigemInicial(orcamento.origem_cliente);
         setEditingId(id);
-        setViewOrcamento(null);
         pendingBaselineRef.current = true;
         setShowForm(true);
       } catch (err) {
@@ -219,26 +218,51 @@ export function useOrcamentosPage() {
     [loadForm]
   );
 
-  const handleVisualizar = useCallback(async (id: string) => {
-    setViewLoading(true);
-    try {
-      const orcamento = await buscarOrcamentoComItens(id);
-      if (!orcamento) {
-        toast.error("Orçamento não encontrado.");
-        return;
+  const openOrcamentoDetalhe = useCallback(
+    async (id: string, mode: "consulta" | "aprovacao") => {
+      setActionLoading(true);
+      try {
+        const orcamento = await buscarOrcamentoComItens(id);
+        if (!orcamento) {
+          toast.error("Orçamento não encontrado.");
+          return;
+        }
+        if (mode === "aprovacao" && orcamento.status === "cancelado") {
+          toast.error("Orçamento cancelado não pode ser aprovado.");
+          return;
+        }
+        const aprovacao = await buscarAprovacaoPorOrcamentoId(id);
+        setAprovarMode(mode);
+        setAprovarOrcamento(orcamento);
+        setAprovarAprovacao(aprovacao);
+        setAprovarOpen(true);
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          mode === "consulta"
+            ? "Erro ao abrir orçamento."
+            : "Erro ao abrir aprovação."
+        );
+      } finally {
+        setActionLoading(false);
       }
-      setViewOrcamento(orcamento);
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao carregar orçamento.");
-    } finally {
-      setViewLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
-  const closeView = useCallback(() => {
-    setViewOrcamento(null);
-  }, []);
+  const handleVisualizar = useCallback(
+    async (id: string) => {
+      await openOrcamentoDetalhe(id, "consulta");
+    },
+    [openOrcamentoDetalhe]
+  );
+
+  const handleOpenAprovar = useCallback(
+    async (id: string) => {
+      await openOrcamentoDetalhe(id, "aprovacao");
+    },
+    [openOrcamentoDetalhe]
+  );
 
   const handleSave = useCallback(async () => {
     const validationError = getValidationError();
@@ -427,36 +451,12 @@ export function useOrcamentosPage() {
     [auditContext, cancelTarget, refresh]
   );
 
-  const handleOpenAprovar = useCallback(async (id: string) => {
-    setActionLoading(true);
-    try {
-      const orcamento = await buscarOrcamentoComItens(id);
-      if (!orcamento) {
-        toast.error("Orçamento não encontrado.");
-        return;
-      }
-      if (orcamento.status === "cancelado") {
-        toast.error("Orçamento cancelado não pode ser aprovado.");
-        return;
-      }
-      const aprovacao = await buscarAprovacaoPorOrcamentoId(id);
-      setAprovarOrcamento(orcamento);
-      setAprovarAprovacao(aprovacao);
-      setAprovarOpen(true);
-      setViewOrcamento(null);
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao abrir aprovação.");
-    } finally {
-      setActionLoading(false);
-    }
-  }, []);
-
   const closeAprovar = useCallback(() => {
     if (aprovarSaving) return;
     setAprovarOpen(false);
     setAprovarOrcamento(null);
     setAprovarAprovacao(null);
+    setAprovarMode("aprovacao");
   }, [aprovarSaving]);
 
   const handleSalvarAprovacao = useCallback(
@@ -701,7 +701,6 @@ export function useOrcamentosPage() {
     servicos,
     servicosLoading,
     servicosError,
-    viewOrcamento,
     viewLoading,
     actionLoading,
     form,
@@ -711,6 +710,7 @@ export function useOrcamentosPage() {
     cancelTarget,
     cancelSaving,
     aprovarOpen,
+    aprovarMode,
     aprovarOrcamento,
     aprovarAprovacao,
     aprovarSaving,
@@ -742,6 +742,5 @@ export function useOrcamentosPage() {
     handleFilterChange,
     clearFilters,
     handleSelectCliente,
-    closeView,
   };
 }

@@ -141,6 +141,15 @@ export function IconUser(props: IconProps) {
   );
 }
 
+export function IconEye(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.75" />
+    </IconBase>
+  );
+}
+
 export function IconSettings(props: IconProps) {
   return (
     <IconBase {...props}>

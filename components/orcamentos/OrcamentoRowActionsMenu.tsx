@@ -5,7 +5,6 @@ import type { OrcamentoRecord } from "@/lib/orcamento-types";
 
 interface OrcamentoRowActionsMenuProps {
   orcamento: OrcamentoRecord;
-  onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -22,7 +21,6 @@ type MenuItem = {
 
 export function OrcamentoRowActionsMenu({
   orcamento,
-  onVisualizar,
   onEditar,
   onGerarPdf,
   onCancelar,
@@ -51,11 +49,6 @@ export function OrcamentoRowActionsMenu({
 
   const items: MenuItem[] = [
     {
-      key: "visualizar",
-      label: "Visualizar",
-      onClick: () => onVisualizar(orcamento.id),
-    },
-    {
       key: "editar",
       label: "Editar",
       disabled: !podeEditar,
@@ -67,17 +60,17 @@ export function OrcamentoRowActionsMenu({
       onClick: () => onGerarPdf(orcamento.id),
     },
     {
+      key: "aprovar",
+      label: "Aprovar",
+      disabled: !podeAprovar,
+      onClick: () => onAprovar(orcamento.id),
+    },
+    {
       key: "cancelar",
       label: "Cancelar",
       danger: true,
       disabled: !podeCancelar,
       onClick: () => onCancelar(orcamento.id),
-    },
-    {
-      key: "aprovar",
-      label: "Aprovar",
-      disabled: !podeAprovar,
-      onClick: () => onAprovar(orcamento.id),
     },
   ];
 
@@ -88,7 +81,7 @@ export function OrcamentoRowActionsMenu({
   }
 
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="relative inline-flex justify-center" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
