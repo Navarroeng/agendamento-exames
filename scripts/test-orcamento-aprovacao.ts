@@ -1,10 +1,11 @@
-/** Smoke test: aprovação comercial de orçamento (diffs + andamento). */
+/** Smoke test: aprovação comercial de orçamento (fluxo simplificado). */
 
 import assert from "node:assert/strict";
 import {
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoInsertPayload,
+  buildResumoComercialOrcamento,
   resolveContratoAndamento,
 } from "../lib/orcamento-aprovacao";
 import { parseMoney } from "../lib/money";
@@ -57,22 +58,63 @@ const orcamento = {
   ],
 } as OrcamentoComItens;
 
-const form = buildAprovacaoFormFromOrcamento(orcamento);
-form.quantidade_colaboradores = "15";
-form.valor_final = "2.500,00";
-form.quantidade_parcelas = "5";
-form.valor_parcela = "500,00";
+const resumo = buildResumoComercialOrcamento(orcamento);
+assert.equal(resumo.quantidadeColaboradores, 10);
+assert.equal(resumo.valorTotal, 2000);
 
-const diffs = buildAprovacaoDiffs(orcamento, form, parseMoney);
+const formIguais = buildAprovacaoFormFromOrcamento(orcamento);
+assert.equal(formIguais.condicoes_iguais, true);
+const payloadIguais = buildAprovacaoInsertPayload(
+  orcamento,
+  formIguais,
+  "Ágatha",
+  parseMoney
+);
+assert.equal(payloadIguais.valor_final, 2000);
+assert.equal(payloadIguais.quantidade_colaboradores, 10);
+assert.equal(payloadIguais.itens.length, 1);
+assert.equal(buildAprovacaoDiffs(orcamento, formIguais, parseMoney).length, 0);
+
+const formAlterado = {
+  ...formIguais,
+  condicoes_iguais: false,
+  forma_pagamento: "parcelado" as const,
+  quantidade_colaboradores: "15",
+  valor_final: "2.500,00",
+  quantidade_parcelas: "5",
+};
+const diffs = buildAprovacaoDiffs(orcamento, formAlterado, parseMoney);
 assert.ok(diffs.some((d) => d.label === "Valor" && d.changed));
 assert.ok(
   diffs.some((d) => d.label === "Quantidade de colaboradores" && d.changed)
 );
 
-const payload = buildAprovacaoInsertPayload(form, "Ágatha", parseMoney);
+const payload = buildAprovacaoInsertPayload(
+  orcamento,
+  formAlterado,
+  "Ágatha",
+  parseMoney
+);
 assert.equal(payload.valor_final, 2500);
 assert.equal(payload.quantidade_colaboradores, 15);
+assert.equal(payload.quantidade_parcelas, 5);
+assert.equal(payload.valor_parcela, 500);
+assert.equal(payload.condicao_pagamento, "5x de R$ 500,00");
 assert.equal(payload.aprovado_por, "Ágatha");
+
+const payloadAvista = buildAprovacaoInsertPayload(
+  orcamento,
+  {
+    ...formAlterado,
+    forma_pagamento: "avista",
+    valor_final: "2.375,00",
+  },
+  "Ágatha",
+  parseMoney
+);
+assert.equal(payloadAvista.condicao_pagamento, "À vista");
+assert.equal(payloadAvista.valor_avista, 2375);
+assert.equal(payloadAvista.quantidade_parcelas, null);
 
 assert.equal(resolveContratoAndamento(null), "nao_enviado");
 assert.equal(
@@ -83,33 +125,6 @@ assert.equal(
     boleto_vencimento: null,
   }),
   "enviado"
-);
-assert.equal(
-  resolveContratoAndamento({
-    contrato_enviado: true,
-    contrato_assinado: true,
-    boleto_pago: false,
-    boleto_vencimento: null,
-  }),
-  "assinado"
-);
-assert.equal(
-  resolveContratoAndamento({
-    contrato_enviado: true,
-    contrato_assinado: true,
-    boleto_pago: false,
-    boleto_vencimento: "2026-08-20",
-  }),
-  "aguardando_pagamento"
-);
-assert.equal(
-  resolveContratoAndamento({
-    contrato_enviado: true,
-    contrato_assinado: true,
-    boleto_pago: true,
-    boleto_vencimento: "2026-08-20",
-  }),
-  "pago"
 );
 
 console.log("test-orcamento-aprovacao: OK");

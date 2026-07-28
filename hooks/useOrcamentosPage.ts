@@ -465,6 +465,7 @@ export function useOrcamentosPage() {
       setAprovarSaving(true);
       try {
         const payload = buildAprovacaoInsertPayload(
+          aprovarOrcamento,
           formValues,
           auditContext.usuarioNome,
           parseMoney
@@ -486,11 +487,14 @@ export function useOrcamentosPage() {
           acao: AUDITORIA_ACOES.edicao,
           registroId: aprovarOrcamento.id,
           registroNome: aprovarOrcamento.numero,
-          descricao: `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero}.`,
+          descricao: formValues.condicoes_iguais
+            ? `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero} conforme as condições originais.`
+            : `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero}.`,
           dadosDepois: {
             status: "aprovado",
             valor_final: payload.valor_final,
             quantidade_colaboradores: payload.quantidade_colaboradores,
+            condicoes_iguais: formValues.condicoes_iguais,
           },
         });
 

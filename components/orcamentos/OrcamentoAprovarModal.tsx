@@ -8,14 +8,18 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { emptyToNull, formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
 import {
   ORCAMENTO_CONTRATO_ANDAMENTO_LABELS,
+  aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoFormFromRecord,
+  buildResumoComercialOrcamento,
+  formatCondicaoAprovada,
   resolveContratoAndamento,
   type OrcamentoAprovacaoFormValues,
   type OrcamentoAprovacaoRecord,
   type OrcamentoContratoUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
+import { calcValorParcela } from "@/lib/orcamento-pagamento";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
@@ -87,7 +91,7 @@ export function OrcamentoAprovarModal({
     setShowDiffConfirm(false);
     setForm(
       aprovacao
-        ? buildAprovacaoFormFromRecord(aprovacao)
+        ? buildAprovacaoFormFromRecord(orcamento, aprovacao)
         : buildAprovacaoFormFromOrcamento(orcamento)
     );
     setContratoEnviado(Boolean(aprovacao?.contrato_enviado));
@@ -130,56 +134,43 @@ export function OrcamentoAprovarModal({
   const camposSomenteLeitura = consultaMode || saving;
 
   const updateFormField = useCallback(
-    (field: keyof Omit<OrcamentoAprovacaoFormValues, "itens">, value: string) => {
+    <K extends keyof OrcamentoAprovacaoFormValues>(
+      field: K,
+      value: OrcamentoAprovacaoFormValues[K]
+    ) => {
       setForm((prev) => (prev ? { ...prev, [field]: value } : prev));
     },
     []
   );
 
-  const updateItem = useCallback(
-    (
-      id: string,
-      field: "servico_nome" | "quantidade" | "valor_unitario",
-      value: string
-    ) => {
-      setForm((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          itens: prev.itens.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  [field]:
-                    field === "valor_unitario" ? maskMoneyInput(value) : value,
-                }
-              : item
-          ),
-        };
-      });
-    },
-    []
-  );
-
   async function handleSalvarAprovacaoClick() {
-    if (!form) return;
-    if (!form.quantidade_colaboradores.trim() || Number(form.quantidade_colaboradores) < 1) {
-      toast.error("Informe a quantidade de colaboradores.");
-      return;
+    if (!form || !orcamento) return;
+
+    if (!form.condicoes_iguais) {
+      if (
+        !form.quantidade_colaboradores.trim() ||
+        Number(form.quantidade_colaboradores) < 1
+      ) {
+        toast.error("Informe a quantidade de colaboradores.");
+        return;
+      }
+      if (parseMoney(form.valor_final) <= 0) {
+        toast.error("Informe o valor total fechado.");
+        return;
+      }
+      if (
+        form.forma_pagamento === "parcelado" &&
+        (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
+      ) {
+        toast.error("Informe a quantidade de parcelas.");
+        return;
+      }
+      if (!showDiffConfirm) {
+        setShowDiffConfirm(true);
+        return;
+      }
     }
-    if (parseMoney(form.valor_final) <= 0) {
-      toast.error("Informe o valor final fechado.");
-      return;
-    }
-    const itensValidos = form.itens.filter((i) => i.servico_nome.trim());
-    if (itensValidos.length === 0) {
-      toast.error("Informe ao menos um serviço.");
-      return;
-    }
-    if (!showDiffConfirm) {
-      setShowDiffConfirm(true);
-      return;
-    }
+
     await onSalvarAprovacao(form);
     setShowDiffConfirm(false);
     setTab("contrato");
@@ -234,6 +225,21 @@ export function OrcamentoAprovarModal({
   if (!open || !orcamento || !mounted || !form) return null;
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
+  const resumoComercial = buildResumoComercialOrcamento(orcamento);
+  const valorFinalEditado = parseMoney(form.valor_final);
+  const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
+  const valorParcelaCalculado = calcValorParcela(
+    valorFinalEditado,
+    parcelasEditadas
+  );
+  const textoParcelasCalculado =
+    valorFinalEditado > 0
+      ? `${parcelasEditadas}x de ${formatCurrency(valorParcelaCalculado)}`
+      : "—";
+  const aprovadoConformeOriginal = aprovacao
+    ? aprovacaoSegueOrcamentoOriginal(orcamento, aprovacao)
+    : false;
+
   const tabs: Array<{ id: TabId; label: string; disabled?: boolean }> = [
     { id: "resumo", label: "Resumo" },
   ];
@@ -335,192 +341,272 @@ export function OrcamentoAprovarModal({
 
           {tab === "aprovado" ? (
             <div className="space-y-4">
-              <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[12px] text-[#92400e]">
-                As condições aprovadas serão salvas separadamente. O orçamento
-                original não será alterado.
-              </p>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="Quantidade de colaboradores" required>
-                  <input
-                    className="field-input"
-                    value={form.quantidade_colaboradores}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField(
-                        "quantidade_colaboradores",
-                        e.target.value.replace(/\D/g, "")
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Valor final fechado" required>
-                  <input
-                    className="field-input"
-                    value={form.valor_final}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField(
-                        "valor_final",
-                        maskMoneyInput(e.target.value)
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Desconto (%)">
-                  <input
-                    className="field-input"
-                    value={form.desconto_percentual}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField("desconto_percentual", e.target.value)
-                    }
-                  />
-                </Field>
-                <Field label="Qtd. de parcelas">
-                  <input
-                    className="field-input"
-                    value={form.quantidade_parcelas}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField(
-                        "quantidade_parcelas",
-                        e.target.value.replace(/\D/g, "")
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Valor das parcelas">
-                  <input
-                    className="field-input"
-                    value={form.valor_parcela}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField(
-                        "valor_parcela",
-                        maskMoneyInput(e.target.value)
-                      )
-                    }
-                  />
-                </Field>
-                <Field label="Valor à vista">
-                  <input
-                    className="field-input"
-                    value={form.valor_avista}
-                    disabled={aprovadoLocked || saving}
-                    onChange={(e) =>
-                      updateFormField(
-                        "valor_avista",
-                        maskMoneyInput(e.target.value)
-                      )
-                    }
-                  />
-                </Field>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <Field label="Condição de pagamento">
-                    <input
-                      className="field-input"
-                      value={form.condicao_pagamento}
-                      disabled={aprovadoLocked || saving}
-                      onChange={(e) =>
-                        updateFormField("condicao_pagamento", e.target.value)
-                      }
-                    />
-                  </Field>
-                </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <Field label="Observações da negociação">
-                    <textarea
-                      className="field-input min-h-[72px] resize-y"
-                      value={form.observacoes}
-                      disabled={aprovadoLocked || saving}
-                      onChange={(e) =>
-                        updateFormField("observacoes", e.target.value)
-                      }
-                    />
-                  </Field>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
+              <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
                 <div className="border-b border-[#eef2f7] px-4 py-3">
                   <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
-                    Serviços
+                    Resumo do orçamento
                   </p>
                 </div>
-                <div className="space-y-3 p-4">
-                  {form.itens.map((item) => (
-                    <div
-                      key={item.id}
-                      className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_100px_140px]"
-                    >
-                      <input
-                        className="field-input"
-                        placeholder="Serviço"
-                        value={item.servico_nome}
-                        disabled={aprovadoLocked || saving}
-                        onChange={(e) =>
-                          updateItem(item.id, "servico_nome", e.target.value)
-                        }
-                      />
-                      <input
-                        className="field-input"
-                        placeholder="Qtd"
-                        value={item.quantidade}
-                        disabled={aprovadoLocked || saving}
-                        onChange={(e) =>
-                          updateItem(
-                            item.id,
-                            "quantidade",
-                            e.target.value.replace(/\D/g, "")
-                          )
-                        }
-                      />
-                      <input
-                        className="field-input"
-                        placeholder="Valor"
-                        value={item.valor_unitario}
-                        disabled={aprovadoLocked || saving}
-                        onChange={(e) =>
-                          updateItem(item.id, "valor_unitario", e.target.value)
-                        }
-                      />
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                  <ResumoItem
+                    label="Quantidade de colaboradores"
+                    value={String(resumoComercial.quantidadeColaboradores)}
+                  />
+                  <ResumoItem
+                    label="Valor do orçamento"
+                    value={formatCurrency(resumoComercial.valorTotal)}
+                  />
+                  <ResumoItem
+                    label="À vista"
+                    value={
+                      resumoComercial.valorAVista > 0
+                        ? resumoComercial.textoAVista
+                        : "—"
+                    }
+                  />
+                  <ResumoItem
+                    label="Parcelado"
+                    value={resumoComercial.textoParcelado || "—"}
+                  />
                 </div>
-              </div>
+                <p className="border-t border-[#eef2f7] px-4 py-3 text-[11px] text-[#64748b]">
+                  Referência do orçamento original. Estes dados não serão
+                  alterados.
+                </p>
+              </section>
 
-              {showDiffConfirm ? (
-                <div className="rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] p-4">
-                  <p className="mb-3 text-sm font-bold text-navy">
-                    Comparação entre original e aprovado
-                  </p>
-                  <div className="space-y-2">
-                    {diffs.map((diff) => (
-                      <div
-                        key={diff.label}
-                        className={`rounded-xl border px-3 py-2 text-[12px] ${
-                          diff.changed
-                            ? "border-[#fcd34d] bg-[#fffbeb]"
-                            : "border-[#e2e8f0] bg-white"
-                        }`}
-                      >
-                        <p className="font-semibold text-navy">{diff.label}</p>
-                        <p className="text-[#64748b]">
-                          Orçamento original: {diff.original}
-                        </p>
-                        <p className="text-[#64748b]">
-                          Orçamento aprovado: {diff.aprovado}
+              {aprovacao ? (
+                <section className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
+                  <div className="border-b border-[#e0eaff] px-4 py-3">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+                      Condições finais aprovadas
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                    {aprovadoConformeOriginal ? (
+                      <div className="sm:col-span-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-[12px] font-semibold text-[#166534]">
+                        Aprovado conforme o orçamento original.
+                      </div>
+                    ) : null}
+                    <ResumoItem
+                      label="Quantidade de colaboradores"
+                      value={String(aprovacao.quantidade_colaboradores)}
+                    />
+                    <ResumoItem
+                      label="Valor total fechado"
+                      value={formatCurrency(Number(aprovacao.valor_final))}
+                    />
+                    <ResumoItem
+                      label="Pagamento"
+                      value={formatCondicaoAprovada(aprovacao)}
+                    />
+                    {aprovacao.observacoes ? (
+                      <div className="sm:col-span-2">
+                        <ResumoItem
+                          label="Observações da negociação"
+                          value={aprovacao.observacoes}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : (
+                <>
+                  <section className="rounded-2xl border border-[#dbe3ef] bg-white p-4 sm:p-5">
+                    <p className="mb-3 text-sm font-extrabold text-navy">
+                      As condições finais ficaram iguais às do orçamento?
+                    </p>
+                    <div className="flex flex-wrap gap-4">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                        <input
+                          type="radio"
+                          name="condicoes-iguais"
+                          className="h-4 w-4 accent-brand-blue"
+                          checked={form.condicoes_iguais}
+                          disabled={aprovadoLocked || saving}
+                          onChange={() => {
+                            updateFormField("condicoes_iguais", true);
+                            setShowDiffConfirm(false);
+                          }}
+                        />
+                        Sim
+                      </label>
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                        <input
+                          type="radio"
+                          name="condicoes-iguais"
+                          className="h-4 w-4 accent-brand-blue"
+                          checked={!form.condicoes_iguais}
+                          disabled={aprovadoLocked || saving}
+                          onChange={() =>
+                            updateFormField("condicoes_iguais", false)
+                          }
+                        />
+                        Não
+                      </label>
+                    </div>
+                    {form.condicoes_iguais ? (
+                      <p className="mt-3 text-[12px] text-[#64748b]">
+                        Ao salvar, o orçamento será aprovado exatamente conforme
+                        enviado. Nenhuma alteração adicional é necessária.
+                      </p>
+                    ) : null}
+                  </section>
+
+                  {!form.condicoes_iguais ? (
+                    <section className="overflow-hidden rounded-2xl border border-[#e8d7a8] bg-gradient-to-br from-[#fffbeb] to-white">
+                      <div className="border-b border-[#f3e6c0] px-4 py-3">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+                          Condições finais aprovadas
                         </p>
                       </div>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-[12px] text-[#1e3a8a]">
-                    As condições aprovadas serão salvas separadamente. O
-                    orçamento original não será alterado.
-                  </p>
-                </div>
-              ) : null}
+                      <div className="space-y-4 p-4 sm:p-5">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <Field label="Quantidade de colaboradores" required>
+                            <input
+                              className="field-input"
+                              value={form.quantidade_colaboradores}
+                              disabled={aprovadoLocked || saving}
+                              onChange={(e) =>
+                                updateFormField(
+                                  "quantidade_colaboradores",
+                                  e.target.value.replace(/\D/g, "")
+                                )
+                              }
+                            />
+                          </Field>
+                          <Field label="Valor total fechado" required>
+                            <input
+                              className="field-input"
+                              value={form.valor_final}
+                              disabled={aprovadoLocked || saving}
+                              onChange={(e) =>
+                                updateFormField(
+                                  "valor_final",
+                                  maskMoneyInput(e.target.value)
+                                )
+                              }
+                            />
+                          </Field>
+                        </div>
+
+                        <div>
+                          <p className="mb-2 text-xs font-bold text-navy">
+                            Forma de pagamento <RequiredMark />
+                          </p>
+                          <div className="flex flex-wrap gap-4">
+                            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                              <input
+                                type="radio"
+                                name="forma-pagamento"
+                                className="h-4 w-4 accent-brand-blue"
+                                checked={form.forma_pagamento === "avista"}
+                                disabled={aprovadoLocked || saving}
+                                onChange={() =>
+                                  updateFormField("forma_pagamento", "avista")
+                                }
+                              />
+                              À vista
+                            </label>
+                            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                              <input
+                                type="radio"
+                                name="forma-pagamento"
+                                className="h-4 w-4 accent-brand-blue"
+                                checked={form.forma_pagamento === "parcelado"}
+                                disabled={aprovadoLocked || saving}
+                                onChange={() =>
+                                  updateFormField(
+                                    "forma_pagamento",
+                                    "parcelado"
+                                  )
+                                }
+                              />
+                              Parcelado
+                            </label>
+                          </div>
+                        </div>
+
+                        {form.forma_pagamento === "avista" ? (
+                          <ResumoItem
+                            label="Valor final fechado"
+                            value={
+                              valorFinalEditado > 0
+                                ? formatCurrency(valorFinalEditado)
+                                : "—"
+                            }
+                          />
+                        ) : (
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <Field label="Quantidade de parcelas" required>
+                              <input
+                                className="field-input"
+                                value={form.quantidade_parcelas}
+                                disabled={aprovadoLocked || saving}
+                                onChange={(e) =>
+                                  updateFormField(
+                                    "quantidade_parcelas",
+                                    e.target.value.replace(/\D/g, "")
+                                  )
+                                }
+                              />
+                            </Field>
+                            <ResumoItem
+                              label="Valor de cada parcela"
+                              value={textoParcelasCalculado}
+                            />
+                          </div>
+                        )}
+
+                        <Field label="Observações da negociação">
+                          <textarea
+                            className="field-input min-h-[72px] resize-y"
+                            value={form.observacoes}
+                            disabled={aprovadoLocked || saving}
+                            onChange={(e) =>
+                              updateFormField("observacoes", e.target.value)
+                            }
+                          />
+                        </Field>
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {showDiffConfirm && !form.condicoes_iguais ? (
+                    <div className="rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] p-4">
+                      <p className="mb-3 text-sm font-bold text-navy">
+                        Comparação entre original e aprovado
+                      </p>
+                      <div className="space-y-2">
+                        {diffs.map((diff) => (
+                          <div
+                            key={diff.label}
+                            className={`rounded-xl border px-3 py-2 text-[12px] ${
+                              diff.changed
+                                ? "border-[#fcd34d] bg-[#fffbeb]"
+                                : "border-[#e2e8f0] bg-white"
+                            }`}
+                          >
+                            <p className="font-semibold text-navy">
+                              {diff.label}
+                            </p>
+                            <p className="text-[#64748b]">
+                              Orçamento original: {diff.original}
+                            </p>
+                            <p className="text-[#64748b]">
+                              Orçamento aprovado: {diff.aprovado}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[12px] text-[#1e3a8a]">
+                        As condições aprovadas serão salvas separadamente. O
+                        orçamento original não será alterado.
+                      </p>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
 
@@ -719,12 +805,16 @@ export function OrcamentoAprovarModal({
             >
               {saving
                 ? "Salvando..."
-                : showDiffConfirm
+                : showDiffConfirm && !form.condicoes_iguais
                   ? "Confirmar e salvar aprovação"
                   : "Salvar aprovação"}
             </button>
           ) : null}
-          {tab === "aprovado" && showDiffConfirm && !aprovadoLocked && !consultaMode ? (
+          {tab === "aprovado" &&
+          showDiffConfirm &&
+          !form.condicoes_iguais &&
+          !aprovadoLocked &&
+          !consultaMode ? (
             <button
               type="button"
               className="btn justify-center sm:w-auto"
@@ -772,6 +862,17 @@ function Field({
         ) : null}
       </label>
       {children}
+    </div>
+  );
+}
+
+function ResumoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#eef2f7] bg-[#f8fafc] px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-navy">{value}</p>
     </div>
   );
 }

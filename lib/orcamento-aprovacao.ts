@@ -1,5 +1,8 @@
 import { formatCurrency } from "@/lib/money";
-import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  calcCondicoesPagamentoProposta,
+  calcValorParcela,
+} from "@/lib/orcamento-pagamento";
 import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
@@ -23,6 +26,8 @@ export const ORCAMENTO_CONTRATO_ANDAMENTO_LABELS: Record<
   aguardando_pagamento: "Aguardando pagamento",
   pago: "Pago",
 };
+
+export type OrcamentoAprovacaoFormaPagamento = "avista" | "parcelado";
 
 export interface OrcamentoAprovacaoItemRecord {
   id: string;
@@ -67,24 +72,14 @@ export interface OrcamentoAprovacaoRecord {
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
 }
 
-export interface OrcamentoAprovacaoItemForm {
-  id: string;
-  servico_id: string;
-  servico_nome: string;
-  quantidade: string;
-  valor_unitario: string;
-}
-
 export interface OrcamentoAprovacaoFormValues {
+  /** true = aprovar conforme o orçamento original (sem alterações). */
+  condicoes_iguais: boolean;
+  forma_pagamento: OrcamentoAprovacaoFormaPagamento;
   quantidade_colaboradores: string;
   valor_final: string;
-  condicao_pagamento: string;
   quantidade_parcelas: string;
-  valor_parcela: string;
-  desconto_percentual: string;
-  valor_avista: string;
   observacoes: string;
-  itens: OrcamentoAprovacaoItemForm[];
 }
 
 export interface OrcamentoAprovacaoInsertPayload {
@@ -130,6 +125,16 @@ export interface OrcamentoAprovacaoDiffItem {
   changed: boolean;
 }
 
+export interface OrcamentoResumoComercial {
+  quantidadeColaboradores: number;
+  valorTotal: number;
+  valorAVista: number;
+  parcelas: number;
+  valorParcela: number;
+  textoParcelado: string;
+  textoAVista: string;
+}
+
 export function resolveContratoAndamento(
   aprovacao: Pick<
     OrcamentoAprovacaoRecord,
@@ -150,149 +155,170 @@ export function resolveContratoAndamento(
   return "nao_enviado";
 }
 
-export function buildAprovacaoInsertPayload(
-  form: OrcamentoAprovacaoFormValues,
-  aprovadoPor: string,
-  parseMoneyFn: (value: string) => number
-): OrcamentoAprovacaoInsertPayload {
-  const itens = form.itens
-    .filter((item) => item.servico_nome.trim())
+export function buildResumoComercialOrcamento(
+  orcamento: OrcamentoComItens
+): OrcamentoResumoComercial {
+  const quantidade = resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
+  const valorTotal = Number(orcamento.valor_total) || 0;
+  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+  return {
+    quantidadeColaboradores: quantidade,
+    valorTotal,
+    valorAVista: pagamento.valorAVista,
+    parcelas: pagamento.parcelas,
+    valorParcela: pagamento.valorParcela,
+    textoParcelado: pagamento.textoParcelado,
+    textoAVista: pagamento.textoAVista,
+  };
+}
+
+function moneyToForm(value: number): string {
+  return value > 0 ? value.toFixed(2).replace(".", ",") : "";
+}
+
+function copyItensFromOrcamento(
+  orcamento: OrcamentoComItens
+): OrcamentoAprovacaoInsertPayload["itens"] {
+  const quantidade =
+    resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
+  return [...(orcamento.orcamento_itens ?? [])]
+    .sort((a, b) => a.ordem - b.ordem)
     .map((item, index) => {
-      const quantidade = Number(item.quantidade) || 1;
-      const valorUnitario = parseMoneyFn(item.valor_unitario);
+      const valor = resolveItemValorServico(item);
       return {
-        servico_id: item.servico_id.trim() || null,
-        servico_nome: item.servico_nome.trim(),
-        quantidade,
-        valor_unitario: valorUnitario,
-        valor_total: quantidade * valorUnitario,
+        servico_id: item.servico_id,
+        servico_nome: item.servico_nome,
+        quantidade: Number(item.quantidade) || quantidade,
+        valor_unitario: valor,
+        valor_total: valor,
         ordem: index,
       };
     });
+}
 
-  const parcelas = Number(form.quantidade_parcelas);
-  const desconto = Number(form.desconto_percentual);
-  const valorParcela = parseMoneyFn(form.valor_parcela);
-  const valorAvista = parseMoneyFn(form.valor_avista);
+function resolveFormaPagamentoFromRecord(
+  aprovacao: OrcamentoAprovacaoRecord
+): OrcamentoAprovacaoFormaPagamento {
+  if (
+    aprovacao.quantidade_parcelas != null &&
+    aprovacao.quantidade_parcelas > 1
+  ) {
+    return "parcelado";
+  }
+  if (aprovacao.valor_parcela != null && Number(aprovacao.valor_parcela) > 0) {
+    return "parcelado";
+  }
+  const condicao = (aprovacao.condicao_pagamento ?? "").toLowerCase();
+  if (condicao.includes("x de") || /^\d+x\b/.test(condicao)) {
+    return "parcelado";
+  }
+  return "avista";
+}
 
-  return {
-    quantidade_colaboradores: Number(form.quantidade_colaboradores) || 1,
-    valor_final: parseMoneyFn(form.valor_final),
-    condicao_pagamento: form.condicao_pagamento.trim() || null,
-    quantidade_parcelas:
-      Number.isFinite(parcelas) && parcelas >= 1 ? parcelas : null,
-    valor_parcela: valorParcela > 0 ? valorParcela : null,
-    desconto_percentual:
-      Number.isFinite(desconto) && desconto >= 0 ? desconto : 0,
-    valor_avista: valorAvista > 0 ? valorAvista : null,
-    observacoes: form.observacoes.trim() || null,
-    aprovado_por: aprovadoPor.trim(),
-    itens,
-  };
+export function aprovacaoSegueOrcamentoOriginal(
+  orcamento: OrcamentoComItens,
+  aprovacao: OrcamentoAprovacaoRecord
+): boolean {
+  const resumo = buildResumoComercialOrcamento(orcamento);
+  const qtdOk =
+    Number(aprovacao.quantidade_colaboradores) === resumo.quantidadeColaboradores;
+  const valorOk =
+    Math.abs(Number(aprovacao.valor_final) - resumo.valorTotal) < 0.009;
+  return qtdOk && valorOk;
 }
 
 export function buildAprovacaoFormFromOrcamento(
   orcamento: OrcamentoComItens
 ): OrcamentoAprovacaoFormValues {
-  const quantidade = String(
-    resolveQuantidadeColaboradoresOrcamento(orcamento) || 1
-  );
-  const valorTotal = Number(orcamento.valor_total) || 0;
-  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
-  const itens = [...(orcamento.orcamento_itens ?? [])]
-    .sort((a, b) => a.ordem - b.ordem)
-    .map((item) => {
-      const valor = resolveItemValorServico(item);
-      return {
-        id: crypto.randomUUID(),
-        servico_id: item.servico_id ?? "",
-        servico_nome: item.servico_nome,
-        quantidade: String(item.quantidade || quantidade),
-        valor_unitario:
-          valor > 0 ? valor.toFixed(2).replace(".", ",") : "",
-      };
-    });
-
+  const resumo = buildResumoComercialOrcamento(orcamento);
   return {
-    quantidade_colaboradores: quantidade,
-    valor_final:
-      valorTotal > 0 ? valorTotal.toFixed(2).replace(".", ",") : "",
-    condicao_pagamento: pagamento.textoParcelado,
-    quantidade_parcelas: String(pagamento.parcelas),
-    valor_parcela:
-      pagamento.valorParcela > 0
-        ? pagamento.valorParcela.toFixed(2).replace(".", ",")
-        : "",
-    desconto_percentual: "5",
-    valor_avista:
-      pagamento.valorAVista > 0
-        ? pagamento.valorAVista.toFixed(2).replace(".", ",")
-        : "",
-    observacoes: orcamento.observacoes ?? "",
-    itens:
-      itens.length > 0
-        ? itens
-        : [
-            {
-              id: crypto.randomUUID(),
-              servico_id: "",
-              servico_nome: "",
-              quantidade,
-              valor_unitario: "",
-            },
-          ],
+    condicoes_iguais: true,
+    forma_pagamento: "parcelado",
+    quantidade_colaboradores: String(resumo.quantidadeColaboradores),
+    valor_final: moneyToForm(resumo.valorTotal),
+    quantidade_parcelas: String(resumo.parcelas),
+    observacoes: "",
   };
 }
 
 export function buildAprovacaoFormFromRecord(
+  orcamento: OrcamentoComItens,
   aprovacao: OrcamentoAprovacaoRecord
 ): OrcamentoAprovacaoFormValues {
-  const itens = [...(aprovacao.orcamento_aprovacao_itens ?? [])]
-    .sort((a, b) => a.ordem - b.ordem)
-    .map((item) => ({
-      id: item.id,
-      servico_id: item.servico_id ?? "",
-      servico_nome: item.servico_nome,
-      quantidade: String(item.quantidade),
-      valor_unitario:
-        Number(item.valor_unitario) > 0
-          ? Number(item.valor_unitario).toFixed(2).replace(".", ",")
-          : "",
-    }));
+  const forma = resolveFormaPagamentoFromRecord(aprovacao);
+  const iguais = aprovacaoSegueOrcamentoOriginal(orcamento, aprovacao);
+  const resumo = buildResumoComercialOrcamento(orcamento);
 
   return {
+    condicoes_iguais: iguais,
+    forma_pagamento: forma,
     quantidade_colaboradores: String(aprovacao.quantidade_colaboradores),
-    valor_final:
-      Number(aprovacao.valor_final) > 0
-        ? Number(aprovacao.valor_final).toFixed(2).replace(".", ",")
-        : "",
-    condicao_pagamento: aprovacao.condicao_pagamento ?? "",
+    valor_final: moneyToForm(Number(aprovacao.valor_final) || 0),
     quantidade_parcelas:
       aprovacao.quantidade_parcelas != null
         ? String(aprovacao.quantidade_parcelas)
-        : "",
-    valor_parcela:
-      aprovacao.valor_parcela != null && Number(aprovacao.valor_parcela) > 0
-        ? Number(aprovacao.valor_parcela).toFixed(2).replace(".", ",")
-        : "",
-    desconto_percentual: String(aprovacao.desconto_percentual ?? 0),
-    valor_avista:
-      aprovacao.valor_avista != null && Number(aprovacao.valor_avista) > 0
-        ? Number(aprovacao.valor_avista).toFixed(2).replace(".", ",")
-        : "",
+        : String(resumo.parcelas),
     observacoes: aprovacao.observacoes ?? "",
-    itens:
-      itens.length > 0
-        ? itens
-        : [
-            {
-              id: crypto.randomUUID(),
-              servico_id: "",
-              servico_nome: "",
-              quantidade: String(aprovacao.quantidade_colaboradores || 1),
-              valor_unitario: "",
-            },
-          ],
+  };
+}
+
+export function buildAprovacaoInsertPayload(
+  orcamento: OrcamentoComItens,
+  form: OrcamentoAprovacaoFormValues,
+  aprovadoPor: string,
+  parseMoneyFn: (value: string) => number
+): OrcamentoAprovacaoInsertPayload {
+  const itens = copyItensFromOrcamento(orcamento);
+  const resumo = buildResumoComercialOrcamento(orcamento);
+
+  if (form.condicoes_iguais) {
+    return {
+      quantidade_colaboradores: resumo.quantidadeColaboradores,
+      valor_final: resumo.valorTotal,
+      condicao_pagamento: resumo.textoParcelado,
+      quantidade_parcelas: resumo.parcelas,
+      valor_parcela: resumo.valorParcela,
+      desconto_percentual: 5,
+      valor_avista: resumo.valorAVista > 0 ? resumo.valorAVista : null,
+      observacoes: form.observacoes.trim() || null,
+      aprovado_por: aprovadoPor.trim(),
+      itens,
+    };
+  }
+
+  const quantidade = Number(form.quantidade_colaboradores) || 1;
+  const valorFinal = parseMoneyFn(form.valor_final);
+
+  if (form.forma_pagamento === "avista") {
+    return {
+      quantidade_colaboradores: quantidade,
+      valor_final: valorFinal,
+      condicao_pagamento: "À vista",
+      quantidade_parcelas: null,
+      valor_parcela: null,
+      desconto_percentual: 0,
+      valor_avista: valorFinal > 0 ? valorFinal : null,
+      observacoes: form.observacoes.trim() || null,
+      aprovado_por: aprovadoPor.trim(),
+      itens,
+    };
+  }
+
+  const parcelas = Math.max(1, Number(form.quantidade_parcelas) || 1);
+  const valorParcela = calcValorParcela(valorFinal, parcelas);
+  const textoParcelado = `${parcelas}x de ${formatCurrency(valorParcela)}`;
+
+  return {
+    quantidade_colaboradores: quantidade,
+    valor_final: valorFinal,
+    condicao_pagamento: textoParcelado,
+    quantidade_parcelas: parcelas,
+    valor_parcela: valorParcela,
+    desconto_percentual: 0,
+    valor_avista: null,
+    observacoes: form.observacoes.trim() || null,
+    aprovado_por: aprovadoPor.trim(),
+    itens,
   };
 }
 
@@ -301,57 +327,58 @@ export function buildAprovacaoDiffs(
   form: OrcamentoAprovacaoFormValues,
   parseMoneyFn: (value: string) => number
 ): OrcamentoAprovacaoDiffItem[] {
-  const qtdOriginal = resolveQuantidadeColaboradoresOrcamento(orcamento);
-  const valorOriginal = Number(orcamento.valor_total) || 0;
-  const pagamentoOriginal = calcCondicoesPagamentoProposta(valorOriginal);
+  if (form.condicoes_iguais) return [];
+
+  const resumo = buildResumoComercialOrcamento(orcamento);
   const qtdAprovada = Number(form.quantidade_colaboradores) || 0;
   const valorAprovado = parseMoneyFn(form.valor_final);
-  const parcelasAprovadas = Number(form.quantidade_parcelas) || 0;
-  const valorParcelaAprovado = parseMoneyFn(form.valor_parcela);
+  const parcelasAprovadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
+  const valorParcelaAprovado = calcValorParcela(valorAprovado, parcelasAprovadas);
+  const pagamentoAprovado =
+    form.forma_pagamento === "avista"
+      ? `À vista · ${formatCurrency(valorAprovado)}`
+      : `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`;
 
-  const servicosOriginal = [...(orcamento.orcamento_itens ?? [])]
-    .sort((a, b) => a.ordem - b.ordem)
-    .map((i) => i.servico_nome)
-    .filter(Boolean)
-    .join(", ");
-  const servicosAprovado = form.itens
-    .map((i) => i.servico_nome.trim())
-    .filter(Boolean)
-    .join(", ");
-
-  const rows: OrcamentoAprovacaoDiffItem[] = [
+  return [
     {
       label: "Quantidade de colaboradores",
-      original: String(qtdOriginal || "—"),
+      original: String(resumo.quantidadeColaboradores || "—"),
       aprovado: String(qtdAprovada || "—"),
-      changed: qtdOriginal !== qtdAprovada,
-    },
-    {
-      label: "Serviços",
-      original: servicosOriginal || "—",
-      aprovado: servicosAprovado || "—",
-      changed: servicosOriginal !== servicosAprovado,
+      changed: resumo.quantidadeColaboradores !== qtdAprovada,
     },
     {
       label: "Valor",
-      original: formatCurrency(valorOriginal),
+      original: formatCurrency(resumo.valorTotal),
       aprovado: formatCurrency(valorAprovado),
-      changed: Math.abs(valorOriginal - valorAprovado) > 0.009,
+      changed: Math.abs(resumo.valorTotal - valorAprovado) > 0.009,
     },
     {
-      label: "Parcelamento",
-      original: pagamentoOriginal.textoParcelado,
-      aprovado:
-        parcelasAprovadas > 0 && valorParcelaAprovado > 0
-          ? `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`
-          : form.condicao_pagamento.trim() || "—",
-      changed:
-        pagamentoOriginal.textoParcelado !==
-        (parcelasAprovadas > 0 && valorParcelaAprovado > 0
-          ? `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`
-          : form.condicao_pagamento.trim()),
+      label: "Pagamento",
+      original: `Parcelado · ${resumo.textoParcelado} · À vista ${resumo.textoAVista}`,
+      aprovado: pagamentoAprovado,
+      changed: true,
     },
   ];
+}
 
-  return rows;
+export function formatCondicaoAprovada(
+  aprovacao: OrcamentoAprovacaoRecord
+): string {
+  const forma = resolveFormaPagamentoFromRecord(aprovacao);
+  if (forma === "avista") {
+    const valor =
+      aprovacao.valor_avista != null && Number(aprovacao.valor_avista) > 0
+        ? Number(aprovacao.valor_avista)
+        : Number(aprovacao.valor_final);
+    return `À vista · ${formatCurrency(valor)}`;
+  }
+  if (
+    aprovacao.quantidade_parcelas != null &&
+    aprovacao.valor_parcela != null
+  ) {
+    return `${aprovacao.quantidade_parcelas}x de ${formatCurrency(
+      Number(aprovacao.valor_parcela)
+    )}`;
+  }
+  return aprovacao.condicao_pagamento?.trim() || "—";
 }
