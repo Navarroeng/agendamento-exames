@@ -342,6 +342,7 @@ export interface ClienteContratoInsert {
   status: ClienteContratoStatus;
   orcamento_id?: string | null;
   numero_orcamento?: string | null;
+  numero?: string | null;
   quantidade_parcelas?: number | null;
   valor_parcela?: number | null;
   valor_avista?: number | null;
@@ -355,6 +356,7 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   cliente_id: string;
   orcamento_id?: string | null;
   numero_orcamento?: string | null;
+  numero?: string | null;
   quantidade_parcelas?: number | null;
   valor_parcela?: number | null;
   valor_avista?: number | null;

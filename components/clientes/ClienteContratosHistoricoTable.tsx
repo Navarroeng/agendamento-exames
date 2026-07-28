@@ -37,10 +37,11 @@ export function ClienteContratosHistoricoTable({
 
   return (
     <div className="table-wrap -mx-1 overflow-x-auto px-1">
-      <table className="table-premium w-full min-w-[980px]">
+      <table className="table-premium w-full min-w-[1080px]">
         <thead>
           <tr>
             {[
+              "Contrato",
               "Orçamento",
               "Aprovação",
               "Colaboradores",
@@ -56,6 +57,9 @@ export function ClienteContratosHistoricoTable({
         <tbody>
           {contratos.map((contrato) => (
             <tr key={contrato.id}>
+              <td className="font-bold text-navy">
+                {contrato.numero?.trim() || "—"}
+              </td>
               <td className="font-semibold text-navy">
                 {contrato.numero_orcamento?.trim() || "—"}
               </td>

@@ -29,6 +29,8 @@ export async function listarContratosPorCliente(
     .from("cliente_contratos")
     .select("*")
     .eq("cliente_id", clienteId)
+    .order("aprovado_em", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .order("data_inicio", { ascending: false });
 
   if (error) throw error;

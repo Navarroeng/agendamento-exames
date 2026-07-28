@@ -34,6 +34,7 @@ export interface OrcamentoAprovacaoIntegracaoResult {
   aprovacao_id: string;
   cliente_id: string;
   contrato_id: string;
+  numero_contrato: string;
   cliente_criado: boolean;
   cliente_localizado: boolean;
   contrato_criado: boolean;

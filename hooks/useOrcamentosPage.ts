@@ -548,8 +548,8 @@ export function useOrcamentosPage() {
             modulo: AUDITORIA_MODULOS.clientes,
             acao: AUDITORIA_ACOES.criacao,
             registroId: integracao.contrato_id,
-            registroNome: integracao.cliente_nome,
-            descricao: `Novo contrato criado para o cliente ${integracao.cliente_nome} a partir do orçamento ${integracao.numero_orcamento}.`,
+            registroNome: integracao.numero_contrato || integracao.cliente_nome,
+            descricao: `Contrato ${integracao.numero_contrato} criado automaticamente a partir do orçamento ${integracao.numero_orcamento}.`,
           });
         } else if (integracao.contrato_ja_existia) {
           toast.message(ORCAMENTO_CONTRATO_JA_VINCULADO_MSG);
@@ -558,8 +558,8 @@ export function useOrcamentosPage() {
             modulo: AUDITORIA_MODULOS.clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: integracao.contrato_id,
-            registroNome: integracao.cliente_nome,
-            descricao: `Contrato já vinculado ao orçamento ${integracao.numero_orcamento} foi atualizado com as condições aprovadas.`,
+            registroNome: integracao.numero_contrato || integracao.cliente_nome,
+            descricao: `Contrato ${integracao.numero_contrato || "existente"} já vinculado ao orçamento ${integracao.numero_orcamento}.`,
           });
         }
 
