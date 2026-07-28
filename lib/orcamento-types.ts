@@ -90,6 +90,10 @@ export interface OrcamentoRecord {
   responsavel: string;
   origem_cliente: OrcamentoOrigemCliente | null;
   observacoes: string | null;
+  motivo_cancelamento: string | null;
+  observacao_cancelamento: string | null;
+  cancelado_em: string | null;
+  cancelado_por: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;
   validade_proposta: string | null;

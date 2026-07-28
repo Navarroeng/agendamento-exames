@@ -5,32 +5,36 @@ import type { OrcamentoRecord } from "@/lib/orcamento-types";
 
 interface OrcamentoRowActionsMenuProps {
   orcamento: OrcamentoRecord;
-  podeExcluir: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
-  onDuplicar: (id: string) => void;
   onGerarPdf: (id: string) => void;
-  onExcluir: (id: string, numero: string) => void;
+  onCancelar: (id: string) => void;
+  onAprovar: (id: string) => void;
 }
 
 type MenuItem = {
   key: string;
   label: string;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 };
 
 export function OrcamentoRowActionsMenu({
   orcamento,
-  podeExcluir,
   onVisualizar,
   onEditar,
-  onDuplicar,
   onGerarPdf,
-  onExcluir,
+  onCancelar,
+  onAprovar,
 }: OrcamentoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const cancelado = orcamento.status === "cancelado";
+  const aprovado = orcamento.status === "aprovado";
+  const podeEditar = !cancelado && !aprovado;
+  const podeCancelar = !cancelado && !aprovado;
+  const podeAprovar = !cancelado;
 
   useEffect(() => {
     if (!open) return;
@@ -54,30 +58,31 @@ export function OrcamentoRowActionsMenu({
     {
       key: "editar",
       label: "Editar",
+      disabled: !podeEditar,
       onClick: () => onEditar(orcamento.id),
-    },
-    {
-      key: "duplicar",
-      label: "Duplicar",
-      onClick: () => onDuplicar(orcamento.id),
     },
     {
       key: "pdf",
       label: "Gerar PDF",
       onClick: () => onGerarPdf(orcamento.id),
     },
+    {
+      key: "cancelar",
+      label: "Cancelar",
+      danger: true,
+      disabled: !podeCancelar,
+      onClick: () => onCancelar(orcamento.id),
+    },
+    {
+      key: "aprovar",
+      label: "Aprovar",
+      disabled: !podeAprovar,
+      onClick: () => onAprovar(orcamento.id),
+    },
   ];
 
-  if (podeExcluir) {
-    items.push({
-      key: "excluir",
-      label: "Excluir",
-      danger: true,
-      onClick: () => onExcluir(orcamento.id, orcamento.numero),
-    });
-  }
-
   function handleAction(item: MenuItem) {
+    if (item.disabled) return;
     setOpen(false);
     item.onClick();
   }
@@ -108,8 +113,9 @@ export function OrcamentoRowActionsMenu({
               key={item.key}
               type="button"
               role="menuitem"
+              disabled={item.disabled}
               onClick={() => handleAction(item)}
-              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
+              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                 item.danger
                   ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
                   : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"

@@ -7,31 +7,46 @@ import { useOrcamentoForm } from "@/hooks/useOrcamentoForm";
 import { useOrcamentosList } from "@/hooks/useOrcamentosList";
 import { useServicosSstList } from "@/hooks/useServicosSstList";
 import { useClientesList } from "@/hooks/useClientesList";
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { emptyToNull, parseMoney } from "@/lib/money";
+import {
+  buildAprovacaoDiffs,
+  buildAprovacaoInsertPayload,
+  type OrcamentoAprovacaoFormValues,
+  type OrcamentoAprovacaoRecord,
+  type OrcamentoContratoUpdatePayload,
+} from "@/lib/orcamento-aprovacao";
 import {
   EMPTY_ORCAMENTO_FILTERS,
+  type OrcamentoComItens,
   type OrcamentoFilters,
 } from "@/lib/orcamento-types";
 import {
   isOrcamentoFormDirty,
   serializeOrcamentoFormSnapshot,
 } from "@/lib/orcamento-form-dirty";
-import {
-  formatOrcamentoOrigemCliente,
-} from "@/lib/orcamento-origem";
+import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
-import { canExcluirOrcamento } from "@/lib/permissions";
 import { gerarNumeroOrcamento } from "@/services/orcamento.service";
 import {
   atualizarOrcamento,
   buscarOrcamentoComItens,
   criarOrcamento,
-  duplicarOrcamento,
-  excluirOrcamento,
 } from "@/services/orcamento.service";
+import {
+  atualizarAcompanhamentoContrato,
+  buscarAprovacaoPorOrcamentoId,
+  cancelarOrcamento,
+  salvarAprovacaoOrcamento,
+} from "@/services/orcamento-aprovacao.service";
+import {
+  deleteOrcamentoComprovantePagamento,
+  obterUrlOrcamentoComprovante,
+  uploadOrcamentoComprovantePagamento,
+} from "@/services/orcamento-comprovante.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
-import type { OrcamentoComItens } from "@/lib/orcamento-types";
 
 function focusOrcamentoPrimeiroCampo(): void {
   requestAnimationFrame(() => {
@@ -41,8 +56,7 @@ function focusOrcamentoPrimeiroCampo(): void {
 
 export function useOrcamentosPage() {
   const auditContext = useAuditoriaUsuario();
-  const { profile } = useAuth();
-  const podeExcluir = canExcluirOrcamento(profile?.perfil);
+  useAuth();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,6 +75,18 @@ export function useOrcamentosPage() {
   const [formBaseline, setFormBaseline] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const pendingBaselineRef = useRef(false);
+
+  const [cancelTarget, setCancelTarget] = useState<OrcamentoComItens | null>(
+    null
+  );
+  const [cancelSaving, setCancelSaving] = useState(false);
+
+  const [aprovarOrcamento, setAprovarOrcamento] =
+    useState<OrcamentoComItens | null>(null);
+  const [aprovarAprovacao, setAprovarAprovacao] =
+    useState<OrcamentoAprovacaoRecord | null>(null);
+  const [aprovarOpen, setAprovarOpen] = useState(false);
+  const [aprovarSaving, setAprovarSaving] = useState(false);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes } = useClientesList();
@@ -163,6 +189,16 @@ export function useOrcamentosPage() {
         const orcamento = await buscarOrcamentoComItens(id);
         if (!orcamento) {
           toast.error("Orçamento não encontrado.");
+          return;
+        }
+        if (orcamento.status === "cancelado") {
+          toast.error("Orçamento cancelado não pode ser editado.");
+          return;
+        }
+        if (orcamento.status === "aprovado") {
+          toast.error(
+            "Orçamento aprovado não pode ser editado. Use Aprovar para consultar as condições finais."
+          );
           return;
         }
         loadForm(orcamento);
@@ -279,31 +315,6 @@ export function useOrcamentosPage() {
     setSaving,
   ]);
 
-  const handleDuplicar = useCallback(
-    async (id: string) => {
-      setActionLoading(true);
-      try {
-        const copia = await duplicarOrcamento(id, auditContext.usuarioNome);
-        await registrarAuditoria({
-          ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
-          acao: AUDITORIA_ACOES.criacao,
-          registroId: copia.id,
-          registroNome: copia.numero,
-          descricao: `Orçamento duplicado a partir de ${id}. Novo número: ${copia.numero}.`,
-        });
-        toast.success(`Orçamento duplicado: ${copia.numero}`);
-        refresh();
-      } catch (err) {
-        console.error(err);
-        toast.error("Erro ao duplicar orçamento.");
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [auditContext, refresh]
-  );
-
   const handleGerarPdf = useCallback(
     async (id: string) => {
       setActionLoading(true);
@@ -333,43 +344,314 @@ export function useOrcamentosPage() {
     [auditContext]
   );
 
-  const handleExcluir = useCallback(
-    async (id: string, numero: string) => {
-      if (!podeExcluir) {
-        toast.error("Seu perfil não pode excluir orçamentos.");
+  const handleOpenCancelar = useCallback(async (id: string) => {
+    setActionLoading(true);
+    try {
+      const orcamento = await buscarOrcamentoComItens(id);
+      if (!orcamento) {
+        toast.error("Orçamento não encontrado.");
         return;
       }
-
-      if (
-        !window.confirm(
-          `Excluir o orçamento ${numero}? Esta ação não pode ser desfeita.`
-        )
-      ) {
+      if (orcamento.status === "cancelado") {
+        toast.error("Este orçamento já está cancelado.");
         return;
       }
+      if (orcamento.status === "aprovado") {
+        toast.error("Orçamento aprovado não pode ser cancelado nesta etapa.");
+        return;
+      }
+      setCancelTarget(orcamento);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao carregar orçamento.");
+    } finally {
+      setActionLoading(false);
+    }
+  }, []);
 
-      setActionLoading(true);
+  const closeCancelar = useCallback(() => {
+    if (cancelSaving) return;
+    setCancelTarget(null);
+  }, [cancelSaving]);
+
+  const handleConfirmCancelar = useCallback(
+    async (motivo: string, observacao: string) => {
+      if (!cancelTarget) return;
+      setCancelSaving(true);
       try {
-        await excluirOrcamento(id);
+        await cancelarOrcamento({
+          id: cancelTarget.id,
+          motivo,
+          observacao: emptyToNull(observacao),
+          canceladoPor: auditContext.usuarioNome,
+        });
+
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
-          acao: AUDITORIA_ACOES.exclusao,
-          registroId: id,
-          registroNome: numero,
-          descricao: `Orçamento ${numero} excluído.`,
+          acao: AUDITORIA_ACOES.cancelamento,
+          registroId: cancelTarget.id,
+          registroNome: cancelTarget.numero,
+          descricao: `${auditContext.usuarioNome} cancelou o orçamento ${cancelTarget.numero}. Motivo: ${motivo}.`,
+          dadosDepois: {
+            status: "cancelado",
+            motivo_cancelamento: motivo,
+            observacao_cancelamento: emptyToNull(observacao),
+          },
         });
-        toast.success("Orçamento excluído.");
+
+        toast.success("Orçamento cancelado.");
+        setCancelTarget(null);
         refresh();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao excluir orçamento.");
+        toast.error("Erro ao cancelar orçamento.");
       } finally {
-        setActionLoading(false);
+        setCancelSaving(false);
       }
     },
-    [auditContext, podeExcluir, refresh]
+    [auditContext, cancelTarget, refresh]
   );
+
+  const handleOpenAprovar = useCallback(async (id: string) => {
+    setActionLoading(true);
+    try {
+      const orcamento = await buscarOrcamentoComItens(id);
+      if (!orcamento) {
+        toast.error("Orçamento não encontrado.");
+        return;
+      }
+      if (orcamento.status === "cancelado") {
+        toast.error("Orçamento cancelado não pode ser aprovado.");
+        return;
+      }
+      const aprovacao = await buscarAprovacaoPorOrcamentoId(id);
+      setAprovarOrcamento(orcamento);
+      setAprovarAprovacao(aprovacao);
+      setAprovarOpen(true);
+      setViewOrcamento(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao abrir aprovação.");
+    } finally {
+      setActionLoading(false);
+    }
+  }, []);
+
+  const closeAprovar = useCallback(() => {
+    if (aprovarSaving) return;
+    setAprovarOpen(false);
+    setAprovarOrcamento(null);
+    setAprovarAprovacao(null);
+  }, [aprovarSaving]);
+
+  const handleSalvarAprovacao = useCallback(
+    async (formValues: OrcamentoAprovacaoFormValues) => {
+      if (!aprovarOrcamento) return;
+      setAprovarSaving(true);
+      try {
+        const payload = buildAprovacaoInsertPayload(
+          formValues,
+          auditContext.usuarioNome,
+          parseMoney
+        );
+        const diffs = buildAprovacaoDiffs(
+          aprovarOrcamento,
+          formValues,
+          parseMoney
+        ).filter((d) => d.changed);
+
+        const saved = await salvarAprovacaoOrcamento(
+          aprovarOrcamento.id,
+          payload
+        );
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero}.`,
+          dadosDepois: {
+            status: "aprovado",
+            valor_final: payload.valor_final,
+            quantidade_colaboradores: payload.quantidade_colaboradores,
+          },
+        });
+
+        for (const diff of diffs) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `${diff.label} alterado na aprovação de ${diff.original} para ${diff.aprovado}.`,
+            dadosAntes: { [diff.label]: diff.original },
+            dadosDepois: { [diff.label]: diff.aprovado },
+          });
+        }
+
+        const refreshed = await buscarOrcamentoComItens(aprovarOrcamento.id);
+        if (refreshed) setAprovarOrcamento(refreshed);
+        setAprovarAprovacao(saved);
+        toast.success("Aprovação salva. Aba Contrato liberada.");
+        refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao salvar aprovação.");
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarOrcamento, auditContext, refresh]
+  );
+
+  const handleSalvarContrato = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: OrcamentoContratoUpdatePayload,
+      file: File | null
+    ) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        const before = aprovarAprovacao;
+        let nextPayload = { ...payload };
+
+        if (file) {
+          const uploaded = await uploadOrcamentoComprovantePagamento(
+            aprovacaoId,
+            file
+          );
+          if (before.comprovante_path && before.comprovante_path !== uploaded.path) {
+            try {
+              await deleteOrcamentoComprovantePagamento(before.comprovante_path);
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: uploaded.path,
+            comprovante_nome: uploaded.nome,
+            comprovante_tipo: uploaded.tipo,
+            comprovante_tamanho: uploaded.tamanho,
+          };
+        }
+
+        if (!nextPayload.boleto_pago) {
+          if (before.comprovante_path && !file) {
+            try {
+              await deleteOrcamentoComprovantePagamento(before.comprovante_path);
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: null,
+            comprovante_nome: null,
+            comprovante_tipo: null,
+            comprovante_tamanho: null,
+            boleto_pago_em: null,
+          };
+        }
+
+        const saved = await atualizarAcompanhamentoContrato(
+          aprovacaoId,
+          nextPayload
+        );
+
+        if (!before.contrato_enviado && saved.contrato_enviado && saved.contrato_enviado_em) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.envio,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `Contrato enviado ao cliente em ${formatDateIsoToBR(saved.contrato_enviado_em)}.`,
+          });
+        }
+
+        if (
+          !before.contrato_assinado &&
+          saved.contrato_assinado &&
+          saved.contrato_assinado_em
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}.`,
+          });
+        }
+
+        if (
+          saved.boleto_vencimento &&
+          saved.boleto_vencimento !== before.boleto_vencimento
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `Vencimento do boleto inicial registrado para ${formatDateIsoToBR(saved.boleto_vencimento)}.`,
+          });
+        }
+
+        if (!before.boleto_pago && saved.boleto_pago && saved.boleto_pago_em) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `Pagamento inicial confirmado em ${formatDateIsoToBR(saved.boleto_pago_em)}.`,
+          });
+        }
+
+        if (file && saved.comprovante_nome) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao: `Comprovante de pagamento anexado: ${saved.comprovante_nome}.`,
+          });
+        }
+
+        setAprovarAprovacao(saved);
+        toast.success("Acompanhamento do contrato salvo.");
+        refresh();
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof Error ? err.message : "Erro ao salvar acompanhamento.";
+        toast.error(message);
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext, refresh]
+  );
+
+  const handleVerComprovante = useCallback(async (path: string) => {
+    try {
+      const url = await obterUrlOrcamentoComprovante(path);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível abrir o comprovante.");
+    }
+  }, []);
 
   const handleFilterChange = useCallback(
     (field: keyof OrcamentoFilters, value: string) => {
@@ -408,11 +690,17 @@ export function useOrcamentosPage() {
     viewOrcamento,
     viewLoading,
     actionLoading,
-    podeExcluir,
     form,
     totals,
     formDirty,
     discardConfirmOpen,
+    cancelTarget,
+    cancelSaving,
+    aprovarOpen,
+    aprovarOrcamento,
+    aprovarAprovacao,
+    aprovarSaving,
+    usuarioNome: auditContext.usuarioNome,
     setField,
     addItem,
     removeItem,
@@ -428,9 +716,15 @@ export function useOrcamentosPage() {
     handleEditar,
     handleVisualizar,
     handleSave,
-    handleDuplicar,
     handleGerarPdf,
-    handleExcluir,
+    handleOpenCancelar,
+    closeCancelar,
+    handleConfirmCancelar,
+    handleOpenAprovar,
+    closeAprovar,
+    handleSalvarAprovacao,
+    handleSalvarContrato,
+    handleVerComprovante,
     handleFilterChange,
     clearFilters,
     handleSelectCliente,

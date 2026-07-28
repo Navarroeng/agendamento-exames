@@ -2,6 +2,8 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { OrcamentoAprovarModal } from "./OrcamentoAprovarModal";
+import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
 import { OrcamentoFormModal } from "./OrcamentoFormModal";
 import { OrcamentoSearchPanel } from "./OrcamentoSearchPanel";
 import { OrcamentoTopActions } from "./OrcamentoTopActions";
@@ -24,11 +26,17 @@ export function OrcamentosPage() {
     viewOrcamento,
     viewLoading,
     actionLoading,
-    podeExcluir,
     form,
     totals,
     formDirty,
     discardConfirmOpen,
+    cancelTarget,
+    cancelSaving,
+    aprovarOpen,
+    aprovarOrcamento,
+    aprovarAprovacao,
+    aprovarSaving,
+    usuarioNome,
     setField,
     addItem,
     removeItem,
@@ -43,9 +51,15 @@ export function OrcamentosPage() {
     handleEditar,
     handleVisualizar,
     handleSave,
-    handleDuplicar,
     handleGerarPdf,
-    handleExcluir,
+    handleOpenCancelar,
+    closeCancelar,
+    handleConfirmCancelar,
+    handleOpenAprovar,
+    closeAprovar,
+    handleSalvarAprovacao,
+    handleSalvarContrato,
+    handleVerComprovante,
     handleFilterChange,
     clearFilters,
     handleSelectCliente,
@@ -73,12 +87,11 @@ export function OrcamentosPage() {
         orcamentos={orcamentos}
         loading={loading}
         error={error}
-        podeExcluir={podeExcluir}
         onVisualizar={handleVisualizar}
         onEditar={handleEditar}
-        onDuplicar={handleDuplicar}
         onGerarPdf={handleGerarPdf}
-        onExcluir={handleExcluir}
+        onCancelar={handleOpenCancelar}
+        onAprovar={handleOpenAprovar}
       />
 
       <OrcamentoFormModal
@@ -115,9 +128,39 @@ export function OrcamentosPage() {
         onClose={closeView}
         onEditar={handleEditar}
         onGerarPdf={handleGerarPdf}
+        onAprovar={
+          viewOrcamento && viewOrcamento.status !== "cancelado"
+            ? handleOpenAprovar
+            : undefined
+        }
       />
 
-      {(saving || viewLoading || actionLoading) && (
+      <OrcamentoCancelarModal
+        open={Boolean(cancelTarget)}
+        numero={cancelTarget?.numero ?? ""}
+        saving={cancelSaving}
+        onClose={closeCancelar}
+        onConfirm={(motivo, observacao) => {
+          void handleConfirmCancelar(motivo, observacao);
+        }}
+      />
+
+      <OrcamentoAprovarModal
+        open={aprovarOpen}
+        orcamento={aprovarOrcamento}
+        aprovacao={aprovarAprovacao}
+        servicos={servicos}
+        saving={aprovarSaving}
+        usuarioNome={usuarioNome}
+        onClose={closeAprovar}
+        onSalvarAprovacao={handleSalvarAprovacao}
+        onSalvarContrato={handleSalvarContrato}
+        onVerComprovante={(path) => {
+          void handleVerComprovante(path);
+        }}
+      />
+
+      {(saving || viewLoading || actionLoading || cancelSaving || aprovarSaving) && (
         <div
           className="fixed inset-0 z-[70] bg-black/10 backdrop-blur-[1px]"
           aria-hidden

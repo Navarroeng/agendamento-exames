@@ -14,24 +14,22 @@ interface OrcamentosTableProps {
   orcamentos: OrcamentoRecord[];
   loading: boolean;
   error: string | null;
-  podeExcluir: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
-  onDuplicar: (id: string) => void;
   onGerarPdf: (id: string) => void;
-  onExcluir: (id: string, numero: string) => void;
+  onCancelar: (id: string) => void;
+  onAprovar: (id: string) => void;
 }
 
 export function OrcamentosTable({
   orcamentos,
   loading,
   error,
-  podeExcluir,
   onVisualizar,
   onEditar,
-  onDuplicar,
   onGerarPdf,
-  onExcluir,
+  onCancelar,
+  onAprovar,
 }: OrcamentosTableProps) {
   return (
     <Panel
@@ -96,12 +94,11 @@ export function OrcamentosTable({
                     <td>
                       <OrcamentoRowActionsMenu
                         orcamento={orcamento}
-                        podeExcluir={podeExcluir}
                         onVisualizar={onVisualizar}
                         onEditar={onEditar}
-                        onDuplicar={onDuplicar}
                         onGerarPdf={onGerarPdf}
-                        onExcluir={onExcluir}
+                        onCancelar={onCancelar}
+                        onAprovar={onAprovar}
                       />
                     </td>
                   </tr>
