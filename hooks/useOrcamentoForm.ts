@@ -23,6 +23,7 @@ import {
   getEmptyOrcamentoForm,
 } from "@/lib/orcamento-defaults";
 import { emptyToNull, maskMoneyInput, parseMoney } from "@/lib/money";
+import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import type {
   OrcamentoComItens,
   OrcamentoFormValues,
@@ -171,6 +172,9 @@ export function useOrcamentoForm() {
       contato: orcamento.contato ?? "",
       email: orcamento.email ?? "",
       telefone: orcamento.telefone ?? "",
+      origem_cliente: isOrcamentoOrigemCliente(orcamento.origem_cliente)
+        ? orcamento.origem_cliente
+        : "",
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
       status: orcamento.status,
@@ -224,6 +228,10 @@ export function useOrcamentoForm() {
 
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
 
+    if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
+      throw new Error("Informe a origem do cliente.");
+    }
+
     return {
       numero: form.numero.trim(),
       data_proposta: form.data_proposta,
@@ -236,6 +244,7 @@ export function useOrcamentoForm() {
       email: emptyToNull(form.email),
       telefone: emptyToNull(form.telefone),
       responsavel: normalizeUppercaseField(responsavel),
+      origem_cliente: form.origem_cliente,
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual: 0,
       forma_pagamento: null,
@@ -255,6 +264,9 @@ export function useOrcamentoForm() {
     }
     if (!form.data_proposta.trim()) {
       return "Informe a data da proposta.";
+    }
+    if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
+      return "Informe a origem do cliente.";
     }
 
     const itensValidos = form.itens.filter(

@@ -5,6 +5,7 @@ import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
+  formatOrcamentoOrigemCliente,
   type OrcamentoRecord,
 } from "@/lib/orcamento-types";
 import { OrcamentoRowActionsMenu } from "./OrcamentoRowActionsMenu";
@@ -51,13 +52,14 @@ export function OrcamentosTable({
           </p>
         )}
         {!loading && !error && orcamentos.length > 0 && (
-          <table className="table-premium w-full min-w-[880px]">
+          <table className="table-premium w-full min-w-[960px]">
             <thead>
               <tr>
                 {[
                   "Número",
                   "Data",
                   "Cliente",
+                  "Origem",
                   "Responsável",
                   "Valor total",
                   "Status",
@@ -76,6 +78,9 @@ export function OrcamentosTable({
                     <td>{formatDateIsoToBR(orcamento.data_proposta)}</td>
                     <td className="max-w-[200px] truncate">
                       {orcamento.cliente_nome}
+                    </td>
+                    <td>
+                      {formatOrcamentoOrigemCliente(orcamento.origem_cliente)}
                     </td>
                     <td>{orcamento.responsavel}</td>
                     <td className="font-semibold text-navy">

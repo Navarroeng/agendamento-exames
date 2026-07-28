@@ -29,6 +29,7 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     contato: "",
     email: "",
     telefone: "",
+    origem_cliente: "",
     observacoes: "",
     forma_pagamento: "",
     status: "em_elaboracao",

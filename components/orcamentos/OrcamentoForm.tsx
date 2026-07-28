@@ -9,6 +9,7 @@ import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import type { OrcamentoFormField } from "@/hooks/useOrcamentoForm";
 import {
   ORCAMENTO_STATUS_OPTIONS,
+  ORCAMENTO_ORIGEM_OPTIONS,
   type OrcamentoFormValues,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
@@ -106,6 +107,23 @@ export function OrcamentoForm({
               onChange={(e) => onChange("status", e.target.value)}
             >
               {ORCAMENTO_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Origem do cliente <RequiredMark />
+            </label>
+            <select
+              className="field-input"
+              value={form.origem_cliente}
+              onChange={(e) => onChange("origem_cliente", e.target.value)}
+            >
+              <option value="">Selecionar origem...</option>
+              {ORCAMENTO_ORIGEM_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

@@ -1,3 +1,5 @@
+import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+
 export type OrcamentoStatus =
   | "em_elaboracao"
   | "enviado"
@@ -5,6 +7,15 @@ export type OrcamentoStatus =
   | "aprovado"
   | "reprovado"
   | "cancelado";
+
+export type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+export {
+  ORCAMENTO_ORIGEM_LABELS,
+  ORCAMENTO_ORIGEM_NAO_INFORMADO,
+  ORCAMENTO_ORIGEM_OPTIONS,
+  formatOrcamentoOrigemCliente,
+  isOrcamentoOrigemCliente,
+} from "@/lib/orcamento-origem";
 
 export type OrcamentoAssinaturaStatus =
   | "nao_aplicavel"
@@ -77,6 +88,7 @@ export interface OrcamentoRecord {
   email: string | null;
   telefone: string | null;
   responsavel: string;
+  origem_cliente: OrcamentoOrigemCliente | null;
   observacoes: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;
@@ -130,6 +142,7 @@ export interface OrcamentoFormValues {
   contato: string;
   email: string;
   telefone: string;
+  origem_cliente: "" | OrcamentoOrigemCliente;
   observacoes: string;
   forma_pagamento: string;
   status: OrcamentoStatus;
@@ -157,6 +170,7 @@ export interface OrcamentoInsertPayload {
   email: string | null;
   telefone: string | null;
   responsavel: string;
+  origem_cliente: OrcamentoOrigemCliente | null;
   observacoes: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;

@@ -16,6 +16,9 @@ import {
   isOrcamentoFormDirty,
   serializeOrcamentoFormSnapshot,
 } from "@/lib/orcamento-form-dirty";
+import {
+  formatOrcamentoOrigemCliente,
+} from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
 import { canExcluirOrcamento } from "@/lib/permissions";
@@ -52,6 +55,9 @@ export function useOrcamentosPage() {
     EMPTY_ORCAMENTO_FILTERS
   );
   const [editingResponsavel, setEditingResponsavel] = useState("");
+  const [editingOrigemInicial, setEditingOrigemInicial] = useState<
+    string | null
+  >(null);
   const [formBaseline, setFormBaseline] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const pendingBaselineRef = useRef(false);
@@ -96,6 +102,7 @@ export function useOrcamentosPage() {
     reset();
     setEditingId(null);
     setEditingResponsavel("");
+    setEditingOrigemInicial(null);
     if (showForm) {
       pendingBaselineRef.current = true;
     } else {
@@ -111,6 +118,7 @@ export function useOrcamentosPage() {
     reset();
     setEditingId(null);
     setEditingResponsavel("");
+    setEditingOrigemInicial(null);
   }, [reset]);
 
   const requestCloseForm = useCallback(() => {
@@ -135,6 +143,7 @@ export function useOrcamentosPage() {
     reset();
     setEditingId(null);
     setEditingResponsavel("");
+    setEditingOrigemInicial(null);
     try {
       const numero = await gerarNumeroOrcamento();
       reset();
@@ -158,6 +167,7 @@ export function useOrcamentosPage() {
         }
         loadForm(orcamento);
         setEditingResponsavel(orcamento.responsavel);
+        setEditingOrigemInicial(orcamento.origem_cliente);
         setEditingId(id);
         setViewOrcamento(null);
         pendingBaselineRef.current = true;
@@ -211,6 +221,9 @@ export function useOrcamentosPage() {
         ? await atualizarOrcamento(editingId!, payload)
         : await criarOrcamento(payload);
 
+      const origemAntes = formatOrcamentoOrigemCliente(editingOrigemInicial);
+      const origemDepois = formatOrcamentoOrigemCliente(saved.origem_cliente);
+
       await registrarAuditoria({
         ...auditContext,
         modulo: AUDITORIA_MODULOS.orcamentos,
@@ -219,13 +232,27 @@ export function useOrcamentosPage() {
         registroNome: saved.numero,
         descricao: isEditing
           ? `Orçamento ${saved.numero} atualizado.`
-          : `Orçamento ${saved.numero} criado.`,
+          : `Orçamento ${saved.numero} criado com origem ${origemDepois}.`,
         dadosDepois: {
           cliente: saved.cliente_nome,
           valor_total: saved.valor_total,
           status: saved.status,
+          origem_cliente: saved.origem_cliente,
         },
       });
+
+      if (isEditing && origemAntes !== origemDepois) {
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: saved.id,
+          registroNome: saved.numero,
+          descricao: `${auditContext.usuarioNome} alterou a origem do cliente de ${origemAntes} para ${origemDepois}.`,
+          dadosAntes: { origem_cliente: editingOrigemInicial },
+          dadosDepois: { origem_cliente: saved.origem_cliente },
+        });
+      }
 
       toast.success(
         isEditing
@@ -245,6 +272,7 @@ export function useOrcamentosPage() {
     buildPayload,
     closeForm,
     editingId,
+    editingOrigemInicial,
     editingResponsavel,
     getValidationError,
     refresh,

@@ -16,6 +16,7 @@ import { formatCurrency } from "@/lib/money";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
+  formatOrcamentoOrigemCliente,
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
@@ -158,6 +159,12 @@ export function OrcamentoViewModal({
                   Responsável:{" "}
                   <strong className="font-semibold text-white">
                     {displayValue(orcamento.responsavel)}
+                  </strong>
+                </span>
+                <span>
+                  Origem:{" "}
+                  <strong className="font-semibold text-white">
+                    {formatOrcamentoOrigemCliente(orcamento.origem_cliente)}
                   </strong>
                 </span>
                 {validadeLabel ? (

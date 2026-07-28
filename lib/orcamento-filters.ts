@@ -1,4 +1,5 @@
 import { textsMatchSearch } from "@/lib/text-normalize";
+import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import type {
   OrcamentoFilters,
   OrcamentoRecord,
@@ -33,6 +34,7 @@ export function filterOrcamentos(
         orcamento.email,
         orcamento.telefone,
         orcamento.responsavel,
+        formatOrcamentoOrigemCliente(orcamento.origem_cliente),
       ],
       busca
     );
