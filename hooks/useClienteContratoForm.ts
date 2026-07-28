@@ -73,6 +73,7 @@ export function useClienteContratoForm() {
       reajuste_percentual: parseOptionalPercent(form.reajuste_percentual),
       observacoes: emptyToNull(form.observacoes),
       status: form.status,
+      liberado_para_agendamento: true,
     }),
     [form]
   );

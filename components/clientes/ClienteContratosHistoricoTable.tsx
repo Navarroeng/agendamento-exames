@@ -1,9 +1,9 @@
 import {
   clienteContratoStatusBadgeClass,
   formatValorContrato,
+  labelAgendamentoContrato,
   labelClienteContratoStatus,
-  labelPagamentoContrato,
-  labelVencimentoBoletoContrato,
+  labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord } from "@/lib/types";
@@ -46,11 +46,10 @@ export function ClienteContratosHistoricoTable({
               "Contrato",
               "Orçamento",
               "Aprovação",
-              "Colaboradores",
               "Valor",
               "Status",
-              "Pagamento",
-              "Venc. boleto",
+              "Financeiro",
+              "Agendamento",
               "Ações",
             ].map((h) => (
               <th key={h}>{h}</th>
@@ -58,61 +57,69 @@ export function ClienteContratosHistoricoTable({
           </tr>
         </thead>
         <tbody>
-          {contratos.map((contrato) => (
-            <tr key={contrato.id}>
-              <td className="font-bold text-navy">
-                {contrato.numero?.trim() || "—"}
-              </td>
-              <td className="font-semibold text-navy">
-                {contrato.numero_orcamento?.trim() || "—"}
-              </td>
-              <td>
-                {contrato.aprovado_em
-                  ? formatDateBR(contrato.aprovado_em.split("T")[0])
-                  : formatDateBR(contrato.data_inicio)}
-              </td>
-              <td className="tabular-nums">
-                {contrato.quantidade_colaboradores ?? "—"}
-              </td>
-              <td className="tabular-nums">
-                {formatValorContrato(contrato.valor_contrato)}
-              </td>
-              <td>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
-                >
-                  {labelClienteContratoStatus(contrato.status)}
-                </span>
-              </td>
-              <td className="text-xs font-semibold text-[#52617a]">
-                {labelPagamentoContrato(contrato)}
-              </td>
-              <td className="text-xs text-[#52617a]">
-                {labelVencimentoBoletoContrato(contrato.boleto_vencimento)}
-              </td>
-              <td>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold text-brand-blue"
-                    onClick={() => onEditar(contrato)}
+          {contratos.map((contrato) => {
+            const agendamento = labelAgendamentoContrato(contrato);
+            return (
+              <tr key={contrato.id}>
+                <td className="font-bold text-navy">
+                  {contrato.numero?.trim() || "—"}
+                </td>
+                <td className="font-semibold text-navy">
+                  {contrato.numero_orcamento?.trim() || "—"}
+                </td>
+                <td>
+                  {contrato.aprovado_em
+                    ? formatDateBR(contrato.aprovado_em.split("T")[0])
+                    : formatDateBR(contrato.data_inicio)}
+                </td>
+                <td className="tabular-nums">
+                  {formatValorContrato(contrato.valor_contrato)}
+                </td>
+                <td>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
                   >
-                    Visualizar
-                  </button>
-                  {contrato.status === "ativo" ||
-                  contrato.status === "em_renovacao" ? (
+                    {labelClienteContratoStatus(contrato.status)}
+                  </span>
+                </td>
+                <td className="text-xs font-semibold text-[#52617a]">
+                  {labelFinanceiroContrato(contrato)}
+                </td>
+                <td>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                      agendamento === "Liberado"
+                        ? "bg-brand-green-soft text-brand-green"
+                        : "bg-brand-orange-soft text-[#c96d00]"
+                    }`}
+                  >
+                    {agendamento}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
-                      className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
-                      onClick={() => onEncerrar(contrato)}
+                      className="rounded-lg bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold text-brand-blue"
+                      onClick={() => onEditar(contrato)}
                     >
-                      Encerrar
+                      Visualizar
                     </button>
-                  ) : null}
-                </div>
-              </td>
-            </tr>
-          ))}
+                    {contrato.status === "ativo" ||
+                    contrato.status === "em_renovacao" ? (
+                      <button
+                        type="button"
+                        className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"
+                        onClick={() => onEncerrar(contrato)}
+                      >
+                        Encerrar
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

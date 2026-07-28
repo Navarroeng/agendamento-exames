@@ -7,17 +7,20 @@ import { RequiredMark } from "@/components/ui/Field";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { emptyToNull, formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
 import {
-  ORCAMENTO_CONTRATO_ANDAMENTO_LABELS,
+  ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS,
+  ORCAMENTO_FINANCEIRO_ANDAMENTO_LABELS,
   aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoFormFromRecord,
   buildResumoComercialOrcamento,
   formatCondicaoAprovada,
-  resolveContratoAndamento,
+  resolveContratoDocumentalAndamento,
+  resolveFinanceiroAndamento,
   type OrcamentoAprovacaoFormValues,
   type OrcamentoAprovacaoRecord,
-  type OrcamentoContratoUpdatePayload,
+  type OrcamentoContratoDocumentalUpdatePayload,
+  type OrcamentoFinanceiroUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
 import {
   ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG,
@@ -32,7 +35,7 @@ import {
 } from "@/lib/orcamento-types";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
 
-type TabId = "resumo" | "aprovado" | "contrato";
+type TabId = "resumo" | "aprovado" | "contrato" | "financeiro";
 
 interface OrcamentoAprovarModalProps {
   open: boolean;
@@ -46,7 +49,11 @@ interface OrcamentoAprovarModalProps {
   onSalvarAprovacao: (form: OrcamentoAprovacaoFormValues) => Promise<void>;
   onSalvarContrato: (
     aprovacaoId: string,
-    payload: OrcamentoContratoUpdatePayload,
+    payload: OrcamentoContratoDocumentalUpdatePayload
+  ) => Promise<void>;
+  onSalvarFinanceiro: (
+    aprovacaoId: string,
+    payload: OrcamentoFinanceiroUpdatePayload,
     file: File | null
   ) => Promise<void>;
   onVerComprovante: (path: string) => void;
@@ -64,9 +71,11 @@ export function OrcamentoAprovarModal({
   aprovacao,
   servicos,
   saving,
+  usuarioNome,
   onClose,
   onSalvarAprovacao,
   onSalvarContrato,
+  onSalvarFinanceiro,
   onVerComprovante,
 }: OrcamentoAprovarModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -132,10 +141,12 @@ export function OrcamentoAprovarModal({
     return buildAprovacaoDiffs(orcamento, form, parseMoney);
   }, [orcamento, form]);
 
-  const andamento = resolveContratoAndamento(aprovacao);
+  const andamentoDocumental = resolveContratoDocumentalAndamento(aprovacao);
+  const andamentoFinanceiro = resolveFinanceiroAndamento(aprovacao);
   const consultaMode = mode === "consulta";
   const aprovadoLocked = Boolean(aprovacao) || consultaMode;
   const camposSomenteLeitura = consultaMode || saving;
+  const financeiroLiberado = Boolean(aprovacao?.contrato_assinado);
 
   const updateFormField = useCallback(
     <K extends keyof OrcamentoAprovacaoFormValues>(
@@ -196,6 +207,24 @@ export function OrcamentoAprovarModal({
       toast.error("Informe a data de assinatura do contrato.");
       return;
     }
+
+    const payload: OrcamentoContratoDocumentalUpdatePayload = {
+      contrato_enviado: contratoEnviado,
+      contrato_enviado_em: contratoEnviado ? contratoEnviadoEm || null : null,
+      contrato_assinado: contratoAssinado,
+      contrato_assinado_em: contratoAssinado ? contratoAssinadoEm || null : null,
+      observacao_contrato: emptyToNull(observacaoContrato),
+    };
+
+    await onSalvarContrato(aprovacao.id, payload);
+    if (contratoAssinado) {
+      setTab("financeiro");
+    }
+  }
+
+  async function handleSalvarFinanceiroClick() {
+    if (!aprovacao) return;
+
     if (boletoPago) {
       if (!boletoPagoEm) {
         toast.error("Informe a data do pagamento.");
@@ -205,29 +234,30 @@ export function OrcamentoAprovarModal({
         toast.error("Anexe o comprovante de pagamento.");
         return;
       }
+      if (comprovanteFile && comprovanteFile.size > 5 * 1024 * 1024) {
+        toast.error("O comprovante deve ter no máximo 5 MB.");
+        return;
+      }
+    } else if (aprovacao.boleto_pago) {
+      const ok = window.confirm(
+        "Confirmar bloqueio do pagamento? O contrato voltará a bloquear agendamentos deste vínculo. O comprovante e o histórico serão preservados."
+      );
+      if (!ok) return;
     }
 
-    const payload: OrcamentoContratoUpdatePayload = {
-      contrato_enviado: contratoEnviado,
-      contrato_enviado_em: contratoEnviado ? contratoEnviadoEm || null : null,
-      contrato_assinado: contratoAssinado,
-      contrato_assinado_em: contratoAssinado ? contratoAssinadoEm || null : null,
-      observacao_contrato: emptyToNull(observacaoContrato),
-      boleto_vencimento: contratoAssinado
-        ? boletoVencimento || null
-        : null,
-      boleto_pago: contratoAssinado ? boletoPago : false,
-      boleto_pago_em:
-        contratoAssinado && boletoPago ? boletoPagoEm || null : null,
+    const payload: OrcamentoFinanceiroUpdatePayload = {
+      boleto_vencimento: boletoVencimento || null,
+      boleto_pago: boletoPago,
+      boleto_pago_em: boletoPago ? boletoPagoEm || null : aprovacao.boleto_pago_em,
       comprovante_path: aprovacao.comprovante_path,
       comprovante_nome: aprovacao.comprovante_nome,
       comprovante_tipo: aprovacao.comprovante_tipo,
       comprovante_tamanho: aprovacao.comprovante_tamanho,
-      observacao_pagamento:
-        contratoAssinado ? emptyToNull(observacaoPagamento) : null,
+      observacao_pagamento: emptyToNull(observacaoPagamento),
+      pagamento_confirmado_por: usuarioNome,
     };
 
-    await onSalvarContrato(aprovacao.id, payload, comprovanteFile);
+    await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
   }
 
@@ -256,6 +286,11 @@ export function OrcamentoAprovarModal({
     if (aprovacao) {
       tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
       tabs.push({ id: "contrato", label: "Contrato" });
+      tabs.push({
+        id: "financeiro",
+        label: "Financeiro",
+        disabled: !financeiroLiberado,
+      });
     }
   } else {
     tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
@@ -263,6 +298,11 @@ export function OrcamentoAprovarModal({
       id: "contrato",
       label: "Contrato",
       disabled: !aprovacao,
+    });
+    tabs.push({
+      id: "financeiro",
+      label: "Financeiro",
+      disabled: !aprovacao || !financeiroLiberado,
     });
   }
 
@@ -301,7 +341,7 @@ export function OrcamentoAprovarModal({
                 </span>
                 {aprovacao ? (
                   <span className="inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                    {ORCAMENTO_CONTRATO_ANDAMENTO_LABELS[andamento]}
+                    {ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS[andamentoDocumental]}
                   </span>
                 ) : null}
               </div>
@@ -629,9 +669,9 @@ export function OrcamentoAprovarModal({
           {tab === "contrato" && aprovacao ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
-                Andamento:{" "}
+                Andamento documental:{" "}
                 <strong className="text-navy">
-                  {ORCAMENTO_CONTRATO_ANDAMENTO_LABELS[andamento]}
+                  {ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS[andamentoDocumental]}
                 </strong>
                 {aprovacao.aprovado_em ? (
                   <span>
@@ -674,14 +714,9 @@ export function OrcamentoAprovarModal({
                     className="field-input"
                     value={contratoAssinado ? "sim" : "nao"}
                     disabled={camposSomenteLeitura}
-                    onChange={(e) => {
-                      const sim = e.target.value === "sim";
-                      setContratoAssinado(sim);
-                      if (!sim) {
-                        setBoletoPago(false);
-                        setComprovanteFile(null);
-                      }
-                    }}
+                    onChange={(e) =>
+                      setContratoAssinado(e.target.value === "sim")
+                    }
                   >
                     {SIM_NAO.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -710,95 +745,102 @@ export function OrcamentoAprovarModal({
                   </Field>
                 </div>
               </div>
+            </div>
+          ) : null}
 
-              {contratoAssinado ? (
-                <section className="rounded-2xl border border-[#e8d7a8] bg-gradient-to-br from-[#fffbeb] to-white p-4 sm:p-5">
-                  <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-navy">
-                    Pagamento inicial
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <Field label="Data de vencimento do boleto">
-                      <input
-                        type="date"
-                        className="field-input"
-                        value={boletoVencimento}
-                        disabled={camposSomenteLeitura}
-                        onChange={(e) => setBoletoVencimento(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Boleto pago?">
-                      <select
-                        className="field-input"
-                        value={boletoPago ? "sim" : "nao"}
-                        disabled={camposSomenteLeitura}
-                        onChange={(e) =>
-                          setBoletoPago(e.target.value === "sim")
-                        }
-                      >
-                        {SIM_NAO.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    {boletoPago ? (
-                      <>
-                        <Field label="Data do pagamento" required>
-                          <input
-                            type="date"
-                            className="field-input"
-                            value={boletoPagoEm}
-                            disabled={camposSomenteLeitura}
-                            onChange={(e) => setBoletoPagoEm(e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Comprovante de pagamento" required>
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                            className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-                            disabled={camposSomenteLeitura}
-                            onChange={(e) =>
-                              setComprovanteFile(e.target.files?.[0] ?? null)
-                            }
-                          />
-                          {aprovacao.comprovante_nome ? (
-                            <button
-                              type="button"
-                              className="mt-1 text-[11px] font-semibold text-brand-blue hover:underline"
-                              onClick={() => {
-                                if (aprovacao.comprovante_path) {
-                                  onVerComprovante(aprovacao.comprovante_path);
-                                }
-                              }}
-                            >
-                              Ver comprovante atual ({aprovacao.comprovante_nome})
-                            </button>
-                          ) : null}
-                          {comprovanteFile ? (
-                            <p className="mt-1 text-[11px] text-[#64748b]">
-                              Novo arquivo: {comprovanteFile.name}
-                            </p>
-                          ) : null}
-                        </Field>
-                      </>
-                    ) : null}
-                    <div className="md:col-span-2">
-                      <Field label="Observação do pagamento">
-                        <textarea
-                          className="field-input min-h-[72px] resize-y"
-                          value={observacaoPagamento}
+          {tab === "financeiro" && aprovacao && financeiroLiberado ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
+                Andamento financeiro:{" "}
+                <strong className="text-navy">
+                  {ORCAMENTO_FINANCEIRO_ANDAMENTO_LABELS[andamentoFinanceiro]}
+                </strong>
+              </div>
+
+              <section className="rounded-2xl border border-[#e8d7a8] bg-gradient-to-br from-[#fffbeb] to-white p-4 sm:p-5">
+                <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-navy">
+                  Pagamento inicial
+                </p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <Field label="Data de vencimento do boleto">
+                    <input
+                      type="date"
+                      className="field-input"
+                      value={boletoVencimento}
+                      disabled={camposSomenteLeitura}
+                      onChange={(e) => setBoletoVencimento(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Boleto pago?">
+                    <select
+                      className="field-input"
+                      value={boletoPago ? "sim" : "nao"}
+                      disabled={camposSomenteLeitura}
+                      onChange={(e) => setBoletoPago(e.target.value === "sim")}
+                    >
+                      {SIM_NAO.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {boletoPago ? (
+                    <>
+                      <Field label="Data do pagamento" required>
+                        <input
+                          type="date"
+                          className="field-input"
+                          value={boletoPagoEm}
                           disabled={camposSomenteLeitura}
-                          onChange={(e) =>
-                            setObservacaoPagamento(e.target.value)
-                          }
+                          onChange={(e) => setBoletoPagoEm(e.target.value)}
                         />
                       </Field>
-                    </div>
+                      <Field label="Comprovante de pagamento" required>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                          className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
+                          disabled={camposSomenteLeitura}
+                          onChange={(e) =>
+                            setComprovanteFile(e.target.files?.[0] ?? null)
+                          }
+                        />
+                        {aprovacao.comprovante_nome ? (
+                          <button
+                            type="button"
+                            className="mt-1 text-[11px] font-semibold text-brand-blue hover:underline"
+                            onClick={() => {
+                              if (aprovacao.comprovante_path) {
+                                onVerComprovante(aprovacao.comprovante_path);
+                              }
+                            }}
+                          >
+                            Ver comprovante atual ({aprovacao.comprovante_nome})
+                          </button>
+                        ) : null}
+                        {comprovanteFile ? (
+                          <p className="mt-1 text-[11px] text-[#64748b]">
+                            Novo arquivo: {comprovanteFile.name}
+                          </p>
+                        ) : null}
+                      </Field>
+                    </>
+                  ) : null}
+                  <div className="md:col-span-2">
+                    <Field label="Observações do pagamento">
+                      <textarea
+                        className="field-input min-h-[72px] resize-y"
+                        value={observacaoPagamento}
+                        disabled={camposSomenteLeitura}
+                        onChange={(e) =>
+                          setObservacaoPagamento(e.target.value)
+                        }
+                      />
+                    </Field>
                   </div>
-                </section>
-              ) : null}
+                </div>
+              </section>
             </div>
           ) : null}
         </div>
@@ -848,6 +890,19 @@ export function OrcamentoAprovarModal({
               disabled={saving}
             >
               {saving ? "Salvando..." : "Salvar acompanhamento"}
+            </button>
+          ) : null}
+          {tab === "financeiro" &&
+          aprovacao &&
+          financeiroLiberado &&
+          !consultaMode ? (
+            <button
+              type="button"
+              className="btn btn-primary justify-center sm:w-auto"
+              onClick={() => void handleSalvarFinanceiroClick()}
+              disabled={saving}
+            >
+              {saving ? "Salvando..." : "Salvar financeiro"}
             </button>
           ) : null}
         </div>

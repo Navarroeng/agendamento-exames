@@ -67,6 +67,8 @@ export interface OrcamentoAprovacaoRecord {
   comprovante_tipo: string | null;
   comprovante_tamanho: number | null;
   observacao_pagamento: string | null;
+  pagamento_confirmado_em?: string | null;
+  pagamento_confirmado_por?: string | null;
   created_at: string;
   updated_at: string;
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
@@ -102,12 +104,15 @@ export interface OrcamentoAprovacaoInsertPayload {
   }>;
 }
 
-export interface OrcamentoContratoUpdatePayload {
+export interface OrcamentoContratoDocumentalUpdatePayload {
   contrato_enviado: boolean;
   contrato_enviado_em: string | null;
   contrato_assinado: boolean;
   contrato_assinado_em: string | null;
   observacao_contrato: string | null;
+}
+
+export interface OrcamentoFinanceiroUpdatePayload {
   boleto_vencimento: string | null;
   boleto_pago: boolean;
   boleto_pago_em: string | null;
@@ -116,7 +121,27 @@ export interface OrcamentoContratoUpdatePayload {
   comprovante_tipo: string | null;
   comprovante_tamanho: number | null;
   observacao_pagamento: string | null;
+  pagamento_confirmado_por?: string | null;
 }
+
+/** @deprecated Prefer payloads documentais/financeiros separados. */
+export interface OrcamentoContratoUpdatePayload
+  extends OrcamentoContratoDocumentalUpdatePayload,
+    OrcamentoFinanceiroUpdatePayload {}
+
+export type OrcamentoFinanceiroAndamento =
+  | "aguardando_vencimento"
+  | "aguardando_pagamento"
+  | "pago";
+
+export const ORCAMENTO_FINANCEIRO_ANDAMENTO_LABELS: Record<
+  OrcamentoFinanceiroAndamento,
+  string
+> = {
+  aguardando_vencimento: "Aguardando vencimento",
+  aguardando_pagamento: "Aguardando pagamento",
+  pago: "Pago",
+};
 
 export interface OrcamentoAprovacaoDiffItem {
   label: string;
@@ -153,6 +178,40 @@ export function resolveContratoAndamento(
   }
   if (aprovacao.contrato_enviado) return "enviado";
   return "nao_enviado";
+}
+
+/** Andamento apenas documental (aba Contrato). */
+export function resolveContratoDocumentalAndamento(
+  aprovacao: Pick<
+    OrcamentoAprovacaoRecord,
+    "contrato_enviado" | "contrato_assinado"
+  > | null
+): "nao_enviado" | "enviado" | "assinado" {
+  if (!aprovacao) return "nao_enviado";
+  if (aprovacao.contrato_assinado) return "assinado";
+  if (aprovacao.contrato_enviado) return "enviado";
+  return "nao_enviado";
+}
+
+export const ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS: Record<
+  "nao_enviado" | "enviado" | "assinado",
+  string
+> = {
+  nao_enviado: "Aguardando envio",
+  enviado: "Enviado",
+  assinado: "Assinado",
+};
+
+export function resolveFinanceiroAndamento(
+  aprovacao: Pick<
+    OrcamentoAprovacaoRecord,
+    "boleto_vencimento" | "boleto_pago"
+  > | null
+): OrcamentoFinanceiroAndamento {
+  if (!aprovacao) return "aguardando_vencimento";
+  if (aprovacao.boleto_pago) return "pago";
+  if (aprovacao.boleto_vencimento) return "aguardando_pagamento";
+  return "aguardando_vencimento";
 }
 
 export function buildResumoComercialOrcamento(

@@ -58,6 +58,7 @@ export function OrcamentosPage() {
     closeAprovar,
     handleSalvarAprovacao,
     handleSalvarContrato,
+    handleSalvarFinanceiro,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,
@@ -141,6 +142,7 @@ export function OrcamentosPage() {
         onClose={closeAprovar}
         onSalvarAprovacao={handleSalvarAprovacao}
         onSalvarContrato={handleSalvarContrato}
+        onSalvarFinanceiro={handleSalvarFinanceiro}
         onVerComprovante={(path) => {
           void handleVerComprovante(path);
         }}

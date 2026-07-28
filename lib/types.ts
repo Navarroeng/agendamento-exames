@@ -275,6 +275,7 @@ export interface ClienteInsert {
   cnpj: string;
   procuracao: ClienteProcuracao;
   disponivel_agendamento: boolean;
+  origem_cadastro?: "manual" | "orcamento";
   contato?: string | null;
   telefone?: string | null;
   email?: string | null;
@@ -353,6 +354,7 @@ export interface ClienteContratoInsert {
   desconto_percentual?: number | null;
   aprovado_em?: string | null;
   aprovado_por?: string | null;
+  liberado_para_agendamento?: boolean;
 }
 
 export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "cliente_id"> {
@@ -372,6 +374,7 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   boleto_vencimento?: string | null;
   boleto_pago?: boolean;
   boleto_pago_em?: string | null;
+  liberado_para_agendamento?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 }

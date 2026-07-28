@@ -15,7 +15,6 @@ import {
   buildAprovacaoInsertPayload,
   type OrcamentoAprovacaoFormValues,
   type OrcamentoAprovacaoRecord,
-  type OrcamentoContratoUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
 import {
   EMPTY_ORCAMENTO_FILTERS,
@@ -42,13 +41,17 @@ import {
   ORCAMENTO_CONTRATO_JA_VINCULADO_MSG,
 } from "@/lib/orcamento-aprovacao-integracao";
 import {
-  atualizarAcompanhamentoContrato,
+  atualizarAcompanhamentoDocumentalContrato,
+  atualizarAcompanhamentoFinanceiro,
   buscarAprovacaoPorOrcamentoId,
   cancelarOrcamento,
   salvarAprovacaoOrcamento,
 } from "@/services/orcamento-aprovacao.service";
+import type {
+  OrcamentoContratoDocumentalUpdatePayload,
+  OrcamentoFinanceiroUpdatePayload,
+} from "@/lib/orcamento-aprovacao";
 import {
-  deleteOrcamentoComprovantePagamento,
   obterUrlOrcamentoComprovante,
   uploadOrcamentoComprovantePagamento,
 } from "@/services/orcamento-comprovante.service";
@@ -95,7 +98,7 @@ export function useOrcamentosPage() {
   const [aprovarSaving, setAprovarSaving] = useState(false);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
-  const { clientes } = useClientesList();
+  const { clientes, refresh: refreshClientes } = useClientesList();
   const { servicos, loading: servicosLoading, error: servicosError } =
     useServicosSstList();
 
@@ -572,6 +575,7 @@ export function useOrcamentosPage() {
             : "Aprovação salva. Contrato vinculado ao cliente."
         );
         refresh();
+        refreshClientes();
       } catch (err) {
         console.error(err);
         toast.error(
@@ -590,57 +594,15 @@ export function useOrcamentosPage() {
   const handleSalvarContrato = useCallback(
     async (
       aprovacaoId: string,
-      payload: OrcamentoContratoUpdatePayload,
-      file: File | null
+      payload: OrcamentoContratoDocumentalUpdatePayload
     ) => {
       if (!aprovarOrcamento || !aprovarAprovacao) return;
       setAprovarSaving(true);
       try {
         const before = aprovarAprovacao;
-        let nextPayload = { ...payload };
-
-        if (file) {
-          const uploaded = await uploadOrcamentoComprovantePagamento(
-            aprovacaoId,
-            file
-          );
-          if (before.comprovante_path && before.comprovante_path !== uploaded.path) {
-            try {
-              await deleteOrcamentoComprovantePagamento(before.comprovante_path);
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          nextPayload = {
-            ...nextPayload,
-            comprovante_path: uploaded.path,
-            comprovante_nome: uploaded.nome,
-            comprovante_tipo: uploaded.tipo,
-            comprovante_tamanho: uploaded.tamanho,
-          };
-        }
-
-        if (!nextPayload.boleto_pago) {
-          if (before.comprovante_path && !file) {
-            try {
-              await deleteOrcamentoComprovantePagamento(before.comprovante_path);
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          nextPayload = {
-            ...nextPayload,
-            comprovante_path: null,
-            comprovante_nome: null,
-            comprovante_tipo: null,
-            comprovante_tamanho: null,
-            boleto_pago_em: null,
-          };
-        }
-
-        const saved = await atualizarAcompanhamentoContrato(
+        const saved = await atualizarAcompanhamentoDocumentalContrato(
           aprovacaoId,
-          nextPayload
+          payload
         );
 
         if (!before.contrato_enviado && saved.contrato_enviado && saved.contrato_enviado_em) {
@@ -665,9 +627,69 @@ export function useOrcamentosPage() {
             acao: AUDITORIA_ACOES.edicao,
             registroId: aprovarOrcamento.id,
             registroNome: aprovarOrcamento.numero,
-            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}.`,
+            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}. Aba Financeiro liberada.`,
           });
         }
+
+        setAprovarAprovacao(saved);
+        toast.success("Acompanhamento do contrato salvo.");
+        refresh();
+        refreshClientes();
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof Error ? err.message : "Erro ao salvar acompanhamento.";
+        toast.error(message);
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext, refresh, refreshClientes]
+  );
+
+  const handleSalvarFinanceiro = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: OrcamentoFinanceiroUpdatePayload,
+      file: File | null
+    ) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        const before = aprovarAprovacao;
+        let nextPayload = { ...payload };
+
+        if (file) {
+          const uploaded = await uploadOrcamentoComprovantePagamento(
+            aprovacaoId,
+            file
+          );
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: uploaded.path,
+            comprovante_nome: uploaded.nome,
+            comprovante_tipo: uploaded.tipo,
+            comprovante_tamanho: uploaded.tamanho,
+          };
+        }
+
+        // Não apaga comprovante/histórico ao marcar boleto como Não.
+        if (!nextPayload.boleto_pago) {
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: before.comprovante_path,
+            comprovante_nome: before.comprovante_nome,
+            comprovante_tipo: before.comprovante_tipo,
+            comprovante_tamanho: before.comprovante_tamanho,
+            boleto_pago_em: before.boleto_pago_em,
+          };
+        }
+
+        const saved = await atualizarAcompanhamentoFinanceiro(
+          aprovacaoId,
+          nextPayload
+        );
 
         if (
           saved.boleto_vencimento &&
@@ -690,7 +712,19 @@ export function useOrcamentosPage() {
             acao: AUDITORIA_ACOES.edicao,
             registroId: aprovarOrcamento.id,
             registroNome: aprovarOrcamento.numero,
-            descricao: `Pagamento inicial confirmado em ${formatDateIsoToBR(saved.boleto_pago_em)}.`,
+            descricao: `Pagamento inicial confirmado em ${formatDateIsoToBR(saved.boleto_pago_em)}. Contrato liberado para agendamentos.`,
+          });
+        }
+
+        if (before.boleto_pago && !saved.boleto_pago) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: aprovarOrcamento.id,
+            registroNome: aprovarOrcamento.numero,
+            descricao:
+              "Pagamento inicial desmarcado. Contrato bloqueado novamente para agendamentos deste vínculo.",
           });
         }
 
@@ -706,19 +740,24 @@ export function useOrcamentosPage() {
         }
 
         setAprovarAprovacao(saved);
-        toast.success("Acompanhamento do contrato salvo.");
+        toast.success(
+          saved.boleto_pago
+            ? "Pagamento confirmado. Cliente liberado para agendamentos."
+            : "Acompanhamento financeiro salvo."
+        );
         refresh();
+        refreshClientes();
       } catch (err) {
         console.error(err);
         const message =
-          err instanceof Error ? err.message : "Erro ao salvar acompanhamento.";
+          err instanceof Error ? err.message : "Erro ao salvar financeiro.";
         toast.error(message);
         throw err;
       } finally {
         setAprovarSaving(false);
       }
     },
-    [aprovarAprovacao, aprovarOrcamento, auditContext, refresh]
+    [aprovarAprovacao, aprovarOrcamento, auditContext, refresh, refreshClientes]
   );
 
   const handleVerComprovante = useCallback(async (path: string) => {
@@ -802,6 +841,7 @@ export function useOrcamentosPage() {
     closeAprovar,
     handleSalvarAprovacao,
     handleSalvarContrato,
+    handleSalvarFinanceiro,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,

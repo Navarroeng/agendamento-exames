@@ -3,10 +3,10 @@ import {
   formatReajusteContrato,
   formatValorContrato,
   formatVigenciaContrato,
+  labelAgendamentoContrato,
   labelClienteContratoStatus,
   labelClienteContratoTipo,
-  labelPagamentoContrato,
-  labelVencimentoBoletoContrato,
+  labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
 import type { ClienteContratoRecord } from "@/lib/types";
 
@@ -46,6 +46,8 @@ export function ClienteContratoAtualCard({
     );
   }
 
+  const agendamentoLabel = labelAgendamentoContrato(contrato);
+
   return (
     <div className="rounded-2xl border border-[#dbe4f4] bg-gradient-to-br from-white via-[#fbfdff] to-[#f0f4ff] p-5 shadow-[0_8px_28px_rgba(67,84,232,0.08)]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -84,13 +86,10 @@ export function ClienteContratoAtualCard({
           }
         />
         <Metric
-          label="Pagamento"
-          value={labelPagamentoContrato(contrato)}
+          label="Financeiro"
+          value={labelFinanceiroContrato(contrato)}
         />
-        <Metric
-          label="Venc. boleto"
-          value={labelVencimentoBoletoContrato(contrato.boleto_vencimento)}
-        />
+        <Metric label="Agendamento" value={agendamentoLabel} />
         <Metric
           label="Tipo contrato"
           value={labelClienteContratoTipo(contrato.tipo_contrato)}

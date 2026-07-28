@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/client";
 import type {
   OrcamentoAprovacaoInsertPayload,
   OrcamentoAprovacaoRecord,
+  OrcamentoContratoDocumentalUpdatePayload,
   OrcamentoContratoUpdatePayload,
+  OrcamentoFinanceiroUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
 import {
   assertOrcamentoCnpjParaAprovacao,
@@ -24,6 +26,71 @@ function sortAprovacao(
       ...(data.orcamento_aprovacao_itens ?? []),
     ].sort((a, b) => a.ordem - b.ordem),
   };
+}
+
+function resolveStatusContratoFromAprovacao(payload: {
+  contrato_enviado: boolean;
+  contrato_assinado: boolean;
+  boleto_pago: boolean;
+  boleto_vencimento: string | null;
+}): string {
+  if (payload.boleto_pago) return "pago";
+  if (payload.contrato_assinado) {
+    return payload.boleto_vencimento
+      ? "aguardando_pagamento"
+      : "assinado";
+  }
+  if (payload.contrato_enviado) return "enviado";
+  return "aguardando_envio";
+}
+
+async function syncClienteContratoFromAprovacao(
+  aprovacao: OrcamentoAprovacaoRecord,
+  options?: { liberadoParaAgendamento?: boolean }
+): Promise<void> {
+  const supabase = createClient();
+  const statusContrato = resolveStatusContratoFromAprovacao({
+    contrato_enviado: aprovacao.contrato_enviado,
+    contrato_assinado: aprovacao.contrato_assinado,
+    boleto_pago: aprovacao.boleto_pago,
+    boleto_vencimento: aprovacao.boleto_vencimento,
+  });
+
+  const update: Record<string, unknown> = {
+    status: statusContrato,
+    contrato_enviado_em: aprovacao.contrato_enviado_em,
+    contrato_assinado_em: aprovacao.contrato_assinado_em,
+    boleto_vencimento: aprovacao.boleto_vencimento,
+    boleto_pago: aprovacao.boleto_pago,
+    boleto_pago_em: aprovacao.boleto_pago_em,
+  };
+
+  if (typeof options?.liberadoParaAgendamento === "boolean") {
+    update.liberado_para_agendamento = options.liberadoParaAgendamento;
+  }
+
+  const { data: contratos, error: syncError } = await supabase
+    .from("cliente_contratos")
+    .update(update)
+    .eq("orcamento_id", aprovacao.orcamento_id)
+    .not("status", "in", "(ativo,encerrado,em_renovacao,cancelado)")
+    .select("id, cliente_id");
+
+  if (syncError) {
+    console.error("Falha ao sincronizar contrato do cliente:", syncError);
+    return;
+  }
+
+  const clienteId = contratos?.[0]?.cliente_id as string | undefined;
+  if (clienteId) {
+    const { error: recomputeError } = await supabase.rpc(
+      "recompute_cliente_disponivel_agendamento",
+      { p_cliente_id: clienteId }
+    );
+    if (recomputeError) {
+      console.error("Falha ao recomputar disponibilidade:", recomputeError);
+    }
+  }
 }
 
 export async function buscarAprovacaoPorOrcamentoId(
@@ -97,25 +164,10 @@ export async function salvarAprovacaoOrcamento(
   return { aprovacao, integracao };
 }
 
-function resolveStatusContratoFromAprovacao(payload: {
-  contrato_enviado: boolean;
-  contrato_assinado: boolean;
-  boleto_pago: boolean;
-  boleto_vencimento: string | null;
-}): string {
-  if (payload.boleto_pago) return "pago";
-  if (payload.contrato_assinado) {
-    return payload.boleto_vencimento
-      ? "aguardando_pagamento"
-      : "assinado";
-  }
-  if (payload.contrato_enviado) return "enviado";
-  return "aguardando_envio";
-}
-
-export async function atualizarAcompanhamentoContrato(
+/** Salva apenas o acompanhamento documental (aba Contrato). */
+export async function atualizarAcompanhamentoDocumentalContrato(
   aprovacaoId: string,
-  payload: OrcamentoContratoUpdatePayload
+  payload: OrcamentoContratoDocumentalUpdatePayload
 ): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -126,14 +178,6 @@ export async function atualizarAcompanhamentoContrato(
       contrato_assinado: payload.contrato_assinado,
       contrato_assinado_em: payload.contrato_assinado_em,
       observacao_contrato: payload.observacao_contrato,
-      boleto_vencimento: payload.boleto_vencimento,
-      boleto_pago: payload.boleto_pago,
-      boleto_pago_em: payload.boleto_pago_em,
-      comprovante_path: payload.comprovante_path,
-      comprovante_nome: payload.comprovante_nome,
-      comprovante_tipo: payload.comprovante_tipo,
-      comprovante_tamanho: payload.comprovante_tamanho,
-      observacao_pagamento: payload.observacao_pagamento,
     })
     .eq("id", aprovacaoId)
     .select(APROVACAO_SELECT)
@@ -142,55 +186,88 @@ export async function atualizarAcompanhamentoContrato(
   if (error) throw error;
 
   const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
-  const statusContrato = resolveStatusContratoFromAprovacao({
-    contrato_enviado: aprovacao.contrato_enviado,
-    contrato_assinado: aprovacao.contrato_assinado,
-    boleto_pago: aprovacao.boleto_pago,
-    boleto_vencimento: aprovacao.boleto_vencimento,
-  });
-
-  const { error: syncError } = await supabase
-    .from("cliente_contratos")
-    .update({
-      status: statusContrato,
-      contrato_enviado_em: aprovacao.contrato_enviado_em,
-      contrato_assinado_em: aprovacao.contrato_assinado_em,
-      boleto_vencimento: aprovacao.boleto_vencimento,
-      boleto_pago: aprovacao.boleto_pago,
-      boleto_pago_em: aprovacao.boleto_pago_em,
-    })
-    .eq("orcamento_id", aprovacao.orcamento_id)
-    .not("status", "in", "(ativo,encerrado,em_renovacao,cancelado)");
-
-  if (syncError) {
-    console.error("Falha ao sincronizar status do contrato do cliente:", syncError);
-  }
-
+  await syncClienteContratoFromAprovacao(aprovacao);
   return aprovacao;
 }
 
-/** Regulariza orçamentos já aprovados sem cliente/contrato (idempotente). */
-export async function backfillOrcamentosAprovadosClientes(): Promise<{
-  clientes_criados: number;
-  clientes_localizados: number;
-  contratos_criados: number;
-  contratos_atualizados: number;
-  pulados_sem_cnpj: number;
-  orcamentos_ja_vinculados: number;
-}> {
+/** Salva o acompanhamento financeiro (aba Financeiro). */
+export async function atualizarAcompanhamentoFinanceiro(
+  aprovacaoId: string,
+  payload: OrcamentoFinanceiroUpdatePayload
+): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc(
-    "backfill_orcamentos_aprovados_clientes"
-  );
-  if (error) throw error;
-  return data as {
-    clientes_criados: number;
-    clientes_localizados: number;
-    contratos_criados: number;
-    contratos_atualizados: number;
-    pulados_sem_cnpj: number;
-    orcamentos_ja_vinculados: number;
+
+  const { data: before, error: beforeError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select("boleto_pago")
+    .eq("id", aprovacaoId)
+    .single();
+  if (beforeError) throw beforeError;
+
+  const confirmingPayment = payload.boleto_pago && !before.boleto_pago;
+  const revokingPayment = !payload.boleto_pago && Boolean(before.boleto_pago);
+
+  const updateRow: Record<string, unknown> = {
+    boleto_vencimento: payload.boleto_vencimento,
+    boleto_pago: payload.boleto_pago,
+    boleto_pago_em: payload.boleto_pago_em,
+    comprovante_path: payload.comprovante_path,
+    comprovante_nome: payload.comprovante_nome,
+    comprovante_tipo: payload.comprovante_tipo,
+    comprovante_tamanho: payload.comprovante_tamanho,
+    observacao_pagamento: payload.observacao_pagamento,
   };
+
+  if (confirmingPayment) {
+    updateRow.pagamento_confirmado_em = new Date().toISOString();
+    updateRow.pagamento_confirmado_por =
+      payload.pagamento_confirmado_por?.trim() || null;
+  } else if (revokingPayment) {
+    // Mantém histórico de confirmação anterior; não apaga comprovante.
+  }
+
+  const { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update(updateRow)
+    .eq("id", aprovacaoId)
+    .select(APROVACAO_SELECT)
+    .single();
+
+  if (error) throw error;
+
+  const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
+  await syncClienteContratoFromAprovacao(aprovacao, {
+    liberadoParaAgendamento: Boolean(aprovacao.boleto_pago),
+  });
+  return aprovacao;
+}
+
+/**
+ * @deprecated Use atualizarAcompanhamentoDocumentalContrato /
+ * atualizarAcompanhamentoFinanceiro.
+ */
+export async function atualizarAcompanhamentoContrato(
+  aprovacaoId: string,
+  payload: OrcamentoContratoUpdatePayload
+): Promise<OrcamentoAprovacaoRecord> {
+  await atualizarAcompanhamentoDocumentalContrato(aprovacaoId, {
+    contrato_enviado: payload.contrato_enviado,
+    contrato_enviado_em: payload.contrato_enviado_em,
+    contrato_assinado: payload.contrato_assinado,
+    contrato_assinado_em: payload.contrato_assinado_em,
+    observacao_contrato: payload.observacao_contrato,
+  });
+  return atualizarAcompanhamentoFinanceiro(aprovacaoId, {
+    boleto_vencimento: payload.boleto_vencimento,
+    boleto_pago: payload.boleto_pago,
+    boleto_pago_em: payload.boleto_pago_em,
+    comprovante_path: payload.comprovante_path,
+    comprovante_nome: payload.comprovante_nome,
+    comprovante_tipo: payload.comprovante_tipo,
+    comprovante_tamanho: payload.comprovante_tamanho,
+    observacao_pagamento: payload.observacao_pagamento,
+    pagamento_confirmado_por: payload.pagamento_confirmado_por,
+  });
 }
 
 export async function cancelarOrcamento(params: {

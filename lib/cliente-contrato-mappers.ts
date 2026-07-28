@@ -67,6 +67,32 @@ export function labelPagamentoContrato(
   return "—";
 }
 
+export function labelFinanceiroContrato(
+  contrato: Pick<
+    ClienteContratoRecord,
+    "status" | "boleto_pago" | "boleto_vencimento"
+  >
+): string {
+  if (contrato.boleto_pago || contrato.status === "pago") return "Pago";
+  if (contrato.boleto_vencimento || contrato.status === "aguardando_pagamento") {
+    return "Aguardando pagamento";
+  }
+  if (
+    contrato.status === "assinado" ||
+    contrato.status === "enviado" ||
+    contrato.status === "aguardando_envio"
+  ) {
+    return "Aguardando vencimento";
+  }
+  return "—";
+}
+
+export function labelAgendamentoContrato(
+  contrato: Pick<ClienteContratoRecord, "liberado_para_agendamento">
+): "Liberado" | "Bloqueado" {
+  return contrato.liberado_para_agendamento ? "Liberado" : "Bloqueado";
+}
+
 export function labelVencimentoBoletoContrato(
   vencimento: string | null | undefined
 ): string {

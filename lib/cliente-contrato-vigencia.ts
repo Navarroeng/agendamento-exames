@@ -1,4 +1,7 @@
-import { buscarContratoAtivo } from "@/services/cliente-contrato.service";
+import {
+  buscarContratoAtivo,
+  listarContratosPorCliente,
+} from "@/services/cliente-contrato.service";
 import { listarClientesParaSelect } from "@/services/cliente.service";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
@@ -23,29 +26,42 @@ export async function verificarContratoVigente(
   clienteId: string,
   dataAgendamento: string
 ): Promise<ContratoVigenciaResult> {
-  const contrato = await buscarContratoAtivo(clienteId);
+  const contratoAtivo = await buscarContratoAtivo(clienteId);
 
   if (
-    !contrato ||
-    contrato.status !== "ativo" ||
-    !contrato.data_inicio?.trim() ||
-    !contrato.data_fim?.trim()
+    contratoAtivo &&
+    contratoAtivo.status === "ativo" &&
+    contratoAtivo.data_inicio?.trim() &&
+    contratoAtivo.data_fim?.trim()
   ) {
-    return { vigente: false, clienteId };
+    const vigente = isDateWithinVigencia(
+      dataAgendamento,
+      contratoAtivo.data_inicio,
+      contratoAtivo.data_fim
+    );
+    if (vigente) {
+      return {
+        vigente: true,
+        dataInicio: contratoAtivo.data_inicio,
+        dataFim: contratoAtivo.data_fim,
+        clienteId,
+      };
+    }
   }
 
-  const vigente = isDateWithinVigencia(
-    dataAgendamento,
-    contrato.data_inicio,
-    contrato.data_fim
-  );
+  // Contratos originados de orçamento liberados após pagamento inicial
+  const contratos = await listarContratosPorCliente(clienteId);
+  const liberado = contratos.find((c) => c.liberado_para_agendamento);
+  if (liberado) {
+    return {
+      vigente: true,
+      dataInicio: liberado.data_inicio,
+      dataFim: liberado.data_fim ?? undefined,
+      clienteId,
+    };
+  }
 
-  return {
-    vigente,
-    dataInicio: contrato.data_inicio,
-    dataFim: contrato.data_fim,
-    clienteId,
-  };
+  return { vigente: false, clienteId };
 }
 
 export async function verificarContratoVigentePorNome(
