@@ -6,6 +6,7 @@ import type {
   OrcamentoContratoUpdatePayload,
   OrcamentoFinanceiroUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
+import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 import {
   assertOrcamentoCnpjParaAprovacao,
   parseAprovacaoIntegracaoError,
@@ -134,6 +135,24 @@ export async function salvarAprovacaoOrcamento(
   assertOrcamentoCnpjParaAprovacao(orcamentoCnpj);
 
   const supabase = createClient();
+
+  const { data: orcamentoAtual, error: statusError } = await supabase
+    .from("orcamentos")
+    .select("status")
+    .eq("id", orcamentoId)
+    .maybeSingle();
+
+  if (statusError) throw statusError;
+  if (!orcamentoAtual) {
+    throw new Error("Orçamento não encontrado.");
+  }
+  if (orcamentoAtual.status === "aprovado") {
+    throw new Error(ORCAMENTO_JA_APROVADO_MSG);
+  }
+  if (orcamentoAtual.status === "cancelado") {
+    throw new Error("Orçamento cancelado não pode ser aprovado.");
+  }
+
   const { data, error } = await supabase.rpc(
     "aprovar_orcamento_integrar_cliente",
     {

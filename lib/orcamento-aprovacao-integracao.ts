@@ -1,5 +1,8 @@
 import { formatCNPJ } from "@/lib/cnpj";
 import { normalizeCnpjDigits } from "@/lib/cliente-cnpj";
+import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
+
+export { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 
 export const ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG =
   "Para concluir a aprovação e vincular o contrato ao cliente, informe um CNPJ válido.";
@@ -57,6 +60,12 @@ export function parseAprovacaoIntegracaoError(error: unknown): string {
 
   if (raw.includes("CNPJ_OBRIGATORIO")) {
     return ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG;
+  }
+  if (
+    raw.includes("ORCAMENTO_JA_APROVADO") ||
+    raw.includes(ORCAMENTO_JA_APROVADO_MSG)
+  ) {
+    return ORCAMENTO_JA_APROVADO_MSG;
   }
   if (raw.includes("ORCAMENTO_CANCELADO")) {
     return "Orçamento cancelado não pode ser aprovado.";

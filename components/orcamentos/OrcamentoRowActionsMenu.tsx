@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  resolveOrcamentoAcoesMenu,
+  type OrcamentoAcaoMenu,
+} from "@/lib/orcamento-acoes";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
 
 interface OrcamentoRowActionsMenuProps {
@@ -12,11 +16,17 @@ interface OrcamentoRowActionsMenuProps {
 }
 
 type MenuItem = {
-  key: string;
+  key: OrcamentoAcaoMenu;
   label: string;
   danger?: boolean;
-  disabled?: boolean;
   onClick: () => void;
+};
+
+const LABELS: Record<OrcamentoAcaoMenu, string> = {
+  editar: "Editar",
+  gerar_pdf: "Gerar PDF",
+  aprovar: "Aprovar",
+  cancelar: "Cancelar",
 };
 
 export function OrcamentoRowActionsMenu({
@@ -28,11 +38,27 @@ export function OrcamentoRowActionsMenu({
 }: OrcamentoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const cancelado = orcamento.status === "cancelado";
-  const aprovado = orcamento.status === "aprovado";
-  const podeEditar = !cancelado && !aprovado;
-  const podeCancelar = !cancelado && !aprovado;
-  const podeAprovar = !cancelado;
+
+  const handlers: Record<OrcamentoAcaoMenu, () => void> = useMemo(
+    () => ({
+      editar: () => onEditar(orcamento.id),
+      gerar_pdf: () => onGerarPdf(orcamento.id),
+      aprovar: () => onAprovar(orcamento.id),
+      cancelar: () => onCancelar(orcamento.id),
+    }),
+    [onAprovar, onCancelar, onEditar, onGerarPdf, orcamento.id]
+  );
+
+  const items: MenuItem[] = useMemo(
+    () =>
+      resolveOrcamentoAcoesMenu(orcamento.status).map((key) => ({
+        key,
+        label: LABELS[key],
+        danger: key === "cancelar",
+        onClick: handlers[key],
+      })),
+    [handlers, orcamento.status]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -47,35 +73,7 @@ export function OrcamentoRowActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const items: MenuItem[] = [
-    {
-      key: "editar",
-      label: "Editar",
-      disabled: !podeEditar,
-      onClick: () => onEditar(orcamento.id),
-    },
-    {
-      key: "pdf",
-      label: "Gerar PDF",
-      onClick: () => onGerarPdf(orcamento.id),
-    },
-    {
-      key: "aprovar",
-      label: "Aprovar",
-      disabled: !podeAprovar,
-      onClick: () => onAprovar(orcamento.id),
-    },
-    {
-      key: "cancelar",
-      label: "Cancelar",
-      danger: true,
-      disabled: !podeCancelar,
-      onClick: () => onCancelar(orcamento.id),
-    },
-  ];
-
   function handleAction(item: MenuItem) {
-    if (item.disabled) return;
     setOpen(false);
     item.onClick();
   }
@@ -106,9 +104,8 @@ export function OrcamentoRowActionsMenu({
               key={item.key}
               type="button"
               role="menuitem"
-              disabled={item.disabled}
               onClick={() => handleAction(item)}
-              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
                 item.danger
                   ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
                   : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"

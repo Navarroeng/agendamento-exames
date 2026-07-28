@@ -25,6 +25,12 @@ import {
   isOrcamentoFormDirty,
   serializeOrcamentoFormSnapshot,
 } from "@/lib/orcamento-form-dirty";
+import {
+  ORCAMENTO_JA_APROVADO_MSG,
+  orcamentoPermiteAprovar,
+  orcamentoPermiteCancelar,
+  orcamentoPermiteEditar,
+} from "@/lib/orcamento-acoes";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
@@ -215,13 +221,11 @@ export function useOrcamentosPage() {
           toast.error("Orçamento não encontrado.");
           return;
         }
-        if (orcamento.status === "cancelado") {
-          toast.error("Orçamento cancelado não pode ser editado.");
-          return;
-        }
-        if (orcamento.status === "aprovado") {
+        if (!orcamentoPermiteEditar(orcamento.status)) {
           toast.error(
-            "Orçamento aprovado não pode ser editado. Use Aprovar para consultar as condições finais."
+            orcamento.status === "aprovado"
+              ? "Orçamento aprovado não pode ser editado. Use Visualizar para consultar."
+              : "Orçamento cancelado não pode ser editado."
           );
           return;
         }
@@ -250,8 +254,12 @@ export function useOrcamentosPage() {
           toast.error("Orçamento não encontrado.");
           return;
         }
-        if (mode === "aprovacao" && orcamento.status === "cancelado") {
-          toast.error("Orçamento cancelado não pode ser aprovado.");
+        if (mode === "aprovacao" && !orcamentoPermiteAprovar(orcamento.status)) {
+          toast.error(
+            orcamento.status === "aprovado"
+              ? ORCAMENTO_JA_APROVADO_MSG
+              : "Orçamento cancelado não pode ser aprovado."
+          );
           return;
         }
         const aprovacao = await buscarAprovacaoPorOrcamentoId(id);
@@ -433,12 +441,12 @@ export function useOrcamentosPage() {
         toast.error("Orçamento não encontrado.");
         return;
       }
-      if (orcamento.status === "cancelado") {
-        toast.error("Este orçamento já está cancelado.");
-        return;
-      }
-      if (orcamento.status === "aprovado") {
-        toast.error("Orçamento aprovado não pode ser cancelado nesta etapa.");
+      if (!orcamentoPermiteCancelar(orcamento.status)) {
+        toast.error(
+          orcamento.status === "cancelado"
+            ? "Este orçamento já está cancelado."
+            : "Este orçamento não pode ser cancelado."
+        );
         return;
       }
       setCancelTarget(orcamento);
@@ -507,6 +515,14 @@ export function useOrcamentosPage() {
   const handleSalvarAprovacao = useCallback(
     async (formValues: OrcamentoAprovacaoFormValues) => {
       if (!aprovarOrcamento) return;
+      if (!orcamentoPermiteAprovar(aprovarOrcamento.status)) {
+        toast.error(
+          aprovarOrcamento.status === "aprovado"
+            ? ORCAMENTO_JA_APROVADO_MSG
+            : "Orçamento cancelado não pode ser aprovado."
+        );
+        return;
+      }
       setAprovarSaving(true);
       try {
         assertOrcamentoCnpjParaAprovacao(aprovarOrcamento.cliente_cnpj);
