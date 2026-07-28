@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { useOrcamentoForm } from "@/hooks/useOrcamentoForm";
@@ -12,6 +12,10 @@ import {
   EMPTY_ORCAMENTO_FILTERS,
   type OrcamentoFilters,
 } from "@/lib/orcamento-types";
+import {
+  isOrcamentoFormDirty,
+  serializeOrcamentoFormSnapshot,
+} from "@/lib/orcamento-form-dirty";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
 import { canExcluirOrcamento } from "@/lib/permissions";
@@ -25,6 +29,12 @@ import {
 } from "@/services/orcamento.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
+
+function focusOrcamentoPrimeiroCampo(): void {
+  requestAnimationFrame(() => {
+    document.getElementById("orcamento-primeiro-campo")?.focus();
+  });
+}
 
 export function useOrcamentosPage() {
   const auditContext = useAuditoriaUsuario();
@@ -42,6 +52,9 @@ export function useOrcamentosPage() {
     EMPTY_ORCAMENTO_FILTERS
   );
   const [editingResponsavel, setEditingResponsavel] = useState("");
+  const [formBaseline, setFormBaseline] = useState<string | null>(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const pendingBaselineRef = useRef(false);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes } = useClientesList();
@@ -70,19 +83,58 @@ export function useOrcamentosPage() {
     [orcamentos, filters]
   );
 
+  const formDirty = isOrcamentoFormDirty(form, formBaseline);
+
+  useEffect(() => {
+    if (!showForm || !pendingBaselineRef.current) return;
+    setFormBaseline(serializeOrcamentoFormSnapshot(form));
+    pendingBaselineRef.current = false;
+    focusOrcamentoPrimeiroCampo();
+  }, [showForm, form]);
+
   const resetForm = useCallback(() => {
+    reset();
+    setEditingId(null);
+    setEditingResponsavel("");
+    if (showForm) {
+      pendingBaselineRef.current = true;
+    } else {
+      setFormBaseline(null);
+    }
+  }, [reset, showForm]);
+
+  const closeForm = useCallback(() => {
+    setDiscardConfirmOpen(false);
+    setShowForm(false);
+    setFormBaseline(null);
+    pendingBaselineRef.current = false;
     reset();
     setEditingId(null);
     setEditingResponsavel("");
   }, [reset]);
 
-  const closeForm = useCallback(() => {
-    setShowForm(false);
-    resetForm();
-  }, [resetForm]);
+  const requestCloseForm = useCallback(() => {
+    if (discardConfirmOpen) return;
+    if (isOrcamentoFormDirty(form, formBaseline)) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    closeForm();
+  }, [closeForm, discardConfirmOpen, form, formBaseline]);
+
+  const continueEditing = useCallback(() => {
+    setDiscardConfirmOpen(false);
+  }, []);
+
+  const discardAndClose = useCallback(() => {
+    closeForm();
+  }, [closeForm]);
 
   const handleNovo = useCallback(async () => {
-    resetForm();
+    setDiscardConfirmOpen(false);
+    reset();
+    setEditingId(null);
+    setEditingResponsavel("");
     try {
       const numero = await gerarNumeroOrcamento();
       reset();
@@ -90,17 +142,14 @@ export function useOrcamentosPage() {
     } catch (err) {
       console.error(err);
     }
+    pendingBaselineRef.current = true;
     setShowForm(true);
-    requestAnimationFrame(() => {
-      document
-        .getElementById("cadastrar-orcamento")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, [reset, resetForm, setField]);
+  }, [reset, setField]);
 
   const handleEditar = useCallback(
     async (id: string) => {
       setViewLoading(true);
+      setDiscardConfirmOpen(false);
       try {
         const orcamento = await buscarOrcamentoComItens(id);
         if (!orcamento) {
@@ -110,12 +159,9 @@ export function useOrcamentosPage() {
         loadForm(orcamento);
         setEditingResponsavel(orcamento.responsavel);
         setEditingId(id);
+        setViewOrcamento(null);
+        pendingBaselineRef.current = true;
         setShowForm(true);
-        requestAnimationFrame(() => {
-          document
-            .getElementById("cadastrar-orcamento")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
       } catch (err) {
         console.error(err);
         toast.error("Erro ao carregar orçamento.");
@@ -182,7 +228,9 @@ export function useOrcamentosPage() {
       });
 
       toast.success(
-        isEditing ? "Orçamento atualizado com sucesso." : "Orçamento criado com sucesso."
+        isEditing
+          ? "Orçamento atualizado com sucesso."
+          : "Orçamento criado com sucesso."
       );
       closeForm();
       refresh();
@@ -335,6 +383,8 @@ export function useOrcamentosPage() {
     podeExcluir,
     form,
     totals,
+    formDirty,
+    discardConfirmOpen,
     setField,
     addItem,
     removeItem,
@@ -343,6 +393,9 @@ export function useOrcamentosPage() {
     saving,
     resetForm,
     closeForm,
+    requestCloseForm,
+    continueEditing,
+    discardAndClose,
     handleNovo,
     handleEditar,
     handleVisualizar,

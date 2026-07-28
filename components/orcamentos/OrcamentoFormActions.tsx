@@ -4,6 +4,7 @@ interface OrcamentoFormActionsProps {
   onClear: () => void;
   onCancel: () => void;
   onSave: () => void;
+  compact?: boolean;
 }
 
 export function OrcamentoFormActions({
@@ -12,16 +13,21 @@ export function OrcamentoFormActions({
   onClear,
   onCancel,
   onSave,
+  compact = false,
 }: OrcamentoFormActionsProps) {
   return (
-    <div className="mb-[18px] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+    <div
+      className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end ${
+        compact ? "" : "mb-[18px]"
+      }`}
+    >
       <button
         type="button"
         className="btn justify-center sm:w-auto"
         onClick={onClear}
         disabled={saving}
       >
-        Limpar
+        Limpar campos
       </button>
       <button
         type="button"

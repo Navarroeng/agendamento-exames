@@ -3,24 +3,45 @@
 import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+type ModalSize = "default" | "wide" | "extraWide" | "xl";
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
   extraWide?: boolean;
+  /** Largura premium (~1320px) para formulários grandes. */
+  size?: ModalSize;
+  /** Quando false, clique no overlay não fecha (útil com formulário dirty). */
+  closeOnOverlayClick?: boolean;
+}
+
+function resolveWidthClass(
+  size: ModalSize | undefined,
+  wide: boolean,
+  extraWide: boolean
+): string {
+  if (size === "xl") return "max-w-[1320px]";
+  if (size === "extraWide" || extraWide) return "max-w-5xl";
+  if (size === "wide" || wide) return "max-w-3xl";
+  return "max-w-2xl";
 }
 
 export function Modal({
   open,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   wide = false,
   extraWide = false,
+  size,
+  closeOnOverlayClick = true,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -28,45 +49,74 @@ export function Modal({
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose]);
+
   if (!open || !mounted) return null;
 
-  const widthClass = extraWide
-    ? "max-w-5xl"
-    : wide
-      ? "max-w-3xl"
-      : "max-w-2xl";
+  const widthClass = resolveWidthClass(size, wide, extraWide);
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
-        onClick={onClose}
+        className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+        onClick={() => {
+          if (closeOnOverlayClick) onClose();
+        }}
         aria-label="Fechar"
       />
       <div
-        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-card border border-app-line bg-white shadow-card ${widthClass}`}
+        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-app-line bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] ${widthClass}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-6 py-5">
-          <h3 id="modal-title" className="text-lg font-extrabold text-navy">
-            {title}
-          </h3>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-5 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <h3
+              id="modal-title"
+              className="text-lg font-extrabold tracking-[-0.2px] text-navy sm:text-xl"
+            >
+              {title}
+            </h3>
+            {subtitle ? (
+              <p className="mt-1 text-sm text-app-muted">{subtitle}</p>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-xl border border-app-line text-lg text-app-muted transition-colors hover:bg-brand-blue-soft hover:text-brand-blue"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-app-line text-lg text-app-muted transition-colors hover:bg-brand-blue-soft hover:text-brand-blue"
+            aria-label="Fechar"
           >
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+          {children}
+        </div>
         {footer ? (
-          <div className="pointer-events-auto shrink-0 border-t border-app-line bg-white px-6 py-4">
+          <div className="pointer-events-auto shrink-0 border-t border-app-line bg-white px-4 py-3 sm:px-6 sm:py-4">
             {footer}
           </div>
         ) : null}

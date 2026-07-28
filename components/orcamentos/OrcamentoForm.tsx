@@ -18,6 +18,8 @@ import { OrcamentoItensSection } from "./OrcamentoItensSection";
 interface OrcamentoFormProps {
   form: OrcamentoFormValues;
   isEditing: boolean;
+  /** Quando true, o formulário é exibido dentro do modal (títulos sem duplicar o header). */
+  embeddedInModal?: boolean;
   clientes: ClienteRecord[];
   servicos: ServicoSstRecord[];
   servicosLoading: boolean;
@@ -42,6 +44,7 @@ interface OrcamentoFormProps {
 export function OrcamentoForm({
   form,
   isEditing,
+  embeddedInModal = false,
   clientes,
   servicos,
   servicosLoading,
@@ -58,12 +61,17 @@ export function OrcamentoForm({
   onApplyValorSugerido,
 }: OrcamentoFormProps) {
   const clienteBloqueado = Boolean(form.cliente_id.trim());
+  const headerTitle = embeddedInModal
+    ? "Dados do orçamento"
+    : isEditing
+      ? "Editar orçamento"
+      : "Novo orçamento";
 
   return (
     <>
       <Panel
         id="cadastrar-orcamento"
-        title={isEditing ? "Editar orçamento" : "Novo orçamento"}
+        title={headerTitle}
         icon={<IconFileText />}
       >
         <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 md:grid-cols-2 lg:grid-cols-3">
@@ -109,6 +117,7 @@ export function OrcamentoForm({
               Cliente cadastrado
             </label>
             <select
+              id="orcamento-primeiro-campo"
               className="field-input"
               value={form.cliente_id}
               onChange={(e) => onSelectCliente(e.target.value)}
@@ -212,7 +221,7 @@ export function OrcamentoForm({
         </div>
       </Panel>
 
-      <div className="mt-[18px]">
+      <div className={embeddedInModal ? "mt-4" : "mt-[18px]"}>
         <OrcamentoItensSection
           itens={form.itens}
           servicos={servicos}
@@ -227,7 +236,7 @@ export function OrcamentoForm({
         />
       </div>
 
-      <div className="mt-[18px]">
+      <div className={embeddedInModal ? "mt-4" : "mt-[18px]"}>
         <Panel title="Condições comerciais" icon={<IconFileText />}>
         <p className="mb-4 text-[11px] text-[#64748b]">
           Validade da proposta:{" "}

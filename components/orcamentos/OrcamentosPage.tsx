@@ -2,8 +2,7 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
-import { OrcamentoForm } from "./OrcamentoForm";
-import { OrcamentoFormActions } from "./OrcamentoFormActions";
+import { OrcamentoFormModal } from "./OrcamentoFormModal";
 import { OrcamentoSearchPanel } from "./OrcamentoSearchPanel";
 import { OrcamentoTopActions } from "./OrcamentoTopActions";
 import { OrcamentoViewModal } from "./OrcamentoViewModal";
@@ -28,6 +27,8 @@ export function OrcamentosPage() {
     podeExcluir,
     form,
     totals,
+    formDirty,
+    discardConfirmOpen,
     setField,
     addItem,
     removeItem,
@@ -35,7 +36,9 @@ export function OrcamentosPage() {
     applyServicoSugerido,
     saving,
     resetForm,
-    closeForm,
+    requestCloseForm,
+    continueEditing,
+    discardAndClose,
     handleNovo,
     handleEditar,
     handleVisualizar,
@@ -78,37 +81,33 @@ export function OrcamentosPage() {
         onExcluir={handleExcluir}
       />
 
-      {showForm && (
-        <>
-          <div className="mt-[18px]">
-            <OrcamentoForm
-              form={form}
-              isEditing={!!editingId}
-              clientes={clientes}
-              servicos={servicos}
-              servicosLoading={servicosLoading}
-              servicosError={servicosError}
-              subtotal={totals.subtotal}
-              valorTotal={totals.valorTotal}
-              validadeProposta={totals.validadeProposta}
-              condicoesPagamento={totals.condicoesPagamento}
-              onChange={setField}
-              onSelectCliente={handleSelectCliente}
-              onAddItem={addItem}
-              onRemoveItem={removeItem}
-              onUpdateItem={updateItem}
-              onApplyValorSugerido={applyServicoSugerido}
-            />
-          </div>
-          <OrcamentoFormActions
-            saving={saving}
-            isEditing={!!editingId}
-            onClear={resetForm}
-            onCancel={closeForm}
-            onSave={handleSave}
-          />
-        </>
-      )}
+      <OrcamentoFormModal
+        open={showForm}
+        isEditing={!!editingId}
+        form={form}
+        clientes={clientes}
+        servicos={servicos}
+        servicosLoading={servicosLoading}
+        servicosError={servicosError}
+        subtotal={totals.subtotal}
+        valorTotal={totals.valorTotal}
+        validadeProposta={totals.validadeProposta}
+        condicoesPagamento={totals.condicoesPagamento}
+        saving={saving}
+        discardConfirmOpen={discardConfirmOpen}
+        closeOnOverlayClick={!formDirty}
+        onChange={setField}
+        onSelectCliente={handleSelectCliente}
+        onAddItem={addItem}
+        onRemoveItem={removeItem}
+        onUpdateItem={updateItem}
+        onApplyValorSugerido={applyServicoSugerido}
+        onClear={resetForm}
+        onRequestClose={requestCloseForm}
+        onSave={handleSave}
+        onContinueEditing={continueEditing}
+        onDiscardAndClose={discardAndClose}
+      />
 
       <OrcamentoViewModal
         orcamento={viewOrcamento}
@@ -120,7 +119,7 @@ export function OrcamentosPage() {
 
       {(saving || viewLoading || actionLoading) && (
         <div
-          className="fixed inset-0 z-50 bg-black/10 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[70] bg-black/10 backdrop-blur-[1px]"
           aria-hidden
         />
       )}
