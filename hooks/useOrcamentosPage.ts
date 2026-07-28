@@ -55,6 +55,17 @@ import {
   obterUrlOrcamentoComprovante,
   uploadOrcamentoComprovantePagamento,
 } from "@/services/orcamento-comprovante.service";
+import {
+  obterUrlOrcamentoOnboarding,
+  uploadOrcamentoListaFuncionarios,
+  uploadOrcamentoLogo,
+} from "@/services/orcamento-onboarding-storage.service";
+import {
+  salvarOrcamentoListaFuncionarios,
+  salvarOrcamentoLogo,
+  salvarOrcamentoProcuracao,
+  salvarOrcamentoVisitaTecnica,
+} from "@/services/orcamento-onboarding.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 function focusOrcamentoPrimeiroCampo(): void {
@@ -96,6 +107,10 @@ export function useOrcamentosPage() {
     "aprovacao"
   );
   const [aprovarSaving, setAprovarSaving] = useState(false);
+  const [funcionariosPreviewUrl, setFuncionariosPreviewUrl] = useState<
+    string | null
+  >(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes, refresh: refreshClientes } = useClientesList();
@@ -243,6 +258,26 @@ export function useOrcamentosPage() {
         setAprovarMode(mode);
         setAprovarOrcamento(orcamento);
         setAprovarAprovacao(aprovacao);
+        setFuncionariosPreviewUrl(null);
+        setLogoPreviewUrl(null);
+        if (aprovacao?.funcionarios_lista_path) {
+          try {
+            setFuncionariosPreviewUrl(
+              await obterUrlOrcamentoOnboarding(aprovacao.funcionarios_lista_path)
+            );
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        if (aprovacao?.logo_path) {
+          try {
+            setLogoPreviewUrl(
+              await obterUrlOrcamentoOnboarding(aprovacao.logo_path)
+            );
+          } catch (err) {
+            console.error(err);
+          }
+        }
         setAprovarOpen(true);
       } catch (err) {
         console.error(err);
@@ -465,6 +500,8 @@ export function useOrcamentosPage() {
     setAprovarOrcamento(null);
     setAprovarAprovacao(null);
     setAprovarMode("aprovacao");
+    setFuncionariosPreviewUrl(null);
+    setLogoPreviewUrl(null);
   }, [aprovarSaving]);
 
   const handleSalvarAprovacao = useCallback(
@@ -760,6 +797,175 @@ export function useOrcamentosPage() {
     [aprovarAprovacao, aprovarOrcamento, auditContext, refresh, refreshClientes]
   );
 
+  const handleSalvarProcuracao = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: {
+        procuracao_status: "ativa" | "inativa";
+        observacao_procuracao: string | null;
+      }
+    ) => {
+      if (!aprovarOrcamento) return;
+      setAprovarSaving(true);
+      try {
+        const saved = await salvarOrcamentoProcuracao(
+          aprovacaoId,
+          aprovarOrcamento.id,
+          payload
+        );
+        setAprovarAprovacao(saved);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `Procuração marcada como ${payload.procuracao_status} no orçamento ${aprovarOrcamento.numero}.`,
+        });
+        toast.success(
+          payload.procuracao_status === "ativa"
+            ? "Procuração ativa. Lista de funcionários liberada."
+            : "Procuração salva."
+        );
+        refreshClientes();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar procuração."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarOrcamento, auditContext, refreshClientes]
+  );
+
+  const handleSalvarFuncionarios = useCallback(
+    async (aprovacaoId: string, file: File | null) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        let meta = {
+          path: aprovarAprovacao.funcionarios_lista_path ?? "",
+          nome: aprovarAprovacao.funcionarios_lista_nome ?? "",
+          tipo: aprovarAprovacao.funcionarios_lista_tipo ?? "",
+          tamanho: aprovarAprovacao.funcionarios_lista_tamanho ?? 0,
+        };
+        if (file) {
+          meta = await uploadOrcamentoListaFuncionarios(aprovacaoId, file);
+        }
+        if (!meta.path) {
+          throw new Error("Anexe a lista de funcionários.");
+        }
+        const saved = await salvarOrcamentoListaFuncionarios(aprovacaoId, meta);
+        setAprovarAprovacao(saved);
+        setFuncionariosPreviewUrl(
+          await obterUrlOrcamentoOnboarding(meta.path)
+        );
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `Lista de funcionários anexada: ${meta.nome}.`,
+        });
+        toast.success("Lista salva. Logo da empresa liberada.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar lista."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext]
+  );
+
+  const handleSalvarLogo = useCallback(
+    async (aprovacaoId: string, file: File | null) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        let meta = {
+          path: aprovarAprovacao.logo_path ?? "",
+          nome: aprovarAprovacao.logo_nome ?? "",
+          tipo: aprovarAprovacao.logo_tipo ?? "",
+          tamanho: aprovarAprovacao.logo_tamanho ?? 0,
+        };
+        if (file) {
+          meta = await uploadOrcamentoLogo(aprovacaoId, file);
+        }
+        if (!meta.path) {
+          throw new Error("Anexe a logomarca.");
+        }
+        const saved = await salvarOrcamentoLogo(aprovacaoId, meta);
+        setAprovarAprovacao(saved);
+        setLogoPreviewUrl(await obterUrlOrcamentoOnboarding(meta.path));
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `Logomarca anexada: ${meta.nome}.`,
+        });
+        toast.success("Logo salva. Visita técnica liberada.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar logo."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext]
+  );
+
+  const handleSalvarVisita = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: {
+        visita_tecnica_necessaria: boolean;
+        visita_tecnica_data: string | null;
+        visita_tecnica_endereco: string | null;
+        visita_tecnica_observacoes: string | null;
+      }
+    ) => {
+      if (!aprovarOrcamento) return;
+      setAprovarSaving(true);
+      try {
+        const saved = await salvarOrcamentoVisitaTecnica(aprovacaoId, payload);
+        setAprovarAprovacao(saved);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: payload.visita_tecnica_necessaria
+            ? `Visita técnica agendada para ${payload.visita_tecnica_data}.`
+            : "Visita técnica registrada como não necessária.",
+        });
+        toast.success("Visita técnica salva.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar visita técnica."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarOrcamento, auditContext]
+  );
+
   const handleVerComprovante = useCallback(async (path: string) => {
     try {
       const url = await obterUrlOrcamentoComprovante(path);
@@ -818,6 +1024,8 @@ export function useOrcamentosPage() {
     aprovarAprovacao,
     aprovarSaving,
     usuarioNome: auditContext.usuarioNome,
+    funcionariosPreviewUrl,
+    logoPreviewUrl,
     setField,
     addItem,
     removeItem,
@@ -842,6 +1050,10 @@ export function useOrcamentosPage() {
     handleSalvarAprovacao,
     handleSalvarContrato,
     handleSalvarFinanceiro,
+    handleSalvarProcuracao,
+    handleSalvarFuncionarios,
+    handleSalvarLogo,
+    handleSalvarVisita,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,

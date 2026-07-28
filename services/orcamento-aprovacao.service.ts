@@ -187,6 +187,7 @@ export async function atualizarAcompanhamentoDocumentalContrato(
       contrato_assinado: payload.contrato_assinado,
       contrato_assinado_em: payload.contrato_assinado_em,
       observacao_contrato: payload.observacao_contrato,
+      contrato_salvo_em: new Date().toISOString(),
     })
     .eq("id", aprovacaoId)
     .select(APROVACAO_SELECT)
@@ -225,6 +226,7 @@ export async function atualizarAcompanhamentoFinanceiro(
     comprovante_tipo: payload.comprovante_tipo,
     comprovante_tamanho: payload.comprovante_tamanho,
     observacao_pagamento: payload.observacao_pagamento,
+    financeiro_salvo_em: new Date().toISOString(),
   };
 
   if (confirmingPayment) {

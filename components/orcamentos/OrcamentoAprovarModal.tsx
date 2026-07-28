@@ -33,9 +33,21 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { OrcamentoEtapasNav } from "./OrcamentoEtapasNav";
+import {
+  OrcamentoAbaFuncionarios,
+  OrcamentoAbaLogo,
+  OrcamentoAbaProcuracao,
+  OrcamentoAbaVisitaTecnica,
+} from "./OrcamentoEtapasExtras";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
+import {
+  isOrcamentoEtapaLiberada,
+  type OrcamentoEtapaId,
+} from "@/lib/orcamento-etapas";
+import { buildMensagemVisitaTecnica } from "@/lib/orcamento-visita-mensagem";
 
-type TabId = "resumo" | "aprovado" | "contrato" | "financeiro";
+type TabId = OrcamentoEtapaId;
 
 interface OrcamentoAprovarModalProps {
   open: boolean;
@@ -45,6 +57,8 @@ interface OrcamentoAprovarModalProps {
   servicos: ServicoSstRecord[];
   saving: boolean;
   usuarioNome: string;
+  funcionariosPreviewUrl?: string | null;
+  logoPreviewUrl?: string | null;
   onClose: () => void;
   onSalvarAprovacao: (form: OrcamentoAprovacaoFormValues) => Promise<void>;
   onSalvarContrato: (
@@ -55,6 +69,24 @@ interface OrcamentoAprovarModalProps {
     aprovacaoId: string,
     payload: OrcamentoFinanceiroUpdatePayload,
     file: File | null
+  ) => Promise<void>;
+  onSalvarProcuracao: (
+    aprovacaoId: string,
+    payload: {
+      procuracao_status: "ativa" | "inativa";
+      observacao_procuracao: string | null;
+    }
+  ) => Promise<void>;
+  onSalvarFuncionarios: (aprovacaoId: string, file: File | null) => Promise<void>;
+  onSalvarLogo: (aprovacaoId: string, file: File | null) => Promise<void>;
+  onSalvarVisita: (
+    aprovacaoId: string,
+    payload: {
+      visita_tecnica_necessaria: boolean;
+      visita_tecnica_data: string | null;
+      visita_tecnica_endereco: string | null;
+      visita_tecnica_observacoes: string | null;
+    }
   ) => Promise<void>;
   onVerComprovante: (path: string) => void;
 }
@@ -72,10 +104,16 @@ export function OrcamentoAprovarModal({
   servicos,
   saving,
   usuarioNome,
+  funcionariosPreviewUrl = null,
+  logoPreviewUrl = null,
   onClose,
   onSalvarAprovacao,
   onSalvarContrato,
   onSalvarFinanceiro,
+  onSalvarProcuracao,
+  onSalvarFuncionarios,
+  onSalvarLogo,
+  onSalvarVisita,
   onVerComprovante,
 }: OrcamentoAprovarModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -93,6 +131,17 @@ export function OrcamentoAprovarModal({
   const [boletoPagoEm, setBoletoPagoEm] = useState("");
   const [observacaoPagamento, setObservacaoPagamento] = useState("");
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
+
+  const [procuracaoStatus, setProcuracaoStatus] = useState<"ativa" | "inativa">(
+    "inativa"
+  );
+  const [observacaoProcuracao, setObservacaoProcuracao] = useState("");
+  const [funcionariosFile, setFuncionariosFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [visitaNecessaria, setVisitaNecessaria] = useState<boolean | null>(null);
+  const [visitaData, setVisitaData] = useState("");
+  const [visitaEndereco, setVisitaEndereco] = useState("");
+  const [visitaObservacoes, setVisitaObservacoes] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -117,6 +166,18 @@ export function OrcamentoAprovarModal({
     setBoletoPagoEm(aprovacao?.boleto_pago_em ?? "");
     setObservacaoPagamento(aprovacao?.observacao_pagamento ?? "");
     setComprovanteFile(null);
+    setProcuracaoStatus(aprovacao?.procuracao_status ?? "inativa");
+    setObservacaoProcuracao(aprovacao?.observacao_procuracao ?? "");
+    setFuncionariosFile(null);
+    setLogoFile(null);
+    setVisitaNecessaria(
+      aprovacao?.visita_tecnica_necessaria == null
+        ? null
+        : Boolean(aprovacao.visita_tecnica_necessaria)
+    );
+    setVisitaData(aprovacao?.visita_tecnica_data ?? "");
+    setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
+    setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
   }, [open, orcamento, aprovacao, mode]);
 
   useEffect(() => {
@@ -145,14 +206,18 @@ export function OrcamentoAprovarModal({
   const andamentoFinanceiro = resolveFinanceiroAndamento(aprovacao);
   const consultaMode = mode === "consulta";
   const aprovadoLocked = Boolean(aprovacao) || consultaMode;
-  /** Condições comerciais: bloqueadas em consulta / após aprovação. */
   const camposSomenteLeitura = consultaMode || saving;
-  /**
-   * Acompanhamento (Contrato/Financeiro) permanece editável também na consulta,
-   * para registrar envio, assinatura e pagamento após a aprovação.
-   */
   const acompanhamentoBloqueado = saving;
-  const financeiroLiberado = Boolean(aprovacao?.contrato_assinado);
+  const orcamentoAprovado =
+    orcamento?.status === "aprovado" || Boolean(aprovacao);
+  const mensagemVisita = useMemo(
+    () =>
+      buildMensagemVisitaTecnica({
+        data: visitaData,
+        endereco: visitaEndereco,
+      }),
+    [visitaData, visitaEndereco]
+  );
 
   const updateFormField = useCallback(
     <K extends keyof OrcamentoAprovacaoFormValues>(
@@ -265,6 +330,79 @@ export function OrcamentoAprovarModal({
 
     await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
+    if (boletoPago) {
+      setTab("procuracao");
+    }
+  }
+
+  async function handleSalvarProcuracaoClick() {
+    if (!aprovacao) return;
+    await onSalvarProcuracao(aprovacao.id, {
+      procuracao_status: procuracaoStatus,
+      observacao_procuracao: emptyToNull(observacaoProcuracao),
+    });
+    if (procuracaoStatus === "ativa") {
+      setTab("funcionarios");
+    }
+  }
+
+  async function handleSalvarFuncionariosClick() {
+    if (!aprovacao) return;
+    if (!funcionariosFile && !aprovacao.funcionarios_lista_path) {
+      toast.error("Anexe a lista de funcionários.");
+      return;
+    }
+    await onSalvarFuncionarios(aprovacao.id, funcionariosFile);
+    setFuncionariosFile(null);
+    setTab("logo");
+  }
+
+  async function handleSalvarLogoClick() {
+    if (!aprovacao) return;
+    if (!logoFile && !aprovacao.logo_path) {
+      toast.error("Anexe a logomarca da empresa.");
+      return;
+    }
+    await onSalvarLogo(aprovacao.id, logoFile);
+    setLogoFile(null);
+    setTab("visita");
+  }
+
+  async function handleSalvarVisitaClick() {
+    if (!aprovacao) return;
+    if (visitaNecessaria == null) {
+      toast.error("Informe se necessita visita técnica.");
+      return;
+    }
+    if (visitaNecessaria) {
+      if (!visitaData.trim()) {
+        toast.error("Informe a data da visita.");
+        return;
+      }
+      if (!visitaEndereco.trim()) {
+        toast.error("Informe o endereço da visita.");
+        return;
+      }
+    }
+    await onSalvarVisita(aprovacao.id, {
+      visita_tecnica_necessaria: visitaNecessaria,
+      visita_tecnica_data: visitaNecessaria ? visitaData || null : null,
+      visita_tecnica_endereco: visitaNecessaria
+        ? emptyToNull(visitaEndereco)
+        : null,
+      visita_tecnica_observacoes: visitaNecessaria
+        ? emptyToNull(visitaObservacoes)
+        : null,
+    });
+  }
+
+  async function handleCopiarMensagemVisita() {
+    try {
+      await navigator.clipboard.writeText(mensagemVisita);
+      toast.success("Mensagem copiada.");
+    } catch {
+      toast.error("Não foi possível copiar a mensagem.");
+    }
   }
 
   if (!open || !orcamento || !mounted || !form) return null;
@@ -284,33 +422,6 @@ export function OrcamentoAprovarModal({
   const aprovadoConformeOriginal = aprovacao
     ? aprovacaoSegueOrcamentoOriginal(orcamento, aprovacao)
     : false;
-
-  const tabs: Array<{ id: TabId; label: string; disabled?: boolean }> = [
-    { id: "resumo", label: "Resumo" },
-  ];
-  if (consultaMode) {
-    if (aprovacao) {
-      tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
-      tabs.push({ id: "contrato", label: "Contrato" });
-      tabs.push({
-        id: "financeiro",
-        label: "Financeiro",
-        disabled: !financeiroLiberado,
-      });
-    }
-  } else {
-    tabs.push({ id: "aprovado", label: "Orçamento aprovado" });
-    tabs.push({
-      id: "contrato",
-      label: "Contrato",
-      disabled: !aprovacao,
-    });
-    tabs.push({
-      id: "financeiro",
-      label: "Financeiro",
-      disabled: !aprovacao || !financeiroLiberado,
-    });
-  }
 
   const tituloModal = consultaMode
     ? `Orçamento · ${orcamento.numero}`
@@ -366,27 +477,13 @@ export function OrcamentoAprovarModal({
             </button>
           </div>
 
-          <div className="mt-4 flex gap-1 overflow-x-auto">
-            {tabs.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.disabled || saving}
-                onClick={() => {
-                  if (!item.disabled) setTab(item.id);
-                }}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors ${
-                  tab === item.id
-                    ? "bg-white text-[#082b63]"
-                    : item.disabled
-                      ? "cursor-not-allowed text-white/35"
-                      : "bg-white/10 text-white/85 hover:bg-white/20"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <OrcamentoEtapasNav
+            tab={tab}
+            aprovacao={aprovacao}
+            orcamentoAprovado={orcamentoAprovado}
+            disabled={saving}
+            onChange={setTab}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6">
@@ -754,7 +851,13 @@ export function OrcamentoAprovarModal({
             </div>
           ) : null}
 
-          {tab === "financeiro" && aprovacao && financeiroLiberado ? (
+          {tab === "financeiro" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "financeiro",
+            aprovacao,
+            orcamentoAprovado
+          ) ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
                 Andamento financeiro:{" "}
@@ -855,6 +958,70 @@ export function OrcamentoAprovarModal({
               </section>
             </div>
           ) : null}
+
+          {tab === "procuracao" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada("procuracao", aprovacao, orcamentoAprovado) ? (
+            <OrcamentoAbaProcuracao
+              status={procuracaoStatus}
+              observacoes={observacaoProcuracao}
+              saving={saving}
+              onChangeStatus={setProcuracaoStatus}
+              onChangeObservacoes={setObservacaoProcuracao}
+              onSalvar={() => void handleSalvarProcuracaoClick()}
+            />
+          ) : null}
+
+          {tab === "funcionarios" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "funcionarios",
+            aprovacao,
+            orcamentoAprovado
+          ) ? (
+            <OrcamentoAbaFuncionarios
+              file={funcionariosFile}
+              savedName={aprovacao.funcionarios_lista_nome ?? null}
+              savedUrl={funcionariosPreviewUrl}
+              savedTipo={aprovacao.funcionarios_lista_tipo ?? null}
+              saving={saving}
+              onFileChange={setFuncionariosFile}
+              onSalvar={() => void handleSalvarFuncionariosClick()}
+            />
+          ) : null}
+
+          {tab === "logo" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada("logo", aprovacao, orcamentoAprovado) ? (
+            <OrcamentoAbaLogo
+              file={logoFile}
+              savedName={aprovacao.logo_nome ?? null}
+              savedUrl={logoPreviewUrl}
+              savedTipo={aprovacao.logo_tipo ?? null}
+              saving={saving}
+              onFileChange={setLogoFile}
+              onSalvar={() => void handleSalvarLogoClick()}
+            />
+          ) : null}
+
+          {tab === "visita" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada("visita", aprovacao, orcamentoAprovado) ? (
+            <OrcamentoAbaVisitaTecnica
+              necessaria={visitaNecessaria}
+              data={visitaData}
+              endereco={visitaEndereco}
+              observacoes={visitaObservacoes}
+              mensagem={mensagemVisita}
+              saving={saving}
+              onChangeNecessaria={setVisitaNecessaria}
+              onChangeData={setVisitaData}
+              onChangeEndereco={setVisitaEndereco}
+              onChangeObservacoes={setVisitaObservacoes}
+              onCopiarMensagem={() => void handleCopiarMensagemVisita()}
+              onSalvar={() => void handleSalvarVisitaClick()}
+            />
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 border-t border-[#e4ebf4] bg-white px-4 py-3 sm:flex-row sm:justify-end sm:px-6 sm:py-4">
@@ -904,7 +1071,13 @@ export function OrcamentoAprovarModal({
               {saving ? "Salvando..." : "Salvar acompanhamento"}
             </button>
           ) : null}
-          {tab === "financeiro" && aprovacao && financeiroLiberado ? (
+          {tab === "financeiro" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "financeiro",
+            aprovacao,
+            orcamentoAprovado
+          ) ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"

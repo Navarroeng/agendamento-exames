@@ -36,6 +36,8 @@ export function OrcamentosPage() {
     aprovarAprovacao,
     aprovarSaving,
     usuarioNome,
+    funcionariosPreviewUrl,
+    logoPreviewUrl,
     setField,
     addItem,
     removeItem,
@@ -59,6 +61,10 @@ export function OrcamentosPage() {
     handleSalvarAprovacao,
     handleSalvarContrato,
     handleSalvarFinanceiro,
+    handleSalvarProcuracao,
+    handleSalvarFuncionarios,
+    handleSalvarLogo,
+    handleSalvarVisita,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,
@@ -139,10 +145,16 @@ export function OrcamentosPage() {
         servicos={servicos}
         saving={aprovarSaving}
         usuarioNome={usuarioNome}
+        funcionariosPreviewUrl={funcionariosPreviewUrl}
+        logoPreviewUrl={logoPreviewUrl}
         onClose={closeAprovar}
         onSalvarAprovacao={handleSalvarAprovacao}
         onSalvarContrato={handleSalvarContrato}
         onSalvarFinanceiro={handleSalvarFinanceiro}
+        onSalvarProcuracao={handleSalvarProcuracao}
+        onSalvarFuncionarios={handleSalvarFuncionarios}
+        onSalvarLogo={handleSalvarLogo}
+        onSalvarVisita={handleSalvarVisita}
         onVerComprovante={(path) => {
           void handleVerComprovante(path);
         }}
