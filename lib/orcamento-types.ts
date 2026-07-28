@@ -149,7 +149,6 @@ export interface OrcamentoFormValues {
   origem_cliente: "" | OrcamentoOrigemCliente;
   observacoes: string;
   forma_pagamento: string;
-  status: OrcamentoStatus;
   itens: OrcamentoItemFormItem[];
 }
 
@@ -181,7 +180,6 @@ export interface OrcamentoInsertPayload {
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;
-  status: OrcamentoStatus;
   itens: OrcamentoItemInsert[];
 }
 

@@ -177,7 +177,6 @@ export function useOrcamentoForm() {
         : "",
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
-      status: orcamento.status,
       itens:
         itensDb.length > 0
           ? itensDb.map((item) => {
@@ -251,7 +250,6 @@ export function useOrcamentoForm() {
       validade_proposta: validadeIso,
       subtotal: totals.subtotal,
       valor_total: totals.valorTotal,
-      status: form.status,
       itens,
     };
   },

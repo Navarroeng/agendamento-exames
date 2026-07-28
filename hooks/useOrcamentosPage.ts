@@ -34,6 +34,7 @@ import {
   atualizarOrcamento,
   buscarOrcamentoComItens,
   criarOrcamento,
+  marcarOrcamentoComoEnviado,
 } from "@/services/orcamento.service";
 import {
   atualizarAcompanhamentoContrato,
@@ -325,15 +326,28 @@ export function useOrcamentosPage() {
           return;
         }
         await gerarPdfOrcamento(orcamento);
+
+        let statusAtualizado = false;
+        if (orcamento.status === "em_elaboracao") {
+          statusAtualizado = await marcarOrcamentoComoEnviado(orcamento.id);
+        }
+
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
           acao: AUDITORIA_ACOES.envio,
           registroId: orcamento.id,
           registroNome: orcamento.numero,
-          descricao: `PDF da proposta ${orcamento.numero} gerado.`,
+          descricao: statusAtualizado
+            ? `PDF da proposta ${orcamento.numero} gerado. Status alterado para Enviado.`
+            : `PDF da proposta ${orcamento.numero} gerado.`,
         });
-        toast.success("PDF gerado com sucesso.");
+        toast.success(
+          statusAtualizado
+            ? "PDF gerado. Status atualizado para Enviado."
+            : "PDF gerado com sucesso."
+        );
+        if (statusAtualizado) refresh();
       } catch (err) {
         console.error(err);
         toast.error("Erro ao gerar PDF.");
@@ -341,7 +355,7 @@ export function useOrcamentosPage() {
         setActionLoading(false);
       }
     },
-    [auditContext]
+    [auditContext, refresh]
   );
 
   const handleOpenCancelar = useCallback(async (id: string) => {

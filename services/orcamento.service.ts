@@ -116,7 +116,7 @@ export async function criarOrcamento(
       validade_proposta: normalized.validade_proposta,
       subtotal: normalized.subtotal,
       valor_total: normalized.valor_total,
-      status: normalized.status,
+      status: "em_elaboracao",
     })
     .select("*")
     .single();
@@ -158,7 +158,6 @@ export async function atualizarOrcamento(
       validade_proposta: normalized.validade_proposta,
       subtotal: normalized.subtotal,
       valor_total: normalized.valor_total,
-      status: normalized.status,
     })
     .eq("id", id);
 
@@ -207,7 +206,6 @@ export async function duplicarOrcamento(
     validade_proposta: calcValidadePropostaIso(hoje),
     subtotal: Number(original.subtotal),
     valor_total: Number(original.subtotal),
-    status: "em_elaboracao",
     itens: (original.orcamento_itens ?? []).map((item, index) => ({
       servico_id: item.servico_id,
       servico_nome: item.servico_nome,
@@ -217,6 +215,23 @@ export async function duplicarOrcamento(
       ordem: index,
     })),
   });
+}
+
+/** Marca como Enviado quando ainda está em elaboração (ex.: gerar PDF). */
+export async function marcarOrcamentoComoEnviado(
+  id: string
+): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamentos")
+    .update({ status: "enviado" })
+    .eq("id", id)
+    .eq("status", "em_elaboracao")
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export async function excluirOrcamento(id: string): Promise<void> {

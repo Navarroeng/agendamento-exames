@@ -8,7 +8,6 @@ import { VALIDADE_PROPOSTA_DIAS } from "@/lib/orcamento-validade";
 import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import type { OrcamentoFormField } from "@/hooks/useOrcamentoForm";
 import {
-  ORCAMENTO_STATUS_OPTIONS,
   ORCAMENTO_ORIGEM_OPTIONS,
   type OrcamentoFormValues,
   type ServicoSstRecord,
@@ -96,22 +95,6 @@ export function OrcamentoForm({
               value={form.data_proposta}
               onChange={(e) => onChange("data_proposta", e.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-navy">
-              Status
-            </label>
-            <select
-              className="field-input"
-              value={form.status}
-              onChange={(e) => onChange("status", e.target.value)}
-            >
-              {ORCAMENTO_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold text-navy">
