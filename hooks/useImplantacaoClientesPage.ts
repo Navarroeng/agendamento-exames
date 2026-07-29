@@ -1,0 +1,571 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useServicosSstList } from "@/hooks/useServicosSstList";
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import {
+  EMPTY_IMPLANTACAO_FILTERS,
+  computeImplantacaoSummary,
+  filterImplantacaoProcessos,
+  implantacaoEtapaToModalTab,
+  resolveImplantacaoEtapaAtual,
+  type ImplantacaoFilters,
+  type ImplantacaoProcesso,
+} from "@/lib/implantacao-clientes";
+import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
+import type {
+  OrcamentoAprovacaoFormValues,
+  OrcamentoAprovacaoRecord,
+  OrcamentoContratoDocumentalUpdatePayload,
+  OrcamentoFinanceiroUpdatePayload,
+} from "@/lib/orcamento-aprovacao";
+import type { OrcamentoComItens } from "@/lib/orcamento-types";
+import type { OrcamentoEtapaId } from "@/lib/orcamento-etapas";
+import { registrarAuditoria } from "@/services/auditoria.service";
+import { listarProcessosImplantacao } from "@/services/implantacao-clientes.service";
+import {
+  atualizarAcompanhamentoDocumentalContrato,
+  atualizarAcompanhamentoFinanceiro,
+  buscarAprovacaoPorOrcamentoId,
+} from "@/services/orcamento-aprovacao.service";
+import {
+  obterUrlOrcamentoOnboarding,
+  uploadOrcamentoListaFuncionarios,
+  uploadOrcamentoLogo,
+} from "@/services/orcamento-onboarding-storage.service";
+import {
+  salvarOrcamentoListaFuncionarios,
+  salvarOrcamentoLogo,
+  salvarOrcamentoProcuracao,
+  salvarOrcamentoVisitaTecnica,
+} from "@/services/orcamento-onboarding.service";
+import { uploadOrcamentoComprovantePagamento, obterUrlOrcamentoComprovante } from "@/services/orcamento-comprovante.service";
+import { buscarOrcamentoComItens } from "@/services/orcamento.service";
+
+export function useImplantacaoClientesPage() {
+  const auditContext = useAuditoriaUsuario();
+  const { servicos } = useServicosSstList();
+
+  const [processos, setProcessos] = useState<ImplantacaoProcesso[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<ImplantacaoFilters>(
+    EMPTY_IMPLANTACAO_FILTERS
+  );
+
+  const [actionLoading, setActionLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOrcamento, setModalOrcamento] = useState<OrcamentoComItens | null>(
+    null
+  );
+  const [modalAprovacao, setModalAprovacao] =
+    useState<OrcamentoAprovacaoRecord | null>(null);
+  const [modalInitialTab, setModalInitialTab] =
+    useState<OrcamentoEtapaId | null>(null);
+  const [modalSaving, setModalSaving] = useState(false);
+  const [funcionariosPreviewUrl, setFuncionariosPreviewUrl] = useState<
+    string | null
+  >(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listarProcessosImplantacao();
+      setProcessos(data);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao carregar processos de implantação."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const filtrados = useMemo(
+    () => filterImplantacaoProcessos(processos, filters),
+    [processos, filters]
+  );
+
+  const summary = useMemo(
+    () => computeImplantacaoSummary(processos),
+    [processos]
+  );
+
+  const responsaveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of processos) {
+      if (p.orcamento.responsavel) set.add(p.orcamento.responsavel);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [processos]);
+
+  const handleFilterChange = useCallback(
+    <K extends keyof ImplantacaoFilters>(
+      field: K,
+      value: ImplantacaoFilters[K]
+    ) => {
+      setFilters((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  const clearFilters = useCallback(() => {
+    setFilters(EMPTY_IMPLANTACAO_FILTERS);
+  }, []);
+
+  const openProcesso = useCallback(
+    async (orcamentoId: string, tab: OrcamentoEtapaId | null) => {
+      setActionLoading(true);
+      try {
+        const orcamento = await buscarOrcamentoComItens(orcamentoId);
+        if (!orcamento) {
+          toast.error("Orçamento não encontrado.");
+          return;
+        }
+        const aprovacao = await buscarAprovacaoPorOrcamentoId(orcamentoId);
+        setModalOrcamento(orcamento);
+        setModalAprovacao(aprovacao);
+        setModalInitialTab(tab);
+        setFuncionariosPreviewUrl(null);
+        setLogoPreviewUrl(null);
+        if (aprovacao?.funcionarios_lista_path) {
+          try {
+            setFuncionariosPreviewUrl(
+              await obterUrlOrcamentoOnboarding(aprovacao.funcionarios_lista_path)
+            );
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        if (aprovacao?.logo_path) {
+          try {
+            setLogoPreviewUrl(
+              await obterUrlOrcamentoOnboarding(aprovacao.logo_path)
+            );
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        setModalOpen(true);
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao abrir processo de implantação.");
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleVisualizar = useCallback(
+    async (orcamentoId: string) => {
+      const processo = processos.find((p) => p.orcamento.id === orcamentoId);
+      const etapa = processo
+        ? resolveImplantacaoEtapaAtual(processo.aprovacao)
+        : "contrato";
+      await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
+    },
+    [openProcesso, processos]
+  );
+
+  const handleContinuar = useCallback(
+    async (orcamentoId: string) => {
+      const processo = processos.find((p) => p.orcamento.id === orcamentoId);
+      const etapa = processo
+        ? resolveImplantacaoEtapaAtual(processo.aprovacao)
+        : "contrato";
+      if (etapa === "concluido") {
+        toast.message("Processo já concluído. Abrindo consulta.");
+        await openProcesso(orcamentoId, "visita");
+        return;
+      }
+      await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
+    },
+    [openProcesso, processos]
+  );
+
+  const closeModal = useCallback(() => {
+    if (modalSaving) return;
+    setModalOpen(false);
+    setModalOrcamento(null);
+    setModalAprovacao(null);
+    setModalInitialTab(null);
+    setFuncionariosPreviewUrl(null);
+    setLogoPreviewUrl(null);
+    void refresh();
+  }, [modalSaving, refresh]);
+
+  const handleSalvarAprovacao = useCallback(
+    async (_form: OrcamentoAprovacaoFormValues) => {
+      toast.error(ORCAMENTO_JA_APROVADO_MSG);
+    },
+    []
+  );
+
+  const handleSalvarContrato = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: OrcamentoContratoDocumentalUpdatePayload
+    ) => {
+      if (!modalOrcamento || !modalAprovacao) return;
+      setModalSaving(true);
+      try {
+        const before = modalAprovacao;
+        const saved = await atualizarAcompanhamentoDocumentalContrato(
+          aprovacaoId,
+          payload
+        );
+
+        if (
+          !before.contrato_enviado &&
+          saved.contrato_enviado &&
+          saved.contrato_enviado_em
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.envio,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: `Contrato enviado ao cliente em ${formatDateIsoToBR(saved.contrato_enviado_em)}.`,
+          });
+        }
+
+        if (
+          !before.contrato_assinado &&
+          saved.contrato_assinado &&
+          saved.contrato_assinado_em
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}. Aba Financeiro liberada.`,
+          });
+        }
+
+        setModalAprovacao(saved);
+        toast.success("Acompanhamento do contrato salvo.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar acompanhamento."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
+  );
+
+  const handleSalvarFinanceiro = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: OrcamentoFinanceiroUpdatePayload,
+      file: File | null
+    ) => {
+      if (!modalOrcamento || !modalAprovacao) return;
+      setModalSaving(true);
+      try {
+        const before = modalAprovacao;
+        let nextPayload = { ...payload };
+
+        if (file) {
+          const uploaded = await uploadOrcamentoComprovantePagamento(
+            aprovacaoId,
+            file
+          );
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: uploaded.path,
+            comprovante_nome: uploaded.nome,
+            comprovante_tipo: uploaded.tipo,
+            comprovante_tamanho: uploaded.tamanho,
+          };
+        }
+
+        if (!nextPayload.boleto_pago) {
+          nextPayload = {
+            ...nextPayload,
+            comprovante_path: before.comprovante_path,
+            comprovante_nome: before.comprovante_nome,
+            comprovante_tipo: before.comprovante_tipo,
+            comprovante_tamanho: before.comprovante_tamanho,
+            boleto_pago_em: before.boleto_pago_em,
+          };
+        }
+
+        const saved = await atualizarAcompanhamentoFinanceiro(
+          aprovacaoId,
+          nextPayload
+        );
+
+        if (
+          saved.boleto_vencimento &&
+          saved.boleto_vencimento !== before.boleto_vencimento
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: `Vencimento do boleto inicial registrado para ${formatDateIsoToBR(saved.boleto_vencimento)}.`,
+          });
+        }
+
+        if (!before.boleto_pago && saved.boleto_pago) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: "Pagamento do boleto confirmado. Agendamento pode ser liberado conforme regra financeira.",
+          });
+        }
+
+        setModalAprovacao(saved);
+        toast.success("Acompanhamento financeiro salvo.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar financeiro."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
+  );
+
+  const handleSalvarProcuracao = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: {
+        procuracao_status: "ativa" | "inativa";
+        observacao_procuracao: string | null;
+      }
+    ) => {
+      if (!modalOrcamento) return;
+      setModalSaving(true);
+      try {
+        const saved = await salvarOrcamentoProcuracao(
+          aprovacaoId,
+          modalOrcamento.id,
+          payload
+        );
+        setModalAprovacao(saved);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao: `Procuração marcada como ${payload.procuracao_status} no orçamento ${modalOrcamento.numero}.`,
+        });
+        toast.success(
+          payload.procuracao_status === "ativa"
+            ? "Procuração ativa. Lista de funcionários liberada."
+            : "Procuração salva."
+        );
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar procuração."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalOrcamento, refresh]
+  );
+
+  const handleSalvarFuncionarios = useCallback(
+    async (aprovacaoId: string, file: File | null) => {
+      if (!modalOrcamento || !modalAprovacao) return;
+      setModalSaving(true);
+      try {
+        let meta = {
+          path: modalAprovacao.funcionarios_lista_path ?? "",
+          nome: modalAprovacao.funcionarios_lista_nome ?? "",
+          tipo: modalAprovacao.funcionarios_lista_tipo ?? "",
+          tamanho: modalAprovacao.funcionarios_lista_tamanho ?? 0,
+        };
+        if (file) {
+          meta = await uploadOrcamentoListaFuncionarios(aprovacaoId, file);
+        }
+        if (!meta.path) {
+          throw new Error("Anexe a lista de funcionários.");
+        }
+        const saved = await salvarOrcamentoListaFuncionarios(aprovacaoId, meta);
+        setModalAprovacao(saved);
+        setFuncionariosPreviewUrl(await obterUrlOrcamentoOnboarding(meta.path));
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao: `Lista de funcionários anexada: ${meta.nome}.`,
+        });
+        toast.success("Lista salva. Logo da empresa liberada.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar lista."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
+  );
+
+  const handleSalvarLogo = useCallback(
+    async (aprovacaoId: string, file: File | null) => {
+      if (!modalOrcamento || !modalAprovacao) return;
+      setModalSaving(true);
+      try {
+        let meta = {
+          path: modalAprovacao.logo_path ?? "",
+          nome: modalAprovacao.logo_nome ?? "",
+          tipo: modalAprovacao.logo_tipo ?? "",
+          tamanho: modalAprovacao.logo_tamanho ?? 0,
+        };
+        if (file) {
+          meta = await uploadOrcamentoLogo(aprovacaoId, file);
+        }
+        if (!meta.path) {
+          throw new Error("Anexe a logomarca.");
+        }
+        const saved = await salvarOrcamentoLogo(aprovacaoId, meta);
+        setModalAprovacao(saved);
+        setLogoPreviewUrl(await obterUrlOrcamentoOnboarding(meta.path));
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao: `Logomarca anexada: ${meta.nome}.`,
+        });
+        toast.success("Logo salva. Visita técnica liberada.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar logo."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
+  );
+
+  const handleSalvarVisita = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: {
+        visita_tecnica_necessaria: boolean;
+        visita_tecnica_data: string | null;
+        visita_tecnica_endereco: string | null;
+        visita_tecnica_observacoes: string | null;
+      }
+    ) => {
+      if (!modalOrcamento) return;
+      setModalSaving(true);
+      try {
+        const saved = await salvarOrcamentoVisitaTecnica(aprovacaoId, payload);
+        setModalAprovacao(saved);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao: payload.visita_tecnica_necessaria
+            ? `Visita técnica agendada para ${payload.visita_tecnica_data}.`
+            : "Visita técnica registrada como não necessária.",
+        });
+        toast.success("Visita técnica salva.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar visita técnica."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalOrcamento, refresh]
+  );
+
+  const handleVerComprovante = useCallback(async (path: string) => {
+    try {
+      const url = await obterUrlOrcamentoComprovante(path);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível abrir o comprovante.");
+    }
+  }, []);
+
+  return {
+    processos: filtrados,
+    loading,
+    error,
+    filters,
+    summary,
+    responsaveis,
+    actionLoading,
+    modalOpen,
+    modalOrcamento,
+    modalAprovacao,
+    modalInitialTab,
+    modalSaving,
+    servicos,
+    usuarioNome: auditContext.usuarioNome,
+    funcionariosPreviewUrl,
+    logoPreviewUrl,
+    handleFilterChange,
+    clearFilters,
+    handleVisualizar,
+    handleContinuar,
+    closeModal,
+    handleSalvarAprovacao,
+    handleSalvarContrato,
+    handleSalvarFinanceiro,
+    handleSalvarProcuracao,
+    handleSalvarFuncionarios,
+    handleSalvarLogo,
+    handleSalvarVisita,
+    handleVerComprovante,
+  };
+}

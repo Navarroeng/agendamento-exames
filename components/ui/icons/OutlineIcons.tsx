@@ -247,6 +247,17 @@ export function IconClock(props: IconProps) {
   );
 }
 
+export function IconChecklist(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="m9 12 1.5 1.5L14 10" />
+      <path d="m9 17 1.5 1.5L14 15" />
+    </IconBase>
+  );
+}
+
 export type NavIconKey =
   | "home"
   | "calendar"
@@ -263,7 +274,8 @@ export type NavIconKey =
   | "user"
   | "shield"
   | "settings"
-  | "document";
+  | "document"
+  | "checklist";
 
 const NAV_ICON_MAP: Record<NavIconKey, ComponentType<IconProps>> = {
   home: IconHome,
@@ -282,6 +294,7 @@ const NAV_ICON_MAP: Record<NavIconKey, ComponentType<IconProps>> = {
   shield: IconShield,
   settings: IconSettings,
   document: IconFileText,
+  checklist: IconChecklist,
 };
 
 export function NavIcon({

@@ -52,6 +52,8 @@ type TabId = OrcamentoEtapaId;
 interface OrcamentoAprovarModalProps {
   open: boolean;
   mode?: "consulta" | "aprovacao";
+  /** Aba inicial ao abrir (ex.: etapa atual da Implantação). */
+  initialTab?: OrcamentoEtapaId | null;
   orcamento: OrcamentoComItens | null;
   aprovacao: OrcamentoAprovacaoRecord | null;
   servicos: ServicoSstRecord[];
@@ -99,6 +101,7 @@ const SIM_NAO = [
 export function OrcamentoAprovarModal({
   open,
   mode = "aprovacao",
+  initialTab = null,
   orcamento,
   aprovacao,
   servicos,
@@ -149,7 +152,14 @@ export function OrcamentoAprovarModal({
 
   useEffect(() => {
     if (!open || !orcamento) return;
-    setTab("resumo");
+    const orcamentoAprovado =
+      orcamento.status === "aprovado" || Boolean(aprovacao);
+    const tabInicial: TabId =
+      initialTab &&
+      isOrcamentoEtapaLiberada(initialTab, aprovacao, orcamentoAprovado)
+        ? initialTab
+        : "resumo";
+    setTab(tabInicial);
     setShowDiffConfirm(false);
     setForm(
       aprovacao
@@ -178,7 +188,7 @@ export function OrcamentoAprovarModal({
     setVisitaData(aprovacao?.visita_tecnica_data ?? "");
     setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
     setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
-  }, [open, orcamento, aprovacao, mode]);
+  }, [open, orcamento, aprovacao, mode, initialTab]);
 
   useEffect(() => {
     if (!open) return;
