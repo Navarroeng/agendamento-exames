@@ -54,3 +54,18 @@ export async function obterUrlOrcamentoOnboarding(
   }
   return data.signedUrl;
 }
+
+/** Remove arquivo do Storage após substituição/remoção confirmada no banco. */
+export async function removerArquivoOrcamentoOnboarding(
+  path: string | null | undefined
+): Promise<void> {
+  const trimmed = (path ?? "").trim();
+  if (!trimmed) return;
+  const supabase = createClient();
+  const { error } = await supabase.storage
+    .from(ORCAMENTO_ONBOARDING_BUCKET)
+    .remove([trimmed]);
+  if (error) {
+    console.error("Falha ao remover arquivo do storage:", error);
+  }
+}

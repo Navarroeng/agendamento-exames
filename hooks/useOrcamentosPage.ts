@@ -63,10 +63,13 @@ import {
 } from "@/services/orcamento-comprovante.service";
 import {
   obterUrlOrcamentoOnboarding,
+  removerArquivoOrcamentoOnboarding,
   uploadOrcamentoListaFuncionarios,
   uploadOrcamentoLogo,
 } from "@/services/orcamento-onboarding-storage.service";
 import {
+  removerOrcamentoListaFuncionarios,
+  removerOrcamentoLogo,
   salvarOrcamentoListaFuncionarios,
   salvarOrcamentoLogo,
   salvarOrcamentoProcuracao,
@@ -876,9 +879,11 @@ export function useOrcamentosPage() {
       if (!aprovarOrcamento || !aprovarAprovacao) return;
       setAprovarSaving(true);
       try {
+        const oldPath = aprovarAprovacao.funcionarios_lista_path ?? "";
+        const oldNome = aprovarAprovacao.funcionarios_lista_nome ?? "";
         let meta = {
-          path: aprovarAprovacao.funcionarios_lista_path ?? "",
-          nome: aprovarAprovacao.funcionarios_lista_nome ?? "",
+          path: oldPath,
+          nome: oldNome,
           tipo: aprovarAprovacao.funcionarios_lista_tipo ?? "",
           tamanho: aprovarAprovacao.funcionarios_lista_tamanho ?? 0,
         };
@@ -893,19 +898,65 @@ export function useOrcamentosPage() {
         setFuncionariosPreviewUrl(
           await obterUrlOrcamentoOnboarding(meta.path)
         );
+        if (oldPath && oldPath !== meta.path) {
+          await removerArquivoOrcamentoOnboarding(oldPath);
+        }
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
           acao: AUDITORIA_ACOES.edicao,
           registroId: aprovarOrcamento.id,
           registroNome: aprovarOrcamento.numero,
-          descricao: `Lista de funcionários anexada: ${meta.nome}.`,
+          descricao:
+            oldPath && file
+              ? `${auditContext.usuarioNome} substituiu a lista de funcionários ${oldNome || "arquivo"} por ${meta.nome}.`
+              : `Lista de funcionários anexada: ${meta.nome}.`,
         });
         toast.success("Lista salva. Logo da empresa liberada.");
       } catch (err) {
         console.error(err);
         toast.error(
           err instanceof Error ? err.message : "Erro ao salvar lista."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext]
+  );
+
+  const handleSubstituirFuncionarios = useCallback(
+    async (aprovacaoId: string, file: File) => {
+      await handleSalvarFuncionarios(aprovacaoId, file);
+    },
+    [handleSalvarFuncionarios]
+  );
+
+  const handleRemoverFuncionarios = useCallback(
+    async (aprovacaoId: string) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        const oldPath = aprovarAprovacao.funcionarios_lista_path ?? "";
+        const oldNome = aprovarAprovacao.funcionarios_lista_nome ?? "arquivo";
+        const saved = await removerOrcamentoListaFuncionarios(aprovacaoId);
+        setAprovarAprovacao(saved);
+        setFuncionariosPreviewUrl(null);
+        await removerArquivoOrcamentoOnboarding(oldPath);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.exclusao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `${auditContext.usuarioNome} removeu a lista de funcionários ${oldNome}.`,
+        });
+        toast.success("Lista removida. Anexe uma nova lista para continuar.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao remover lista."
         );
         throw err;
       } finally {
@@ -937,9 +988,11 @@ export function useOrcamentosPage() {
           return;
         }
 
+        const oldPath = aprovarAprovacao.logo_path ?? "";
+        const oldNome = aprovarAprovacao.logo_nome ?? "";
         let meta = {
-          path: aprovarAprovacao.logo_path ?? "",
-          nome: aprovarAprovacao.logo_nome ?? "",
+          path: oldPath,
+          nome: oldNome,
           tipo: aprovarAprovacao.logo_tipo ?? "",
           tamanho: aprovarAprovacao.logo_tamanho ?? 0,
         };
@@ -955,19 +1008,67 @@ export function useOrcamentosPage() {
         });
         setAprovarAprovacao(saved);
         setLogoPreviewUrl(await obterUrlOrcamentoOnboarding(meta.path));
+        if (oldPath && oldPath !== meta.path) {
+          await removerArquivoOrcamentoOnboarding(oldPath);
+        }
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
           acao: AUDITORIA_ACOES.edicao,
           registroId: aprovarOrcamento.id,
           registroNome: aprovarOrcamento.numero,
-          descricao: `Logomarca anexada: ${meta.nome}.`,
+          descricao:
+            oldPath && file
+              ? `${auditContext.usuarioNome} substituiu a logomarca ${oldNome || "arquivo"} por ${meta.nome}.`
+              : `Logomarca anexada: ${meta.nome}.`,
         });
         toast.success("Logo salva. Visita técnica liberada.");
       } catch (err) {
         console.error(err);
         toast.error(
           err instanceof Error ? err.message : "Erro ao salvar logo."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext]
+  );
+
+  const handleSubstituirLogo = useCallback(
+    async (aprovacaoId: string, file: File) => {
+      await handleSalvarLogo(aprovacaoId, file, true);
+    },
+    [handleSalvarLogo]
+  );
+
+  const handleRemoverLogo = useCallback(
+    async (aprovacaoId: string) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        const oldPath = aprovarAprovacao.logo_path ?? "";
+        const oldNome = aprovarAprovacao.logo_nome ?? "arquivo";
+        const saved = await removerOrcamentoLogo(aprovacaoId);
+        setAprovarAprovacao(saved);
+        setLogoPreviewUrl(null);
+        await removerArquivoOrcamentoOnboarding(oldPath);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.exclusao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `${auditContext.usuarioNome} removeu a logomarca ${oldNome}.`,
+        });
+        toast.success(
+          "Logomarca removida. Anexe outra ou selecione Não e salve."
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao remover logo."
         );
         throw err;
       } finally {
@@ -1102,7 +1203,11 @@ export function useOrcamentosPage() {
     handleSalvarFinanceiro,
     handleSalvarProcuracao,
     handleSalvarFuncionarios,
+    handleSubstituirFuncionarios,
+    handleRemoverFuncionarios,
     handleSalvarLogo,
+    handleSubstituirLogo,
+    handleRemoverLogo,
     handleSalvarVisita,
     handleVerComprovante,
     handleFilterChange,

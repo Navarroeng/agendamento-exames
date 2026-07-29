@@ -83,11 +83,15 @@ interface OrcamentoAprovarModalProps {
     }
   ) => Promise<void>;
   onSalvarFuncionarios: (aprovacaoId: string, file: File | null) => Promise<void>;
+  onSubstituirFuncionarios: (aprovacaoId: string, file: File) => Promise<void>;
+  onRemoverFuncionarios: (aprovacaoId: string) => Promise<void>;
   onSalvarLogo: (
     aprovacaoId: string,
     file: File | null,
     possuiLogo: boolean
   ) => Promise<void>;
+  onSubstituirLogo: (aprovacaoId: string, file: File) => Promise<void>;
+  onRemoverLogo: (aprovacaoId: string) => Promise<void>;
   onSalvarVisita: (
     aprovacaoId: string,
     payload: {
@@ -122,7 +126,11 @@ export function OrcamentoAprovarModal({
   onSalvarFinanceiro,
   onSalvarProcuracao,
   onSalvarFuncionarios,
+  onSubstituirFuncionarios,
+  onRemoverFuncionarios,
   onSalvarLogo,
+  onSubstituirLogo,
+  onRemoverLogo,
   onSalvarVisita,
   onVerComprovante,
 }: OrcamentoAprovarModalProps) {
@@ -1034,6 +1042,14 @@ export function OrcamentoAprovarModal({
               saving={saving}
               onFileChange={setFuncionariosFile}
               onSalvar={() => void handleSalvarFuncionariosClick()}
+              onSubstituir={async (file) => {
+                await onSubstituirFuncionarios(aprovacao.id, file);
+                setFuncionariosFile(null);
+              }}
+              onRemover={async () => {
+                await onRemoverFuncionarios(aprovacao.id);
+                setFuncionariosFile(null);
+              }}
             />
           ) : null}
 
@@ -1053,6 +1069,16 @@ export function OrcamentoAprovarModal({
               }}
               onFileChange={setLogoFile}
               onSalvar={() => void handleSalvarLogoClick()}
+              onSubstituir={async (file) => {
+                await onSubstituirLogo(aprovacao.id, file);
+                setLogoFile(null);
+                setPossuiLogo(true);
+              }}
+              onRemover={async () => {
+                await onRemoverLogo(aprovacao.id);
+                setLogoFile(null);
+                setPossuiLogo(true);
+              }}
             />
           ) : null}
 

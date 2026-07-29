@@ -63,7 +63,11 @@ export function OrcamentosPage() {
     handleSalvarFinanceiro,
     handleSalvarProcuracao,
     handleSalvarFuncionarios,
+    handleSubstituirFuncionarios,
+    handleRemoverFuncionarios,
     handleSalvarLogo,
+    handleSubstituirLogo,
+    handleRemoverLogo,
     handleSalvarVisita,
     handleVerComprovante,
     handleFilterChange,
@@ -153,7 +157,11 @@ export function OrcamentosPage() {
         onSalvarFinanceiro={handleSalvarFinanceiro}
         onSalvarProcuracao={handleSalvarProcuracao}
         onSalvarFuncionarios={handleSalvarFuncionarios}
+        onSubstituirFuncionarios={handleSubstituirFuncionarios}
+        onRemoverFuncionarios={handleRemoverFuncionarios}
         onSalvarLogo={handleSalvarLogo}
+        onSubstituirLogo={handleSubstituirLogo}
+        onRemoverLogo={handleRemoverLogo}
         onSalvarVisita={handleSalvarVisita}
         onVerComprovante={(path) => {
           void handleVerComprovante(path);

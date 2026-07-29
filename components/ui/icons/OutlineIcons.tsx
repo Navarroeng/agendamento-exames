@@ -258,6 +258,26 @@ export function IconChecklist(props: IconProps) {
   );
 }
 
+export function IconTrash(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 7h16" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      <path d="M6.5 7 7.5 19a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7" />
+      <path d="M10 11v6M14 11v6" />
+    </IconBase>
+  );
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </IconBase>
+  );
+}
+
 export type NavIconKey =
   | "home"
   | "calendar"

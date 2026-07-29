@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RequiredMark } from "@/components/ui/Field";
+import { OrcamentoAnexoRemoverModal } from "@/components/orcamentos/OrcamentoAnexoRemoverModal";
+import {
+  IconRefresh,
+  IconTrash,
+} from "@/components/ui/icons/OutlineIcons";
 
 interface OrcamentoAbaProcuracaoProps {
   status: "ativa" | "inativa";
@@ -251,6 +256,45 @@ interface OrcamentoAbaFuncionariosProps {
   saving: boolean;
   onFileChange: (file: File | null) => void;
   onSalvar: () => void;
+  onSubstituir: (file: File) => Promise<void>;
+  onRemover: () => Promise<void>;
+}
+
+function AnexoAcoes({
+  saving,
+  onSubstituirClick,
+  onRemoverClick,
+  substituirLabel,
+  removerLabel,
+}: {
+  saving: boolean;
+  onSubstituirClick: () => void;
+  onRemoverClick: () => void;
+  substituirLabel: string;
+  removerLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[#dbe3ef] bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-[#f8fafc] disabled:opacity-60"
+        disabled={saving}
+        onClick={onSubstituirClick}
+      >
+        <IconRefresh size={14} />
+        {substituirLabel}
+      </button>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[#fecaca] bg-white px-3 py-1.5 text-xs font-semibold text-brand-red hover:bg-[#fef2f2] disabled:opacity-60"
+        disabled={saving}
+        onClick={onRemoverClick}
+      >
+        <IconTrash size={14} />
+        {removerLabel}
+      </button>
+    </div>
+  );
 }
 
 export function OrcamentoAbaFuncionarios({
@@ -261,46 +305,111 @@ export function OrcamentoAbaFuncionarios({
   saving,
   onFileChange,
   onSalvar,
+  onSubstituir,
+  onRemover,
 }: OrcamentoAbaFuncionariosProps) {
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [actionSaving, setActionSaving] = useState(false);
+  const hasSaved = Boolean(savedName);
   const hasPreview = Boolean(file || savedName);
+  const busy = saving || actionSaving;
+
+  async function handleReplaceSelected(selected: File | null) {
+    if (!selected) return;
+    setActionSaving(true);
+    try {
+      await onSubstituir(selected);
+      onFileChange(null);
+    } finally {
+      setActionSaving(false);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
+
+  async function handleConfirmRemover() {
+    setActionSaving(true);
+    try {
+      await onRemover();
+      onFileChange(null);
+      setConfirmOpen(false);
+    } finally {
+      setActionSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-bold text-navy">
-          Anexar lista de funcionários <RequiredMark />
-        </span>
-        <input
-          type="file"
-          accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png"
-          className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-          disabled={saving}
-          onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-        />
-        <p className="mt-1 text-[11px] text-app-muted">
-          Aceita XLS, XLSX, CSV, PDF, JPG, JPEG e PNG (máx. 10 MB).
-        </p>
-      </label>
-
-      {hasPreview ? (
-        <OrcamentoArquivoPreview
-          file={file}
-          savedUrl={savedUrl}
-          savedName={savedName}
-          savedTipo={savedTipo}
-        />
+      {!hasSaved ? (
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-bold text-navy">
+            Anexar lista de funcionários <RequiredMark />
+          </span>
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png"
+            className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
+            disabled={busy}
+            onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+          />
+          <p className="mt-1 text-[11px] text-app-muted">
+            Aceita XLS, XLSX, CSV, PDF, JPG, JPEG e PNG (máx. 10 MB).
+          </p>
+        </label>
       ) : null}
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={saving || (!file && !savedName)}
-          onClick={onSalvar}
-        >
-          {saving ? "Salvando..." : "Salvar Lista"}
-        </button>
-      </div>
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png"
+        className="hidden"
+        disabled={busy}
+        onChange={(e) => {
+          void handleReplaceSelected(e.target.files?.[0] ?? null);
+        }}
+      />
+
+      {hasPreview ? (
+        <div className="space-y-3">
+          <OrcamentoArquivoPreview
+            file={file}
+            savedUrl={savedUrl}
+            savedName={savedName}
+            savedTipo={savedTipo}
+          />
+          {hasSaved ? (
+            <AnexoAcoes
+              saving={busy}
+              onSubstituirClick={() => replaceInputRef.current?.click()}
+              onRemoverClick={() => setConfirmOpen(true)}
+              substituirLabel="Substituir"
+              removerLabel="Remover"
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      {!hasSaved ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || (!file && !savedName)}
+            onClick={onSalvar}
+          >
+            {busy ? "Salvando..." : "Salvar Lista"}
+          </button>
+        </div>
+      ) : null}
+
+      <OrcamentoAnexoRemoverModal
+        open={confirmOpen}
+        titulo="Remover lista"
+        mensagem="Tem certeza de que deseja remover a lista de funcionários anexada?"
+        saving={actionSaving}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void handleConfirmRemover()}
+      />
     </div>
   );
 }
@@ -315,6 +424,8 @@ interface OrcamentoAbaLogoProps {
   onChangePossuiLogo: (value: boolean) => void;
   onFileChange: (file: File | null) => void;
   onSalvar: () => void;
+  onSubstituir: (file: File) => Promise<void>;
+  onRemover: () => Promise<void>;
 }
 
 export function OrcamentoAbaLogo({
@@ -327,12 +438,42 @@ export function OrcamentoAbaLogo({
   onChangePossuiLogo,
   onFileChange,
   onSalvar,
+  onSubstituir,
+  onRemover,
 }: OrcamentoAbaLogoProps) {
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [actionSaving, setActionSaving] = useState(false);
   const showUpload = possuiLogo === true;
+  const hasSaved = Boolean(savedName);
   const hasPreview = Boolean(file || savedName);
+  const busy = saving || actionSaving;
   const canSave =
     possuiLogo === false ||
     (possuiLogo === true && Boolean(file || savedName));
+
+  async function handleReplaceSelected(selected: File | null) {
+    if (!selected) return;
+    setActionSaving(true);
+    try {
+      await onSubstituir(selected);
+      onFileChange(null);
+    } finally {
+      setActionSaving(false);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
+
+  async function handleConfirmRemover() {
+    setActionSaving(true);
+    try {
+      await onRemover();
+      onFileChange(null);
+      setConfirmOpen(false);
+    } finally {
+      setActionSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -345,7 +486,7 @@ export function OrcamentoAbaLogo({
             type="radio"
             name="possui_logo"
             checked={possuiLogo === true}
-            disabled={saving}
+            disabled={busy}
             onChange={() => onChangePossuiLogo(true)}
           />
           Sim
@@ -355,7 +496,7 @@ export function OrcamentoAbaLogo({
             type="radio"
             name="possui_logo"
             checked={possuiLogo === false}
-            disabled={saving}
+            disabled={busy}
             onChange={() => onChangePossuiLogo(false)}
           />
           Não
@@ -364,43 +505,78 @@ export function OrcamentoAbaLogo({
 
       {showUpload ? (
         <>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-bold text-navy">
-              Upload da logomarca <RequiredMark />
-            </span>
-            <input
-              type="file"
-              accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
-              className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-              disabled={saving}
-              onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-            />
-            <p className="mt-1 text-[11px] text-app-muted">
-              Aceita PNG, JPG, JPEG e SVG (máx. 10 MB).
-            </p>
-          </label>
+          {!hasSaved ? (
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-navy">
+                Upload da logomarca <RequiredMark />
+              </span>
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+                className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
+                disabled={busy}
+                onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+              />
+              <p className="mt-1 text-[11px] text-app-muted">
+                Aceita PNG, JPG, JPEG e SVG (máx. 10 MB).
+              </p>
+            </label>
+          ) : null}
+
+          <input
+            ref={replaceInputRef}
+            type="file"
+            accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              void handleReplaceSelected(e.target.files?.[0] ?? null);
+            }}
+          />
 
           {hasPreview ? (
-            <OrcamentoArquivoPreview
-              file={file}
-              savedUrl={savedUrl}
-              savedName={savedName}
-              savedTipo={savedTipo}
-            />
+            <div className="space-y-3">
+              <OrcamentoArquivoPreview
+                file={file}
+                savedUrl={savedUrl}
+                savedName={savedName}
+                savedTipo={savedTipo}
+              />
+              {hasSaved ? (
+                <AnexoAcoes
+                  saving={busy}
+                  onSubstituirClick={() => replaceInputRef.current?.click()}
+                  onRemoverClick={() => setConfirmOpen(true)}
+                  substituirLabel="Substituir"
+                  removerLabel="Remover"
+                />
+              ) : null}
+            </div>
           ) : null}
         </>
       ) : null}
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={saving || !canSave}
-          onClick={onSalvar}
-        >
-          {saving ? "Salvando..." : "Salvar"}
-        </button>
-      </div>
+      {!(showUpload && hasSaved) ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || !canSave}
+            onClick={onSalvar}
+          >
+            {busy ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      ) : null}
+
+      <OrcamentoAnexoRemoverModal
+        open={confirmOpen}
+        titulo="Remover logomarca"
+        mensagem="Tem certeza de que deseja remover a logomarca anexada?"
+        saving={actionSaving}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void handleConfirmRemover()}
+      />
     </div>
   );
 }

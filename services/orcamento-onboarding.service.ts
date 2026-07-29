@@ -90,6 +90,24 @@ export async function salvarOrcamentoListaFuncionarios(
   return fetchAprovacao(aprovacaoId);
 }
 
+export async function removerOrcamentoListaFuncionarios(
+  aprovacaoId: string
+): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      funcionarios_lista_path: null,
+      funcionarios_lista_nome: null,
+      funcionarios_lista_tipo: null,
+      funcionarios_lista_tamanho: null,
+      funcionarios_lista_salva_em: null,
+    })
+    .eq("id", aprovacaoId);
+  if (error) throw error;
+  return fetchAprovacao(aprovacaoId);
+}
+
 export async function salvarOrcamentoLogo(
   aprovacaoId: string,
   payload: {
@@ -131,6 +149,26 @@ export async function salvarOrcamentoLogo(
       logo_tipo: fileMeta.tipo,
       logo_tamanho: fileMeta.tamanho,
       logo_salva_em: agora,
+    })
+    .eq("id", aprovacaoId);
+  if (error) throw error;
+  return fetchAprovacao(aprovacaoId);
+}
+
+/** Remove a logo anexada, mantém possui_logo=true (etapa pendente). */
+export async function removerOrcamentoLogo(
+  aprovacaoId: string
+): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      possui_logo: true,
+      logo_path: null,
+      logo_nome: null,
+      logo_tipo: null,
+      logo_tamanho: null,
+      logo_salva_em: null,
     })
     .eq("id", aprovacaoId);
   if (error) throw error;
