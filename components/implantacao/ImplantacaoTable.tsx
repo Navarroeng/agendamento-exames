@@ -116,17 +116,17 @@ export function ImplantacaoTable({
                   <tr key={processo.orcamento.id}>
                     <td className="whitespace-nowrap">{dataAprovacao}</td>
                     <td className="font-bold text-navy">
-                      <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <span>{processo.orcamento.numero}</span>
                         {processo.orcamento.origem_cliente === "renovacao" && (
                           <span
-                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ea580c] text-[11px] font-extrabold leading-none text-white"
+                            className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-[#c2410c] bg-[#ffedd5] text-[11px] font-extrabold leading-none text-[#c2410c]"
                             title="Cliente em renovação de contrato"
                             aria-label="Cliente em renovação de contrato"
                           >
                             R
                           </span>
                         )}
-                        <span>{processo.orcamento.numero}</span>
                       </span>
                     </td>
                     <td className="max-w-[200px] truncate">
