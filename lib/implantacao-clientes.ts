@@ -61,7 +61,7 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
 
 /** Classe base compartilhada — só a cor muda por etapa. */
 export const IMPLANTACAO_ETAPA_BADGE_BASE =
-  "inline-flex h-6 min-w-[7.5rem] items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
+  "inline-flex h-6 items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
 
 export const IMPLANTACAO_ETAPA_BADGE: Record<
   ImplantacaoEtapaId,
@@ -72,7 +72,7 @@ export const IMPLANTACAO_ETAPA_BADGE: Record<
   procuracao: { className: "bg-[#f3e8ff] text-[#7e22ce]" },
   funcionarios: { className: "bg-[#ffedd5] text-[#c2410c]" },
   logo: { className: "bg-[#e2e8f0] text-[#475569]" },
-  visita: { className: "bg-[#bae6fd] text-[#0369a1]" },
+  visita: { className: "bg-[#e0f2fe] text-[#0c4a6e]" },
   concluido: { className: "bg-brand-green-soft text-brand-green" },
 };
 

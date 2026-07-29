@@ -101,7 +101,6 @@ export function ImplantacaoTable({
             </thead>
             <tbody>
               {processos.map((processo) => {
-                const etapaBadge = IMPLANTACAO_ETAPA_BADGE[processo.etapaAtual];
                 const agendamentoBadge =
                   IMPLANTACAO_AGENDAMENTO_BADGE[processo.agendamentoLabel];
                 const cnpj = processo.orcamento.cliente_cnpj;
@@ -139,9 +138,13 @@ export function ImplantacaoTable({
                     <td>{processo.orcamento.responsavel}</td>
                     <td>
                       <span
-                        className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${etapaBadge.className}`}
+                        className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${
+                          IMPLANTACAO_ETAPA_BADGE[processo.etapaAtual]
+                            ?.className ?? "bg-[#e0f2fe] text-[#0c4a6e]"
+                        }`}
                       >
-                        {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual]}
+                        {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual] ??
+                          processo.etapaAtual}
                       </span>
                     </td>
                     <td>
