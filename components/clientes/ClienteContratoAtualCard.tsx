@@ -8,6 +8,7 @@ import {
   labelClienteContratoTipo,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
+import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord } from "@/lib/types";
 
 interface ClienteContratoAtualCardProps {
@@ -47,6 +48,8 @@ export function ClienteContratoAtualCard({
   }
 
   const agendamentoLabel = labelAgendamentoContrato(contrato);
+  const statusExibicao =
+    contrato.status === "pago" ? "ativo" : contrato.status;
 
   return (
     <div className="rounded-2xl border border-[#dbe4f4] bg-gradient-to-br from-white via-[#fbfdff] to-[#f0f4ff] p-5 shadow-[0_8px_28px_rgba(67,84,232,0.08)]">
@@ -66,15 +69,37 @@ export function ClienteContratoAtualCard({
           ) : null}
         </div>
         <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
+          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(statusExibicao)}`}
         >
-          {labelClienteContratoStatus(contrato.status)}
+          {labelClienteContratoStatus(statusExibicao)}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-4">
         <Metric
-          label="Valor contrato"
+          label="Status"
+          value={labelClienteContratoStatus(statusExibicao)}
+        />
+        <Metric
+          label="Início"
+          value={
+            contrato.data_inicio?.trim()
+              ? formatDateBR(contrato.data_inicio)
+              : "—"
+          }
+        />
+        <Metric
+          label="Fim"
+          value={
+            contrato.data_fim?.trim() ? formatDateBR(contrato.data_fim) : "—"
+          }
+        />
+        <Metric
+          label="Financeiro"
+          value={labelFinanceiroContrato(contrato)}
+        />
+        <Metric
+          label="Valor"
           value={formatValorContrato(contrato.valor_contrato)}
         />
         <Metric
@@ -85,13 +110,9 @@ export function ClienteContratoAtualCard({
               : "—"
           }
         />
-        <Metric
-          label="Financeiro"
-          value={labelFinanceiroContrato(contrato)}
-        />
         <Metric label="Agendamento" value={agendamentoLabel} />
         <Metric
-          label="Tipo contrato"
+          label="Tipo"
           value={labelClienteContratoTipo(contrato.tipo_contrato)}
         />
         <Metric

@@ -249,7 +249,21 @@ export function useImplantacaoClientesPage() {
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
-            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}. Aba Financeiro liberada.`,
+            descricao: `Contrato assinado em ${formatDateIsoToBR(saved.contrato_assinado_em)}. Vigência iniciada a partir da assinatura (12 meses). Aba Financeiro liberada.`,
+          });
+        } else if (
+          before.contrato_assinado &&
+          saved.contrato_assinado &&
+          before.contrato_assinado_em !== saved.contrato_assinado_em &&
+          saved.contrato_assinado_em
+        ) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: `Data de assinatura alterada para ${formatDateIsoToBR(saved.contrato_assinado_em)}. Vigência recalculada (início + 12 meses).`,
           });
         }
 
@@ -332,7 +346,8 @@ export function useImplantacaoClientesPage() {
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
-            descricao: "Pagamento do boleto confirmado. Agendamento pode ser liberado conforme regra financeira.",
+            descricao:
+              "Pagamento do boleto confirmado. Contrato ativado e liberado para agendamentos.",
           });
         }
 

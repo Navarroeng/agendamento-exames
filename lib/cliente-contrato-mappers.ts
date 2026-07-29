@@ -16,6 +16,8 @@ import type {
 } from "@/lib/types";
 
 export function labelClienteContratoStatus(status: ClienteContratoStatus): string {
+  // Legado: "pago" era status misto financeiro/contratual — exibir como Ativo.
+  if (status === "pago") return "Ativo";
   return (
     CLIENTE_CONTRATO_STATUS_OPTIONS.find((item) => item.value === status)?.label ??
     status

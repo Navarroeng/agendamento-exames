@@ -2,6 +2,10 @@
 export function addMonthsToIsoDate(isoDate: string, months: number): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const date = new Date(year, month - 1 + months, day);
+  // Ajuste se o dia estourou (ex.: 31 jan + 1 mês)
+  if (date.getDate() !== day) {
+    date.setDate(0);
+  }
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");

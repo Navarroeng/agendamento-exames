@@ -12,6 +12,8 @@ import {
   parseAprovacaoIntegracaoError,
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
+import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
+import type { ClienteContratoStatus } from "@/lib/types";
 
 const APROVACAO_SELECT = `
   *,
@@ -29,59 +31,87 @@ function sortAprovacao(
   };
 }
 
-function resolveStatusContratoFromAprovacao(payload: {
-  contrato_enviado: boolean;
-  contrato_assinado: boolean;
-  boleto_pago: boolean;
-  boleto_vencimento: string | null;
-}): string {
-  if (payload.boleto_pago) return "pago";
-  if (payload.contrato_assinado) {
-    return payload.boleto_vencimento
-      ? "aguardando_pagamento"
-      : "assinado";
+async function encerrarOutrosContratosAtivos(
+  clienteId: string,
+  excludeContratoId: string,
+  dataReferencia: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("cliente_contratos")
+    .update({
+      status: "encerrado" satisfies ClienteContratoStatus,
+      data_fim: dataReferencia.slice(0, 10),
+    })
+    .eq("cliente_id", clienteId)
+    .eq("status", "ativo")
+    .neq("id", excludeContratoId);
+  if (error) {
+    console.error("Falha ao encerrar contratos ativos anteriores:", error);
   }
-  if (payload.contrato_enviado) return "enviado";
-  return "aguardando_envio";
 }
 
 async function syncClienteContratoFromAprovacao(
   aprovacao: OrcamentoAprovacaoRecord
 ): Promise<void> {
   const supabase = createClient();
-  const statusContrato = resolveStatusContratoFromAprovacao({
-    contrato_enviado: aprovacao.contrato_enviado,
-    contrato_assinado: aprovacao.contrato_assinado,
-    boleto_pago: aprovacao.boleto_pago,
-    boleto_vencimento: aprovacao.boleto_vencimento,
+  const syncPayload = buildClienteContratoSyncFromAprovacao({
+    aprovacao: {
+      contrato_enviado: aprovacao.contrato_enviado,
+      contrato_assinado: aprovacao.contrato_assinado,
+      contrato_assinado_em: aprovacao.contrato_assinado_em,
+      contrato_enviado_em: aprovacao.contrato_enviado_em,
+      boleto_pago: aprovacao.boleto_pago,
+      boleto_vencimento: aprovacao.boleto_vencimento,
+      boleto_pago_em: aprovacao.boleto_pago_em,
+    },
   });
 
-  // Contratos de orçamento: liberação = boleto pago (única regra financeira).
   const update: Record<string, unknown> = {
-    status: statusContrato,
-    contrato_enviado_em: aprovacao.contrato_enviado_em,
-    contrato_assinado_em: aprovacao.contrato_assinado_em,
-    boleto_vencimento: aprovacao.boleto_vencimento,
-    boleto_pago: aprovacao.boleto_pago,
-    boleto_pago_em: aprovacao.boleto_pago_em,
-    liberado_para_agendamento: Boolean(aprovacao.boleto_pago),
+    status: syncPayload.status,
+    contrato_enviado_em: syncPayload.contrato_enviado_em,
+    contrato_assinado_em: syncPayload.contrato_assinado_em,
+    boleto_vencimento: syncPayload.boleto_vencimento,
+    boleto_pago: syncPayload.boleto_pago,
+    boleto_pago_em: syncPayload.boleto_pago_em,
+    liberado_para_agendamento: syncPayload.liberado_para_agendamento,
   };
+
+  if (syncPayload.data_inicio) {
+    update.data_inicio = syncPayload.data_inicio;
+  }
+  if (syncPayload.data_fim) {
+    update.data_fim = syncPayload.data_fim;
+  }
+  if (syncPayload.tipo_contrato) {
+    update.tipo_contrato = syncPayload.tipo_contrato;
+  }
 
   const { data: contratos, error: syncError } = await supabase
     .from("cliente_contratos")
     .update(update)
     .eq("orcamento_id", aprovacao.orcamento_id)
     .not("status", "in", "(encerrado,cancelado)")
-    .select("id, cliente_id");
+    .select("id, cliente_id, numero, data_inicio, data_fim, status");
 
   if (syncError) {
     console.error("Falha ao sincronizar contrato do cliente:", syncError);
     return;
   }
 
+  if (syncPayload.status === "ativo" && contratos?.length) {
+    for (const row of contratos) {
+      await encerrarOutrosContratosAtivos(
+        row.cliente_id as string,
+        row.id as string,
+        (syncPayload.data_inicio as string) ||
+          new Date().toISOString().slice(0, 10)
+      );
+    }
+  }
+
   let clienteId = contratos?.[0]?.cliente_id as string | undefined;
 
-  // Se o filtro de status não atualizou linhas, ainda tenta recomputar pelo orçamento.
   if (!clienteId) {
     const { data: fallback } = await supabase
       .from("cliente_contratos")
