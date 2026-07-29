@@ -345,7 +345,7 @@ export async function cancelarOrcamento(params: {
       cancelado_por: params.canceladoPor.trim(),
     })
     .eq("id", params.id)
-    .neq("status", "cancelado");
+    .not("status", "in", '("cancelado","contrato_encerrado")');
 
   if (error) throw error;
 }

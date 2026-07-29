@@ -86,6 +86,7 @@ export function formatOrcamentoStatus(status: OrcamentoStatus): string {
     aprovado: "Aprovado",
     reprovado: "Reprovado",
     cancelado: "Cancelado",
+    contrato_encerrado: "Contrato encerrado",
   };
   return labels[status] ?? status;
 }

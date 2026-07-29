@@ -386,6 +386,9 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   boleto_pago?: boolean;
   boleto_pago_em?: string | null;
   liberado_para_agendamento?: boolean;
+  encerrado_em?: string | null;
+  encerrado_por?: string | null;
+  motivo_encerramento?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

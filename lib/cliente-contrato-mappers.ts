@@ -6,6 +6,11 @@ import {
   contratoLiberaAgendamento,
   labelAgendamentoLiberacao,
 } from "@/lib/cliente-pode-agendar";
+import {
+  labelContratoStatusVisual,
+  resolveContratoStatusVisual,
+  contratoStatusVisualBadgeClass,
+} from "@/lib/contrato-status-visual";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency, formatCurrencyBRL } from "@/lib/money";
 import type {
@@ -22,6 +27,20 @@ export function labelClienteContratoStatus(status: ClienteContratoStatus): strin
     CLIENTE_CONTRATO_STATUS_OPTIONS.find((item) => item.value === status)?.label ??
     status
   );
+}
+
+/** Rótulo preferencial (visual padronizado: Ativo / Próximo / Expirado / Encerrado). */
+export function labelClienteContratoStatusExibicao(
+  contrato: Pick<
+    ClienteContratoRecord,
+    "status" | "data_inicio" | "data_fim" | "encerrado_em"
+  >
+): string {
+  const visual = resolveContratoStatusVisual(contrato);
+  if (visual === "pipeline") {
+    return labelClienteContratoStatus(contrato.status);
+  }
+  return labelContratoStatusVisual(visual, contrato.status);
 }
 
 export function labelClienteContratoTipo(
@@ -50,12 +69,25 @@ export function clienteContratoStatusBadgeClass(
     case "assinado":
       return "bg-[#dbeafe] text-[#1d4ed8]";
     case "encerrado":
-      return "bg-[#f4f6fb] text-[#52617a]";
+      return "bg-brand-red-soft text-brand-red";
     case "cancelado":
       return "bg-brand-red-soft text-brand-red";
     default:
       return "bg-[#f4f6fb] text-[#52617a]";
   }
+}
+
+export function clienteContratoBadgeClassExibicao(
+  contrato: Pick<
+    ClienteContratoRecord,
+    "status" | "data_inicio" | "data_fim" | "encerrado_em"
+  >
+): string {
+  const visual = resolveContratoStatusVisual(contrato);
+  if (visual === "pipeline") {
+    return clienteContratoStatusBadgeClass(contrato.status);
+  }
+  return contratoStatusVisualBadgeClass(visual);
 }
 
 export function labelPagamentoContrato(

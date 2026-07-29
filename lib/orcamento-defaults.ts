@@ -62,5 +62,6 @@ export function isValidOrcamentoStatus(value: string): value is OrcamentoStatus 
     "aprovado",
     "reprovado",
     "cancelado",
+    "contrato_encerrado",
   ].includes(value);
 }

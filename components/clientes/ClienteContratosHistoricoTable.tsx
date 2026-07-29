@@ -1,8 +1,8 @@
 import {
-  clienteContratoStatusBadgeClass,
+  clienteContratoBadgeClassExibicao,
   formatValorContrato,
   labelAgendamentoContrato,
-  labelClienteContratoStatus,
+  labelClienteContratoStatusExibicao,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
@@ -77,9 +77,9 @@ export function ClienteContratosHistoricoTable({
                 </td>
                 <td>
                   <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(contrato.status)}`}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${clienteContratoBadgeClassExibicao(contrato)}`}
                   >
-                    {labelClienteContratoStatus(contrato.status)}
+                    {labelClienteContratoStatusExibicao(contrato)}
                   </span>
                 </td>
                 <td className="text-xs font-semibold text-[#52617a]">

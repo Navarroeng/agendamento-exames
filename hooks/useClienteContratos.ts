@@ -20,10 +20,6 @@ import type { ClienteContratoRecord } from "@/lib/types";
 
 const VALIDATION_MESSAGE = "Informe a data de início do contrato.";
 
-function todayIsoDate(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
 export function useClienteContratos(
   clienteId: string | null,
   clienteNome?: string | null
@@ -175,8 +171,10 @@ export function useClienteContratos(
 
     setEncerrarSaving(true);
     try {
-      const dataFim = encerrarTarget.data_fim ?? todayIsoDate();
-      await encerrarContrato(encerrarTarget.id, dataFim);
+      await encerrarContrato(encerrarTarget.id, {
+        motivo: "Encerrado manualmente no cadastro do cliente.",
+        encerradoPor: auditContext.usuarioNome,
+      });
       await registrarAuditoria({
         usuarioId: auditContext.usuarioId,
         usuarioNome: auditContext.usuarioNome,

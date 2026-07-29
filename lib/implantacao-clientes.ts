@@ -29,7 +29,8 @@ export type ImplantacaoEtapaOperacionalId =
 export type ImplantacaoEtapaId =
   | Exclude<ImplantacaoEtapaOperacionalId, "agendamentos">
   | "aguardando_agendamentos"
-  | "concluido";
+  | "concluido"
+  | "contrato_encerrado";
 
 export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
   id: ImplantacaoEtapaOperacionalId;
@@ -56,6 +57,7 @@ export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
   { value: "visita", label: "Visita agendada" },
   { value: "aguardando_agendamentos", label: "Aguardando agendamentos" },
   { value: "concluido", label: "Concluído" },
+  { value: "contrato_encerrado", label: "Contrato encerrado" },
 ];
 
 export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
@@ -67,6 +69,7 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   visita: "Visita agendada",
   aguardando_agendamentos: "Aguardando agendamentos",
   concluido: "Concluído",
+  contrato_encerrado: "Contrato encerrado",
 };
 
 /** Classe base compartilhada — só a cor muda por etapa. */
@@ -85,6 +88,7 @@ export const IMPLANTACAO_ETAPA_BADGE: Record<
   visita: { className: "bg-[#e0f2fe] text-[#0c4a6e]" },
   aguardando_agendamentos: { className: "bg-[#fef9c3] text-[#a16207]" },
   concluido: { className: "bg-brand-green-soft text-brand-green" },
+  contrato_encerrado: { className: "bg-brand-red-soft text-brand-red" },
 };
 
 export const IMPLANTACAO_AGENDAMENTO_BADGE = {
@@ -172,8 +176,18 @@ export function resolveImplantacaoEtapaAtual(
   opts?: {
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
+    orcamentoStatus?: OrcamentoStatus;
+    contratoStatus?: string | null;
+    contratoEncerradoEm?: string | null;
   }
 ): ImplantacaoEtapaId {
+  if (
+    opts?.orcamentoStatus === "contrato_encerrado" ||
+    opts?.contratoStatus === "encerrado" ||
+    Boolean(opts?.contratoEncerradoEm)
+  ) {
+    return "contrato_encerrado";
+  }
   if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
   if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
   if (!isProcuracaoEtapaConcluida(aprovacao)) return "procuracao";
@@ -214,7 +228,11 @@ export function countImplantacaoEtapasConcluidas(
 export function implantacaoEtapaToModalTab(
   etapa: ImplantacaoEtapaId
 ): OrcamentoEtapaId {
-  if (etapa === "concluido" || etapa === "aguardando_agendamentos") {
+  if (
+    etapa === "concluido" ||
+    etapa === "aguardando_agendamentos" ||
+    etapa === "contrato_encerrado"
+  ) {
     return "agendamentos";
   }
   return etapa;
@@ -235,17 +253,28 @@ export function buildImplantacaoProcesso(params: {
     0,
     params.agendamentosRealizados ?? 0
   );
-  const contagemOpts = { quantidadeContratada, agendamentosRealizados };
+  const contagemOpts = {
+    quantidadeContratada,
+    agendamentosRealizados,
+    orcamentoStatus: orcamento.status,
+    contratoStatus: contrato?.status ?? null,
+    contratoEncerradoEm: contrato?.encerrado_em ?? null,
+  };
   const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao, contagemOpts);
-  const etapasConcluidas = countImplantacaoEtapasConcluidas(
-    aprovacao,
-    contagemOpts
-  );
+  const etapasConcluidas =
+    etapaAtual === "contrato_encerrado"
+      ? 0
+      : countImplantacaoEtapasConcluidas(aprovacao, contagemOpts);
   const totalEtapas = IMPLANTACAO_ETAPAS_OPERACIONAIS.length;
-  const agendamentoLiberado = contrato
-    ? contratoLiberaAgendamento(contrato)
-    : false;
-  const cancelado = orcamento.status === "cancelado";
+  const agendamentoLiberado =
+    etapaAtual === "contrato_encerrado"
+      ? false
+      : contrato
+        ? contratoLiberaAgendamento(contrato)
+        : false;
+  const cancelado =
+    orcamento.status === "cancelado" ||
+    orcamento.status === "contrato_encerrado";
   const concluido = etapaAtual === "concluido";
 
   return {
@@ -255,7 +284,10 @@ export function buildImplantacaoProcesso(params: {
     etapaAtual,
     etapasConcluidas,
     totalEtapas,
-    progressoLabel: `${etapasConcluidas} de ${totalEtapas}`,
+    progressoLabel:
+      etapaAtual === "contrato_encerrado"
+        ? "Contrato encerrado"
+        : `${etapasConcluidas} de ${totalEtapas}`,
     agendamentoLiberado,
     agendamentoLabel: labelAgendamentoLiberacao(agendamentoLiberado),
     dataAprovacao: aprovacao?.aprovado_em ?? null,
@@ -278,7 +310,12 @@ export interface ImplantacaoSummaryStats {
 export function computeImplantacaoSummary(
   processos: ImplantacaoProcesso[]
 ): ImplantacaoSummaryStats {
-  const ativos = processos.filter((p) => p.orcamento.status !== "cancelado");
+  const ativos = processos.filter(
+    (p) =>
+      p.orcamento.status !== "cancelado" &&
+      p.orcamento.status !== "contrato_encerrado" &&
+      p.etapaAtual !== "contrato_encerrado"
+  );
 
   return {
     totalEmImplantacao: ativos.filter((p) => p.etapaAtual !== "concluido")
@@ -317,7 +354,13 @@ export function filterImplantacaoProcessos(
     const { orcamento, etapaAtual, dataAprovacao, numeroContrato } = p;
 
     if (filters.andamento === "em_andamento") {
-      if (orcamento.status === "cancelado") return false;
+      if (
+        orcamento.status === "cancelado" ||
+        orcamento.status === "contrato_encerrado" ||
+        etapaAtual === "contrato_encerrado"
+      ) {
+        return false;
+      }
       if (etapaAtual === "concluido") return false;
     } else if (filters.andamento === "concluidos") {
       if (etapaAtual !== "concluido") return false;
@@ -374,6 +417,7 @@ const ETAPA_SORT_ORDER: Record<ImplantacaoEtapaId, number> = {
   visita: 6,
   aguardando_agendamentos: 7,
   concluido: 8,
+  contrato_encerrado: 9,
 };
 
 export function sortImplantacaoProcessos(
@@ -399,7 +443,13 @@ export function sortImplantacaoProcessos(
     }
 
     const score = (p: ImplantacaoProcesso) => {
-      if (p.orcamento.status === "cancelado") return 3;
+      if (
+        p.orcamento.status === "cancelado" ||
+        p.orcamento.status === "contrato_encerrado" ||
+        p.etapaAtual === "contrato_encerrado"
+      ) {
+        return 3;
+      }
       if (p.etapaAtual === "concluido") return 2;
       return 1;
     };

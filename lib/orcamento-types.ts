@@ -6,7 +6,8 @@ export type OrcamentoStatus =
   | "em_negociacao"
   | "aprovado"
   | "reprovado"
-  | "cancelado";
+  | "cancelado"
+  | "contrato_encerrado";
 
 export type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 export {
@@ -33,6 +34,7 @@ export const ORCAMENTO_STATUS_OPTIONS: readonly {
   { value: "aprovado", label: "Aprovado" },
   { value: "reprovado", label: "Reprovado" },
   { value: "cancelado", label: "Cancelado" },
+  { value: "contrato_encerrado", label: "Contrato encerrado" },
 ] as const;
 
 export const ORCAMENTO_STATUS_LABELS: Record<OrcamentoStatus, string> =
@@ -61,6 +63,9 @@ export const ORCAMENTO_STATUS_BADGE: Record<
   },
   cancelado: {
     className: "bg-[#f1f5f9] text-[#64748b]",
+  },
+  contrato_encerrado: {
+    className: "bg-brand-red-soft text-brand-red",
   },
 };
 

@@ -9,6 +9,10 @@ import type { ClienteContratoRecord } from "@/lib/types";
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
   "Cliente sem contrato vigente. Não é possível agendar exames até renovar o contrato.";
 
+export const CONTRATO_ENCERRADO_ERROR_MESSAGE =
+  "O contrato desta empresa está encerrado. Não é possível criar novos agendamentos.";
+
+
 export type ContratoVigenciaResult = {
   vigente: boolean;
   dataInicio?: string;
@@ -125,7 +129,17 @@ export async function assertContratoVigentePorNome(
     clienteNome,
     dataAgendamento
   );
-  if (!result.vigente) {
-    throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
+  if (result.vigente) return;
+
+  if (result.clienteId) {
+    const contratos = await listarContratosPorCliente(result.clienteId);
+    const encerrado = contratos.find(
+      (c) => c.status === "encerrado" || Boolean(c.encerrado_em)
+    );
+    if (encerrado) {
+      throw new Error(CONTRATO_ENCERRADO_ERROR_MESSAGE);
+    }
   }
+
+  throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
 }

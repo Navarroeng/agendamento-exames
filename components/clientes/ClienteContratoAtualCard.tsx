@@ -1,10 +1,10 @@
 import {
-  clienteContratoStatusBadgeClass,
+  clienteContratoBadgeClassExibicao,
   formatReajusteContrato,
   formatValorContrato,
   formatVigenciaContrato,
   labelAgendamentoContrato,
-  labelClienteContratoStatus,
+  labelClienteContratoStatusExibicao,
   labelClienteContratoTipo,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
@@ -48,8 +48,7 @@ export function ClienteContratoAtualCard({
   }
 
   const agendamentoLabel = labelAgendamentoContrato(contrato);
-  const statusExibicao =
-    contrato.status === "pago" ? "ativo" : contrato.status;
+  const statusLabel = labelClienteContratoStatusExibicao(contrato);
 
   return (
     <div className="rounded-2xl border border-[#dbe4f4] bg-gradient-to-br from-white via-[#fbfdff] to-[#f0f4ff] p-5 shadow-[0_8px_28px_rgba(67,84,232,0.08)]">
@@ -69,17 +68,14 @@ export function ClienteContratoAtualCard({
           ) : null}
         </div>
         <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${clienteContratoStatusBadgeClass(statusExibicao)}`}
+          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold ${clienteContratoBadgeClassExibicao(contrato)}`}
         >
-          {labelClienteContratoStatus(statusExibicao)}
+          {statusLabel}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-4">
-        <Metric
-          label="Status"
-          value={labelClienteContratoStatus(statusExibicao)}
-        />
+        <Metric label="Status" value={statusLabel} />
         <Metric
           label="Início"
           value={
@@ -89,11 +85,17 @@ export function ClienteContratoAtualCard({
           }
         />
         <Metric
-          label="Fim"
+          label="Fim previsto"
           value={
             contrato.data_fim?.trim() ? formatDateBR(contrato.data_fim) : "—"
           }
         />
+        {contrato.encerrado_em ? (
+          <Metric
+            label="Encerrado em"
+            value={formatDateBR(contrato.encerrado_em.split("T")[0])}
+          />
+        ) : null}
         <Metric
           label="Financeiro"
           value={labelFinanceiroContrato(contrato)}

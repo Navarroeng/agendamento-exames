@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { OrcamentoAprovarModal } from "./OrcamentoAprovarModal";
 import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
+import { OrcamentoEncerrarContratoModal } from "./OrcamentoEncerrarContratoModal";
 import { OrcamentoFormModal } from "./OrcamentoFormModal";
 import { OrcamentoSearchPanel } from "./OrcamentoSearchPanel";
 import { OrcamentoTopActions } from "./OrcamentoTopActions";
@@ -30,6 +31,7 @@ export function OrcamentosPage() {
     discardConfirmOpen,
     cancelTarget,
     cancelSaving,
+    encerrarContratoTarget,
     aprovarOpen,
     aprovarMode,
     aprovarOrcamento,
@@ -55,7 +57,9 @@ export function OrcamentosPage() {
     handleGerarPdf,
     handleOpenCancelar,
     closeCancelar,
+    closeEncerrarContrato,
     handleConfirmCancelar,
+    handleConfirmEncerrarContrato,
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,
@@ -138,6 +142,18 @@ export function OrcamentosPage() {
         onClose={closeCancelar}
         onConfirm={(motivo, observacao) => {
           void handleConfirmCancelar(motivo, observacao);
+        }}
+      />
+
+      <OrcamentoEncerrarContratoModal
+        open={Boolean(encerrarContratoTarget)}
+        numeroOrcamento={encerrarContratoTarget?.orcamento.numero ?? ""}
+        numeroContrato={encerrarContratoTarget?.contratoNumero ?? null}
+        futurosCount={encerrarContratoTarget?.futurosCount ?? 0}
+        saving={cancelSaving}
+        onClose={closeEncerrarContrato}
+        onConfirm={(params) => {
+          void handleConfirmEncerrarContrato(params);
         }}
       />
 

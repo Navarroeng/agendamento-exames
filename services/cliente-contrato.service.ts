@@ -131,20 +131,53 @@ export async function atualizarContrato(
 
 export async function encerrarContrato(
   id: string,
-  dataFim: string
+  opts?: {
+    dataFim?: string;
+    motivo?: string;
+    encerradoPor?: string;
+    /** Se true, sobrescreve data_fim (legado). Default: preserva vigência prevista. */
+    alterarDataFim?: boolean;
+  }
 ): Promise<ClienteContratoRecord> {
   const supabase = createClient();
+  const agora = new Date().toISOString();
+  const update: Record<string, unknown> = {
+    status: "encerrado" satisfies ClienteContratoStatus,
+    encerrado_em: agora,
+    liberado_para_agendamento: false,
+  };
+  if (opts?.encerradoPor?.trim()) {
+    update.encerrado_por = opts.encerradoPor.trim();
+  }
+  if (opts?.motivo?.trim()) {
+    update.motivo_encerramento = opts.motivo.trim();
+  }
+  if (opts?.alterarDataFim && opts.dataFim) {
+    update.data_fim = opts.dataFim;
+  }
 
   const { data, error } = await supabase
     .from("cliente_contratos")
-    .update({
-      status: "encerrado" satisfies ClienteContratoStatus,
-      data_fim: dataFim,
-    })
+    .update(update)
     .eq("id", id)
     .select("*")
     .single();
 
   if (error) throw error;
   return data as ClienteContratoRecord;
+}
+
+export async function buscarContratoPorOrcamentoId(
+  orcamentoId: string
+): Promise<ClienteContratoRecord | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cliente_contratos")
+    .select("*")
+    .eq("orcamento_id", orcamentoId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ClienteContratoRecord | null) ?? null;
 }

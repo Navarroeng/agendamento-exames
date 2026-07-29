@@ -53,6 +53,13 @@ import {
   cancelarOrcamento,
   salvarAprovacaoOrcamento,
 } from "@/services/orcamento-aprovacao.service";
+import { buscarContratoPorOrcamentoId } from "@/services/cliente-contrato.service";
+import {
+  buildAuditoriaEncerramentoContrato,
+  encerrarContratoDeOrcamento,
+  listarAgendamentosFuturosDoContrato,
+  type DestinoAgendamentosFuturos,
+} from "@/services/orcamento-encerrar-contrato.service";
 import type {
   OrcamentoContratoDocumentalUpdatePayload,
   OrcamentoFinanceiroUpdatePayload,
@@ -106,6 +113,11 @@ export function useOrcamentosPage() {
     null
   );
   const [cancelSaving, setCancelSaving] = useState(false);
+  const [encerrarContratoTarget, setEncerrarContratoTarget] = useState<{
+    orcamento: OrcamentoComItens;
+    contratoNumero: string | null;
+    futurosCount: number;
+  } | null>(null);
 
   const [aprovarOrcamento, setAprovarOrcamento] =
     useState<OrcamentoComItens | null>(null);
@@ -446,12 +458,29 @@ export function useOrcamentosPage() {
       }
       if (!orcamentoPermiteCancelar(orcamento.status)) {
         toast.error(
-          orcamento.status === "cancelado"
-            ? "Este orçamento já está cancelado."
+          orcamento.status === "cancelado" ||
+            orcamento.status === "contrato_encerrado"
+            ? "Este orçamento já está encerrado/cancelado."
             : "Este orçamento não pode ser cancelado."
         );
         return;
       }
+
+      const contrato = await buscarContratoPorOrcamentoId(orcamento.id);
+      if (
+        contrato &&
+        contrato.status !== "encerrado" &&
+        !contrato.encerrado_em
+      ) {
+        const futuros = await listarAgendamentosFuturosDoContrato(contrato.id);
+        setEncerrarContratoTarget({
+          orcamento,
+          contratoNumero: contrato.numero ?? null,
+          futurosCount: futuros.length,
+        });
+        return;
+      }
+
       setCancelTarget(orcamento);
     } catch (err) {
       console.error(err);
@@ -464,6 +493,11 @@ export function useOrcamentosPage() {
   const closeCancelar = useCallback(() => {
     if (cancelSaving) return;
     setCancelTarget(null);
+  }, [cancelSaving]);
+
+  const closeEncerrarContrato = useCallback(() => {
+    if (cancelSaving) return;
+    setEncerrarContratoTarget(null);
   }, [cancelSaving]);
 
   const handleConfirmCancelar = useCallback(
@@ -503,6 +537,67 @@ export function useOrcamentosPage() {
       }
     },
     [auditContext, cancelTarget, refresh]
+  );
+
+  const handleConfirmEncerrarContrato = useCallback(
+    async (params: {
+      motivo: string;
+      destinoAgendamentosFuturos: DestinoAgendamentosFuturos;
+    }) => {
+      if (!encerrarContratoTarget) return;
+      setCancelSaving(true);
+      try {
+        const { orcamento } = encerrarContratoTarget;
+        const result = await encerrarContratoDeOrcamento({
+          orcamentoId: orcamento.id,
+          motivo: params.motivo,
+          usuarioNome: auditContext.usuarioNome,
+          destinoAgendamentosFuturos: params.destinoAgendamentosFuturos,
+        });
+
+        const numeroContrato =
+          result.contrato.numero ||
+          encerrarContratoTarget.contratoNumero ||
+          result.contrato.id;
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.cancelamento,
+          registroId: orcamento.id,
+          registroNome: orcamento.numero,
+          descricao: buildAuditoriaEncerramentoContrato({
+            usuarioNome: auditContext.usuarioNome,
+            contratoNumero: numeroContrato,
+            motivo: params.motivo,
+            dataHora: new Date(),
+          }),
+          dadosDepois: {
+            status: "contrato_encerrado",
+            contrato_id: result.contrato.id,
+            contrato_status: "encerrado",
+            motivo_encerramento: params.motivo,
+            agendamentos_futuros_cancelados: result.futurosCancelados,
+          },
+        });
+
+        toast.success(
+          result.futurosCancelados > 0
+            ? `Contrato encerrado. ${result.futurosCancelados} agendamento(s) futuro(s) cancelado(s).`
+            : "Contrato encerrado. Histórico preservado."
+        );
+        setEncerrarContratoTarget(null);
+        refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao encerrar contrato."
+        );
+      } finally {
+        setCancelSaving(false);
+      }
+    },
+    [auditContext, encerrarContratoTarget, refresh]
   );
 
   const closeAprovar = useCallback(() => {
@@ -1169,6 +1264,7 @@ export function useOrcamentosPage() {
     discardConfirmOpen,
     cancelTarget,
     cancelSaving,
+    encerrarContratoTarget,
     aprovarOpen,
     aprovarMode,
     aprovarOrcamento,
@@ -1195,7 +1291,9 @@ export function useOrcamentosPage() {
     handleGerarPdf,
     handleOpenCancelar,
     closeCancelar,
+    closeEncerrarContrato,
     handleConfirmCancelar,
+    handleConfirmEncerrarContrato,
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,

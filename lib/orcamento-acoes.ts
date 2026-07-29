@@ -24,6 +24,8 @@ export function resolveOrcamentoAcoesMenu(
       return ["gerar_pdf"];
     case "cancelado":
       return ["gerar_pdf"];
+    case "contrato_encerrado":
+      return ["gerar_pdf"];
     default:
       return ["gerar_pdf"];
   }
