@@ -6,6 +6,7 @@ import { IconChecklist, IconEye } from "@/components/ui/icons/OutlineIcons";
 import {
   IMPLANTACAO_AGENDAMENTO_BADGE,
   IMPLANTACAO_ETAPA_BADGE,
+  IMPLANTACAO_ETAPA_BADGE_BASE,
   IMPLANTACAO_ETAPA_LABELS,
   IMPLANTACAO_ETAPAS_OPERACIONAIS,
   resolveImplantacaoEtapaVisual,
@@ -20,6 +21,9 @@ interface ImplantacaoTableProps {
   onVisualizar: (orcamentoId: string) => void;
   onContinuar: (orcamentoId: string) => void;
 }
+
+const AGENDAMENTO_BADGE_BASE =
+  "inline-flex h-6 min-w-[5.5rem] items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
 
 function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
   return (
@@ -79,14 +83,13 @@ export function ImplantacaoTable({
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[1180px]">
+          <table className="table-premium w-full min-w-[1080px]">
             <thead>
               <tr>
+                <th>Data da aprovação</th>
                 <th>Orçamento</th>
-                <th>Contrato</th>
                 <th>Cliente</th>
                 <th>CNPJ</th>
-                <th>Data da aprovação</th>
                 <th>Responsável</th>
                 <th>Etapa atual</th>
                 <th>Progresso</th>
@@ -107,11 +110,9 @@ export function ImplantacaoTable({
 
                 return (
                   <tr key={processo.orcamento.id}>
+                    <td className="whitespace-nowrap">{dataAprovacao}</td>
                     <td className="font-bold text-navy">
                       {processo.orcamento.numero}
-                    </td>
-                    <td className="font-medium text-[#334155]">
-                      {processo.numeroContrato || "—"}
                     </td>
                     <td className="max-w-[200px] truncate">
                       {processo.orcamento.cliente_nome}
@@ -123,11 +124,10 @@ export function ImplantacaoTable({
                           : cnpj
                         : "—"}
                     </td>
-                    <td>{dataAprovacao}</td>
                     <td>{processo.orcamento.responsavel}</td>
                     <td>
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${etapaBadge.className}`}
+                        className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${etapaBadge.className}`}
                       >
                         {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual]}
                       </span>
@@ -137,7 +137,7 @@ export function ImplantacaoTable({
                     </td>
                     <td>
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${agendamentoBadge.className}`}
+                        className={`${AGENDAMENTO_BADGE_BASE} ${agendamentoBadge.className}`}
                       >
                         {processo.agendamentoLabel}
                       </span>

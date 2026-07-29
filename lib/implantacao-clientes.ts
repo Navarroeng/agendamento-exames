@@ -31,7 +31,7 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
   label: string;
 }> = [
   { id: "contrato", label: "Contrato" },
-  { id: "financeiro", label: "Financeiro" },
+  { id: "financeiro", label: "Aguardando pagamento" },
   { id: "procuracao", label: "Procuração" },
   { id: "funcionarios", label: "Lista de funcionários" },
   { id: "logo", label: "Logo da empresa" },
@@ -51,13 +51,17 @@ export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
 
 export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   contrato: "Contrato",
-  financeiro: "Financeiro",
+  financeiro: "Aguardando pagamento",
   procuracao: "Procuração",
   funcionarios: "Lista de funcionários",
   logo: "Logo da empresa",
   visita: "Visita técnica",
   concluido: "Concluído",
 };
+
+/** Classe base compartilhada — só a cor muda por etapa. */
+export const IMPLANTACAO_ETAPA_BADGE_BASE =
+  "inline-flex h-6 min-w-[7.5rem] items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
 
 export const IMPLANTACAO_ETAPA_BADGE: Record<
   ImplantacaoEtapaId,
@@ -67,8 +71,8 @@ export const IMPLANTACAO_ETAPA_BADGE: Record<
   financeiro: { className: "bg-[#fef3c7] text-[#b45309]" },
   procuracao: { className: "bg-[#f3e8ff] text-[#7e22ce]" },
   funcionarios: { className: "bg-[#ffedd5] text-[#c2410c]" },
-  logo: { className: "bg-[#f1f5f9] text-[#64748b]" },
-  visita: { className: "bg-[#e0f2fe] text-[#0369a1]" },
+  logo: { className: "bg-[#e2e8f0] text-[#475569]" },
+  visita: { className: "bg-[#bae6fd] text-[#0369a1]" },
   concluido: { className: "bg-brand-green-soft text-brand-green" },
 };
 
@@ -107,7 +111,7 @@ export const EMPTY_IMPLANTACAO_FILTERS: ImplantacaoFilters = {
   aprovadoDe: "",
   aprovadoAte: "",
   andamento: "em_andamento",
-  sort: "prioridade",
+  sort: "aprovado_em",
 };
 
 export interface ImplantacaoProcesso {
@@ -314,7 +318,9 @@ export function sortImplantacaoProcessos(
       return ETAPA_SORT_ORDER[a.etapaAtual] - ETAPA_SORT_ORDER[b.etapaAtual];
     }
     if (sort === "aprovado_em") {
-      return (a.dataAprovacao ?? "").localeCompare(b.dataAprovacao ?? "");
+      const da = a.dataAprovacao ?? "9999-12-31";
+      const db = b.dataAprovacao ?? "9999-12-31";
+      return da.localeCompare(db);
     }
 
     // prioridade: pendentes antigos primeiro; concluídos e cancelados por último

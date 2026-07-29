@@ -189,8 +189,8 @@ export function ImplantacaoSearchPanel({
               onChange("sort", e.target.value as ImplantacaoFilters["sort"])
             }
           >
-            <option value="prioridade">Prioridade (padrão)</option>
-            <option value="aprovado_em">Data da aprovação</option>
+            <option value="aprovado_em">Data da aprovação (padrão)</option>
+            <option value="prioridade">Prioridade</option>
             <option value="cliente">Cliente</option>
             <option value="etapa">Etapa atual</option>
             <option value="responsavel">Responsável</option>
