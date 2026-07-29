@@ -13,12 +13,14 @@ import {
   serializeOrcamentoFormSnapshot,
 } from "../lib/orcamento-form-dirty";
 
-assert.equal(ORCAMENTO_ORIGEM_OPTIONS.length, 2);
+assert.equal(ORCAMENTO_ORIGEM_OPTIONS.length, 3);
 assert.equal(formatOrcamentoOrigemCliente("indicacao"), "Indicação");
 assert.equal(formatOrcamentoOrigemCliente("google"), "Google");
+assert.equal(formatOrcamentoOrigemCliente("renovacao"), "Renovação");
 assert.equal(formatOrcamentoOrigemCliente(null), ORCAMENTO_ORIGEM_NAO_INFORMADO);
 assert.equal(formatOrcamentoOrigemCliente(""), ORCAMENTO_ORIGEM_NAO_INFORMADO);
 assert.ok(isOrcamentoOrigemCliente("indicacao"));
+assert.ok(isOrcamentoOrigemCliente("renovacao"));
 assert.ok(!isOrcamentoOrigemCliente(""));
 
 const form = getEmptyOrcamentoForm();
@@ -26,7 +28,8 @@ form.numero = "2026-010";
 const baseline = serializeOrcamentoFormSnapshot(form);
 assert.equal(isOrcamentoFormDirty(form, baseline), false);
 
-form.origem_cliente = "google";
+form.origem_cliente = "renovacao";
 assert.equal(isOrcamentoFormDirty(form, baseline), true);
+
 
 console.log("test-orcamento-origem: OK");

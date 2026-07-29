@@ -1,4 +1,4 @@
-export type OrcamentoOrigemCliente = "indicacao" | "google";
+export type OrcamentoOrigemCliente = "indicacao" | "google" | "renovacao";
 
 export const ORCAMENTO_ORIGEM_OPTIONS: readonly {
   value: OrcamentoOrigemCliente;
@@ -6,11 +6,13 @@ export const ORCAMENTO_ORIGEM_OPTIONS: readonly {
 }[] = [
   { value: "indicacao", label: "Indicação" },
   { value: "google", label: "Google" },
+  { value: "renovacao", label: "Renovação" },
 ] as const;
 
 export const ORCAMENTO_ORIGEM_LABELS: Record<OrcamentoOrigemCliente, string> = {
   indicacao: "Indicação",
   google: "Google",
+  renovacao: "Renovação",
 };
 
 export const ORCAMENTO_ORIGEM_NAO_INFORMADO = "Não informado";
@@ -18,10 +20,12 @@ export const ORCAMENTO_ORIGEM_NAO_INFORMADO = "Não informado";
 export function isOrcamentoOrigemCliente(
   value: string | null | undefined
 ): value is OrcamentoOrigemCliente {
-  return value === "indicacao" || value === "google";
+  return (
+    value === "indicacao" || value === "google" || value === "renovacao"
+  );
 }
 
-/** Rótulo para UI, histórico e auditoria. */
+/** Rótulo para UI, histórico e auditoria (uso interno; não vai no PDF). */
 export function formatOrcamentoOrigemCliente(
   value: string | null | undefined
 ): string {
