@@ -1,9 +1,13 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { formatCargoVisualizacao } from "@/lib/agendamento-cargo";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
 import { formatHorarioDisplay } from "@/lib/format-datetime";
 import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
+import { buscarContratoPorId } from "@/services/contrato-agendamentos.service";
 import {
   DataRow,
   IconBriefcase,
@@ -27,6 +31,33 @@ export function ViewModalGeneralSection({
   agendamento,
 }: ViewModalGeneralSectionProps) {
   const status = statusBadge(agendamento.status as AgendamentoStatus);
+  const [contratoNumero, setContratoNumero] = useState<string | null>(null);
+  const [orcamentoNumero, setOrcamentoNumero] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!agendamento.contrato_id) {
+      setContratoNumero(null);
+      setOrcamentoNumero(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const contrato = await buscarContratoPorId(agendamento.contrato_id!);
+        if (cancelled) return;
+        setContratoNumero(contrato?.numero ?? agendamento.contrato_id!);
+        setOrcamentoNumero(contrato?.numero_orcamento ?? null);
+      } catch {
+        if (!cancelled) {
+          setContratoNumero(agendamento.contrato_id!);
+          setOrcamentoNumero(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agendamento.contrato_id]);
 
   return (
     <section>
@@ -101,6 +132,27 @@ export function ViewModalGeneralSection({
               label="Matrícula"
               value={agendamento.numero_matricula ?? "—"}
             />
+            {agendamento.contrato_id ? (
+              <>
+                <DataRow
+                  icon={<IconDoc />}
+                  label="Contrato vinculado"
+                  value={contratoNumero ?? "—"}
+                />
+                <DataRow
+                  icon={<IconDoc />}
+                  label="Origem"
+                  value={orcamentoNumero ?? "—"}
+                />
+                <DataRow
+                  icon={<IconDoc />}
+                  label="Consome saldo da implantação"
+                  value={
+                    agendamento.consome_saldo_contrato === false ? "Não" : "Sim"
+                  }
+                />
+              </>
+            ) : null}
           </div>
         </div>
       </div>
