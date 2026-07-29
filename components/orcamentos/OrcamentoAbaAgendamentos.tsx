@@ -6,6 +6,7 @@ import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
+  agendamentoConsomeSaldoContrato,
   buildContratoAgendamentoContagem,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
@@ -142,30 +143,12 @@ export function OrcamentoAbaAgendamentos({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
-          <Card
-            label="Colaboradores contratados"
-            value={String(quantidadeDisplay)}
-          />
-          <Card
-            label="Agendamentos realizados"
-            value={String(contagem.realizados)}
-          />
-          <Card
-            label="Agendamentos pendentes"
-            value={String(contagem.pendentes)}
-          />
-          <Card
-            label="Progresso"
-            value={`${contagem.percentual}%`}
-            hint={
-              contagem.adicionais > 0
-                ? `${contagem.adicionais} adicional${
-                    contagem.adicionais === 1 ? "" : "is"
-                  }`
-                : undefined
-            }
-          />
+        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-5">
+          <Card label="Previstos" value={String(quantidadeDisplay)} />
+          <Card label="Utilizados" value={String(contagem.utilizados)} />
+          <Card label="Disponíveis" value={String(contagem.disponiveis)} />
+          <Card label="Adicionais" value={String(contagem.adicionais)} />
+          <Card label="Progresso" value={`${contagem.percentual}%`} />
         </div>
 
         <div className="border-t border-[#eef2f7] px-4 py-3">
@@ -208,43 +191,63 @@ export function OrcamentoAbaAgendamentos({
             </p>
           ) : null}
           {!loading && !error && agendamentos.length > 0 ? (
-            <table className="table-premium w-full min-w-[720px]">
-              <thead>
-                <tr>
-                  <th>Colaborador</th>
-                  <th>Data do exame</th>
-                  <th>Horário</th>
-                  <th>Tipo de ASO</th>
-                  <th>Clínica</th>
-                  <th>Status</th>
-                  <th className="w-[72px] text-center">Visualizar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agendamentos.map((ag) => (
-                  <tr key={ag.id}>
-                    <td className="font-semibold text-navy">
-                      {ag.colaborador}
-                    </td>
-                    <td>{formatDateIsoToBR(ag.data_agendamento)}</td>
-                    <td>{formatHorarioForForm(ag.horario) || "—"}</td>
-                    <td>{ag.aso || "—"}</td>
-                    <td>{ag.clinica_nome || "—"}</td>
-                    <td>{statusAgendamentoLabel(ag.status)}</td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe3ef] text-brand-blue hover:bg-[#eff6ff]"
-                        title="Visualizar agendamento"
-                        onClick={() => setViewAgendamento(ag)}
-                      >
-                        <IconEye size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              {(["consumidores", "adicionais"] as const).map((grupo) => {
+                const rows = agendamentos.filter((ag) => {
+                  const consome = agendamentoConsomeSaldoContrato(ag);
+                  return grupo === "consumidores" ? consome : !consome;
+                });
+                if (rows.length === 0) return null;
+                return (
+                  <div key={grupo}>
+                    <div className="border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-2">
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#64748b]">
+                        {grupo === "consumidores"
+                          ? "Contabilizados na implantação"
+                          : "Adicionais"}
+                      </p>
+                    </div>
+                    <table className="table-premium w-full min-w-[720px]">
+                      <thead>
+                        <tr>
+                          <th>Colaborador</th>
+                          <th>Data do exame</th>
+                          <th>Horário</th>
+                          <th>Tipo de ASO</th>
+                          <th>Clínica</th>
+                          <th>Status</th>
+                          <th className="w-[72px] text-center">Visualizar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((ag) => (
+                          <tr key={ag.id}>
+                            <td className="font-semibold text-navy">
+                              {ag.colaborador}
+                            </td>
+                            <td>{formatDateIsoToBR(ag.data_agendamento)}</td>
+                            <td>{formatHorarioForForm(ag.horario) || "—"}</td>
+                            <td>{ag.aso || "—"}</td>
+                            <td>{ag.clinica_nome || "—"}</td>
+                            <td>{statusAgendamentoLabel(ag.status)}</td>
+                            <td className="text-center">
+                              <button
+                                type="button"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe3ef] text-brand-blue hover:bg-[#eff6ff]"
+                                title="Visualizar agendamento"
+                                onClick={() => setViewAgendamento(ag)}
+                              >
+                                <IconEye size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </>
           ) : null}
         </div>
       </section>

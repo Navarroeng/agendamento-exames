@@ -10,7 +10,6 @@ import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/Agenda
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
-import { ContratoAgendamentoSelectModal } from "./ContratoAgendamentoSelectModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -91,10 +90,16 @@ export function AgendamentoPage() {
     handleConfirmarLiberarAsoRetido,
     bloquearCamposAsoDocumentacao,
     handleSave,
-    contratoSelectOpen,
-    contratoSelectOpcoes,
-    closeContratoSelectModal,
-    handleSelectContratoAgendamento,
+    vinculoComSaldo,
+    vinculoSemSaldo,
+    vinculoDecision,
+    vinculoContratoId,
+    vinculoLoading,
+    contratoEditInfo,
+    handleVinculoSelectContrato,
+    handleVinculoSim,
+    handleVinculoNao,
+    handleVinculoLimpar,
     handleCopyMensagemClinica,
     cargoSemExames,
     duplicidade90DiasOpen,
@@ -162,6 +167,18 @@ export function AgendamentoPage() {
             exams={exams}
             clienteValidacaoLoading={clienteValidacaoLoading}
             formularioClienteLiberado={formularioClienteLiberado}
+            vinculoContratosComSaldo={vinculoComSaldo}
+            vinculoContratosSemSaldo={vinculoSemSaldo}
+            vinculoDecision={vinculoDecision}
+            vinculoContratoId={vinculoContratoId}
+            vinculoLoading={vinculoLoading}
+            contratoVinculadoNumero={contratoEditInfo?.numero ?? null}
+            contratoVinculadoOrcamento={contratoEditInfo?.orcamento ?? null}
+            consomeSaldoExibicao={contratoEditInfo?.consome ?? null}
+            onVinculoSelectContrato={handleVinculoSelectContrato}
+            onVinculoSim={handleVinculoSim}
+            onVinculoNao={handleVinculoNao}
+            onVinculoLimpar={handleVinculoLimpar}
           />
           <ExamSection
             exams={exams}
@@ -292,13 +309,6 @@ export function AgendamentoPage() {
         exames={examesDisponiveisParaAdicionar}
         onClose={closeExamesAdicionaisModal}
         onConfirm={handleConfirmExamesAdicionais}
-      />
-      <ContratoAgendamentoSelectModal
-        open={contratoSelectOpen}
-        opcoes={contratoSelectOpcoes}
-        saving={saving}
-        onSelect={(id) => void handleSelectContratoAgendamento(id)}
-        onCancel={closeContratoSelectModal}
       />
 
       {saving && (

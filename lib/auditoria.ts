@@ -50,6 +50,8 @@ export const AUDITORIA_ACOES = {
     "cancelamento_excepcional_fatura_emitida",
   custo_clinica_marcado_conferido: "custo_clinica_marcado_conferido",
   custo_clinica_conferencia_reaberta: "custo_clinica_conferencia_reaberta",
+  vinculo_contrato_implantacao: "vinculo_contrato_implantacao",
+  sem_vinculo_contrato_implantacao: "sem_vinculo_contrato_implantacao",
 } as const;
 
 export type AuditoriaAcao =
@@ -105,6 +107,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
     "Cancelamento excepcional (fatura emitida)",
   custo_clinica_marcado_conferido: "Custo marcado como conferido",
   custo_clinica_conferencia_reaberta: "Conferência reaberta",
+  vinculo_contrato_implantacao: "Vínculo ao contrato (implantação)",
+  sem_vinculo_contrato_implantacao: "Sem vínculo ao contrato (implantação)",
 };
 
 export interface AuditoriaUsuarioContext {

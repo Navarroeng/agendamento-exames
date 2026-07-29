@@ -62,6 +62,10 @@ export interface AgendamentoInsert {
   aso_retido_por?: string | null;
   /** Contrato da implantação/renovação ao qual o agendamento pertence. */
   contrato_id?: string | null;
+  /** Se true, o colaborador conta no saldo inicial da implantação. */
+  consome_saldo_contrato?: boolean | null;
+  vinculado_contrato_em?: string | null;
+  vinculado_contrato_por?: string | null;
 }
 
 export interface ExameFormItem {
