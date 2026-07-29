@@ -110,7 +110,7 @@ export const EMPTY_IMPLANTACAO_FILTERS: ImplantacaoFilters = {
   origem: "",
   aprovadoDe: "",
   aprovadoAte: "",
-  andamento: "em_andamento",
+  andamento: "todos",
   sort: "aprovado_em",
 };
 
