@@ -8,7 +8,8 @@ export type OrcamentoEtapaId =
   | "procuracao"
   | "funcionarios"
   | "logo"
-  | "visita";
+  | "visita"
+  | "agendamentos";
 
 export type OrcamentoEtapaEstado = "concluida" | "atual" | "bloqueada" | "disponivel";
 
@@ -21,7 +22,13 @@ export const ORCAMENTO_ETAPAS: Array<{ id: OrcamentoEtapaId; label: string }> = 
   { id: "funcionarios", label: "Lista de funcionários" },
   { id: "logo", label: "Logo da empresa" },
   { id: "visita", label: "Visita técnica" },
+  { id: "agendamentos", label: "Agendamentos" },
 ];
+
+export type OrcamentoEtapasContagemAgendamentos = {
+  quantidadeContratada: number;
+  agendamentosRealizados: number;
+};
 
 export function isContratoEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
@@ -77,6 +84,17 @@ export function isVisitaEtapaConcluida(
   );
 }
 
+export function isAgendamentosEtapaConcluida(
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  contagem?: OrcamentoEtapasContagemAgendamentos | null
+): boolean {
+  if (!isVisitaEtapaConcluida(aprovacao)) return false;
+  const qtd = Math.max(0, contagem?.quantidadeContratada ?? 0);
+  const feitos = Math.max(0, contagem?.agendamentosRealizados ?? 0);
+  if (qtd <= 0) return false;
+  return feitos >= qtd;
+}
+
 /** Etapa liberada para clique (não necessariamente a atual). */
 export function isOrcamentoEtapaLiberada(
   etapa: OrcamentoEtapaId,
@@ -99,6 +117,8 @@ export function isOrcamentoEtapaLiberada(
       return isFuncionariosEtapaConcluida(aprovacao);
     case "visita":
       return isLogoEtapaConcluida(aprovacao);
+    case "agendamentos":
+      return isVisitaEtapaConcluida(aprovacao);
     default:
       return false;
   }
@@ -107,7 +127,8 @@ export function isOrcamentoEtapaLiberada(
 export function isOrcamentoEtapaConcluida(
   etapa: OrcamentoEtapaId,
   aprovacao: OrcamentoAprovacaoRecord | null,
-  orcamentoAprovado: boolean
+  orcamentoAprovado: boolean,
+  contagem?: OrcamentoEtapasContagemAgendamentos | null
 ): boolean {
   switch (etapa) {
     case "resumo":
@@ -126,6 +147,8 @@ export function isOrcamentoEtapaConcluida(
       return isLogoEtapaConcluida(aprovacao);
     case "visita":
       return isVisitaEtapaConcluida(aprovacao);
+    case "agendamentos":
+      return isAgendamentosEtapaConcluida(aprovacao, contagem);
     default:
       return false;
   }
@@ -133,28 +156,30 @@ export function isOrcamentoEtapaConcluida(
 
 export function resolveOrcamentoEtapaAtual(
   aprovacao: OrcamentoAprovacaoRecord | null,
-  orcamentoAprovado: boolean
+  orcamentoAprovado: boolean,
+  contagem?: OrcamentoEtapasContagemAgendamentos | null
 ): OrcamentoEtapaId {
   for (const etapa of ORCAMENTO_ETAPAS) {
     if (
       isOrcamentoEtapaLiberada(etapa.id, aprovacao, orcamentoAprovado) &&
-      !isOrcamentoEtapaConcluida(etapa.id, aprovacao, orcamentoAprovado)
+      !isOrcamentoEtapaConcluida(etapa.id, aprovacao, orcamentoAprovado, contagem)
     ) {
       return etapa.id;
     }
   }
-  return "visita";
+  return "agendamentos";
 }
 
 export function resolveOrcamentoEtapaEstado(
   etapa: OrcamentoEtapaId,
   aprovacao: OrcamentoAprovacaoRecord | null,
   orcamentoAprovado: boolean,
-  tabAtiva: OrcamentoEtapaId
+  tabAtiva: OrcamentoEtapaId,
+  contagem?: OrcamentoEtapasContagemAgendamentos | null
 ): OrcamentoEtapaEstado {
   const liberada = isOrcamentoEtapaLiberada(etapa, aprovacao, orcamentoAprovado);
   if (!liberada) return "bloqueada";
-  if (isOrcamentoEtapaConcluida(etapa, aprovacao, orcamentoAprovado)) {
+  if (isOrcamentoEtapaConcluida(etapa, aprovacao, orcamentoAprovado, contagem)) {
     return tabAtiva === etapa ? "atual" : "concluida";
   }
   if (tabAtiva === etapa) return "atual";

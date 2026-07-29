@@ -37,7 +37,11 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
           const estado = resolveImplantacaoEtapaVisual(
             etapa.id,
             processo.etapaAtual,
-            processo.aprovacao
+            processo.aprovacao,
+            {
+              quantidadeContratada: processo.quantidadeContratada,
+              agendamentosRealizados: processo.agendamentosRealizados,
+            }
           );
           const tone =
             estado === "concluida"

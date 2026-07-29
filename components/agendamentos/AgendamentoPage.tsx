@@ -10,6 +10,7 @@ import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/Agenda
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
+import { ContratoAgendamentoSelectModal } from "./ContratoAgendamentoSelectModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -90,6 +91,10 @@ export function AgendamentoPage() {
     handleConfirmarLiberarAsoRetido,
     bloquearCamposAsoDocumentacao,
     handleSave,
+    contratoSelectOpen,
+    contratoSelectOpcoes,
+    closeContratoSelectModal,
+    handleSelectContratoAgendamento,
     handleCopyMensagemClinica,
     cargoSemExames,
     duplicidade90DiasOpen,
@@ -287,6 +292,13 @@ export function AgendamentoPage() {
         exames={examesDisponiveisParaAdicionar}
         onClose={closeExamesAdicionaisModal}
         onConfirm={handleConfirmExamesAdicionais}
+      />
+      <ContratoAgendamentoSelectModal
+        open={contratoSelectOpen}
+        opcoes={contratoSelectOpcoes}
+        saving={saving}
+        onSelect={(id) => void handleSelectContratoAgendamento(id)}
+        onCancel={closeContratoSelectModal}
       />
 
       {saving && (

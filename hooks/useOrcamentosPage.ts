@@ -968,7 +968,7 @@ export function useOrcamentosPage() {
             ? `Visita técnica agendada para ${payload.visita_tecnica_data}.`
             : "Visita técnica registrada como não necessária.",
         });
-        toast.success("Visita técnica salva.");
+        toast.success("Visita técnica salva. Aba Agendamentos liberada.");
       } catch (err) {
         console.error(err);
         toast.error(

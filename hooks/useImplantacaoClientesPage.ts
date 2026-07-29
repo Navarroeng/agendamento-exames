@@ -11,7 +11,6 @@ import {
   computeImplantacaoSummary,
   filterImplantacaoProcessos,
   implantacaoEtapaToModalTab,
-  resolveImplantacaoEtapaAtual,
   type ImplantacaoFilters,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
@@ -172,9 +171,7 @@ export function useImplantacaoClientesPage() {
   const handleVisualizar = useCallback(
     async (orcamentoId: string) => {
       const processo = processos.find((p) => p.orcamento.id === orcamentoId);
-      const etapa = processo
-        ? resolveImplantacaoEtapaAtual(processo.aprovacao)
-        : "contrato";
+      const etapa = processo?.etapaAtual ?? "contrato";
       await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
     },
     [openProcesso, processos]
@@ -183,12 +180,10 @@ export function useImplantacaoClientesPage() {
   const handleContinuar = useCallback(
     async (orcamentoId: string) => {
       const processo = processos.find((p) => p.orcamento.id === orcamentoId);
-      const etapa = processo
-        ? resolveImplantacaoEtapaAtual(processo.aprovacao)
-        : "contrato";
+      const etapa = processo?.etapaAtual ?? "contrato";
       if (etapa === "concluido") {
         toast.message("Processo já concluído. Abrindo consulta.");
-        await openProcesso(orcamentoId, "visita");
+        await openProcesso(orcamentoId, "agendamentos");
         return;
       }
       await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
@@ -512,7 +507,7 @@ export function useImplantacaoClientesPage() {
             ? `Visita técnica agendada para ${payload.visita_tecnica_data}.`
             : "Visita técnica registrada como não necessária.",
         });
-        toast.success("Visita técnica salva.");
+        toast.success("Visita técnica salva. Aba Agendamentos liberada.");
         void refresh();
       } catch (err) {
         console.error(err);

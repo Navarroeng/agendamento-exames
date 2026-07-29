@@ -112,6 +112,10 @@ import {
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
 import {
+  listarContratosAptosParaAgendamento,
+  type ContratoAptoAgendamento,
+} from "@/services/contrato-agendamentos.service";
+import {
   marcarFaturaClienteNecessitaReemissao,
   obterFaturasClienteIdsPorAgendamento,
 } from "@/services/fatura-historico.service";
@@ -231,6 +235,12 @@ export function useAgendamentosPage() {
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
   const [cargosLoading, setCargosLoading] = useState(false);
+  const [contratoSelectOpen, setContratoSelectOpen] = useState(false);
+  const [contratoSelectOpcoes, setContratoSelectOpcoes] = useState<
+    ContratoAptoAgendamento[]
+  >([]);
+  const pendingSaveStatusRef = useRef<AgendamentoStatus | null>(null);
+  const forcedContratoIdRef = useRef<string | null>(null);
 
   const formularioClienteLiberado = useMemo(() => {
     const isNovo = !editingId && !editingSomenteDocumentacao;
@@ -1672,7 +1682,33 @@ export function useAgendamentosPage() {
           editingId && isAgendamentoAsoRetido(editingStatus)
             ? "aso_retido"
             : status;
-        const payload = buildPayload(payloadStatus, cargoFields);
+        let payload = buildPayload(payloadStatus, cargoFields);
+
+        const forcedContratoId = forcedContratoIdRef.current;
+        forcedContratoIdRef.current = null;
+        const contratoAtual =
+          editingId != null ? getById(editingId)?.contrato_id ?? null : null;
+
+        if (forcedContratoId) {
+          payload = { ...payload, contrato_id: forcedContratoId };
+        } else if (contratoAtual) {
+          payload = { ...payload, contrato_id: contratoAtual };
+        } else {
+          const aptos = await listarContratosAptosParaAgendamento(
+            payload.cliente_nome
+          );
+          if (aptos.length > 1) {
+            pendingSaveStatusRef.current = status;
+            setContratoSelectOpcoes(aptos);
+            setContratoSelectOpen(true);
+            setSaving(false);
+            return;
+          }
+          if (aptos.length === 1) {
+            payload = { ...payload, contrato_id: aptos[0].contrato.id };
+          }
+        }
+
         const examesPayload = getExamesPayload();
 
         if (editingId) {
@@ -1874,6 +1910,26 @@ export function useAgendamentosPage() {
     [executeSave]
   );
 
+  const closeContratoSelectModal = useCallback(() => {
+    setContratoSelectOpen(false);
+    setContratoSelectOpcoes([]);
+    pendingSaveStatusRef.current = null;
+    forcedContratoIdRef.current = null;
+  }, []);
+
+  const handleSelectContratoAgendamento = useCallback(
+    async (contratoId: string) => {
+      const status = pendingSaveStatusRef.current;
+      pendingSaveStatusRef.current = null;
+      setContratoSelectOpen(false);
+      setContratoSelectOpcoes([]);
+      if (!status) return;
+      forcedContratoIdRef.current = contratoId;
+      await executeSave(status);
+    },
+    [executeSave]
+  );
+
   const closeDuplicidade90DiasModal = useCallback(() => {
     setDuplicidade90DiasOpen(false);
     setDuplicidade90DiasInfo(null);
@@ -1967,6 +2023,10 @@ export function useAgendamentosPage() {
     handleConfirmarLiberarAsoRetido,
     bloquearCamposAsoDocumentacao,
     handleSave,
+    contratoSelectOpen,
+    contratoSelectOpcoes,
+    closeContratoSelectModal,
+    handleSelectContratoAgendamento,
     handleCopyMensagemClinica,
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,

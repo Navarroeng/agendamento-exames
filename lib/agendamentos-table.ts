@@ -26,6 +26,10 @@ function statusAgendamento(
   return { statusType: "pending", statusLabel: "Pendente" };
 }
 
+export function statusAgendamentoLabel(status: string): string {
+  return statusAgendamento(status).statusLabel;
+}
+
 function formatExamesResumo(exames: AgendamentoExameRecord[]): string {
   if (exames.length === 0) return "—";
   const first = exames[0].tipo_exame;

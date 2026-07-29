@@ -60,6 +60,8 @@ export interface AgendamentoInsert {
   aso_retido_observacao?: string | null;
   aso_retido_em?: string | null;
   aso_retido_por?: string | null;
+  /** Contrato da implantação/renovação ao qual o agendamento pertence. */
+  contrato_id?: string | null;
 }
 
 export interface ExameFormItem {

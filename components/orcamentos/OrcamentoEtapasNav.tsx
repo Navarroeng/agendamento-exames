@@ -9,6 +9,10 @@ interface OrcamentoEtapasNavProps {
   aprovacao: OrcamentoAprovacaoRecord | null;
   orcamentoAprovado: boolean;
   disabled?: boolean;
+  contagemAgendamentos?: {
+    quantidadeContratada: number;
+    agendamentosRealizados: number;
+  } | null;
   onChange: (tab: OrcamentoEtapaId) => void;
 }
 
@@ -24,6 +28,7 @@ export function OrcamentoEtapasNav({
   aprovacao,
   orcamentoAprovado,
   disabled,
+  contagemAgendamentos = null,
   onChange,
 }: OrcamentoEtapasNavProps) {
   return (
@@ -33,7 +38,8 @@ export function OrcamentoEtapasNav({
           item.id,
           aprovacao,
           orcamentoAprovado,
-          tab
+          tab,
+          contagemAgendamentos
         );
         const bloqueada = estado === "bloqueada";
         const ativa = tab === item.id;

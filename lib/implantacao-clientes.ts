@@ -17,17 +17,22 @@ import {
 } from "@/lib/cliente-pode-agendar";
 
 /** Etapas operacionais da implantação (pós-aprovação). */
-export type ImplantacaoEtapaId =
+export type ImplantacaoEtapaOperacionalId =
   | "contrato"
   | "financeiro"
   | "procuracao"
   | "funcionarios"
   | "logo"
   | "visita"
+  | "agendamentos";
+
+export type ImplantacaoEtapaId =
+  | Exclude<ImplantacaoEtapaOperacionalId, "agendamentos">
+  | "aguardando_agendamentos"
   | "concluido";
 
 export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
-  id: Exclude<ImplantacaoEtapaId, "concluido">;
+  id: ImplantacaoEtapaOperacionalId;
   label: string;
 }> = [
   { id: "contrato", label: "Contrato" },
@@ -36,16 +41,20 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
   { id: "funcionarios", label: "Lista de funcionários" },
   { id: "logo", label: "Logo da empresa" },
   { id: "visita", label: "Visita técnica" },
+  { id: "agendamentos", label: "Agendamentos" },
 ];
 
 export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
   value: ImplantacaoEtapaId;
   label: string;
 }> = [
-  ...IMPLANTACAO_ETAPAS_OPERACIONAIS.map((e) => ({
-    value: e.id as ImplantacaoEtapaId,
-    label: e.label,
-  })),
+  { value: "contrato", label: "Contrato" },
+  { value: "financeiro", label: "Aguardando pagamento" },
+  { value: "procuracao", label: "Procuração" },
+  { value: "funcionarios", label: "Lista de funcionários" },
+  { value: "logo", label: "Logo da empresa" },
+  { value: "visita", label: "Visita agendada" },
+  { value: "aguardando_agendamentos", label: "Aguardando agendamentos" },
   { value: "concluido", label: "Concluído" },
 ];
 
@@ -55,7 +64,8 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   procuracao: "Procuração",
   funcionarios: "Lista de funcionários",
   logo: "Logo da empresa",
-  visita: "Visita técnica",
+  visita: "Visita agendada",
+  aguardando_agendamentos: "Aguardando agendamentos",
   concluido: "Concluído",
 };
 
@@ -73,6 +83,7 @@ export const IMPLANTACAO_ETAPA_BADGE: Record<
   funcionarios: { className: "bg-[#ffedd5] text-[#c2410c]" },
   logo: { className: "bg-[#e2e8f0] text-[#475569]" },
   visita: { className: "bg-[#e0f2fe] text-[#0c4a6e]" },
+  aguardando_agendamentos: { className: "bg-[#fef9c3] text-[#a16207]" },
   concluido: { className: "bg-brand-green-soft text-brand-green" },
 };
 
@@ -127,10 +138,41 @@ export interface ImplantacaoProcesso {
   dataAprovacao: string | null;
   numeroContrato: string | null;
   ativo: boolean;
+  quantidadeContratada: number;
+  agendamentosRealizados: number;
+}
+
+export function resolveQuantidadeContratadaImplantacao(
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  contrato: ClienteContratoRecord | null
+): number {
+  const fromAprovacao = Number(aprovacao?.quantidade_colaboradores);
+  if (Number.isFinite(fromAprovacao) && fromAprovacao > 0) {
+    return Math.floor(fromAprovacao);
+  }
+  const fromContrato = Number(contrato?.quantidade_colaboradores);
+  if (Number.isFinite(fromContrato) && fromContrato > 0) {
+    return Math.floor(fromContrato);
+  }
+  return 0;
+}
+
+export function isAgendamentosImplantacaoConcluida(
+  quantidadeContratada: number,
+  agendamentosRealizados: number
+): boolean {
+  const qtd = Math.max(0, quantidadeContratada);
+  const feitos = Math.max(0, agendamentosRealizados);
+  if (qtd <= 0) return false;
+  return feitos >= qtd;
 }
 
 export function resolveImplantacaoEtapaAtual(
-  aprovacao: OrcamentoAprovacaoRecord | null
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  opts?: {
+    quantidadeContratada?: number;
+    agendamentosRealizados?: number;
+  }
 ): ImplantacaoEtapaId {
   if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
   if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
@@ -138,11 +180,18 @@ export function resolveImplantacaoEtapaAtual(
   if (!isFuncionariosEtapaConcluida(aprovacao)) return "funcionarios";
   if (!isLogoEtapaConcluida(aprovacao)) return "logo";
   if (!isVisitaEtapaConcluida(aprovacao)) return "visita";
-  return "concluido";
+  const qtd = Math.max(0, opts?.quantidadeContratada ?? 0);
+  const feitos = Math.max(0, opts?.agendamentosRealizados ?? 0);
+  if (isAgendamentosImplantacaoConcluida(qtd, feitos)) return "concluido";
+  return "aguardando_agendamentos";
 }
 
 export function countImplantacaoEtapasConcluidas(
-  aprovacao: OrcamentoAprovacaoRecord | null
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  opts?: {
+    quantidadeContratada?: number;
+    agendamentosRealizados?: number;
+  }
 ): number {
   let n = 0;
   if (isContratoEtapaConcluida(aprovacao)) n += 1;
@@ -151,13 +200,23 @@ export function countImplantacaoEtapasConcluidas(
   if (isFuncionariosEtapaConcluida(aprovacao)) n += 1;
   if (isLogoEtapaConcluida(aprovacao)) n += 1;
   if (isVisitaEtapaConcluida(aprovacao)) n += 1;
+  if (
+    isAgendamentosImplantacaoConcluida(
+      opts?.quantidadeContratada ?? 0,
+      opts?.agendamentosRealizados ?? 0
+    )
+  ) {
+    n += 1;
+  }
   return n;
 }
 
 export function implantacaoEtapaToModalTab(
   etapa: ImplantacaoEtapaId
 ): OrcamentoEtapaId {
-  if (etapa === "concluido") return "visita";
+  if (etapa === "concluido" || etapa === "aguardando_agendamentos") {
+    return "agendamentos";
+  }
   return etapa;
 }
 
@@ -165,10 +224,23 @@ export function buildImplantacaoProcesso(params: {
   orcamento: OrcamentoRecord;
   aprovacao: OrcamentoAprovacaoRecord | null;
   contrato: ClienteContratoRecord | null;
+  agendamentosRealizados?: number;
 }): ImplantacaoProcesso {
   const { orcamento, aprovacao, contrato } = params;
-  const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao);
-  const etapasConcluidas = countImplantacaoEtapasConcluidas(aprovacao);
+  const quantidadeContratada = resolveQuantidadeContratadaImplantacao(
+    aprovacao,
+    contrato
+  );
+  const agendamentosRealizados = Math.max(
+    0,
+    params.agendamentosRealizados ?? 0
+  );
+  const contagemOpts = { quantidadeContratada, agendamentosRealizados };
+  const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao, contagemOpts);
+  const etapasConcluidas = countImplantacaoEtapasConcluidas(
+    aprovacao,
+    contagemOpts
+  );
   const totalEtapas = IMPLANTACAO_ETAPAS_OPERACIONAIS.length;
   const agendamentoLiberado = contrato
     ? contratoLiberaAgendamento(contrato)
@@ -189,6 +261,8 @@ export function buildImplantacaoProcesso(params: {
     dataAprovacao: aprovacao?.aprovado_em ?? null,
     numeroContrato: contrato?.numero ?? null,
     ativo: !cancelado && !concluido,
+    quantidadeContratada,
+    agendamentosRealizados,
   };
 }
 
@@ -298,7 +372,8 @@ const ETAPA_SORT_ORDER: Record<ImplantacaoEtapaId, number> = {
   funcionarios: 4,
   logo: 5,
   visita: 6,
-  concluido: 7,
+  aguardando_agendamentos: 7,
+  concluido: 8,
 };
 
 export function sortImplantacaoProcessos(
@@ -323,7 +398,6 @@ export function sortImplantacaoProcessos(
       return da.localeCompare(db);
     }
 
-    // prioridade: pendentes antigos primeiro; concluídos e cancelados por último
     const score = (p: ImplantacaoProcesso) => {
       if (p.orcamento.status === "cancelado") return 3;
       if (p.etapaAtual === "concluido") return 2;
@@ -344,20 +418,36 @@ export type ImplantacaoEtapaVisualEstado =
   | "bloqueada";
 
 export function resolveImplantacaoEtapaVisual(
-  etapa: Exclude<ImplantacaoEtapaId, "concluido">,
+  etapa: ImplantacaoEtapaOperacionalId,
   etapaAtual: ImplantacaoEtapaId,
-  aprovacao: OrcamentoAprovacaoRecord | null
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  opts?: {
+    quantidadeContratada?: number;
+    agendamentosRealizados?: number;
+  }
 ): ImplantacaoEtapaVisualEstado {
-  const doneMap: Record<Exclude<ImplantacaoEtapaId, "concluido">, boolean> = {
+  const agendamentosDone = isAgendamentosImplantacaoConcluida(
+    opts?.quantidadeContratada ?? 0,
+    opts?.agendamentosRealizados ?? 0
+  );
+
+  const doneMap: Record<ImplantacaoEtapaOperacionalId, boolean> = {
     contrato: isContratoEtapaConcluida(aprovacao),
     financeiro: isFinanceiroEtapaConcluida(aprovacao),
     procuracao: isProcuracaoEtapaConcluida(aprovacao),
     funcionarios: isFuncionariosEtapaConcluida(aprovacao),
     logo: isLogoEtapaConcluida(aprovacao),
     visita: isVisitaEtapaConcluida(aprovacao),
+    agendamentos: agendamentosDone,
   };
 
   if (doneMap[etapa]) return "concluida";
+
+  if (etapa === "agendamentos") {
+    if (etapaAtual === "aguardando_agendamentos") return "atual";
+    return "bloqueada";
+  }
+
   if (etapaAtual === etapa) return "atual";
   return "bloqueada";
 }

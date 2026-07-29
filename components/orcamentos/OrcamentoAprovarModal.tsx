@@ -41,12 +41,14 @@ import {
   OrcamentoAbaProcuracao,
   OrcamentoAbaVisitaTecnica,
 } from "./OrcamentoEtapasExtras";
+import { OrcamentoAbaAgendamentos } from "./OrcamentoAbaAgendamentos";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
 import {
   isOrcamentoEtapaLiberada,
   type OrcamentoEtapaId,
 } from "@/lib/orcamento-etapas";
 import { buildMensagemVisitaTecnica } from "@/lib/orcamento-visita-mensagem";
+import type { ContratoAgendamentoContagem } from "@/lib/contrato-agendamentos";
 
 type TabId = OrcamentoEtapaId;
 
@@ -146,6 +148,8 @@ export function OrcamentoAprovarModal({
   const [visitaData, setVisitaData] = useState("");
   const [visitaEndereco, setVisitaEndereco] = useState("");
   const [visitaObservacoes, setVisitaObservacoes] = useState("");
+  const [agendamentosContagem, setAgendamentosContagem] =
+    useState<ContratoAgendamentoContagem | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -181,6 +185,7 @@ export function OrcamentoAprovarModal({
     setObservacaoProcuracao(aprovacao?.observacao_procuracao ?? "");
     setFuncionariosFile(null);
     setLogoFile(null);
+    setAgendamentosContagem(null);
     setVisitaNecessaria(
       aprovacao?.visita_tecnica_necessaria == null
         ? null
@@ -405,6 +410,7 @@ export function OrcamentoAprovarModal({
         ? emptyToNull(visitaObservacoes)
         : null,
     });
+    setTab("agendamentos");
   }
 
   async function handleCopiarMensagemVisita() {
@@ -493,6 +499,20 @@ export function OrcamentoAprovarModal({
             aprovacao={aprovacao}
             orcamentoAprovado={orcamentoAprovado}
             disabled={saving}
+            contagemAgendamentos={
+              agendamentosContagem
+                ? {
+                    quantidadeContratada: agendamentosContagem.contratados,
+                    agendamentosRealizados: agendamentosContagem.realizados,
+                  }
+                : aprovacao
+                  ? {
+                      quantidadeContratada:
+                        Number(aprovacao.quantidade_colaboradores) || 0,
+                      agendamentosRealizados: 0,
+                    }
+                  : null
+            }
             onChange={setTab}
           />
         </div>
@@ -1031,6 +1051,20 @@ export function OrcamentoAprovarModal({
               onChangeObservacoes={setVisitaObservacoes}
               onCopiarMensagem={() => void handleCopiarMensagemVisita()}
               onSalvar={() => void handleSalvarVisitaClick()}
+            />
+          ) : null}
+
+          {tab === "agendamentos" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "agendamentos",
+            aprovacao,
+            orcamentoAprovado
+          ) ? (
+            <OrcamentoAbaAgendamentos
+              orcamentoId={orcamento.id}
+              aprovacao={aprovacao}
+              onContagemChange={setAgendamentosContagem}
             />
           ) : null}
         </div>
