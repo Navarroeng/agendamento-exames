@@ -65,6 +65,13 @@ function EsocialStatusBadge({ status }: { status: ESocialVisualStatus }) {
       </span>
     );
   }
+  if (status === "cancelado") {
+    return (
+      <span className="inline-block rounded-md bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-bold text-[#475569] ring-1 ring-[#e2e8f0]">
+        Cancelado
+      </span>
+    );
+  }
   return (
     <span className="inline-block rounded-md bg-brand-orange-soft px-2 py-0.5 text-[10px] font-bold text-[#c96d00]">
       Pendente
@@ -86,6 +93,8 @@ interface ESocialTableProps {
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
   onMarcarPendente: (id: string) => void;
+  onCancelarEnvio: (id: string) => void;
+  onVerCancelamento: (id: string) => void;
 }
 
 export function ESocialTable({
@@ -102,6 +111,8 @@ export function ESocialTable({
   onVisualizar,
   onMarcarEnviado,
   onMarcarPendente,
+  onCancelarEnvio,
+  onVerCancelamento,
 }: ESocialTableProps) {
   return (
     <section className="panel-card mb-4 scroll-mt-6">
@@ -215,6 +226,8 @@ export function ESocialTable({
                             onVisualizar={onVisualizar}
                             onMarcarEnviado={onMarcarEnviado}
                             onMarcarPendente={onMarcarPendente}
+                            onCancelarEnvio={onCancelarEnvio}
+                            onVerCancelamento={onVerCancelamento}
                           />
                         </td>
                       </tr>

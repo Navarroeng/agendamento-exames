@@ -1,5 +1,6 @@
 import { addMonthsToIsoDate } from "@/lib/cliente-contrato-dates";
 import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
+import { getESocialVisualStatus } from "@/lib/esocial-filters";
 import { formatDateBR } from "@/lib/format";
 import type {
   AgendamentoWithExames,
@@ -101,7 +102,10 @@ export function buildKpis(
     totalFaturado,
     custosClinicas,
     lucroBruto: totalFaturado - custosClinicas,
-    pendenciasEsocial: filtered.filter((a) => !a.envio_esocial).length,
+    pendenciasEsocial: filtered.filter((a) => {
+      const status = getESocialVisualStatus(a);
+      return status === "pendente" || status === "urgente";
+    }).length,
     periodicosVencendo,
     contratosVencendo,
     contratosAtivos: contratosAtivos.length,
@@ -133,7 +137,10 @@ export function buildPendenciasOperacionais(
     if (!item.aso_assinado) {
       rows.push({ id: `${item.id}-assinado`, ...base, statusPendente: "ASO não assinado" });
     }
-    if (!item.envio_esocial) {
+    if (
+      getESocialVisualStatus(item) === "pendente" ||
+      getESocialVisualStatus(item) === "urgente"
+    ) {
       rows.push({ id: `${item.id}-esocial`, ...base, statusPendente: "e-Social pendente" });
     }
   });
@@ -233,7 +240,10 @@ export function buildEsocialEmpresasPendentes(
   const map = new Map<string, Set<string>>();
 
   filterAgendamentosRelatorios(agendamentos, filters)
-    .filter((a) => !a.envio_esocial)
+    .filter((a) => {
+      const status = getESocialVisualStatus(a);
+      return status === "pendente" || status === "urgente";
+    })
     .forEach((a) => {
       const set = map.get(a.cliente_nome) ?? new Set<string>();
       set.add(a.colaborador);

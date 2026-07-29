@@ -344,6 +344,75 @@ export async function atualizarEnvioEsocial(
   return result.data as EnvioEsocialUpdate;
 }
 
+export type CancelarEnvioEsocialUpdate = Pick<
+  AgendamentoWithExames,
+  | "id"
+  | "esocial_envio_cancelado"
+  | "esocial_cancelado_em"
+  | "esocial_cancelado_por"
+  | "esocial_motivo_cancelamento"
+  | "esocial_status_anterior"
+  | "envio_esocial"
+  | "data_envio_esocial"
+  | "esocial_recibo"
+>;
+
+/**
+ * Cancela o controle interno de envio ao e-Social.
+ * Não apaga data de envio nem número do recibo.
+ */
+export async function cancelarEnvioEsocial(params: {
+  id: string;
+  motivo: string;
+  canceladoPor: string;
+  statusAnterior: string;
+}): Promise<CancelarEnvioEsocialUpdate> {
+  const motivo = params.motivo.trim();
+  if (!motivo) {
+    throw new Error("Informe o motivo do cancelamento.");
+  }
+
+  const supabase = createClient();
+  const canceladoEm = new Date().toISOString();
+
+  const { data: atual, error: fetchError } = await supabase
+    .from("agendamentos")
+    .select(
+      "id, esocial_envio_cancelado, envio_esocial, data_envio_esocial, esocial_recibo"
+    )
+    .eq("id", params.id)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!atual) throw new Error("Agendamento não encontrado.");
+  if (atual.esocial_envio_cancelado === true) {
+    throw new Error("Este envio ao e-Social já está cancelado.");
+  }
+
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .update({
+      esocial_envio_cancelado: true,
+      esocial_cancelado_em: canceladoEm,
+      esocial_cancelado_por: params.canceladoPor.trim(),
+      esocial_motivo_cancelamento: motivo,
+      esocial_status_anterior: params.statusAnterior,
+    })
+    .eq("id", params.id)
+    .eq("esocial_envio_cancelado", false)
+    .select(
+      "id, esocial_envio_cancelado, esocial_cancelado_em, esocial_cancelado_por, esocial_motivo_cancelamento, esocial_status_anterior, envio_esocial, data_envio_esocial, esocial_recibo"
+    )
+    .single();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Não foi possível cancelar o envio ao e-Social.");
+  }
+
+  return data as CancelarEnvioEsocialUpdate;
+}
+
 export async function cancelarAgendamento(
   id: string,
   motivoCancelamento: string,

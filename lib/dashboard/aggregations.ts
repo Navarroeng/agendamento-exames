@@ -103,7 +103,10 @@ export function buildDashboardKpis(
     (a) => a.data_agendamento.split("T")[0] === hoje
   ).length;
 
-  const pendenciasEsocial = active.filter((a) => !a.envio_esocial).length;
+  const pendenciasEsocial = active.filter((a) => {
+    const status = getESocialVisualStatus(a);
+    return status === "pendente" || status === "urgente";
+  }).length;
 
   const asosPendentesAssinatura = active.filter((a) => !a.aso_assinado).length;
 

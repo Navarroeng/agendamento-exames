@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
-import { AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   INVALID_DATE_TOAST,
   isValidDateBR,
@@ -13,9 +13,12 @@ import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloquei
 import {
   EMPTY_ESOCIAL_FILTERS,
   ESOCIAL_PAGE_SIZE,
+  ESOCIAL_VISUAL_STATUS_LABELS,
   computeESocialSummary,
   extractESocialFilterOptions,
   filterAgendamentosESocial,
+  getESocialVisualStatusSemCancelamento,
+  isEsocialEnvioCancelado,
   type ESocialFilters,
 } from "@/lib/esocial-filters";
 import {
@@ -37,7 +40,10 @@ import {
 import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
-import { atualizarEnvioEsocial } from "@/services/agendamento.service";
+import {
+  atualizarEnvioEsocial,
+  cancelarEnvioEsocial,
+} from "@/services/agendamento.service";
 import {
   registrarTentativaReciboEsocialDuplicado,
   verificarReciboEsocialDuplicado,
@@ -45,6 +51,7 @@ import {
 import {
   listarBloqueioFaturaPorAgendamentos,
 } from "@/services/agendamento-fatura-bloqueio.service";
+import { registrarAuditoria } from "@/services/auditoria.service";
 import { registrarHistorico } from "@/services/historico.service";
 import type { AgendamentoWithExames } from "@/lib/types";
 
@@ -82,6 +89,11 @@ export function useESocialPage() {
   const [bloqueioPorAgendamento, setBloqueioPorAgendamento] = useState<
     Map<string, AgendamentoFaturaBloqueio>
   >(new Map());
+
+  const [cancelTarget, setCancelTarget] =
+    useState<AgendamentoWithExames | null>(null);
+  const [verCancelamentoTarget, setVerCancelamentoTarget] =
+    useState<AgendamentoWithExames | null>(null);
 
   useEffect(() => {
     const ids = agendamentos.map((agendamento) => agendamento.id);
@@ -199,13 +211,22 @@ export function useESocialPage() {
   );
 
   const openMarcarEnviado = useCallback((id: string) => {
+    const ag = getById(id);
+    if (!ag) {
+      toast.error("Agendamento não encontrado.");
+      return;
+    }
+    if (isEsocialEnvioCancelado(ag)) {
+      toast.error("Envio cancelado. Consulte o motivo do cancelamento.");
+      return;
+    }
     setMarcarEnviadoId(id);
     setDataEnvioInput("");
     setReciboInput("");
     setReciboError(null);
     setReciboDuplicadoInfo(null);
     setMarcarEnviadoOpen(true);
-  }, []);
+  }, [getById]);
 
   const closeMarcarEnviado = useCallback(() => {
     if (saving || validatingRecibo) return;
@@ -337,6 +358,10 @@ export function useESocialPage() {
         toast.error("Agendamento não encontrado.");
         return;
       }
+      if (isEsocialEnvioCancelado(ag)) {
+        toast.error("Envio cancelado. Consulte o motivo do cancelamento.");
+        return;
+      }
 
       const ok = window.confirm(
         `Marcar o agendamento de ${ag.colaborador} como pendente de e-Social? A data de envio e o Nº Recibo serão removidos.`
@@ -373,6 +398,135 @@ export function useESocialPage() {
     [getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
   );
 
+  const openCancelarEnvio = useCallback(
+    (id: string) => {
+      const ag = getById(id);
+      if (!ag) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (isEsocialEnvioCancelado(ag)) {
+        toast.error("Este envio ao e-Social já está cancelado.");
+        return;
+      }
+      setCancelTarget(ag);
+    },
+    [getById]
+  );
+
+  const closeCancelarEnvio = useCallback(() => {
+    if (saving) return;
+    setCancelTarget(null);
+  }, [saving]);
+
+  const handleConfirmCancelarEnvio = useCallback(
+    async (motivo: string) => {
+      if (!cancelTarget) return;
+      const statusAnterior = getESocialVisualStatusSemCancelamento(cancelTarget);
+      setSaving(true);
+      try {
+        const updated = await cancelarEnvioEsocial({
+          id: cancelTarget.id,
+          motivo,
+          canceladoPor: auditContext.usuarioNome,
+          statusAnterior,
+        });
+
+        updateAgendamentoInList(cancelTarget.id, {
+          esocial_envio_cancelado: updated.esocial_envio_cancelado,
+          esocial_cancelado_em: updated.esocial_cancelado_em,
+          esocial_cancelado_por: updated.esocial_cancelado_por,
+          esocial_motivo_cancelamento: updated.esocial_motivo_cancelamento,
+          esocial_status_anterior: updated.esocial_status_anterior,
+        });
+
+        const statusLabel =
+          ESOCIAL_VISUAL_STATUS_LABELS[statusAnterior] ?? statusAnterior;
+        const recibo = cancelTarget.esocial_recibo?.trim() || "—";
+        const dataEnvio = cancelTarget.data_envio_esocial?.split("T")[0] || "—";
+
+        await registrarHistorico(
+          cancelTarget.id,
+          usuario,
+          [
+            {
+              acao: "Cancelamento",
+              detalhes: `${usuario} cancelou o controle de envio ao eSocial. Status anterior: ${statusLabel}. Motivo: ${motivo}`,
+            },
+          ],
+          {
+            auditContext,
+            auditModulo: AUDITORIA_MODULOS.esocial,
+            registroNome: cancelTarget.colaborador,
+          }
+        );
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.esocial,
+          acao: AUDITORIA_ACOES.cancelamento,
+          registroId: cancelTarget.id,
+          registroNome: cancelTarget.colaborador,
+          descricao: `${auditContext.usuarioNome} cancelou o controle de envio ao eSocial do agendamento de ${cancelTarget.colaborador}. Status anterior: ${statusLabel}. Motivo: ${motivo}`,
+          dadosAntes: {
+            status_visual: statusAnterior,
+            envio_esocial: cancelTarget.envio_esocial,
+            data_envio_esocial: cancelTarget.data_envio_esocial,
+            esocial_recibo: cancelTarget.esocial_recibo,
+          },
+          dadosDepois: {
+            esocial_envio_cancelado: true,
+            esocial_motivo_cancelamento: motivo,
+            esocial_status_anterior: statusAnterior,
+            data_envio_esocial: dataEnvio,
+            esocial_recibo: recibo,
+            origem: "pagina_esocial",
+          },
+        });
+
+        await reloadAgendamentos();
+        toast.success("Envio ao e-Social cancelado.");
+        setCancelTarget(null);
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao cancelar envio ao e-Social."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      auditContext,
+      cancelTarget,
+      reloadAgendamentos,
+      updateAgendamentoInList,
+      usuario,
+    ]
+  );
+
+  const openVerCancelamento = useCallback(
+    (id: string) => {
+      const ag = getById(id);
+      if (!ag) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (!isEsocialEnvioCancelado(ag)) {
+        toast.error("Este registro não possui cancelamento de e-Social.");
+        return;
+      }
+      setVerCancelamentoTarget(ag);
+    },
+    [getById]
+  );
+
+  const closeVerCancelamento = useCallback(() => {
+    setVerCancelamentoTarget(null);
+  }, []);
+
   const viewFaturaBloqueio = useMemo(() => {
     if (!viewAgendamento) return null;
     return bloqueioPorAgendamento.get(viewAgendamento.id) ?? null;
@@ -406,6 +560,13 @@ export function useESocialPage() {
     closeMarcarEnviado,
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
+    openCancelarEnvio,
+    closeCancelarEnvio,
+    handleConfirmCancelarEnvio,
+    cancelTarget,
+    openVerCancelamento,
+    closeVerCancelamento,
+    verCancelamentoTarget,
     marcarEnviadoOpen,
     validatingRecibo,
     reciboError,

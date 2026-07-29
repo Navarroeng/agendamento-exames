@@ -12,9 +12,14 @@ export type ESocialStatusFilter =
   | "pendente"
   | "urgente"
   | "enviado"
+  | "cancelado"
   | "todos";
 
-export type ESocialVisualStatus = "enviado" | "pendente" | "urgente";
+export type ESocialVisualStatus =
+  | "enviado"
+  | "pendente"
+  | "urgente"
+  | "cancelado";
 
 export interface ESocialFilters {
   cliente: string;
@@ -33,6 +38,7 @@ export const ESOCIAL_STATUS_OPTIONS: ReadonlyArray<{
   { value: "pendente", label: "Pendentes" },
   { value: "urgente", label: "Enviar urgente" },
   { value: "enviado", label: "Enviado" },
+  { value: "cancelado", label: "Cancelado" },
   { value: "todos", label: "Todos" },
 ];
 
@@ -46,6 +52,12 @@ export const EMPTY_ESOCIAL_FILTERS: ESocialFilters = {
 };
 
 const URGENTE_DIAS = 30;
+
+export function isEsocialEnvioCancelado(
+  agendamento: Pick<AgendamentoWithExames, "esocial_envio_cancelado">
+): boolean {
+  return agendamento.esocial_envio_cancelado === true;
+}
 
 /** Normaliza envio_esocial (boolean ou legado Sim/Não/texto do banco). */
 export function isEnvioEsocialConcluido(
@@ -76,14 +88,30 @@ function daysSinceExam(isoDate: string): number {
   return Math.floor((hoje.getTime() - exam.getTime()) / 86400000);
 }
 
-export function getESocialVisualStatus(
+/** Status derivado sem considerar cancelamento (para gravar status anterior). */
+export function getESocialVisualStatusSemCancelamento(
   agendamento: AgendamentoWithExames
-): ESocialVisualStatus {
+): Exclude<ESocialVisualStatus, "cancelado"> {
   if (isEnvioEsocialConcluido(agendamento.envio_esocial)) return "enviado";
   const dias = daysSinceExam(agendamento.data_agendamento);
   if (dias > URGENTE_DIAS) return "urgente";
   return "pendente";
 }
+
+export function getESocialVisualStatus(
+  agendamento: AgendamentoWithExames
+): ESocialVisualStatus {
+  if (isEsocialEnvioCancelado(agendamento)) return "cancelado";
+  return getESocialVisualStatusSemCancelamento(agendamento);
+}
+
+export const ESOCIAL_VISUAL_STATUS_LABELS: Record<ESocialVisualStatus, string> =
+  {
+    enviado: "Enviado",
+    pendente: "Pendente",
+    urgente: "Enviar urgente",
+    cancelado: "Cancelado",
+  };
 
 function matchesText(value: string, query: string): boolean {
   return textMatchesSearch(value, query);
@@ -129,6 +157,8 @@ function matchesStatusFilter(
       return visual === "urgente";
     case "enviado":
       return visual === "enviado";
+    case "cancelado":
+      return visual === "cancelado";
     case "todos":
       return true;
     default:
@@ -199,7 +229,8 @@ export function computeESocialSummary(
     const visual = getESocialVisualStatus(a);
     if (visual === "enviado") enviados += 1;
     else if (visual === "urgente") enviarUrgente += 1;
-    else pendentes += 1;
+    else if (visual === "pendente") pendentes += 1;
+    // cancelado: não entra em pendentes/urgente/enviados
   });
 
   const percentualEnviado =

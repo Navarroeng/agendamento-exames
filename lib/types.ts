@@ -46,6 +46,11 @@ export interface AgendamentoInsert {
   envio_esocial: boolean;
   data_envio_esocial: string | null;
   esocial_recibo?: string | null;
+  esocial_envio_cancelado?: boolean;
+  esocial_cancelado_em?: string | null;
+  esocial_cancelado_por?: string | null;
+  esocial_motivo_cancelamento?: string | null;
+  esocial_status_anterior?: string | null;
   cargo_id?: string | null;
   cargo_nome?: string | null;
   status: AgendamentoStatus;

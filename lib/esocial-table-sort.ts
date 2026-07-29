@@ -38,6 +38,7 @@ const STATUS_SORT_LABELS: Record<
   enviado: "Enviado",
   urgente: "Enviar urgente",
   pendente: "Pendente",
+  cancelado: "Cancelado",
 };
 
 function compareTextPtBr(a: string, b: string): number {

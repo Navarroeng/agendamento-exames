@@ -4,10 +4,12 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconEsocial } from "@/components/ui/icons/OutlineIcons";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { useESocialPage } from "@/hooks/useESocialPage";
+import { ESocialCancelarEnvioModal } from "./ESocialCancelarEnvioModal";
 import { ESocialFiltersPanel } from "./ESocialFilters";
 import { ESocialMarcarEnviadoModal } from "./ESocialMarcarEnviadoModal";
 import { ESocialSummaryCards } from "./ESocialSummaryCards";
 import { ESocialTable } from "./ESocialTable";
+import { ESocialVerCancelamentoModal } from "./ESocialVerCancelamentoModal";
 
 export function ESocialPage() {
   const {
@@ -31,12 +33,18 @@ export function ESocialPage() {
     viewAgendamento,
     setViewAgendamento,
     viewFaturaBloqueio,
-    bloqueioPorAgendamento,
     handleVisualizar,
     openMarcarEnviado,
     closeMarcarEnviado,
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
+    openCancelarEnvio,
+    closeCancelarEnvio,
+    handleConfirmCancelarEnvio,
+    cancelTarget,
+    openVerCancelamento,
+    closeVerCancelamento,
+    verCancelamentoTarget,
     marcarEnviadoOpen,
     validatingRecibo,
     reciboError,
@@ -80,6 +88,8 @@ export function ESocialPage() {
           onVisualizar={handleVisualizar}
           onMarcarEnviado={openMarcarEnviado}
           onMarcarPendente={handleMarcarPendente}
+          onCancelarEnvio={openCancelarEnvio}
+          onVerCancelamento={openVerCancelamento}
         />
       </div>
 
@@ -101,6 +111,22 @@ export function ESocialPage() {
         onChangeRecibo={handleReciboInputChange}
         onClose={closeMarcarEnviado}
         onConfirm={handleConfirmMarcarEnviado}
+      />
+
+      <ESocialCancelarEnvioModal
+        open={Boolean(cancelTarget)}
+        agendamento={cancelTarget}
+        saving={saving}
+        onClose={closeCancelarEnvio}
+        onConfirm={(motivo) => {
+          void handleConfirmCancelarEnvio(motivo);
+        }}
+      />
+
+      <ESocialVerCancelamentoModal
+        open={Boolean(verCancelamentoTarget)}
+        agendamento={verCancelamentoTarget}
+        onClose={closeVerCancelamento}
       />
     </AppShell>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { isEnvioEsocialConcluido } from "@/lib/esocial-filters";
+import {
+  isEnvioEsocialConcluido,
+  isEsocialEnvioCancelado,
+} from "@/lib/esocial-filters";
 import type { AgendamentoWithExames } from "@/lib/types";
 
 interface ESocialRowActionsMenuProps {
@@ -9,18 +12,29 @@ interface ESocialRowActionsMenuProps {
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
   onMarcarPendente: (id: string) => void;
+  onCancelarEnvio: (id: string) => void;
+  onVerCancelamento: (id: string) => void;
   disabled?: boolean;
 }
+
+type MenuItem = {
+  key: string;
+  label: string;
+  danger?: boolean;
+};
 
 export function ESocialRowActionsMenu({
   agendamento,
   onVisualizar,
   onMarcarEnviado,
   onMarcarPendente,
+  onCancelarEnvio,
+  onVerCancelamento,
   disabled = false,
 }: ESocialRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const cancelado = isEsocialEnvioCancelado(agendamento);
   const enviado = isEnvioEsocialConcluido(agendamento.envio_esocial);
 
   useEffect(() => {
@@ -36,15 +50,22 @@ export function ESocialRowActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const items = enviado
+  const items: MenuItem[] = cancelado
     ? [
         { key: "visualizar", label: "Ver agendamento" },
-        { key: "pendente", label: "Marcar como pendente" },
+        { key: "ver_cancelamento", label: "Ver cancelamento" },
       ]
-    : [
-        { key: "visualizar", label: "Ver agendamento" },
-        { key: "enviado", label: "Marcar como enviado" },
-      ];
+    : enviado
+      ? [
+          { key: "visualizar", label: "Ver agendamento" },
+          { key: "pendente", label: "Marcar como pendente" },
+          { key: "cancelar", label: "Cancelar envio", danger: true },
+        ]
+      : [
+          { key: "visualizar", label: "Ver agendamento" },
+          { key: "enviado", label: "Marcar como enviado" },
+          { key: "cancelar", label: "Cancelar envio", danger: true },
+        ];
 
   function handleAction(key: string) {
     setOpen(false);
@@ -58,6 +79,12 @@ export function ESocialRowActionsMenu({
         break;
       case "pendente":
         onMarcarPendente(agendamento.id);
+        break;
+      case "cancelar":
+        onCancelarEnvio(agendamento.id);
+        break;
+      case "ver_cancelamento":
+        onVerCancelamento(agendamento.id);
         break;
     }
   }
@@ -81,7 +108,7 @@ export function ESocialRowActionsMenu({
 
       {open && (
         <div
-          className="absolute right-0 top-full z-20 mt-1 min-w-[168px] overflow-hidden rounded-[10px] border border-[#e8edf5] bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.12)]"
+          className="absolute right-0 top-full z-20 mt-1 min-w-[176px] overflow-hidden rounded-[10px] border border-[#e8edf5] bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.12)]"
           role="menu"
         >
           {items.map((item) => (
@@ -91,9 +118,11 @@ export function ESocialRowActionsMenu({
               role="menuitem"
               onClick={() => handleAction(item.key)}
               className={`block w-full px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${
-                item.key === "pendente"
-                  ? "text-[#64748b] hover:bg-brand-orange-soft hover:text-[#c96d00]"
-                  : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
+                item.danger
+                  ? "text-[#64748b] hover:bg-brand-red-soft hover:text-brand-red"
+                  : item.key === "pendente"
+                    ? "text-[#64748b] hover:bg-brand-orange-soft hover:text-[#c96d00]"
+                    : "text-[#475569] hover:bg-[#f0f4ff] hover:text-brand-blue"
               }`}
             >
               {item.label}
