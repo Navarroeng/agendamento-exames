@@ -17,10 +17,13 @@ comment on function public.calcular_fim_vigencia_meses(date, integer) is
   'Fim da vigência por meses de calendário (padrão 12).';
 
 -- Espelha a regra TS: assinado+pago → ativo (não usa mais "pago" como status principal).
-create or replace function public.resolve_status_contrato_from_aprovacao(
-  p_contrato_enviado boolean,
-  p_contrato_assinado boolean,
-  p_boleto_pago boolean,
+-- DROP necessário: CREATE OR REPLACE não pode renomear parâmetros (p_enviado → p_contrato_enviado).
+drop function if exists public.resolve_status_contrato_from_aprovacao(boolean, boolean, boolean, date);
+
+create function public.resolve_status_contrato_from_aprovacao(
+  p_enviado boolean,
+  p_assinado boolean,
+  p_pago boolean,
   p_boleto_vencimento date
 )
 returns text
@@ -28,16 +31,17 @@ language plpgsql
 immutable
 as $$
 begin
-  if coalesce(p_boleto_pago, false) and coalesce(p_contrato_assinado, false) then
+  -- Assinado + pago → status contratual ativo (financeiro continua em boleto_pago).
+  if coalesce(p_pago, false) and coalesce(p_assinado, false) then
     return 'ativo';
   end if;
-  if coalesce(p_contrato_assinado, false) then
+  if coalesce(p_assinado, false) then
     if p_boleto_vencimento is not null then
       return 'aguardando_pagamento';
     end if;
     return 'assinado';
   end if;
-  if coalesce(p_contrato_enviado, false) then
+  if coalesce(p_enviado, false) then
     return 'enviado';
   end if;
   return 'aguardando_envio';
