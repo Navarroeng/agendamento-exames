@@ -112,7 +112,18 @@ export function ImplantacaoTable({
                   <tr key={processo.orcamento.id}>
                     <td className="whitespace-nowrap">{dataAprovacao}</td>
                     <td className="font-bold text-navy">
-                      {processo.orcamento.numero}
+                      <span className="inline-flex items-center gap-1.5">
+                        {processo.orcamento.origem_cliente === "renovacao" && (
+                          <span
+                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ea580c] text-[11px] font-extrabold leading-none text-white"
+                            title="Cliente em renovação de contrato"
+                            aria-label="Cliente em renovação de contrato"
+                          >
+                            R
+                          </span>
+                        )}
+                        <span>{processo.orcamento.numero}</span>
+                      </span>
                     </td>
                     <td className="max-w-[200px] truncate">
                       {processo.orcamento.cliente_nome}
