@@ -2,112 +2,65 @@ import assert from "node:assert/strict";
 import {
   agendamentoConsomeSaldoContrato,
   buildContratoAgendamentoContagem,
-  colaboradorContagemKey,
-  colaboradorJaConsomeSaldoNoContrato,
-  countAgendamentosAdicionais,
-  countColaboradoresUnicos,
-  isAgendamentoValidoParaContrato,
+  isAgendamentoSelecionavel,
+  isDataNaVigencia,
+  resolveClassificacaoAgendamento,
 } from "../lib/contrato-agendamentos";
 
-const contratoA = "ctr-a";
-const contratoB = "ctr-b";
+assert.equal(isAgendamentoSelecionavel("agendado"), true);
+assert.equal(isAgendamentoSelecionavel("rascunho"), true);
+assert.equal(isAgendamentoSelecionavel("aso_retido"), true);
+assert.equal(isAgendamentoSelecionavel("cancelado"), false);
 
 assert.equal(
-  isAgendamentoValidoParaContrato(
-    { status: "agendado", contrato_id: contratoA },
-    contratoA
-  ),
-  true
+  resolveClassificacaoAgendamento({ status: "cancelado", selecionado: true }),
+  "cancelado"
 );
 assert.equal(
-  isAgendamentoValidoParaContrato(
-    { status: "cancelado", contrato_id: contratoA },
-    contratoA
-  ),
-  false
+  resolveClassificacaoAgendamento({ status: "agendado", selecionado: true }),
+  "contrato"
+);
+assert.equal(
+  resolveClassificacaoAgendamento({ status: "agendado", selecionado: false }),
+  "adicional"
 );
 
-assert.equal(
-  colaboradorContagemKey({
-    colaborador: "X",
-    colaborador_cpf: "123.456.789-09",
-  }),
-  "cpf:12345678909"
-);
-assert.equal(
-  colaboradorContagemKey({ colaborador: "SEM CPF", colaborador_cpf: "" }),
-  null
-);
+assert.equal(isDataNaVigencia("2026-03-15", "2026-01-01", "2026-12-31"), true);
+assert.equal(isDataNaVigencia("2025-12-31", "2026-01-01", "2026-12-31"), false);
+assert.equal(isDataNaVigencia("2027-01-01", "2026-01-01", "2026-12-31"), false);
 
-const rows = [
-  {
-    id: "1",
-    status: "agendado" as const,
-    contrato_id: contratoA,
-    colaborador: "MARIA",
-    colaborador_cpf: "123.456.789-09",
-    consome_saldo_contrato: true,
-  },
-  {
-    id: "2",
-    status: "agendado" as const,
-    contrato_id: contratoA,
-    colaborador: "MARIA DA SILVA",
-    colaborador_cpf: "12345678909",
-    consome_saldo_contrato: true,
-  },
-  {
-    id: "3",
-    status: "agendado" as const,
-    contrato_id: contratoA,
-    colaborador: "ANA",
-    colaborador_cpf: "55566677788",
-    consome_saldo_contrato: false,
-  },
-  {
-    id: "4",
-    status: "cancelado" as const,
-    contrato_id: contratoA,
-    colaborador: "JOAO",
-    colaborador_cpf: "98765432100",
-    consome_saldo_contrato: true,
-  },
-  {
-    id: "5",
-    status: "agendado" as const,
-    contrato_id: contratoB,
-    colaborador: "PEDRO",
-    colaborador_cpf: "11122233344",
-    consome_saldo_contrato: true,
-  },
-];
-
-assert.equal(countColaboradoresUnicos(rows, contratoA), 1);
-assert.equal(countAgendamentosAdicionais(rows, contratoA), 1);
-assert.equal(
-  colaboradorJaConsomeSaldoNoContrato(rows, contratoA, "123.456.789-09"),
-  true
-);
-assert.equal(
-  colaboradorJaConsomeSaldoNoContrato(rows, contratoA, "55566677788"),
-  false
-);
 assert.equal(
   agendamentoConsomeSaldoContrato({
     status: "agendado",
-    contrato_id: contratoA,
+    contrato_id: "ctr-a",
     consome_saldo_contrato: null,
   }),
   true
 );
+assert.equal(
+  agendamentoConsomeSaldoContrato({
+    status: "cancelado",
+    contrato_id: "ctr-a",
+    consome_saldo_contrato: true,
+  }),
+  false
+);
 
-const c0 = buildContratoAgendamentoContagem(5, 0, 0);
-assert.equal(c0.disponiveis, 5);
-assert.equal(c0.concluido, false);
+// Exemplo da especificação: 3 previstos, 3 selecionados, 2 adicionais válidos
+const c = buildContratoAgendamentoContagem(3, 3, 2);
+assert.equal(c.previstos, 3);
+assert.equal(c.utilizados, 3);
+assert.equal(c.disponiveis, 0);
+assert.equal(c.adicionais, 2);
+assert.equal(c.percentual, 100);
+assert.equal(c.concluido, true);
 
-const c5 = buildContratoAgendamentoContagem(5, 5, 2);
-assert.equal(c5.disponiveis, 0);
-assert.equal(c5.adicionais, 2);
-assert.equal(c5.concluido, true);
+const parcial = buildContratoAgendamentoContagem(3, 2, 3);
+assert.equal(parcial.disponiveis, 1);
+assert.equal(parcial.concluido, false);
+assert.equal(parcial.percentual < 100, true);
+
+const zero = buildContratoAgendamentoContagem(0, 0, 0);
+assert.equal(zero.concluido, false);
 
 console.log("ok: contrato-agendamentos");

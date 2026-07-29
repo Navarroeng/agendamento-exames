@@ -111,13 +111,7 @@ import {
   cancelarAgendamento,
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
-import {
-  listarContratosComSaldoParaVinculo,
-  resolverConsomeSaldoAoVincular,
-  buscarContratoPorId,
-  type ContratoAptoAgendamento,
-} from "@/services/contrato-agendamentos.service";
-import type { VinculoContratoDecision } from "@/lib/contrato-agendamentos";
+import { invalidarContabilizacaoPorCancelamento } from "@/services/contrato-agendamentos.service";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -240,23 +234,6 @@ export function useAgendamentosPage() {
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
   const [cargosLoading, setCargosLoading] = useState(false);
-  const [vinculoComSaldo, setVinculoComSaldo] = useState<
-    ContratoAptoAgendamento[]
-  >([]);
-  const [vinculoSemSaldo, setVinculoSemSaldo] = useState<
-    ContratoAptoAgendamento[]
-  >([]);
-  const [vinculoDecision, setVinculoDecision] =
-    useState<VinculoContratoDecision>("pendente");
-  const [vinculoContratoId, setVinculoContratoId] = useState<string | null>(
-    null
-  );
-  const [vinculoLoading, setVinculoLoading] = useState(false);
-  const [contratoEditInfo, setContratoEditInfo] = useState<{
-    numero: string | null;
-    orcamento: string | null;
-    consome: boolean | null;
-  } | null>(null);
 
   const formularioClienteLiberado = useMemo(() => {
     const isNovo = !editingId && !editingSomenteDocumentacao;
@@ -712,42 +689,6 @@ export function useAgendamentosPage() {
     [cargoId, exams, pricingLoading, cargosLoading]
   );
 
-  const limparVinculoContratoState = useCallback(() => {
-    setVinculoComSaldo([]);
-    setVinculoSemSaldo([]);
-    setVinculoDecision("pendente");
-    setVinculoContratoId(null);
-    setVinculoLoading(false);
-    setContratoEditInfo(null);
-  }, []);
-
-  const carregarVinculoContratosCliente = useCallback(
-    async (clienteNome: string) => {
-      const nome = clienteNome.trim();
-      if (!nome) {
-        limparVinculoContratoState();
-        return;
-      }
-      setVinculoLoading(true);
-      try {
-        const { comSaldo, semSaldo } =
-          await listarContratosComSaldoParaVinculo(nome);
-        setVinculoComSaldo(comSaldo);
-        setVinculoSemSaldo(semSaldo);
-        setVinculoDecision("pendente");
-        setVinculoContratoId(
-          comSaldo.length === 1 ? comSaldo[0].contrato.id : null
-        );
-      } catch (err) {
-        console.error("Erro ao carregar contratos para vínculo:", err);
-        limparVinculoContratoState();
-      } finally {
-        setVinculoLoading(false);
-      }
-    },
-    [limparVinculoContratoState]
-  );
-
   const resetForm = useCallback(() => {
     reset();
     resetExams();
@@ -768,8 +709,7 @@ export function useAgendamentosPage() {
     setClienteValidacaoLoading(false);
     clienteValidacaoSeqRef.current += 1;
     prevAsoRef.current = "";
-    limparVinculoContratoState();
-  }, [reset, resetExams, limparVinculoContratoState]);
+  }, [reset, resetExams]);
 
   const clearFormPorInadimplencia = useCallback(() => {
     setClienteId("");
@@ -859,7 +799,6 @@ export function useAgendamentosPage() {
 
         setClienteId(nextClienteId);
         setField("cliente_nome", cliente.nome);
-        void carregarVinculoContratosCliente(cliente.nome);
         return true;
       } catch (err) {
         if (seq !== clienteValidacaoSeqRef.current) return false;
@@ -873,7 +812,7 @@ export function useAgendamentosPage() {
         }
       }
     },
-    [clientes, editingId, form.cliente_nome, auditContext, setField, clearFormPorInadimplencia, exibirBloqueioInadimplencia, carregarVinculoContratosCliente]
+    [clientes, editingId, form.cliente_nome, auditContext, setField, clearFormPorInadimplencia, exibirBloqueioInadimplencia]
   );
 
   const closeInadimplenciaModal = useCallback(() => {
@@ -987,13 +926,12 @@ export function useAgendamentosPage() {
         setClienteValidacaoLoading(false);
         setClienteId("");
         setField("cliente_nome", "");
-        limparVinculoContratoState();
         return;
       }
 
       void validarESelecionarCliente(nextClienteId);
     },
-    [clienteId, clienteValidacaoLoading, setField, validarESelecionarCliente, limparVinculoContratoState]
+    [clienteId, clienteValidacaoLoading, setField, validarESelecionarCliente]
   );
 
   const closeClienteProcuracaoModal = useCallback(() => {
@@ -1016,7 +954,6 @@ export function useAgendamentosPage() {
     try {
       setClienteId(pendingClienteId);
       setField("cliente_nome", cliente.nome);
-      void carregarVinculoContratosCliente(cliente.nome);
       await registrarAgendamentoClienteSemProcuracao(auditContext, {
         clienteId: cliente.id,
         clienteNome: cliente.nome,
@@ -1036,7 +973,6 @@ export function useAgendamentosPage() {
     auditContext,
     editingId,
     form.colaborador,
-    carregarVinculoContratosCliente,
   ]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
@@ -1182,30 +1118,6 @@ export function useAgendamentosPage() {
       setEditingId(id);
       setShowForm(true);
       setFiltersExpanded(false);
-      limparVinculoContratoState();
-      if (agendamento.contrato_id) {
-        void (async () => {
-          try {
-            const contrato = await buscarContratoPorId(agendamento.contrato_id!);
-            setContratoEditInfo({
-              numero: contrato?.numero ?? null,
-              orcamento: contrato?.numero_orcamento ?? null,
-              consome:
-                agendamento.consome_saldo_contrato === false ? false : true,
-            });
-          } catch (err) {
-            console.error(err);
-            setContratoEditInfo({
-              numero: null,
-              orcamento: null,
-              consome:
-                agendamento.consome_saldo_contrato === false ? false : true,
-            });
-          }
-        })();
-      } else {
-        setContratoEditInfo(null);
-      }
       requestAnimationFrame(() => {
         document
           .getElementById("novo-agendamento")
@@ -1215,7 +1127,7 @@ export function useAgendamentosPage() {
         void enforceRetornoTrabalhoExames();
       }
     },
-    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames, obterBloqueioAtualizado, limparVinculoContratoState]
+    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames, obterBloqueioAtualizado]
   );
 
   const handleVisualizar = useCallback(
@@ -1510,19 +1422,16 @@ export function useAgendamentosPage() {
         }
 
         toast.success("Agendamento cancelado com sucesso!");
-        if (
-          agendamento.contrato_id &&
-          agendamento.consome_saldo_contrato !== false
-        ) {
-          const contrato = await buscarContratoPorId(agendamento.contrato_id);
-          await registrarAuditoria({
-            ...auditContext,
-            modulo: AUDITORIA_MODULOS.agendamentos,
-            acao: AUDITORIA_ACOES.cancelamento,
-            registroId: cancelTargetId,
-            registroNome: agendamento.colaborador,
-            descricao: `${historicoUsuario} cancelou o agendamento de ${agendamento.colaborador} vinculado ao contrato ${contrato?.numero || agendamento.contrato_id}, devolvendo saldo à implantação.`,
-          });
+        try {
+          await invalidarContabilizacaoPorCancelamento(
+            cancelTargetId,
+            historicoUsuario
+          );
+        } catch (err) {
+          console.error(
+            "Erro ao invalidar contabilização do contrato após cancelamento:",
+            err
+          );
         }
         if (isExcepcional) {
           toast.warning(CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST);
@@ -1766,32 +1675,6 @@ export function useAgendamentosPage() {
         }
       }
 
-      if (!editingId) {
-        if (vinculoComSaldo.length > 0 && vinculoDecision === "pendente") {
-          toast.error(
-            "Informe se deseja vincular este agendamento ao contrato da implantação."
-          );
-          return;
-        }
-        if (
-          vinculoComSaldo.length === 0 &&
-          vinculoSemSaldo.length > 0 &&
-          vinculoDecision !== "nao"
-        ) {
-          toast.error(
-            "Confirme para continuar sem vínculo com o contrato da implantação."
-          );
-          return;
-        }
-        if (
-          vinculoDecision === "sim" &&
-          !vinculoContratoId
-        ) {
-          toast.error("Selecione o contrato para vincular o agendamento.");
-          return;
-        }
-      }
-
       setSaving(true);
       try {
         const cargoFields = buildCargoAgendamentoFields(
@@ -1807,6 +1690,7 @@ export function useAgendamentosPage() {
 
         if (editingId) {
           const atual = getById(editingId);
+          // Preserva campos legados; a seleção de previsão fica em contrato_agendamentos.
           payload = {
             ...payload,
             contrato_id: atual?.contrato_id ?? null,
@@ -1814,23 +1698,6 @@ export function useAgendamentosPage() {
             vinculado_contrato_em: atual?.vinculado_contrato_em ?? null,
             vinculado_contrato_por: atual?.vinculado_contrato_por ?? null,
           };
-        } else if (vinculoDecision === "sim" && vinculoContratoId) {
-          const consome = await resolverConsomeSaldoAoVincular({
-            contratoId: vinculoContratoId,
-            colaboradorCpf: payload.colaborador_cpf,
-          });
-          payload = {
-            ...payload,
-            contrato_id: vinculoContratoId,
-            consome_saldo_contrato: consome,
-            vinculado_contrato_em: new Date().toISOString(),
-            vinculado_contrato_por: historicoUsuario,
-          };
-          if (!consome) {
-            toast.message(
-              "Colaborador já contabilizado neste contrato. Vínculo sem consumir saldo adicional."
-            );
-          }
         } else {
           payload = {
             ...payload,
@@ -1930,35 +1797,6 @@ export function useAgendamentosPage() {
               registroNome: payload.colaborador,
             }
           );
-
-          if (payload.contrato_id && vinculoDecision === "sim") {
-            const selecionado =
-              vinculoComSaldo.find((c) => c.contrato.id === payload.contrato_id) ??
-              null;
-            const saldoApos = payload.consome_saldo_contrato
-              ? Math.max(0, (selecionado?.disponiveis ?? 1) - 1)
-              : selecionado?.disponiveis ?? 0;
-            await registrarAuditoria({
-              ...auditContext,
-              modulo: AUDITORIA_MODULOS.agendamentos,
-              acao: AUDITORIA_ACOES.vinculo_contrato_implantacao,
-              registroId: novoId,
-              registroNome: payload.colaborador,
-              descricao: `${historicoUsuario} vinculou o agendamento de ${payload.colaborador} ao contrato ${selecionado?.contrato.numero || payload.contrato_id}. Saldo após o vínculo: ${saldoApos} colaborador${saldoApos === 1 ? "" : "es"}.`,
-            });
-          } else if (
-            !payload.contrato_id &&
-            (vinculoComSaldo.length > 0 || vinculoSemSaldo.length > 0)
-          ) {
-            await registrarAuditoria({
-              ...auditContext,
-              modulo: AUDITORIA_MODULOS.agendamentos,
-              acao: AUDITORIA_ACOES.sem_vinculo_contrato_implantacao,
-              registroId: novoId,
-              registroNome: payload.colaborador,
-              descricao: `${historicoUsuario} salvou o agendamento de ${payload.colaborador} sem vínculo ao contrato da implantação.`,
-            });
-          }
 
           if (cargoFields.cargo_id && dataIso) {
             try {
@@ -2061,10 +1899,6 @@ export function useAgendamentosPage() {
       bloquearDuplicidade90Dias,
       exibirBloqueioInadimplencia,
       resolverInfoClienteInadimplencia,
-      vinculoComSaldo,
-      vinculoSemSaldo,
-      vinculoDecision,
-      vinculoContratoId,
       historicoUsuario,
     ]
   );
@@ -2075,34 +1909,6 @@ export function useAgendamentosPage() {
     },
     [executeSave]
   );
-
-  const handleVinculoSelectContrato = useCallback((contratoId: string) => {
-    setVinculoContratoId(contratoId);
-  }, []);
-
-  const handleVinculoSim = useCallback(() => {
-    const id =
-      vinculoContratoId ||
-      (vinculoComSaldo.length === 1 ? vinculoComSaldo[0].contrato.id : null);
-    if (!id) {
-      toast.error("Selecione o contrato para vincular.");
-      return;
-    }
-    setVinculoContratoId(id);
-    setVinculoDecision("sim");
-  }, [vinculoContratoId, vinculoComSaldo]);
-
-  const handleVinculoNao = useCallback(() => {
-    setVinculoDecision("nao");
-    setVinculoContratoId(null);
-  }, []);
-
-  const handleVinculoLimpar = useCallback(() => {
-    setVinculoDecision("pendente");
-    setVinculoContratoId(
-      vinculoComSaldo.length === 1 ? vinculoComSaldo[0].contrato.id : null
-    );
-  }, [vinculoComSaldo]);
 
   const closeDuplicidade90DiasModal = useCallback(() => {
     setDuplicidade90DiasOpen(false);
@@ -2197,16 +2003,6 @@ export function useAgendamentosPage() {
     handleConfirmarLiberarAsoRetido,
     bloquearCamposAsoDocumentacao,
     handleSave,
-    vinculoComSaldo,
-    vinculoSemSaldo,
-    vinculoDecision,
-    vinculoContratoId,
-    vinculoLoading,
-    contratoEditInfo,
-    handleVinculoSelectContrato,
-    handleVinculoSim,
-    handleVinculoNao,
-    handleVinculoLimpar,
     handleCopyMensagemClinica,
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,

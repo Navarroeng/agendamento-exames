@@ -1064,6 +1064,7 @@ export function OrcamentoAprovarModal({
             <OrcamentoAbaAgendamentos
               orcamentoId={orcamento.id}
               aprovacao={aprovacao}
+              usuarioNome={usuarioNome}
               onContagemChange={setAgendamentosContagem}
             />
           ) : null}

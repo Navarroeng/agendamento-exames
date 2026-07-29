@@ -1,24 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
 import {
-  agendamentoConsomeSaldoContrato,
   buildContratoAgendamentoContagem,
-  colaboradorJaConsomeSaldoNoContrato,
-  countAgendamentosAdicionais,
-  countColaboradoresUnicos,
-  statusContratoPodeReceberVinculo,
+  isAgendamentoSelecionavel,
+  isDataNaVigencia,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
-import { contratoLiberaAgendamento } from "@/lib/cliente-pode-agendar";
-import {
-  formatOrcamentoOrigemCliente,
-  type OrcamentoOrigemCliente,
-} from "@/lib/orcamento-origem";
-import { listarClientesParaSelect } from "@/services/cliente.service";
-import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 import type {
-  AgendamentoStatus,
   AgendamentoWithExames,
   ClienteContratoRecord,
+  ClienteRecord,
 } from "@/lib/types";
 
 const AGENDAMENTO_SELECT = `
@@ -32,6 +22,28 @@ const AGENDAMENTO_SELECT = `
     motivo_valor_zero
   )
 `;
+
+export type ContratoAgendamentoVinculo = {
+  id: string;
+  contrato_id: string;
+  agendamento_id: string;
+  contabiliza_previsao: boolean;
+  vinculado_por: string | null;
+  vinculado_em: string;
+  removido_em: string | null;
+};
+
+export type AgendamentoNaVigenciaItem = {
+  agendamento: AgendamentoWithExames;
+  selecionado: boolean;
+  selecionavel: boolean;
+  bloqueadoOutroContrato: boolean;
+  outroContratoNumero: string | null;
+};
+
+function digitsOnly(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
 
 export async function buscarContratoPorOrcamentoId(
   orcamentoId: string
@@ -64,81 +76,204 @@ export async function buscarContratoPorId(
   return (data as ClienteContratoRecord | null) ?? null;
 }
 
-export async function listarAgendamentosPorContrato(
+async function buscarNomesClienteParaMatch(
+  clienteId: string
+): Promise<{ nomes: string[]; cliente: ClienteRecord | null }> {
+  const supabase = createClient();
+  const { data: cliente, error } = await supabase
+    .from("clientes")
+    .select("*")
+    .eq("id", clienteId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!cliente) return { nomes: [], cliente: null };
+
+  const nomes = new Set<string>([String(cliente.nome).trim()]);
+  const cnpjDigits = digitsOnly(cliente.cnpj as string);
+  if (cnpjDigits.length >= 11) {
+    const { data: mesmos } = await supabase.from("clientes").select("nome, cnpj");
+    for (const row of mesmos ?? []) {
+      if (digitsOnly(row.cnpj as string) === cnpjDigits) {
+        const n = String(row.nome ?? "").trim();
+        if (n) nomes.add(n);
+      }
+    }
+  }
+  return { nomes: Array.from(nomes), cliente: cliente as ClienteRecord };
+}
+
+export async function listarVinculosAtivosPorContrato(
   contratoId: string
-): Promise<AgendamentoWithExames[]> {
-  if (!contratoId) return [];
+): Promise<ContratoAgendamentoVinculo[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("agendamentos")
-    .select(AGENDAMENTO_SELECT)
+    .from("contrato_agendamentos")
+    .select("*")
     .eq("contrato_id", contratoId)
-    .order("data_agendamento", { ascending: true })
-    .order("horario", { ascending: true });
-
+    .is("removido_em", null)
+    .eq("contabiliza_previsao", true);
   if (error) throw error;
-  return (data ?? []) as AgendamentoWithExames[];
+  return (data ?? []) as ContratoAgendamentoVinculo[];
 }
 
-type ContagemRow = {
-  id: string;
-  status: AgendamentoStatus;
-  contrato_id: string | null;
-  colaborador: string;
-  colaborador_cpf: string;
-  consome_saldo_contrato: boolean | null;
-};
-
-async function fetchContagemRows(
-  contratoIds: string[]
-): Promise<ContagemRow[]> {
-  if (contratoIds.length === 0) return [];
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select(
-      "id, contrato_id, status, colaborador, colaborador_cpf, consome_saldo_contrato"
-    )
-    .in("contrato_id", contratoIds)
-    .neq("status", "cancelado");
-
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: String(row.id),
-    status: row.status as AgendamentoStatus,
-    contrato_id: (row.contrato_id as string | null) ?? null,
-    colaborador: String(row.colaborador ?? ""),
-    colaborador_cpf: String(row.colaborador_cpf ?? ""),
-    consome_saldo_contrato:
-      row.consome_saldo_contrato == null
-        ? null
-        : Boolean(row.consome_saldo_contrato),
-  }));
-}
-
-/** Contagem de colaboradores que consomem saldo, por contrato. */
+/** Contagem de utilizados (seleções válidas) por contrato. */
 export async function contarColaboradoresPorContratos(
   contratoIds: string[]
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   if (contratoIds.length === 0) return map;
+  for (const id of contratoIds) map.set(id, 0);
 
-  const rows = await fetchContagemRows(contratoIds);
-  const byContrato = new Map<string, ContagemRow[]>();
-  for (const row of rows) {
-    const cid = row.contrato_id;
-    if (!cid) continue;
-    const list = byContrato.get(cid) ?? [];
-    list.push(row);
-    byContrato.set(cid, list);
-  }
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contrato_agendamentos")
+    .select("contrato_id, agendamento_id, contabiliza_previsao, removido_em")
+    .in("contrato_id", contratoIds)
+    .is("removido_em", null)
+    .eq("contabiliza_previsao", true);
 
-  for (const id of contratoIds) {
-    map.set(id, countColaboradoresUnicos(byContrato.get(id) ?? [], id));
+  if (error) throw error;
+  const agIds = Array.from(
+    new Set((data ?? []).map((r) => String(r.agendamento_id)))
+  );
+  if (agIds.length === 0) return map;
+
+  const { data: ags, error: agErr } = await supabase
+    .from("agendamentos")
+    .select("id, status")
+    .in("id", agIds);
+  if (agErr) throw agErr;
+
+  const statusById = new Map(
+    (ags ?? []).map((a) => [String(a.id), String(a.status)])
+  );
+
+  for (const row of data ?? []) {
+    const agId = String(row.agendamento_id);
+    const status = statusById.get(agId);
+    if (!status || status === "cancelado") continue;
+    const cid = String(row.contrato_id);
+    map.set(cid, (map.get(cid) ?? 0) + 1);
   }
   return map;
 }
 
+export async function carregarAgendamentosVigenciaContrato(params: {
+  contrato: ClienteContratoRecord;
+  quantidadeContratada: number;
+}): Promise<{
+  itens: AgendamentoNaVigenciaItem[];
+  contagem: ContratoAgendamentoContagem;
+}> {
+  const { contrato, quantidadeContratada } = params;
+  const supabase = createClient();
+  const { nomes } = await buscarNomesClienteParaMatch(contrato.cliente_id);
+
+  if (
+    !nomes.length ||
+    !contrato.data_inicio?.trim() ||
+    !contrato.data_fim?.trim()
+  ) {
+    return {
+      itens: [],
+      contagem: buildContratoAgendamentoContagem(quantidadeContratada, 0, 0),
+    };
+  }
+
+  // Busca por nomes do cliente (agendamentos não têm cliente_id).
+  const { data: raw, error } = await supabase
+    .from("agendamentos")
+    .select(AGENDAMENTO_SELECT)
+    .gte("data_agendamento", contrato.data_inicio.slice(0, 10))
+    .lte("data_agendamento", contrato.data_fim.slice(0, 10))
+    .order("data_agendamento", { ascending: true })
+    .order("horario", { ascending: true })
+    .limit(2000);
+
+  if (error) throw error;
+
+  const nomesNorm = new Set(nomes.map((n) => n.trim().toLowerCase()));
+  const agendamentos = ((raw ?? []) as AgendamentoWithExames[]).filter((ag) => {
+    const nome = (ag.cliente_nome ?? "").trim().toLowerCase();
+    if (!nomesNorm.has(nome)) return false;
+    return isDataNaVigencia(
+      ag.data_agendamento,
+      contrato.data_inicio,
+      contrato.data_fim
+    );
+  });
+
+  const { data: vinculos, error: vErr } = await supabase
+    .from("contrato_agendamentos")
+    .select("*")
+    .is("removido_em", null)
+    .eq("contabiliza_previsao", true);
+  if (vErr) throw vErr;
+
+  const selecionadosDeste = new Set(
+    (vinculos ?? [])
+      .filter((v) => v.contrato_id === contrato.id)
+      .map((v) => String(v.agendamento_id))
+  );
+
+  const emOutroContrato = new Map<string, string>();
+  const outrosContratoIds = Array.from(
+    new Set(
+      (vinculos ?? [])
+        .filter((v) => v.contrato_id !== contrato.id)
+        .map((v) => String(v.contrato_id))
+    )
+  );
+  const numeroByContrato = new Map<string, string>();
+  if (outrosContratoIds.length > 0) {
+    const { data: ctrs } = await supabase
+      .from("cliente_contratos")
+      .select("id, numero")
+      .in("id", outrosContratoIds);
+    for (const c of ctrs ?? []) {
+      numeroByContrato.set(String(c.id), String(c.numero ?? c.id));
+    }
+    for (const v of vinculos ?? []) {
+      if (v.contrato_id === contrato.id) continue;
+      emOutroContrato.set(
+        String(v.agendamento_id),
+        numeroByContrato.get(String(v.contrato_id)) ?? String(v.contrato_id)
+      );
+    }
+  }
+
+  const itens: AgendamentoNaVigenciaItem[] = agendamentos.map((ag) => {
+    const selecionado = selecionadosDeste.has(ag.id);
+    const outro = emOutroContrato.get(ag.id) ?? null;
+    const selecionavel =
+      isAgendamentoSelecionavel(ag.status) && (!outro || selecionado);
+    return {
+      agendamento: ag,
+      selecionado,
+      selecionavel,
+      bloqueadoOutroContrato: Boolean(outro) && !selecionado,
+      outroContratoNumero: outro,
+    };
+  });
+
+  const utilizados = itens.filter(
+    (i) => i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
+  ).length;
+  const adicionais = itens.filter(
+    (i) => !i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
+  ).length;
+
+  return {
+    itens,
+    contagem: buildContratoAgendamentoContagem(
+      quantidadeContratada,
+      utilizados,
+      adicionais
+    ),
+  };
+}
+
+/** Compat com chamadas antigas da aba. */
 export async function carregarResumoAgendamentosContrato(params: {
   contratoId: string;
   quantidadeContratada: number;
@@ -146,151 +281,308 @@ export async function carregarResumoAgendamentosContrato(params: {
   agendamentos: AgendamentoWithExames[];
   contagem: ContratoAgendamentoContagem;
 }> {
-  const agendamentos = await listarAgendamentosPorContrato(params.contratoId);
-  const utilizados = countColaboradoresUnicos(agendamentos, params.contratoId);
-  const adicionais = countAgendamentosAdicionais(
-    agendamentos,
-    params.contratoId
-  );
+  const contrato = await buscarContratoPorId(params.contratoId);
+  if (!contrato) {
+    return {
+      agendamentos: [],
+      contagem: buildContratoAgendamentoContagem(
+        params.quantidadeContratada,
+        0,
+        0
+      ),
+    };
+  }
+  const resumo = await carregarAgendamentosVigenciaContrato({
+    contrato,
+    quantidadeContratada: params.quantidadeContratada,
+  });
   return {
-    agendamentos,
-    contagem: buildContratoAgendamentoContagem(
-      params.quantidadeContratada,
-      utilizados,
-      adicionais
-    ),
+    agendamentos: resumo.itens.map((i) => i.agendamento),
+    contagem: resumo.contagem,
   };
 }
 
+export async function salvarSelecaoAgendamentosContrato(params: {
+  contratoId: string;
+  agendamentoIdsSelecionados: string[];
+  usuarioNome: string;
+  quantidadePrevista: number;
+}): Promise<void> {
+  const {
+    contratoId,
+    agendamentoIdsSelecionados,
+    usuarioNome,
+    quantidadePrevista,
+  } = params;
+
+  if (agendamentoIdsSelecionados.length > quantidadePrevista) {
+    throw new Error(
+      `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
+    );
+  }
+
+  const supabase = createClient();
+  const agora = new Date().toISOString();
+
+  // Validar status e existência
+  if (agendamentoIdsSelecionados.length > 0) {
+    const { data: ags, error: agStatusErr } = await supabase
+      .from("agendamentos")
+      .select("id, status, colaborador")
+      .in("id", agendamentoIdsSelecionados);
+    if (agStatusErr) throw agStatusErr;
+    const invalidos = (ags ?? []).filter(
+      (a) => !isAgendamentoSelecionavel(String(a.status))
+    );
+    if (invalidos.length > 0) {
+      throw new Error(
+        "Agendamento cancelado não pode ser contabilizado no contrato."
+      );
+    }
+  }
+
+  // Validar bloqueio em outros contratos
+  if (agendamentoIdsSelecionados.length > 0) {
+    const { data: conflitos, error } = await supabase
+      .from("contrato_agendamentos")
+      .select("agendamento_id, contrato_id")
+      .in("agendamento_id", agendamentoIdsSelecionados)
+      .eq("contabiliza_previsao", true)
+      .is("removido_em", null)
+      .neq("contrato_id", contratoId);
+    if (error) throw error;
+    if (conflitos?.length) {
+      const cid = String(conflitos[0].contrato_id);
+      const { data: ctr } = await supabase
+        .from("cliente_contratos")
+        .select("numero")
+        .eq("id", cid)
+        .maybeSingle();
+      throw new Error(
+        `Este agendamento já está contabilizado no contrato ${ctr?.numero || cid}.`
+      );
+    }
+  }
+
+  const { data: contratoRow } = await supabase
+    .from("cliente_contratos")
+    .select("numero")
+    .eq("id", contratoId)
+    .maybeSingle();
+  const contratoNumero = String(contratoRow?.numero ?? contratoId);
+
+  // Soft-remove seleções atuais que saíram
+  const { data: atuais, error: atualErr } = await supabase
+    .from("contrato_agendamentos")
+    .select("id, agendamento_id")
+    .eq("contrato_id", contratoId)
+    .is("removido_em", null)
+    .eq("contabiliza_previsao", true);
+  if (atualErr) throw atualErr;
+
+  const selectedSet = new Set(agendamentoIdsSelecionados);
+  const removidos = (atuais ?? []).filter(
+    (r) => !selectedSet.has(String(r.agendamento_id))
+  );
+  const removerIds = removidos.map((r) => String(r.id));
+  const adicionados = agendamentoIdsSelecionados.filter(
+    (id) => !(atuais ?? []).some((r) => String(r.agendamento_id) === id)
+  );
+
+  if (removerIds.length > 0) {
+    const { error } = await supabase
+      .from("contrato_agendamentos")
+      .update({
+        contabiliza_previsao: false,
+        removido_em: agora,
+        removido_por: usuarioNome,
+        updated_at: agora,
+      })
+      .in("id", removerIds);
+    if (error) throw error;
+  }
+
+  // Upsert novas seleções
+  for (const agendamentoId of agendamentoIdsSelecionados) {
+    const { data: existing } = await supabase
+      .from("contrato_agendamentos")
+      .select("id")
+      .eq("contrato_id", contratoId)
+      .eq("agendamento_id", agendamentoId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from("contrato_agendamentos")
+        .update({
+          contabiliza_previsao: true,
+          removido_em: null,
+          removido_por: null,
+          vinculado_por: usuarioNome,
+          vinculado_em: agora,
+          updated_at: agora,
+        })
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("contrato_agendamentos").insert({
+        contrato_id: contratoId,
+        agendamento_id: agendamentoId,
+        contabiliza_previsao: true,
+        vinculado_por: usuarioNome,
+        vinculado_em: agora,
+      });
+      if (error) throw error;
+    }
+  }
+
+  // Auditoria de alterações de seleção
+  const idsParaNome = [
+    ...adicionados,
+    ...removidos.map((r) => String(r.agendamento_id)),
+  ];
+  let nomesById = new Map<string, string>();
+  if (idsParaNome.length > 0) {
+    const { data: nomeRows } = await supabase
+      .from("agendamentos")
+      .select("id, colaborador")
+      .in("id", idsParaNome);
+    nomesById = new Map(
+      (nomeRows ?? []).map((r) => [
+        String(r.id),
+        String(r.colaborador ?? r.id),
+      ])
+    );
+  }
+
+  const { registrarAuditoria } = await import("@/services/auditoria.service");
+  const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
+    "@/lib/auditoria"
+  );
+
+  for (const id of adicionados) {
+    const nome = nomesById.get(id) ?? id;
+    await registrarAuditoria({
+      usuarioNome,
+      usuarioEmail: "",
+      modulo: AUDITORIA_MODULOS.orcamentos,
+      acao: AUDITORIA_ACOES.vinculo_contrato_implantacao,
+      registroId: contratoId,
+      registroNome: contratoNumero,
+      descricao: `${usuarioNome} vinculou ${nome} ao contrato ${contratoNumero}.`,
+    });
+  }
+  for (const row of removidos) {
+    const id = String(row.agendamento_id);
+    const nome = nomesById.get(id) ?? id;
+    await registrarAuditoria({
+      usuarioNome,
+      usuarioEmail: "",
+      modulo: AUDITORIA_MODULOS.orcamentos,
+      acao: AUDITORIA_ACOES.sem_vinculo_contrato_implantacao,
+      registroId: contratoId,
+      registroNome: contratoNumero,
+      descricao: `${usuarioNome} removeu ${nome} do contrato ${contratoNumero}.`,
+    });
+  }
+
+  const utilizados = agendamentoIdsSelecionados.length;
+  const concluiu = quantidadePrevista > 0 && utilizados >= quantidadePrevista;
+  const antes = (atuais ?? []).length;
+  const antesConcluido = quantidadePrevista > 0 && antes >= quantidadePrevista;
+  if (antesConcluido !== concluiu) {
+    await registrarAuditoria({
+      usuarioNome,
+      usuarioEmail: "",
+      modulo: AUDITORIA_MODULOS.orcamentos,
+      acao: AUDITORIA_ACOES.edicao,
+      registroId: contratoId,
+      registroNome: contratoNumero,
+      descricao: concluiu
+        ? `${usuarioNome} concluiu a etapa Agendamentos do contrato ${contratoNumero} (${utilizados} de ${quantidadePrevista}).`
+        : `${usuarioNome} reabriu a etapa Agendamentos do contrato ${contratoNumero} (${utilizados} de ${quantidadePrevista}).`,
+    });
+  }
+}
+
+/** Ao cancelar agendamento: deixa de contabilizar previsão. */
+export async function invalidarContabilizacaoPorCancelamento(
+  agendamentoId: string,
+  usuarioNome: string
+): Promise<void> {
+  const supabase = createClient();
+  const agora = new Date().toISOString();
+
+  const { data: vinculos } = await supabase
+    .from("contrato_agendamentos")
+    .select("id, contrato_id")
+    .eq("agendamento_id", agendamentoId)
+    .eq("contabiliza_previsao", true)
+    .is("removido_em", null);
+
+  if (!vinculos?.length) return;
+
+  const { error } = await supabase
+    .from("contrato_agendamentos")
+    .update({
+      contabiliza_previsao: false,
+      removido_em: agora,
+      removido_por: usuarioNome,
+      updated_at: agora,
+    })
+    .eq("agendamento_id", agendamentoId)
+    .eq("contabiliza_previsao", true)
+    .is("removido_em", null);
+  if (error) throw error;
+
+  const { data: ag } = await supabase
+    .from("agendamentos")
+    .select("colaborador")
+    .eq("id", agendamentoId)
+    .maybeSingle();
+  const colaborador = String(ag?.colaborador ?? agendamentoId);
+
+  const { registrarAuditoria } = await import("@/services/auditoria.service");
+  const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
+    "@/lib/auditoria"
+  );
+
+  for (const v of vinculos) {
+    const { data: ctr } = await supabase
+      .from("cliente_contratos")
+      .select("numero")
+      .eq("id", v.contrato_id)
+      .maybeSingle();
+    const numero = String(ctr?.numero ?? v.contrato_id);
+    await registrarAuditoria({
+      usuarioNome,
+      usuarioEmail: "",
+      modulo: AUDITORIA_MODULOS.agendamentos,
+      acao: AUDITORIA_ACOES.cancelamento,
+      registroId: String(v.contrato_id),
+      registroNome: numero,
+      descricao: `${usuarioNome} cancelou o agendamento de ${colaborador}; a contabilização no contrato ${numero} foi removida automaticamente.`,
+    });
+  }
+}
+
+// Mantidos para compatibilidade de imports legados (sem uso no novo fluxo de criação).
 export type ContratoAptoAgendamento = {
   contrato: ClienteContratoRecord;
   realizados: number;
   contratados: number;
   disponiveis: number;
   origemLabel: string;
-  origem: OrcamentoOrigemCliente | null;
 };
 
-function isContratoOrcamentoLiberado(c: ClienteContratoRecord): boolean {
-  return (
-    Boolean(c.orcamento_id) &&
-    statusContratoPodeReceberVinculo(c.status) &&
-    contratoLiberaAgendamento(c)
-  );
+export async function listarContratosComSaldoParaVinculo(_clienteNome: string) {
+  return { comSaldo: [] as ContratoAptoAgendamento[], semSaldo: [] as ContratoAptoAgendamento[] };
 }
 
-async function mapOrigensOrcamento(
-  orcamentoIds: string[]
-): Promise<Map<string, OrcamentoOrigemCliente | null>> {
-  const map = new Map<string, OrcamentoOrigemCliente | null>();
-  if (orcamentoIds.length === 0) return map;
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orcamentos")
-    .select("id, origem_cliente")
-    .in("id", orcamentoIds);
-  if (error) throw error;
-  for (const row of data ?? []) {
-    map.set(
-      String(row.id),
-      (row.origem_cliente as OrcamentoOrigemCliente | null) ?? null
-    );
-  }
-  return map;
+export async function listarContratosAptosParaAgendamento(_clienteNome: string) {
+  return [] as ContratoAptoAgendamento[];
 }
 
-async function toContratoAptoList(
-  contratos: ClienteContratoRecord[]
-): Promise<ContratoAptoAgendamento[]> {
-  if (contratos.length === 0) return [];
-  const counts = await contarColaboradoresPorContratos(
-    contratos.map((c) => c.id)
-  );
-  const origemMap = await mapOrigensOrcamento(
-    contratos.map((c) => c.orcamento_id!).filter(Boolean)
-  );
-
-  return contratos.map((contrato) => {
-    const contratados = Math.max(
-      0,
-      Number(contrato.quantidade_colaboradores) || 0
-    );
-    const realizados = counts.get(contrato.id) ?? 0;
-    const origem = contrato.orcamento_id
-      ? origemMap.get(contrato.orcamento_id) ?? null
-      : null;
-    return {
-      contrato,
-      realizados,
-      contratados,
-      disponiveis: Math.max(0, contratados - realizados),
-      origem,
-      origemLabel: formatOrcamentoOrigemCliente(origem),
-    };
-  });
-}
-
-/**
- * Contratos de orçamento liberados do cliente (com ou sem saldo).
- * Não inclui manuais nem contratos bloqueados financeiramente.
- */
-export async function listarContratosAptosParaAgendamento(
-  clienteNome: string
-): Promise<ContratoAptoAgendamento[]> {
-  const nome = clienteNome.trim();
-  if (!nome) return [];
-
-  const clientes = await listarClientesParaSelect();
-  const cliente = clientes.find(
-    (c) => c.nome.trim().toLowerCase() === nome.toLowerCase()
-  );
-  if (!cliente) return [];
-
-  const contratos = await listarContratosPorCliente(cliente.id);
-  const aptos = contratos.filter(isContratoOrcamentoLiberado);
-  return toContratoAptoList(aptos);
-}
-
-export async function listarContratosComSaldoParaVinculo(
-  clienteNome: string
-): Promise<{
-  comSaldo: ContratoAptoAgendamento[];
-  semSaldo: ContratoAptoAgendamento[];
-}> {
-  const aptos = await listarContratosAptosParaAgendamento(clienteNome);
-  return {
-    comSaldo: aptos.filter((c) => c.disponiveis > 0),
-    semSaldo: aptos.filter((c) => c.disponiveis <= 0 && c.contratados > 0),
-  };
-}
-
-export async function resolverConsomeSaldoAoVincular(params: {
-  contratoId: string;
-  colaboradorCpf: string;
-  ignorarAgendamentoId?: string | null;
-}): Promise<boolean> {
-  const rows = await fetchContagemRows([params.contratoId]);
-  if (
-    colaboradorJaConsomeSaldoNoContrato(
-      rows,
-      params.contratoId,
-      params.colaboradorCpf,
-      params.ignorarAgendamentoId
-    )
-  ) {
-    return false;
-  }
-  return true;
-}
-
-export function filtrarAgendamentosConsumindoSaldo(
-  agendamentos: AgendamentoWithExames[],
-  contratoId: string
-): AgendamentoWithExames[] {
-  return agendamentos.filter(
-    (ag) =>
-      ag.contrato_id === contratoId &&
-      ag.status !== "cancelado" &&
-      agendamentoConsomeSaldoContrato(ag)
-  );
+export async function resolverConsomeSaldoAoVincular() {
+  return false;
 }

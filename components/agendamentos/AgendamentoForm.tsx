@@ -1,6 +1,5 @@
 import { ContratoVigenciaAlert } from "@/components/agendamentos/ContratoVigenciaAlert";
 import { ClienteProcuracaoAlert } from "@/components/agendamentos/ClienteProcuracaoAlert";
-import { ContratoImplantacaoVinculoAlert } from "@/components/agendamentos/ContratoImplantacaoVinculoAlert";
 import {
   ClinicaRegrasAlert,
   getHorarioFieldHint,
@@ -12,10 +11,8 @@ import { RESPONSAVEIS, TIPOS_ASO } from "@/lib/constants";
 import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaCheck";
 import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
-import type { VinculoContratoDecision } from "@/lib/contrato-agendamentos";
 import type { FormField } from "@/hooks/useAgendamentoForm";
 import type { ClienteRecord, ClinicaRecord, ExameFormItem } from "@/lib/types";
-import type { ContratoAptoAgendamento } from "@/services/contrato-agendamentos.service";
 
 interface AgendamentoFormProps {
   form: Record<FormField, string>;
@@ -38,18 +35,6 @@ interface AgendamentoFormProps {
   exams: ExameFormItem[];
   clienteValidacaoLoading?: boolean;
   formularioClienteLiberado?: boolean;
-  vinculoContratosComSaldo?: ContratoAptoAgendamento[];
-  vinculoContratosSemSaldo?: ContratoAptoAgendamento[];
-  vinculoDecision?: VinculoContratoDecision;
-  vinculoContratoId?: string | null;
-  vinculoLoading?: boolean;
-  contratoVinculadoNumero?: string | null;
-  contratoVinculadoOrcamento?: string | null;
-  consomeSaldoExibicao?: boolean | null;
-  onVinculoSelectContrato?: (contratoId: string) => void;
-  onVinculoSim?: () => void;
-  onVinculoNao?: () => void;
-  onVinculoLimpar?: () => void;
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -75,18 +60,6 @@ export function AgendamentoForm({
   exams,
   clienteValidacaoLoading = false,
   formularioClienteLiberado = true,
-  vinculoContratosComSaldo = [],
-  vinculoContratosSemSaldo = [],
-  vinculoDecision = "pendente",
-  vinculoContratoId = null,
-  vinculoLoading = false,
-  contratoVinculadoNumero = null,
-  contratoVinculadoOrcamento = null,
-  consomeSaldoExibicao = null,
-  onVinculoSelectContrato,
-  onVinculoSim,
-  onVinculoNao,
-  onVinculoLimpar,
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
@@ -227,7 +200,9 @@ export function AgendamentoForm({
             <select
               className="field-input w-full min-w-0"
               value={form.clinica_nome}
-              disabled={camposDependentesClienteDesabilitados || clinicasLoading}
+              disabled={
+                camposDependentesClienteDesabilitados || clinicasLoading
+              }
               onChange={(e) => onChange("clinica_nome", e.target.value)}
             >
               <option value="">
@@ -262,42 +237,6 @@ export function AgendamentoForm({
           <ClinicaRegrasAlert clinica={selectedClinica} exams={exams} />
           <ClienteProcuracaoAlert visible={showClienteProcuracaoAlert} />
           <ContratoVigenciaAlert state={contratoVigencia} />
-          {!isEditing &&
-          onVinculoSim &&
-          onVinculoNao &&
-          onVinculoLimpar &&
-          onVinculoSelectContrato ? (
-            <div className="mt-3">
-              <ContratoImplantacaoVinculoAlert
-                comSaldo={vinculoContratosComSaldo}
-                semSaldo={vinculoContratosSemSaldo}
-                decision={vinculoDecision}
-                selectedContratoId={vinculoContratoId}
-                disabled={vinculoLoading || camposDependentesClienteDesabilitados}
-                onSelectContrato={onVinculoSelectContrato}
-                onVincular={onVinculoSim}
-                onNaoVincular={onVinculoNao}
-                onLimparDecisao={onVinculoLimpar}
-              />
-            </div>
-          ) : null}
-          {isEditing && contratoVinculadoNumero ? (
-            <div className="mt-3 rounded-xl border border-[#e4ebf4] bg-[#f8fafc] px-4 py-3 text-sm text-navy">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Contrato vinculado
-              </p>
-              <p className="mt-1 font-extrabold">{contratoVinculadoNumero}</p>
-              {contratoVinculadoOrcamento ? (
-                <p className="mt-0.5 text-xs text-[#64748b]">
-                  Origem: {contratoVinculadoOrcamento}
-                </p>
-              ) : null}
-              <p className="mt-1 text-xs text-[#64748b]">
-                Consome saldo da implantação:{" "}
-                {consomeSaldoExibicao === false ? "Não" : "Sim"}
-              </p>
-            </div>
-          ) : null}
         </>
       ) : null}
     </Panel>

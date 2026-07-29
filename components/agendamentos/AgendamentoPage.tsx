@@ -90,16 +90,6 @@ export function AgendamentoPage() {
     handleConfirmarLiberarAsoRetido,
     bloquearCamposAsoDocumentacao,
     handleSave,
-    vinculoComSaldo,
-    vinculoSemSaldo,
-    vinculoDecision,
-    vinculoContratoId,
-    vinculoLoading,
-    contratoEditInfo,
-    handleVinculoSelectContrato,
-    handleVinculoSim,
-    handleVinculoNao,
-    handleVinculoLimpar,
     handleCopyMensagemClinica,
     cargoSemExames,
     duplicidade90DiasOpen,
@@ -167,18 +157,6 @@ export function AgendamentoPage() {
             exams={exams}
             clienteValidacaoLoading={clienteValidacaoLoading}
             formularioClienteLiberado={formularioClienteLiberado}
-            vinculoContratosComSaldo={vinculoComSaldo}
-            vinculoContratosSemSaldo={vinculoSemSaldo}
-            vinculoDecision={vinculoDecision}
-            vinculoContratoId={vinculoContratoId}
-            vinculoLoading={vinculoLoading}
-            contratoVinculadoNumero={contratoEditInfo?.numero ?? null}
-            contratoVinculadoOrcamento={contratoEditInfo?.orcamento ?? null}
-            consomeSaldoExibicao={contratoEditInfo?.consome ?? null}
-            onVinculoSelectContrato={handleVinculoSelectContrato}
-            onVinculoSim={handleVinculoSim}
-            onVinculoNao={handleVinculoNao}
-            onVinculoLimpar={handleVinculoLimpar}
           />
           <ExamSection
             exams={exams}
