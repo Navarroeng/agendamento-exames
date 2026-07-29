@@ -83,7 +83,11 @@ interface OrcamentoAprovarModalProps {
     }
   ) => Promise<void>;
   onSalvarFuncionarios: (aprovacaoId: string, file: File | null) => Promise<void>;
-  onSalvarLogo: (aprovacaoId: string, file: File | null) => Promise<void>;
+  onSalvarLogo: (
+    aprovacaoId: string,
+    file: File | null,
+    possuiLogo: boolean
+  ) => Promise<void>;
   onSalvarVisita: (
     aprovacaoId: string,
     payload: {
@@ -144,6 +148,7 @@ export function OrcamentoAprovarModal({
   const [observacaoProcuracao, setObservacaoProcuracao] = useState("");
   const [funcionariosFile, setFuncionariosFile] = useState<File | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [possuiLogo, setPossuiLogo] = useState<boolean | null>(null);
   const [visitaNecessaria, setVisitaNecessaria] = useState<boolean | null>(null);
   const [visitaData, setVisitaData] = useState("");
   const [visitaEndereco, setVisitaEndereco] = useState("");
@@ -185,6 +190,13 @@ export function OrcamentoAprovarModal({
     setObservacaoProcuracao(aprovacao?.observacao_procuracao ?? "");
     setFuncionariosFile(null);
     setLogoFile(null);
+    setPossuiLogo(
+      aprovacao?.possui_logo == null
+        ? aprovacao?.logo_path
+          ? true
+          : null
+        : Boolean(aprovacao.possui_logo)
+    );
     setAgendamentosContagem(null);
     setVisitaNecessaria(
       aprovacao?.visita_tecnica_necessaria == null
@@ -375,11 +387,15 @@ export function OrcamentoAprovarModal({
 
   async function handleSalvarLogoClick() {
     if (!aprovacao) return;
-    if (!logoFile && !aprovacao.logo_path) {
+    if (possuiLogo == null) {
+      toast.error("Informe se deseja incluir a logomarca da empresa.");
+      return;
+    }
+    if (possuiLogo && !logoFile && !aprovacao.logo_path) {
       toast.error("Anexe a logomarca da empresa.");
       return;
     }
-    await onSalvarLogo(aprovacao.id, logoFile);
+    await onSalvarLogo(aprovacao.id, logoFile, possuiLogo);
     setLogoFile(null);
     setTab("visita");
   }
@@ -1025,11 +1041,16 @@ export function OrcamentoAprovarModal({
           aprovacao &&
           isOrcamentoEtapaLiberada("logo", aprovacao, orcamentoAprovado) ? (
             <OrcamentoAbaLogo
+              possuiLogo={possuiLogo}
               file={logoFile}
               savedName={aprovacao.logo_nome ?? null}
               savedUrl={logoPreviewUrl}
               savedTipo={aprovacao.logo_tipo ?? null}
               saving={saving}
+              onChangePossuiLogo={(value) => {
+                setPossuiLogo(value);
+                if (!value) setLogoFile(null);
+              }}
               onFileChange={setLogoFile}
               onSalvar={() => void handleSalvarLogoClick()}
             />

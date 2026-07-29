@@ -84,6 +84,8 @@ export interface OrcamentoAprovacaoRecord {
   logo_tipo?: string | null;
   logo_tamanho?: number | null;
   logo_salva_em?: string | null;
+  /** true = incluir logo; false = sem logo; null = ainda não decidiu. */
+  possui_logo?: boolean | null;
   visita_tecnica_necessaria?: boolean | null;
   visita_tecnica_data?: string | null;
   visita_tecnica_endereco?: string | null;

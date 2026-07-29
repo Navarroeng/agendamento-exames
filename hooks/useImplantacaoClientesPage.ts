@@ -455,10 +455,28 @@ export function useImplantacaoClientesPage() {
   );
 
   const handleSalvarLogo = useCallback(
-    async (aprovacaoId: string, file: File | null) => {
+    async (aprovacaoId: string, file: File | null, possuiLogo: boolean) => {
       if (!modalOrcamento || !modalAprovacao) return;
       setModalSaving(true);
       try {
+        if (!possuiLogo) {
+          const saved = await salvarOrcamentoLogo(aprovacaoId, {
+            possui_logo: false,
+          });
+          setModalAprovacao(saved);
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.edicao,
+            registroId: modalOrcamento.id,
+            registroNome: modalOrcamento.numero,
+            descricao: "Empresa sem logomarca. Etapa Logo concluída sem anexo.",
+          });
+          toast.success("Etapa Logo salva. Visita técnica liberada.");
+          void refresh();
+          return;
+        }
+
         let meta = {
           path: modalAprovacao.logo_path ?? "",
           nome: modalAprovacao.logo_nome ?? "",
@@ -471,7 +489,10 @@ export function useImplantacaoClientesPage() {
         if (!meta.path) {
           throw new Error("Anexe a logomarca.");
         }
-        const saved = await salvarOrcamentoLogo(aprovacaoId, meta);
+        const saved = await salvarOrcamentoLogo(aprovacaoId, {
+          possui_logo: true,
+          fileMeta: meta,
+        });
         setModalAprovacao(saved);
         setLogoPreviewUrl(await obterUrlOrcamentoOnboarding(meta.path));
         await registrarAuditoria({

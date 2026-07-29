@@ -92,22 +92,45 @@ export async function salvarOrcamentoListaFuncionarios(
 
 export async function salvarOrcamentoLogo(
   aprovacaoId: string,
-  fileMeta: {
-    path: string;
-    nome: string;
-    tipo: string;
-    tamanho: number;
+  payload: {
+    possui_logo: boolean;
+    fileMeta?: {
+      path: string;
+      nome: string;
+      tipo: string;
+      tamanho: number;
+    } | null;
   }
 ): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
+  const agora = new Date().toISOString();
+
+  if (!payload.possui_logo) {
+    const { error } = await supabase
+      .from("orcamento_aprovacoes")
+      .update({
+        possui_logo: false,
+        logo_salva_em: agora,
+      })
+      .eq("id", aprovacaoId);
+    if (error) throw error;
+    return fetchAprovacao(aprovacaoId);
+  }
+
+  const fileMeta = payload.fileMeta;
+  if (!fileMeta?.path) {
+    throw new Error("Anexe a logomarca da empresa.");
+  }
+
   const { error } = await supabase
     .from("orcamento_aprovacoes")
     .update({
+      possui_logo: true,
       logo_path: fileMeta.path,
       logo_nome: fileMeta.nome,
       logo_tipo: fileMeta.tipo,
       logo_tamanho: fileMeta.tamanho,
-      logo_salva_em: new Date().toISOString(),
+      logo_salva_em: agora,
     })
     .eq("id", aprovacaoId);
   if (error) throw error;

@@ -72,7 +72,13 @@ export function isFuncionariosEtapaConcluida(
 export function isLogoEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
 ): boolean {
-  return Boolean(aprovacao?.logo_path);
+  if (!aprovacao) return false;
+  if (aprovacao.possui_logo === false) {
+    return Boolean(aprovacao.logo_salva_em);
+  }
+  // Sim (explícito ou legado com arquivo): precisa ter logo anexada.
+  if (aprovacao.logo_path) return true;
+  return false;
 }
 
 export function isVisitaEtapaConcluida(

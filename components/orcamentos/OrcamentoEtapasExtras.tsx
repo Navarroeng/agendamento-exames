@@ -306,61 +306,99 @@ export function OrcamentoAbaFuncionarios({
 }
 
 interface OrcamentoAbaLogoProps {
+  possuiLogo: boolean | null;
   file: File | null;
   savedName: string | null;
   savedUrl: string | null;
   savedTipo: string | null;
   saving: boolean;
+  onChangePossuiLogo: (value: boolean) => void;
   onFileChange: (file: File | null) => void;
   onSalvar: () => void;
 }
 
 export function OrcamentoAbaLogo({
+  possuiLogo,
   file,
   savedName,
   savedUrl,
   savedTipo,
   saving,
+  onChangePossuiLogo,
   onFileChange,
   onSalvar,
 }: OrcamentoAbaLogoProps) {
+  const showUpload = possuiLogo === true;
   const hasPreview = Boolean(file || savedName);
+  const canSave =
+    possuiLogo === false ||
+    (possuiLogo === true && Boolean(file || savedName));
 
   return (
     <div className="space-y-4">
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-bold text-navy">
-          Upload da logomarca <RequiredMark />
-        </span>
-        <input
-          type="file"
-          accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
-          className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
-          disabled={saving}
-          onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-        />
-        <p className="mt-1 text-[11px] text-app-muted">
-          Aceita PNG, JPG, JPEG e SVG (máx. 10 MB).
-        </p>
-      </label>
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-xs font-bold text-navy">
+          Gostaria de incluir a logomarca da empresa?
+        </legend>
+        <label className="flex items-center gap-2 text-sm text-[#334155]">
+          <input
+            type="radio"
+            name="possui_logo"
+            checked={possuiLogo === true}
+            disabled={saving}
+            onChange={() => onChangePossuiLogo(true)}
+          />
+          Sim
+        </label>
+        <label className="flex items-center gap-2 text-sm text-[#334155]">
+          <input
+            type="radio"
+            name="possui_logo"
+            checked={possuiLogo === false}
+            disabled={saving}
+            onChange={() => onChangePossuiLogo(false)}
+          />
+          Não
+        </label>
+      </fieldset>
 
-      {hasPreview ? (
-        <OrcamentoArquivoPreview
-          file={file}
-          savedUrl={savedUrl}
-          savedName={savedName}
-          savedTipo={savedTipo}
-        />
+      {showUpload ? (
+        <>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold text-navy">
+              Upload da logomarca <RequiredMark />
+            </span>
+            <input
+              type="file"
+              accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+              className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[#eef2ff] file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-navy"
+              disabled={saving}
+              onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+            />
+            <p className="mt-1 text-[11px] text-app-muted">
+              Aceita PNG, JPG, JPEG e SVG (máx. 10 MB).
+            </p>
+          </label>
+
+          {hasPreview ? (
+            <OrcamentoArquivoPreview
+              file={file}
+              savedUrl={savedUrl}
+              savedName={savedName}
+              savedTipo={savedTipo}
+            />
+          ) : null}
+        </>
       ) : null}
 
       <div className="flex justify-end">
         <button
           type="button"
           className="btn btn-primary"
-          disabled={saving || (!file && !savedName)}
+          disabled={saving || !canSave}
           onClick={onSalvar}
         >
-          {saving ? "Salvando..." : "Salvar Logo"}
+          {saving ? "Salvando..." : "Salvar"}
         </button>
       </div>
     </div>
