@@ -7,13 +7,24 @@ export interface ClienteFilterOption {
   label: string;
 }
 
+/**
+ * Apresentação do nome da empresa em caixa alta (pt-BR).
+ * Não altera o valor persistido — uso exclusivo de UI.
+ */
+export function formatClienteNomeDisplay(
+  nome: string | null | undefined
+): string {
+  if (nome == null) return "";
+  return nome.toLocaleUpperCase("pt-BR");
+}
+
 export function formatClienteSelectLabel(
   cliente: Pick<ClienteRecord, "nome" | "cnpj">
 ): string {
   const cnpjLabel = cliente.cnpj?.trim()
     ? formatCNPJ(cliente.cnpj)
     : "CNPJ não informado";
-  return `${cliente.nome} — ${cnpjLabel}`;
+  return `${formatClienteNomeDisplay(cliente.nome)} — ${cnpjLabel}`;
 }
 
 export function buildClienteFilterOptions(
@@ -43,7 +54,7 @@ export function buildClienteFilterOptionsHistorico(
     if (!nome) continue;
     const key = nome.toLowerCase();
     if (byKey.has(key)) continue;
-    byKey.set(key, { value: nome, label: nome });
+    byKey.set(key, { value: nome, label: formatClienteNomeDisplay(nome) });
   }
 
   return Array.from(byKey.values()).sort((a, b) =>

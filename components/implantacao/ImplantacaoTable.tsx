@@ -3,6 +3,8 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { Panel } from "@/components/ui/Panel";
 import { IconChecklist, IconEye } from "@/components/ui/icons/OutlineIcons";
+import { formatCNPJ } from "@/lib/cnpj";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   IMPLANTACAO_AGENDAMENTO_BADGE,
   IMPLANTACAO_ETAPA_BADGE,
@@ -12,7 +14,6 @@ import {
   resolveImplantacaoEtapaVisual,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
-import { formatCNPJ } from "@/lib/cnpj";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
@@ -126,7 +127,7 @@ export function ImplantacaoTable({
                       </span>
                     </td>
                     <td className="max-w-[200px] truncate">
-                      {processo.orcamento.cliente_nome}
+                      {formatClienteNomeDisplay(processo.orcamento.cliente_nome)}
                     </td>
                     <td className="whitespace-nowrap text-[12px]">
                       {cnpj

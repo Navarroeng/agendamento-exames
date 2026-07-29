@@ -8,6 +8,7 @@ import {
   type AgendamentoTableSortState,
 } from "@/lib/agendamento-table-sort";
 import type { AgendamentoTableRow } from "@/lib/types";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { RowActionsMenu } from "./RowActionsMenu";
 
 const TH =
@@ -166,9 +167,9 @@ export function AgendamentosTable({
                   </td>
                   <td
                     className={`${TD} max-w-[140px] truncate`}
-                    title={row.cliente}
+                    title={formatClienteNomeDisplay(row.cliente)}
                   >
-                    {row.cliente}
+                    {formatClienteNomeDisplay(row.cliente)}
                   </td>
                   <td
                     className={`${TD} max-w-[120px] truncate`}

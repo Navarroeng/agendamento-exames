@@ -8,6 +8,7 @@ import {
   formatOrcamentoOrigemCliente,
   type OrcamentoRecord,
 } from "@/lib/orcamento-types";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { OrcamentoRowActionsMenu } from "./OrcamentoRowActionsMenu";
 
 interface OrcamentosTableProps {
@@ -72,7 +73,7 @@ export function OrcamentosTable({
                     <td className="font-bold text-navy">{orcamento.numero}</td>
                     <td>{formatDateIsoToBR(orcamento.data_proposta)}</td>
                     <td className="max-w-[200px] truncate">
-                      {orcamento.cliente_nome}
+                      {formatClienteNomeDisplay(orcamento.cliente_nome)}
                     </td>
                     <td>
                       {formatOrcamentoOrigemCliente(orcamento.origem_cliente)}

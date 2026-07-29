@@ -26,6 +26,7 @@ import {
   ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG,
   resolveOrcamentoCnpjDigits,
 } from "@/lib/orcamento-aprovacao-integracao";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { calcValorParcela } from "@/lib/orcamento-pagamento";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -473,7 +474,7 @@ export function OrcamentoAprovarModal({
                 ) : null}
               </div>
               <p className="mt-1 truncate text-sm text-white/80">
-                {orcamento.cliente_nome}
+                {formatClienteNomeDisplay(orcamento.cliente_nome)}
               </p>
             </div>
             <button

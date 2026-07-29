@@ -18,7 +18,7 @@ export function ClienteForm({ form, onChange }: ClienteFormProps) {
       <div className="form-grid grid grid-cols-1 gap-x-5 gap-y-[18px] md:grid-cols-2">
         <Field label={<>Nome da empresa <RequiredMark /></>}>
           <input
-            className="field-input"
+            className="field-input uppercase"
             placeholder="Nome da empresa"
             value={form.nome}
             onChange={(e) => onChange("nome", e.target.value)}

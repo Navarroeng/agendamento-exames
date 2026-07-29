@@ -16,6 +16,7 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
 function displayValue(value: string | null | undefined): string {
@@ -79,7 +80,14 @@ export function OrcamentoViewBody({
       <section className="rounded-2xl border border-[#e4ebf4] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
         <SectionTitle>Dados do cliente</SectionTitle>
         <div className="grid grid-cols-1 gap-x-8 gap-y-3.5 md:grid-cols-2">
-          <ClientField label="Cliente" value={displayValue(orcamento.cliente_nome)} />
+          <ClientField
+            label="Cliente"
+            value={
+              orcamento.cliente_nome?.trim()
+                ? formatClienteNomeDisplay(orcamento.cliente_nome)
+                : "—"
+            }
+          />
           <ClientField label="CNPJ" value={displayValue(orcamento.cliente_cnpj)} />
           <ClientField label="Setor" value={displayValue(orcamento.cliente_setor)} />
           <ClientField label="Contato" value={displayValue(orcamento.contato)} />

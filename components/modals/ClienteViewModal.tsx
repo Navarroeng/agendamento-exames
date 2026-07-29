@@ -26,6 +26,7 @@ import {
 } from "@/lib/cliente-disponivel-agendamento";
 import { SIM_NAO } from "@/lib/constants";
 import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import type { ClienteRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -165,7 +166,9 @@ export function ClienteViewModal({
     }
   };
 
-  const displayNome = editingCliente ? clienteForm.nome : cliente.nome;
+  const displayNome = formatClienteNomeDisplay(
+    editingCliente ? clienteForm.nome : cliente.nome
+  );
   const displayCnpj = editingCliente
     ? clienteForm.cnpj
     : formatCNPJ(cliente.cnpj);
@@ -253,7 +256,7 @@ export function ClienteViewModal({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field label={<>Nome da empresa <RequiredMark /></>}>
                     <input
-                      className="field-input"
+                      className="field-input uppercase"
                       value={clienteForm.nome}
                       onChange={(e) => setClienteField("nome", e.target.value)}
                     />
@@ -300,7 +303,10 @@ export function ClienteViewModal({
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
-                  <InfoItem label="Nome" value={cliente.nome} />
+                  <InfoItem
+                    label="Nome"
+                    value={formatClienteNomeDisplay(cliente.nome)}
+                  />
                   <InfoItem label="CNPJ" value={formatCNPJ(cliente.cnpj)} />
                   <InfoItem
                     label="Procuração"

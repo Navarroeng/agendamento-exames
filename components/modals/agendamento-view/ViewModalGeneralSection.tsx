@@ -1,4 +1,5 @@
 import { formatCargoVisualizacao } from "@/lib/agendamento-cargo";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
 import { formatHorarioDisplay } from "@/lib/format-datetime";
@@ -45,7 +46,7 @@ export function ViewModalGeneralSection({
             <DataRow
               icon={<IconBuilding />}
               label="Cliente"
-              value={agendamento.cliente_nome}
+              value={formatClienteNomeDisplay(agendamento.cliente_nome)}
             />
             <DataRow
               icon={<IconStethoscope />}

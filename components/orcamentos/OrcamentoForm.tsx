@@ -13,6 +13,7 @@ import {
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import type { ClienteRecord } from "@/lib/types";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { OrcamentoItensSection } from "./OrcamentoItensSection";
 
 interface OrcamentoFormProps {
@@ -126,7 +127,7 @@ export function OrcamentoForm({
               <option value="">Selecionar cliente...</option>
               {clientes.map((cliente) => (
                 <option key={cliente.id} value={cliente.id}>
-                  {cliente.nome}
+                  {formatClienteNomeDisplay(cliente.nome)}
                 </option>
               ))}
             </select>
@@ -136,7 +137,7 @@ export function OrcamentoForm({
               Cliente <RequiredMark />
             </label>
             <input
-              className={`field-input ${clienteBloqueado ? "bg-[#f8fafc]" : ""}`}
+              className={`field-input uppercase ${clienteBloqueado ? "bg-[#f8fafc]" : ""}`}
               placeholder="Nome da empresa"
               value={form.cliente_nome}
               readOnly={clienteBloqueado}

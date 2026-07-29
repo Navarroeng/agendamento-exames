@@ -3,6 +3,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 
 import { formatCNPJ } from "@/lib/cnpj";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatClienteAgendamentoBadgeLabel } from "@/lib/cliente-disponivel-agendamento";
 import type { ClienteRecord } from "@/lib/types";
 
@@ -80,7 +81,9 @@ export function ClientesTable({
                       : undefined
                   }
                 >
-                  <td className="font-bold text-navy">{cliente.nome}</td>
+                  <td className="font-bold text-navy">
+                    {formatClienteNomeDisplay(cliente.nome)}
+                  </td>
 
                   <td>{formatCNPJ(cliente.cnpj)}</td>
 
