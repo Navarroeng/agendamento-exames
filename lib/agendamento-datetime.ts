@@ -119,6 +119,50 @@ export function parseHorarioToStorage(value: string): string | null {
   return value.trim();
 }
 
+/** Data de hoje (AAAA-MM-DD) no fuso America/Sao_Paulo. */
+export function todayIsoSaoPaulo(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export const DATA_AGENDAMENTO_PASSADA_MSG =
+  "Não é permitido criar agendamentos com data anterior ao dia atual. Verifique a data informada.";
+
+/**
+ * Valida se a data do agendamento pode ser salva.
+ * - Criação: data >= hoje (SP).
+ * - Edição: permite manter a data original (mesmo no passado);
+ *   se alterar, a nova data deve ser >= hoje.
+ */
+export function isDataAgendamentoPermitida(params: {
+  dataIso: string;
+  dataOriginalIso?: string | null;
+  hojeIso?: string;
+}): boolean {
+  const data = params.dataIso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
+
+  const original = (params.dataOriginalIso ?? "").slice(0, 10);
+  if (original && original === data) return true;
+
+  const hoje = (params.hojeIso ?? todayIsoSaoPaulo()).slice(0, 10);
+  return data >= hoje;
+}
+
+export function assertDataAgendamentoPermitida(params: {
+  dataIso: string;
+  dataOriginalIso?: string | null;
+  hojeIso?: string;
+}): void {
+  if (!isDataAgendamentoPermitida(params)) {
+    throw new Error(DATA_AGENDAMENTO_PASSADA_MSG);
+  }
+}
+
 /** DD/MM/AAAA ou ISO → DD/MM para mensagem WhatsApp */
 export function formatDataDDM(displayOrIso: string): string {
   if (!displayOrIso?.trim()) return "";

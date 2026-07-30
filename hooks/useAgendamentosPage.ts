@@ -31,11 +31,14 @@ import {
   separarExamesCatalogoParaAdicionar,
 } from "@/lib/agendamento-exames-adicionais";
 import {
+  DATA_AGENDAMENTO_PASSADA_MSG,
   INVALID_DATE_TOAST,
   INVALID_TIME_TOAST,
+  isDataAgendamentoPermitida,
   isValidDateBR,
   isValidHorario24,
   parseDateBRToIso,
+  todayIsoSaoPaulo,
 } from "@/lib/agendamento-datetime";
 import {
   EXAME_DUPLICADO_TOAST,
@@ -198,6 +201,7 @@ export function useAgendamentosPage() {
   const [editingStatus, setEditingStatus] = useState<AgendamentoStatus | null>(
     null
   );
+  const [dataFieldError, setDataFieldError] = useState<string | null>(null);
   const [asoRetidoModalOpen, setAsoRetidoModalOpen] = useState(false);
   const [asoRetidoTargetId, setAsoRetidoTargetId] = useState<string | null>(
     null
@@ -909,9 +913,21 @@ export function useAgendamentosPage() {
   const closeForm = useCallback(() => {
     setShowForm(false);
     resetForm();
+    setDataFieldError(null);
     setFiltersExpanded(false);
   }, [resetForm]);
 
+  const handleFormFieldChange = useCallback(
+    (field: Parameters<typeof setField>[0], value: string) => {
+      if (field === "data_agendamento") {
+        setDataFieldError(null);
+      }
+      setField(field, value);
+    },
+    [setField]
+  );
+
+  const dataAgendamentoMinIso = todayIsoSaoPaulo();
   const toggleFilters = useCallback(() => {
     setFiltersExpanded((prev) => !prev);
   }, []);
@@ -1611,9 +1627,28 @@ export function useAgendamentosPage() {
         return;
       }
       if (!isValidDateBR(form.data_agendamento)) {
+        setDataFieldError(INVALID_DATE_TOAST);
         toast.error(INVALID_DATE_TOAST);
         return;
       }
+
+      const dataIso = parseDateBRToIso(form.data_agendamento);
+      const dataOriginalIso = editingId
+        ? getById(editingId)?.data_agendamento ?? null
+        : null;
+      if (
+        dataIso &&
+        !isDataAgendamentoPermitida({
+          dataIso,
+          dataOriginalIso,
+        })
+      ) {
+        setDataFieldError(DATA_AGENDAMENTO_PASSADA_MSG);
+        toast.error(DATA_AGENDAMENTO_PASSADA_MSG);
+        return;
+      }
+      setDataFieldError(null);
+
       if (!form.horario.trim()) {
         toast.error(VALIDATION_TOAST_MESSAGE);
         return;
@@ -1649,7 +1684,6 @@ export function useAgendamentosPage() {
         return;
       }
 
-      const dataIso = parseDateBRToIso(form.data_agendamento);
       if (dataIso) {
         const contrato = await verificarContratoVigentePorNome(
           form.cliente_nome,
@@ -1948,7 +1982,9 @@ export function useAgendamentosPage() {
     cancelModalVariant,
     saving,
     form,
-    setField,
+    setField: handleFormFieldChange,
+    dataFieldError,
+    dataAgendamentoMinIso,
     clinicasAtivas,
     clientes: clientesParaAgendamento,
     clientesFormulario: clientesParaAgendamento,

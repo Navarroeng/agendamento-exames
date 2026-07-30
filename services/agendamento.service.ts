@@ -1,4 +1,5 @@
 import { assertExamesValorClientePermitido } from "@/lib/agendamento-clinico-zero-demissional";
+import { assertDataAgendamentoPermitida } from "@/lib/agendamento-datetime";
 import { assertContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
 import { assertClienteDisponivelParaAgendamento } from "@/services/cliente.service";
 import { assertExamesSemDuplicidade } from "@/lib/duplicidade-validations";
@@ -88,6 +89,9 @@ export async function salvarAgendamentoComExames(
   exames: ExamePayload[]
 ): Promise<string> {
   validarExamesPayload(agendamento.aso, exames);
+  assertDataAgendamentoPermitida({
+    dataIso: agendamento.data_agendamento,
+  });
   await assertContratoVigentePorNome(
     agendamento.cliente_nome,
     agendamento.data_agendamento
@@ -167,6 +171,20 @@ export async function atualizarAgendamentoComExames(
 ): Promise<void> {
   await assertAgendamentoEditavelPorFatura(id);
   validarExamesPayload(agendamento.aso, exames);
+
+  const supabase = createClient();
+  const { data: atualRow, error: atualErr } = await supabase
+    .from("agendamentos")
+    .select("data_agendamento")
+    .eq("id", id)
+    .maybeSingle();
+  if (atualErr) throw atualErr;
+
+  assertDataAgendamentoPermitida({
+    dataIso: agendamento.data_agendamento,
+    dataOriginalIso: atualRow?.data_agendamento ?? null,
+  });
+
   await assertContratoVigentePorNome(
     agendamento.cliente_nome,
     agendamento.data_agendamento
@@ -181,7 +199,6 @@ export async function atualizarAgendamentoComExames(
     agendamentoIdAtual: id,
   });
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo, id);
-  const supabase = createClient();
 
   const { error } = await supabase
     .from("agendamentos")

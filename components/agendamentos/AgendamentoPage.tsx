@@ -39,6 +39,8 @@ export function AgendamentoPage() {
     saving,
     form,
     setField,
+    dataFieldError,
+    dataAgendamentoMinIso,
     clinicasAtivas,
     clientes,
     clientesLoading,
@@ -157,6 +159,8 @@ export function AgendamentoPage() {
             exams={exams}
             clienteValidacaoLoading={clienteValidacaoLoading}
             formularioClienteLiberado={formularioClienteLiberado}
+            dataFieldError={dataFieldError}
+            dataMinIso={dataAgendamentoMinIso}
           />
           <ExamSection
             exams={exams}

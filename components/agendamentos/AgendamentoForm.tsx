@@ -9,7 +9,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { RESPONSAVEIS, TIPOS_ASO } from "@/lib/constants";
 import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaCheck";
-import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
+import { maskDateBR, maskTime24, formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
 import type { FormField } from "@/hooks/useAgendamentoForm";
 import type { ClienteRecord, ClinicaRecord, ExameFormItem } from "@/lib/types";
@@ -35,6 +35,9 @@ interface AgendamentoFormProps {
   exams: ExameFormItem[];
   clienteValidacaoLoading?: boolean;
   formularioClienteLiberado?: boolean;
+  dataFieldError?: string | null;
+  /** Data mínima permitida (ISO AAAA-MM-DD), fuso SP. */
+  dataMinIso?: string;
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -60,12 +63,15 @@ export function AgendamentoForm({
   exams,
   clienteValidacaoLoading = false,
   formularioClienteLiberado = true,
+  dataFieldError = null,
+  dataMinIso,
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
   const horarioHint = getHorarioFieldHint(selectedClinica, exams);
   const camposDependentesClienteDesabilitados =
     readOnly || !formularioClienteLiberado;
+  const dataMinLabel = dataMinIso ? formatDateIsoToBR(dataMinIso) : null;
 
   return (
     <Panel
@@ -89,7 +95,11 @@ export function AgendamentoForm({
         <div className="agendamento-form-row1">
           <Field label={<>Data <RequiredMark /></>}>
             <input
-              className="field-input w-full"
+              className={`field-input w-full ${
+                dataFieldError
+                  ? "border-brand-red ring-1 ring-brand-red/30"
+                  : ""
+              }`}
               type="text"
               inputMode="numeric"
               autoComplete="off"
@@ -97,10 +107,27 @@ export function AgendamentoForm({
               maxLength={10}
               value={form.data_agendamento}
               disabled={readOnly}
+              aria-invalid={Boolean(dataFieldError)}
+              aria-describedby={
+                dataFieldError ? "agendamento-data-error" : undefined
+              }
+              min={dataMinIso || undefined}
               onChange={(e) =>
                 onChange("data_agendamento", maskDateBR(e.target.value))
               }
             />
+            {dataFieldError ? (
+              <p
+                id="agendamento-data-error"
+                className="mt-1.5 text-[11px] font-medium text-brand-red"
+              >
+                {dataFieldError}
+              </p>
+            ) : dataMinLabel ? (
+              <p className="mt-1.5 text-[11px] font-medium text-[#64748b]">
+                Data mínima: {dataMinLabel} (hoje ou futura)
+              </p>
+            ) : null}
           </Field>
           <Field label={<>Horário <RequiredMark /></>}>
             <input
