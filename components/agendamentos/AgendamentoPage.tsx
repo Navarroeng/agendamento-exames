@@ -40,7 +40,7 @@ export function AgendamentoPage() {
     form,
     setField,
     dataFieldError,
-    dataAgendamentoMinIso,
+    handleDataBlur,
     clinicasAtivas,
     clientes,
     clientesLoading,
@@ -160,7 +160,7 @@ export function AgendamentoPage() {
             clienteValidacaoLoading={clienteValidacaoLoading}
             formularioClienteLiberado={formularioClienteLiberado}
             dataFieldError={dataFieldError}
-            dataMinIso={dataAgendamentoMinIso}
+            onDataBlur={handleDataBlur}
           />
           <ExamSection
             exams={exams}

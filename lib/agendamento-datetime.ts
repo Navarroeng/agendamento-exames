@@ -130,7 +130,7 @@ export function todayIsoSaoPaulo(now: Date = new Date()): string {
 }
 
 export const DATA_AGENDAMENTO_PASSADA_MSG =
-  "Não é permitido criar agendamentos com data anterior ao dia atual. Verifique a data informada.";
+  "Data inválida. Informe a data de hoje ou uma data futura.";
 
 /**
  * Valida se a data do agendamento pode ser salva.

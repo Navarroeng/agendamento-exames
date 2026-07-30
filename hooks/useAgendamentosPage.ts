@@ -38,7 +38,6 @@ import {
   isValidDateBR,
   isValidHorario24,
   parseDateBRToIso,
-  todayIsoSaoPaulo,
 } from "@/lib/agendamento-datetime";
 import {
   EXAME_DUPLICADO_TOAST,
@@ -917,17 +916,75 @@ export function useAgendamentosPage() {
     setFiltersExpanded(false);
   }, [resetForm]);
 
-  const handleFormFieldChange = useCallback(
-    (field: Parameters<typeof setField>[0], value: string) => {
-      if (field === "data_agendamento") {
+  const getDataOriginalIso = useCallback((): string | null => {
+    if (!editingId) return null;
+    return getById(editingId)?.data_agendamento ?? null;
+  }, [editingId, getById]);
+
+  const validateDataAgendamentoField = useCallback(
+    (opts?: { fromSave?: boolean }): boolean => {
+      const value = form.data_agendamento.trim();
+      if (!value) {
         setDataFieldError(null);
+        return true;
       }
-      setField(field, value);
+      if (!isValidDateBR(value)) {
+        // Formato incompleto/inválido: sem mensagem de data passada no blur.
+        if (!opts?.fromSave) setDataFieldError(null);
+        return true;
+      }
+      const dataIso = parseDateBRToIso(value);
+      if (
+        dataIso &&
+        !isDataAgendamentoPermitida({
+          dataIso,
+          dataOriginalIso: getDataOriginalIso(),
+        })
+      ) {
+        setDataFieldError(DATA_AGENDAMENTO_PASSADA_MSG);
+        return false;
+      }
+      setDataFieldError(null);
+      return true;
     },
-    [setField]
+    [form.data_agendamento, getDataOriginalIso]
   );
 
-  const dataAgendamentoMinIso = todayIsoSaoPaulo();
+  const handleFormFieldChange = useCallback(
+    (field: Parameters<typeof setField>[0], value: string) => {
+      setField(field, value);
+      if (field !== "data_agendamento") return;
+
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.length < 10 || !isValidDateBR(trimmed)) {
+        setDataFieldError(null);
+        return;
+      }
+      const dataIso = parseDateBRToIso(trimmed);
+      const dataOriginalIso = editingId
+        ? getById(editingId)?.data_agendamento ?? null
+        : null;
+      if (
+        dataIso &&
+        !isDataAgendamentoPermitida({
+          dataIso,
+          dataOriginalIso,
+        })
+      ) {
+        // Mantém erro se já estava inválida e ainda é passada; senão só no blur.
+        setDataFieldError((prev) =>
+          prev ? DATA_AGENDAMENTO_PASSADA_MSG : null
+        );
+        return;
+      }
+      setDataFieldError(null);
+    },
+    [setField, editingId, getById]
+  );
+
+  const handleDataBlur = useCallback(() => {
+    validateDataAgendamentoField();
+  }, [validateDataAgendamentoField]);
   const toggleFilters = useCallback(() => {
     setFiltersExpanded((prev) => !prev);
   }, []);
@@ -1984,7 +2041,7 @@ export function useAgendamentosPage() {
     form,
     setField: handleFormFieldChange,
     dataFieldError,
-    dataAgendamentoMinIso,
+    handleDataBlur,
     clinicasAtivas,
     clientes: clientesParaAgendamento,
     clientesFormulario: clientesParaAgendamento,

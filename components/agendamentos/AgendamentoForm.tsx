@@ -9,7 +9,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { RESPONSAVEIS, TIPOS_ASO } from "@/lib/constants";
 import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaCheck";
-import { maskDateBR, maskTime24, formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
 import type { FormField } from "@/hooks/useAgendamentoForm";
 import type { ClienteRecord, ClinicaRecord, ExameFormItem } from "@/lib/types";
@@ -36,8 +36,7 @@ interface AgendamentoFormProps {
   clienteValidacaoLoading?: boolean;
   formularioClienteLiberado?: boolean;
   dataFieldError?: string | null;
-  /** Data mínima permitida (ISO AAAA-MM-DD), fuso SP. */
-  dataMinIso?: string;
+  onDataBlur?: () => void;
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -64,14 +63,13 @@ export function AgendamentoForm({
   clienteValidacaoLoading = false,
   formularioClienteLiberado = true,
   dataFieldError = null,
-  dataMinIso,
+  onDataBlur,
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
   const horarioHint = getHorarioFieldHint(selectedClinica, exams);
   const camposDependentesClienteDesabilitados =
     readOnly || !formularioClienteLiberado;
-  const dataMinLabel = dataMinIso ? formatDateIsoToBR(dataMinIso) : null;
 
   return (
     <Panel
@@ -111,10 +109,10 @@ export function AgendamentoForm({
               aria-describedby={
                 dataFieldError ? "agendamento-data-error" : undefined
               }
-              min={dataMinIso || undefined}
               onChange={(e) =>
                 onChange("data_agendamento", maskDateBR(e.target.value))
               }
+              onBlur={() => onDataBlur?.()}
             />
             {dataFieldError ? (
               <p
@@ -122,10 +120,6 @@ export function AgendamentoForm({
                 className="mt-1.5 text-[11px] font-medium text-brand-red"
               >
                 {dataFieldError}
-              </p>
-            ) : dataMinLabel ? (
-              <p className="mt-1.5 text-[11px] font-medium text-[#64748b]">
-                Data mínima: {dataMinLabel} (hoje ou futura)
               </p>
             ) : null}
           </Field>
