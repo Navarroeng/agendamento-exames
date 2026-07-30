@@ -121,7 +121,8 @@ export const EMPTY_IMPLANTACAO_FILTERS: ImplantacaoFilters = {
   busca: "",
   responsavel: "",
   etapa: "",
-  status: "",
+  /** Padrão: só aprovados (oculta contrato encerrado ao entrar). */
+  status: "aprovado",
   origem: "",
   aprovadoDe: "",
   aprovadoAte: "",
@@ -353,13 +354,18 @@ export function filterImplantacaoProcessos(
   let list = processos.filter((p) => {
     const { orcamento, etapaAtual, dataAprovacao, numeroContrato } = p;
 
+    const filtrandoEncerrado = filters.status === "contrato_encerrado";
+
     if (filters.andamento === "em_andamento") {
-      if (
-        orcamento.status === "cancelado" ||
-        orcamento.status === "contrato_encerrado" ||
-        etapaAtual === "contrato_encerrado"
-      ) {
-        return false;
+      // Status "Contrato encerrado" sobrescreve o padrão e mostra esses registros.
+      if (!filtrandoEncerrado) {
+        if (
+          orcamento.status === "cancelado" ||
+          orcamento.status === "contrato_encerrado" ||
+          etapaAtual === "contrato_encerrado"
+        ) {
+          return false;
+        }
       }
       if (etapaAtual === "concluido") return false;
     } else if (filters.andamento === "concluidos") {

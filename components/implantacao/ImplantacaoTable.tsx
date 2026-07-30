@@ -174,7 +174,9 @@ export function ImplantacaoTable({
                     </td>
                     <td className="text-center">
                       {processo.etapaAtual !== "concluido" &&
-                      processo.orcamento.status !== "cancelado" ? (
+                      processo.etapaAtual !== "contrato_encerrado" &&
+                      processo.orcamento.status !== "cancelado" &&
+                      processo.orcamento.status !== "contrato_encerrado" ? (
                         <button
                           type="button"
                           onClick={() => onContinuar(processo.orcamento.id)}

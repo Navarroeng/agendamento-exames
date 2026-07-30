@@ -30,7 +30,7 @@ function hasActiveFilters(filters: ImplantacaoFilters): boolean {
     filters.busca.trim() !== "" ||
     filters.responsavel !== "" ||
     filters.etapa !== "" ||
-    filters.status !== "" ||
+    filters.status !== EMPTY_IMPLANTACAO_FILTERS.status ||
     filters.origem !== "" ||
     filters.aprovadoDe !== "" ||
     filters.aprovadoAte !== "" ||
@@ -237,7 +237,9 @@ export function ImplantacaoSearchPanel({
                 >
                   <option value="">Todos</option>
                   {ORCAMENTO_STATUS_OPTIONS.filter((o) =>
-                    ["aprovado", "cancelado"].includes(o.value)
+                    ["aprovado", "cancelado", "contrato_encerrado"].includes(
+                      o.value
+                    )
                   ).map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
