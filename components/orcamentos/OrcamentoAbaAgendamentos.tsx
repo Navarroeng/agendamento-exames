@@ -3,20 +3,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
+import { DispensaAgendamentosIniciaisModal } from "@/components/orcamentos/DispensaAgendamentosIniciaisModal";
+import { ReabrirAgendamentosIniciaisModal } from "@/components/orcamentos/ReabrirAgendamentosIniciaisModal";
 import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
   buildContratoAgendamentoContagem,
+  contratoTemAgendamentosIniciaisDispensados,
   isAgendamentoSelecionavel,
   resolveClassificacaoAgendamento,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
+import { formatCreatedAtBR } from "@/lib/format-datetime";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { AgendamentoWithExames, ClienteContratoRecord } from "@/lib/types";
 import {
   buscarContratoPorOrcamentoId,
   carregarAgendamentosVigenciaContrato,
+  dispensarAgendamentosIniciaisContrato,
+  reabrirAgendamentosIniciaisContrato,
   salvarSelecaoAgendamentosContrato,
   type AgendamentoNaVigenciaItem,
 } from "@/services/contrato-agendamentos.service";
@@ -25,6 +31,7 @@ interface OrcamentoAbaAgendamentosProps {
   orcamentoId: string;
   aprovacao: OrcamentoAprovacaoRecord;
   usuarioNome: string;
+  clienteNome?: string;
   onContagemChange?: (contagem: ContratoAgendamentoContagem) => void;
 }
 
@@ -136,17 +143,22 @@ export function OrcamentoAbaAgendamentos({
   orcamentoId,
   aprovacao,
   usuarioNome,
+  clienteNome,
   onContagemChange,
 }: OrcamentoAbaAgendamentosProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dispensaSaving, setDispensaSaving] = useState(false);
+  const [reabrirSaving, setReabrirSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contrato, setContrato] = useState<ClienteContratoRecord | null>(null);
   const [itens, setItens] = useState<AgendamentoNaVigenciaItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewAgendamento, setViewAgendamento] =
     useState<AgendamentoWithExames | null>(null);
+  const [dispensaModalOpen, setDispensaModalOpen] = useState(false);
+  const [reabrirModalOpen, setReabrirModalOpen] = useState(false);
 
   const onContagemChangeRef = useRef(onContagemChange);
   onContagemChangeRef.current = onContagemChange;
@@ -155,6 +167,8 @@ export function OrcamentoAbaAgendamentos({
     Number(aprovacao.quantidade_colaboradores) ||
     Number(contrato?.quantidade_colaboradores) ||
     0;
+
+  const dispensado = contratoTemAgendamentosIniciaisDispensados(contrato);
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -215,6 +229,17 @@ export function OrcamentoAbaAgendamentos({
   }, [load]);
 
   const contagemPreview = useMemo(() => {
+    if (dispensado) {
+      const adicionais = itens.filter((i) =>
+        isAgendamentoSelecionavel(i.agendamento.status)
+      ).length;
+      return buildContratoAgendamentoContagem(
+        quantidadePrevista,
+        0,
+        adicionais,
+        { dispensado: true }
+      );
+    }
     const utilizados = itens.filter(
       (i) =>
         selectedIds.has(i.agendamento.id) &&
@@ -230,9 +255,19 @@ export function OrcamentoAbaAgendamentos({
       utilizados,
       adicionais
     );
-  }, [itens, selectedIds, quantidadePrevista]);
+  }, [itens, selectedIds, quantidadePrevista, dispensado]);
+
+  useEffect(() => {
+    onContagemChangeRef.current?.(contagemPreview);
+  }, [contagemPreview]);
 
   function toggleSelecao(item: AgendamentoNaVigenciaItem) {
+    if (dispensado) {
+      toast.error(
+        "Os agendamentos iniciais deste contrato foram dispensados pelo cliente."
+      );
+      return;
+    }
     if (!item.selecionavel) {
       if (item.bloqueadoOutroContrato) {
         toast.error(
@@ -268,6 +303,12 @@ export function OrcamentoAbaAgendamentos({
       toast.error("Contrato não encontrado para este orçamento.");
       return;
     }
+    if (dispensado) {
+      toast.error(
+        "Os agendamentos iniciais deste contrato foram dispensados pelo cliente."
+      );
+      return;
+    }
     setSaving(true);
     try {
       await salvarSelecaoAgendamentosContrato({
@@ -294,14 +335,79 @@ export function OrcamentoAbaAgendamentos({
     }
   }
 
+  function handleEscolherNao() {
+    if (!contrato) {
+      toast.error("Contrato não encontrado para este orçamento.");
+      return;
+    }
+    if (selectedIds.size > 0) {
+      toast.error(
+        `Este contrato já possui ${selectedIds.size} agendamento${
+          selectedIds.size === 1 ? "" : "s"
+        } contabilizado${
+          selectedIds.size === 1 ? "" : "s"
+        }. Remova os vínculos antes de registrar que o cliente não realizará os agendamentos iniciais.`
+      );
+      return;
+    }
+    setDispensaModalOpen(true);
+  }
+
+  async function handleConfirmarDispensa(motivo: string) {
+    if (!contrato) return;
+    setDispensaSaving(true);
+    try {
+      await dispensarAgendamentosIniciaisContrato({
+        contratoId: contrato.id,
+        motivo,
+        usuarioNome,
+        quantidadePrevista,
+        clienteNome,
+      });
+      toast.success("Dispensa dos agendamentos iniciais registrada.");
+      setDispensaModalOpen(false);
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao registrar dispensa."
+      );
+    } finally {
+      setDispensaSaving(false);
+    }
+  }
+
+  async function handleConfirmarReabertura(motivo: string) {
+    if (!contrato) return;
+    setReabrirSaving(true);
+    try {
+      await reabrirAgendamentosIniciaisContrato({
+        contratoId: contrato.id,
+        motivo,
+        usuarioNome,
+        clienteNome,
+      });
+      toast.success("Agendamentos iniciais reabertos.");
+      setReabrirModalOpen(false);
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao reabrir agendamentos."
+      );
+    } finally {
+      setReabrirSaving(false);
+    }
+  }
+
   const grupos = useMemo(() => {
     const doContrato: AgendamentoNaVigenciaItem[] = [];
     const demais: AgendamentoNaVigenciaItem[] = [];
     const cancelados: AgendamentoNaVigenciaItem[] = [];
     for (const item of itens) {
-      const selecionado = selectedIds.has(item.agendamento.id);
+      const selecionado = !dispensado && selectedIds.has(item.agendamento.id);
       if (item.agendamento.status === "cancelado") {
-        cancelados.push({ ...item, selecionado });
+        cancelados.push({ ...item, selecionado: false });
       } else if (selecionado) {
         doContrato.push({ ...item, selecionado: true });
       } else {
@@ -309,7 +415,7 @@ export function OrcamentoAbaAgendamentos({
       }
     }
     return { doContrato, demais, cancelados };
-  }, [itens, selectedIds]);
+  }, [itens, selectedIds, dispensado]);
 
   function renderTabela(
     titulo: string,
@@ -341,14 +447,18 @@ export function OrcamentoAbaAgendamentos({
           <tbody>
             {rows.map((item) => {
               const ag = item.agendamento;
-              const selecionado = selectedIds.has(ag.id);
+              const selecionado =
+                !dispensado && selectedIds.has(ag.id);
               const classificacao = resolveClassificacaoAgendamento({
                 status: ag.status,
                 selecionado,
+                dispensado,
               });
-              const disabled = (!item.selecionavel && !selecionado) || saving;
-              const title =
-                ag.status === "cancelado"
+              const disabled =
+                dispensado || (!item.selecionavel && !selecionado) || saving;
+              const title = dispensado
+                ? "Agendamentos iniciais dispensados — vínculo bloqueado"
+                : ag.status === "cancelado"
                   ? "Agendamento cancelado não pode ser contabilizado no contrato."
                   : item.bloqueadoOutroContrato
                     ? `Já contabilizado em ${item.outroContratoNumero}`
@@ -403,10 +513,81 @@ export function OrcamentoAbaAgendamentos({
             Agendamentos do contrato
           </p>
           <p className="mt-0.5 text-xs text-[#64748b]">
-            Selecione até {quantidadePrevista || "—"} agendamentos para
-            contabilizar na previsão inicial. Demais permanecem como adicionais.
+            {dispensado
+              ? "Os agendamentos iniciais foram dispensados. Novos exames não consomem a previsão inicial."
+              : `Selecione até ${quantidadePrevista || "—"} agendamentos para contabilizar na previsão inicial. Demais permanecem como adicionais.`}
           </p>
         </div>
+
+        {contrato ? (
+          <div className="border-b border-[#eef2f7] px-4 py-3">
+            {dispensado ? (
+              <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+                <p className="text-sm font-extrabold text-navy">
+                  Cliente optou por não realizar os agendamentos iniciais.
+                </p>
+                <div className="mt-2 grid gap-1 text-xs text-[#475569] sm:grid-cols-2">
+                  <p>
+                    <span className="font-bold text-navy">Previstos:</span>{" "}
+                    {quantidadePrevista || "—"}
+                  </p>
+                  <p>
+                    <span className="font-bold text-navy">Data da decisão:</span>{" "}
+                    {formatCreatedAtBR(contrato.dispensado_em)}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="font-bold text-navy">Motivo:</span>{" "}
+                    {contrato.motivo_dispensa_agendamentos || "—"}
+                  </p>
+                  <p>
+                    <span className="font-bold text-navy">Responsável:</span>{" "}
+                    {contrato.dispensado_por || "—"}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className="btn btn-muted text-xs"
+                    disabled={reabrirSaving || loading}
+                    onClick={() => setReabrirModalOpen(true)}
+                  >
+                    Reabrir agendamentos iniciais
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-extrabold text-navy">
+                  O cliente deseja realizar os agendamentos iniciais previstos no
+                  contrato?
+                </legend>
+                <div className="flex flex-wrap gap-4">
+                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-[#334155]">
+                    <input
+                      type="radio"
+                      name="deseja-agendamentos-iniciais"
+                      checked
+                      readOnly
+                      className="accent-brand-blue"
+                    />
+                    Sim
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-[#334155]">
+                    <input
+                      type="radio"
+                      name="deseja-agendamentos-iniciais"
+                      checked={false}
+                      disabled={!contrato || saving || loading}
+                      onChange={handleEscolherNao}
+                      className="accent-brand-blue"
+                    />
+                    Não
+                  </label>
+                </div>
+              </fieldset>
+            )}
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-5">
           <Card label="Previstos" value={String(contagemPreview.previstos)} />
@@ -415,8 +596,18 @@ export function OrcamentoAbaAgendamentos({
             label="Disponíveis"
             value={String(contagemPreview.disponiveis)}
           />
-          <Card label="Adicionais" value={String(contagemPreview.adicionais)} />
-          <Card label="Progresso" value={`${contagemPreview.percentual}%`} />
+          {dispensado ? (
+            <Card
+              label="Situação"
+              value={contagemPreview.situacaoLabel || "Dispensados"}
+            />
+          ) : (
+            <Card
+              label="Adicionais"
+              value={String(contagemPreview.adicionais)}
+            />
+          )}
+          <Card label="Progresso" value={contagemPreview.progressoLabel} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eef2f7] px-4 py-3">
@@ -436,6 +627,11 @@ export function OrcamentoAbaAgendamentos({
                 Contrato ainda não vinculado a este orçamento.
               </p>
             )}
+            {dispensado ? (
+              <p className="mt-1 text-xs font-semibold text-[#64748b]">
+                Substatus: Agendamentos iniciais dispensados pelo cliente
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -449,8 +645,13 @@ export function OrcamentoAbaAgendamentos({
             <button
               type="button"
               className="btn btn-primary"
-              disabled={saving || loading || !contrato}
+              disabled={saving || loading || !contrato || dispensado}
               onClick={() => void handleSalvar()}
+              title={
+                dispensado
+                  ? "Seleção bloqueada: agendamentos iniciais dispensados"
+                  : undefined
+              }
             >
               {saving ? "Salvando..." : "Salvar agendamentos do contrato"}
             </button>
@@ -459,6 +660,13 @@ export function OrcamentoAbaAgendamentos({
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
+        {dispensado ? (
+          <div className="border-b border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs font-semibold text-[#92400e]">
+            Os agendamentos iniciais deste contrato foram dispensados pelo
+            cliente. Novos agendamentos não serão contabilizados na previsão
+            inicial.
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           {showInitialLoading ? (
             <p className="px-4 py-8 text-center text-sm text-app-muted">
@@ -477,7 +685,9 @@ export function OrcamentoAbaAgendamentos({
             <>
               {renderTabela("Agendamentos do contrato", grupos.doContrato)}
               {renderTabela(
-                "Demais agendamentos da vigência",
+                dispensado
+                  ? "Agendamentos da vigência (adicionais / histórico)"
+                  : "Demais agendamentos da vigência",
                 grupos.demais
               )}
               {renderTabela("Cancelados", grupos.cancelados, true)}
@@ -489,6 +699,23 @@ export function OrcamentoAbaAgendamentos({
       <AgendamentoViewModal
         agendamento={viewAgendamento}
         onClose={() => setViewAgendamento(null)}
+      />
+
+      <DispensaAgendamentosIniciaisModal
+        open={dispensaModalOpen}
+        quantidadePrevista={quantidadePrevista}
+        numeroContrato={contrato?.numero ?? null}
+        saving={dispensaSaving}
+        onClose={() => setDispensaModalOpen(false)}
+        onConfirm={(motivo) => void handleConfirmarDispensa(motivo)}
+      />
+
+      <ReabrirAgendamentosIniciaisModal
+        open={reabrirModalOpen}
+        numeroContrato={contrato?.numero ?? null}
+        saving={reabrirSaving}
+        onClose={() => setReabrirModalOpen(false)}
+        onConfirm={(motivo) => void handleConfirmarReabertura(motivo)}
       />
     </div>
   );

@@ -37,6 +37,7 @@ function processo(
     ativo: true,
     quantidadeContratada: 0,
     agendamentosRealizados: 0,
+    agendamentosIniciaisDispensados: false,
     ...overrides,
   };
 }

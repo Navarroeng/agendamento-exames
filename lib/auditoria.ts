@@ -52,6 +52,8 @@ export const AUDITORIA_ACOES = {
   custo_clinica_conferencia_reaberta: "custo_clinica_conferencia_reaberta",
   vinculo_contrato_implantacao: "vinculo_contrato_implantacao",
   sem_vinculo_contrato_implantacao: "sem_vinculo_contrato_implantacao",
+  dispensa_agendamentos_iniciais: "dispensa_agendamentos_iniciais",
+  reabertura_agendamentos_iniciais: "reabertura_agendamentos_iniciais",
 } as const;
 
 export type AuditoriaAcao =
@@ -109,6 +111,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   custo_clinica_conferencia_reaberta: "Conferência reaberta",
   vinculo_contrato_implantacao: "Vínculo ao contrato (implantação)",
   sem_vinculo_contrato_implantacao: "Sem vínculo ao contrato (implantação)",
+  dispensa_agendamentos_iniciais: "Dispensa de agendamentos iniciais",
+  reabertura_agendamentos_iniciais: "Reabertura de agendamentos iniciais",
 };
 
 export interface AuditoriaUsuarioContext {

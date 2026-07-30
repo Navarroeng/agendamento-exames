@@ -28,6 +28,7 @@ export const ORCAMENTO_ETAPAS: Array<{ id: OrcamentoEtapaId; label: string }> = 
 export type OrcamentoEtapasContagemAgendamentos = {
   quantidadeContratada: number;
   agendamentosRealizados: number;
+  agendamentosDispensados?: boolean;
 };
 
 export function isContratoEtapaConcluida(
@@ -95,6 +96,7 @@ export function isAgendamentosEtapaConcluida(
   contagem?: OrcamentoEtapasContagemAgendamentos | null
 ): boolean {
   if (!isVisitaEtapaConcluida(aprovacao)) return false;
+  if (contagem?.agendamentosDispensados) return true;
   const qtd = Math.max(0, contagem?.quantidadeContratada ?? 0);
   const feitos = Math.max(0, contagem?.agendamentosRealizados ?? 0);
   if (qtd <= 0) return false;

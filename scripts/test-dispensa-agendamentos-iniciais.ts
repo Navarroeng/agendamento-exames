@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import {
-  countImplantacaoEtapasConcluidas,
+  buildContratoAgendamentoContagem,
+  contratoTemAgendamentosIniciaisDispensados,
+  resolveClassificacaoAgendamento,
+} from "../lib/contrato-agendamentos";
+import {
+  isAgendamentosImplantacaoConcluida,
   resolveImplantacaoEtapaAtual,
 } from "../lib/implantacao-clientes";
+import { isAgendamentosEtapaConcluida } from "../lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 
 function aprovacaoBase(
@@ -11,7 +17,7 @@ function aprovacaoBase(
   return {
     id: "a1",
     orcamento_id: "o1",
-    quantidade_colaboradores: 5,
+    quantidade_colaboradores: 2,
     valor_final: 1000,
     quantidade_parcelas: 1,
     valor_parcela: 1000,
@@ -39,64 +45,63 @@ function aprovacaoBase(
 }
 
 assert.equal(
-  resolveImplantacaoEtapaAtual(aprovacaoBase(), {
-    quantidadeContratada: 5,
+  contratoTemAgendamentosIniciaisDispensados({
+    agendamentos_iniciais_dispensados: true,
+  }),
+  true
+);
+assert.equal(
+  contratoTemAgendamentosIniciaisDispensados({
+    agendamentos_iniciais_dispensados: false,
+  }),
+  false
+);
+
+assert.equal(isAgendamentosImplantacaoConcluida(2, 0, true), true);
+assert.equal(isAgendamentosImplantacaoConcluida(2, 0, false), false);
+assert.equal(isAgendamentosImplantacaoConcluida(2, 2, false), true);
+
+const contagem = buildContratoAgendamentoContagem(2, 0, 1, {
+  dispensado: true,
+});
+assert.equal(contagem.progressoLabel, "Concluído por dispensa");
+assert.equal(contagem.utilizados, 0);
+assert.equal(contagem.disponiveis, 0);
+
+assert.equal(
+  resolveClassificacaoAgendamento({
+    status: "agendado",
+    selecionado: false,
+    dispensado: true,
+  }),
+  "adicional"
+);
+
+assert.equal(
+  isAgendamentosEtapaConcluida(aprovacaoBase(), {
+    quantidadeContratada: 2,
     agendamentosRealizados: 0,
+    agendamentosDispensados: true,
+  }),
+  true
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase(), {
+    quantidadeContratada: 2,
+    agendamentosRealizados: 0,
+    agendamentosDispensados: true,
+  }),
+  "concluido"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase(), {
+    quantidadeContratada: 2,
+    agendamentosRealizados: 0,
+    agendamentosDispensados: false,
   }),
   "aguardando_agendamentos"
 );
 
-assert.equal(
-  resolveImplantacaoEtapaAtual(aprovacaoBase(), {
-    quantidadeContratada: 5,
-    agendamentosRealizados: 5,
-  }),
-  "concluido"
-);
-
-assert.equal(
-  resolveImplantacaoEtapaAtual(
-    aprovacaoBase({
-      visita_tecnica_necessaria: null,
-      visita_tecnica_salva_em: null,
-    }),
-    { quantidadeContratada: 5, agendamentosRealizados: 5 }
-  ),
-  "visita"
-);
-
-assert.equal(
-  countImplantacaoEtapasConcluidas(aprovacaoBase(), {
-    quantidadeContratada: 5,
-    agendamentosRealizados: 2,
-  }),
-  6
-);
-
-assert.equal(
-  countImplantacaoEtapasConcluidas(aprovacaoBase(), {
-    quantidadeContratada: 5,
-    agendamentosRealizados: 5,
-  }),
-  7
-);
-
-assert.equal(
-  resolveImplantacaoEtapaAtual(aprovacaoBase(), {
-    quantidadeContratada: 2,
-    agendamentosRealizados: 0,
-    agendamentosDispensados: true,
-  }),
-  "concluido"
-);
-
-assert.equal(
-  countImplantacaoEtapasConcluidas(aprovacaoBase(), {
-    quantidadeContratada: 2,
-    agendamentosRealizados: 0,
-    agendamentosDispensados: true,
-  }),
-  7
-);
-
-console.log("ok: implantacao-agendamentos-etapa");
+console.log("ok: dispensa-agendamentos-iniciais");

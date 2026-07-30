@@ -389,6 +389,13 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   encerrado_em?: string | null;
   encerrado_por?: string | null;
   motivo_encerramento?: string | null;
+  agendamentos_iniciais_dispensados?: boolean;
+  motivo_dispensa_agendamentos?: string | null;
+  dispensado_em?: string | null;
+  dispensado_por?: string | null;
+  reaberto_em?: string | null;
+  reaberto_por?: string | null;
+  motivo_reabertura?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

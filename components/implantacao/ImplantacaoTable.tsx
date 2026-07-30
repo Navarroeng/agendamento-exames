@@ -41,6 +41,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
             {
               quantidadeContratada: processo.quantidadeContratada,
               agendamentosRealizados: processo.agendamentosRealizados,
+              agendamentosDispensados: processo.agendamentosIniciaisDispensados,
             }
           );
           const tone =
@@ -141,15 +142,27 @@ export function ImplantacaoTable({
                     </td>
                     <td>{processo.orcamento.responsavel}</td>
                     <td>
-                      <span
-                        className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${
-                          IMPLANTACAO_ETAPA_BADGE[processo.etapaAtual]
-                            ?.className ?? "bg-[#e0f2fe] text-[#0c4a6e]"
-                        }`}
-                      >
-                        {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual] ??
-                          processo.etapaAtual}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${
+                            IMPLANTACAO_ETAPA_BADGE[processo.etapaAtual]
+                              ?.className ?? "bg-[#e0f2fe] text-[#0c4a6e]"
+                          }`}
+                          title={
+                            processo.agendamentosIniciaisDispensados
+                              ? "Agendamentos iniciais dispensados pelo cliente"
+                              : undefined
+                          }
+                        >
+                          {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual] ??
+                            processo.etapaAtual}
+                        </span>
+                        {processo.agendamentosIniciaisDispensados ? (
+                          <span className="text-[10px] font-semibold text-[#64748b]">
+                            Agendamentos iniciais dispensados
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
                       <ProgressoEtapas processo={processo} />

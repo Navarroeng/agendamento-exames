@@ -12,6 +12,7 @@ interface OrcamentoEtapasNavProps {
   contagemAgendamentos?: {
     quantidadeContratada: number;
     agendamentosRealizados: number;
+    agendamentosDispensados?: boolean;
   } | null;
   onChange: (tab: OrcamentoEtapaId) => void;
 }

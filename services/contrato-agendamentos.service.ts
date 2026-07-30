@@ -168,6 +168,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   const { contrato, quantidadeContratada } = params;
   const supabase = createClient();
   const { nomes } = await buscarNomesClienteParaMatch(contrato.cliente_id);
+  const dispensado = Boolean(contrato.agendamentos_iniciais_dispensados);
 
   if (
     !nomes.length ||
@@ -176,7 +177,9 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   ) {
     return {
       itens: [],
-      contagem: buildContratoAgendamentoContagem(quantidadeContratada, 0, 0),
+      contagem: buildContratoAgendamentoContagem(quantidadeContratada, 0, 0, {
+        dispensado,
+      }),
     };
   }
 
@@ -243,10 +246,13 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   }
 
   const itens: AgendamentoNaVigenciaItem[] = agendamentos.map((ag) => {
-    const selecionado = selecionadosDeste.has(ag.id);
+    const selecionado =
+      !dispensado && selecionadosDeste.has(ag.id);
     const outro = emOutroContrato.get(ag.id) ?? null;
     const selecionavel =
-      isAgendamentoSelecionavel(ag.status) && (!outro || selecionado);
+      !dispensado &&
+      isAgendamentoSelecionavel(ag.status) &&
+      (!outro || selecionado);
     return {
       agendamento: ag,
       selecionado,
@@ -256,11 +262,15 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     };
   });
 
-  const utilizados = itens.filter(
-    (i) => i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
-  ).length;
+  const utilizados = dispensado
+    ? 0
+    : itens.filter(
+        (i) =>
+          i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
+      ).length;
   const adicionais = itens.filter(
-    (i) => !i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
+    (i) =>
+      !i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
   ).length;
 
   return {
@@ -268,7 +278,8 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     contagem: buildContratoAgendamentoContagem(
       quantidadeContratada,
       utilizados,
-      adicionais
+      adicionais,
+      { dispensado }
     ),
   };
 }
@@ -366,9 +377,16 @@ export async function salvarSelecaoAgendamentosContrato(params: {
 
   const { data: contratoRow } = await supabase
     .from("cliente_contratos")
-    .select("numero")
+    .select("numero, agendamentos_iniciais_dispensados")
     .eq("id", contratoId)
     .maybeSingle();
+
+  if (contratoRow?.agendamentos_iniciais_dispensados) {
+    throw new Error(
+      "Os agendamentos iniciais deste contrato foram dispensados pelo cliente. Não é possível vincular agendamentos à previsão inicial."
+    );
+  }
+
   const contratoNumero = String(contratoRow?.numero ?? contratoId);
 
   // Soft-remove seleções atuais que saíram
@@ -564,6 +582,160 @@ export async function invalidarContabilizacaoPorCancelamento(
       descricao: `${usuarioNome} cancelou o agendamento de ${colaborador}; a contabilização no contrato ${numero} foi removida automaticamente.`,
     });
   }
+}
+
+export async function dispensarAgendamentosIniciaisContrato(params: {
+  contratoId: string;
+  motivo: string;
+  usuarioNome: string;
+  quantidadePrevista: number;
+  clienteNome?: string;
+}): Promise<void> {
+  const motivo = params.motivo.trim();
+  if (!motivo) {
+    throw new Error("Informe o motivo / observação da dispensa.");
+  }
+
+  const supabase = createClient();
+  const { data: contrato, error: cErr } = await supabase
+    .from("cliente_contratos")
+    .select(
+      "id, numero, cliente_id, agendamentos_iniciais_dispensados, quantidade_colaboradores"
+    )
+    .eq("id", params.contratoId)
+    .maybeSingle();
+  if (cErr) throw cErr;
+  if (!contrato) throw new Error("Contrato não encontrado.");
+
+  if (contrato.agendamentos_iniciais_dispensados) {
+    throw new Error(
+      "Os agendamentos iniciais deste contrato já estão dispensados."
+    );
+  }
+
+  const vinculos = await listarVinculosAtivosPorContrato(params.contratoId);
+  if (vinculos.length > 0) {
+    throw new Error(
+      `Este contrato já possui ${vinculos.length} agendamento${
+        vinculos.length === 1 ? "" : "s"
+      } contabilizado${
+        vinculos.length === 1 ? "" : "s"
+      }. Remova os vínculos antes de registrar que o cliente não realizará os agendamentos iniciais.`
+    );
+  }
+
+  const agora = new Date().toISOString();
+  const { error } = await supabase
+    .from("cliente_contratos")
+    .update({
+      agendamentos_iniciais_dispensados: true,
+      motivo_dispensa_agendamentos: motivo,
+      dispensado_em: agora,
+      dispensado_por: params.usuarioNome,
+      updated_at: agora,
+    })
+    .eq("id", params.contratoId);
+  if (error) throw error;
+
+  let clienteNome = (params.clienteNome ?? "").trim();
+  if (!clienteNome && contrato.cliente_id) {
+    const { data: cli } = await supabase
+      .from("clientes")
+      .select("nome")
+      .eq("id", contrato.cliente_id)
+      .maybeSingle();
+    clienteNome = String(cli?.nome ?? "").trim();
+  }
+
+  const numero = String(contrato.numero ?? params.contratoId);
+  const qtd =
+    params.quantidadePrevista ||
+    Number(contrato.quantidade_colaboradores) ||
+    0;
+  const { registrarAuditoria } = await import("@/services/auditoria.service");
+  const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
+    "@/lib/auditoria"
+  );
+  await registrarAuditoria({
+    usuarioNome: params.usuarioNome,
+    usuarioEmail: "",
+    modulo: AUDITORIA_MODULOS.orcamentos,
+    acao: AUDITORIA_ACOES.dispensa_agendamentos_iniciais,
+    registroId: params.contratoId,
+    registroNome: numero,
+    descricao: `${params.usuarioNome} registrou que o cliente ${
+      clienteNome || "—"
+    } optou por não realizar os ${qtd} agendamentos iniciais do contrato ${numero}. Motivo: ${motivo}`,
+  });
+}
+
+export async function reabrirAgendamentosIniciaisContrato(params: {
+  contratoId: string;
+  motivo: string;
+  usuarioNome: string;
+  clienteNome?: string;
+}): Promise<void> {
+  const motivo = params.motivo.trim();
+  if (!motivo) {
+    throw new Error("Informe o motivo da reabertura.");
+  }
+
+  const supabase = createClient();
+  const { data: contrato, error: cErr } = await supabase
+    .from("cliente_contratos")
+    .select(
+      "id, numero, cliente_id, agendamentos_iniciais_dispensados"
+    )
+    .eq("id", params.contratoId)
+    .maybeSingle();
+  if (cErr) throw cErr;
+  if (!contrato) throw new Error("Contrato não encontrado.");
+
+  if (!contrato.agendamentos_iniciais_dispensados) {
+    throw new Error(
+      "Os agendamentos iniciais deste contrato não estão dispensados."
+    );
+  }
+
+  const agora = new Date().toISOString();
+  const { error } = await supabase
+    .from("cliente_contratos")
+    .update({
+      agendamentos_iniciais_dispensados: false,
+      reaberto_em: agora,
+      reaberto_por: params.usuarioNome,
+      motivo_reabertura: motivo,
+      updated_at: agora,
+    })
+    .eq("id", params.contratoId);
+  if (error) throw error;
+
+  let clienteNome = (params.clienteNome ?? "").trim();
+  if (!clienteNome && contrato.cliente_id) {
+    const { data: cli } = await supabase
+      .from("clientes")
+      .select("nome")
+      .eq("id", contrato.cliente_id)
+      .maybeSingle();
+    clienteNome = String(cli?.nome ?? "").trim();
+  }
+
+  const numero = String(contrato.numero ?? params.contratoId);
+  const { registrarAuditoria } = await import("@/services/auditoria.service");
+  const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
+    "@/lib/auditoria"
+  );
+  await registrarAuditoria({
+    usuarioNome: params.usuarioNome,
+    usuarioEmail: "",
+    modulo: AUDITORIA_MODULOS.orcamentos,
+    acao: AUDITORIA_ACOES.reabertura_agendamentos_iniciais,
+    registroId: params.contratoId,
+    registroNome: numero,
+    descricao: `${params.usuarioNome} reabriu os agendamentos iniciais do contrato ${numero}${
+      clienteNome ? ` (cliente ${clienteNome})` : ""
+    }. Motivo: ${motivo}`,
+  });
 }
 
 // Mantidos para compatibilidade de imports legados (sem uso no novo fluxo de criação).

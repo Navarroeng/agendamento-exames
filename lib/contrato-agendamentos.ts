@@ -11,6 +11,9 @@ export type ContratoAgendamentoContagem = {
   percentual: number;
   mensagem: string;
   concluido: boolean;
+  dispensado: boolean;
+  progressoLabel: string;
+  situacaoLabel: string | null;
 };
 
 export type AgendamentoClassificacao = "contrato" | "adicional" | "cancelado";
@@ -24,9 +27,31 @@ export function isAgendamentoSelecionavel(
 export function buildContratoAgendamentoContagem(
   quantidadeContratada: number,
   utilizados: number,
-  adicionais = 0
+  adicionais = 0,
+  opts?: { dispensado?: boolean }
 ): ContratoAgendamentoContagem {
   const previstos = Math.max(0, quantidadeContratada || 0);
+  const dispensado = Boolean(opts?.dispensado);
+
+  if (dispensado) {
+    const extras = Math.max(0, adicionais);
+    return {
+      contratados: previstos,
+      previstos,
+      realizados: 0,
+      utilizados: 0,
+      pendentes: 0,
+      disponiveis: 0,
+      adicionais: extras,
+      percentual: 100,
+      mensagem: "Cliente optou por não realizar os agendamentos iniciais.",
+      concluido: true,
+      dispensado: true,
+      progressoLabel: "Concluído por dispensa",
+      situacaoLabel: "Dispensados pelo cliente",
+    };
+  }
+
   const usados = Math.max(0, utilizados);
   const disponiveis = Math.max(0, previstos - usados);
   const extras = Math.max(0, adicionais);
@@ -67,14 +92,19 @@ export function buildContratoAgendamentoContagem(
     percentual,
     mensagem,
     concluido,
+    dispensado: false,
+    progressoLabel: `${percentual}%`,
+    situacaoLabel: null,
   };
 }
 
 export function resolveClassificacaoAgendamento(params: {
   status: AgendamentoStatus | string;
   selecionado: boolean;
+  dispensado?: boolean;
 }): AgendamentoClassificacao {
   if (params.status === "cancelado") return "cancelado";
+  if (params.dispensado) return "adicional";
   if (params.selecionado) return "contrato";
   return "adicional";
 }
@@ -102,4 +132,13 @@ export function agendamentoConsomeSaldoContrato(
   if (agendamento.status === "cancelado") return false;
   if (agendamento.consome_saldo_contrato === false) return false;
   return true;
+}
+
+export function contratoTemAgendamentosIniciaisDispensados(
+  contrato:
+    | { agendamentos_iniciais_dispensados?: boolean | null }
+    | null
+    | undefined
+): boolean {
+  return Boolean(contrato?.agendamentos_iniciais_dispensados);
 }

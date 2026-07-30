@@ -145,6 +145,7 @@ export interface ImplantacaoProcesso {
   ativo: boolean;
   quantidadeContratada: number;
   agendamentosRealizados: number;
+  agendamentosIniciaisDispensados: boolean;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -164,8 +165,10 @@ export function resolveQuantidadeContratadaImplantacao(
 
 export function isAgendamentosImplantacaoConcluida(
   quantidadeContratada: number,
-  agendamentosRealizados: number
+  agendamentosRealizados: number,
+  dispensado = false
 ): boolean {
+  if (dispensado) return true;
   const qtd = Math.max(0, quantidadeContratada);
   const feitos = Math.max(0, agendamentosRealizados);
   if (qtd <= 0) return false;
@@ -177,6 +180,7 @@ export function resolveImplantacaoEtapaAtual(
   opts?: {
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
+    agendamentosDispensados?: boolean;
     orcamentoStatus?: OrcamentoStatus;
     contratoStatus?: string | null;
     contratoEncerradoEm?: string | null;
@@ -197,7 +201,15 @@ export function resolveImplantacaoEtapaAtual(
   if (!isVisitaEtapaConcluida(aprovacao)) return "visita";
   const qtd = Math.max(0, opts?.quantidadeContratada ?? 0);
   const feitos = Math.max(0, opts?.agendamentosRealizados ?? 0);
-  if (isAgendamentosImplantacaoConcluida(qtd, feitos)) return "concluido";
+  if (
+    isAgendamentosImplantacaoConcluida(
+      qtd,
+      feitos,
+      Boolean(opts?.agendamentosDispensados)
+    )
+  ) {
+    return "concluido";
+  }
   return "aguardando_agendamentos";
 }
 
@@ -206,6 +218,7 @@ export function countImplantacaoEtapasConcluidas(
   opts?: {
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
+    agendamentosDispensados?: boolean;
   }
 ): number {
   let n = 0;
@@ -218,7 +231,8 @@ export function countImplantacaoEtapasConcluidas(
   if (
     isAgendamentosImplantacaoConcluida(
       opts?.quantidadeContratada ?? 0,
-      opts?.agendamentosRealizados ?? 0
+      opts?.agendamentosRealizados ?? 0,
+      Boolean(opts?.agendamentosDispensados)
     )
   ) {
     n += 1;
@@ -254,9 +268,13 @@ export function buildImplantacaoProcesso(params: {
     0,
     params.agendamentosRealizados ?? 0
   );
+  const agendamentosIniciaisDispensados = Boolean(
+    contrato?.agendamentos_iniciais_dispensados
+  );
   const contagemOpts = {
     quantidadeContratada,
     agendamentosRealizados,
+    agendamentosDispensados: agendamentosIniciaisDispensados,
     orcamentoStatus: orcamento.status,
     contratoStatus: contrato?.status ?? null,
     contratoEncerradoEm: contrato?.encerrado_em ?? null,
@@ -296,6 +314,7 @@ export function buildImplantacaoProcesso(params: {
     ativo: !cancelado && !concluido,
     quantidadeContratada,
     agendamentosRealizados,
+    agendamentosIniciaisDispensados,
   };
 }
 
@@ -480,11 +499,13 @@ export function resolveImplantacaoEtapaVisual(
   opts?: {
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
+    agendamentosDispensados?: boolean;
   }
 ): ImplantacaoEtapaVisualEstado {
   const agendamentosDone = isAgendamentosImplantacaoConcluida(
     opts?.quantidadeContratada ?? 0,
-    opts?.agendamentosRealizados ?? 0
+    opts?.agendamentosRealizados ?? 0,
+    Boolean(opts?.agendamentosDispensados)
   );
 
   const doneMap: Record<ImplantacaoEtapaOperacionalId, boolean> = {

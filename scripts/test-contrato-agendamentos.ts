@@ -62,5 +62,27 @@ assert.equal(parcial.percentual < 100, true);
 
 const zero = buildContratoAgendamentoContagem(0, 0, 0);
 assert.equal(zero.concluido, false);
+assert.equal(zero.dispensado, false);
+
+const dispensado = buildContratoAgendamentoContagem(2, 0, 3, {
+  dispensado: true,
+});
+assert.equal(dispensado.previstos, 2);
+assert.equal(dispensado.utilizados, 0);
+assert.equal(dispensado.disponiveis, 0);
+assert.equal(dispensado.adicionais, 3);
+assert.equal(dispensado.concluido, true);
+assert.equal(dispensado.dispensado, true);
+assert.equal(dispensado.progressoLabel, "Concluído por dispensa");
+assert.equal(dispensado.situacaoLabel, "Dispensados pelo cliente");
+
+assert.equal(
+  resolveClassificacaoAgendamento({
+    status: "agendado",
+    selecionado: true,
+    dispensado: true,
+  }),
+  "adicional"
+);
 
 console.log("ok: contrato-agendamentos");

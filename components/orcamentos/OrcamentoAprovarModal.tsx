@@ -528,6 +528,7 @@ export function OrcamentoAprovarModal({
                 ? {
                     quantidadeContratada: agendamentosContagem.contratados,
                     agendamentosRealizados: agendamentosContagem.realizados,
+                    agendamentosDispensados: agendamentosContagem.dispensado,
                   }
                 : aprovacao
                   ? {
@@ -1112,6 +1113,7 @@ export function OrcamentoAprovarModal({
               orcamentoId={orcamento.id}
               aprovacao={aprovacao}
               usuarioNome={usuarioNome}
+              clienteNome={orcamento.cliente_nome}
               onContagemChange={setAgendamentosContagem}
             />
           ) : null}
