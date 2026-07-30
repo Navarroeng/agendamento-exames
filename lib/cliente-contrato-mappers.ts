@@ -128,7 +128,7 @@ export function labelFinanceiroContrato(
 export function labelAgendamentoContrato(
   contrato: Pick<
     ClienteContratoRecord,
-    "orcamento_id" | "boleto_pago" | "liberado_para_agendamento"
+    "orcamento_id" | "boleto_pago" | "liberado_para_agendamento" | "status"
   >
 ): "Liberado" | "Bloqueado" {
   return labelAgendamentoLiberacao(contratoLiberaAgendamento(contrato));

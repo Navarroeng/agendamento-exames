@@ -37,17 +37,29 @@ async function encerrarOutrosContratosAtivos(
   dataReferencia: string
 ): Promise<void> {
   const supabase = createClient();
+  const ref = dataReferencia.slice(0, 10);
+  // Dia anterior ao início do novo contrato (quando possível).
+  const fimAnterior = (() => {
+    const d = new Date(`${ref}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return ref;
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
   const { error } = await supabase
     .from("cliente_contratos")
     .update({
       status: "encerrado" satisfies ClienteContratoStatus,
-      data_fim: dataReferencia.slice(0, 10),
+      data_fim: fimAnterior,
+      updated_at: new Date().toISOString(),
     })
     .eq("cliente_id", clienteId)
     .eq("status", "ativo")
     .neq("id", excludeContratoId);
   if (error) {
-    console.error("Falha ao encerrar contratos ativos anteriores:", error);
+    throw new Error(
+      `Não foi possível encerrar o contrato ativo anterior: ${error.message}`
+    );
   }
 }
 
@@ -67,69 +79,86 @@ async function syncClienteContratoFromAprovacao(
     },
   });
 
-  const update: Record<string, unknown> = {
-    status: syncPayload.status,
-    contrato_enviado_em: syncPayload.contrato_enviado_em,
-    contrato_assinado_em: syncPayload.contrato_assinado_em,
-    boleto_vencimento: syncPayload.boleto_vencimento,
-    boleto_pago: syncPayload.boleto_pago,
-    boleto_pago_em: syncPayload.boleto_pago_em,
-    liberado_para_agendamento: syncPayload.liberado_para_agendamento,
-  };
-
-  if (syncPayload.data_inicio) {
-    update.data_inicio = syncPayload.data_inicio;
-  }
-  if (syncPayload.data_fim) {
-    update.data_fim = syncPayload.data_fim;
-  }
-  if (syncPayload.tipo_contrato) {
-    update.tipo_contrato = syncPayload.tipo_contrato;
-  }
-
-  const { data: contratos, error: syncError } = await supabase
+  const { data: targets, error: findError } = await supabase
     .from("cliente_contratos")
-    .update(update)
+    .select("id, cliente_id, status, data_inicio, data_fim")
     .eq("orcamento_id", aprovacao.orcamento_id)
-    .not("status", "in", "(encerrado,cancelado)")
-    .select("id, cliente_id, numero, data_inicio, data_fim, status");
+    .not("status", "in", "(encerrado,cancelado)");
 
-  if (syncError) {
-    console.error("Falha ao sincronizar contrato do cliente:", syncError);
-    return;
+  if (findError) {
+    throw new Error(
+      `Falha ao localizar contrato para sincronizar: ${findError.message}`
+    );
   }
 
-  if (syncPayload.status === "ativo" && contratos?.length) {
-    for (const row of contratos) {
+  if (!targets?.length) {
+    throw new Error(
+      "Contrato do cliente não encontrado para sincronizar o financeiro. Verifique o vínculo orçamento ↔ contrato."
+    );
+  }
+
+  const dataRef =
+    (syncPayload.data_inicio as string | undefined) ||
+    (targets[0].data_inicio as string | undefined) ||
+    new Date().toISOString().slice(0, 10);
+
+  // Crítico: encerrar outro ativo ANTES de promover este para ativo
+  // (idx_cliente_contratos_um_ativo).
+  if (syncPayload.status === "ativo") {
+    for (const row of targets) {
       await encerrarOutrosContratosAtivos(
         row.cliente_id as string,
         row.id as string,
-        (syncPayload.data_inicio as string) ||
-          new Date().toISOString().slice(0, 10)
+        dataRef
       );
     }
   }
 
-  let clienteId = contratos?.[0]?.cliente_id as string | undefined;
+  for (const row of targets) {
+    const update: Record<string, unknown> = {
+      status: syncPayload.status,
+      contrato_enviado_em: syncPayload.contrato_enviado_em,
+      contrato_assinado_em: syncPayload.contrato_assinado_em,
+      boleto_vencimento: syncPayload.boleto_vencimento,
+      boleto_pago: syncPayload.boleto_pago,
+      boleto_pago_em: syncPayload.boleto_pago_em,
+      liberado_para_agendamento: syncPayload.liberado_para_agendamento,
+      updated_at: new Date().toISOString(),
+    };
 
-  if (!clienteId) {
-    const { data: fallback } = await supabase
+    // Preserva vigência já definida no contrato.
+    const temVigencia =
+      Boolean(String(row.data_inicio ?? "").trim()) &&
+      Boolean(String(row.data_fim ?? "").trim());
+    if (!temVigencia) {
+      if (syncPayload.data_inicio) update.data_inicio = syncPayload.data_inicio;
+      if (syncPayload.data_fim) update.data_fim = syncPayload.data_fim;
+      if (syncPayload.tipo_contrato) {
+        update.tipo_contrato = syncPayload.tipo_contrato;
+      }
+    }
+
+    const { error: syncError } = await supabase
       .from("cliente_contratos")
-      .select("id, cliente_id")
-      .eq("orcamento_id", aprovacao.orcamento_id)
-      .limit(1)
-      .maybeSingle();
-    clienteId = fallback?.cliente_id as string | undefined;
+      .update(update)
+      .eq("id", row.id);
+
+    if (syncError) {
+      throw new Error(
+        `Falha ao sincronizar contrato do cliente: ${syncError.message}`
+      );
+    }
   }
 
-  if (clienteId) {
-    const { error: recomputeError } = await supabase.rpc(
-      "recompute_cliente_disponivel_agendamento",
-      { p_cliente_id: clienteId }
+  const clienteId = targets[0].cliente_id as string;
+  const { error: recomputeError } = await supabase.rpc(
+    "recompute_cliente_disponivel_agendamento",
+    { p_cliente_id: clienteId }
+  );
+  if (recomputeError) {
+    throw new Error(
+      `Falha ao recomputar disponibilidade de agendamento: ${recomputeError.message}`
     );
-    if (recomputeError) {
-      console.error("Falha ao recomputar disponibilidade:", recomputeError);
-    }
   }
 }
 

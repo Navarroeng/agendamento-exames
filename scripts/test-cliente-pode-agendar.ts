@@ -11,22 +11,33 @@ const orcamentoNaoPago = {
   orcamento_id: "o1",
   boleto_pago: false,
   liberado_para_agendamento: true, // flag errado não deve liberar
+  status: "assinado" as const,
 };
 
 const orcamentoPago = {
   orcamento_id: "o1",
   boleto_pago: true,
   liberado_para_agendamento: true,
+  status: "ativo" as const,
+};
+
+const orcamentoPagoEncerrado = {
+  orcamento_id: "o1",
+  boleto_pago: true,
+  liberado_para_agendamento: true,
+  status: "encerrado" as const,
 };
 
 const manualLiberado = {
   orcamento_id: null,
   boleto_pago: false,
   liberado_para_agendamento: true,
+  status: "ativo" as const,
 };
 
 assert.equal(contratoLiberaAgendamento(orcamentoNaoPago), false);
 assert.equal(contratoLiberaAgendamento(orcamentoPago), true);
+assert.equal(contratoLiberaAgendamento(orcamentoPagoEncerrado), false);
 assert.equal(contratoLiberaAgendamento(manualLiberado), true);
 
 assert.equal(
@@ -55,5 +66,6 @@ assert.equal(
 
 assert.equal(labelAgendamentoContrato(orcamentoNaoPago), "Bloqueado");
 assert.equal(labelAgendamentoContrato(orcamentoPago), "Liberado");
+assert.equal(labelAgendamentoContrato(orcamentoPagoEncerrado), "Bloqueado");
 
 console.log("test-cliente-pode-agendar: OK");

@@ -65,6 +65,7 @@ assert.equal(
     orcamento_id: "o1",
     boleto_pago: false,
     liberado_para_agendamento: false,
+    status: "assinado",
   }),
   "Bloqueado"
 );
@@ -73,8 +74,26 @@ assert.equal(
     orcamento_id: "o1",
     boleto_pago: true,
     liberado_para_agendamento: true,
+    status: "ativo",
   }),
   "Liberado"
+);
+assert.equal(
+  labelAgendamentoContrato({
+    orcamento_id: "o1",
+    boleto_pago: true,
+    liberado_para_agendamento: true,
+    status: "encerrado",
+  }),
+  "Bloqueado"
+);
+assert.equal(
+  labelFinanceiroContrato({
+    status: "ativo",
+    boleto_pago: true,
+    boleto_vencimento: "2026-08-01",
+  }),
+  "Pago"
 );
 
 console.log("test-orcamento-financeiro-abas: OK");

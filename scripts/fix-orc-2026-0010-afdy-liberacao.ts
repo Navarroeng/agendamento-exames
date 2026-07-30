@@ -1,6 +1,6 @@
 /**
- * Correção pontual: ORC-2026-0010 / AFDY ARTIGOS ESPORTIVOS
- * Espelha boleto_pago da aprovação no contrato e recomputa liberação.
+ * Correção pontual: ORC-2026-0010 / CTR-2026-0005 / AFDY
+ * Encerrar outro ativo antes de espelhar boleto/status (evita idx_um_ativo).
  */
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
@@ -27,7 +27,8 @@ function loadEnvLocal(): Record<string, string> {
   return out;
 }
 
-const NUMERO = "ORC-2026-0010";
+const NUMERO_ORC = "ORC-2026-0010";
+const NUMERO_CTR = "CTR-2026-0005";
 
 async function main() {
   const env = loadEnvLocal();
@@ -38,41 +39,47 @@ async function main() {
 
   const orc = await sb
     .from("orcamentos")
-    .select("id,numero,cliente_nome,cliente_id,status,origem_cliente")
-    .eq("numero", NUMERO)
+    .select("id,numero,cliente_nome,cliente_id")
+    .eq("numero", NUMERO_ORC)
     .maybeSingle();
-  if (orc.error) throw orc.error;
-  console.log("orcamento", orc.data);
+  console.log("orcamento", orc.error?.message ?? orc.data);
   if (!orc.data?.id) {
-    console.error("Orçamento não encontrado.");
+    console.error("Use a migration 066 no SQL Editor (anon sem acesso RLS).");
     process.exit(1);
   }
 
   const apr = await sb
     .from("orcamento_aprovacoes")
     .select(
-      "id,boleto_pago,boleto_pago_em,boleto_vencimento,contrato_assinado,contrato_assinado_em,contrato_enviado,contrato_enviado_em"
+      "boleto_pago,boleto_pago_em,boleto_vencimento,contrato_assinado,contrato_assinado_em,contrato_enviado,contrato_enviado_em"
     )
     .eq("orcamento_id", orc.data.id)
     .maybeSingle();
-  if (apr.error) throw apr.error;
-  console.log("aprovacao_antes", apr.data);
-  if (!apr.data) {
-    console.error("Aprovação não encontrada.");
-    process.exit(1);
-  }
+  console.log("aprovacao", apr.data);
 
-  const ctrRes = await sb
+  let ctr = await sb
     .from("cliente_contratos")
-    .select(
-      "id,numero,status,orcamento_id,cliente_id,boleto_pago,boleto_pago_em,boleto_vencimento,liberado_para_agendamento,contrato_assinado_em,contrato_enviado_em"
-    )
-    .eq("orcamento_id", orc.data.id);
-  if (ctrRes.error) throw ctrRes.error;
-  console.log("contratos_antes", ctrRes.data);
+    .select("*")
+    .eq("orcamento_id", orc.data.id)
+    .not("status", "in", "(encerrado,cancelado)")
+    .maybeSingle();
 
-  if (!ctrRes.data?.length) {
-    console.error("Nenhum contrato vinculado a este orçamento.");
+  if (!ctr.data) {
+    ctr = await sb
+      .from("cliente_contratos")
+      .select("*")
+      .eq("numero", NUMERO_CTR)
+      .maybeSingle();
+  }
+  console.log("contrato_antes", {
+    id: ctr.data?.id,
+    numero: ctr.data?.numero,
+    status: ctr.data?.status,
+    boleto_pago: ctr.data?.boleto_pago,
+    liberado: ctr.data?.liberado_para_agendamento,
+  });
+
+  if (!ctr.data?.id || !apr.data) {
     process.exit(1);
   }
 
@@ -88,56 +95,53 @@ async function main() {
     },
   });
 
-  console.log("sync_payload", syncPayload);
+  const dataRef = String(
+    ctr.data.data_inicio || syncPayload.data_inicio || new Date().toISOString()
+  ).slice(0, 10);
+  const fimAnterior = (() => {
+    const d = new Date(`${dataRef}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
 
-  const update: Record<string, unknown> = {
-    status: syncPayload.status,
-    contrato_enviado_em: syncPayload.contrato_enviado_em,
-    contrato_assinado_em: syncPayload.contrato_assinado_em,
-    boleto_vencimento: syncPayload.boleto_vencimento,
-    boleto_pago: syncPayload.boleto_pago,
-    boleto_pago_em: syncPayload.boleto_pago_em,
-    liberado_para_agendamento: syncPayload.liberado_para_agendamento,
-    updated_at: new Date().toISOString(),
-  };
-  if (syncPayload.data_inicio) update.data_inicio = syncPayload.data_inicio;
-  if (syncPayload.data_fim) update.data_fim = syncPayload.data_fim;
-  if (syncPayload.tipo_contrato) update.tipo_contrato = syncPayload.tipo_contrato;
-
-  for (const ctr of ctrRes.data) {
-    if (ctr.status === "encerrado" || ctr.status === "cancelado") {
-      console.log("pulando contrato", ctr.numero, ctr.status);
-      continue;
-    }
-    const { data: updated, error } = await sb
+  if (syncPayload.status === "ativo") {
+    const enc = await sb
       .from("cliente_contratos")
-      .update(update)
-      .eq("id", ctr.id)
-      .select(
-        "id,numero,status,boleto_pago,liberado_para_agendamento,data_inicio,data_fim"
-      )
-      .single();
-    if (error) throw error;
-    console.log("contrato_depois", updated);
-
-    const clienteId = ctr.cliente_id as string;
-    const recompute = await sb.rpc("recompute_cliente_disponivel_agendamento", {
-      p_cliente_id: clienteId,
-    });
-    console.log(
-      "recompute",
-      recompute.error?.message ?? `disponivel=${recompute.data}`
-    );
-
-    const clAfter = await sb
-      .from("clientes")
-      .select("id,nome,disponivel_agendamento")
-      .eq("id", clienteId)
-      .maybeSingle();
-    console.log("cliente_depois", clAfter.error?.message ?? clAfter.data);
+      .update({
+        status: "encerrado",
+        data_fim: fimAnterior,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("cliente_id", ctr.data.cliente_id)
+      .eq("status", "ativo")
+      .neq("id", ctr.data.id);
+    if (enc.error) throw enc.error;
+    console.log("outros_ativos_encerrados");
   }
 
-  console.log("ok: correção pontual", NUMERO);
+  const { data: updated, error } = await sb
+    .from("cliente_contratos")
+    .update({
+      status: syncPayload.status,
+      boleto_pago: syncPayload.boleto_pago,
+      boleto_pago_em: syncPayload.boleto_pago_em,
+      boleto_vencimento: syncPayload.boleto_vencimento,
+      liberado_para_agendamento: syncPayload.liberado_para_agendamento,
+      contrato_assinado_em: syncPayload.contrato_assinado_em,
+      contrato_enviado_em: syncPayload.contrato_enviado_em,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", ctr.data.id)
+    .select("id,numero,status,boleto_pago,liberado_para_agendamento")
+    .single();
+  if (error) throw error;
+  console.log("contrato_depois", updated);
+
+  const recompute = await sb.rpc("recompute_cliente_disponivel_agendamento", {
+    p_cliente_id: ctr.data.cliente_id,
+  });
+  console.log("recompute", recompute.error?.message ?? recompute.data);
+  console.log("ok:", NUMERO_ORC, NUMERO_CTR);
 }
 
 main().catch((err) => {

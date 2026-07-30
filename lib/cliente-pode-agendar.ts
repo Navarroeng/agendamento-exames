@@ -2,7 +2,10 @@ import type { ClienteContratoRecord } from "@/lib/types";
 
 export type ContratoParaAgendamento = Pick<
   ClienteContratoRecord,
-  "orcamento_id" | "boleto_pago" | "liberado_para_agendamento"
+  | "orcamento_id"
+  | "boleto_pago"
+  | "liberado_para_agendamento"
+  | "status"
 >;
 
 export type ClienteParaAgendamento = {
@@ -10,13 +13,19 @@ export type ClienteParaAgendamento = {
 };
 
 /**
- * Regra única: um contrato libera agendamento quando
- * - manual (sem orcamento_id) e liberado_para_agendamento; ou
- * - originado de orçamento e boleto_pago = true.
+ * Regra única de liberação para agendamento (badge / disponibilidade).
+ * - encerrado/cancelado → bloqueado;
+ * - originado de orçamento → boleto_pago = true;
+ * - manual → liberado_para_agendamento.
+ *
+ * Vigência (data do exame) é validada em contratoEstaVigenteNaData no ato de agendar.
  */
 export function contratoLiberaAgendamento(
   contrato: ContratoParaAgendamento
 ): boolean {
+  if (contrato.status === "encerrado" || contrato.status === "cancelado") {
+    return false;
+  }
   if (contrato.orcamento_id) {
     return contrato.boleto_pago === true;
   }
