@@ -7,13 +7,11 @@ import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   IMPLANTACAO_AGENDAMENTO_BADGE,
-  IMPLANTACAO_ETAPA_BADGE,
-  IMPLANTACAO_ETAPA_BADGE_BASE,
-  IMPLANTACAO_ETAPA_LABELS,
   IMPLANTACAO_ETAPAS_OPERACIONAIS,
   resolveImplantacaoEtapaVisual,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
+import { EtapaAtualBadge } from "@/components/implantacao/EtapaAtualBadge";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
@@ -142,27 +140,15 @@ export function ImplantacaoTable({
                     </td>
                     <td>{processo.orcamento.responsavel}</td>
                     <td>
-                      <div className="flex flex-col gap-0.5">
-                        <span
-                          className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${
-                            IMPLANTACAO_ETAPA_BADGE[processo.etapaAtual]
-                              ?.className ?? "bg-[#e0f2fe] text-[#0c4a6e]"
-                          }`}
-                          title={
-                            processo.agendamentosIniciaisDispensados
-                              ? "Agendamentos iniciais dispensados pelo cliente"
-                              : undefined
-                          }
-                        >
-                          {IMPLANTACAO_ETAPA_LABELS[processo.etapaAtual] ??
-                            processo.etapaAtual}
-                        </span>
-                        {processo.agendamentosIniciaisDispensados ? (
-                          <span className="text-[10px] font-semibold text-[#64748b]">
-                            Agendamentos iniciais dispensados
-                          </span>
-                        ) : null}
-                      </div>
+                      <EtapaAtualBadge
+                        etapa={processo.etapaAtual}
+                        observacao={
+                          processo.agendamentosIniciaisDispensados &&
+                          processo.etapaAtual === "concluido"
+                            ? "Agendamentos iniciais dispensados"
+                            : null
+                        }
+                      />
                     </td>
                     <td>
                       <ProgressoEtapas processo={processo} />

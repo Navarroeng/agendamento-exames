@@ -74,21 +74,75 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
 
 /** Classe base compartilhada — só a cor muda por etapa. */
 export const IMPLANTACAO_ETAPA_BADGE_BASE =
-  "inline-flex h-6 items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
+  "inline-flex h-6 max-w-full items-center justify-center rounded-full border px-2.5 text-[10px] font-semibold leading-none whitespace-nowrap";
 
+export type ImplantacaoEtapaBadgeTone = {
+  className: string;
+  family:
+    | "contrato"
+    | "financeiro"
+    | "procuracao"
+    | "lista"
+    | "logo"
+    | "visita"
+    | "agendamentos"
+    | "concluido"
+    | "encerrado";
+};
+
+/**
+ * Mapa visual único da coluna “Etapa atual”.
+ * Fundo claro + texto escuro + borda suave da mesma família.
+ */
 export const IMPLANTACAO_ETAPA_BADGE: Record<
   ImplantacaoEtapaId,
-  { className: string }
+  ImplantacaoEtapaBadgeTone
 > = {
-  contrato: { className: "bg-brand-blue-soft text-brand-blue" },
-  financeiro: { className: "bg-[#fef3c7] text-[#b45309]" },
-  procuracao: { className: "bg-[#f3e8ff] text-[#7e22ce]" },
-  funcionarios: { className: "bg-[#ffedd5] text-[#c2410c]" },
-  logo: { className: "bg-[#e2e8f0] text-[#475569]" },
-  visita: { className: "bg-[#e0f2fe] text-[#0c4a6e]" },
-  aguardando_agendamentos: { className: "bg-[#fef9c3] text-[#a16207]" },
-  concluido: { className: "bg-brand-green-soft text-brand-green" },
-  contrato_encerrado: { className: "bg-brand-red-soft text-brand-red" },
+  // Azul — Contrato
+  contrato: {
+    family: "contrato",
+    className: "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]",
+  },
+  // Laranja — Financeiro / Aguardando pagamento
+  financeiro: {
+    family: "financeiro",
+    className: "border-[#fdba74] bg-[#ffedd5] text-[#c2410c]",
+  },
+  // Roxo — Procuração
+  procuracao: {
+    family: "procuracao",
+    className: "border-[#d8b4fe] bg-[#f3e8ff] text-[#7e22ce]",
+  },
+  // Amarelo — Lista de funcionários
+  funcionarios: {
+    family: "lista",
+    className: "border-[#fde047] bg-[#fef9c3] text-[#a16207]",
+  },
+  // Dourado — Logo da empresa
+  logo: {
+    family: "logo",
+    className: "border-[#f0d78c] bg-[#fef6e0] text-[#92640a]",
+  },
+  // Marrom — Visita técnica
+  visita: {
+    family: "visita",
+    className: "border-[#d6c3b0] bg-[#f5ebe0] text-[#7c4a2d]",
+  },
+  // Rosa — Aguardando agendamentos
+  aguardando_agendamentos: {
+    family: "agendamentos",
+    className: "border-[#f9a8d4] bg-[#fce7f3] text-[#be185d]",
+  },
+  // Verde — Concluído
+  concluido: {
+    family: "concluido",
+    className: "border-[#86efac] bg-[#dcfce7] text-[#15803d]",
+  },
+  // Vermelho — Contrato encerrado
+  contrato_encerrado: {
+    family: "encerrado",
+    className: "border-[#fca5a5] bg-[#fee2e2] text-[#b91c1c]",
+  },
 };
 
 export const IMPLANTACAO_AGENDAMENTO_BADGE = {
