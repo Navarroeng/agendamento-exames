@@ -1,22 +1,14 @@
--- Procuração: pendente | ativa | nao_necessaria (substitui "inativa").
--- Ordem obrigatória: dropar constraint → converter valores → default → nova constraint.
+-- Reparo: migration 071 falhou ao atualizar para 'pendente' com a constraint antiga ainda ativa.
+-- Idempotente: drop → convert → default → nova check (orcamento_aprovacoes e clientes).
 
 begin;
 
--- 1) Campos de auditoria operacional na aprovação
 alter table public.orcamento_aprovacoes
   add column if not exists procuracao_atualizada_em timestamptz null;
 
 alter table public.orcamento_aprovacoes
   add column if not exists procuracao_atualizada_por text null;
 
-comment on column public.orcamento_aprovacoes.procuracao_atualizada_em is
-  'Data/hora da última alteração de status da procuração na implantação.';
-
-comment on column public.orcamento_aprovacoes.procuracao_atualizada_por is
-  'Usuário que atualizou o status da procuração na implantação.';
-
--- 2) orcamento_aprovacoes: remover check antigo ANTES de converter
 alter table public.orcamento_aprovacoes
   drop constraint if exists orcamento_aprovacoes_procuracao_status_check;
 
@@ -28,13 +20,12 @@ alter table public.orcamento_aprovacoes
   alter column procuracao_status set default 'pendente';
 
 alter table public.orcamento_aprovacoes
+  drop constraint if exists orcamento_aprovacoes_procuracao_status_check;
+
+alter table public.orcamento_aprovacoes
   add constraint orcamento_aprovacoes_procuracao_status_check
   check (procuracao_status in ('pendente', 'ativa', 'nao_necessaria'));
 
-comment on column public.orcamento_aprovacoes.procuracao_status is
-  'Status da procuração na implantação: pendente | ativa | nao_necessaria.';
-
--- 3) clientes: mesma ordem
 alter table public.clientes
   drop constraint if exists clientes_procuracao_check;
 
@@ -46,10 +37,10 @@ alter table public.clientes
   alter column procuracao set default 'pendente';
 
 alter table public.clientes
+  drop constraint if exists clientes_procuracao_check;
+
+alter table public.clientes
   add constraint clientes_procuracao_check
   check (procuracao in ('pendente', 'ativa', 'nao_necessaria'));
-
-comment on column public.clientes.procuracao is
-  'Status da procuração SST/eSocial: pendente | ativa | nao_necessaria.';
 
 commit;
