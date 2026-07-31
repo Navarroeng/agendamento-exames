@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { OrcamentoAprovarModal } from "./OrcamentoAprovarModal";
+import { OrcamentoAlterarResponsavelModal } from "./OrcamentoAlterarResponsavelModal";
 import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
 import { OrcamentoEncerrarContratoModal } from "./OrcamentoEncerrarContratoModal";
 import { OrcamentoFormModal } from "./OrcamentoFormModal";
@@ -32,6 +33,10 @@ export function OrcamentosPage() {
     cancelTarget,
     cancelSaving,
     encerrarContratoTarget,
+    alterarResponsavelTarget,
+    alterarResponsavelSaving,
+    usuariosResponsavel,
+    usuariosResponsavelLoading,
     aprovarOpen,
     aprovarMode,
     aprovarOrcamento,
@@ -39,6 +44,7 @@ export function OrcamentosPage() {
     aprovarSaving,
     usuarioNome,
     podeEncerrarContrato,
+    resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
     setField,
@@ -61,6 +67,9 @@ export function OrcamentosPage() {
     closeEncerrarContrato,
     handleConfirmCancelar,
     handleConfirmEncerrarContrato,
+    handleOpenAlterarResponsavel,
+    closeAlterarResponsavel,
+    handleConfirmAlterarResponsavel,
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,
@@ -104,11 +113,13 @@ export function OrcamentosPage() {
         loading={loading}
         error={error}
         podeEncerrarContrato={podeEncerrarContrato}
+        resolvePodeAlterarResponsavel={resolvePodeAlterarResponsavel}
         onVisualizar={handleVisualizar}
         onEditar={handleEditar}
         onGerarPdf={handleGerarPdf}
         onCancelar={handleOpenCancelar}
         onAprovar={handleOpenAprovar}
+        onAlterarResponsavel={handleOpenAlterarResponsavel}
       />
 
       <OrcamentoFormModal
@@ -161,6 +172,19 @@ export function OrcamentosPage() {
         }}
       />
 
+      <OrcamentoAlterarResponsavelModal
+        open={Boolean(alterarResponsavelTarget)}
+        numero={alterarResponsavelTarget?.numero ?? ""}
+        responsavelAtual={alterarResponsavelTarget?.responsavel ?? ""}
+        usuarios={usuariosResponsavel}
+        usuariosLoading={usuariosResponsavelLoading}
+        saving={alterarResponsavelSaving}
+        onClose={closeAlterarResponsavel}
+        onConfirm={(params) => {
+          void handleConfirmAlterarResponsavel(params);
+        }}
+      />
+
       <OrcamentoAprovarModal
         open={aprovarOpen}
         mode={aprovarMode}
@@ -190,7 +214,7 @@ export function OrcamentosPage() {
         }}
       />
 
-      {(saving || viewLoading || actionLoading || cancelSaving || aprovarSaving) && (
+      {(saving || viewLoading || actionLoading || cancelSaving || aprovarSaving || alterarResponsavelSaving) && (
         <div
           className="fixed inset-0 z-[70] bg-black/10 backdrop-blur-[1px]"
           aria-hidden

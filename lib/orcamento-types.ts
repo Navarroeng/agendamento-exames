@@ -93,6 +93,11 @@ export interface OrcamentoRecord {
   email: string | null;
   telefone: string | null;
   responsavel: string;
+  /** Nome de quem criou (preservado na transferência). */
+  criado_por?: string | null;
+  criado_por_user_id?: string | null;
+  /** user_id do responsável atual pelo processo. */
+  responsavel_user_id?: string | null;
   origem_cliente: OrcamentoOrigemCliente | null;
   observacoes: string | null;
   motivo_cancelamento: string | null;
@@ -178,6 +183,9 @@ export interface OrcamentoInsertPayload {
   email: string | null;
   telefone: string | null;
   responsavel: string;
+  criado_por?: string | null;
+  criado_por_user_id?: string | null;
+  responsavel_user_id?: string | null;
   origem_cliente: OrcamentoOrigemCliente | null;
   observacoes: string | null;
   desconto_percentual: number;

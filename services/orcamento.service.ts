@@ -109,6 +109,10 @@ export async function criarOrcamento(
       email: normalized.email,
       telefone: normalized.telefone,
       responsavel: normalized.responsavel,
+      criado_por: normalized.criado_por ?? normalized.responsavel,
+      criado_por_user_id:
+        normalized.criado_por_user_id ?? normalized.responsavel_user_id ?? null,
+      responsavel_user_id: normalized.responsavel_user_id ?? null,
       origem_cliente: normalized.origem_cliente,
       observacoes: normalized.observacoes,
       desconto_percentual: normalized.desconto_percentual,
@@ -150,7 +154,6 @@ export async function atualizarOrcamento(
       contato: normalized.contato,
       email: normalized.email,
       telefone: normalized.telefone,
-      responsavel: normalized.responsavel,
       origem_cliente: normalized.origem_cliente,
       observacoes: normalized.observacoes,
       desconto_percentual: normalized.desconto_percentual,

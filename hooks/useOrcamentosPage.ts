@@ -38,6 +38,15 @@ import {
   CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
   podeEncerrarContrato as usuarioPodeEncerrarContrato,
 } from "@/lib/contrato-permissoes";
+import {
+  ORCAMENTO_RESPONSAVEL_BLOQUEADO_MSG,
+  podeAlterarResponsavelProcesso,
+} from "@/lib/orcamento-responsavel";
+import {
+  alterarResponsavelProcesso,
+  listarUsuariosAtivosParaResponsavel,
+} from "@/services/orcamento-responsavel.service";
+import type { PerfilUsuario } from "@/lib/types";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
@@ -103,6 +112,20 @@ export function useOrcamentosPage() {
   const auditContext = useAuditoriaUsuario();
   const { profile } = useAuth();
   const podeEncerrarContrato = usuarioPodeEncerrarContrato(profile?.perfil);
+  const resolvePodeAlterarResponsavel = useCallback(
+    (orcamento: {
+      status: OrcamentoComItens["status"];
+      responsavel: string;
+      responsavel_user_id?: string | null;
+    }) =>
+      podeAlterarResponsavelProcesso({
+        perfil: profile?.perfil,
+        usuarioId: profile?.user_id,
+        usuarioNome: profile?.nome ?? auditContext.usuarioNome,
+        orcamento,
+      }),
+    [auditContext.usuarioNome, profile?.nome, profile?.perfil, profile?.user_id]
+  );
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -128,6 +151,15 @@ export function useOrcamentosPage() {
     contratoNumero: string | null;
     futurosCount: number;
   } | null>(null);
+  const [alterarResponsavelTarget, setAlterarResponsavelTarget] =
+    useState<OrcamentoComItens | null>(null);
+  const [alterarResponsavelSaving, setAlterarResponsavelSaving] =
+    useState(false);
+  const [usuariosResponsavel, setUsuariosResponsavel] = useState<
+    PerfilUsuario[]
+  >([]);
+  const [usuariosResponsavelLoading, setUsuariosResponsavelLoading] =
+    useState(false);
 
   const [aprovarOrcamento, setAprovarOrcamento] =
     useState<OrcamentoComItens | null>(null);
@@ -349,9 +381,17 @@ export function useOrcamentosPage() {
 
     setSaving(true);
     try {
-      const payload = buildPayload(
+      const basePayload = buildPayload(
         editingId ? editingResponsavel : auditContext.usuarioNome
       );
+      const payload = editingId
+        ? basePayload
+        : {
+            ...basePayload,
+            criado_por: auditContext.usuarioNome,
+            criado_por_user_id: profile?.user_id ?? null,
+            responsavel_user_id: profile?.user_id ?? null,
+          };
       const isEditing = Boolean(editingId);
 
       const saved = isEditing
@@ -412,6 +452,7 @@ export function useOrcamentosPage() {
     editingOrigemInicial,
     editingResponsavel,
     getValidationError,
+    profile?.user_id,
     refresh,
     setSaving,
   ]);
@@ -537,6 +578,110 @@ export function useOrcamentosPage() {
     if (cancelSaving) return;
     setEncerrarContratoTarget(null);
   }, [cancelSaving]);
+
+  const handleOpenAlterarResponsavel = useCallback(
+    async (id: string) => {
+      setActionLoading(true);
+      try {
+        const orcamento = await buscarOrcamentoComItens(id);
+        if (!orcamento) {
+          toast.error("Orçamento não encontrado.");
+          return;
+        }
+        if (
+          !podeAlterarResponsavelProcesso({
+            perfil: profile?.perfil,
+            usuarioId: profile?.user_id,
+            usuarioNome: profile?.nome ?? auditContext.usuarioNome,
+            orcamento,
+          })
+        ) {
+          toast.error(
+            orcamento.status === "cancelado" ||
+              orcamento.status === "contrato_encerrado"
+              ? ORCAMENTO_RESPONSAVEL_BLOQUEADO_MSG
+              : "Você não possui permissão para alterar o responsável deste processo."
+          );
+          return;
+        }
+
+        setUsuariosResponsavelLoading(true);
+        const usuarios = await listarUsuariosAtivosParaResponsavel();
+        setUsuariosResponsavel(usuarios);
+        setAlterarResponsavelTarget(orcamento);
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao carregar dados para alteração de responsável.");
+      } finally {
+        setUsuariosResponsavelLoading(false);
+        setActionLoading(false);
+      }
+    },
+    [auditContext.usuarioNome, profile?.nome, profile?.perfil, profile?.user_id]
+  );
+
+  const closeAlterarResponsavel = useCallback(() => {
+    if (alterarResponsavelSaving) return;
+    setAlterarResponsavelTarget(null);
+  }, [alterarResponsavelSaving]);
+
+  const handleConfirmAlterarResponsavel = useCallback(
+    async (params: {
+      novoResponsavelUserId: string;
+      novoResponsavelNome: string;
+      motivo: string;
+    }) => {
+      if (!alterarResponsavelTarget) return;
+      setAlterarResponsavelSaving(true);
+      try {
+        const result = await alterarResponsavelProcesso({
+          orcamentoId: alterarResponsavelTarget.id,
+          novoResponsavelUserId: params.novoResponsavelUserId,
+          novoResponsavelNome: params.novoResponsavelNome,
+          motivo: params.motivo,
+        });
+
+        const contratoTxt = result.numeroContrato
+          ? ` Contrato: ${result.numeroContrato}.`
+          : "";
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.alteracao_responsavel_processo,
+          registroId: result.orcamento.id,
+          registroNome: result.orcamento.numero,
+          descricao: `${auditContext.usuarioNome} alterou o responsável do processo ${result.orcamento.numero} de ${result.responsavelAnterior} para ${result.responsavelNovo}.${contratoTxt}\nMotivo:\n${result.motivo}`,
+          dadosAntes: {
+            responsavel: result.responsavelAnterior,
+          },
+          dadosDepois: {
+            responsavel: result.responsavelNovo,
+            motivo: result.motivo,
+            contrato: result.numeroContrato,
+          },
+        });
+
+        if (aprovarOrcamento?.id === result.orcamento.id) {
+          setAprovarOrcamento(result.orcamento);
+        }
+
+        setAlterarResponsavelTarget(null);
+        toast.success("Responsável pelo processo alterado com sucesso.");
+        refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao alterar o responsável do processo."
+        );
+      } finally {
+        setAlterarResponsavelSaving(false);
+      }
+    },
+    [alterarResponsavelTarget, aprovarOrcamento?.id, auditContext, refresh]
+  );
 
   const handleConfirmCancelar = useCallback(
     async (motivo: string, observacao: string) => {
@@ -1377,6 +1522,10 @@ export function useOrcamentosPage() {
     cancelTarget,
     cancelSaving,
     encerrarContratoTarget,
+    alterarResponsavelTarget,
+    alterarResponsavelSaving,
+    usuariosResponsavel,
+    usuariosResponsavelLoading,
     aprovarOpen,
     aprovarMode,
     aprovarOrcamento,
@@ -1384,6 +1533,7 @@ export function useOrcamentosPage() {
     aprovarSaving,
     usuarioNome: auditContext.usuarioNome,
     podeEncerrarContrato,
+    resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
     setField,
@@ -1407,6 +1557,9 @@ export function useOrcamentosPage() {
     closeEncerrarContrato,
     handleConfirmCancelar,
     handleConfirmEncerrarContrato,
+    handleOpenAlterarResponsavel,
+    closeAlterarResponsavel,
+    handleConfirmAlterarResponsavel,
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,

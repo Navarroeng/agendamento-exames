@@ -10,10 +10,12 @@ import type { OrcamentoRecord } from "@/lib/orcamento-types";
 interface OrcamentoRowActionsMenuProps {
   orcamento: OrcamentoRecord;
   podeEncerrarContrato?: boolean;
+  podeAlterarResponsavel?: boolean;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
   onAprovar: (id: string) => void;
+  onAlterarResponsavel: (id: string) => void;
 }
 
 type MenuItem = {
@@ -27,16 +29,19 @@ const LABELS: Record<OrcamentoAcaoMenu, string> = {
   editar: "Editar",
   gerar_pdf: "Gerar PDF",
   aprovar: "Aprovar",
+  alterar_responsavel: "Alterar responsável pelo processo",
   cancelar: "Cancelar",
 };
 
 export function OrcamentoRowActionsMenu({
   orcamento,
   podeEncerrarContrato = false,
+  podeAlterarResponsavel = false,
   onEditar,
   onGerarPdf,
   onCancelar,
   onAprovar,
+  onAlterarResponsavel,
 }: OrcamentoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,15 +51,24 @@ export function OrcamentoRowActionsMenu({
       editar: () => onEditar(orcamento.id),
       gerar_pdf: () => onGerarPdf(orcamento.id),
       aprovar: () => onAprovar(orcamento.id),
+      alterar_responsavel: () => onAlterarResponsavel(orcamento.id),
       cancelar: () => onCancelar(orcamento.id),
     }),
-    [onAprovar, onCancelar, onEditar, onGerarPdf, orcamento.id]
+    [
+      onAlterarResponsavel,
+      onAprovar,
+      onCancelar,
+      onEditar,
+      onGerarPdf,
+      orcamento.id,
+    ]
   );
 
   const items: MenuItem[] = useMemo(
     () =>
       resolveOrcamentoAcoesMenu(orcamento.status, {
         podeEncerrarContrato,
+        podeAlterarResponsavel,
       }).map((key) => ({
         key,
         label:
@@ -64,7 +78,7 @@ export function OrcamentoRowActionsMenu({
         danger: key === "cancelar",
         onClick: handlers[key],
       })),
-    [handlers, orcamento.status, podeEncerrarContrato]
+    [handlers, orcamento.status, podeAlterarResponsavel, podeEncerrarContrato]
   );
 
   useEffect(() => {

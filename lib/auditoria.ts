@@ -32,6 +32,7 @@ export const AUDITORIA_ACOES = {
   tentativa_edicao_bloqueada_fatura: "tentativa_edicao_bloqueada_fatura",
   tentativa_encerrar_contrato_sem_permissao:
     "tentativa_encerrar_contrato_sem_permissao",
+  alteracao_responsavel_processo: "alteracao_responsavel_processo",
   agendamento_bloqueado_inadimplencia: "agendamento_bloqueado_inadimplencia",
   fatura_marcada_vencida: "fatura_marcada_vencida",
   exames_carregados_cargo: "exames_carregados_cargo",
@@ -91,6 +92,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   tentativa_edicao_bloqueada_fatura: "Tentativa de edição bloqueada (fatura)",
   tentativa_encerrar_contrato_sem_permissao:
     "Tentativa de encerrar contrato sem permissão",
+  alteracao_responsavel_processo: "Alteração de responsável do processo",
   agendamento_bloqueado_inadimplencia:
     "Novo agendamento bloqueado (inadimplência)",
   fatura_marcada_vencida: "Fatura marcada como vencida",

@@ -16,11 +16,13 @@ interface OrcamentosTableProps {
   loading: boolean;
   error: string | null;
   podeEncerrarContrato?: boolean;
+  resolvePodeAlterarResponsavel?: (orcamento: OrcamentoRecord) => boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
   onAprovar: (id: string) => void;
+  onAlterarResponsavel: (id: string) => void;
 }
 
 export function OrcamentosTable({
@@ -28,11 +30,13 @@ export function OrcamentosTable({
   loading,
   error,
   podeEncerrarContrato = false,
+  resolvePodeAlterarResponsavel,
   onVisualizar,
   onEditar,
   onGerarPdf,
   onCancelar,
   onAprovar,
+  onAlterarResponsavel,
 }: OrcamentosTableProps) {
   return (
     <Panel
@@ -106,10 +110,14 @@ export function OrcamentosTable({
                       <OrcamentoRowActionsMenu
                         orcamento={orcamento}
                         podeEncerrarContrato={podeEncerrarContrato}
+                        podeAlterarResponsavel={
+                          resolvePodeAlterarResponsavel?.(orcamento) ?? false
+                        }
                         onEditar={onEditar}
                         onGerarPdf={onGerarPdf}
                         onCancelar={onCancelar}
                         onAprovar={onAprovar}
+                        onAlterarResponsavel={onAlterarResponsavel}
                       />
                     </td>
                   </tr>

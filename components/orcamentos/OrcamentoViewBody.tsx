@@ -103,7 +103,13 @@ export function OrcamentoViewBody({
             value={formatOrcamentoOrigemCliente(orcamento.origem_cliente)}
           />
           <ClientField
-            label="Responsável"
+            label="Criado por"
+            value={displayValue(
+              orcamento.criado_por?.trim() || orcamento.responsavel
+            )}
+          />
+          <ClientField
+            label="Responsável atual"
             value={displayValue(orcamento.responsavel)}
           />
         </div>
