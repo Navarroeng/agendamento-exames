@@ -71,9 +71,11 @@ export interface OrcamentoAprovacaoRecord {
   pagamento_confirmado_por?: string | null;
   contrato_salvo_em?: string | null;
   financeiro_salvo_em?: string | null;
-  procuracao_status?: "ativa" | "inativa";
+  procuracao_status?: "pendente" | "ativa" | "nao_necessaria";
   observacao_procuracao?: string | null;
   procuracao_salva_em?: string | null;
+  procuracao_atualizada_em?: string | null;
+  procuracao_atualizada_por?: string | null;
   funcionarios_lista_path?: string | null;
   funcionarios_lista_nome?: string | null;
   funcionarios_lista_tipo?: string | null;

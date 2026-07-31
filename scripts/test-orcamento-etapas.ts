@@ -84,6 +84,37 @@ assert.equal(
   true
 );
 
+const procuracaoPendente = aprovacao({
+  ...financeiroOk,
+  procuracao_status: "pendente",
+  procuracao_salva_em: "2026-07-30T13:00:00Z",
+});
+assert.equal(isProcuracaoEtapaConcluida(procuracaoPendente), false);
+assert.equal(
+  isOrcamentoEtapaLiberada("funcionarios", procuracaoPendente, true),
+  false
+);
+
+const procuracaoDispensada = aprovacao({
+  ...financeiroOk,
+  procuracao_status: "nao_necessaria",
+  observacao_procuracao: "Sem eSocial pela Navarro.",
+  procuracao_salva_em: "2026-07-30T13:00:00Z",
+});
+assert.equal(isProcuracaoEtapaConcluida(procuracaoDispensada), true);
+assert.equal(
+  isOrcamentoEtapaLiberada("funcionarios", procuracaoDispensada, true),
+  true
+);
+
+const procuracaoDispensadaSemObs = aprovacao({
+  ...financeiroOk,
+  procuracao_status: "nao_necessaria",
+  observacao_procuracao: null,
+  procuracao_salva_em: "2026-07-30T13:00:00Z",
+});
+assert.equal(isProcuracaoEtapaConcluida(procuracaoDispensadaSemObs), false);
+
 const msg = buildMensagemVisitaTecnica({
   data: "2026-08-10",
   horario: "09:00",

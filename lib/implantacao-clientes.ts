@@ -38,7 +38,7 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
 }> = [
   { id: "contrato", label: "Contrato" },
   { id: "financeiro", label: "Aguardando pagamento" },
-  { id: "procuracao", label: "Procuração" },
+  { id: "procuracao", label: "Aguardando procuração" },
   { id: "funcionarios", label: "Lista de funcionários" },
   { id: "logo", label: "Logo da empresa" },
   { id: "visita", label: "Visita técnica" },
@@ -51,7 +51,7 @@ export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
 }> = [
   { value: "contrato", label: "Contrato" },
   { value: "financeiro", label: "Aguardando pagamento" },
-  { value: "procuracao", label: "Procuração" },
+  { value: "procuracao", label: "Aguardando procuração" },
   { value: "funcionarios", label: "Lista de funcionários" },
   { value: "logo", label: "Logo da empresa" },
   { value: "visita", label: "Visita agendada" },
@@ -63,7 +63,7 @@ export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
 export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   contrato: "Contrato",
   financeiro: "Aguardando pagamento",
-  procuracao: "Procuração",
+  procuracao: "Aguardando procuração",
   funcionarios: "Lista de funcionários",
   logo: "Logo da empresa",
   visita: "Visita agendada",

@@ -440,31 +440,71 @@ export function useImplantacaoClientesPage() {
     async (
       aprovacaoId: string,
       payload: {
-        procuracao_status: "ativa" | "inativa";
+        procuracao_status: "pendente" | "ativa" | "nao_necessaria";
         observacao_procuracao: string | null;
       }
     ) => {
       if (!modalOrcamento) return;
       setModalSaving(true);
       try {
+        const before = modalAprovacao;
         const saved = await salvarOrcamentoProcuracao(
           aprovacaoId,
           modalOrcamento.id,
-          payload
+          {
+            ...payload,
+            atualizadoPor: auditContext.usuarioNome,
+          }
         );
         setModalAprovacao(saved);
+
+        const label =
+          payload.procuracao_status === "ativa"
+            ? "Ativa"
+            : payload.procuracao_status === "nao_necessaria"
+              ? "Não necessária"
+              : "Pendente";
+        const clienteNome = modalOrcamento.cliente_nome?.trim() || "cliente";
+        let descricao = `${auditContext.usuarioNome} definiu a procuração do cliente ${clienteNome} como ${label} (orçamento ${modalOrcamento.numero}).`;
+        if (
+          payload.procuracao_status === "nao_necessaria" &&
+          payload.observacao_procuracao
+        ) {
+          descricao += `\nJustificativa:\n${payload.observacao_procuracao}`;
+        }
+        if (
+          before &&
+          (before.procuracao_status === "ativa" ||
+            before.procuracao_status === "nao_necessaria") &&
+          payload.procuracao_status === "pendente"
+        ) {
+          descricao = `${auditContext.usuarioNome} reabriu a etapa de procuração do orçamento ${modalOrcamento.numero} (status Pendente). Próximas etapas bloqueadas novamente.`;
+        }
+
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
-          acao: AUDITORIA_ACOES.edicao,
+          acao: AUDITORIA_ACOES.procuracao_alterada,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
-          descricao: `Procuração marcada como ${payload.procuracao_status} no orçamento ${modalOrcamento.numero}.`,
+          descricao,
+          dadosAntes: before
+            ? {
+                procuracao_status: before.procuracao_status,
+                observacao_procuracao: before.observacao_procuracao,
+              }
+            : null,
+          dadosDepois: {
+            procuracao_status: payload.procuracao_status,
+            observacao_procuracao: payload.observacao_procuracao,
+          },
         });
         toast.success(
-          payload.procuracao_status === "ativa"
-            ? "Procuração ativa. Lista de funcionários liberada."
-            : "Procuração salva."
+          payload.procuracao_status === "pendente"
+            ? "Procuração pendente. Próximas etapas bloqueadas."
+            : payload.procuracao_status === "ativa"
+              ? "Procuração ativa. Lista de funcionários liberada."
+              : "Procuração marcada como não necessária. Lista de funcionários liberada."
         );
         void refresh();
       } catch (err) {
@@ -477,7 +517,7 @@ export function useImplantacaoClientesPage() {
         setModalSaving(false);
       }
     },
-    [auditContext, modalOrcamento, refresh]
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
   );
 
   const handleSalvarFuncionarios = useCallback(

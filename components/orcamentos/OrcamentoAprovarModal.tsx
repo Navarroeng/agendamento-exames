@@ -51,6 +51,11 @@ import {
 } from "@/lib/orcamento-etapas";
 import { buildMensagemVisitaTecnica } from "@/lib/orcamento-visita-mensagem";
 import type { ContratoAgendamentoContagem } from "@/lib/contrato-agendamentos";
+import {
+  isProcuracaoStatusConcluida,
+  normalizeProcuracaoStatus,
+  type ProcuracaoStatus,
+} from "@/lib/cliente-procuracao";
 
 type TabId = OrcamentoEtapaId;
 
@@ -86,7 +91,7 @@ interface OrcamentoAprovarModalProps {
   onSalvarProcuracao: (
     aprovacaoId: string,
     payload: {
-      procuracao_status: "ativa" | "inativa";
+      procuracao_status: ProcuracaoStatus;
       observacao_procuracao: string | null;
     }
   ) => Promise<void>;
@@ -165,9 +170,8 @@ export function OrcamentoAprovarModal({
   const [observacaoPagamento, setObservacaoPagamento] = useState("");
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
 
-  const [procuracaoStatus, setProcuracaoStatus] = useState<"ativa" | "inativa">(
-    "inativa"
-  );
+  const [procuracaoStatus, setProcuracaoStatus] =
+    useState<ProcuracaoStatus>("pendente");
   const [observacaoProcuracao, setObservacaoProcuracao] = useState("");
   const [funcionariosFile, setFuncionariosFile] = useState<File | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -211,7 +215,9 @@ export function OrcamentoAprovarModal({
     setBoletoPagoEm(aprovacao?.boleto_pago_em ?? "");
     setObservacaoPagamento(aprovacao?.observacao_pagamento ?? "");
     setComprovanteFile(null);
-    setProcuracaoStatus(aprovacao?.procuracao_status ?? "inativa");
+    setProcuracaoStatus(
+      normalizeProcuracaoStatus(aprovacao?.procuracao_status)
+    );
     setObservacaoProcuracao(aprovacao?.observacao_procuracao ?? "");
     setFuncionariosFile(null);
     setLogoFile(null);
@@ -461,11 +467,33 @@ export function OrcamentoAprovarModal({
 
   async function handleSalvarProcuracaoClick() {
     if (!aprovacao) return;
+
+    if (
+      procuracaoStatus === "nao_necessaria" &&
+      !observacaoProcuracao.trim()
+    ) {
+      toast.error(
+        "Informe por que a procuração não será necessária para este cliente."
+      );
+      return;
+    }
+
+    const statusAnterior = normalizeProcuracaoStatus(
+      aprovacao.procuracao_status
+    );
+    const estavaConcluida = isProcuracaoStatusConcluida(statusAnterior);
+    if (estavaConcluida && procuracaoStatus === "pendente") {
+      const ok = window.confirm(
+        "Ao definir a procuração como Pendente, as próximas etapas serão bloqueadas novamente. Documentos e dados já salvos serão preservados. Deseja continuar?"
+      );
+      if (!ok) return;
+    }
+
     await onSalvarProcuracao(aprovacao.id, {
       procuracao_status: procuracaoStatus,
       observacao_procuracao: emptyToNull(observacaoProcuracao),
     });
-    if (procuracaoStatus === "ativa") {
+    if (isProcuracaoStatusConcluida(procuracaoStatus)) {
       setTab("funcionarios");
     }
   }

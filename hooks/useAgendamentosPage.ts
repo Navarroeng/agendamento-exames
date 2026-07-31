@@ -70,7 +70,7 @@ import {
   buildClienteFilterOptionsHistorico,
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
-import { isClienteProcuracaoAtiva } from "@/lib/cliente-procuracao";
+import { clienteProcuracaoRequerAtencao } from "@/lib/cliente-procuracao";
 import {
   CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
   filterClientesParaNovoAgendamento,
@@ -794,7 +794,7 @@ export function useAgendamentosPage() {
           return false;
         }
 
-        if (!isClienteProcuracaoAtiva(cliente.procuracao)) {
+        if (clienteProcuracaoRequerAtencao(cliente.procuracao)) {
           setPendingClienteId(nextClienteId);
           setClienteProcuracaoModalOpen(true);
           return false;
@@ -1051,7 +1051,7 @@ export function useAgendamentosPage() {
   const showClienteProcuracaoAlert = useMemo(() => {
     if (!clienteId) return false;
     const cliente = clientes.find((c) => c.id === clienteId);
-    return !!cliente && !isClienteProcuracaoAtiva(cliente.procuracao);
+    return !!cliente && clienteProcuracaoRequerAtencao(cliente.procuracao);
   }, [clienteId, clientes]);
 
   const applyCargoChange = useCallback(

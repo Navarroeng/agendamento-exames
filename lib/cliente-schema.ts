@@ -13,7 +13,7 @@
  * - setor (text, nullable) — migration 045
  * - created_at (timestamptz)
  * - cnpj_digits (text, generated) — CNPJ só com dígitos; índice único (migration 031)
- * - procuracao (text) — ativa | inativa (migration 033)
+ * - procuracao (text) — pendente | ativa | nao_necessaria (migrations 033/071)
  * - disponivel_agendamento (boolean) — migration 043
  */
 export const CLIENTE_DB_COLUMNS =

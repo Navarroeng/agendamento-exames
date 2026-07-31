@@ -34,17 +34,30 @@ export async function salvarOrcamentoProcuracao(
   aprovacaoId: string,
   orcamentoId: string,
   payload: {
-    procuracao_status: "ativa" | "inativa";
+    procuracao_status: "pendente" | "ativa" | "nao_necessaria";
     observacao_procuracao: string | null;
+    atualizadoPor: string;
   }
 ): Promise<OrcamentoAprovacaoRecord> {
+  const status = payload.procuracao_status;
+  const observacao = payload.observacao_procuracao?.trim() || null;
+
+  if (status === "nao_necessaria" && !observacao) {
+    throw new Error(
+      "Informe por que a procuração não será necessária para este cliente."
+    );
+  }
+
+  const agora = new Date().toISOString();
   const supabase = createClient();
   const { error } = await supabase
     .from("orcamento_aprovacoes")
     .update({
-      procuracao_status: payload.procuracao_status,
-      observacao_procuracao: payload.observacao_procuracao,
-      procuracao_salva_em: new Date().toISOString(),
+      procuracao_status: status,
+      observacao_procuracao: observacao,
+      procuracao_salva_em: agora,
+      procuracao_atualizada_em: agora,
+      procuracao_atualizada_por: payload.atualizadoPor.trim() || null,
     })
     .eq("id", aprovacaoId);
   if (error) throw error;
@@ -59,7 +72,7 @@ export async function salvarOrcamentoProcuracao(
   if (orc?.cliente_id) {
     await supabase
       .from("clientes")
-      .update({ procuracao: payload.procuracao_status })
+      .update({ procuracao: status })
       .eq("id", orc.cliente_id);
   }
 

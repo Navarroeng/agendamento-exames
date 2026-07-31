@@ -10,10 +10,10 @@ import {
 import { maskTime24 } from "@/lib/agendamento-datetime";
 
 interface OrcamentoAbaProcuracaoProps {
-  status: "ativa" | "inativa";
+  status: "pendente" | "ativa" | "nao_necessaria";
   observacoes: string;
   saving: boolean;
-  onChangeStatus: (value: "ativa" | "inativa") => void;
+  onChangeStatus: (value: "pendente" | "ativa" | "nao_necessaria") => void;
   onChangeObservacoes: (value: string) => void;
   onSalvar: () => void;
 }
@@ -26,11 +26,16 @@ export function OrcamentoAbaProcuracao({
   onChangeObservacoes,
   onSalvar,
 }: OrcamentoAbaProcuracaoProps) {
+  const exigeObservacao = status === "nao_necessaria";
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
-        Defina o status da procuração do cliente. Somente com status{" "}
-        <strong className="text-navy">Ativa</strong> a próxima etapa é liberada.
+        Defina o status da procuração do cliente. A próxima etapa é liberada
+        quando o status for <strong className="text-navy">Ativa</strong> ou{" "}
+        <strong className="text-navy">Não necessária</strong>. Com{" "}
+        <strong className="text-navy">Pendente</strong>, o processo permanece
+        aguardando procuração.
       </div>
 
       <fieldset className="space-y-2">
@@ -41,11 +46,11 @@ export function OrcamentoAbaProcuracao({
           <input
             type="radio"
             name="procuracao_status"
-            checked={status === "inativa"}
+            checked={status === "pendente"}
             disabled={saving}
-            onChange={() => onChangeStatus("inativa")}
+            onChange={() => onChangeStatus("pendente")}
           />
-          Inativa
+          Pendente
         </label>
         <label className="flex items-center gap-2 text-sm text-[#334155]">
           <input
@@ -57,18 +62,39 @@ export function OrcamentoAbaProcuracao({
           />
           Ativa
         </label>
+        <label className="flex items-center gap-2 text-sm text-[#334155]">
+          <input
+            type="radio"
+            name="procuracao_status"
+            checked={status === "nao_necessaria"}
+            disabled={saving}
+            onChange={() => onChangeStatus("nao_necessaria")}
+          />
+          Não necessária
+        </label>
       </fieldset>
 
       <label className="block">
         <span className="mb-1.5 block text-xs font-bold text-navy">
           Observações
+          {exigeObservacao ? <RequiredMark /> : null}
         </span>
         <textarea
           className="field-input min-h-[96px] resize-y"
           value={observacoes}
           disabled={saving}
           onChange={(e) => onChangeObservacoes(e.target.value)}
+          placeholder={
+            exigeObservacao
+              ? "Ex.: Não será necessário envio de eventos ao eSocial pela Navarro."
+              : undefined
+          }
         />
+        {exigeObservacao ? (
+          <p className="mt-1.5 text-[11px] text-[#64748b]">
+            Informe por que a procuração não será necessária para este cliente.
+          </p>
+        ) : null}
       </label>
 
       <div className="flex justify-end">

@@ -272,7 +272,7 @@ export interface AgendamentoHistoricoRecord {
   created_at: string;
 }
 
-export type ClienteProcuracao = "ativa" | "inativa";
+export type ClienteProcuracao = "pendente" | "ativa" | "nao_necessaria";
 
 export interface ClienteFormValues {
   nome: string;

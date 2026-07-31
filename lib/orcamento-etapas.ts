@@ -1,4 +1,5 @@
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import { isProcuracaoStatusConcluida } from "@/lib/cliente-procuracao";
 
 export type OrcamentoEtapaId =
   | "resumo"
@@ -58,10 +59,14 @@ export function isProcuracaoEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
 ): boolean {
   if (!aprovacao) return false;
-  return (
-    aprovacao.procuracao_status === "ativa" &&
-    Boolean(aprovacao.procuracao_salva_em)
-  );
+  if (!isProcuracaoStatusConcluida(aprovacao.procuracao_status)) {
+    return false;
+  }
+  if (!aprovacao.procuracao_salva_em) return false;
+  if (aprovacao.procuracao_status === "nao_necessaria") {
+    return Boolean(aprovacao.observacao_procuracao?.trim());
+  }
+  return true;
 }
 
 export function isFuncionariosEtapaConcluida(
