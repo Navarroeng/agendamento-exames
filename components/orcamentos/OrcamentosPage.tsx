@@ -38,6 +38,7 @@ export function OrcamentosPage() {
     aprovarAprovacao,
     aprovarSaving,
     usuarioNome,
+    podeEncerrarContrato,
     funcionariosPreviewUrl,
     logoPreviewUrl,
     setField,
@@ -102,6 +103,7 @@ export function OrcamentosPage() {
         orcamentos={orcamentos}
         loading={loading}
         error={error}
+        podeEncerrarContrato={podeEncerrarContrato}
         onVisualizar={handleVisualizar}
         onEditar={handleEditar}
         onGerarPdf={handleGerarPdf}

@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import {
+  CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
+  podeEncerrarContrato as usuarioPodeEncerrarContrato,
+} from "@/lib/contrato-permissoes";
 import { useClienteContratoForm } from "@/hooks/useClienteContratoForm";
 import {
   getContratoAtual,
@@ -25,6 +29,8 @@ export function useClienteContratos(
   clienteNome?: string | null
 ) {
   const auditContext = useAuditoriaUsuario();
+  const { profile } = useAuth();
+  const podeEncerrarContrato = usuarioPodeEncerrarContrato(profile?.perfil);
   const [contratos, setContratos] = useState<ClienteContratoRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -162,12 +168,33 @@ export function useClienteContratos(
     clienteNome,
   ]);
 
-  const handleEncerrar = useCallback((contrato: ClienteContratoRecord) => {
-    setEncerrarTarget(contrato);
-  }, []);
+  const handleEncerrar = useCallback(
+    async (contrato: ClienteContratoRecord) => {
+      if (!podeEncerrarContrato) {
+        toast.error(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG);
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.clientes,
+          acao: AUDITORIA_ACOES.tentativa_encerrar_contrato_sem_permissao,
+          registroId: clienteId,
+          registroNome: clienteNome ?? contrato.numero ?? undefined,
+          descricao: `Usuário ${auditContext.usuarioNome} tentou encerrar o contrato ${contrato.numero || contrato.id} sem permissão.`,
+        });
+        return;
+      }
+      setEncerrarTarget(contrato);
+    },
+    [auditContext, clienteId, clienteNome, podeEncerrarContrato]
+  );
 
   const confirmEncerrar = useCallback(async () => {
     if (!encerrarTarget) return;
+    if (!podeEncerrarContrato) {
+      toast.error(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG);
+      return;
+    }
 
     setEncerrarSaving(true);
     try {
@@ -190,11 +217,20 @@ export function useClienteContratos(
       await refresh();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao encerrar contrato.");
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao encerrar contrato."
+      );
     } finally {
       setEncerrarSaving(false);
     }
-  }, [encerrarTarget, refresh, auditContext, clienteId, clienteNome]);
+  }, [
+    encerrarTarget,
+    refresh,
+    auditContext,
+    clienteId,
+    clienteNome,
+    podeEncerrarContrato,
+  ]);
 
   return {
     contratos,
@@ -208,6 +244,7 @@ export function useClienteContratos(
     saving,
     encerrarTarget,
     encerrarSaving,
+    podeEncerrarContrato,
     handleNovoContrato,
     handleEditarContrato,
     handleSave,

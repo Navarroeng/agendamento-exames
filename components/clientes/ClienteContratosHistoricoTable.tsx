@@ -11,6 +11,7 @@ import type { ClienteContratoRecord } from "@/lib/types";
 interface ClienteContratosHistoricoTableProps {
   contratos: ClienteContratoRecord[];
   loading: boolean;
+  podeEncerrarContrato?: boolean;
   onEditar: (contrato: ClienteContratoRecord) => void;
   onEncerrar: (contrato: ClienteContratoRecord) => void;
 }
@@ -18,6 +19,7 @@ interface ClienteContratosHistoricoTableProps {
 export function ClienteContratosHistoricoTable({
   contratos,
   loading,
+  podeEncerrarContrato = false,
   onEditar,
   onEncerrar,
 }: ClienteContratosHistoricoTableProps) {
@@ -105,8 +107,9 @@ export function ClienteContratosHistoricoTable({
                     >
                       Visualizar
                     </button>
-                    {contrato.status === "ativo" ||
-                    contrato.status === "em_renovacao" ? (
+                    {podeEncerrarContrato &&
+                    (contrato.status === "ativo" ||
+                      contrato.status === "em_renovacao") ? (
                       <button
                         type="button"
                         className="rounded-lg bg-[#f4f6fb] px-2.5 py-1 text-[10px] font-bold text-[#52617a]"

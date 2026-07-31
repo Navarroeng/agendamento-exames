@@ -8,10 +8,18 @@ export type OrcamentoAcaoMenu =
 
 export const ORCAMENTO_JA_APROVADO_MSG = "Este orçamento já foi aprovado.";
 
-/** Ações exibidas no menu ⋯ conforme o status. */
+export type ResolveOrcamentoAcoesOptions = {
+  /** Só ADM pode cancelar/encerrar quando o orçamento já virou contrato (aprovado). */
+  podeEncerrarContrato?: boolean;
+};
+
+/** Ações exibidas no menu ⋯ conforme o status e permissões. */
 export function resolveOrcamentoAcoesMenu(
-  status: OrcamentoStatus
+  status: OrcamentoStatus,
+  options?: ResolveOrcamentoAcoesOptions
 ): OrcamentoAcaoMenu[] {
+  const podeEncerrar = options?.podeEncerrarContrato === true;
+
   switch (status) {
     case "em_elaboracao":
       return ["editar", "gerar_pdf", "cancelar"];
@@ -19,7 +27,7 @@ export function resolveOrcamentoAcoesMenu(
     case "em_negociacao":
       return ["editar", "gerar_pdf", "aprovar", "cancelar"];
     case "aprovado":
-      return ["gerar_pdf", "cancelar"];
+      return podeEncerrar ? ["gerar_pdf", "cancelar"] : ["gerar_pdf"];
     case "reprovado":
       return ["gerar_pdf"];
     case "cancelado":
@@ -32,13 +40,20 @@ export function resolveOrcamentoAcoesMenu(
 }
 
 export function orcamentoPermiteEditar(status: OrcamentoStatus): boolean {
-  return resolveOrcamentoAcoesMenu(status).includes("editar");
+  return resolveOrcamentoAcoesMenu(status, {
+    podeEncerrarContrato: true,
+  }).includes("editar");
 }
 
 export function orcamentoPermiteAprovar(status: OrcamentoStatus): boolean {
-  return resolveOrcamentoAcoesMenu(status).includes("aprovar");
+  return resolveOrcamentoAcoesMenu(status, {
+    podeEncerrarContrato: true,
+  }).includes("aprovar");
 }
 
-export function orcamentoPermiteCancelar(status: OrcamentoStatus): boolean {
-  return resolveOrcamentoAcoesMenu(status).includes("cancelar");
+export function orcamentoPermiteCancelar(
+  status: OrcamentoStatus,
+  options?: ResolveOrcamentoAcoesOptions
+): boolean {
+  return resolveOrcamentoAcoesMenu(status, options).includes("cancelar");
 }

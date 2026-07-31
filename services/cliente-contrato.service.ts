@@ -4,6 +4,7 @@ import type {
   ClienteContratoRecord,
   ClienteContratoStatus,
 } from "@/lib/types";
+import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
 
 export async function listarTodosContratos(
   limit = 1000
@@ -139,6 +140,8 @@ export async function encerrarContrato(
     alterarDataFim?: boolean;
   }
 ): Promise<ClienteContratoRecord> {
+  await assertPodeEncerrarContrato();
+
   const supabase = createClient();
   const agora = new Date().toISOString();
   const update: Record<string, unknown> = {

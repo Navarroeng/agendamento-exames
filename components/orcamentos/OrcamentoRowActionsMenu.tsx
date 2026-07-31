@@ -9,6 +9,7 @@ import type { OrcamentoRecord } from "@/lib/orcamento-types";
 
 interface OrcamentoRowActionsMenuProps {
   orcamento: OrcamentoRecord;
+  podeEncerrarContrato?: boolean;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -31,6 +32,7 @@ const LABELS: Record<OrcamentoAcaoMenu, string> = {
 
 export function OrcamentoRowActionsMenu({
   orcamento,
+  podeEncerrarContrato = false,
   onEditar,
   onGerarPdf,
   onCancelar,
@@ -51,13 +53,18 @@ export function OrcamentoRowActionsMenu({
 
   const items: MenuItem[] = useMemo(
     () =>
-      resolveOrcamentoAcoesMenu(orcamento.status).map((key) => ({
+      resolveOrcamentoAcoesMenu(orcamento.status, {
+        podeEncerrarContrato,
+      }).map((key) => ({
         key,
-        label: LABELS[key],
+        label:
+          key === "cancelar" && orcamento.status === "aprovado"
+            ? "Encerrar contrato"
+            : LABELS[key],
         danger: key === "cancelar",
         onClick: handlers[key],
       })),
-    [handlers, orcamento.status]
+    [handlers, orcamento.status, podeEncerrarContrato]
   );
 
   useEffect(() => {

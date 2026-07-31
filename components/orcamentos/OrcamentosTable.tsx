@@ -15,6 +15,7 @@ interface OrcamentosTableProps {
   orcamentos: OrcamentoRecord[];
   loading: boolean;
   error: string | null;
+  podeEncerrarContrato?: boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
@@ -26,6 +27,7 @@ export function OrcamentosTable({
   orcamentos,
   loading,
   error,
+  podeEncerrarContrato = false,
   onVisualizar,
   onEditar,
   onGerarPdf,
@@ -103,6 +105,7 @@ export function OrcamentosTable({
                     <td className="text-center">
                       <OrcamentoRowActionsMenu
                         orcamento={orcamento}
+                        podeEncerrarContrato={podeEncerrarContrato}
                         onEditar={onEditar}
                         onGerarPdf={onGerarPdf}
                         onCancelar={onCancelar}

@@ -5,6 +5,7 @@ import {
   buscarContratoPorOrcamentoId,
   encerrarContrato,
 } from "@/services/cliente-contrato.service";
+import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
 
 export type DestinoAgendamentosFuturos = "manter" | "cancelar";
 
@@ -97,6 +98,8 @@ export async function encerrarContratoDeOrcamento(params: {
   contrato: ClienteContratoRecord;
   futurosCancelados: number;
 }> {
+  await assertPodeEncerrarContrato();
+
   const motivo = params.motivo.trim();
   if (!motivo) {
     throw new Error("Informe o motivo do encerramento.");

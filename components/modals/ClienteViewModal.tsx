@@ -95,6 +95,7 @@ export function ClienteViewModal({
     saving,
     encerrarTarget,
     encerrarSaving,
+    podeEncerrarContrato,
     handleNovoContrato,
     handleEditarContrato,
     handleSave,
@@ -350,13 +351,15 @@ export function ClienteViewModal({
                       >
                         Editar contrato
                       </button>
-                      <button
-                        type="button"
-                        className="btn !px-4 !py-2 text-xs"
-                        onClick={() => handleEncerrar(contratoAtual)}
-                      >
-                        Encerrar contrato
-                      </button>
+                      {podeEncerrarContrato ? (
+                        <button
+                          type="button"
+                          className="btn !px-4 !py-2 text-xs"
+                          onClick={() => handleEncerrar(contratoAtual)}
+                        >
+                          Encerrar contrato
+                        </button>
+                      ) : null}
                     </>
                   ) : null}
                 </div>
@@ -371,6 +374,7 @@ export function ClienteViewModal({
                 <ClienteContratosHistoricoTable
                   contratos={historico}
                   loading={loading}
+                  podeEncerrarContrato={podeEncerrarContrato}
                   onEditar={handleEditarContrato}
                   onEncerrar={handleEncerrar}
                 />

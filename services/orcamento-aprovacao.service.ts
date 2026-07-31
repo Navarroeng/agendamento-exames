@@ -21,6 +21,11 @@ import {
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
 import type { ClienteContratoStatus } from "@/lib/types";
+import {
+  CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
+  ORCAMENTO_COM_CONTRATO_USE_ENCERRAR_MSG,
+} from "@/lib/contrato-permissoes";
+import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
 
 const APROVACAO_SELECT = `
   *,
@@ -498,6 +503,24 @@ export async function cancelarOrcamento(params: {
   canceladoPor: string;
 }): Promise<void> {
   const supabase = createClient();
+
+  const { data: contratos, error: contratosError } = await supabase
+    .from("cliente_contratos")
+    .select("id, status, encerrado_em, numero")
+    .eq("orcamento_id", params.id)
+    .not("status", "in", "(encerrado,cancelado)")
+    .limit(1);
+  if (contratosError) throw contratosError;
+
+  if (contratos && contratos.length > 0) {
+    try {
+      await assertPodeEncerrarContrato();
+    } catch {
+      throw new Error(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG);
+    }
+    throw new Error(ORCAMENTO_COM_CONTRATO_USE_ENCERRAR_MSG);
+  }
+
   const { error } = await supabase
     .from("orcamentos")
     .update({

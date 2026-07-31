@@ -34,6 +34,10 @@ import {
   orcamentoPermiteCancelar,
   orcamentoPermiteEditar,
 } from "@/lib/orcamento-acoes";
+import {
+  CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
+  podeEncerrarContrato as usuarioPodeEncerrarContrato,
+} from "@/lib/contrato-permissoes";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
@@ -97,7 +101,8 @@ function focusOrcamentoPrimeiroCampo(): void {
 
 export function useOrcamentosPage() {
   const auditContext = useAuditoriaUsuario();
-  useAuth();
+  const { profile } = useAuth();
+  const podeEncerrarContrato = usuarioPodeEncerrarContrato(profile?.perfil);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -461,13 +466,29 @@ export function useOrcamentosPage() {
         toast.error("Orçamento não encontrado.");
         return;
       }
-      if (!orcamentoPermiteCancelar(orcamento.status)) {
+      if (
+        !orcamentoPermiteCancelar(orcamento.status, {
+          podeEncerrarContrato,
+        })
+      ) {
         toast.error(
           orcamento.status === "cancelado" ||
             orcamento.status === "contrato_encerrado"
             ? "Este orçamento já está encerrado/cancelado."
-            : "Este orçamento não pode ser cancelado."
+            : orcamento.status === "aprovado" && !podeEncerrarContrato
+              ? CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG
+              : "Este orçamento não pode ser cancelado."
         );
+        if (orcamento.status === "aprovado" && !podeEncerrarContrato) {
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.tentativa_encerrar_contrato_sem_permissao,
+            registroId: orcamento.id,
+            registroNome: orcamento.numero,
+            descricao: `Usuário ${auditContext.usuarioNome} tentou encerrar o contrato do orçamento ${orcamento.numero} sem permissão.`,
+          });
+        }
         return;
       }
 
@@ -477,6 +498,18 @@ export function useOrcamentosPage() {
         contrato.status !== "encerrado" &&
         !contrato.encerrado_em
       ) {
+        if (!podeEncerrarContrato) {
+          toast.error(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG);
+          await registrarAuditoria({
+            ...auditContext,
+            modulo: AUDITORIA_MODULOS.orcamentos,
+            acao: AUDITORIA_ACOES.tentativa_encerrar_contrato_sem_permissao,
+            registroId: orcamento.id,
+            registroNome: orcamento.numero,
+            descricao: `Usuário ${auditContext.usuarioNome} tentou encerrar o contrato ${contrato.numero || contrato.id} sem permissão.`,
+          });
+          return;
+        }
         const futuros = await listarAgendamentosFuturosDoContrato(contrato.id);
         setEncerrarContratoTarget({
           orcamento,
@@ -493,7 +526,7 @@ export function useOrcamentosPage() {
     } finally {
       setActionLoading(false);
     }
-  }, []);
+  }, [auditContext, podeEncerrarContrato]);
 
   const closeCancelar = useCallback(() => {
     if (cancelSaving) return;
@@ -536,7 +569,9 @@ export function useOrcamentosPage() {
         refresh();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao cancelar orçamento.");
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao cancelar orçamento."
+        );
       } finally {
         setCancelSaving(false);
       }
@@ -550,6 +585,18 @@ export function useOrcamentosPage() {
       destinoAgendamentosFuturos: DestinoAgendamentosFuturos;
     }) => {
       if (!encerrarContratoTarget) return;
+      if (!podeEncerrarContrato) {
+        toast.error(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG);
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.tentativa_encerrar_contrato_sem_permissao,
+          registroId: encerrarContratoTarget.orcamento.id,
+          registroNome: encerrarContratoTarget.orcamento.numero,
+          descricao: `Usuário ${auditContext.usuarioNome} tentou encerrar o contrato ${encerrarContratoTarget.contratoNumero || encerrarContratoTarget.orcamento.numero} sem permissão.`,
+        });
+        return;
+      }
       setCancelSaving(true);
       try {
         const { orcamento } = encerrarContratoTarget;
@@ -602,7 +649,7 @@ export function useOrcamentosPage() {
         setCancelSaving(false);
       }
     },
-    [auditContext, encerrarContratoTarget, refresh]
+    [auditContext, encerrarContratoTarget, podeEncerrarContrato, refresh]
   );
 
   const closeAprovar = useCallback(() => {
@@ -1336,6 +1383,7 @@ export function useOrcamentosPage() {
     aprovarAprovacao,
     aprovarSaving,
     usuarioNome: auditContext.usuarioNome,
+    podeEncerrarContrato,
     funcionariosPreviewUrl,
     logoPreviewUrl,
     setField,
