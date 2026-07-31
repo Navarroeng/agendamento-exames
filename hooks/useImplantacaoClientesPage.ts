@@ -627,6 +627,7 @@ export function useImplantacaoClientesPage() {
       payload: {
         visita_tecnica_necessaria: boolean;
         visita_tecnica_data: string | null;
+        visita_tecnica_horario: string | null;
         visita_tecnica_endereco: string | null;
         visita_tecnica_observacoes: string | null;
       }
@@ -643,7 +644,7 @@ export function useImplantacaoClientesPage() {
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
           descricao: payload.visita_tecnica_necessaria
-            ? `Visita técnica agendada para ${payload.visita_tecnica_data}.`
+            ? `Visita técnica agendada para ${payload.visita_tecnica_data} às ${payload.visita_tecnica_horario}.`
             : "Visita técnica registrada como não necessária.",
         });
         toast.success("Visita técnica salva. Aba Agendamentos liberada.");

@@ -180,6 +180,7 @@ export async function salvarOrcamentoVisitaTecnica(
   payload: {
     visita_tecnica_necessaria: boolean;
     visita_tecnica_data: string | null;
+    visita_tecnica_horario: string | null;
     visita_tecnica_endereco: string | null;
     visita_tecnica_observacoes: string | null;
   }
@@ -191,6 +192,9 @@ export async function salvarOrcamentoVisitaTecnica(
       visita_tecnica_necessaria: payload.visita_tecnica_necessaria,
       visita_tecnica_data: payload.visita_tecnica_necessaria
         ? payload.visita_tecnica_data
+        : null,
+      visita_tecnica_horario: payload.visita_tecnica_necessaria
+        ? payload.visita_tecnica_horario
         : null,
       visita_tecnica_endereco: payload.visita_tecnica_necessaria
         ? payload.visita_tecnica_endereco

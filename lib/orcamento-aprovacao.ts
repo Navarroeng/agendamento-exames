@@ -88,6 +88,7 @@ export interface OrcamentoAprovacaoRecord {
   possui_logo?: boolean | null;
   visita_tecnica_necessaria?: boolean | null;
   visita_tecnica_data?: string | null;
+  visita_tecnica_horario?: string | null;
   visita_tecnica_endereco?: string | null;
   visita_tecnica_observacoes?: string | null;
   visita_tecnica_salva_em?: string | null;

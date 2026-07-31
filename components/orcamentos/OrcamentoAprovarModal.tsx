@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { RequiredMark } from "@/components/ui/Field";
-import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { formatDateIsoToBR, isValidHorario24 } from "@/lib/agendamento-datetime";
 import { emptyToNull, formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
 import {
   ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS,
@@ -97,6 +97,7 @@ interface OrcamentoAprovarModalProps {
     payload: {
       visita_tecnica_necessaria: boolean;
       visita_tecnica_data: string | null;
+      visita_tecnica_horario: string | null;
       visita_tecnica_endereco: string | null;
       visita_tecnica_observacoes: string | null;
     }
@@ -159,6 +160,7 @@ export function OrcamentoAprovarModal({
   const [possuiLogo, setPossuiLogo] = useState<boolean | null>(null);
   const [visitaNecessaria, setVisitaNecessaria] = useState<boolean | null>(null);
   const [visitaData, setVisitaData] = useState("");
+  const [visitaHorario, setVisitaHorario] = useState("");
   const [visitaEndereco, setVisitaEndereco] = useState("");
   const [visitaObservacoes, setVisitaObservacoes] = useState("");
   const [agendamentosContagem, setAgendamentosContagem] =
@@ -212,6 +214,7 @@ export function OrcamentoAprovarModal({
         : Boolean(aprovacao.visita_tecnica_necessaria)
     );
     setVisitaData(aprovacao?.visita_tecnica_data ?? "");
+    setVisitaHorario(aprovacao?.visita_tecnica_horario ?? "");
     setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
     setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
   }, [open, orcamento, aprovacao, mode, initialTab]);
@@ -250,9 +253,10 @@ export function OrcamentoAprovarModal({
     () =>
       buildMensagemVisitaTecnica({
         data: visitaData,
+        horario: visitaHorario,
         endereco: visitaEndereco,
       }),
-    [visitaData, visitaEndereco]
+    [visitaData, visitaHorario, visitaEndereco]
   );
 
   const updateFormField = useCallback(
@@ -419,6 +423,10 @@ export function OrcamentoAprovarModal({
         toast.error("Informe a data da visita.");
         return;
       }
+      if (!visitaHorario.trim() || !isValidHorario24(visitaHorario)) {
+        toast.error("Informe o horário da visita no formato HH:mm.");
+        return;
+      }
       if (!visitaEndereco.trim()) {
         toast.error("Informe o endereço da visita.");
         return;
@@ -427,6 +435,9 @@ export function OrcamentoAprovarModal({
     await onSalvarVisita(aprovacao.id, {
       visita_tecnica_necessaria: visitaNecessaria,
       visita_tecnica_data: visitaNecessaria ? visitaData || null : null,
+      visita_tecnica_horario: visitaNecessaria
+        ? visitaHorario.trim() || null
+        : null,
       visita_tecnica_endereco: visitaNecessaria
         ? emptyToNull(visitaEndereco)
         : null,
@@ -1089,12 +1100,14 @@ export function OrcamentoAprovarModal({
             <OrcamentoAbaVisitaTecnica
               necessaria={visitaNecessaria}
               data={visitaData}
+              horario={visitaHorario}
               endereco={visitaEndereco}
               observacoes={visitaObservacoes}
               mensagem={mensagemVisita}
               saving={saving}
               onChangeNecessaria={setVisitaNecessaria}
               onChangeData={setVisitaData}
+              onChangeHorario={setVisitaHorario}
               onChangeEndereco={setVisitaEndereco}
               onChangeObservacoes={setVisitaObservacoes}
               onCopiarMensagem={() => void handleCopiarMensagemVisita()}

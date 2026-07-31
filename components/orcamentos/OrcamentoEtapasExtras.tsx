@@ -7,6 +7,7 @@ import {
   IconRefresh,
   IconTrash,
 } from "@/components/ui/icons/OutlineIcons";
+import { maskTime24 } from "@/lib/agendamento-datetime";
 
 interface OrcamentoAbaProcuracaoProps {
   status: "ativa" | "inativa";
@@ -584,12 +585,14 @@ export function OrcamentoAbaLogo({
 interface OrcamentoAbaVisitaProps {
   necessaria: boolean | null;
   data: string;
+  horario: string;
   endereco: string;
   observacoes: string;
   mensagem: string;
   saving: boolean;
   onChangeNecessaria: (value: boolean) => void;
   onChangeData: (value: string) => void;
+  onChangeHorario: (value: string) => void;
   onChangeEndereco: (value: string) => void;
   onChangeObservacoes: (value: string) => void;
   onCopiarMensagem: () => void;
@@ -599,12 +602,14 @@ interface OrcamentoAbaVisitaProps {
 export function OrcamentoAbaVisitaTecnica({
   necessaria,
   data,
+  horario,
   endereco,
   observacoes,
   mensagem,
   saving,
   onChangeNecessaria,
   onChangeData,
+  onChangeHorario,
   onChangeEndereco,
   onChangeObservacoes,
   onCopiarMensagem,
@@ -653,6 +658,22 @@ export function OrcamentoAbaVisitaTecnica({
                 value={data}
                 disabled={saving}
                 onChange={(e) => onChangeData(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-navy">
+                Horário da visita <RequiredMark />
+              </span>
+              <input
+                type="text"
+                className="field-input"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="HH:mm"
+                maxLength={5}
+                value={horario}
+                disabled={saving}
+                onChange={(e) => onChangeHorario(maskTime24(e.target.value))}
               />
             </label>
             <label className="block md:col-span-2">

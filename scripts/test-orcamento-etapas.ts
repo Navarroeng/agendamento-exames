@@ -86,9 +86,12 @@ assert.equal(
 
 const msg = buildMensagemVisitaTecnica({
   data: "2026-08-10",
+  horario: "09:00",
   endereco: "Rua A, 100",
 });
-assert.match(msg, /Navarro Engenharia/);
+assert.match(msg, /Navarro Engenharia de Segurança e Medicina Ocupacional/);
 assert.match(msg, /Rua A, 100/);
+assert.match(msg, /às 09:00/);
+assert.match(msg, /Pedro Navarro/);
 
 console.log("test-orcamento-etapas: OK");
