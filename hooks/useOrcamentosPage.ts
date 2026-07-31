@@ -13,6 +13,9 @@ import { emptyToNull, parseMoney } from "@/lib/money";
 import {
   buildAprovacaoDiffs,
   buildAprovacaoInsertPayload,
+  buildCondicoesComerciaisFromForm,
+  formatCondicaoAprovada,
+  formatPagamentoFromCondicoes,
   type OrcamentoAprovacaoFormValues,
   type OrcamentoAprovacaoRecord,
 } from "@/lib/orcamento-aprovacao";
@@ -49,8 +52,10 @@ import {
 import {
   atualizarAcompanhamentoDocumentalContrato,
   atualizarAcompanhamentoFinanceiro,
+  atualizarCondicoesAprovadas,
   buscarAprovacaoPorOrcamentoId,
   cancelarOrcamento,
+  listarHistoricoCondicoesAprovadas,
   salvarAprovacaoOrcamento,
 } from "@/services/orcamento-aprovacao.service";
 import { buscarContratoPorOrcamentoId } from "@/services/cliente-contrato.service";
@@ -742,6 +747,65 @@ export function useOrcamentosPage() {
     [aprovarOrcamento, auditContext, refresh]
   );
 
+  const handleAtualizarCondicoesAprovadas = useCallback(
+    async (formValues: OrcamentoAprovacaoFormValues) => {
+      if (!aprovarOrcamento || !aprovarAprovacao) return;
+      setAprovarSaving(true);
+      try {
+        const before = aprovarAprovacao;
+        const payload = buildCondicoesComerciaisFromForm(formValues, parseMoney);
+        const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
+          aprovarAprovacao.id,
+          payload,
+          auditContext.usuarioNome
+        );
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao: `${auditContext.usuarioNome} alterou as condições finais aprovadas do orçamento ${aprovarOrcamento.numero}.`,
+          dadosAntes: {
+            quantidade_colaboradores: before.quantidade_colaboradores,
+            valor_final: before.valor_final,
+            pagamento: formatCondicaoAprovada(before),
+          },
+          dadosDepois: {
+            quantidade_colaboradores: payload.quantidade_colaboradores,
+            valor_final: payload.valor_final,
+            pagamento: formatPagamentoFromCondicoes(payload),
+            historico_id: historico.id,
+          },
+        });
+
+        setAprovarAprovacao(saved);
+        toast.success(
+          "Condições aprovadas atualizadas. Financeiro, Contrato e Clientes sincronizados."
+        );
+        refresh();
+        refreshClientes();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao atualizar condições aprovadas."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarAprovacao, aprovarOrcamento, auditContext, refresh, refreshClientes]
+  );
+
+  const handleListarHistoricoCondicoes = useCallback(
+    async (aprovacaoId: string) => listarHistoricoCondicoesAprovadas(aprovacaoId),
+    []
+  );
+
   const handleSalvarContrato = useCallback(
     async (
       aprovacaoId: string,
@@ -1298,6 +1362,8 @@ export function useOrcamentosPage() {
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,
+    handleAtualizarCondicoesAprovadas,
+    handleListarHistoricoCondicoes,
     handleSalvarContrato,
     handleSalvarFinanceiro,
     handleSalvarProcuracao,

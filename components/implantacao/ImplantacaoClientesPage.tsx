@@ -32,6 +32,8 @@ export function ImplantacaoClientesPage() {
     handleContinuar,
     closeModal,
     handleSalvarAprovacao,
+    handleAtualizarCondicoesAprovadas,
+    handleListarHistoricoCondicoes,
     handleSalvarContrato,
     handleSalvarFinanceiro,
     handleSalvarProcuracao,
@@ -90,6 +92,8 @@ export function ImplantacaoClientesPage() {
         logoPreviewUrl={logoPreviewUrl}
         onClose={closeModal}
         onSalvarAprovacao={handleSalvarAprovacao}
+        onAtualizarCondicoesAprovadas={handleAtualizarCondicoesAprovadas}
+        onListarHistoricoCondicoes={handleListarHistoricoCondicoes}
         onSalvarContrato={handleSalvarContrato}
         onSalvarFinanceiro={handleSalvarFinanceiro}
         onSalvarProcuracao={handleSalvarProcuracao}

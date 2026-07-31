@@ -1,10 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
+  OrcamentoAprovacaoCondicoesHistoricoRecord,
   OrcamentoAprovacaoInsertPayload,
   OrcamentoAprovacaoRecord,
+  OrcamentoCondicoesComerciaisPayload,
   OrcamentoContratoDocumentalUpdatePayload,
   OrcamentoContratoUpdatePayload,
   OrcamentoFinanceiroUpdatePayload,
+} from "@/lib/orcamento-aprovacao";
+import {
+  condicoesComerciaisMudaram,
+  formatCondicaoAprovada,
+  formatPagamentoFromCondicoes,
 } from "@/lib/orcamento-aprovacao";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 import {
@@ -249,6 +256,133 @@ export async function salvarAprovacaoOrcamento(
   }
 
   return { aprovacao, integracao };
+}
+
+/**
+ * Atualiza as condições finais já aprovadas, sincroniza o contrato do cliente
+ * e registra histórico append-only.
+ */
+export async function atualizarCondicoesAprovadas(
+  aprovacaoId: string,
+  payload: OrcamentoCondicoesComerciaisPayload,
+  alteradoPor: string
+): Promise<{
+  aprovacao: OrcamentoAprovacaoRecord;
+  historico: OrcamentoAprovacaoCondicoesHistoricoRecord;
+}> {
+  const supabase = createClient();
+  const usuario = alteradoPor.trim();
+  if (!usuario) {
+    throw new Error("Informe o usuário responsável pela alteração.");
+  }
+  if (payload.quantidade_colaboradores < 1) {
+    throw new Error("Informe a quantidade de colaboradores.");
+  }
+  if (payload.valor_final <= 0) {
+    throw new Error("Informe o valor total fechado.");
+  }
+
+  const { data: beforeRaw, error: beforeError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(APROVACAO_SELECT)
+    .eq("id", aprovacaoId)
+    .single();
+  if (beforeError) throw beforeError;
+
+  const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+  if (!condicoesComerciaisMudaram(before, payload)) {
+    throw new Error("Nenhuma alteração nas condições aprovadas.");
+  }
+
+  const { data: updatedRaw, error: updateError } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      quantidade_colaboradores: payload.quantidade_colaboradores,
+      valor_final: payload.valor_final,
+      condicao_pagamento: payload.condicao_pagamento,
+      quantidade_parcelas: payload.quantidade_parcelas,
+      valor_parcela: payload.valor_parcela,
+      desconto_percentual: payload.desconto_percentual,
+      valor_avista: payload.valor_avista,
+      observacoes: payload.observacoes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", aprovacaoId)
+    .select(APROVACAO_SELECT)
+    .single();
+  if (updateError) throw updateError;
+
+  const aprovacao = sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord);
+
+  const { data: contratos, error: findContratosError } = await supabase
+    .from("cliente_contratos")
+    .select("id")
+    .eq("orcamento_id", aprovacao.orcamento_id)
+    .not("status", "in", "(encerrado,cancelado)");
+  if (findContratosError) {
+    throw new Error(
+      `Falha ao localizar contrato para atualizar condições: ${findContratosError.message}`
+    );
+  }
+  if (!contratos?.length) {
+    throw new Error(
+      "Contrato do cliente não encontrado para sincronizar as condições aprovadas."
+    );
+  }
+
+  for (const row of contratos) {
+    const { error: syncError } = await supabase
+      .from("cliente_contratos")
+      .update({
+        quantidade_colaboradores: payload.quantidade_colaboradores,
+        valor_contrato: payload.valor_final,
+        condicao_pagamento: payload.condicao_pagamento,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    if (syncError) {
+      throw new Error(
+        `Falha ao sincronizar condições no contrato: ${syncError.message}`
+      );
+    }
+  }
+
+  const { data: historicoRaw, error: historicoError } = await supabase
+    .from("orcamento_aprovacao_condicoes_historico")
+    .insert({
+      aprovacao_id: aprovacao.id,
+      orcamento_id: aprovacao.orcamento_id,
+      alterado_por: usuario,
+      quantidade_anterior: Number(before.quantidade_colaboradores) || 0,
+      quantidade_nova: payload.quantidade_colaboradores,
+      valor_anterior: Number(before.valor_final) || 0,
+      valor_novo: payload.valor_final,
+      pagamento_anterior: formatCondicaoAprovada(before),
+      pagamento_novo: formatPagamentoFromCondicoes(payload),
+      observacoes_anteriores: before.observacoes,
+      observacoes_novas: payload.observacoes,
+    })
+    .select("*")
+    .single();
+  if (historicoError) throw historicoError;
+
+  return {
+    aprovacao,
+    historico: historicoRaw as OrcamentoAprovacaoCondicoesHistoricoRecord,
+  };
+}
+
+export async function listarHistoricoCondicoesAprovadas(
+  aprovacaoId: string
+): Promise<OrcamentoAprovacaoCondicoesHistoricoRecord[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_aprovacao_condicoes_historico")
+    .select("*")
+    .eq("aprovacao_id", aprovacaoId)
+    .order("alterado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as OrcamentoAprovacaoCondicoesHistoricoRecord[];
 }
 
 /** Salva apenas o acompanhamento documental (aba Contrato). */

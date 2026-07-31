@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { RequiredMark } from "@/components/ui/Field";
 import { formatDateIsoToBR, isValidHorario24 } from "@/lib/agendamento-datetime";
 import { emptyToNull, formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
+import { formatDateTimeBR } from "@/lib/format-datetime";
 import {
   ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS,
   ORCAMENTO_FINANCEIRO_ANDAMENTO_LABELS,
@@ -17,6 +18,7 @@ import {
   formatCondicaoAprovada,
   resolveContratoDocumentalAndamento,
   resolveFinanceiroAndamento,
+  type OrcamentoAprovacaoCondicoesHistoricoRecord,
   type OrcamentoAprovacaoFormValues,
   type OrcamentoAprovacaoRecord,
   type OrcamentoContratoDocumentalUpdatePayload,
@@ -66,6 +68,12 @@ interface OrcamentoAprovarModalProps {
   logoPreviewUrl?: string | null;
   onClose: () => void;
   onSalvarAprovacao: (form: OrcamentoAprovacaoFormValues) => Promise<void>;
+  onAtualizarCondicoesAprovadas: (
+    form: OrcamentoAprovacaoFormValues
+  ) => Promise<void>;
+  onListarHistoricoCondicoes: (
+    aprovacaoId: string
+  ) => Promise<OrcamentoAprovacaoCondicoesHistoricoRecord[]>;
   onSalvarContrato: (
     aprovacaoId: string,
     payload: OrcamentoContratoDocumentalUpdatePayload
@@ -123,6 +131,8 @@ export function OrcamentoAprovarModal({
   logoPreviewUrl = null,
   onClose,
   onSalvarAprovacao,
+  onAtualizarCondicoesAprovadas,
+  onListarHistoricoCondicoes,
   onSalvarContrato,
   onSalvarFinanceiro,
   onSalvarProcuracao,
@@ -139,6 +149,10 @@ export function OrcamentoAprovarModal({
   const [tab, setTab] = useState<TabId>("resumo");
   const [form, setForm] = useState<OrcamentoAprovacaoFormValues | null>(null);
   const [showDiffConfirm, setShowDiffConfirm] = useState(false);
+  const [editandoCondicoes, setEditandoCondicoes] = useState(false);
+  const [historicoCondicoes, setHistoricoCondicoes] = useState<
+    OrcamentoAprovacaoCondicoesHistoricoRecord[]
+  >([]);
 
   const [contratoEnviado, setContratoEnviado] = useState(false);
   const [contratoEnviadoEm, setContratoEnviadoEm] = useState("");
@@ -181,6 +195,7 @@ export function OrcamentoAprovarModal({
         : "resumo";
     setTab(tabInicial);
     setShowDiffConfirm(false);
+    setEditandoCondicoes(false);
     setForm(
       aprovacao
         ? buildAprovacaoFormFromRecord(orcamento, aprovacao)
@@ -218,6 +233,26 @@ export function OrcamentoAprovarModal({
     setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
     setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
   }, [open, orcamento, aprovacao, mode, initialTab]);
+
+  useEffect(() => {
+    if (!open || !aprovacao?.id) {
+      setHistoricoCondicoes([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await onListarHistoricoCondicoes(aprovacao.id);
+        if (!cancelled) setHistoricoCondicoes(rows);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setHistoricoCondicoes([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, aprovacao?.id, onListarHistoricoCondicoes]);
 
   useEffect(() => {
     if (!open) return;
@@ -268,6 +303,55 @@ export function OrcamentoAprovarModal({
     },
     []
   );
+
+  function iniciarEdicaoCondicoes() {
+    if (!orcamento || !aprovacao) return;
+    setForm({
+      ...buildAprovacaoFormFromRecord(orcamento, aprovacao),
+      condicoes_iguais: false,
+    });
+    setEditandoCondicoes(true);
+  }
+
+  function cancelarEdicaoCondicoes() {
+    if (!orcamento || !aprovacao) return;
+    setForm(buildAprovacaoFormFromRecord(orcamento, aprovacao));
+    setEditandoCondicoes(false);
+  }
+
+  async function handleSalvarCondicoesEditadasClick() {
+    if (!form || !aprovacao) return;
+    if (
+      !form.quantidade_colaboradores.trim() ||
+      Number(form.quantidade_colaboradores) < 1
+    ) {
+      toast.error("Informe a quantidade de colaboradores.");
+      return;
+    }
+    if (parseMoney(form.valor_final) <= 0) {
+      toast.error("Informe o valor total fechado.");
+      return;
+    }
+    if (
+      form.forma_pagamento === "parcelado" &&
+      (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
+    ) {
+      toast.error("Informe a quantidade de parcelas.");
+      return;
+    }
+
+    await onAtualizarCondicoesAprovadas({
+      ...form,
+      condicoes_iguais: false,
+    });
+    setEditandoCondicoes(false);
+    try {
+      const rows = await onListarHistoricoCondicoes(aprovacao.id);
+      setHistoricoCondicoes(rows);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function handleSalvarAprovacaoClick() {
     if (!form || !orcamento) return;
@@ -603,38 +687,162 @@ export function OrcamentoAprovarModal({
 
               {aprovacao ? (
                 <section className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
-                  <div className="border-b border-[#e0eaff] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e0eaff] px-4 py-3">
                     <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
                       Condições finais aprovadas
                     </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                    {aprovadoConformeOriginal ? (
-                      <div className="sm:col-span-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-[12px] font-semibold text-[#166534]">
-                        Aprovado conforme o orçamento original.
-                      </div>
+                    {!editandoCondicoes ? (
+                      <button
+                        type="button"
+                        className="btn justify-center text-[12px] sm:w-auto"
+                        disabled={saving}
+                        onClick={iniciarEdicaoCondicoes}
+                      >
+                        ✏️ Editar condições aprovadas
+                      </button>
                     ) : null}
-                    <ResumoItem
-                      label="Quantidade de colaboradores"
-                      value={String(aprovacao.quantidade_colaboradores)}
-                    />
-                    <ResumoItem
-                      label="Valor total fechado"
-                      value={formatCurrency(Number(aprovacao.valor_final))}
-                    />
-                    <ResumoItem
-                      label="Pagamento"
-                      value={formatCondicaoAprovada(aprovacao)}
-                    />
-                    {aprovacao.observacoes ? (
-                      <div className="sm:col-span-2">
+                  </div>
+                  {editandoCondicoes && form ? (
+                    <div className="space-y-4 p-4 sm:p-5">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <Field label="Quantidade de colaboradores" required>
+                          <input
+                            className="field-input"
+                            value={form.quantidade_colaboradores}
+                            disabled={saving}
+                            onChange={(e) =>
+                              updateFormField(
+                                "quantidade_colaboradores",
+                                e.target.value.replace(/\D/g, "")
+                              )
+                            }
+                          />
+                        </Field>
+                        <Field label="Valor total fechado" required>
+                          <input
+                            className="field-input"
+                            value={form.valor_final}
+                            disabled={saving}
+                            onChange={(e) =>
+                              updateFormField(
+                                "valor_final",
+                                maskMoneyInput(e.target.value)
+                              )
+                            }
+                          />
+                        </Field>
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-xs font-bold text-navy">
+                          Forma de pagamento <RequiredMark />
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                            <input
+                              type="radio"
+                              name="forma-pagamento-edit"
+                              className="h-4 w-4 accent-brand-blue"
+                              checked={form.forma_pagamento === "avista"}
+                              disabled={saving}
+                              onChange={() =>
+                                updateFormField("forma_pagamento", "avista")
+                              }
+                            />
+                            À vista
+                          </label>
+                          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-[#334155]">
+                            <input
+                              type="radio"
+                              name="forma-pagamento-edit"
+                              className="h-4 w-4 accent-brand-blue"
+                              checked={form.forma_pagamento === "parcelado"}
+                              disabled={saving}
+                              onChange={() =>
+                                updateFormField("forma_pagamento", "parcelado")
+                              }
+                            />
+                            Parcelado
+                          </label>
+                        </div>
+                      </div>
+
+                      {form.forma_pagamento === "avista" ? (
                         <ResumoItem
-                          label="Observações da negociação"
-                          value={aprovacao.observacoes}
+                          label="Valor final fechado"
+                          value={
+                            valorFinalEditado > 0
+                              ? formatCurrency(valorFinalEditado)
+                              : "—"
+                          }
                         />
-                      </div>
-                    ) : null}
-                  </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <Field label="Quantidade de parcelas" required>
+                            <input
+                              className="field-input"
+                              value={form.quantidade_parcelas}
+                              disabled={saving}
+                              onChange={(e) =>
+                                updateFormField(
+                                  "quantidade_parcelas",
+                                  e.target.value.replace(/\D/g, "")
+                                )
+                              }
+                            />
+                          </Field>
+                          <ResumoItem
+                            label="Valor de cada parcela"
+                            value={textoParcelasCalculado}
+                          />
+                        </div>
+                      )}
+
+                      <Field label="Observações da negociação">
+                        <textarea
+                          className="field-input min-h-[72px] resize-y"
+                          value={form.observacoes}
+                          disabled={saving}
+                          onChange={(e) =>
+                            updateFormField("observacoes", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <p className="text-[11px] text-[#64748b]">
+                        O resumo do orçamento original não será alterado. Ao
+                        salvar, Financeiro, Contrato, Implantação, Clientes e
+                        Histórico de Contratos passam a usar os novos valores.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                      {aprovadoConformeOriginal ? (
+                        <div className="sm:col-span-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-[12px] font-semibold text-[#166534]">
+                          Aprovado conforme o orçamento original.
+                        </div>
+                      ) : null}
+                      <ResumoItem
+                        label="Quantidade de colaboradores"
+                        value={String(aprovacao.quantidade_colaboradores)}
+                      />
+                      <ResumoItem
+                        label="Valor total fechado"
+                        value={formatCurrency(Number(aprovacao.valor_final))}
+                      />
+                      <ResumoItem
+                        label="Pagamento"
+                        value={formatCondicaoAprovada(aprovacao)}
+                      />
+                      {aprovacao.observacoes ? (
+                        <div className="sm:col-span-2">
+                          <ResumoItem
+                            label="Observações da negociação"
+                            value={aprovacao.observacoes}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </section>
               ) : (
                 <>
@@ -833,6 +1041,48 @@ export function OrcamentoAprovarModal({
                   ) : null}
                 </>
               )}
+
+              {aprovacao && historicoCondicoes.length > 0 ? (
+                <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
+                  <div className="border-b border-[#eef2f7] px-4 py-3">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+                      Histórico de alterações das condições
+                    </p>
+                    <p className="mt-1 text-[11px] text-[#64748b]">
+                      Registro permanente para auditoria. Não pode ser apagado.
+                    </p>
+                  </div>
+                  <div className="divide-y divide-[#eef2f7]">
+                    {historicoCondicoes.map((row) => (
+                      <div key={row.id} className="space-y-2 px-4 py-3 text-[12px]">
+                        <p className="font-semibold text-navy">
+                          {formatDateTimeBR(row.alterado_em)} · {row.alterado_por}
+                        </p>
+                        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          <p className="text-[#64748b]">
+                            Quantidade: {row.quantidade_anterior} →{" "}
+                            <span className="font-semibold text-[#334155]">
+                              {row.quantidade_nova}
+                            </span>
+                          </p>
+                          <p className="text-[#64748b]">
+                            Valor: {formatCurrency(Number(row.valor_anterior))} →{" "}
+                            <span className="font-semibold text-[#334155]">
+                              {formatCurrency(Number(row.valor_novo))}
+                            </span>
+                          </p>
+                          <p className="text-[#64748b] sm:col-span-2">
+                            Pagamento: {row.pagamento_anterior} →{" "}
+                            <span className="font-semibold text-[#334155]">
+                              {row.pagamento_novo}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
             </div>
           ) : null}
 
@@ -1141,7 +1391,32 @@ export function OrcamentoAprovarModal({
           >
             Fechar
           </button>
-          {tab === "aprovado" && !aprovadoLocked && !consultaMode ? (
+          {tab === "aprovado" &&
+          aprovacao &&
+          editandoCondicoes ? (
+            <>
+              <button
+                type="button"
+                className="btn justify-center sm:w-auto"
+                onClick={cancelarEdicaoCondicoes}
+                disabled={saving}
+              >
+                Cancelar edição
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary justify-center sm:w-auto"
+                onClick={() => void handleSalvarCondicoesEditadasClick()}
+                disabled={saving}
+              >
+                {saving ? "Salvando..." : "Salvar alterações"}
+              </button>
+            </>
+          ) : null}
+          {tab === "aprovado" &&
+          !aprovadoLocked &&
+          !consultaMode &&
+          !editandoCondicoes ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
@@ -1159,7 +1434,8 @@ export function OrcamentoAprovarModal({
           showDiffConfirm &&
           !form.condicoes_iguais &&
           !aprovadoLocked &&
-          !consultaMode ? (
+          !consultaMode &&
+          !editandoCondicoes ? (
             <button
               type="button"
               className="btn justify-center sm:w-auto"

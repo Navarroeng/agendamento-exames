@@ -21,6 +21,12 @@ import type {
   OrcamentoContratoDocumentalUpdatePayload,
   OrcamentoFinanceiroUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
+import {
+  buildCondicoesComerciaisFromForm,
+  formatCondicaoAprovada,
+  formatPagamentoFromCondicoes,
+} from "@/lib/orcamento-aprovacao";
+import { parseMoney } from "@/lib/money";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import type { OrcamentoEtapaId } from "@/lib/orcamento-etapas";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -28,7 +34,9 @@ import { listarProcessosImplantacao } from "@/services/implantacao-clientes.serv
 import {
   atualizarAcompanhamentoDocumentalContrato,
   atualizarAcompanhamentoFinanceiro,
+  atualizarCondicoesAprovadas,
   buscarAprovacaoPorOrcamentoId,
+  listarHistoricoCondicoesAprovadas,
 } from "@/services/orcamento-aprovacao.service";
 import {
   obterUrlOrcamentoOnboarding,
@@ -209,6 +217,64 @@ export function useImplantacaoClientesPage() {
     async (_form: OrcamentoAprovacaoFormValues) => {
       toast.error(ORCAMENTO_JA_APROVADO_MSG);
     },
+    []
+  );
+
+  const handleAtualizarCondicoesAprovadas = useCallback(
+    async (formValues: OrcamentoAprovacaoFormValues) => {
+      if (!modalOrcamento || !modalAprovacao) return;
+      setModalSaving(true);
+      try {
+        const before = modalAprovacao;
+        const payload = buildCondicoesComerciaisFromForm(formValues, parseMoney);
+        const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
+          modalAprovacao.id,
+          payload,
+          auditContext.usuarioNome
+        );
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao: AUDITORIA_ACOES.edicao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao: `${auditContext.usuarioNome} alterou as condições finais aprovadas do orçamento ${modalOrcamento.numero}.`,
+          dadosAntes: {
+            quantidade_colaboradores: before.quantidade_colaboradores,
+            valor_final: before.valor_final,
+            pagamento: formatCondicaoAprovada(before),
+          },
+          dadosDepois: {
+            quantidade_colaboradores: payload.quantidade_colaboradores,
+            valor_final: payload.valor_final,
+            pagamento: formatPagamentoFromCondicoes(payload),
+            historico_id: historico.id,
+          },
+        });
+
+        setModalAprovacao(saved);
+        toast.success(
+          "Condições aprovadas atualizadas. Financeiro, Contrato e Clientes sincronizados."
+        );
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao atualizar condições aprovadas."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalAprovacao, modalOrcamento, refresh]
+  );
+
+  const handleListarHistoricoCondicoes = useCallback(
+    async (aprovacaoId: string) => listarHistoricoCondicoesAprovadas(aprovacaoId),
     []
   );
 
@@ -695,6 +761,8 @@ export function useImplantacaoClientesPage() {
     handleContinuar,
     closeModal,
     handleSalvarAprovacao,
+    handleAtualizarCondicoesAprovadas,
+    handleListarHistoricoCondicoes,
     handleSalvarContrato,
     handleSalvarFinanceiro,
     handleSalvarProcuracao,

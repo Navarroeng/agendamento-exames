@@ -127,6 +127,35 @@ export interface OrcamentoAprovacaoInsertPayload {
   }>;
 }
 
+/** Campos comerciais das condições finais (sem itens / aprovado_por). */
+export type OrcamentoCondicoesComerciaisPayload = Pick<
+  OrcamentoAprovacaoInsertPayload,
+  | "quantidade_colaboradores"
+  | "valor_final"
+  | "condicao_pagamento"
+  | "quantidade_parcelas"
+  | "valor_parcela"
+  | "desconto_percentual"
+  | "valor_avista"
+  | "observacoes"
+>;
+
+export interface OrcamentoAprovacaoCondicoesHistoricoRecord {
+  id: string;
+  aprovacao_id: string;
+  orcamento_id: string;
+  alterado_em: string;
+  alterado_por: string;
+  quantidade_anterior: number;
+  quantidade_nova: number;
+  valor_anterior: number;
+  valor_novo: number;
+  pagamento_anterior: string;
+  pagamento_novo: string;
+  observacoes_anteriores: string | null;
+  observacoes_novas: string | null;
+}
+
 export interface OrcamentoContratoDocumentalUpdatePayload {
   contrato_enviado: boolean;
   contrato_enviado_em: string | null;
@@ -463,4 +492,83 @@ export function formatCondicaoAprovada(
     )}`;
   }
   return aprovacao.condicao_pagamento?.trim() || "—";
+}
+
+/**
+ * Monta payload comercial a partir do formulário (sempre valores editados;
+ * não usa o atalho "conforme original").
+ */
+export function buildCondicoesComerciaisFromForm(
+  form: OrcamentoAprovacaoFormValues,
+  parseMoneyFn: (value: string) => number
+): OrcamentoCondicoesComerciaisPayload {
+  const quantidade = Number(form.quantidade_colaboradores) || 1;
+  const valorFinal = parseMoneyFn(form.valor_final);
+
+  if (form.forma_pagamento === "avista") {
+    return {
+      quantidade_colaboradores: quantidade,
+      valor_final: valorFinal,
+      condicao_pagamento: "À vista",
+      quantidade_parcelas: null,
+      valor_parcela: null,
+      desconto_percentual: 0,
+      valor_avista: valorFinal > 0 ? valorFinal : null,
+      observacoes: form.observacoes.trim() || null,
+    };
+  }
+
+  const parcelas = Math.max(1, Number(form.quantidade_parcelas) || 1);
+  const valorParcela = calcValorParcela(valorFinal, parcelas);
+  const textoParcelado = `${parcelas}x de ${formatCurrency(valorParcela)}`;
+
+  return {
+    quantidade_colaboradores: quantidade,
+    valor_final: valorFinal,
+    condicao_pagamento: textoParcelado,
+    quantidade_parcelas: parcelas,
+    valor_parcela: valorParcela,
+    desconto_percentual: 0,
+    valor_avista: null,
+    observacoes: form.observacoes.trim() || null,
+  };
+}
+
+export function formatPagamentoFromCondicoes(
+  payload: Pick<
+    OrcamentoCondicoesComerciaisPayload,
+    | "condicao_pagamento"
+    | "quantidade_parcelas"
+    | "valor_parcela"
+    | "valor_avista"
+    | "valor_final"
+  >
+): string {
+  return formatCondicaoAprovada({
+    quantidade_parcelas: payload.quantidade_parcelas,
+    valor_parcela: payload.valor_parcela,
+    valor_avista: payload.valor_avista,
+    valor_final: payload.valor_final,
+    condicao_pagamento: payload.condicao_pagamento,
+  } as OrcamentoAprovacaoRecord);
+}
+
+export function condicoesComerciaisMudaram(
+  before: OrcamentoAprovacaoRecord,
+  after: OrcamentoCondicoesComerciaisPayload
+): boolean {
+  if (Number(before.quantidade_colaboradores) !== after.quantidade_colaboradores) {
+    return true;
+  }
+  if (Math.abs(Number(before.valor_final) - after.valor_final) > 0.009) {
+    return true;
+  }
+  if (
+    formatCondicaoAprovada(before) !== formatPagamentoFromCondicoes(after)
+  ) {
+    return true;
+  }
+  const obsAntes = (before.observacoes ?? "").trim();
+  const obsDepois = (after.observacoes ?? "").trim();
+  return obsAntes !== obsDepois;
 }

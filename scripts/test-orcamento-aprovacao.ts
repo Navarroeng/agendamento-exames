@@ -5,8 +5,13 @@ import {
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoInsertPayload,
+  buildCondicoesComerciaisFromForm,
   buildResumoComercialOrcamento,
+  condicoesComerciaisMudaram,
+  formatCondicaoAprovada,
+  formatPagamentoFromCondicoes,
   resolveContratoAndamento,
+  type OrcamentoAprovacaoRecord,
 } from "../lib/orcamento-aprovacao";
 import { parseMoney } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
@@ -125,6 +130,46 @@ assert.equal(
     boleto_vencimento: null,
   }),
   "enviado"
+);
+
+const condicoesEdit = buildCondicoesComerciaisFromForm(
+  {
+    ...formAlterado,
+    forma_pagamento: "avista",
+    valor_final: "2.100,00",
+    quantidade_colaboradores: "12",
+    observacoes: "Ajuste comercial",
+  },
+  parseMoney
+);
+assert.equal(condicoesEdit.quantidade_colaboradores, 12);
+assert.equal(condicoesEdit.valor_final, 2100);
+assert.equal(condicoesEdit.condicao_pagamento, "À vista");
+assert.equal(formatPagamentoFromCondicoes(condicoesEdit), "À vista · R$ 2.100,00");
+
+const aprovacaoAntes = {
+  quantidade_colaboradores: 10,
+  valor_final: 2000,
+  valor_avista: 1900,
+  quantidade_parcelas: null,
+  valor_parcela: null,
+  condicao_pagamento: "À vista",
+  observacoes: null,
+} as OrcamentoAprovacaoRecord;
+assert.equal(formatCondicaoAprovada(aprovacaoAntes), "À vista · R$ 1.900,00");
+assert.equal(condicoesComerciaisMudaram(aprovacaoAntes, condicoesEdit), true);
+assert.equal(
+  condicoesComerciaisMudaram(aprovacaoAntes, {
+    quantidade_colaboradores: 10,
+    valor_final: 2000,
+    condicao_pagamento: "À vista",
+    quantidade_parcelas: null,
+    valor_parcela: null,
+    desconto_percentual: 0,
+    valor_avista: 1900,
+    observacoes: null,
+  }),
+  false
 );
 
 console.log("test-orcamento-aprovacao: OK");

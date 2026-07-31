@@ -63,6 +63,8 @@ export function OrcamentosPage() {
     handleOpenAprovar,
     closeAprovar,
     handleSalvarAprovacao,
+    handleAtualizarCondicoesAprovadas,
+    handleListarHistoricoCondicoes,
     handleSalvarContrato,
     handleSalvarFinanceiro,
     handleSalvarProcuracao,
@@ -169,6 +171,8 @@ export function OrcamentosPage() {
         logoPreviewUrl={logoPreviewUrl}
         onClose={closeAprovar}
         onSalvarAprovacao={handleSalvarAprovacao}
+        onAtualizarCondicoesAprovadas={handleAtualizarCondicoesAprovadas}
+        onListarHistoricoCondicoes={handleListarHistoricoCondicoes}
         onSalvarContrato={handleSalvarContrato}
         onSalvarFinanceiro={handleSalvarFinanceiro}
         onSalvarProcuracao={handleSalvarProcuracao}
