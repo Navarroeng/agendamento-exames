@@ -285,10 +285,10 @@ export function ImplantacaoSearchPanel({
                     )
                   }
                 >
-                  <option value="aprovado_em">Data da aprovação (padrão)</option>
+                  <option value="etapa">Etapa atual (padrão)</option>
+                  <option value="aprovado_em">Data da aprovação</option>
                   <option value="prioridade">Prioridade</option>
                   <option value="cliente">Cliente</option>
-                  <option value="etapa">Etapa atual</option>
                   <option value="responsavel">Responsável</option>
                 </select>
               </div>

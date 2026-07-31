@@ -181,7 +181,7 @@ export const EMPTY_IMPLANTACAO_FILTERS: ImplantacaoFilters = {
   aprovadoDe: "",
   aprovadoAte: "",
   andamento: "todos",
-  sort: "aprovado_em",
+  sort: "etapa",
 };
 
 export interface ImplantacaoProcesso {
