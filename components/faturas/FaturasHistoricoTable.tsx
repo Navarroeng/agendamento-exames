@@ -37,7 +37,7 @@ function statusBadge(status: FaturaStatus, variant: FaturaTipo, pago: boolean) {
           reemitida: historicoStatusLabelClinica("cancelada", false),
         }
       : {
-          rascunho: "Rascunho",
+          rascunho: FATURA_MES_STATUS_LABELS.aberta_emissao,
           emitida: "Emitida",
           vencida: "Vencida",
           cancelada: "Cancelada",

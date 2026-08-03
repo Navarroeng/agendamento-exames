@@ -32,7 +32,7 @@ function statusLabel(
   if (status === "vencida") return FATURA_MES_STATUS_LABELS.vencida;
   if (status === "emitida") return "Emitida";
   if (status === "cancelada") return "Cancelada";
-  if (status === "rascunho") return "Rascunho";
+  if (status === "rascunho") return FATURA_MES_STATUS_LABELS.aberta_emissao;
   return "Pré-visualização";
 }
 

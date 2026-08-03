@@ -298,13 +298,13 @@ export function FaturasMesPanel({
                 onChange={(e) => onChange("status", e.target.value)}
               >
                 <option value="">Todos os status</option>
-                {(Object.keys(FATURA_MES_STATUS_LABELS) as FaturaMesStatus[]).map(
-                  (status) => (
+                {(Object.keys(FATURA_MES_STATUS_LABELS) as FaturaMesStatus[])
+                  .filter((status) => status !== "rascunho")
+                  .map((status) => (
                     <option key={status} value={status}>
                       {FATURA_MES_STATUS_LABELS[status]}
                     </option>
-                  )
-                )}
+                  ))}
               </select>
             </Field>
           )}

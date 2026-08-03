@@ -109,6 +109,18 @@ export function FaturasMesRowActions({
     );
   }
 
+  if (fatura && variant === "cliente" && fatura.status === "rascunho") {
+    return (
+      <AbertaEmissaoActionsMenu
+        referenciaNome={row.referenciaNome}
+        emitLabel={EMIT_LABEL.cliente}
+        saving={saving}
+        onVisualizar={() => onVisualizarFatura(fatura.id)}
+        onEmitir={() => onEmitir(row.referenciaNome)}
+      />
+    );
+  }
+
   if (fatura) {
     const faturaComPagamento: FaturaRecord = {
       ...fatura,

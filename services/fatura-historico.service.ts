@@ -12,6 +12,10 @@ import {
 } from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/client";
 import {
+  EMPTY_FATURA_FILTERS,
+  filterAgendamentosFatura,
+} from "@/lib/fatura-filters";
+import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
   FATURA_SEM_ELEGIVEIS_MSG,
   isAgendamentoElegivelFatura,
@@ -21,7 +25,13 @@ import {
   ComprovanteValidationError,
   isComprovantePagamentoDbError,
 } from "@/lib/fatura-comprovante";
+import {
+  buildFaturaItensFromAgendamentos,
+  calcTotalFaturaItens,
+} from "@/lib/fatura-mappers";
+import { mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import { assertFaturaMesDisponivel } from "@/services/duplicidade.service";
+import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import {
   deleteComprovantePagamento,
   uploadComprovantePagamento,
@@ -723,11 +733,119 @@ export async function reabrirConferenciaCustosClinica(
   });
 }
 
+/**
+ * Cancela a emissão de uma fatura de cliente: reabre para emissão (rascunho),
+ * mantém o registro/período/vínculos e recalcula itens pelos agendamentos atuais.
+ * Não exclui e não marca como cancelada.
+ */
+export async function reabrirEmissaoFaturaCliente(
+  id: string,
+  auditOptions?: FaturaAuditOptions
+): Promise<FaturaComItens> {
+  const existing = await buscarFaturaComItens(id);
+  if (!existing) throw new Error("Fatura não encontrada.");
+  if (existing.tipo !== "cliente") {
+    throw new Error("Reabrir emissão disponível apenas para faturas de clientes.");
+  }
+  if (existing.status !== "emitida" && existing.status !== "vencida") {
+    throw new Error(
+      "Somente faturas emitidas (ou vencidas) podem ter a emissão cancelada."
+    );
+  }
+
+  const mesBR = mesReferenciaBRFromFatura(existing);
+  let itens: FaturaItemInsert[] = [];
+  if (mesBR) {
+    const agendamentos = await listarAgendamentosParaFatura();
+    const agsReferencia = filterAgendamentosFatura(agendamentos, {
+      ...EMPTY_FATURA_FILTERS,
+      mesReferencia: mesBR,
+      cliente: existing.referencia_nome,
+    });
+    itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
+  }
+  const valorTotal = calcTotalFaturaItens(itens);
+  const comprovantePath =
+    existing.comprovante_pagamento_path?.trim() || null;
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("faturas")
+    .update({
+      status: "rascunho",
+      data_emissao: null,
+      pago: false,
+      data_pagamento: null,
+      observacao_pagamento: null,
+      comprovante_pagamento_path: null,
+      comprovante_pagamento_nome: null,
+      valor_total: valorTotal,
+      total_exames: itens.length,
+    })
+    .eq("id", id)
+    .eq("tipo", "cliente")
+    .in("status", ["emitida", "vencida"]);
+
+  if (error) throw error;
+
+  const { error: deleteError } = await supabase
+    .from("fatura_itens")
+    .delete()
+    .eq("fatura_id", id);
+
+  if (deleteError) throw deleteError;
+
+  if (itens.length > 0) {
+    const { error: insertError } = await supabase.from("fatura_itens").insert(
+      itens.map((item) => ({
+        ...item,
+        fatura_id: id,
+      }))
+    );
+    if (insertError) throw insertError;
+  }
+
+  if (comprovantePath) {
+    await deleteComprovantePagamento(comprovantePath).catch(() => undefined);
+  }
+
+  const updated = await buscarFaturaComItens(id);
+  if (!updated) throw new Error("Erro ao recarregar fatura reaberta.");
+
+  const usuario =
+    auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+
+  await auditarFatura(auditOptions, {
+    tipo: "cliente",
+    acao: AUDITORIA_ACOES.fatura_emissao_reaberta,
+    registroId: updated.id,
+    registroNome: updated.numero,
+    descricao:
+      `${usuario} cancelou a emissão da fatura ${updated.numero} ` +
+      `(${updated.referencia_nome}) e reabriu para emissão.`,
+  });
+
+  return updated;
+}
+
+/**
+ * Ação "Cancelar" na UI de faturas de clientes (emitida/vencida) = reabrir emissão.
+ * Demais casos (legado) ainda marcam como cancelada.
+ */
 export async function cancelarFatura(
   id: string,
   auditOptions?: FaturaAuditOptions
 ): Promise<void> {
   const existing = await buscarFaturaComItens(id);
+  if (!existing) throw new Error("Fatura não encontrada.");
+
+  if (
+    existing.tipo === "cliente" &&
+    (existing.status === "emitida" || existing.status === "vencida")
+  ) {
+    await reabrirEmissaoFaturaCliente(id, auditOptions);
+    return;
+  }
 
   const supabase = createClient();
   const { error } = await supabase
@@ -738,15 +856,13 @@ export async function cancelarFatura(
 
   if (error) throw error;
 
-  if (existing) {
-    await auditarFatura(auditOptions, {
-      tipo: existing.tipo,
-      acao: AUDITORIA_ACOES.cancelamento,
-      registroId: existing.id,
-      registroNome: existing.numero,
-      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} cancelou a fatura ${existing.numero} (${existing.referencia_nome}).`,
-    });
-  }
+  await auditarFatura(auditOptions, {
+    tipo: existing.tipo,
+    acao: AUDITORIA_ACOES.cancelamento,
+    registroId: existing.id,
+    registroNome: existing.numero,
+    descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} cancelou a fatura ${existing.numero} (${existing.referencia_nome}).`,
+  });
 }
 
 export interface FaturaPagamentoInput {

@@ -125,14 +125,12 @@ export function FaturaRowActionsMenu({
   }
 
   if (
-    fatura.status !== "cancelada" &&
-    !faturaStatusHistoricoReemissao(fatura.status) &&
-    fatura.status !== "necessita_reemissao" &&
+    faturaStatusEmissaoAtiva(fatura.status) &&
     variant === "cliente"
   ) {
     items.push({
       key: "cancelar",
-      label: "Cancelar fatura",
+      label: "Cancelar",
       danger: true,
       onClick: () => onCancelar(fatura.id),
     });

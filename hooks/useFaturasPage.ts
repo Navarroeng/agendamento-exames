@@ -828,23 +828,25 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       if (!fatura) return;
 
       const ok = window.confirm(
-        `Cancelar a fatura ${fatura.numero}? Esta ação não pode ser desfeita.`
+        "Tem certeza que deseja cancelar esta emissão?"
       );
       if (!ok) return;
 
       setSaving(true);
       try {
         await cancelarFatura(id, auditOptions);
-        toast.success("Fatura cancelada.");
+        toast.success("Emissão cancelada. Fatura reaberta para emissão.");
         if (preview?.faturaId === id) {
           setPreview((prev) =>
-            prev ? { ...prev, status: "cancelada" } : null
+            prev ? { ...prev, status: "rascunho" } : null
           );
         }
         await reloadAll();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao cancelar fatura.");
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao cancelar emissão."
+        );
       } finally {
         setSaving(false);
       }

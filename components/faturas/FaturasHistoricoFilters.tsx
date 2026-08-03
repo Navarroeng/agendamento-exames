@@ -69,7 +69,7 @@ export function FaturasHistoricoFilters({
           { value: "pendente", label: HISTORICO_STATUS_FILTER_LABELS_CLINICA.pendente },
         ]
       : [
-          { value: "rascunho", label: "Rascunho" },
+          { value: "rascunho", label: "Aberta para emissão" },
           { value: "emitida", label: "Emitida" },
           { value: "vencida", label: "Vencida" },
           { value: "cancelada", label: "Cancelada" },

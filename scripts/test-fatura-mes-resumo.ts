@@ -237,4 +237,48 @@ assert.deepEqual(
 );
 assert.equal(resumoClinica.resumo.valorPrevisto, 100);
 
+assert.equal(
+  deriveFaturaMesStatus(fatura("rasc", "Empresa R", "2026-06", "rascunho")),
+  "aberta_emissao",
+  "rascunho deve exibir como Aberta para emissão"
+);
+
+const faturaCanceladaComAg = fatura(
+  "f-cancel",
+  "Empresa Cancelada",
+  "2026-06",
+  "cancelada"
+);
+const depoisCancelada = buildResumoClientesMes(
+  [ag("c-1", "Empresa Cancelada", "2026-06-10", 80)],
+  [faturaCanceladaComAg],
+  "06/2026"
+);
+assert.ok(depoisCancelada);
+assert.equal(
+  depoisCancelada.rows.length,
+  1,
+  "cliente com fatura cancelada + agendamentos não deve sumir da lista"
+);
+assert.equal(depoisCancelada.rows[0].status, "aberta_emissao");
+assert.equal(depoisCancelada.rows[0].fatura, null);
+assert.equal(depoisCancelada.rows[0].valorTotal, 80);
+
+const faturaReaberta = fatura(
+  "f-reab",
+  "Empresa Reaberta",
+  "2026-06",
+  "rascunho"
+);
+const depoisReabrir = buildResumoClientesMes(
+  [ag("r-1", "Empresa Reaberta", "2026-06-10", 90)],
+  [faturaReaberta],
+  "06/2026"
+);
+assert.ok(depoisReabrir);
+assert.equal(depoisReabrir.rows.length, 1);
+assert.equal(depoisReabrir.rows[0].status, "aberta_emissao");
+assert.equal(depoisReabrir.rows[0].fatura?.id, "f-reab");
+assert.equal(depoisReabrir.rows[0].valorTotal, 90);
+
 console.log("test-fatura-mes-resumo: ok");

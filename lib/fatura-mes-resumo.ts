@@ -103,7 +103,8 @@ export function deriveFaturaMesStatus(
   if (fatura.status === "substituida") return "substituida";
   if (fatura.status === "reemitida") return "reemitida";
   if (fatura.status === "necessita_reemissao") return "necessita_reemissao";
-  if (fatura.status === "rascunho") return "rascunho";
+  // Rascunho = aberta para emissão (cancelar emissão reabre neste estado).
+  if (fatura.status === "rascunho") return "aberta_emissao";
   if (fatura.status === "vencida") {
     return fatura.pago ? "paga" : "vencida";
   }
@@ -426,8 +427,12 @@ function buildResumoMesInterno(
     )
   );
 
+  // Faturas inativas (ex.: cancelada antiga) não “ocupam” o cliente no mês —
+  // senão a linha some da lista (filtrada) e também não gera “Aberta para emissão”.
   const clientesComFatura = new Set(
-    faturasMes.map((fatura) => normalizeReferencia(fatura.referencia_nome))
+    faturasMes
+      .filter((fatura) => !faturaStatusHistoricoInativo(fatura.status))
+      .map((fatura) => normalizeReferencia(fatura.referencia_nome))
   );
 
   const rowsAbertas: FaturaMesRow[] = Array.from(byReferencia.entries())

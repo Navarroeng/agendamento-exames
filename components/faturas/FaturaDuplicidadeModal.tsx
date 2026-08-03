@@ -20,7 +20,7 @@ function statusLabel(status: string, tipo: "cliente" | "clinica"): string {
     );
   }
   if (status === "emitida") return "Emitida";
-  if (status === "rascunho") return "Rascunho";
+  if (status === "rascunho") return "Aberta para emissão";
   if (status === "cancelada") return "Cancelada";
   return status;
 }
