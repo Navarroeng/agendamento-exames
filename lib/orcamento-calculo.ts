@@ -81,22 +81,37 @@ export function applyValorAutomaticoPacoteCompletoSstItem(
     "servico_nome" | "quantidade" | "valor_unitario" | "valor_total"
   >
 ): Pick<OrcamentoItemFormItem, "valor_unitario" | "valor_total"> {
-  const qtd = parseQuantidadeColaboradores(item.quantidade);
-  const auto = isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd)
-    ? calcValorPacoteCompletoSst(qtd)
-    : null;
-
-  if (auto == null) {
+  const isPacote =
+    isPacoteCompletoSst(item.servico_nome) ||
+    isPacoteCompletoNome(item.servico_nome);
+  if (!isPacote) {
     return {
       valor_unitario: item.valor_unitario,
       valor_total: item.valor_total,
     };
   }
 
-  const masked = formatValorOrcamentoInput(auto);
+  const qtd = parseQuantidadeColaboradores(item.quantidade);
+  const auto = calcValorPacoteCompletoSst(qtd);
+  if (auto != null) {
+    const masked = formatValorOrcamentoInput(auto);
+    return {
+      valor_unitario: masked,
+      valor_total: String(auto),
+    };
+  }
+
+  // 21+: sem sugestão automática — campo vazio para preenchimento manual.
+  if (qtd > PACOTE_COMPLETO_SST_QTD_AUTO_MAX) {
+    return {
+      valor_unitario: "",
+      valor_total: "",
+    };
+  }
+
   return {
-    valor_unitario: masked,
-    valor_total: String(auto),
+    valor_unitario: item.valor_unitario,
+    valor_total: item.valor_total,
   };
 }
 

@@ -15,6 +15,7 @@ import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
   validateOrcamentoItensValores,
+  applyValorAutomaticoPacoteCompletoSstItem,
 } from "../lib/orcamento-calculo";
 import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
@@ -58,6 +59,32 @@ assert.equal(
   false
 );
 assert.equal(isValorOrcamentoItemBloqueado("Treinamento NR", "5"), false);
+
+const formAuto = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: PACOTE_COMPLETO_SST_NOME,
+  quantidade: "5",
+  valor_unitario: "",
+  valor_total: "",
+});
+assert.equal(formAuto.valor_unitario, "R$ 1.700,00");
+assert.equal(formAuto.valor_total, "1700");
+
+const formAcima20 = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: PACOTE_COMPLETO_SST_NOME,
+  quantidade: "21",
+  valor_unitario: "R$ 3.200,00",
+  valor_total: "3200",
+});
+assert.equal(formAcima20.valor_unitario, "");
+assert.equal(formAcima20.valor_total, "");
+
+const formOutroMantem = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: "Treinamento NR",
+  quantidade: "21",
+  valor_unitario: "R$ 900,00",
+  valor_total: "900",
+});
+assert.equal(formOutroMantem.valor_unitario, "R$ 900,00");
 
 const payloadAuto = applyPacoteCompletoSstPrecoItensPayload([
   {
