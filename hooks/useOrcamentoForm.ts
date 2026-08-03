@@ -7,11 +7,17 @@ import {
   normalizeUppercaseField,
 } from "@/lib/text-normalize";
 import {
+  applyPacoteCompletoSstPrecoItensPayload,
+  applyValorAutomaticoPacoteCompletoSstItem,
   calcSubtotalItens,
   formatQuantidadeColaboradoresInput,
+  formatValorOrcamentoInput,
+  isPacoteCompletoSstValorAutomatico,
+  isValorOrcamentoItemBloqueado,
   parseQuantidadeColaboradores,
   resolveItemValorParaFormulario,
   resolveQuantidadeColaboradoresOrcamento,
+  validateOrcamentoItensValores,
 } from "@/lib/orcamento-calculo";
 import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import {
@@ -39,7 +45,11 @@ function syncQuantidadeColaboradores(
   itens: OrcamentoItemFormItem[],
   quantidade: string
 ): OrcamentoItemFormItem[] {
-  return itens.map((item) => ({ ...item, quantidade }));
+  return itens.map((item) => {
+    const next = { ...item, quantidade };
+    const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
+    return { ...next, ...auto };
+  });
 }
 
 export function useOrcamentoForm() {
@@ -106,10 +116,19 @@ export function useOrcamentoForm() {
 
             if (field === "servico_id" && servicoNome !== undefined) {
               next.servico_nome = servicoNome;
+              const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
+              next.valor_unitario = auto.valor_unitario;
+              next.valor_total = auto.valor_total;
             }
 
             if (field === "valor_unitario") {
-              next.valor_total = next.valor_unitario;
+              if (isValorOrcamentoItemBloqueado(next.servico_nome, next.quantidade)) {
+                const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
+                next.valor_unitario = auto.valor_unitario;
+                next.valor_total = auto.valor_total;
+              } else {
+                next.valor_total = next.valor_unitario;
+              }
             }
 
             return next;
@@ -122,11 +141,28 @@ export function useOrcamentoForm() {
 
   const applyServicoSugerido = useCallback(
     (itemId: string, valorSugerido: number | null) => {
-      if (valorSugerido == null || valorSugerido <= 0) return;
-      const masked = maskMoneyInput(String(Math.round(valorSugerido * 100)));
-      updateItem(itemId, "valor_unitario", masked);
+      setForm((prev) => ({
+        ...prev,
+        itens: prev.itens.map((item) => {
+          if (item.id !== itemId) return item;
+
+          const qtd = parseQuantidadeColaboradores(item.quantidade);
+          if (isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd)) {
+            const auto = applyValorAutomaticoPacoteCompletoSstItem(item);
+            return { ...item, ...auto };
+          }
+
+          if (valorSugerido == null || valorSugerido <= 0) return item;
+          const masked = formatValorOrcamentoInput(valorSugerido);
+          return {
+            ...item,
+            valor_unitario: masked,
+            valor_total: String(valorSugerido),
+          };
+        }),
+      }));
     },
-    [updateItem]
+    []
   );
 
   const applyClienteSelection = useCallback((cliente: ClienteRecord | null) => {
@@ -209,7 +245,7 @@ export function useOrcamentoForm() {
 
   const buildPayload = useCallback(
     (responsavel: string): OrcamentoInsertPayload => {
-    const itens = form.itens
+    const itensRaw = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
         const quantidade = parseQuantidadeColaboradores(item.quantidade) || 1;
@@ -225,6 +261,8 @@ export function useOrcamentoForm() {
         };
       });
 
+    const itens = applyPacoteCompletoSstPrecoItensPayload(itensRaw);
+    const subtotal = itens.reduce((sum, item) => sum + item.valor_total, 0);
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
 
     if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
@@ -248,12 +286,12 @@ export function useOrcamentoForm() {
       desconto_percentual: 0,
       forma_pagamento: null,
       validade_proposta: validadeIso,
-      subtotal: totals.subtotal,
-      valor_total: totals.valorTotal,
+      subtotal,
+      valor_total: subtotal,
       itens,
     };
   },
-    [form, totals.subtotal, totals.valorTotal]
+    [form]
   );
 
   const getValidationError = useCallback((): string | null => {
@@ -274,16 +312,13 @@ export function useOrcamentoForm() {
       return "Adicione ao menos um serviço.";
     }
 
-    for (const item of itensValidos) {
-      if (!parseQuantidadeColaboradores(item.quantidade)) {
-        return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
-      }
-      if (parseMoney(item.valor_unitario) < 0) {
-        return "Informe valor válido para todos os serviços.";
-      }
-    }
-
-    return null;
+    return validateOrcamentoItensValores(
+      itensValidos.map((item) => ({
+        servico_nome: item.servico_nome,
+        quantidade: parseQuantidadeColaboradores(item.quantidade),
+        valor_unitario: parseMoney(item.valor_unitario),
+      }))
+    );
   }, [form]);
 
   const validate = useCallback(

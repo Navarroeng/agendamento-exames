@@ -1,10 +1,13 @@
-import { formatCurrency } from "@/lib/money";
+import { isValorOrcamentoItemBloqueado } from "@/lib/orcamento-calculo";
 import type {
   OrcamentoItemFormItem,
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { OrcamentoPacoteInclusosCard } from "./OrcamentoPacoteInclusosCard";
-import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
+import {
+  isPacoteCompletoSst,
+  resolveItensInclusosServico,
+} from "@/lib/servico-sst-pacote";
 
 interface OrcamentoItemTableRowProps {
   item: OrcamentoItemFormItem;
@@ -40,11 +43,20 @@ export function OrcamentoItemTableRow({
     item.servico_nome
   );
   const showPacoteCard = itensInclusos.length > 0;
+  const valorBloqueado = isValorOrcamentoItemBloqueado(
+    item.servico_nome,
+    item.quantidade
+  );
 
   function handleServicoChange(servicoId: string) {
     const servico = servicos.find((s) => s.id === servicoId);
     const nome = servico?.nome === "Outros" ? "" : servico?.nome ?? "";
     onUpdate("servico_id", servicoId, nome);
+    if (isPacoteCompletoSst(nome)) {
+      // Tabela automática (1–20) é aplicada no updateItem.
+      onApplyValorSugerido(null);
+      return;
+    }
     if (servico?.valor_sugerido != null && servico.nome !== "Outros") {
       onApplyValorSugerido(Number(servico.valor_sugerido));
     }
@@ -97,6 +109,12 @@ export function OrcamentoItemTableRow({
           className={`${inputClass} max-w-[120px]`}
           placeholder="R$ 0,00"
           value={item.valor_unitario}
+          disabled={valorBloqueado}
+          title={
+            valorBloqueado
+              ? "Valor calculado automaticamente pela tabela do Pacote completo - SST"
+              : undefined
+          }
           onChange={(e) => onUpdate("valor_unitario", e.target.value)}
         />
       </td>

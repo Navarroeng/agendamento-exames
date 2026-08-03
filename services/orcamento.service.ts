@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
+import {
+  applyPacoteCompletoSstPrecoItensPayload,
+  validateOrcamentoItensValores,
+} from "@/lib/orcamento-calculo";
 import { calcValidadePropostaIso } from "@/lib/orcamento-validade";
 import type {
   OrcamentoComItens,
@@ -14,11 +18,24 @@ const ORCAMENTO_SELECT = `
 function normalizeOrcamentoPayload(
   payload: OrcamentoInsertPayload
 ): OrcamentoInsertPayload {
+  const itens = applyPacoteCompletoSstPrecoItensPayload(payload.itens ?? []);
+  const validationError = validateOrcamentoItensValores(itens);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const subtotal = itens.reduce(
+    (sum, item) => sum + Number(item.valor_total),
+    0
+  );
+
   return {
     ...payload,
+    itens,
     desconto_percentual: 0,
     validade_proposta: calcValidadePropostaIso(payload.data_proposta),
-    valor_total: payload.subtotal,
+    subtotal,
+    valor_total: subtotal,
   };
 }
 
