@@ -196,7 +196,7 @@ function compareFaturaMesRows(a: FaturaMesRow, b: FaturaMesRow): number {
   });
 }
 
-/** Entra na listagem aberta (sem fatura) somente com valor > 0. */
+/** Entra na listagem operacional somente com valor faturável > 0. */
 export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
   return valorTotal > 0;
 }
@@ -211,6 +211,11 @@ export function rowPossuiAgendamentosValidos(
 function isRowAtivaNoResumo(row: FaturaMesRow): boolean {
   if (!rowPossuiAgendamentosValidos(row)) return false;
   if (row.fatura && faturaStatusHistoricoInativo(row.fatura.status)) {
+    return false;
+  }
+  // Competência sem valor faturável atual não aparece na listagem operacional
+  // (ex.: fatura reaberta cujo total ficou R$ 0,00). Histórico permanece no banco.
+  if (!isReferenciaFaturavelNoMes(row.valorTotal)) {
     return false;
   }
   return true;

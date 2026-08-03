@@ -281,4 +281,57 @@ assert.equal(depoisReabrir.rows[0].status, "aberta_emissao");
 assert.equal(depoisReabrir.rows[0].fatura?.id, "f-reab");
 assert.equal(depoisReabrir.rows[0].valorTotal, 90);
 
+// Fatura reaberta (rascunho) com total R$ 0,00 — some da listagem operacional
+const faturaFanGames = fatura(
+  "f-fan",
+  "FAN GAMES",
+  "2026-07",
+  "rascunho"
+);
+const fanZerado = buildResumoClientesMes(
+  [ag("fan-1", "FAN GAMES", "2026-07-10", 0)],
+  [faturaFanGames],
+  "07/2026"
+);
+assert.ok(fanZerado);
+assert.equal(
+  fanZerado.rows.length,
+  0,
+  "rascunho com total zero não deve aparecer na listagem operacional"
+);
+assert.equal(fanZerado.resumo.totalReferencias, 0);
+assert.equal(fanZerado.resumo.valorPrevisto, 0);
+
+// Mesmo rascunho volta a aparecer se surgir valor faturável
+const fanComValor = buildResumoClientesMes(
+  [
+    ag("fan-1", "FAN GAMES", "2026-07-10", 0),
+    ag("fan-2", "FAN GAMES", "2026-07-15", 40),
+  ],
+  [faturaFanGames],
+  "07/2026"
+);
+assert.ok(fanComValor);
+assert.equal(fanComValor.rows.length, 1);
+assert.equal(fanComValor.rows[0].referenciaNome, "FAN GAMES");
+assert.equal(fanComValor.rows[0].status, "aberta_emissao");
+assert.equal(fanComValor.rows[0].fatura?.id, "f-fan");
+assert.equal(fanComValor.rows[0].valorTotal, 40);
+
+// Reaberta com valor reduzido, mas > 0 — permanece
+const faturaReduzida = fatura(
+  "f-red",
+  "Empresa Reduzida",
+  "2026-07",
+  "rascunho"
+);
+const reduzida = buildResumoClientesMes(
+  [ag("red-1", "Empresa Reduzida", "2026-07-10", 25)],
+  [faturaReduzida],
+  "07/2026"
+);
+assert.ok(reduzida);
+assert.equal(reduzida.rows.length, 1);
+assert.equal(reduzida.rows[0].valorTotal, 25);
+
 console.log("test-fatura-mes-resumo: ok");

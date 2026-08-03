@@ -11,6 +11,9 @@ export const FATURA_STATUS_ELEGIVEL: FaturaStatusElegivel = "agendado";
 export const FATURA_SEM_ELEGIVEIS_MSG =
   "Nenhum agendamento elegível para faturamento encontrado.";
 
+export const FATURA_SEM_VALOR_COMPETENCIA_MSG =
+  "Não há valores a faturar para este cliente nesta competência.";
+
 export const FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG =
   "Não há agendamentos válidos para reemitir esta fatura.";
 

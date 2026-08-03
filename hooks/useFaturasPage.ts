@@ -63,7 +63,7 @@ import { obterUrlFaturaClinicaConferencia } from "@/services/fatura-conferencia-
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
-import { FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG, FATURA_SEM_ELEGIVEIS_MSG } from "@/lib/fatura-elegibilidade";
+import { FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG, FATURA_SEM_ELEGIVEIS_MSG, FATURA_SEM_VALOR_COMPETENCIA_MSG } from "@/lib/fatura-elegibilidade";
 import type {
   AgendamentoWithExames,
   FaturaPreviewState,
@@ -637,6 +637,9 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       }
 
       const valorTotal = calcTotalFaturaItens(current.itens);
+      if (current.tipo === "cliente" && valorTotal <= 0) {
+        throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
+      }
 
       const saved = await salvarFatura({
         faturaId: current.faturaId,
@@ -1155,6 +1158,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         toast.error(NO_RECORDS_TOAST);
         return;
       }
+      if (isCliente && calcTotalFaturaItens(itens) <= 0) {
+        toast.error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
+        return;
+      }
 
       const nextPreview = buildPreviewFromAgendamentos(
         pageTipo,
@@ -1309,6 +1316,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
       if (itens.length === 0) {
         toast.error(FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG);
+        return;
+      }
+      if (calcTotalFaturaItens(itens) <= 0) {
+        toast.error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
         return;
       }
 
