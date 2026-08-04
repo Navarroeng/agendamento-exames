@@ -14,6 +14,7 @@ export function ImplantacaoClientesPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     summary,
     responsaveis,
     actionLoading,
@@ -28,6 +29,7 @@ export function ImplantacaoClientesPage() {
     logoPreviewUrl,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
     handleVisualizar,
     handleContinuar,
     closeModal,
@@ -71,6 +73,8 @@ export function ImplantacaoClientesPage() {
         processos={processos}
         loading={loading}
         error={error}
+        mesSelecionado={mesSelecionado}
+        onMesChange={handleMesChange}
         onVisualizar={(id) => {
           void handleVisualizar(id);
         }}

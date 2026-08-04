@@ -11,12 +11,19 @@ import {
   resolveImplantacaoEtapaVisual,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
+import {
+  IMPLANTACAO_MES_VAZIO_MSG,
+  type ImplantacaoYearMonth,
+} from "@/lib/implantacao-meses";
 import { EtapaAtualBadge } from "@/components/implantacao/EtapaAtualBadge";
+import { ImplantacaoMesTabs } from "@/components/implantacao/ImplantacaoMesTabs";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
   loading: boolean;
   error: string | null;
+  mesSelecionado: ImplantacaoYearMonth;
+  onMesChange: (mes: ImplantacaoYearMonth) => void;
   onVisualizar: (orcamentoId: string) => void;
   onContinuar: (orcamentoId: string) => void;
 }
@@ -65,6 +72,8 @@ export function ImplantacaoTable({
   processos,
   loading,
   error,
+  mesSelecionado,
+  onMesChange,
   onVisualizar,
   onContinuar,
 }: ImplantacaoTableProps) {
@@ -74,6 +83,8 @@ export function ImplantacaoTable({
       icon={<IconChecklist />}
       iconTone="blue"
     >
+      <ImplantacaoMesTabs selected={mesSelecionado} onSelect={onMesChange} />
+
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (
           <p className="py-8 text-center text-sm text-app-muted">Carregando...</p>
@@ -83,7 +94,7 @@ export function ImplantacaoTable({
         )}
         {!loading && !error && processos.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
-            Nenhum processo de implantação encontrado.
+            {IMPLANTACAO_MES_VAZIO_MSG}
           </p>
         )}
         {!loading && !error && processos.length > 0 && (

@@ -10,10 +10,16 @@ import {
   EMPTY_IMPLANTACAO_FILTERS,
   computeImplantacaoSummary,
   filterImplantacaoProcessos,
+  filterImplantacaoProcessosPorMes,
   implantacaoEtapaToModalTab,
+  sortImplantacaoProcessosPorDataAprovacao,
   type ImplantacaoFilters,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
+import {
+  resolveInitialImplantacaoMes,
+  type ImplantacaoYearMonth,
+} from "@/lib/implantacao-meses";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 import type {
   OrcamentoAprovacaoFormValues,
@@ -65,6 +71,9 @@ export function useImplantacaoClientesPage() {
   const [filters, setFilters] = useState<ImplantacaoFilters>(
     EMPTY_IMPLANTACAO_FILTERS
   );
+  const [mesSelecionado, setMesSelecionado] = useState<ImplantacaoYearMonth>(
+    () => resolveInitialImplantacaoMes()
+  );
 
   const [actionLoading, setActionLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,10 +112,11 @@ export function useImplantacaoClientesPage() {
     void refresh();
   }, [refresh]);
 
-  const filtrados = useMemo(
-    () => filterImplantacaoProcessos(processos, filters),
-    [processos, filters]
-  );
+  const filtrados = useMemo(() => {
+    const porFiltros = filterImplantacaoProcessos(processos, filters);
+    const porMes = filterImplantacaoProcessosPorMes(porFiltros, mesSelecionado);
+    return sortImplantacaoProcessosPorDataAprovacao(porMes);
+  }, [processos, filters, mesSelecionado]);
 
   const summary = useMemo(
     () => computeImplantacaoSummary(processos),
@@ -133,6 +143,11 @@ export function useImplantacaoClientesPage() {
 
   const clearFilters = useCallback(() => {
     setFilters(EMPTY_IMPLANTACAO_FILTERS);
+    setMesSelecionado(resolveInitialImplantacaoMes());
+  }, []);
+
+  const handleMesChange = useCallback((mes: ImplantacaoYearMonth) => {
+    setMesSelecionado(mes);
   }, []);
 
   const openProcesso = useCallback(
@@ -783,6 +798,7 @@ export function useImplantacaoClientesPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     summary,
     responsaveis,
     actionLoading,
@@ -797,6 +813,7 @@ export function useImplantacaoClientesPage() {
     logoPreviewUrl,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
     handleVisualizar,
     handleContinuar,
     closeModal,

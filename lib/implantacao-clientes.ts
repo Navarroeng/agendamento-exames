@@ -15,6 +15,10 @@ import {
   contratoLiberaAgendamento,
   labelAgendamentoLiberacao,
 } from "@/lib/cliente-pode-agendar";
+import {
+  processoBelongsToMesAprovacao,
+  type ImplantacaoYearMonth,
+} from "@/lib/implantacao-meses";
 
 /** Etapas operacionais da implantação (pós-aprovação). */
 export type ImplantacaoEtapaOperacionalId =
@@ -516,9 +520,7 @@ export function sortImplantacaoProcessos(
       return ETAPA_SORT_ORDER[a.etapaAtual] - ETAPA_SORT_ORDER[b.etapaAtual];
     }
     if (sort === "aprovado_em") {
-      const da = a.dataAprovacao ?? "9999-12-31";
-      const db = b.dataAprovacao ?? "9999-12-31";
-      return da.localeCompare(db);
+      return comparePorDataAprovacaoENumero(a, b);
     }
 
     const score = (p: ImplantacaoProcesso) => {
@@ -535,10 +537,38 @@ export function sortImplantacaoProcessos(
     const sa = score(a);
     const sb = score(b);
     if (sa !== sb) return sa - sb;
-    return (a.dataAprovacao ?? "").localeCompare(b.dataAprovacao ?? "");
+    return comparePorDataAprovacaoENumero(a, b);
   });
 
   return copy;
+}
+
+function comparePorDataAprovacaoENumero(
+  a: ImplantacaoProcesso,
+  b: ImplantacaoProcesso
+): number {
+  const da = (a.dataAprovacao ?? "9999-12-31").slice(0, 10);
+  const db = (b.dataAprovacao ?? "9999-12-31").slice(0, 10);
+  const byDate = da.localeCompare(db);
+  if (byDate !== 0) return byDate;
+  return a.orcamento.numero.localeCompare(b.orcamento.numero, "pt-BR");
+}
+
+/** Dentro da aba mensal: mais antigo primeiro; número do orçamento como desempate. */
+export function sortImplantacaoProcessosPorDataAprovacao(
+  processos: ImplantacaoProcesso[]
+): ImplantacaoProcesso[] {
+  return [...processos].sort(comparePorDataAprovacaoENumero);
+}
+
+/** Filtra pela data de aprovação (`dataAprovacao` / coluna “Data da aprovação”). */
+export function filterImplantacaoProcessosPorMes(
+  processos: ImplantacaoProcesso[],
+  mes: ImplantacaoYearMonth
+): ImplantacaoProcesso[] {
+  return processos.filter((p) =>
+    processoBelongsToMesAprovacao(p.dataAprovacao, mes)
+  );
 }
 
 export type ImplantacaoEtapaVisualEstado =
