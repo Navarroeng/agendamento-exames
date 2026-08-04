@@ -22,7 +22,7 @@ const CARDS: {
     key: "agendamentosDoDia",
     label: "Agendamentos do dia",
     icon: <IconCalendar size={15} />,
-    tone: "border-[#e8edf5] bg-white text-navy",
+    tone: "border-[#a7f3d0]/80 bg-[#ECFDF5] text-[#059669]",
   },
   {
     key: "pendenciasEsocial",
