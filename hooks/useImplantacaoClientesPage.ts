@@ -12,7 +12,7 @@ import {
   filterImplantacaoProcessos,
   filterImplantacaoProcessosPorMes,
   implantacaoEtapaToModalTab,
-  sortImplantacaoProcessosPorDataAprovacao,
+  sortImplantacaoProcessos,
   type ImplantacaoFilters,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
@@ -113,9 +113,12 @@ export function useImplantacaoClientesPage() {
   }, [refresh]);
 
   const filtrados = useMemo(() => {
+    // filterImplantacaoProcessos já aplica filters.sort; após o mês,
+    // reaplicamos a ordenação escolhida (padrão: etapa → Contrato no topo,
+    // Concluído no fim).
     const porFiltros = filterImplantacaoProcessos(processos, filters);
     const porMes = filterImplantacaoProcessosPorMes(porFiltros, mesSelecionado);
-    return sortImplantacaoProcessosPorDataAprovacao(porMes);
+    return sortImplantacaoProcessos(porMes, filters.sort);
   }, [processos, filters, mesSelecionado]);
 
   const summary = useMemo(
