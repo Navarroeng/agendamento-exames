@@ -97,7 +97,9 @@ export function toPeriodicoFuturoRow(
   return {
     ...record,
     displayStatus,
-    dataRealizadaBR: formatDateBR(record.data_realizada),
+    dataRealizadaBR: record.data_realizada
+      ? formatDateBR(record.data_realizada)
+      : "—",
     proximaDataBR: formatDateBR(record.proxima_data),
   };
 }

@@ -153,6 +153,9 @@ export function ImplantacaoTable({
                     <td>
                       <EtapaAtualBadge
                         etapa={processo.etapaAtual}
+                        alertaExamesFuturos={
+                          processo.concluidoComExamesFuturos
+                        }
                         observacao={
                           processo.agendamentosIniciaisDispensados &&
                           processo.etapaAtual === "concluido"

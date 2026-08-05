@@ -15,6 +15,7 @@ import {
   computeProximaDataPeriodico,
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
+import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
@@ -32,6 +33,13 @@ type PeriodicoFuturoWithCargo = PeriodicoFuturoRecord & {
 function isPeriodicoDeCargoComAlerta(record: PeriodicoFuturoWithCargo): boolean {
   const validade = record.cargos?.validade_periodico_meses;
   return cargoGeraAlertaPeriodico(validade);
+}
+
+function deveListarPeriodico(record: PeriodicoFuturoWithCargo): boolean {
+  const origem = (record.origem ?? "").trim().toLowerCase();
+  if (origem === ORIGEM_PERIODICO_IMPLANTACAO) return true;
+  if (record.consome_previsao_contrato) return true;
+  return isPeriodicoDeCargoComAlerta(record);
 }
 
 function stripCargoJoin(
@@ -54,7 +62,7 @@ export async function listarPeriodicosFuturos(
   if (error) throw error;
 
   return ((data ?? []) as PeriodicoFuturoWithCargo[])
-    .filter(isPeriodicoDeCargoComAlerta)
+    .filter(deveListarPeriodico)
     .map(stripCargoJoin);
 }
 

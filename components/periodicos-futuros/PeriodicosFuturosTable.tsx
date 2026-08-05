@@ -2,6 +2,11 @@ import {
   periodicoDisplayStatusClass,
   periodicoDisplayStatusLabel,
 } from "@/lib/periodicos-futuro";
+import {
+  labelMotivoExameFuturo,
+  labelOrigemPeriodico,
+} from "@/lib/contrato-programacao-futura";
+import { formatCPF } from "@/lib/cpf";
 import type { PeriodicoFuturoRow } from "@/lib/types";
 
 interface PeriodicosFuturosTableProps {
@@ -49,15 +54,19 @@ export function PeriodicosFuturosTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
-      <table className="w-full min-w-[960px] text-left text-xs">
+      <table className="w-full min-w-[1180px] text-left text-xs">
         <thead>
           <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
             <th className="px-3 py-2.5">Empresa</th>
             <th className="px-3 py-2.5">Colaborador</th>
+            <th className="px-3 py-2.5">CPF</th>
             <th className="px-3 py-2.5">Cargo</th>
-            <th className="px-3 py-2.5">Exame</th>
+            <th className="px-3 py-2.5">Exame / ASO</th>
             <th className="px-3 py-2.5">Realizado em</th>
             <th className="px-3 py-2.5">Próxima data</th>
+            <th className="px-3 py-2.5">Origem</th>
+            <th className="px-3 py-2.5">Motivo</th>
+            <th className="px-3 py-2.5">Observações</th>
             <th className="px-3 py-2.5">Status</th>
             <th className="px-3 py-2.5">Ações</th>
           </tr>
@@ -74,13 +83,37 @@ export function PeriodicosFuturosTable({
                   {record.cliente_nome}
                 </td>
                 <td className="px-3 py-2.5">{record.colaborador}</td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {formatCPF(record.colaborador_cpf)}
+                </td>
                 <td className="px-3 py-2.5">{record.cargo_nome ?? "—"}</td>
-                <td className="px-3 py-2.5">{record.exame_nome}</td>
+                <td className="px-3 py-2.5">
+                  {record.tipo_aso || record.exame_nome}
+                </td>
                 <td className="px-3 py-2.5 tabular-nums">
                   {record.dataRealizadaBR}
                 </td>
                 <td className="px-3 py-2.5 tabular-nums font-bold">
                   {record.proximaDataBR}
+                </td>
+                <td className="px-3 py-2.5">
+                  {labelOrigemPeriodico(record.origem)}
+                </td>
+                <td className="max-w-[160px] px-3 py-2.5">
+                  <span className="line-clamp-2" title={labelMotivoExameFuturo(record.motivo, record.motivo_detalhe)}>
+                    {labelMotivoExameFuturo(
+                      record.motivo,
+                      record.motivo_detalhe
+                    )}
+                  </span>
+                </td>
+                <td className="max-w-[160px] px-3 py-2.5 text-[#64748b]">
+                  <span
+                    className="line-clamp-2"
+                    title={record.observacoes ?? undefined}
+                  >
+                    {record.observacoes?.trim() || "—"}
+                  </span>
                 </td>
                 <td className="px-3 py-2.5">
                   <span

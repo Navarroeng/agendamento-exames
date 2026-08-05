@@ -33,7 +33,7 @@ export function PeriodicosFuturosPage() {
   return (
     <AppShell
       title="Periódicos Futuros"
-      subtitle="Acompanhe exames com repetição em 6 meses gerados a partir dos agendamentos."
+      subtitle="Acompanhe exames periódicos gerados pelos agendamentos e programações da Implantação."
       icon={<IconClock size={20} />}
     >
       <PeriodicosFuturosCards

@@ -7,6 +7,7 @@ import {
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
+import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
 
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
@@ -106,6 +107,8 @@ export async function listarProcessosImplantacao(): Promise<
   );
   const realizadosPorContrato =
     await contarColaboradoresPorContratos(contratoIds);
+  const programacoesPorContrato =
+    await contarProgramacoesFuturasPorContratos(contratoIds);
 
   const processos: ImplantacaoProcesso[] = [];
 
@@ -135,8 +138,11 @@ export async function listarProcessosImplantacao(): Promise<
       continue;
     }
 
-    const agendamentosRealizados = contrato
+    const agendados = contrato
       ? realizadosPorContrato.get(contrato.id) ?? 0
+      : 0;
+    const programados = contrato
+      ? programacoesPorContrato.get(contrato.id) ?? 0
       : 0;
 
     processos.push(
@@ -144,7 +150,8 @@ export async function listarProcessosImplantacao(): Promise<
         orcamento,
         aprovacao,
         contrato,
-        agendamentosRealizados,
+        agendamentosRealizados: agendados,
+        examesProgramadosFuturos: programados,
       })
     );
   }

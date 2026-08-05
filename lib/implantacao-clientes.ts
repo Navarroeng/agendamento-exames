@@ -203,7 +203,14 @@ export interface ImplantacaoProcesso {
   ativo: boolean;
   quantidadeContratada: number;
   agendamentosRealizados: number;
+  /** Exames futuros que também consomem vaga do contrato. */
+  examesProgramadosFuturos: number;
   agendamentosIniciaisDispensados: boolean;
+  /**
+   * Concluído porque a previsão foi preenchida com pelo menos um exame
+   * programado para o futuro (não apenas agendamentos já feitos).
+   */
+  concluidoComExamesFuturos: boolean;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -316,15 +323,20 @@ export function buildImplantacaoProcesso(params: {
   aprovacao: OrcamentoAprovacaoRecord | null;
   contrato: ClienteContratoRecord | null;
   agendamentosRealizados?: number;
+  examesProgramadosFuturos?: number;
 }): ImplantacaoProcesso {
   const { orcamento, aprovacao, contrato } = params;
   const quantidadeContratada = resolveQuantidadeContratadaImplantacao(
     aprovacao,
     contrato
   );
+  const examesProgramadosFuturos = Math.max(
+    0,
+    params.examesProgramadosFuturos ?? 0
+  );
   const agendamentosRealizados = Math.max(
     0,
-    params.agendamentosRealizados ?? 0
+    (params.agendamentosRealizados ?? 0) + examesProgramadosFuturos
   );
   const agendamentosIniciaisDispensados = Boolean(
     contrato?.agendamentos_iniciais_dispensados
@@ -353,6 +365,10 @@ export function buildImplantacaoProcesso(params: {
     orcamento.status === "cancelado" ||
     orcamento.status === "contrato_encerrado";
   const concluido = etapaAtual === "concluido";
+  const concluidoComExamesFuturos =
+    concluido &&
+    !agendamentosIniciaisDispensados &&
+    examesProgramadosFuturos > 0;
 
   return {
     orcamento,
@@ -372,7 +388,9 @@ export function buildImplantacaoProcesso(params: {
     ativo: !cancelado && !concluido,
     quantidadeContratada,
     agendamentosRealizados,
+    examesProgramadosFuturos,
     agendamentosIniciaisDispensados,
+    concluidoComExamesFuturos,
   };
 }
 

@@ -135,6 +135,10 @@ import {
   criarPeriodicosDeAgendamento,
 } from "@/services/periodico-futuro.service";
 import {
+  buscarPeriodicoPendenteColaborador,
+  vincularPeriodicoAoAgendamento,
+} from "@/services/contrato-programacao-futura.service";
+import {
   AGENDAMENTO_BLOQUEADO_FATURA_MSG,
   CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST,
   isAgendamentoBloqueadoFaturaError,
@@ -171,7 +175,13 @@ import {
   orderAgendamentosForTable,
   type AgendamentoTableSortState,
 } from "@/lib/agendamento-table-sort";
-import type { AgendamentoStatus, AgendamentoWithExames, CargoRecord, ExameFormItem } from "@/lib/types";
+import type {
+  AgendamentoStatus,
+  AgendamentoWithExames,
+  CargoRecord,
+  ExameFormItem,
+  PeriodicoFuturoRecord,
+} from "@/lib/types";
 
 export function useAgendamentosPage() {
   const searchParams = useSearchParams();
@@ -213,6 +223,12 @@ export function useAgendamentosPage() {
   const [duplicidade90DiasOpen, setDuplicidade90DiasOpen] = useState(false);
   const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
     useState<AgendamentoDuplicidade90DiasInfo | null>(null);
+  const [periodicoVinculoOpen, setPeriodicoVinculoOpen] = useState(false);
+  const [periodicoVinculo, setPeriodicoVinculo] =
+    useState<PeriodicoFuturoRecord | null>(null);
+  const periodicoDecisionRef = useRef<"none" | "skip" | "link">("none");
+  const periodicoLinkIdRef = useRef<string | null>(null);
+  const pendingSaveStatusRef = useRef<AgendamentoStatus | null>(null);
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
   const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
   const [cargoChangeLoading, setCargoChangeLoading] = useState(false);
@@ -1766,6 +1782,32 @@ export function useAgendamentosPage() {
         }
       }
 
+      if (!editingId && periodicoDecisionRef.current === "none") {
+        try {
+          const pendente = await buscarPeriodicoPendenteColaborador({
+            clienteNome: form.cliente_nome,
+            colaborador: form.colaborador,
+            colaboradorCpf: form.colaborador_cpf,
+          });
+          if (pendente) {
+            pendingSaveStatusRef.current = status;
+            setPeriodicoVinculo(pendente);
+            setPeriodicoVinculoOpen(true);
+            return;
+          }
+        } catch (periodicoErr) {
+          console.error(
+            "Erro ao verificar periódico futuro pendente:",
+            periodicoErr
+          );
+        }
+      }
+
+      const periodicoLinkId =
+        periodicoDecisionRef.current === "link"
+          ? periodicoLinkIdRef.current
+          : null;
+
       setSaving(true);
       try {
         const cargoFields = buildCargoAgendamentoFields(
@@ -1889,6 +1931,27 @@ export function useAgendamentosPage() {
             }
           );
 
+          if (periodicoLinkId) {
+            try {
+              await vincularPeriodicoAoAgendamento({
+                periodicoId: periodicoLinkId,
+                agendamentoId: novoId,
+                usuarioNome: historicoUsuario,
+              });
+              toast.message(
+                "Periódico Futuro vinculado a este agendamento."
+              );
+            } catch (vinculoErr) {
+              console.error(
+                "Erro ao vincular periódico futuro:",
+                vinculoErr
+              );
+              toast.error(
+                "Agendamento salvo, mas não foi possível vincular o Periódico Futuro."
+              );
+            }
+          }
+
           if (cargoFields.cargo_id && dataIso) {
             try {
               const criados = await criarPeriodicosDeAgendamento(novoId, {
@@ -1918,6 +1981,11 @@ export function useAgendamentosPage() {
 
         setDuplicidade90DiasOpen(false);
         setDuplicidade90DiasInfo(null);
+        setPeriodicoVinculoOpen(false);
+        setPeriodicoVinculo(null);
+        periodicoDecisionRef.current = "none";
+        periodicoLinkIdRef.current = null;
+        pendingSaveStatusRef.current = null;
         setShowForm(false);
         resetForm();
         setFiltersExpanded(false);
@@ -2000,6 +2068,34 @@ export function useAgendamentosPage() {
     },
     [executeSave]
   );
+
+  const closePeriodicoVinculoModal = useCallback(() => {
+    setPeriodicoVinculoOpen(false);
+    setPeriodicoVinculo(null);
+    periodicoDecisionRef.current = "none";
+    periodicoLinkIdRef.current = null;
+    pendingSaveStatusRef.current = null;
+  }, []);
+
+  const handleContinuarComPeriodicoPendente = useCallback(() => {
+    periodicoDecisionRef.current = "skip";
+    periodicoLinkIdRef.current = null;
+    setPeriodicoVinculoOpen(false);
+    const status = pendingSaveStatusRef.current ?? "agendado";
+    void executeSave(status);
+  }, [executeSave]);
+
+  const handleUtilizarPeriodicoPendente = useCallback(() => {
+    if (!periodicoVinculo?.id) {
+      closePeriodicoVinculoModal();
+      return;
+    }
+    periodicoDecisionRef.current = "link";
+    periodicoLinkIdRef.current = periodicoVinculo.id;
+    setPeriodicoVinculoOpen(false);
+    const status = pendingSaveStatusRef.current ?? "agendado";
+    void executeSave(status);
+  }, [closePeriodicoVinculoModal, executeSave, periodicoVinculo?.id]);
 
   const closeDuplicidade90DiasModal = useCallback(() => {
     setDuplicidade90DiasOpen(false);
@@ -2100,6 +2196,11 @@ export function useAgendamentosPage() {
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
+    periodicoVinculoOpen,
+    periodicoVinculo,
+    closePeriodicoVinculoModal,
+    handleContinuarComPeriodicoPendente,
+    handleUtilizarPeriodicoPendente,
     cargoChangeModalOpen,
     cargoChangeLoading,
     closeCargoChangeModal,

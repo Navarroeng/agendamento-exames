@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { DispensaAgendamentosIniciaisModal } from "@/components/orcamentos/DispensaAgendamentosIniciaisModal";
+import {
+  InformarExameFuturoModal,
+  type InformarExameFuturoFormResult,
+} from "@/components/orcamentos/InformarExameFuturoModal";
 import { ReabrirAgendamentosIniciaisModal } from "@/components/orcamentos/ReabrirAgendamentosIniciaisModal";
 import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
@@ -15,6 +19,12 @@ import {
   resolveClassificacaoAgendamento,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
+import {
+  formatMesAnoPrevisto,
+  labelMotivoExameFuturo,
+  labelOrigemPeriodico,
+  type ColaboradorSugestao,
+} from "@/lib/contrato-programacao-futura";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { AgendamentoWithExames, ClienteContratoRecord } from "@/lib/types";
@@ -26,6 +36,12 @@ import {
   salvarSelecaoAgendamentosContrato,
   type AgendamentoNaVigenciaItem,
 } from "@/services/contrato-agendamentos.service";
+import {
+  criarExameFuturoImplantacao,
+  listarProgramacoesFuturasDoContrato,
+  listarSugestoesColaboradoresContrato,
+  type PeriodicoProgramadoContrato,
+} from "@/services/contrato-programacao-futura.service";
 
 interface OrcamentoAbaAgendamentosProps {
   orcamentoId: string;
@@ -159,6 +175,14 @@ export function OrcamentoAbaAgendamentos({
     useState<AgendamentoWithExames | null>(null);
   const [dispensaModalOpen, setDispensaModalOpen] = useState(false);
   const [reabrirModalOpen, setReabrirModalOpen] = useState(false);
+  const [exameFuturoModalOpen, setExameFuturoModalOpen] = useState(false);
+  const [exameFuturoSaving, setExameFuturoSaving] = useState(false);
+  const [programacoes, setProgramacoes] = useState<
+    PeriodicoProgramadoContrato[]
+  >([]);
+  const [sugestoesColaboradores, setSugestoesColaboradores] = useState<
+    ColaboradorSugestao[]
+  >([]);
 
   const onContagemChangeRef = useRef(onContagemChange);
   onContagemChangeRef.current = onContagemChange;
@@ -169,6 +193,7 @@ export function OrcamentoAbaAgendamentos({
     0;
 
   const dispensado = contratoTemAgendamentosIniciaisDispensados(contrato);
+  const programacoesAtivas = programacoes.length;
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -191,15 +216,21 @@ export function OrcamentoAbaAgendamentos({
           const empty = buildContratoAgendamentoContagem(qtd, 0, 0);
           setItens([]);
           setSelectedIds(new Set());
+          setProgramacoes([]);
+          setSugestoesColaboradores([]);
           onContagemChangeRef.current?.(empty);
           return;
         }
 
-        const resumo = await carregarAgendamentosVigenciaContrato({
-          contrato: contratoRow,
-          quantidadeContratada: qtd,
-        });
+        const [resumo, progs] = await Promise.all([
+          carregarAgendamentosVigenciaContrato({
+            contrato: contratoRow,
+            quantidadeContratada: qtd,
+          }),
+          listarProgramacoesFuturasDoContrato(contratoRow.id),
+        ]);
         setItens(resumo.itens);
+        setProgramacoes(progs);
         setSelectedIds(
           new Set(
             resumo.itens
@@ -207,6 +238,28 @@ export function OrcamentoAbaAgendamentos({
               .map((i) => i.agendamento.id)
           )
         );
+
+        const nomesCliente = Array.from(
+          new Set(
+            [
+              clienteNome?.trim(),
+              ...resumo.itens.map((i) => i.agendamento.cliente_nome?.trim()),
+            ].filter((n): n is string => Boolean(n))
+          )
+        );
+        if (nomesCliente.length > 0) {
+          try {
+            const sug = await listarSugestoesColaboradoresContrato({
+              clienteNomes: nomesCliente,
+            });
+            setSugestoesColaboradores(sug);
+          } catch {
+            setSugestoesColaboradores([]);
+          }
+        } else {
+          setSugestoesColaboradores([]);
+        }
+
         onContagemChangeRef.current?.(resumo.contagem);
       } catch (err) {
         console.error(err);
@@ -220,7 +273,7 @@ export function OrcamentoAbaAgendamentos({
         setRefreshing(false);
       }
     },
-    [aprovacao.quantidade_colaboradores, orcamentoId]
+    [aprovacao.quantidade_colaboradores, clienteNome, orcamentoId]
   );
 
   // Carrega uma vez ao montar (abrir modal / entrar na aba). Sem polling.
@@ -240,7 +293,7 @@ export function OrcamentoAbaAgendamentos({
         { dispensado: true }
       );
     }
-    const utilizados = itens.filter(
+    const utilizadosAg = itens.filter(
       (i) =>
         selectedIds.has(i.agendamento.id) &&
         isAgendamentoSelecionavel(i.agendamento.status)
@@ -252,10 +305,16 @@ export function OrcamentoAbaAgendamentos({
     ).length;
     return buildContratoAgendamentoContagem(
       quantidadePrevista,
-      utilizados,
+      utilizadosAg + programacoesAtivas,
       adicionais
     );
-  }, [itens, selectedIds, quantidadePrevista, dispensado]);
+  }, [
+    itens,
+    selectedIds,
+    quantidadePrevista,
+    dispensado,
+    programacoesAtivas,
+  ]);
 
   useEffect(() => {
     onContagemChangeRef.current?.(contagemPreview);
@@ -287,7 +346,7 @@ export function OrcamentoAbaAgendamentos({
         next.delete(item.agendamento.id);
         return next;
       }
-      if (next.size >= quantidadePrevista) {
+      if (next.size + programacoesAtivas >= quantidadePrevista) {
         toast.error(
           `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
         );
@@ -296,6 +355,47 @@ export function OrcamentoAbaAgendamentos({
       next.add(item.agendamento.id);
       return next;
     });
+  }
+
+  async function handleConfirmarExameFuturo(
+    data: InformarExameFuturoFormResult
+  ) {
+    if (!contrato) return;
+    setExameFuturoSaving(true);
+    try {
+      const empresa =
+        clienteNome?.trim() ||
+        itens[0]?.agendamento.cliente_nome?.trim() ||
+        "";
+      if (!empresa) {
+        toast.error("Não foi possível identificar a empresa do contrato.");
+        return;
+      }
+      await criarExameFuturoImplantacao({
+        contratoId: contrato.id,
+        clienteNome: empresa,
+        colaborador: data.colaborador,
+        colaboradorCpf: data.colaboradorCpf,
+        tipoAso: data.tipoAso,
+        dataPrevistaIso: data.dataPrevistaIso,
+        motivo: data.motivo,
+        motivoDetalhe: data.motivoDetalhe,
+        observacoes: data.observacoes,
+        criadoPor: usuarioNome,
+      });
+      toast.success("Exame futuro programado e vaga do contrato consumida.");
+      setExameFuturoModalOpen(false);
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar o exame futuro."
+      );
+    } finally {
+      setExameFuturoSaving(false);
+    }
   }
 
   async function handleSalvar() {
@@ -634,6 +734,16 @@ export function OrcamentoAbaAgendamentos({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {!dispensado && contagemPreview.disponiveis > 0 ? (
+              <button
+                type="button"
+                className="btn btn-muted text-xs"
+                disabled={saving || loading || !contrato || exameFuturoSaving}
+                onClick={() => setExameFuturoModalOpen(true)}
+              >
+                Informar exame futuro
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-muted text-xs"
@@ -696,6 +806,50 @@ export function OrcamentoAbaAgendamentos({
         </div>
       </section>
 
+      {!dispensado && programacoes.length > 0 ? (
+        <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
+          <div className="border-b border-[#eef2f7] px-4 py-3">
+            <h3 className="text-sm font-extrabold text-navy">
+              Exames programados para o futuro
+            </h3>
+            <p className="mt-0.5 text-xs text-[#64748b]">
+              Vagas do contrato já consumidas com realização prevista
+              posteriormente.
+            </p>
+          </div>
+          <ul className="divide-y divide-[#f1f5f9]">
+            {programacoes.map((p) => (
+              <li key={p.id} className="px-4 py-3">
+                <p className="text-sm font-extrabold text-navy">
+                  {p.colaborador}
+                </p>
+                <p className="mt-0.5 text-xs font-semibold text-[#475569]">
+                  {p.tipo_aso || p.exame_nome || "—"}
+                </p>
+                <div className="mt-2 grid gap-1 text-xs text-[#64748b] sm:grid-cols-2">
+                  <p>
+                    <span className="font-bold text-navy">Previsto para:</span>{" "}
+                    {formatMesAnoPrevisto(p.proxima_data)}
+                  </p>
+                  <p>
+                    <span className="font-bold text-navy">Motivo:</span>{" "}
+                    {labelMotivoExameFuturo(p.motivo, p.motivo_detalhe)}
+                  </p>
+                  <p>
+                    <span className="font-bold text-navy">Origem:</span>{" "}
+                    {labelOrigemPeriodico(p.origem)}
+                  </p>
+                  <p>
+                    <span className="font-bold text-navy">Status:</span>{" "}
+                    {p.status === "reagendado" ? "Atendido" : "Programado"}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <AgendamentoViewModal
         agendamento={viewAgendamento}
         onClose={() => setViewAgendamento(null)}
@@ -716,6 +870,15 @@ export function OrcamentoAbaAgendamentos({
         saving={reabrirSaving}
         onClose={() => setReabrirModalOpen(false)}
         onConfirm={(motivo) => void handleConfirmarReabertura(motivo)}
+      />
+
+      <InformarExameFuturoModal
+        open={exameFuturoModalOpen}
+        saving={exameFuturoSaving}
+        numeroContrato={contrato?.numero ?? null}
+        sugestoes={sugestoesColaboradores}
+        onClose={() => setExameFuturoModalOpen(false)}
+        onConfirm={(data) => void handleConfirmarExameFuturo(data)}
       />
     </div>
   );

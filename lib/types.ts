@@ -160,12 +160,20 @@ export interface PeriodicoFuturoRecord {
   colaborador: string;
   cargo_id: string | null;
   cargo_nome: string | null;
-  exame_id: string;
+  exame_id: string | null;
   tipo_exame: string;
   exame_nome: string;
-  data_realizada: string;
+  data_realizada: string | null;
   proxima_data: string;
   status: PeriodicoFuturoStoredStatus;
+  origem?: string | null;
+  motivo?: string | null;
+  motivo_detalhe?: string | null;
+  observacoes?: string | null;
+  contrato_id?: string | null;
+  colaborador_cpf?: string | null;
+  tipo_aso?: string | null;
+  consome_previsao_contrato?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

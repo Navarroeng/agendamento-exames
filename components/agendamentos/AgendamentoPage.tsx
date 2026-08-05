@@ -10,6 +10,7 @@ import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/Agenda
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
+import { PeriodicoFuturoVinculoModal } from "@/components/agendamentos/PeriodicoFuturoVinculoModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -97,6 +98,11 @@ export function AgendamentoPage() {
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
+    periodicoVinculoOpen,
+    periodicoVinculo,
+    closePeriodicoVinculoModal,
+    handleContinuarComPeriodicoPendente,
+    handleUtilizarPeriodicoPendente,
     cargoChangeModalOpen,
     cargoChangeLoading,
     closeCargoChangeModal,
@@ -265,6 +271,14 @@ export function AgendamentoPage() {
         open={duplicidade90DiasOpen}
         agendamento={duplicidade90DiasInfo}
         onClose={closeDuplicidade90DiasModal}
+      />
+      <PeriodicoFuturoVinculoModal
+        open={periodicoVinculoOpen}
+        periodico={periodicoVinculo}
+        saving={saving}
+        onCancelar={closePeriodicoVinculoModal}
+        onContinuar={handleContinuarComPeriodicoPendente}
+        onUtilizar={handleUtilizarPeriodicoPendente}
       />
       <AgendamentoCargoChangeModal
         open={cargoChangeModalOpen}

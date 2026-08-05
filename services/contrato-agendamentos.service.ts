@@ -175,11 +175,25 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     !contrato.data_inicio?.trim() ||
     !contrato.data_fim?.trim()
   ) {
+    let programados = 0;
+    if (!dispensado) {
+      const { count, error: pErr } = await supabase
+        .from("periodicos_futuros")
+        .select("id", { count: "exact", head: true })
+        .eq("contrato_id", contrato.id)
+        .eq("consome_previsao_contrato", true)
+        .in("status", ["ativo", "reagendado"]);
+      if (pErr) throw pErr;
+      programados = count ?? 0;
+    }
     return {
       itens: [],
-      contagem: buildContratoAgendamentoContagem(quantidadeContratada, 0, 0, {
-        dispensado,
-      }),
+      contagem: buildContratoAgendamentoContagem(
+        quantidadeContratada,
+        programados,
+        0,
+        { dispensado }
+      ),
     };
   }
 
@@ -262,7 +276,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     };
   });
 
-  const utilizados = dispensado
+  const utilizadosAg = dispensado
     ? 0
     : itens.filter(
         (i) =>
@@ -273,11 +287,23 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       !i.selecionado && isAgendamentoSelecionavel(i.agendamento.status)
   ).length;
 
+  let programados = 0;
+  if (!dispensado) {
+    const { count, error: pErr } = await supabase
+      .from("periodicos_futuros")
+      .select("id", { count: "exact", head: true })
+      .eq("contrato_id", contrato.id)
+      .eq("consome_previsao_contrato", true)
+      .in("status", ["ativo", "reagendado"]);
+    if (pErr) throw pErr;
+    programados = count ?? 0;
+  }
+
   return {
     itens,
     contagem: buildContratoAgendamentoContagem(
       quantidadeContratada,
-      utilizados,
+      utilizadosAg + programados,
       adicionais,
       { dispensado }
     ),
@@ -326,13 +352,23 @@ export async function salvarSelecaoAgendamentosContrato(params: {
     quantidadePrevista,
   } = params;
 
-  if (agendamentoIdsSelecionados.length > quantidadePrevista) {
+  const supabase = createClient();
+
+  const { count: progCount, error: progErr } = await supabase
+    .from("periodicos_futuros")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", contratoId)
+    .eq("consome_previsao_contrato", true)
+    .in("status", ["ativo", "reagendado"]);
+  if (progErr) throw progErr;
+
+  const programados = progCount ?? 0;
+  if (agendamentoIdsSelecionados.length + programados > quantidadePrevista) {
     throw new Error(
       `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
     );
   }
 
-  const supabase = createClient();
   const agora = new Date().toISOString();
 
   // Validar status e existência
@@ -504,9 +540,10 @@ export async function salvarSelecaoAgendamentosContrato(params: {
     });
   }
 
-  const utilizados = agendamentoIdsSelecionados.length;
+  const utilizados =
+    agendamentoIdsSelecionados.length + programados;
   const concluiu = quantidadePrevista > 0 && utilizados >= quantidadePrevista;
-  const antes = (atuais ?? []).length;
+  const antes = (atuais ?? []).length + programados;
   const antesConcluido = quantidadePrevista > 0 && antes >= quantidadePrevista;
   if (antesConcluido !== concluiu) {
     await registrarAuditoria({

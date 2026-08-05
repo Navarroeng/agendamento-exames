@@ -49,7 +49,9 @@ function processo(partial: {
     ativo: true,
     quantidadeContratada: 0,
     agendamentosRealizados: 0,
+    examesProgramadosFuturos: 0,
     agendamentosIniciaisDispensados: false,
+    concluidoComExamesFuturos: false,
   };
 }
 
