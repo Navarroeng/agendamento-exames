@@ -1,4 +1,5 @@
 import { isExameClinicoManual } from "@/lib/exame-pricing";
+import { MOTIVO_ASO_INCLUSO_CONTRATO } from "@/lib/contrato-creditos-aso";
 import { parseMoney } from "@/lib/money";
 import type { ExameFormItem } from "@/lib/types";
 import type { ExamePayload } from "@/services/agendamento.service";
@@ -80,6 +81,11 @@ export function assertExamesValorClientePermitido(
 
     if (valor < 0) {
       throw new Error(VALOR_CLIENTE_ZERO_BLOQUEADO_MSG);
+    }
+
+    const motivo = exame.motivo_valor_zero?.trim() || "";
+    if (motivo === MOTIVO_ASO_INCLUSO_CONTRATO) {
+      continue;
     }
 
     if (isExameClinicoManual(exame.tipo_exame)) {

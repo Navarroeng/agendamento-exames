@@ -26,6 +26,11 @@ import {
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
 import {
+  applyValoresCreditoContratoNosExames,
+  applyValoresCreditoContratoNosExamesPayload,
+  type ContratoCreditoAsoRecord,
+} from "@/lib/contrato-creditos-aso";
+import {
   listarExamesDisponiveisParaAdicionar,
   mensagemExameJaNoAgendamento,
   separarExamesCatalogoParaAdicionar,
@@ -115,6 +120,10 @@ import {
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
 import { invalidarContabilizacaoPorCancelamento } from "@/services/contrato-agendamentos.service";
+import {
+  listarCreditosDisponiveisDoCliente,
+  vincularCreditoUtilizadoAoContrato,
+} from "@/services/contrato-creditos-aso.service";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -257,6 +266,23 @@ export function useAgendamentosPage() {
   const [clienteValidacaoLoading, setClienteValidacaoLoading] = useState(false);
   const clienteValidacaoSeqRef = useRef(0);
   const [clienteId, setClienteId] = useState("");
+  const [creditoAsoModalOpen, setCreditoAsoModalOpen] = useState(false);
+  const [creditosAsoDisponiveis, setCreditosAsoDisponiveis] = useState<
+    Array<
+      ContratoCreditoAsoRecord & {
+        contrato_numero: string | null;
+        contrato_data_inicio: string | null;
+        contrato_data_fim: string | null;
+      }
+    >
+  >([]);
+  const [creditoAsoSelectedId, setCreditoAsoSelectedId] = useState<string | null>(
+    null
+  );
+  const [creditoAsoEmUsoId, setCreditoAsoEmUsoId] = useState<string | null>(null);
+  const [creditoAsoNumeroContrato, setCreditoAsoNumeroContrato] = useState<
+    string | null
+  >(null);
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
@@ -730,6 +756,11 @@ export function useAgendamentosPage() {
     setCargoChangeModalOpen(false);
     setClienteProcuracaoModalOpen(false);
     setPendingClienteId(null);
+    setCreditoAsoModalOpen(false);
+    setCreditosAsoDisponiveis([]);
+    setCreditoAsoSelectedId(null);
+    setCreditoAsoEmUsoId(null);
+    setCreditoAsoNumeroContrato(null);
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
     setInadimplenciaCliente(null);
@@ -826,6 +857,31 @@ export function useAgendamentosPage() {
 
         setClienteId(nextClienteId);
         setField("cliente_nome", cliente.nome);
+
+        if (!editingId) {
+          try {
+            const creditos = await listarCreditosDisponiveisDoCliente({
+              clienteId: cliente.id,
+              clienteCnpj: cliente.cnpj,
+            });
+            if (seq !== clienteValidacaoSeqRef.current) return false;
+            if (creditos.length > 0) {
+              setCreditosAsoDisponiveis(creditos);
+              setCreditoAsoSelectedId(
+                creditos.length === 1 ? creditos[0].id : null
+              );
+              setCreditoAsoModalOpen(true);
+            } else {
+              setCreditosAsoDisponiveis([]);
+              setCreditoAsoSelectedId(null);
+              setCreditoAsoEmUsoId(null);
+              setCreditoAsoNumeroContrato(null);
+            }
+          } catch (credErr) {
+            console.error("Erro ao consultar créditos ASO:", credErr);
+          }
+        }
+
         return true;
       } catch (err) {
         if (seq !== clienteValidacaoSeqRef.current) return false;
@@ -1158,6 +1214,24 @@ export function useAgendamentosPage() {
       });
       setClienteProcuracaoModalOpen(false);
       setPendingClienteId(null);
+
+      if (!editingId) {
+        try {
+          const creditos = await listarCreditosDisponiveisDoCliente({
+            clienteId: cliente.id,
+            clienteCnpj: cliente.cnpj,
+          });
+          if (creditos.length > 0) {
+            setCreditosAsoDisponiveis(creditos);
+            setCreditoAsoSelectedId(
+              creditos.length === 1 ? creditos[0].id : null
+            );
+            setCreditoAsoModalOpen(true);
+          }
+        } catch (credErr) {
+          console.error("Erro ao consultar créditos ASO:", credErr);
+        }
+      }
     } finally {
       setClienteProcuracaoConfirmLoading(false);
     }
@@ -1169,6 +1243,49 @@ export function useAgendamentosPage() {
     auditContext,
     editingId,
     form.colaborador,
+  ]);
+
+  const handleCreditoAsoNaoUtilizar = useCallback(() => {
+    setCreditoAsoModalOpen(false);
+    setCreditoAsoEmUsoId(null);
+    setCreditoAsoNumeroContrato(null);
+    setCreditoAsoSelectedId(null);
+  }, []);
+
+  const handleCreditoAsoUtilizar = useCallback(() => {
+    const id =
+      creditoAsoSelectedId ||
+      (creditosAsoDisponiveis.length === 1
+        ? creditosAsoDisponiveis[0].id
+        : null);
+    if (!id) {
+      toast.error("Selecione o ASO contratual que deseja utilizar.");
+      return;
+    }
+    const credito = creditosAsoDisponiveis.find((c) => c.id === id);
+    setCreditoAsoEmUsoId(id);
+    setCreditoAsoNumeroContrato(credito?.contrato_numero ?? null);
+    setCreditoAsoModalOpen(false);
+
+    // Aplica valor zero nos exames do cargo já carregados (feedback visual).
+    void (async () => {
+      try {
+        let nomesCargo: string[] = [];
+        if (cargoId) {
+          const obrigatorios = await listarExamesObrigatoriosPorCargo(cargoId);
+          nomesCargo = obrigatorios.map((e) => e.nome).filter(Boolean);
+        }
+        loadExams(applyValoresCreditoContratoNosExames(exams, nomesCargo));
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, [
+    creditoAsoSelectedId,
+    creditosAsoDisponiveis,
+    cargoId,
+    exams,
+    loadExams,
   ]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
@@ -1975,7 +2092,26 @@ export function useAgendamentosPage() {
           };
         }
 
-        const examesPayload = getExamesPayload();
+        const examesPayloadRaw = getExamesPayload();
+        let examesPayload = examesPayloadRaw;
+
+        if (!editingId && creditoAsoEmUsoId) {
+          let nomesCargo: string[] = [];
+          if (cargoId) {
+            try {
+              const obrigatorios = await listarExamesObrigatoriosPorCargo(cargoId);
+              nomesCargo = obrigatorios
+                .map((e) => e.nome?.trim() || "")
+                .filter(Boolean);
+            } catch (cargoErr) {
+              console.error("Erro ao carregar exames do cargo:", cargoErr);
+            }
+          }
+          examesPayload = applyValoresCreditoContratoNosExamesPayload(
+            examesPayloadRaw,
+            nomesCargo
+          );
+        }
 
         if (editingId) {
           const anterior = getById(editingId);
@@ -2055,6 +2191,33 @@ export function useAgendamentosPage() {
             agendamentoId: novoId,
             colaborador: payload.colaborador,
           });
+
+          if (creditoAsoEmUsoId) {
+            const credito = creditosAsoDisponiveis.find(
+              (c) => c.id === creditoAsoEmUsoId
+            );
+            if (credito) {
+              try {
+                await vincularCreditoUtilizadoAoContrato({
+                  creditoId: credito.id,
+                  agendamentoId: novoId,
+                  contratoId: credito.contrato_id,
+                  colaborador: payload.colaborador,
+                  colaboradorCpf: payload.colaborador_cpf ?? null,
+                  usuarioNome: historicoUsuario,
+                  numeroContrato: credito.contrato_numero,
+                });
+              } catch (creditoErr) {
+                console.error(creditoErr);
+                toast.error(
+                  creditoErr instanceof Error
+                    ? creditoErr.message
+                    : "Agendamento salvo, mas o crédito contratual não pôde ser vinculado."
+                );
+              }
+            }
+          }
+
           await registrarHistorico(
             novoId,
             historicoUsuario,
@@ -2358,6 +2521,14 @@ export function useAgendamentosPage() {
     clientesLoading,
     clienteId,
     handleClienteChange,
+    creditoAsoModalOpen,
+    creditosAsoDisponiveis,
+    creditoAsoSelectedId,
+    setCreditoAsoSelectedId,
+    creditoAsoEmUsoId,
+    creditoAsoNumeroContrato,
+    handleCreditoAsoNaoUtilizar,
+    handleCreditoAsoUtilizar,
     cargoId,
     cargosAtivos: cargosFormOptions,
     cargosLoading,

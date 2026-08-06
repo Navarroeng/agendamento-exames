@@ -32,7 +32,11 @@ import type {
 
 export type ExamePayload = Pick<
   ExameInsert,
-  "tipo_exame" | "valor_cliente" | "custo_clinica" | "motivo_valor_zero"
+  | "tipo_exame"
+  | "valor_cliente"
+  | "custo_clinica"
+  | "motivo_valor_zero"
+  | "incluso_credito_contrato"
 >;
 
 const EXAMES_SAVE_ERROR =
@@ -60,6 +64,7 @@ function toExameInsertRows(
     valor_cliente: exame.valor_cliente,
     custo_clinica: exame.custo_clinica,
     motivo_valor_zero: exame.motivo_valor_zero?.trim() || null,
+    incluso_credito_contrato: Boolean(exame.incluso_credito_contrato),
   }));
 }
 

@@ -11,6 +11,7 @@ import { AgendamentoClienteProcuracaoModal } from "@/components/modals/Agendamen
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
 import { PeriodicoFuturoVinculoModal } from "@/components/agendamentos/PeriodicoFuturoVinculoModal";
+import { CreditoAsoDisponivelModal } from "@/components/agendamentos/CreditoAsoDisponivelModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -48,6 +49,14 @@ export function AgendamentoPage() {
     clientesLoading,
     clienteId,
     handleClienteChange,
+    creditoAsoModalOpen,
+    creditosAsoDisponiveis,
+    creditoAsoSelectedId,
+    setCreditoAsoSelectedId,
+    creditoAsoEmUsoId,
+    creditoAsoNumeroContrato,
+    handleCreditoAsoNaoUtilizar,
+    handleCreditoAsoUtilizar,
     cargoId,
     cargosAtivos,
     cargosLoading,
@@ -172,6 +181,12 @@ export function AgendamentoPage() {
             onDataBlur={handleDataBlur}
             onCpfBlur={handleCpfBlur}
           />
+          {creditoAsoEmUsoId && creditoAsoNumeroContrato ? (
+            <div className="mb-3 rounded-xl border border-brand-blue/30 bg-brand-blue-soft px-4 py-3 text-sm font-semibold leading-relaxed text-brand-blue">
+              Este agendamento utilizará 1 ASO disponível do contrato{" "}
+              {creditoAsoNumeroContrato}.
+            </div>
+          ) : null}
           <ExamSection
             exams={exams}
             aso={form.aso}
@@ -316,6 +331,15 @@ export function AgendamentoPage() {
         exames={examesDisponiveisParaAdicionar}
         onClose={closeExamesAdicionaisModal}
         onConfirm={handleConfirmExamesAdicionais}
+      />
+      <CreditoAsoDisponivelModal
+        open={creditoAsoModalOpen}
+        clienteNome={form.cliente_nome}
+        creditos={creditosAsoDisponiveis}
+        selectedId={creditoAsoSelectedId}
+        onSelectId={setCreditoAsoSelectedId}
+        onNaoUtilizar={handleCreditoAsoNaoUtilizar}
+        onUtilizar={handleCreditoAsoUtilizar}
       />
 
       {saving && (
