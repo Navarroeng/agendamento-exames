@@ -71,6 +71,7 @@ import {
 } from "@/lib/implantacao-treinamento";
 import {
   classifyOrcamentoFluxoImplantacao,
+  resolveItensParaFluxoImplantacao,
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 
@@ -219,10 +220,10 @@ export function OrcamentoAprovarModal({
   useEffect(() => {
     if (!open || !orcamento) return;
     const treinamentosId = resolveTreinamentosServicoId(servicos);
-    const itens =
-      aprovacao?.orcamento_aprovacao_itens?.length
-        ? aprovacao.orcamento_aprovacao_itens
-        : orcamento.orcamento_itens ?? [];
+    const itens = resolveItensParaFluxoImplantacao({
+      aprovacaoItens: aprovacao?.orcamento_aprovacao_itens,
+      orcamentoItens: orcamento.orcamento_itens,
+    });
     const fluxo = classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
     const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
@@ -361,10 +362,10 @@ export function OrcamentoAprovarModal({
   const fluxoImplantacao = useMemo(() => {
     if (!orcamento) return "padrao" as const;
     const treinamentosId = resolveTreinamentosServicoId(servicos);
-    const itens =
-      aprovacao?.orcamento_aprovacao_itens?.length
-        ? aprovacao.orcamento_aprovacao_itens
-        : orcamento.orcamento_itens ?? [];
+    const itens = resolveItensParaFluxoImplantacao({
+      aprovacaoItens: aprovacao?.orcamento_aprovacao_itens,
+      orcamentoItens: orcamento.orcamento_itens,
+    });
     return classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
   }, [orcamento, aprovacao, servicos]);
   const etapasCtx: OrcamentoEtapasContexto = useMemo(

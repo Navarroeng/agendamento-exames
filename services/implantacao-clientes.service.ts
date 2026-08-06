@@ -8,6 +8,7 @@ import {
 } from "@/lib/implantacao-clientes";
 import {
   classifyOrcamentoFluxoImplantacao,
+  resolveItensParaFluxoImplantacao,
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
@@ -120,7 +121,16 @@ export async function listarProcessosImplantacao(): Promise<
       itensByOrcamento.set(a.orcamento_id, itens);
     }
   }
-  const needItens = idsArray.filter((id) => !itensByOrcamento.has(id));
+  // Completa com itens do orçamento quando aprovação não trouxe serviços úteis
+  const needItens = idsArray.filter((id) => {
+    const current = itensByOrcamento.get(id) ?? [];
+    return (
+      resolveItensParaFluxoImplantacao({
+        aprovacaoItens: current,
+        orcamentoItens: [],
+      }).length === 0
+    );
+  });
   if (needItens.length > 0) {
     const { data: itensRows, error: itensErr } = await supabase
       .from("orcamento_itens")
@@ -183,7 +193,10 @@ export async function listarProcessosImplantacao(): Promise<
       ? programacoesPorContrato.get(contrato.id) ?? 0
       : 0;
 
-    const itens = itensByOrcamento.get(id) ?? [];
+    const itens = resolveItensParaFluxoImplantacao({
+      aprovacaoItens: itensByOrcamento.get(id) ?? [],
+      orcamentoItens: [],
+    });
     const fluxoImplantacao = classifyOrcamentoFluxoImplantacao(
       itens,
       treinamentosServicoId

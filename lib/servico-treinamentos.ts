@@ -1,6 +1,6 @@
 /**
- * Detecção do serviço SST "Treinamentos" (nome exato no catálogo).
- * Preferir servico_id; fallback por igualdade estrita do nome (sem includes).
+ * Detecção do serviço SST "Treinamentos".
+ * Preferir servico_id; fallback por nome normalizado (sem includes).
  */
 
 export const SERVICO_SST_NOME_TREINAMENTOS = "Treinamentos" as const;
@@ -15,11 +15,25 @@ export type ServicoItemRef = {
   servico_nome?: string | null;
 };
 
+/** Remove acentos, espaços extras e normaliza para comparação exata. */
+export function normalizeServicoNome(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+export const SERVICO_SST_NOME_TREINAMENTOS_NORMALIZADO =
+  normalizeServicoNome(SERVICO_SST_NOME_TREINAMENTOS);
+
 export function resolveTreinamentosServicoId(
   servicos: Array<{ id: string; nome: string }>
 ): string | null {
   const found = servicos.find(
-    (s) => s.nome.trim() === SERVICO_SST_NOME_TREINAMENTOS
+    (s) =>
+      normalizeServicoNome(s.nome) === SERVICO_SST_NOME_TREINAMENTOS_NORMALIZADO
   );
   return found?.id ?? null;
 }
@@ -32,7 +46,32 @@ export function isServicoTreinamentos(
   if (treinamentosServicoId && id) {
     return id === treinamentosServicoId;
   }
-  return (item.servico_nome ?? "").trim() === SERVICO_SST_NOME_TREINAMENTOS;
+  return (
+    normalizeServicoNome(item.servico_nome) ===
+    SERVICO_SST_NOME_TREINAMENTOS_NORMALIZADO
+  );
+}
+
+/**
+ * Itens para classificação: prioriza aprovação (snapshot), senão itens do orçamento.
+ * Se a aprovação existir mas vier sem serviços úteis, cai no orçamento.
+ */
+export function resolveItensParaFluxoImplantacao(params: {
+  orcamentoItens?: ServicoItemRef[] | null;
+  aprovacaoItens?: ServicoItemRef[] | null;
+}): ServicoItemRef[] {
+  const aprovacao = (params.aprovacaoItens ?? []).filter(
+    (item) =>
+      Boolean((item.servico_id ?? "").trim()) ||
+      Boolean((item.servico_nome ?? "").trim())
+  );
+  if (aprovacao.length > 0) return aprovacao;
+
+  return (params.orcamentoItens ?? []).filter(
+    (item) =>
+      Boolean((item.servico_id ?? "").trim()) ||
+      Boolean((item.servico_nome ?? "").trim())
+  );
 }
 
 export function classifyOrcamentoFluxoImplantacao(

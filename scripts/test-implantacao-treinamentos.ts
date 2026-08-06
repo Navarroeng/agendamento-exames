@@ -17,12 +17,20 @@ import {
 import {
   classifyOrcamentoFluxoImplantacao,
   isServicoTreinamentos,
+  normalizeServicoNome,
+  resolveItensParaFluxoImplantacao,
 } from "../lib/servico-treinamentos";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
 
 const TREINO_ID = "srv-treinamentos";
 
+assert.equal(normalizeServicoNome("  Treinamentos  "), "treinamentos");
+assert.equal(normalizeServicoNome("TREINAMENTOS"), "treinamentos");
+assert.equal(
+  isServicoTreinamentos({ servico_nome: " treinamentos " }, null),
+  true
+);
 assert.equal(
   isServicoTreinamentos(
     { servico_id: TREINO_ID, servico_nome: "Outro" },
@@ -41,6 +49,14 @@ assert.equal(
 assert.equal(
   isServicoTreinamentos({ servico_nome: "Treinamentos" }, null),
   true
+);
+
+assert.deepEqual(
+  resolveItensParaFluxoImplantacao({
+    aprovacaoItens: [{ servico_id: null, servico_nome: "" }],
+    orcamentoItens: [{ servico_id: TREINO_ID, servico_nome: "Treinamentos" }],
+  }),
+  [{ servico_id: TREINO_ID, servico_nome: "Treinamentos" }]
 );
 
 assert.equal(
