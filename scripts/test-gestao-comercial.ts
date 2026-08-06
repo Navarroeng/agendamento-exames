@@ -38,7 +38,7 @@ const base = (
 
 const historico: GestaoComercialHistoricoMensal[] = [
   { ano: 2025, mes: 1, valorFechado: 25910, origemDado: "historico_manual" },
-  { ano: 2026, mes: 6, valorFechado: 11500, origemDado: "historico_manual" },
+  { ano: 2026, mes: 6, valorFechado: 19700, origemDado: "historico_manual" },
   { ano: 2026, mes: 7, valorFechado: 99999, origemDado: "historico_manual" },
 ];
 
@@ -73,7 +73,7 @@ assert.equal(jan2025.origem, "historico_manual");
 
 // 2) Junho/2026 histórico
 const jun2026 = resolveValorMesGestaoComercial([], filtersBase, 2026, 6, histMap);
-assert.equal(jun2026.valorFechado, 11500);
+assert.equal(jun2026.valorFechado, 19700);
 assert.equal(jun2026.origem, "historico_manual");
 
 // 3) Julho/2026: real prevalece e NÃO soma com histórico 99999
@@ -103,14 +103,14 @@ const dashJul = buildGestaoComercialDashboard(
   historico
 );
 assert.equal(dashJul.valorFechado, 8000);
-assert.equal(dashJul.comparacao.valorAnterior, 11500);
-assert.equal(dashJul.comparacao.diferenca, 8000 - 11500);
+assert.equal(dashJul.comparacao.valorAnterior, 19700);
+assert.equal(dashJul.comparacao.diferenca, 8000 - 19700);
 assert.equal(dashJul.comparacao.origemAnterior, "historico_manual");
 assert.equal(dashJul.comparacao.origemAtual, "sistema");
 
 // 5) Mês histórico: cards sem detalhes
 const dashJun = buildGestaoComercialDashboard([], filtersBase, historico);
-assert.equal(dashJun.valorFechado, 11500);
+assert.equal(dashJun.valorFechado, 19700);
 assert.equal(dashJun.indicadoresDetalhadosDisponiveis, false);
 assert.equal(dashJun.contratosFechados, 0);
 assert.equal(dashJun.rows.length, 0);
@@ -120,7 +120,7 @@ assert.ok(dashJun.mensagemDetalhesIndisponiveis);
 const serieJun = dashJul.serieMensalAno.find((s) => s.mes === 6);
 const serieJul = dashJul.serieMensalAno.find((s) => s.mes === 7);
 assert.equal(serieJun?.origem, "historico_manual");
-assert.equal(serieJun?.valorFechado, 11500);
+assert.equal(serieJun?.valorFechado, 19700);
 assert.equal(serieJul?.origem, "sistema");
 assert.equal(serieJul?.valorFechado, 8000);
 
@@ -142,7 +142,7 @@ assert.equal(conflito.valorFechado, 500);
 assert.equal(conflito.origem, "sistema");
 
 // 8) Total anual sem duplicidade
-assert.ok(dashJul.totalAnualValor >= 11500 + 8000 - 0.01);
+assert.ok(dashJul.totalAnualValor >= 19700 + 8000 - 0.01);
 
 // Regressão: ativos excluem encerrados
 const rows: GestaoComercialFechamentoRow[] = [

@@ -71,7 +71,7 @@ insert into public.gestao_comercial_historico_mensal (
   (2026, 3, 26070.00, 'historico_manual', 'Valor consolidado anterior ao início do sistema', 'migration_079', 'migration_079'),
   (2026, 4, 56550.00, 'historico_manual', 'Valor consolidado anterior ao início do sistema', 'migration_079', 'migration_079'),
   (2026, 5, 18525.00, 'historico_manual', 'Valor consolidado anterior ao início do sistema', 'migration_079', 'migration_079'),
-  (2026, 6, 11500.00, 'historico_manual', 'Valor consolidado anterior ao início do sistema', 'migration_079', 'migration_079')
+  (2026, 6, 19700.00, 'historico_manual', 'Valor consolidado anterior ao início do sistema', 'migration_079', 'migration_079')
 on conflict (ano, mes) do update
 set
   valor_fechado = excluded.valor_fechado,
