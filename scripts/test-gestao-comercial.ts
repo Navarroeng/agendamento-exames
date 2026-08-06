@@ -2,9 +2,11 @@
 import assert from "node:assert/strict";
 import {
   buildGestaoComercialDashboard,
+  buildEvolucaoAnualGestaoComercial,
   calcComparacaoMes,
   indexHistoricoMensal,
   isContratoContabilizavel,
+  labelPeriodoAteMes,
   resolveValorFechado,
   resolveValorMesGestaoComercial,
   type GestaoComercialFechamentoRow,
@@ -225,5 +227,86 @@ const dash2026Cmp = buildGestaoComercialDashboard(
 );
 assert.equal(dash2026Cmp.anoComparacaoA, 2025);
 assert.equal(dash2026Cmp.anoComparacaoB, 2026);
+
+// 10) Evolução anual executiva
+
+const seedAnual: GestaoComercialHistoricoMensal[] = [
+  // 2023
+  ...[32480.5, 37766, 46910, 8200, 9655, 11240, 10070, 17095, 6075, 15775, 15985, 19120].map(
+    (v, i) => ({
+      ano: 2023,
+      mes: i + 1,
+      valorFechado: v,
+      origemDado: "historico_manual" as const,
+    })
+  ),
+  // 2024
+  ...[18455, 22746, 16390, 43835, 9790, 6125, 19645, 22020, 11589, 20000, 8500, 17370].map(
+    (v, i) => ({
+      ano: 2024,
+      mes: i + 1,
+      valorFechado: v,
+      origemDado: "historico_manual" as const,
+    })
+  ),
+  // 2025
+  ...[25910, 25646, 16980, 36785, 23300, 20300, 33600, 39150, 26900, 25400, 29295, 40000].map(
+    (v, i) => ({
+      ano: 2025,
+      mes: i + 1,
+      valorFechado: v,
+      origemDado: "historico_manual" as const,
+    })
+  ),
+  // 2026 jan-jun
+  ...[40900, 37426, 26070, 56550, 18525, 19700].map((v, i) => ({
+    ano: 2026,
+    mes: i + 1,
+    valorFechado: v,
+    origemDado: "historico_manual" as const,
+  })),
+];
+
+const nowAgo = new Date(Date.UTC(2026, 7, 6)); // 6 ago 2026
+const evo = buildEvolucaoAnualGestaoComercial(
+  [],
+  filtersBase,
+  seedAnual,
+  nowAgo
+);
+assert.deepEqual(evo.anosDisponiveis, [2023, 2024, 2025, 2026]);
+assert.equal(evo.melhorAnoCompleto?.ano, 2025);
+assert.equal(evo.melhorAnoCompleto?.valor, 343266);
+assert.equal(evo.crescimentoUltimosCompletos?.anoRecente, 2025);
+assert.equal(evo.crescimentoUltimosCompletos?.anoAnterior, 2024);
+
+const p2023 = evo.pontosAnuais.find((p) => p.ano === 2023)!;
+const p2024 = evo.pontosAnuais.find((p) => p.ano === 2024)!;
+const p2025 = evo.pontosAnuais.find((p) => p.ano === 2025)!;
+const p2026 = evo.pontosAnuais.find((p) => p.ano === 2026)!;
+assert.equal(p2023.parcial, false);
+assert.equal(p2024.parcial, false);
+assert.equal(p2025.parcial, false);
+assert.equal(p2026.parcial, true);
+assert.equal(p2023.valorTotal, 230371.5);
+assert.equal(p2024.valorTotal, 216465);
+assert.equal(p2025.valorTotal, 343266);
+assert.equal(p2026.valorTotal, 199171); // só até jun no seed; sem jul/ago históricos
+assert.equal(p2026.mesAte, 6);
+assert.equal(p2026.periodoLabel, labelPeriodoAteMes(6));
+
+// Comparação mesmo período: jan-jun 2026 vs jan-jun 2025
+const janJun2025 = 25910 + 25646 + 16980 + 36785 + 23300 + 20300;
+assert.equal(evo.anoAtualVsMesmoPeriodo?.mesAte, 6);
+assert.equal(evo.anoAtualVsMesmoPeriodo?.valorAtual, 199171);
+assert.equal(evo.anoAtualVsMesmoPeriodo?.valorAnterior, janJun2025);
+
+// Acumulado: fev 2025 = jan+fev
+const fev2025 = evo.acumuladoMensal.find((m) => m.mes === 2)!;
+assert.equal(fev2025.porAno[2025], 25910 + 25646);
+// Meses futuros de 2026 = null
+const set2026 = evo.acumuladoMensal.find((m) => m.mes === 9)!;
+assert.equal(set2026.porAno[2026], null);
+assert.ok(set2026.porAno[2025] != null);
 
 console.log("test-gestao-comercial: OK");

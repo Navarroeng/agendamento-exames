@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconChart } from "@/components/ui/icons/OutlineIcons";
 import { GestaoComercialBreakdowns } from "@/components/gestao-comercial/GestaoComercialBreakdowns";
 import { GestaoComercialCards } from "@/components/gestao-comercial/GestaoComercialCards";
-import { GestaoComercialComparacaoAnualChart } from "@/components/gestao-comercial/GestaoComercialComparacaoAnualChart";
+import { GestaoComercialEvolucaoAnualChart } from "@/components/gestao-comercial/GestaoComercialEvolucaoAnualChart";
 import { GestaoComercialEvolucaoChart } from "@/components/gestao-comercial/GestaoComercialEvolucaoChart";
 import { GestaoComercialFiltersBar } from "@/components/gestao-comercial/GestaoComercialFiltersBar";
 import { GestaoComercialTabela } from "@/components/gestao-comercial/GestaoComercialTabela";
@@ -67,10 +67,8 @@ export function GestaoComercialPage() {
                   ano={filters.ano}
                   totalAnual={dashboard.totalAnualValor}
                 />
-                <GestaoComercialComparacaoAnualChart
-                  data={dashboard.serieComparacaoAnual}
-                  anoA={dashboard.anoComparacaoA}
-                  anoB={dashboard.anoComparacaoB}
+                <GestaoComercialEvolucaoAnualChart
+                  evolucao={dashboard.evolucaoAnual}
                 />
                 <GestaoComercialBreakdowns dashboard={dashboard} />
                 <GestaoComercialTabela

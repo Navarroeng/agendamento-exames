@@ -95,6 +95,53 @@ export interface GestaoComercialSerieAnualMes {
   origemAnoB: GestaoComercialOrigemDado | null;
 }
 
+export type GestaoComercialOrigemAno = GestaoComercialOrigemDado | "mista";
+
+export interface GestaoComercialAnoPonto {
+  ano: number;
+  valorTotal: number;
+  parcial: boolean;
+  mesAte: number;
+  periodoLabel: string;
+  origem: GestaoComercialOrigemAno | null;
+  variacaoPercentual: number | null;
+  variacaoAbsoluta: number | null;
+  valorComparavelAnterior: number | null;
+  anoComparavelAnterior: number | null;
+}
+
+export interface GestaoComercialAcumuladoMes {
+  mes: number;
+  label: string;
+  /** Acumulado jan→mês por ano; null = mês futuro / sem dado ainda. */
+  porAno: Record<number, number | null>;
+}
+
+export interface GestaoComercialEvolucaoAnual {
+  pontosAnuais: GestaoComercialAnoPonto[];
+  acumuladoMensal: GestaoComercialAcumuladoMes[];
+  anosDisponiveis: number[];
+  melhorAnoCompleto: { ano: number; valor: number } | null;
+  crescimentoUltimosCompletos: {
+    anoAnterior: number;
+    anoRecente: number;
+    diferenca: number;
+    percentual: number | null;
+  } | null;
+  anoAtualVsMesmoPeriodo: {
+    anoAtual: number;
+    anoAnterior: number;
+    mesAte: number;
+    periodoLabel: string;
+    valorAtual: number;
+    valorAnterior: number;
+    diferenca: number;
+    percentual: number | null;
+    tendencia: "alta" | "baixa" | "igual" | "sem_base";
+  } | null;
+  historicoFiltrado: boolean;
+}
+
 export interface GestaoComercialGrupoResumo {
   chave: string;
   label: string;
@@ -129,6 +176,7 @@ export interface GestaoComercialDashboard {
   serieComparacaoAnual: GestaoComercialSerieAnualMes[];
   anoComparacaoA: number;
   anoComparacaoB: number;
+  evolucaoAnual: GestaoComercialEvolucaoAnual;
   totalAnualValor: number;
   porOrigem: GestaoComercialGrupoResumo[];
   porResponsavel: GestaoComercialGrupoResumo[];
@@ -493,6 +541,300 @@ export function labelOrigemGestaoComercial(
   return "Sem dados";
 }
 
+export function labelOrigemAnoGestaoComercial(
+  origem: GestaoComercialOrigemAno | null | undefined
+): string {
+  if (origem === "mista") {
+    return "Histórico consolidado e dados reais";
+  }
+  return labelOrigemGestaoComercial(origem);
+}
+
+export function labelPeriodoAteMes(mesAte: number): string {
+  if (mesAte <= 0) return "Sem período";
+  if (mesAte === 12) return "Ano completo";
+  if (mesAte === 1) return "Janeiro";
+  return `Janeiro a ${MESES_PT[mesAte - 1]}`;
+}
+
+export function listarAnosDisponiveisGestaoComercial(params: {
+  historico: GestaoComercialHistoricoMensal[];
+  allRows: GestaoComercialFechamentoRow[];
+  now?: Date;
+}): number[] {
+  const now = params.now ?? new Date();
+  const set = new Set<number>();
+  set.add(now.getFullYear());
+  for (const h of params.historico) {
+    if (Number.isFinite(h.ano)) set.add(h.ano);
+  }
+  for (const row of params.allRows) {
+    const y = Number(String(row.aprovadoEm).slice(0, 4));
+    if (Number.isFinite(y) && y >= 2000) set.add(y);
+  }
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+export function somarMesesGestaoComercial(params: {
+  allRows: GestaoComercialFechamentoRow[];
+  filters: GestaoComercialFilters;
+  historicoMap: Map<string, number>;
+  ano: number;
+  mesAte: number;
+}): {
+  valor: number;
+  origem: GestaoComercialOrigemAno | null;
+  ultimoMesComValor: number;
+} {
+  let valor = 0;
+  let temSistema = false;
+  let temHistorico = false;
+  let ultimoMesComValor = 0;
+  const limite = Math.max(0, Math.min(12, params.mesAte));
+  for (let mes = 1; mes <= limite; mes++) {
+    const resolved = resolveValorMesGestaoComercial(
+      params.allRows,
+      params.filters,
+      params.ano,
+      mes,
+      params.historicoMap
+    );
+    if (resolved.valorFechado == null) continue;
+    valor += resolved.valorFechado;
+    ultimoMesComValor = mes;
+    if (resolved.origem === "sistema") temSistema = true;
+    if (resolved.origem === "historico_manual") temHistorico = true;
+  }
+  const origem: GestaoComercialOrigemAno | null =
+    temSistema && temHistorico
+      ? "mista"
+      : temSistema
+        ? "sistema"
+        : temHistorico
+          ? "historico_manual"
+          : null;
+  return { valor, origem, ultimoMesComValor };
+}
+
+function calcVariacao(
+  atual: number,
+  anterior: number
+): {
+  diferenca: number;
+  percentual: number | null;
+  tendencia: "alta" | "baixa" | "igual" | "sem_base";
+} {
+  const diferenca = atual - anterior;
+  if (anterior === 0) {
+    return { diferenca, percentual: null, tendencia: "sem_base" };
+  }
+  const percentual = (diferenca / anterior) * 100;
+  if (Math.abs(diferenca) < 0.005) {
+    return { diferenca: 0, percentual: 0, tendencia: "igual" };
+  }
+  return {
+    diferenca,
+    percentual,
+    tendencia: percentual > 0 ? "alta" : "baixa",
+  };
+}
+
+export function buildEvolucaoAnualGestaoComercial(
+  allRows: GestaoComercialFechamentoRow[],
+  filters: GestaoComercialFilters,
+  historico: GestaoComercialHistoricoMensal[] = [],
+  now = new Date()
+): GestaoComercialEvolucaoAnual {
+  const historicoMap = indexHistoricoMensal(historico);
+  const anosDisponiveis = listarAnosDisponiveisGestaoComercial({
+    historico,
+    allRows,
+    now,
+  });
+  const anoAtual = now.getFullYear();
+  const mesCorrente = now.getMonth() + 1;
+  const historicoFiltrado =
+    Boolean(filters.responsavel) ||
+    Boolean(filters.origem) ||
+    Boolean(filters.tipo) ||
+    filters.statusContrato === "encerrados";
+
+  const filtersChart: GestaoComercialFilters = {
+    ...filters,
+    usarPeriodoPersonalizado: false,
+    periodoInicio: "",
+    periodoFim: "",
+  };
+
+  const totaisPorAno = new Map<
+    number,
+    {
+      valor: number;
+      parcial: boolean;
+      mesAte: number;
+      origem: GestaoComercialOrigemAno | null;
+    }
+  >();
+
+  for (const ano of anosDisponiveis) {
+    const parcial = ano === anoAtual;
+    const mesLimite = ano > anoAtual ? 0 : parcial ? mesCorrente : 12;
+    const soma = somarMesesGestaoComercial({
+      allRows,
+      filters: filtersChart,
+      historicoMap,
+      ano,
+      mesAte: mesLimite,
+    });
+    const mesAte = parcial
+      ? soma.ultimoMesComValor || mesCorrente
+      : 12;
+    // Recalcula parcial até o último mês com dados (não inventa meses vazios).
+    const efetivo =
+      parcial && soma.ultimoMesComValor > 0 && soma.ultimoMesComValor !== mesLimite
+        ? somarMesesGestaoComercial({
+            allRows,
+            filters: filtersChart,
+            historicoMap,
+            ano,
+            mesAte: soma.ultimoMesComValor,
+          })
+        : soma;
+    totaisPorAno.set(ano, {
+      valor: efetivo.valor,
+      parcial,
+      mesAte: parcial ? efetivo.ultimoMesComValor || mesCorrente : 12,
+      origem: efetivo.origem,
+    });
+  }
+
+  const pontosAnuais: GestaoComercialAnoPonto[] = anosDisponiveis.map((ano) => {
+    const atual = totaisPorAno.get(ano)!;
+    const anoAnterior = ano - 1;
+    const ant = totaisPorAno.get(anoAnterior);
+    let valorComparavelAnterior: number | null = null;
+    if (ant) {
+      if (atual.parcial) {
+        const cmp = somarMesesGestaoComercial({
+          allRows,
+          filters: filtersChart,
+          historicoMap,
+          ano: anoAnterior,
+          mesAte: atual.mesAte,
+        });
+        valorComparavelAnterior = cmp.valor;
+      } else if (!ant.parcial) {
+        valorComparavelAnterior = ant.valor;
+      }
+    }
+    const variacao =
+      valorComparavelAnterior != null
+        ? calcVariacao(atual.valor, valorComparavelAnterior)
+        : null;
+
+    return {
+      ano,
+      valorTotal: atual.valor,
+      parcial: atual.parcial,
+      mesAte: atual.mesAte,
+      periodoLabel: atual.parcial
+        ? labelPeriodoAteMes(atual.mesAte)
+        : "Ano completo",
+      origem: atual.origem,
+      variacaoPercentual: variacao?.percentual ?? null,
+      variacaoAbsoluta: variacao?.diferenca ?? null,
+      valorComparavelAnterior,
+      anoComparavelAnterior:
+        valorComparavelAnterior != null ? anoAnterior : null,
+    };
+  });
+
+  const acumuladoMensal: GestaoComercialAcumuladoMes[] = MESES_PT.map(
+    (label, idx) => {
+      const mes = idx + 1;
+      const porAno: Record<number, number | null> = {};
+      for (const ano of anosDisponiveis) {
+        const meta = totaisPorAno.get(ano)!;
+        if (ano > anoAtual) {
+          porAno[ano] = null;
+          continue;
+        }
+        if (ano === anoAtual && mes > meta.mesAte) {
+          porAno[ano] = null;
+          continue;
+        }
+        if (ano < anoAtual && mes > 12) {
+          porAno[ano] = null;
+          continue;
+        }
+        const soma = somarMesesGestaoComercial({
+          allRows,
+          filters: filtersChart,
+          historicoMap,
+          ano,
+          mesAte: mes,
+        });
+        porAno[ano] = soma.valor;
+      }
+      return { mes, label, porAno };
+    }
+  );
+
+  const anosCompletos = pontosAnuais.filter((p) => !p.parcial && p.valorTotal > 0);
+  let melhorAnoCompleto: GestaoComercialEvolucaoAnual["melhorAnoCompleto"] = null;
+  for (const p of anosCompletos) {
+    if (!melhorAnoCompleto || p.valorTotal > melhorAnoCompleto.valor) {
+      melhorAnoCompleto = { ano: p.ano, valor: p.valorTotal };
+    }
+  }
+
+  let crescimentoUltimosCompletos: GestaoComercialEvolucaoAnual["crescimentoUltimosCompletos"] =
+    null;
+  if (anosCompletos.length >= 2) {
+    const ordenados = [...anosCompletos].sort((a, b) => a.ano - b.ano);
+    const recente = ordenados[ordenados.length - 1];
+    const anterior = ordenados[ordenados.length - 2];
+    const v = calcVariacao(recente.valorTotal, anterior.valorTotal);
+    crescimentoUltimosCompletos = {
+      anoAnterior: anterior.ano,
+      anoRecente: recente.ano,
+      diferenca: v.diferenca,
+      percentual: v.percentual,
+    };
+  }
+
+  let anoAtualVsMesmoPeriodo: GestaoComercialEvolucaoAnual["anoAtualVsMesmoPeriodo"] =
+    null;
+  const pontoAtual = pontosAnuais.find((p) => p.ano === anoAtual && p.parcial);
+  if (pontoAtual && pontoAtual.valorComparavelAnterior != null) {
+    const v = calcVariacao(
+      pontoAtual.valorTotal,
+      pontoAtual.valorComparavelAnterior
+    );
+    anoAtualVsMesmoPeriodo = {
+      anoAtual,
+      anoAnterior: anoAtual - 1,
+      mesAte: pontoAtual.mesAte,
+      periodoLabel: pontoAtual.periodoLabel,
+      valorAtual: pontoAtual.valorTotal,
+      valorAnterior: pontoAtual.valorComparavelAnterior,
+      diferenca: v.diferenca,
+      percentual: v.percentual,
+      tendencia: v.tendencia,
+    };
+  }
+
+  return {
+    pontosAnuais,
+    acumuladoMensal,
+    anosDisponiveis,
+    melhorAnoCompleto,
+    crescimentoUltimosCompletos,
+    anoAtualVsMesmoPeriodo,
+    historicoFiltrado,
+  };
+}
+
 function emptyDetalheGroups(valorFechado: number) {
   return {
     porOrigem: [] as GestaoComercialGrupoResumo[],
@@ -705,6 +1047,13 @@ export function buildGestaoComercialDashboard(
     }
   );
 
+  const evolucaoAnual = buildEvolucaoAnualGestaoComercial(
+    allRows,
+    filters,
+    historico,
+    now
+  );
+
   const detalhes = indicadoresDetalhadosDisponiveis
     ? (() => {
         const origemMap = new Map<string, GestaoComercialFechamentoRow[]>();
@@ -785,6 +1134,7 @@ export function buildGestaoComercialDashboard(
     serieComparacaoAnual,
     anoComparacaoA,
     anoComparacaoB,
+    evolucaoAnual,
     totalAnualValor,
     ...detalhes,
     mensagemDetalhesIndisponiveis: indicadoresDetalhadosDisponiveis
