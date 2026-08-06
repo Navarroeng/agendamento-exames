@@ -256,6 +256,7 @@ export interface ExameInsert {
   valor_cliente: number;
   custo_clinica: number;
   motivo_valor_zero?: string | null;
+  incluso_credito_contrato?: boolean;
 }
 
 export interface AgendamentoRecord extends AgendamentoInsert {
@@ -270,6 +271,7 @@ export interface AgendamentoExameRecord {
   valor_cliente: number;
   custo_clinica: number;
   motivo_valor_zero?: string | null;
+  incluso_credito_contrato?: boolean | null;
 }
 
 export interface AgendamentoWithExames extends AgendamentoRecord {

@@ -65,6 +65,12 @@ export const AUDITORIA_ACOES = {
   treinamento_reagendado: "treinamento_reagendado",
   treinamento_realizado: "treinamento_realizado",
   treinamento_cancelado: "treinamento_cancelado",
+  credito_aso_registrado: "credito_aso_registrado",
+  credito_aso_utilizado: "credito_aso_utilizado",
+  credito_aso_devolvido: "credito_aso_devolvido",
+  credito_aso_expirado: "credito_aso_expirado",
+  credito_aso_removido: "credito_aso_removido",
+  credito_aso_observacao_editada: "credito_aso_observacao_editada",
 } as const;
 
 export type AuditoriaAcao =
@@ -135,6 +141,12 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   treinamento_reagendado: "Treinamento reagendado",
   treinamento_realizado: "Treinamento realizado",
   treinamento_cancelado: "Treinamento cancelado",
+  credito_aso_registrado: "ASO contratual em aberto registrado",
+  credito_aso_utilizado: "ASO contratual utilizado em agendamento",
+  credito_aso_devolvido: "ASO contratual devolvido ao saldo",
+  credito_aso_expirado: "ASO contratual expirado",
+  credito_aso_removido: "ASO contratual em aberto removido",
+  credito_aso_observacao_editada: "Observação do ASO em aberto editada",
 };
 
 export interface AuditoriaUsuarioContext {
