@@ -52,7 +52,11 @@ export function filterOrcamentos(
   const busca = filters.busca.trim();
 
   const filtered = orcamentos.filter((orcamento) => {
-    if (filters.status && orcamento.status !== filters.status) {
+    // "Todos" (status vazio) = ativos/em andamento: oculta contrato_encerrado.
+    // Só exibe encerrados quando o filtro específico é selecionado.
+    if (!filters.status) {
+      if (orcamento.status === "contrato_encerrado") return false;
+    } else if (orcamento.status !== filters.status) {
       return false;
     }
 
