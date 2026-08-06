@@ -51,6 +51,7 @@ export function AgendamentoPage() {
     clienteId,
     handleClienteChange,
     creditoAsoModalOpen,
+    creditoAsoModalVariant,
     creditosAsoDisponiveis,
     creditoAsoSelectedId,
     setCreditoAsoSelectedId,
@@ -356,6 +357,7 @@ export function AgendamentoPage() {
         clienteNome={form.cliente_nome}
         creditos={creditosAsoDisponiveis}
         selectedId={creditoAsoSelectedId}
+        variant={creditoAsoModalVariant}
         onSelectId={setCreditoAsoSelectedId}
         onNaoUtilizar={handleCreditoAsoNaoUtilizar}
         onUtilizar={handleCreditoAsoUtilizar}

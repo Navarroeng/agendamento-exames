@@ -25,6 +25,8 @@ import {
   podeRemoverExameAgendamento,
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
+import { resolverProximoAvisoBeneficio } from "@/lib/agendamento-beneficios-contratuais";
+import type { CreditoAsoModalVariant } from "@/components/agendamentos/CreditoAsoDisponivelModal";
 import {
   applyValoresCreditoContratoNosExames,
   applyValoresCreditoContratoNosExamesPayload,
@@ -276,6 +278,8 @@ export function useAgendamentosPage() {
   const clienteValidacaoSeqRef = useRef(0);
   const [clienteId, setClienteId] = useState("");
   const [creditoAsoModalOpen, setCreditoAsoModalOpen] = useState(false);
+  const [creditoAsoModalVariant, setCreditoAsoModalVariant] =
+    useState<CreditoAsoModalVariant>("padrao");
   const [creditosAsoDisponiveis, setCreditosAsoDisponiveis] = useState<
     Array<
       ContratoCreditoAsoRecord & {
@@ -292,6 +296,9 @@ export function useAgendamentosPage() {
   const [creditoAsoNumeroContrato, setCreditoAsoNumeroContrato] = useState<
     string | null
   >(null);
+  const creditoDecisionRef = useRef<"none" | "skip" | "use">("none");
+  const creditoAlertKeyRef = useRef<string | null>(null);
+  const continuarSaveAposCreditoRef = useRef<(() => void) | null>(null);
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
@@ -766,10 +773,13 @@ export function useAgendamentosPage() {
     setClienteProcuracaoModalOpen(false);
     setPendingClienteId(null);
     setCreditoAsoModalOpen(false);
+    setCreditoAsoModalVariant("padrao");
     setCreditosAsoDisponiveis([]);
     setCreditoAsoSelectedId(null);
     setCreditoAsoEmUsoId(null);
     setCreditoAsoNumeroContrato(null);
+    creditoDecisionRef.current = "none";
+    creditoAlertKeyRef.current = null;
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
     setInadimplenciaCliente(null);
@@ -867,27 +877,35 @@ export function useAgendamentosPage() {
         setClienteId(nextClienteId);
         setField("cliente_nome", cliente.nome);
 
+        // Troca de empresa: limpa vínculos/decisões anteriores.
+        periodicoDecisionRef.current = "none";
+        periodicoLinkIdRef.current = null;
+        periodicoAlertKeyRef.current = null;
+        setPeriodicoVinculoOpen(false);
+        setPeriodicoVinculoList([]);
+        creditoDecisionRef.current = "none";
+        creditoAlertKeyRef.current = null;
+        setCreditoAsoModalOpen(false);
+        setCreditoAsoModalVariant("padrao");
+        setCreditoAsoEmUsoId(null);
+        setCreditoAsoNumeroContrato(null);
+        setCreditoAsoSelectedId(null);
+
         if (!editingId) {
           try {
+            // Carrega silenciosamente — modal só após CPF.
             const creditos = await listarCreditosDisponiveisDoCliente({
               clienteId: cliente.id,
               clienteCnpj: cliente.cnpj,
             });
             if (seq !== clienteValidacaoSeqRef.current) return false;
-            if (creditos.length > 0) {
-              setCreditosAsoDisponiveis(creditos);
-              setCreditoAsoSelectedId(
-                creditos.length === 1 ? creditos[0].id : null
-              );
-              setCreditoAsoModalOpen(true);
-            } else {
-              setCreditosAsoDisponiveis([]);
-              setCreditoAsoSelectedId(null);
-              setCreditoAsoEmUsoId(null);
-              setCreditoAsoNumeroContrato(null);
-            }
+            setCreditosAsoDisponiveis(creditos);
+            setCreditoAsoSelectedId(
+              creditos.length === 1 ? creditos[0].id : null
+            );
           } catch (credErr) {
             console.error("Erro ao consultar créditos ASO:", credErr);
+            setCreditosAsoDisponiveis([]);
           }
         }
 
@@ -1050,6 +1068,12 @@ export function useAgendamentosPage() {
         periodicoDecisionRef.current = "none";
         periodicoLinkIdRef.current = null;
         periodicoAlertKeyRef.current = null;
+        creditoDecisionRef.current = "none";
+        creditoAlertKeyRef.current = null;
+        setCreditoAsoEmUsoId(null);
+        setCreditoAsoNumeroContrato(null);
+        setCreditoAsoModalOpen(false);
+        setCreditoAsoModalVariant("padrao");
       }
       if (field !== "data_agendamento") return;
 
@@ -1106,7 +1130,10 @@ export function useAgendamentosPage() {
           colaboradorCpf: form.colaborador_cpf,
           tipoAso: form.aso || null,
         });
-        if (pendentes.length === 0) return false;
+        if (pendentes.length === 0) {
+          setPeriodicoVinculoList([]);
+          return false;
+        }
 
         periodicoAlertKeyRef.current = alertKey;
         setPeriodicoVinculoList(pendentes);
@@ -1152,23 +1179,110 @@ export function useAgendamentosPage() {
     ]
   );
 
+  const oferecerCreditoAsoSeDisponivel = useCallback(
+    (variant: CreditoAsoModalVariant) => {
+      if (editingId) return false;
+      if (creditoDecisionRef.current !== "none") return false;
+      if (periodicoDecisionRef.current === "link") return false;
+      if (creditosAsoDisponiveis.length === 0) return false;
+
+      setCreditoAsoModalVariant(variant);
+      setCreditoAsoSelectedId(
+        creditosAsoDisponiveis.length === 1
+          ? creditosAsoDisponiveis[0].id
+          : creditoAsoSelectedId
+      );
+      setCreditoAsoModalOpen(true);
+      return true;
+    },
+    [creditoAsoSelectedId, creditosAsoDisponiveis, editingId]
+  );
+
+  const avaliarBeneficiosAposCpf = useCallback(
+    async (opts?: { force?: boolean; fromSave?: boolean }) => {
+      if (editingId) return false;
+      const cpf = normalizeCpfDigits(form.colaborador_cpf);
+      if (cpf.length !== 11) return false;
+      if (!form.cliente_nome.trim()) return false;
+
+      const alertKey = `${cpf}|${form.cliente_nome.trim().toLowerCase()}`;
+      if (
+        !opts?.force &&
+        !opts?.fromSave &&
+        creditoAlertKeyRef.current === alertKey &&
+        periodicoAlertKeyRef.current?.startsWith(alertKey)
+      ) {
+        // Já avaliamos este par empresa+CPF nesta sessão de formulário.
+        // periodicoAlertKey inclui ASO; se mudou ASO o periodico reabre via effect.
+      }
+
+      // 1) Periódico Futuro (prioridade)
+      if (periodicoDecisionRef.current === "none") {
+        const openedPeriodico = await verificarPeriodicoFuturoPendente({
+          force: opts?.force,
+          fromSave: opts?.fromSave,
+        });
+        if (openedPeriodico) {
+          creditoAlertKeyRef.current = alertKey;
+          return true;
+        }
+      }
+
+      // 2) ASO genérico — só se não vinculou periódico
+      const proximo = resolverProximoAvisoBeneficio({
+        temPeriodicoFuturo: false,
+        periodicoDecisao: periodicoDecisionRef.current,
+        temAsoAberto: creditosAsoDisponiveis.length > 0,
+        creditoDecisao: creditoDecisionRef.current,
+      });
+
+      if (proximo === "aso_apos_recusa_periodico") {
+        creditoAlertKeyRef.current = alertKey;
+        return oferecerCreditoAsoSeDisponivel("apos_recusa_periodico");
+      }
+      if (proximo === "aso_aberto") {
+        creditoAlertKeyRef.current = alertKey;
+        return oferecerCreditoAsoSeDisponivel("padrao");
+      }
+
+      return false;
+    },
+    [
+      creditosAsoDisponiveis.length,
+      editingId,
+      form.cliente_nome,
+      form.colaborador_cpf,
+      oferecerCreditoAsoSeDisponivel,
+      verificarPeriodicoFuturoPendente,
+    ]
+  );
+
   const handleCpfBlur = useCallback(() => {
     const cpf = normalizeCpfDigits(form.colaborador_cpf);
     if (cpf.length === 11) {
-      void verificarPeriodicoFuturoPendente();
+      void avaliarBeneficiosAposCpf();
     }
-  }, [form.colaborador_cpf, verificarPeriodicoFuturoPendente]);
+  }, [avaliarBeneficiosAposCpf, form.colaborador_cpf]);
 
   useEffect(() => {
     if (editingId || !showForm) return;
     if (!form.aso.trim()) return;
     const cpf = normalizeCpfDigits(form.colaborador_cpf);
-    if (cpf.length !== 11 && !form.colaborador.trim()) return;
+    if (cpf.length !== 11) return;
     if (!form.cliente_nome.trim()) return;
-    void verificarPeriodicoFuturoPendente();
+    void avaliarBeneficiosAposCpf();
     // Revalida ao mudar o tipo de ASO (CPF/cliente já podem estar preenchidos).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: só reage a ASO
-  }, [editingId, form.aso, showForm, verificarPeriodicoFuturoPendente]);
+  }, [editingId, form.aso, showForm, avaliarBeneficiosAposCpf]);
+
+  // Se a empresa foi escolhida com CPF já preenchido, avalia após o load silencioso.
+  useEffect(() => {
+    if (editingId || !showForm || !clienteId) return;
+    const cpf = normalizeCpfDigits(form.colaborador_cpf);
+    if (cpf.length !== 11) return;
+    void avaliarBeneficiosAposCpf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reage à troca de cliente
+  }, [clienteId]);
 
   const handleDataBlur = useCallback(() => {
     validateDataAgendamentoField();
@@ -1187,6 +1301,18 @@ export function useAgendamentosPage() {
         setClienteValidacaoLoading(false);
         setClienteId("");
         setField("cliente_nome", "");
+        periodicoDecisionRef.current = "none";
+        periodicoLinkIdRef.current = null;
+        periodicoAlertKeyRef.current = null;
+        setPeriodicoVinculoOpen(false);
+        setPeriodicoVinculoList([]);
+        creditoDecisionRef.current = "none";
+        creditoAlertKeyRef.current = null;
+        setCreditoAsoModalOpen(false);
+        setCreditosAsoDisponiveis([]);
+        setCreditoAsoSelectedId(null);
+        setCreditoAsoEmUsoId(null);
+        setCreditoAsoNumeroContrato(null);
         return;
       }
 
@@ -1230,13 +1356,15 @@ export function useAgendamentosPage() {
             clienteId: cliente.id,
             clienteCnpj: cliente.cnpj,
           });
-          if (creditos.length > 0) {
-            setCreditosAsoDisponiveis(creditos);
-            setCreditoAsoSelectedId(
-              creditos.length === 1 ? creditos[0].id : null
-            );
-            setCreditoAsoModalOpen(true);
-          }
+          setCreditosAsoDisponiveis(creditos);
+          setCreditoAsoSelectedId(
+            creditos.length === 1 ? creditos[0].id : null
+          );
+          // Sem modal aqui — aguarda CPF.
+          setCreditoAsoModalOpen(false);
+          setCreditoAsoEmUsoId(null);
+          setCreditoAsoNumeroContrato(null);
+          creditoDecisionRef.current = "none";
         } catch (credErr) {
           console.error("Erro ao consultar créditos ASO:", credErr);
         }
@@ -1255,10 +1383,20 @@ export function useAgendamentosPage() {
   ]);
 
   const handleCreditoAsoNaoUtilizar = useCallback(() => {
+    creditoDecisionRef.current = "skip";
     setCreditoAsoModalOpen(false);
     setCreditoAsoEmUsoId(null);
     setCreditoAsoNumeroContrato(null);
     setCreditoAsoSelectedId(null);
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      pendingSaveStatusRef.current = pending;
+      // executeSave é chamado via fila abaixo (ref atualizada após definição).
+      queueMicrotask(() => {
+        const fn = continuarSaveAposCreditoRef.current;
+        if (fn) fn();
+      });
+    }
   }, []);
 
   const handleCreditoAsoUtilizar = useCallback(() => {
@@ -1272,11 +1410,11 @@ export function useAgendamentosPage() {
       return;
     }
     const credito = creditosAsoDisponiveis.find((c) => c.id === id);
+    creditoDecisionRef.current = "use";
     setCreditoAsoEmUsoId(id);
     setCreditoAsoNumeroContrato(credito?.contrato_numero ?? null);
     setCreditoAsoModalOpen(false);
 
-    // Aplica valor zero nos exames do cargo já carregados (feedback visual).
     void (async () => {
       try {
         let nomesCargo: string[] = [];
@@ -1289,6 +1427,14 @@ export function useAgendamentosPage() {
         console.error(err);
       }
     })();
+
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      queueMicrotask(() => {
+        const fn = continuarSaveAposCreditoRef.current;
+        if (fn) fn();
+      });
+    }
   }, [
     creditoAsoSelectedId,
     creditosAsoDisponiveis,
@@ -2085,7 +2231,7 @@ export function useAgendamentosPage() {
 
       if (!editingId && periodicoDecisionRef.current === "none") {
         try {
-          const opened = await verificarPeriodicoFuturoPendente({
+          const opened = await avaliarBeneficiosAposCpf({
             force: true,
             fromSave: true,
           });
@@ -2093,18 +2239,91 @@ export function useAgendamentosPage() {
             pendingSaveStatusRef.current = status;
             return;
           }
-        } catch (periodicoErr) {
+        } catch (benefErr) {
           console.error(
-            "Erro ao verificar periódico futuro pendente:",
-            periodicoErr
+            "Erro ao verificar benefícios contratuais:",
+            benefErr
           );
+        }
+      } else if (
+        !editingId &&
+        periodicoDecisionRef.current === "skip" &&
+        creditoDecisionRef.current === "none" &&
+        creditosAsoDisponiveis.length > 0
+      ) {
+        pendingSaveStatusRef.current = status;
+        setCreditoAsoModalVariant("apos_recusa_periodico");
+        setCreditoAsoSelectedId(
+          creditosAsoDisponiveis.length === 1
+            ? creditosAsoDisponiveis[0].id
+            : null
+        );
+        setCreditoAsoModalOpen(true);
+        return;
+      }
+
+      // Vínculo específico do periódico prevalece — não consome ASO genérico.
+      const usandoPeriodico = periodicoDecisionRef.current === "link";
+      const creditoEmUsoEfetivo = usandoPeriodico ? null : creditoAsoEmUsoId;
+
+      if (!editingId && creditoEmUsoEfetivo) {
+        try {
+          const cliente = clientes.find((c) => c.id === clienteId);
+          const frescos = await listarCreditosDisponiveisDoCliente({
+            clienteId: clienteId || undefined,
+            clienteCnpj: cliente?.cnpj ?? null,
+          });
+          const aindaDisponivel = frescos.some(
+            (c) => c.id === creditoEmUsoEfetivo
+          );
+          if (!aindaDisponivel) {
+            toast.error(
+              "O ASO contratual selecionado não está mais disponível. Refaça a escolha."
+            );
+            setCreditoAsoEmUsoId(null);
+            setCreditoAsoNumeroContrato(null);
+            creditoDecisionRef.current = "none";
+            setCreditosAsoDisponiveis(frescos);
+            return;
+          }
+          setCreditosAsoDisponiveis(frescos);
+        } catch (credErr) {
+          console.error(credErr);
+          toast.error(
+            "Não foi possível revalidar o ASO contratual. Tente novamente."
+          );
+          return;
         }
       }
 
-      const periodicoLinkId =
-        periodicoDecisionRef.current === "link"
-          ? periodicoLinkIdRef.current
-          : null;
+      const periodicoLinkId = usandoPeriodico
+        ? periodicoLinkIdRef.current
+        : null;
+
+      if (!editingId && periodicoLinkId) {
+        try {
+          const pendentes = await listarPeriodicosPendentesColaborador({
+            clienteNome: form.cliente_nome,
+            colaborador: form.colaborador,
+            colaboradorCpf: form.colaborador_cpf,
+            tipoAso: form.aso || null,
+          });
+          if (!pendentes.some((p) => p.id === periodicoLinkId)) {
+            toast.error(
+              "O exame futuro selecionado não está mais disponível. Refaça a escolha."
+            );
+            periodicoDecisionRef.current = "none";
+            periodicoLinkIdRef.current = null;
+            return;
+          }
+        } catch (perErr) {
+          console.error(perErr);
+          toast.error(
+            "Não foi possível revalidar o Periódico Futuro. Tente novamente."
+          );
+          return;
+        }
+      }
 
       setSaving(true);
       try {
@@ -2151,7 +2370,7 @@ export function useAgendamentosPage() {
         const examesPayloadRaw = getExamesPayload();
         let examesPayload = examesPayloadRaw;
 
-        if (!editingId && creditoAsoEmUsoId) {
+        if (!editingId && creditoEmUsoEfetivo) {
           let nomesCargo: string[] = [];
           if (cargoId) {
             try {
@@ -2248,9 +2467,9 @@ export function useAgendamentosPage() {
             colaborador: payload.colaborador,
           });
 
-          if (creditoAsoEmUsoId) {
+          if (creditoEmUsoEfetivo) {
             const credito = creditosAsoDisponiveis.find(
-              (c) => c.id === creditoAsoEmUsoId
+              (c) => c.id === creditoEmUsoEfetivo
             );
             if (credito) {
               try {
@@ -2428,6 +2647,9 @@ export function useAgendamentosPage() {
       historicoUsuario,
       clientes,
       verificarPeriodicoFuturoPendente,
+      avaliarBeneficiosAposCpf,
+      creditosAsoDisponiveis,
+      creditoAsoEmUsoId,
     ]
   );
 
@@ -2437,6 +2659,13 @@ export function useAgendamentosPage() {
     },
     [executeSave]
   );
+
+  continuarSaveAposCreditoRef.current = () => {
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      void executeSave(pending);
+    }
+  };
 
   const auditarDecisaoPeriodico = useCallback(
     async (
@@ -2516,11 +2745,27 @@ export function useAgendamentosPage() {
     periodicoDecisionRef.current = "skip";
     periodicoLinkIdRef.current = null;
     setPeriodicoVinculoOpen(false);
+
+    // Após recusar antecipação, exige confirmação explícita do ASO genérico.
+    if (
+      creditosAsoDisponiveis.length > 0 &&
+      creditoDecisionRef.current === "none"
+    ) {
+      setCreditoAsoModalVariant("apos_recusa_periodico");
+      setCreditoAsoSelectedId(
+        creditosAsoDisponiveis.length === 1
+          ? creditosAsoDisponiveis[0].id
+          : null
+      );
+      setCreditoAsoModalOpen(true);
+      return;
+    }
+
     const pending = pendingSaveStatusRef.current;
     if (pending) {
       void executeSave(pending);
     }
-  }, [auditarDecisaoPeriodico, executeSave]);
+  }, [auditarDecisaoPeriodico, creditosAsoDisponiveis, executeSave]);
 
   const handleUtilizarPeriodicoPendente = useCallback(
     (periodicoId: string) => {
@@ -2531,6 +2776,11 @@ export function useAgendamentosPage() {
       void auditarDecisaoPeriodico("antecipou_e_vinculou", periodicoId);
       periodicoDecisionRef.current = "link";
       periodicoLinkIdRef.current = periodicoId;
+      // Não consumir ASO genérico junto com o vínculo específico.
+      creditoDecisionRef.current = "skip";
+      setCreditoAsoEmUsoId(null);
+      setCreditoAsoNumeroContrato(null);
+      setCreditoAsoModalOpen(false);
       setPeriodicoVinculoOpen(false);
       const pending = pendingSaveStatusRef.current;
       if (pending) {
@@ -2644,6 +2894,7 @@ export function useAgendamentosPage() {
     clienteId,
     handleClienteChange,
     creditoAsoModalOpen,
+    creditoAsoModalVariant,
     creditosAsoDisponiveis,
     creditoAsoSelectedId,
     setCreditoAsoSelectedId,

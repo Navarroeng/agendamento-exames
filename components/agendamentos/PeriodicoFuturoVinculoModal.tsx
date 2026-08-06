@@ -115,7 +115,7 @@ export function PeriodicoFuturoVinculoModal({
               onClick={onContinuarSemVincular}
               disabled={saving}
             >
-              Continuar sem vincular
+              Não antecipar
             </button>
             <button
               type="button"
@@ -124,8 +124,8 @@ export function PeriodicoFuturoVinculoModal({
               disabled={saving || !selected?.id}
             >
               {isAntecipacao
-                ? "Antecipar e vincular ao Periódico Futuro"
-                : "Vincular ao Periódico Futuro"}
+                ? "Antecipar e vincular ao exame futuro"
+                : "Vincular ao exame futuro"}
             </button>
           </div>
         )
