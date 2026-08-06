@@ -10,6 +10,7 @@ import {
   EMPTY_FATURA_FILTERS,
   emptyHistoricoFiltersForTipo,
   extractFaturaFilterOptions,
+  filterAgendamentosDaReferenciaFatura,
   filterAgendamentosFatura,
   filterFaturasHistorico,
   formatPeriodoFatura,
@@ -17,6 +18,10 @@ import {
   type FaturaFilters,
   type FaturaHistoricoFilters,
 } from "@/lib/fatura-filters";
+import {
+  resolveClienteFromCatalog,
+  type ClienteCatalogItem,
+} from "@/lib/fatura-empresa-match";
 import {
   buildResumoClientesMes,
   buildResumoClinicasMes,
@@ -56,6 +61,7 @@ import {
   salvarFatura,
   sincronizarFaturasClienteNecessitaReemissao,
 } from "@/services/fatura-historico.service";
+import { corrigirItensFaturaClienteInconsistentes } from "@/services/fatura-itens-correcao.service";
 import { sincronizarFaturasVencidas } from "@/services/fatura-inadimplencia.service";
 import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
@@ -142,6 +148,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const auditContext = useAuditoriaUsuario();
   const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const { clientes } = useClientesList();
+  const clientesCatalog = useMemo<ClienteCatalogItem[]>(
+    () =>
+      clientes.map((c) => ({
+        id: c.id,
+        nome: c.nome,
+        cnpj: c.cnpj,
+      })),
+    [clientes]
+  );
 
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>(
     []
@@ -219,6 +234,32 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const reloadAll = useCallback(async () => {
     await Promise.all([reloadAgendamentos(), reloadHistorico()]);
   }, [reloadAgendamentos, reloadHistorico]);
+
+  const correcaoItensAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (pageTipo !== "cliente") return;
+    if (correcaoItensAttemptedRef.current) return;
+    correcaoItensAttemptedRef.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await corrigirItensFaturaClienteInconsistentes();
+        if (cancelled || result.itensRemovidos === 0) return;
+        await reloadAll();
+        toast.message(
+          `${result.itensRemovidos} item(ns) removido(s) de fatura(s) com cliente incorreto.`
+        );
+      } catch (err) {
+        console.error("Erro ao corrigir itens de fatura inconsistentes:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pageTipo, reloadAll]);
 
   useEffect(() => {
     if (pageTipo !== "cliente") return;
@@ -322,7 +363,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           agendamentos,
           faturas,
           filters.mesReferencia,
-          filters.cliente
+          filters.cliente,
+          clientesCatalog
         )
       : buildResumoClinicasMes(
           agendamentos,
@@ -332,10 +374,11 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         );
   }, [
     agendamentos,
-    faturas,
+    clientesCatalog,
     filters.cliente,
     filters.clinica,
     filters.mesReferencia,
+    faturas,
     mesReferenciaValido,
     pageTipo,
   ]);
@@ -508,7 +551,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         ...filters,
         ...(isCliente ? { cliente: referencia } : { clinica: referencia }),
       };
-      const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
+      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
+        mesReferencia: filters.mesReferencia,
+        tipo,
+        referenciaNome: referencia,
+        referenciaId: isCliente
+          ? resolveClienteFromCatalog(clientesCatalog, referencia)?.id
+          : null,
+        clientesCatalog,
+      });
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
         resumoMesBase?.rows,
@@ -552,7 +603,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       setPreview(nextPreview);
       setPreviewOpen(true);
     },
-    [agendamentos, bloquearFaturaDuplicada, filters, resumoMesBase?.rows]
+    [agendamentos, bloquearFaturaDuplicada, clientesCatalog, filters, resumoMesBase?.rows]
   );
 
   const openPreviewForTipo = useCallback(
@@ -577,10 +628,17 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
 
       if (await bloquearFaturaDuplicada(tipo, referencia)) return;
 
-      const itens = buildFaturaItensFromAgendamentos(
-        agendamentosFiltrados,
-        tipo
-      );
+      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
+        mesReferencia: filters.mesReferencia,
+        tipo,
+        referenciaNome: referencia,
+        referenciaId:
+          tipo === "cliente"
+            ? resolveClienteFromCatalog(clientesCatalog, referencia)?.id
+            : null,
+        clientesCatalog,
+      });
+      const itens = buildFaturaItensFromAgendamentos(agsReferencia, tipo);
       if (itens.length === 0) {
         toast.error(NO_RECORDS_TOAST);
         return;
@@ -590,15 +648,16 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         tipo,
         referencia,
         filters,
-        agendamentosFiltrados
+        agsReferencia
       );
       previewRef.current = nextPreview;
       setPreview(nextPreview);
       setPreviewOpen(true);
     },
     [
-      agendamentosFiltrados,
+      agendamentos,
       bloquearFaturaDuplicada,
+      clientesCatalog,
       filters,
     ]
   );
@@ -645,6 +704,11 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         faturaId: current.faturaId,
         tipo: current.tipo,
         referencia_nome: current.referenciaNome,
+        referencia_id:
+          current.tipo === "cliente"
+            ? resolveClienteFromCatalog(clientesCatalog, current.referenciaNome)
+                ?.id ?? null
+            : null,
         periodo_inicio: current.periodo_inicio,
         periodo_fim: current.periodo_fim,
         data_vencimento: current.data_vencimento,
@@ -1136,7 +1200,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         ...filters,
         ...(isCliente ? { cliente: referencia } : { clinica: referencia }),
       };
-      const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
+      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
+        mesReferencia: filters.mesReferencia,
+        tipo: pageTipo,
+        referenciaNome: referencia,
+        referenciaId: isCliente
+          ? resolveClienteFromCatalog(clientesCatalog, referencia)?.id
+          : null,
+        clientesCatalog,
+      });
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
         resumoMesBase?.rows,
@@ -1206,6 +1278,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [
       agendamentos,
       bloquearFaturaDuplicada,
+      clientesCatalog,
       filters,
       pageTipo,
       persistPreview,
@@ -1312,7 +1385,16 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         mesReferencia,
         cliente: referencia,
       };
-      const agsReferencia = filterAgendamentosFatura(agendamentos, mesFilters);
+      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
+        mesReferencia,
+        tipo: "cliente",
+        referenciaNome: referencia,
+        referenciaId:
+          fatura.referencia_id ||
+          resolveClienteFromCatalog(clientesCatalog, referencia)?.id ||
+          null,
+        clientesCatalog,
+      });
       const itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
       if (itens.length === 0) {
         toast.error(FATURA_SEM_AGENDAMENTOS_VALIDOS_REEMISSAO_MSG);
@@ -1361,6 +1443,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       agendamentos,
       auditOptions,
       bloquearFaturaDuplicada,
+      clientesCatalog,
       faturas,
       filters,
       geradoPor,

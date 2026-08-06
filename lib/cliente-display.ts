@@ -68,6 +68,9 @@ export function resolveClienteIdByNome(
 ): string {
   const trimmed = nome.trim();
   if (!trimmed) return "";
-  const found = clientes.find((c) => c.nome === trimmed);
+  const key = trimmed.toLowerCase().replace(/\s+/g, " ");
+  const found = clientes.find(
+    (c) => c.nome.trim().toLowerCase().replace(/\s+/g, " ") === key
+  );
   return found?.id ?? "";
 }

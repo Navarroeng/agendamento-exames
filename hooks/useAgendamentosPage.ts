@@ -1821,6 +1821,15 @@ export function useAgendamentosPage() {
             : status;
         let payload = buildPayload(payloadStatus, cargoFields);
 
+        const clienteIdResolvido =
+          clienteId.trim() ||
+          resolveClienteIdByNome(clientes, payload.cliente_nome) ||
+          null;
+        payload = {
+          ...payload,
+          cliente_id: clienteIdResolvido,
+        };
+
         if (editingId) {
           const atual = getById(editingId);
           // Preserva campos legados; a seleção de previsão fica em contrato_agendamentos.
@@ -2059,6 +2068,7 @@ export function useAgendamentosPage() {
       exibirBloqueioInadimplencia,
       resolverInfoClienteInadimplencia,
       historicoUsuario,
+      clientes,
     ]
   );
 

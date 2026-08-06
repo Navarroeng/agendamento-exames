@@ -3,11 +3,13 @@ import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
 import {
   EMPTY_FATURA_FILTERS,
   faturaMatchesMesReferencia,
+  filterAgendamentosDaReferenciaFatura,
   filterAgendamentosFatura,
   formatPeriodoFatura,
   type FaturaFilters,
 } from "@/lib/fatura-filters";
 import { isValorTotalFaturavel } from "@/lib/fatura-elegibilidade";
+import type { ClienteCatalogItem } from "@/lib/fatura-empresa-match";
 import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
@@ -250,16 +252,19 @@ function agendamentosReferenciaMes(
   agendamentos: AgendamentoWithExames[],
   mesReferencia: string,
   referenciaNome: string,
-  referenciaField: "cliente" | "clinica"
+  referenciaField: "cliente" | "clinica",
+  opts?: {
+    referenciaId?: string | null;
+    clientesCatalog?: ClienteCatalogItem[];
+  }
 ): AgendamentoWithExames[] {
-  const filters: FaturaFilters = {
-    ...EMPTY_FATURA_FILTERS,
+  return filterAgendamentosDaReferenciaFatura(agendamentos, {
     mesReferencia,
-    ...(referenciaField === "cliente"
-      ? { cliente: referenciaNome }
-      : { clinica: referenciaNome }),
-  };
-  return filterAgendamentosFatura(agendamentos, filters);
+    tipo: referenciaField === "cliente" ? "cliente" : "clinica",
+    referenciaNome,
+    referenciaId: opts?.referenciaId,
+    clientesCatalog: opts?.clientesCatalog,
+  });
 }
 
 function buildRowFromFatura(
@@ -268,7 +273,8 @@ function buildRowFromFatura(
   mesReferencia: string,
   periodoLabel: string,
   tipo: FaturaTipo,
-  referenciaField: "cliente" | "clinica"
+  referenciaField: "cliente" | "clinica",
+  clientesCatalog?: ClienteCatalogItem[]
 ): FaturaMesRow {
   const referenciaNome = fatura.referencia_nome.trim() || "—";
   const mesAgendamentos =
@@ -278,7 +284,11 @@ function buildRowFromFatura(
         agendamentos,
         mesAgendamentos,
         referenciaNome,
-        referenciaField
+        referenciaField,
+        {
+          referenciaId: fatura.referencia_id,
+          clientesCatalog,
+        }
       )
     : [];
 
@@ -356,7 +366,8 @@ function buildResumoPeriodoCompleto(
   faturas: FaturaRecord[],
   tipo: FaturaTipo,
   referenciaFilter: string,
-  referenciaField: "cliente" | "clinica"
+  referenciaField: "cliente" | "clinica",
+  clientesCatalog?: ClienteCatalogItem[]
 ): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } {
   const faturasDoTipo = faturas.filter((f) => f.tipo === tipo);
 
@@ -376,7 +387,8 @@ function buildResumoPeriodoCompleto(
         mesBR,
         periodoLabel,
         tipo,
-        referenciaField
+        referenciaField,
+        clientesCatalog
       );
     });
 
@@ -392,7 +404,8 @@ function buildResumoMesInterno(
   mesReferencia: string,
   tipo: FaturaTipo,
   referenciaFilter: string,
-  referenciaField: "cliente" | "clinica"
+  referenciaField: "cliente" | "clinica",
+  clientesCatalog?: ClienteCatalogItem[]
 ): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
   if (!isValidMonthYearBR(mesReferencia)) return null;
 
@@ -403,6 +416,7 @@ function buildResumoMesInterno(
       ? { cliente: referenciaFilter }
       : { clinica: referenciaFilter }),
   };
+  // Busca de UI permanece parcial; o pertencimento à fatura é exato em buildRowFromFatura.
   const agsDoMes = filterAgendamentosFatura(agendamentos, filters);
   const byReferencia = new Map<string, AgendamentoWithExames[]>();
 
@@ -432,7 +446,8 @@ function buildResumoMesInterno(
       mesReferencia,
       periodoLabel,
       tipo,
-      referenciaField
+      referenciaField,
+      clientesCatalog
     )
   );
 
@@ -470,7 +485,8 @@ export function buildResumoClientesMes(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
   mesReferencia: string,
-  clienteFilter = ""
+  clienteFilter = "",
+  clientesCatalog?: ClienteCatalogItem[]
 ): { rows: ClienteFaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
   if (!mesReferencia.trim()) {
     const result = buildResumoPeriodoCompleto(
@@ -478,7 +494,8 @@ export function buildResumoClientesMes(
       faturas,
       "cliente",
       clienteFilter,
-      "cliente"
+      "cliente",
+      clientesCatalog
     );
     return {
       resumo: result.resumo,
@@ -495,7 +512,8 @@ export function buildResumoClientesMes(
     mesReferencia,
     "cliente",
     clienteFilter,
-    "cliente"
+    "cliente",
+    clientesCatalog
   );
   if (!result) return null;
   return {

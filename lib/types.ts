@@ -66,6 +66,8 @@ export interface AgendamentoInsert {
   consome_saldo_contrato?: boolean | null;
   vinculado_contrato_em?: string | null;
   vinculado_contrato_por?: string | null;
+  /** Cliente do cadastro (preferencial para faturamento). */
+  cliente_id?: string | null;
 }
 
 export interface ExameFormItem {

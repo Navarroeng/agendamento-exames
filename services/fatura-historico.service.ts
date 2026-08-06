@@ -12,8 +12,7 @@ import {
 } from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/client";
 import {
-  EMPTY_FATURA_FILTERS,
-  filterAgendamentosFatura,
+  filterAgendamentosDaReferenciaFatura,
 } from "@/lib/fatura-filters";
 import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
@@ -23,6 +22,10 @@ import {
   isExameFaturavel,
   isValorTotalFaturavel,
 } from "@/lib/fatura-elegibilidade";
+import {
+  resolveClienteFromCatalog,
+  type ClienteCatalogItem,
+} from "@/lib/fatura-empresa-match";
 import {
   COMPROVANTE_OBRIGATORIO_MSG,
   ComprovanteValidationError,
@@ -777,10 +780,21 @@ export async function reabrirEmissaoFaturaCliente(
   let itens: FaturaItemInsert[] = [];
   if (mesBR) {
     const agendamentos = await listarAgendamentosParaFatura();
-    const agsReferencia = filterAgendamentosFatura(agendamentos, {
-      ...EMPTY_FATURA_FILTERS,
+    const supabaseClientes = createClient();
+    const { data: clientesRows } = await supabaseClientes
+      .from("clientes")
+      .select("id, nome, cnpj")
+      .limit(5000);
+    const catalog = (clientesRows ?? []) as ClienteCatalogItem[];
+    const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
       mesReferencia: mesBR,
-      cliente: existing.referencia_nome,
+      tipo: "cliente",
+      referenciaNome: existing.referencia_nome,
+      referenciaId:
+        existing.referencia_id ||
+        resolveClienteFromCatalog(catalog, existing.referencia_nome)?.id ||
+        null,
+      clientesCatalog: catalog,
     });
     itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
   }

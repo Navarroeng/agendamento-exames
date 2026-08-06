@@ -3,6 +3,11 @@ import {
   parseMonthYearBRToIsoRange,
 } from "@/lib/agendamento-datetime";
 import { filterAgendamentosElegiveisFatura } from "@/lib/fatura-elegibilidade";
+import {
+  isAgendamentoDaClinica,
+  isAgendamentoDaEmpresa,
+  type ClienteCatalogItem,
+} from "@/lib/fatura-empresa-match";
 import { faturaStatusEmissaoAtiva } from "@/lib/fatura-reemissao";
 import { formatDateBR } from "@/lib/format";
 import type { AgendamentoWithExames, FaturaRecord } from "@/lib/types";
@@ -130,11 +135,25 @@ export function faturaMatchesMesReferencia(
 
 export function filterAgendamentosFatura(
   agendamentos: AgendamentoWithExames[],
-  filters: FaturaFilters
+  filters: FaturaFilters,
+  opts?: {
+    /** Catálogo para resolver cliente_id/CNPJ no pertencimento exato. */
+    clientesCatalog?: ClienteCatalogItem[];
+    /**
+     * partial = busca de UI (includes).
+     * exact = pertencimento à empresa/clínica da fatura (sem substring).
+     * Default: partial para filtros de tela; use exact ao montar fatura de uma referência.
+     */
+    clienteMatch?: "partial" | "exact";
+    clinicaMatch?: "partial" | "exact";
+  }
 ): AgendamentoWithExames[] {
   const range = filters.mesReferencia.trim()
     ? parseMonthYearBRToIsoRange(filters.mesReferencia)
     : null;
+  const clienteMatch = opts?.clienteMatch ?? "partial";
+  const clinicaMatch = opts?.clinicaMatch ?? "partial";
+  const catalog = opts?.clientesCatalog;
 
   return filterAgendamentosElegiveisFatura(agendamentos).filter((item) => {
     if (
@@ -146,10 +165,78 @@ export function filterAgendamentosFatura(
     ) {
       return false;
     }
-    if (!matchesText(item.cliente_nome, filters.cliente)) return false;
-    if (!matchesText(item.clinica_nome, filters.clinica)) return false;
+
+    if (filters.cliente.trim()) {
+      if (clienteMatch === "exact") {
+        if (
+          !isAgendamentoDaEmpresa(
+            {
+              cliente_id: item.cliente_id,
+              cliente_nome: item.cliente_nome,
+            },
+            { nome: filters.cliente },
+            catalog
+          )
+        ) {
+          return false;
+        }
+      } else if (!matchesText(item.cliente_nome, filters.cliente)) {
+        return false;
+      }
+    }
+
+    if (filters.clinica.trim()) {
+      if (clinicaMatch === "exact") {
+        if (!isAgendamentoDaClinica(item.clinica_nome, filters.clinica)) {
+          return false;
+        }
+      } else if (!matchesText(item.clinica_nome, filters.clinica)) {
+        return false;
+      }
+    }
+
     if (!matchesText(item.responsavel, filters.responsavel)) return false;
     return true;
+  });
+}
+
+/** Agendamentos que pertencem exatamente à empresa/clínica da fatura. */
+export function filterAgendamentosDaReferenciaFatura(
+  agendamentos: AgendamentoWithExames[],
+  params: {
+    mesReferencia: string;
+    tipo: "cliente" | "clinica";
+    referenciaNome: string;
+    referenciaId?: string | null;
+    clientesCatalog?: ClienteCatalogItem[];
+  }
+): AgendamentoWithExames[] {
+  const filters: FaturaFilters = {
+    ...EMPTY_FATURA_FILTERS,
+    mesReferencia: params.mesReferencia,
+    ...(params.tipo === "cliente"
+      ? { cliente: params.referenciaNome }
+      : { clinica: params.referenciaNome }),
+  };
+
+  if (params.tipo === "cliente") {
+    return filterAgendamentosFatura(agendamentos, filters, {
+      clienteMatch: "exact",
+      clientesCatalog: params.clientesCatalog,
+    }).filter((ag) =>
+      isAgendamentoDaEmpresa(
+        { cliente_id: ag.cliente_id, cliente_nome: ag.cliente_nome },
+        {
+          id: params.referenciaId,
+          nome: params.referenciaNome,
+        },
+        params.clientesCatalog
+      )
+    );
+  }
+
+  return filterAgendamentosFatura(agendamentos, filters, {
+    clinicaMatch: "exact",
   });
 }
 
