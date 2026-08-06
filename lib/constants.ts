@@ -71,6 +71,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Implantação de Clientes",
         href: "/implantacao",
       },
+      {
+        iconKey: "chart",
+        label: "Gestão Comercial",
+        href: "/gestao-comercial",
+      },
     ],
   },
   {

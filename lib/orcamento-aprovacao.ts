@@ -54,6 +54,10 @@ export interface OrcamentoAprovacaoRecord {
   observacoes: string | null;
   aprovado_por: string;
   aprovado_em: string;
+  /** Snapshot do responsável do processo no fechamento (Gestão Comercial). */
+  responsavel_no_fechamento?: string | null;
+  /** true = backfill aproximado (registros anteriores ao snapshot). */
+  responsavel_no_fechamento_aproximado?: boolean | null;
   contrato_enviado: boolean;
   contrato_enviado_em: string | null;
   contrato_assinado: boolean;

@@ -209,7 +209,7 @@ export async function salvarAprovacaoOrcamento(
 
   const { data: orcamentoAtual, error: statusError } = await supabase
     .from("orcamentos")
-    .select("status")
+    .select("status, responsavel")
     .eq("id", orcamentoId)
     .maybeSingle();
 
@@ -238,6 +238,7 @@ export async function salvarAprovacaoOrcamento(
         valor_avista: payload.valor_avista,
         observacoes: payload.observacoes,
         aprovado_por: payload.aprovado_por,
+        responsavel_no_fechamento: orcamentoAtual.responsavel ?? null,
       },
       p_itens: payload.itens.map((item) => ({
         servico_id: item.servico_id,
