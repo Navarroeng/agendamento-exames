@@ -25,6 +25,7 @@ export function PeriodicosFuturosPage() {
     handleCardClick,
     setPage,
     handleCriarAgendamento,
+    handleVisualizarAgendamento,
     handleMarcarReagendado,
     handleCancelarAcompanhamento,
     canActOnRecord,
@@ -63,6 +64,7 @@ export function PeriodicosFuturosPage() {
           onCriarAgendamento={handleCriarAgendamento}
           onMarcarReagendado={handleMarcarReagendado}
           onCancelarAcompanhamento={handleCancelarAcompanhamento}
+          onVisualizarAgendamento={handleVisualizarAgendamento}
         />
       </div>
 

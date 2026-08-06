@@ -7,6 +7,7 @@ import {
   labelOrigemPeriodico,
 } from "@/lib/contrato-programacao-futura";
 import { formatCPF } from "@/lib/cpf";
+import { formatDateBR } from "@/lib/format";
 import type { PeriodicoFuturoRow } from "@/lib/types";
 
 interface PeriodicosFuturosTableProps {
@@ -18,6 +19,7 @@ interface PeriodicosFuturosTableProps {
   onCriarAgendamento: (record: PeriodicoFuturoRow) => void;
   onMarcarReagendado: (id: string) => void;
   onCancelarAcompanhamento: (id: string) => void;
+  onVisualizarAgendamento?: (agendamentoId: string) => void;
 }
 
 export function PeriodicosFuturosTable({
@@ -29,6 +31,7 @@ export function PeriodicosFuturosTable({
   onCriarAgendamento,
   onMarcarReagendado,
   onCancelarAcompanhamento,
+  onVisualizarAgendamento,
 }: PeriodicosFuturosTableProps) {
   if (loading) {
     return (
@@ -74,6 +77,13 @@ export function PeriodicosFuturosTable({
         <tbody>
           {records.map((record) => {
             const actionable = canActOnRecord(record);
+            const dataOriginal =
+              record.data_prevista_original?.slice(0, 10) || null;
+            const dataAtual = record.proxima_data?.slice(0, 10) || null;
+            const mostrouOriginal =
+              Boolean(dataOriginal) &&
+              dataOriginal !== dataAtual &&
+              (record.status === "reagendado" || Boolean(record.antecipado));
             return (
               <tr
                 key={record.id}
@@ -94,13 +104,24 @@ export function PeriodicosFuturosTable({
                   {record.dataRealizadaBR}
                 </td>
                 <td className="px-3 py-2.5 tabular-nums font-bold">
-                  {record.proximaDataBR}
+                  <div>{record.proximaDataBR}</div>
+                  {mostrouOriginal && dataOriginal ? (
+                    <div className="mt-0.5 text-[10px] font-medium text-[#64748b]">
+                      Previsto: {formatDateBR(dataOriginal)}
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   {labelOrigemPeriodico(record.origem)}
                 </td>
                 <td className="max-w-[160px] px-3 py-2.5">
-                  <span className="line-clamp-2" title={labelMotivoExameFuturo(record.motivo, record.motivo_detalhe)}>
+                  <span
+                    className="line-clamp-2"
+                    title={labelMotivoExameFuturo(
+                      record.motivo,
+                      record.motivo_detalhe
+                    )}
+                  >
                     {labelMotivoExameFuturo(
                       record.motivo,
                       record.motivo_detalhe
@@ -116,22 +137,46 @@ export function PeriodicosFuturosTable({
                   </span>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span
-                    className={`font-bold ${periodicoDisplayStatusClass(record.displayStatus)}`}
-                  >
-                    {periodicoDisplayStatusLabel(record.displayStatus)}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span
+                      className={`font-bold ${periodicoDisplayStatusClass(record.displayStatus)}`}
+                    >
+                      {record.status === "reagendado"
+                        ? "Agendamento criado"
+                        : periodicoDisplayStatusLabel(record.displayStatus)}
+                    </span>
+                    {record.antecipado ? (
+                      <span className="w-fit rounded bg-[#fef3c7] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#92400e]">
+                        Antecipado
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
-                      disabled={saving}
-                      onClick={() => onCriarAgendamento(record)}
-                    >
-                      Criar agendamento
-                    </button>
+                    {record.status === "reagendado" &&
+                    record.agendamento_id &&
+                    onVisualizarAgendamento ? (
+                      <button
+                        type="button"
+                        className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
+                        disabled={saving}
+                        onClick={() =>
+                          onVisualizarAgendamento(record.agendamento_id!)
+                        }
+                      >
+                        Ver agendamento
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
+                        disabled={saving}
+                        onClick={() => onCriarAgendamento(record)}
+                      >
+                        Criar agendamento
+                      </button>
+                    )}
                     {actionable && (
                       <>
                         <button

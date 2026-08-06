@@ -167,6 +167,9 @@ export interface PeriodicoFuturoRecord {
   exame_nome: string;
   data_realizada: string | null;
   proxima_data: string;
+  /** Data prevista original (preservada na antecipação). */
+  data_prevista_original?: string | null;
+  antecipado?: boolean | null;
   status: PeriodicoFuturoStoredStatus;
   origem?: string | null;
   motivo?: string | null;

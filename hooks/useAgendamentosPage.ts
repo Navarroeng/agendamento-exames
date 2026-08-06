@@ -110,6 +110,7 @@ import {
 import {
   atualizarAgendamentoComExames,
   atualizarDocumentacaoAgendamento,
+  buscarAgendamentoComExamesPorId,
   cancelarAgendamento,
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
@@ -135,9 +136,11 @@ import {
   criarPeriodicosDeAgendamento,
 } from "@/services/periodico-futuro.service";
 import {
-  buscarPeriodicoPendenteColaborador,
+  listarPeriodicosPendentesColaborador,
   vincularPeriodicoAoAgendamento,
 } from "@/services/contrato-programacao-futura.service";
+import { createClient } from "@/lib/supabase/client";
+import { normalizeCpfDigits } from "@/lib/cpf";
 import {
   AGENDAMENTO_BLOQUEADO_FATURA_MSG,
   CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST,
@@ -224,10 +227,15 @@ export function useAgendamentosPage() {
   const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
     useState<AgendamentoDuplicidade90DiasInfo | null>(null);
   const [periodicoVinculoOpen, setPeriodicoVinculoOpen] = useState(false);
-  const [periodicoVinculo, setPeriodicoVinculo] =
-    useState<PeriodicoFuturoRecord | null>(null);
+  const [periodicoVinculoList, setPeriodicoVinculoList] = useState<
+    PeriodicoFuturoRecord[]
+  >([]);
+  const [periodicoContratoNumeros, setPeriodicoContratoNumeros] = useState<
+    Record<string, string>
+  >({});
   const periodicoDecisionRef = useRef<"none" | "skip" | "link">("none");
   const periodicoLinkIdRef = useRef<string | null>(null);
+  const periodicoAlertKeyRef = useRef<string | null>(null);
   const pendingSaveStatusRef = useRef<AgendamentoStatus | null>(null);
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
   const [pendingCargoId, setPendingCargoId] = useState<string | null>(null);
@@ -872,6 +880,9 @@ export function useAgendamentosPage() {
     resetForm();
     setField("cliente_nome", prefill.cliente_nome);
     setField("colaborador", prefill.colaborador);
+    if (prefill.colaborador_cpf) {
+      setField("colaborador_cpf", prefill.colaborador_cpf);
+    }
     if (prefill.aso) setField("aso", prefill.aso);
 
     const clienteResolved = resolveClienteIdByNome(clientes, prefill.cliente_nome);
@@ -969,6 +980,12 @@ export function useAgendamentosPage() {
   const handleFormFieldChange = useCallback(
     (field: Parameters<typeof setField>[0], value: string) => {
       setField(field, value);
+      if (field === "colaborador_cpf" || field === "aso") {
+        // Reabre verificação quando CPF/ASO mudam
+        periodicoDecisionRef.current = "none";
+        periodicoLinkIdRef.current = null;
+        periodicoAlertKeyRef.current = null;
+      }
       if (field !== "data_agendamento") return;
 
       const trimmed = value.trim();
@@ -987,7 +1004,6 @@ export function useAgendamentosPage() {
           dataOriginalIso,
         })
       ) {
-        // Mantém erro se já estava inválida e ainda é passada; senão só no blur.
         setDataFieldError((prev) =>
           prev ? DATA_AGENDAMENTO_PASSADA_MSG : null
         );
@@ -997,6 +1013,97 @@ export function useAgendamentosPage() {
     },
     [setField, editingId, getById]
   );
+
+  const verificarPeriodicoFuturoPendente = useCallback(
+    async (opts?: { force?: boolean; fromSave?: boolean }) => {
+      if (editingId) return false;
+      if (periodicoDecisionRef.current !== "none" && !opts?.force) {
+        return false;
+      }
+
+      const cpf = normalizeCpfDigits(form.colaborador_cpf);
+      if (cpf.length !== 11 && !form.colaborador.trim()) return false;
+      if (!form.cliente_nome.trim()) return false;
+
+      const alertKey = `${cpf}|${form.cliente_nome.trim().toLowerCase()}|${form.aso.trim().toLowerCase()}`;
+      if (
+        !opts?.force &&
+        !opts?.fromSave &&
+        periodicoAlertKeyRef.current === alertKey
+      ) {
+        return false;
+      }
+
+      try {
+        const pendentes = await listarPeriodicosPendentesColaborador({
+          clienteNome: form.cliente_nome,
+          colaborador: form.colaborador,
+          colaboradorCpf: form.colaborador_cpf,
+          tipoAso: form.aso || null,
+        });
+        if (pendentes.length === 0) return false;
+
+        periodicoAlertKeyRef.current = alertKey;
+        setPeriodicoVinculoList(pendentes);
+
+        const contratoIds = Array.from(
+          new Set(
+            pendentes
+              .map((p) => p.contrato_id)
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+        if (contratoIds.length > 0) {
+          const supabase = createClient();
+          const { data } = await supabase
+            .from("cliente_contratos")
+            .select("id, numero")
+            .in("id", contratoIds);
+          const map: Record<string, string> = {};
+          for (const row of data ?? []) {
+            if (row.id && row.numero) map[String(row.id)] = String(row.numero);
+          }
+          setPeriodicoContratoNumeros(map);
+        } else {
+          setPeriodicoContratoNumeros({});
+        }
+
+        setPeriodicoVinculoOpen(true);
+        return true;
+      } catch (periodicoErr) {
+        console.error(
+          "Erro ao verificar periódico futuro pendente:",
+          periodicoErr
+        );
+        return false;
+      }
+    },
+    [
+      editingId,
+      form.aso,
+      form.cliente_nome,
+      form.colaborador,
+      form.colaborador_cpf,
+    ]
+  );
+
+  const handleCpfBlur = useCallback(() => {
+    const cpf = normalizeCpfDigits(form.colaborador_cpf);
+    if (cpf.length === 11) {
+      void verificarPeriodicoFuturoPendente();
+    }
+  }, [form.colaborador_cpf, verificarPeriodicoFuturoPendente]);
+
+  useEffect(() => {
+    if (editingId || !showForm) return;
+    if (!form.aso.trim()) return;
+    const cpf = normalizeCpfDigits(form.colaborador_cpf);
+    if (cpf.length !== 11 && !form.colaborador.trim()) return;
+    if (!form.cliente_nome.trim()) return;
+    void verificarPeriodicoFuturoPendente();
+    // Revalida ao mudar o tipo de ASO (CPF/cliente já podem estar preenchidos).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: só reage a ASO
+  }, [editingId, form.aso, showForm, verificarPeriodicoFuturoPendente]);
 
   const handleDataBlur = useCallback(() => {
     validateDataAgendamentoField();
@@ -1220,16 +1327,37 @@ export function useAgendamentosPage() {
   );
 
   const handleVisualizar = useCallback(
-    (id: string) => {
-      const agendamento = getById(id);
-      if (!agendamento) {
-        toast.error("Agendamento não encontrado.");
+    async (id: string) => {
+      const local = getById(id);
+      if (local) {
+        setViewAgendamento(local);
         return;
       }
-      setViewAgendamento(agendamento);
+      try {
+        const remoto = await buscarAgendamentoComExamesPorId(id);
+        if (!remoto) {
+          toast.error("Agendamento não encontrado.");
+          return;
+        }
+        setViewAgendamento(remoto);
+      } catch (err) {
+        console.error(err);
+        toast.error("Não foi possível abrir o agendamento.");
+      }
     },
     [getById]
   );
+
+  useEffect(() => {
+    const abrirId = searchParams.get("abrirAgendamento")?.trim();
+    if (!abrirId) return;
+    void handleVisualizar(abrirId);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("abrirAgendamento");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [searchParams, handleVisualizar]);
 
   const handleHistorico = useCallback((id: string) => {
     setHistoricoAgendamentoId(id);
@@ -1784,15 +1912,12 @@ export function useAgendamentosPage() {
 
       if (!editingId && periodicoDecisionRef.current === "none") {
         try {
-          const pendente = await buscarPeriodicoPendenteColaborador({
-            clienteNome: form.cliente_nome,
-            colaborador: form.colaborador,
-            colaboradorCpf: form.colaborador_cpf,
+          const opened = await verificarPeriodicoFuturoPendente({
+            force: true,
+            fromSave: true,
           });
-          if (pendente) {
+          if (opened) {
             pendingSaveStatusRef.current = status;
-            setPeriodicoVinculo(pendente);
-            setPeriodicoVinculoOpen(true);
             return;
           }
         } catch (periodicoErr) {
@@ -1946,6 +2071,9 @@ export function useAgendamentosPage() {
                 periodicoId: periodicoLinkId,
                 agendamentoId: novoId,
                 usuarioNome: historicoUsuario,
+                dataAgendamentoIso: dataIso,
+                usuarioEmail: auditContext.usuarioEmail,
+                usuarioId: auditContext.usuarioId,
               });
               toast.message(
                 "Periódico Futuro vinculado a este agendamento."
@@ -1991,10 +2119,11 @@ export function useAgendamentosPage() {
         setDuplicidade90DiasOpen(false);
         setDuplicidade90DiasInfo(null);
         setPeriodicoVinculoOpen(false);
-        setPeriodicoVinculo(null);
+        setPeriodicoVinculoList([]);
         periodicoDecisionRef.current = "none";
         periodicoLinkIdRef.current = null;
         pendingSaveStatusRef.current = null;
+        periodicoAlertKeyRef.current = null;
         setShowForm(false);
         resetForm();
         setFiltersExpanded(false);
@@ -2069,6 +2198,7 @@ export function useAgendamentosPage() {
       resolverInfoClienteInadimplencia,
       historicoUsuario,
       clientes,
+      verificarPeriodicoFuturoPendente,
     ]
   );
 
@@ -2079,33 +2209,107 @@ export function useAgendamentosPage() {
     [executeSave]
   );
 
-  const closePeriodicoVinculoModal = useCallback(() => {
+  const auditarDecisaoPeriodico = useCallback(
+    async (
+      decisao: "cancelou" | "continuou_sem_vinculo" | "antecipou_e_vinculou",
+      periodicoId?: string | null
+    ) => {
+      const periodico =
+        periodicoVinculoList.find((p) => p.id === periodicoId) ??
+        periodicoVinculoList[0] ??
+        null;
+      const dataPrevista =
+        periodico?.data_prevista_original?.slice(0, 10) ||
+        periodico?.proxima_data?.slice(0, 10) ||
+        "";
+      const decisaoLabel =
+        decisao === "cancelou"
+          ? "cancelou o aviso de periódico futuro"
+          : decisao === "continuou_sem_vinculo"
+            ? "optou por continuar sem vincular ao periódico futuro"
+            : "optou por antecipar/vincular ao periódico futuro";
+      try {
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: historicoUsuario,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.periodicos_futuros,
+          acao:
+            decisao === "cancelou"
+              ? AUDITORIA_ACOES.cancelamento
+              : decisao === "continuou_sem_vinculo"
+                ? AUDITORIA_ACOES.sem_vinculo_contrato_implantacao
+                : AUDITORIA_ACOES.reagendamento,
+          registroId: periodico?.id ?? null,
+          registroNome: form.colaborador || periodico?.colaborador || "",
+          descricao: `${historicoUsuario} ${decisaoLabel} para ${form.colaborador || periodico?.colaborador || "colaborador"} (CPF ${normalizeCpfDigits(form.colaborador_cpf) || "—"})${dataPrevista ? `, previsto para ${dataPrevista}` : ""}.`,
+          dadosDepois: {
+            decisao,
+            colaborador: form.colaborador,
+            colaborador_cpf: normalizeCpfDigits(form.colaborador_cpf),
+            periodico_futuro_id: periodico?.id ?? null,
+            data_prevista: dataPrevista || null,
+            aso: form.aso || null,
+          },
+        });
+      } catch (err) {
+        console.error("Erro ao auditar decisão de periódico futuro:", err);
+      }
+    },
+    [
+      auditContext.usuarioEmail,
+      auditContext.usuarioId,
+      form.aso,
+      form.colaborador,
+      form.colaborador_cpf,
+      historicoUsuario,
+      periodicoVinculoList,
+    ]
+  );
+
+  const handleCancelarPeriodicoVinculo = useCallback(() => {
+    void auditarDecisaoPeriodico("cancelou");
+    const fromSave = pendingSaveStatusRef.current !== null;
     setPeriodicoVinculoOpen(false);
-    setPeriodicoVinculo(null);
+    setPeriodicoVinculoList([]);
     periodicoDecisionRef.current = "none";
     periodicoLinkIdRef.current = null;
     pendingSaveStatusRef.current = null;
-  }, []);
+    periodicoAlertKeyRef.current = null;
+    if (!fromSave) {
+      setField("colaborador_cpf", "");
+      setField("colaborador", "");
+    }
+  }, [auditarDecisaoPeriodico, setField]);
 
   const handleContinuarComPeriodicoPendente = useCallback(() => {
+    void auditarDecisaoPeriodico("continuou_sem_vinculo");
     periodicoDecisionRef.current = "skip";
     periodicoLinkIdRef.current = null;
     setPeriodicoVinculoOpen(false);
-    const status = pendingSaveStatusRef.current ?? "agendado";
-    void executeSave(status);
-  }, [executeSave]);
-
-  const handleUtilizarPeriodicoPendente = useCallback(() => {
-    if (!periodicoVinculo?.id) {
-      closePeriodicoVinculoModal();
-      return;
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      void executeSave(pending);
     }
-    periodicoDecisionRef.current = "link";
-    periodicoLinkIdRef.current = periodicoVinculo.id;
-    setPeriodicoVinculoOpen(false);
-    const status = pendingSaveStatusRef.current ?? "agendado";
-    void executeSave(status);
-  }, [closePeriodicoVinculoModal, executeSave, periodicoVinculo?.id]);
+  }, [auditarDecisaoPeriodico, executeSave]);
+
+  const handleUtilizarPeriodicoPendente = useCallback(
+    (periodicoId: string) => {
+      if (!periodicoId) {
+        handleCancelarPeriodicoVinculo();
+        return;
+      }
+      void auditarDecisaoPeriodico("antecipou_e_vinculou", periodicoId);
+      periodicoDecisionRef.current = "link";
+      periodicoLinkIdRef.current = periodicoId;
+      setPeriodicoVinculoOpen(false);
+      const pending = pendingSaveStatusRef.current;
+      if (pending) {
+        void executeSave(pending);
+      }
+    },
+    [auditarDecisaoPeriodico, executeSave, handleCancelarPeriodicoVinculo]
+  );
 
   const closeDuplicidade90DiasModal = useCallback(() => {
     setDuplicidade90DiasOpen(false);
@@ -2207,8 +2411,10 @@ export function useAgendamentosPage() {
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
     periodicoVinculoOpen,
-    periodicoVinculo,
-    closePeriodicoVinculoModal,
+    periodicoVinculoList,
+    periodicoContratoNumeros,
+    handleCpfBlur,
+    handleCancelarPeriodicoVinculo,
     handleContinuarComPeriodicoPendente,
     handleUtilizarPeriodicoPendente,
     cargoChangeModalOpen,

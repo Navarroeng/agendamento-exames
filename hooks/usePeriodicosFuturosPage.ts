@@ -120,12 +120,20 @@ export function usePeriodicosFuturosPage() {
       saveAgendamentoPrefill({
         cliente_nome: record.cliente_nome,
         colaborador: record.colaborador,
+        colaborador_cpf: record.colaborador_cpf ?? undefined,
         cargo_id: record.cargo_id ?? undefined,
         cargo_nome: record.cargo_nome ?? undefined,
         exame_nome: record.exame_nome,
-        aso: "Periódico",
+        aso: record.tipo_aso || "Periódico",
       });
       router.push("/");
+    },
+    [router]
+  );
+
+  const handleVisualizarAgendamento = useCallback(
+    (agendamentoId: string) => {
+      router.push(`/?abrirAgendamento=${encodeURIComponent(agendamentoId)}`);
     },
     [router]
   );
@@ -187,6 +195,7 @@ export function usePeriodicosFuturosPage() {
     handleCardClick,
     setPage,
     handleCriarAgendamento,
+    handleVisualizarAgendamento,
     handleMarcarReagendado,
     handleCancelarAcompanhamento,
     canActOnRecord,

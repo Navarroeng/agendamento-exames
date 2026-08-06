@@ -101,6 +101,8 @@ export async function criarPeriodicosDeAgendamento(
       exame_nome: exame.nome,
       data_realizada: dataRealizada,
       proxima_data: proximaData,
+      data_prevista_original: proximaData,
+      antecipado: false,
       status: "ativo" as const,
     }));
 
@@ -163,13 +165,40 @@ export async function cancelarPeriodicosPorAgendamento(
   agendamentoId: string
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase
+
+  // Origem ainda ativa (gerado a partir deste agendamento): cancela acompanhamento.
+  const { error: cancelOrigemErr } = await supabase
     .from("periodicos_futuros")
     .update({ status: "cancelado" })
     .eq("agendamento_id", agendamentoId)
     .eq("status", "ativo");
+  if (cancelOrigemErr) throw cancelOrigemErr;
 
-  if (error) throw error;
+  // Vínculo de cumprimento (reagendado): volta a pendente (ativo) e libera o ID.
+  const { data: vinculados, error: findVinculoErr } = await supabase
+    .from("periodicos_futuros")
+    .select("id, data_prevista_original, proxima_data")
+    .eq("agendamento_id", agendamentoId)
+    .eq("status", "reagendado");
+  if (findVinculoErr) throw findVinculoErr;
+
+  for (const row of vinculados ?? []) {
+    const dataOriginal =
+      (row.data_prevista_original as string | null)?.slice(0, 10) ||
+      String(row.proxima_data ?? "").slice(0, 10) ||
+      null;
+    const { error: restoreErr } = await supabase
+      .from("periodicos_futuros")
+      .update({
+        status: "ativo",
+        agendamento_id: null,
+        antecipado: false,
+        ...(dataOriginal ? { proxima_data: dataOriginal } : {}),
+      })
+      .eq("id", row.id)
+      .eq("status", "reagendado");
+    if (restoreErr) throw restoreErr;
+  }
 }
 
 export async function marcarPeriodicoReagendado(

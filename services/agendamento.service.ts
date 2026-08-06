@@ -164,6 +164,32 @@ export async function listarAgendamentosComExames(
   return (data ?? []) as AgendamentoWithExames[];
 }
 
+export async function buscarAgendamentoComExamesPorId(
+  id: string
+): Promise<AgendamentoWithExames | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select(
+      `
+      *,
+      agendamento_exames (
+        id,
+        agendamento_id,
+        tipo_exame,
+        valor_cliente,
+        custo_clinica,
+        motivo_valor_zero
+      )
+    `
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as AgendamentoWithExames | null) ?? null;
+}
+
 export async function atualizarAgendamentoComExames(
   id: string,
   agendamento: AgendamentoInsert,
