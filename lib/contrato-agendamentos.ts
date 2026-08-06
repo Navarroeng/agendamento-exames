@@ -10,15 +10,26 @@ export type ContratoAgendamentoContagem = {
   agendados: number;
   /** Exames futuros que consomem previsão. */
   programadosFuturos: number;
-  /** ASOs contratuais em aberto (status disponivel). */
+  /**
+   * ASOs contratuais em aberto formalmente registrados
+   * (`contrato_creditos_aso` status disponivel).
+   */
   emAberto: number;
-  /** Total comprometido (agendados + futuros + em aberto). */
+  /**
+   * Vagas ainda sem classificação (agendamento / futuro / ASO em aberto).
+   * Nunca negativo.
+   */
+  pendentesDefinicao: number;
+  /** Total comprometido (agendados + futuros + ASOs em aberto). */
   comprometidos: number;
+  /** @deprecated Alias de pendentesDefinicao. */
   pendentes: number;
+  /** @deprecated Alias de pendentesDefinicao. */
   disponiveis: number;
   adicionais: number;
   percentual: number;
   mensagem: string;
+  mensagemComplemento: string | null;
   concluido: boolean;
   dispensado: boolean;
   progressoLabel: string;
@@ -46,9 +57,24 @@ export function buildContratoAgendamentoContagem(
 ): ContratoAgendamentoContagem {
   const previstos = Math.max(0, quantidadeContratada || 0);
   const dispensado = Boolean(opts?.dispensado);
-  const agendados = Math.max(0, opts?.agendados ?? utilizados);
+  const agendados = Math.max(0, opts?.agendados ?? 0);
   const programadosFuturos = Math.max(0, opts?.programadosFuturos ?? 0);
   const emAberto = Math.max(0, opts?.emAberto ?? 0);
+
+  // Comprometidos = classificação já formalizada (sem dupla contagem).
+  // `utilizados` continua sendo a fonte de verdade do progresso quando
+  // passado como agendados+futuros+emAberto pelo chamador.
+  const hasBreakdown =
+    opts?.agendados != null ||
+    opts?.programadosFuturos != null ||
+    opts?.emAberto != null;
+  const comprometidos = Math.max(
+    0,
+    hasBreakdown
+      ? agendados + programadosFuturos + emAberto
+      : Math.max(0, utilizados)
+  );
+  const usadosProgresso = Math.max(0, utilizados);
 
   if (dispensado) {
     const extras = Math.max(0, adicionais);
@@ -60,12 +86,14 @@ export function buildContratoAgendamentoContagem(
       agendados: 0,
       programadosFuturos: 0,
       emAberto: 0,
+      pendentesDefinicao: 0,
       comprometidos: 0,
       pendentes: 0,
       disponiveis: 0,
       adicionais: extras,
       percentual: 100,
       mensagem: "Cliente optou por não realizar os agendamentos iniciais.",
+      mensagemComplemento: null,
       concluido: true,
       dispensado: true,
       progressoLabel: "Concluído por dispensa",
@@ -73,49 +101,62 @@ export function buildContratoAgendamentoContagem(
     };
   }
 
-  const usados = Math.max(0, utilizados);
-  const disponiveis = Math.max(0, previstos - usados);
+  const pendentesDefinicao = Math.max(0, previstos - comprometidos);
   const extras = Math.max(0, adicionais);
   const percentual =
     previstos > 0
-      ? Math.min(100, Math.round((usados / previstos) * 100))
-      : usados > 0
+      ? Math.min(100, Math.round((usadosProgresso / previstos) * 100))
+      : usadosProgresso > 0
         ? 100
         : 0;
-  const concluido = previstos > 0 ? usados >= previstos : false;
+  const concluido = previstos > 0 ? usadosProgresso >= previstos : false;
 
   let mensagem = "";
+  let mensagemComplemento: string | null = null;
+
   if (previstos <= 0) {
     mensagem =
       "Quantidade de colaboradores não informada nas condições aprovadas.";
-  } else if (disponiveis === 1) {
+  } else if (pendentesDefinicao === 1) {
     mensagem =
-      "Falta selecionar 1 agendamento para atingir a quantidade prevista no contrato.";
-  } else if (disponiveis > 1) {
-    mensagem = `Faltam selecionar ${disponiveis} agendamentos para atingir a quantidade prevista no contrato.`;
-  } else if (extras > 0) {
-    mensagem =
-      extras === 1
-        ? "A quantidade prevista foi atingida e existe 1 agendamento adicional."
-        : `A quantidade prevista foi atingida e existem ${extras} agendamentos adicionais.`;
+      "Falta definir 1 vaga para atingir a quantidade prevista no contrato.";
+    mensagemComplemento =
+      "Você pode vincular novos agendamentos, informar exames futuros ou manter essa vaga como ASO em aberto.";
+  } else if (pendentesDefinicao > 1) {
+    mensagem = `Faltam definir ${pendentesDefinicao} vagas para atingir a quantidade prevista no contrato.`;
+    mensagemComplemento =
+      "Você pode vincular novos agendamentos, informar exames futuros ou manter essas vagas como ASOs em aberto.";
   } else {
-    mensagem = "A quantidade prevista de agendamentos do contrato foi atingida.";
+    mensagem = "A quantidade prevista do contrato foi totalmente classificada.";
+    if (emAberto === 1) {
+      mensagemComplemento =
+        "Existe 1 ASO disponível para utilização futura durante a vigência do contrato.";
+    } else if (emAberto > 1) {
+      mensagemComplemento = `Existem ${emAberto} ASOs disponíveis para utilização futura durante a vigência do contrato.`;
+    } else if (extras > 0) {
+      mensagemComplemento =
+        extras === 1
+          ? "Existe 1 agendamento adicional além da previsão."
+          : `Existem ${extras} agendamentos adicionais além da previsão.`;
+    }
   }
 
   return {
     contratados: previstos,
     previstos,
-    realizados: usados,
-    utilizados: usados,
-    agendados,
-    programadosFuturos,
-    emAberto,
-    comprometidos: usados,
-    pendentes: disponiveis,
-    disponiveis,
+    realizados: usadosProgresso,
+    utilizados: usadosProgresso,
+    agendados: hasBreakdown ? agendados : Math.max(0, usadosProgresso),
+    programadosFuturos: hasBreakdown ? programadosFuturos : 0,
+    emAberto: hasBreakdown ? emAberto : 0,
+    pendentesDefinicao,
+    comprometidos,
+    pendentes: pendentesDefinicao,
+    disponiveis: pendentesDefinicao,
     adicionais: extras,
     percentual,
     mensagem,
+    mensagemComplemento,
     concluido,
     dispensado: false,
     progressoLabel: `${percentual}%`,

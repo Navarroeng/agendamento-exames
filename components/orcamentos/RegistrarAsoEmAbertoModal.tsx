@@ -52,7 +52,7 @@ export function RegistrarAsoEmAbertoModal({
     }
     if (qtd > quantidadeDisponivel) {
       setError(
-        `Há apenas ${quantidadeDisponivel} vaga(s) disponível(is) neste contrato.`
+        `Há apenas ${quantidadeDisponivel} vaga(s) pendente(s) de definição neste contrato.`
       );
       return;
     }
@@ -101,7 +101,7 @@ export function RegistrarAsoEmAbertoModal({
             <span className="font-bold text-navy">Já vinculados:</span>{" "}
             {quantidadeVinculada}
             {" · "}
-            <span className="font-bold text-navy">Disponíveis:</span>{" "}
+            <span className="font-bold text-navy">Pendentes de definição:</span>{" "}
             {quantidadeDisponivel}
           </p>
           <p className="mt-1">

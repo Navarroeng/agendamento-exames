@@ -63,13 +63,49 @@ interface OrcamentoAbaAgendamentosProps {
   onContagemChange?: (contagem: ContratoAgendamentoContagem) => void;
 }
 
-function Card({ label, value }: { label: string; value: string }) {
+function Card({
+  label,
+  value,
+  alert,
+  title,
+}: {
+  label: string;
+  value: string;
+  alert?: boolean;
+  title?: string;
+}) {
   return (
-    <div className="rounded-xl border border-[#e4ebf4] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+    <div
+      title={title}
+      className={
+        alert
+          ? "rounded-xl border border-[#fbbf24] bg-[#fffbeb] px-3.5 py-3 shadow-[0_2px_10px_rgba(245,158,11,0.08)]"
+          : "rounded-xl border border-[#e4ebf4] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
+      }
+    >
+      <p
+        className={
+          alert
+            ? "flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-[#b45309]"
+            : "text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]"
+        }
+      >
+        {alert ? (
+          <span aria-hidden className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+            <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+              <path d="M8.866 2.5a1 1 0 0 0-1.732 0l-5.5 9.5A1 1 0 0 0 2.5 13.5h11a1 1 0 0 0 .866-1.5l-5.5-9.5zM8 6.25a.75.75 0 0 1 .75.75v2a.75.75 0 0 1-1.5 0v-2A.75.75 0 0 1 8 6.25zm0 5a.875.875 0 1 1 0-1.75.875.875 0 0 1 0 1.75z" />
+            </svg>
+          </span>
+        ) : null}
         {label}
       </p>
-      <p className="mt-1 text-xl font-extrabold tabular-nums text-navy">
+      <p
+        className={
+          alert
+            ? "mt-1 text-xl font-extrabold tabular-nums text-[#92400e]"
+            : "mt-1 text-xl font-extrabold tabular-nums text-navy"
+        }
+      >
         {value}
       </p>
     </div>
@@ -430,7 +466,7 @@ export function OrcamentoAbaAgendamentos({
   async function handleConfirmarAsoEmAberto(
     data: RegistrarAsoEmAbertoFormResult
   ) {
-    if (!contrato) return;
+    if (!contrato || asoAbertoSaving) return;
     setAsoAbertoSaving(true);
     try {
       await registrarCreditosAsoEmAberto({
@@ -466,7 +502,7 @@ export function OrcamentoAbaAgendamentos({
   async function handleRemoverCredito(credito: ContratoCreditoAsoRecord) {
     if (
       !window.confirm(
-        "Remover a classificação deste ASO em aberto? A vaga voltará a aparecer como disponível e o progresso será recalculado."
+        "Remover a classificação deste ASO em aberto? A vaga voltará para Pendentes de definição e o progresso será recalculado."
       )
     ) {
       return;
@@ -804,7 +840,7 @@ export function OrcamentoAbaAgendamentos({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
           <Card label="Previstos" value={String(contagemPreview.previstos)} />
           <Card
             label="Agendados"
@@ -814,7 +850,22 @@ export function OrcamentoAbaAgendamentos({
             label="Programados p/ futuro"
             value={String(contagemPreview.programadosFuturos)}
           />
-          <Card label="Em aberto" value={String(contagemPreview.emAberto)} />
+          <Card
+            label="Pendentes de definição"
+            value={String(contagemPreview.pendentesDefinicao)}
+            alert={contagemPreview.pendentesDefinicao > 0}
+            title={
+              contagemPreview.pendentesDefinicao > 0
+                ? contagemPreview.pendentesDefinicao === 1
+                  ? "Existe 1 vaga do contrato que ainda precisa ser agendada, programada para o futuro ou mantida como ASO em aberto."
+                  : `Existem ${contagemPreview.pendentesDefinicao} vagas do contrato que ainda precisam ser agendadas, programadas para o futuro ou mantidas como ASO em aberto.`
+                : undefined
+            }
+          />
+          <Card
+            label="ASOs em aberto"
+            value={String(contagemPreview.emAberto)}
+          />
           <Card
             label="Comprometidos"
             value={String(contagemPreview.comprometidos)}
@@ -838,6 +889,11 @@ export function OrcamentoAbaAgendamentos({
             <p className="text-sm font-semibold text-navy">
               {contagemPreview.mensagem}
             </p>
+            {contagemPreview.mensagemComplemento ? (
+              <p className="mt-1 text-xs text-[#64748b]">
+                {contagemPreview.mensagemComplemento}
+              </p>
+            ) : null}
             {contrato?.numero ? (
               <p className="mt-1 text-xs text-[#64748b]">
                 Contrato: {contrato.numero}
@@ -857,7 +913,7 @@ export function OrcamentoAbaAgendamentos({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!dispensado && contagemPreview.disponiveis > 0 ? (
+            {!dispensado && contagemPreview.pendentesDefinicao > 0 ? (
               <>
                 <button
                   type="button"
@@ -1037,7 +1093,7 @@ export function OrcamentoAbaAgendamentos({
         quantidadeVinculada={
           contagemPreview.agendados + contagemPreview.programadosFuturos
         }
-        quantidadeDisponivel={contagemPreview.disponiveis}
+        quantidadeDisponivel={contagemPreview.pendentesDefinicao}
         dataFim={contrato?.data_fim ?? null}
         onClose={() => setAsoAbertoModalOpen(false)}
         onConfirm={(data) => void handleConfirmarAsoEmAberto(data)}

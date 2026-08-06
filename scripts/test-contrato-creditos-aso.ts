@@ -15,6 +15,69 @@ import { isAgendamentosEtapaConcluida } from "../lib/orcamento-etapas";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
 import type { ExameFormItem } from "../lib/types";
 
+// Caso 8 previstos, 3 agendados, 3 futuros — ainda sem confirmar ASOs
+const casoAntes = buildContratoAgendamentoContagem(8, 6, 0, {
+  agendados: 3,
+  programadosFuturos: 3,
+  emAberto: 0,
+});
+assert.equal(casoAntes.pendentesDefinicao, 2);
+assert.equal(casoAntes.emAberto, 0);
+assert.equal(casoAntes.comprometidos, 6);
+assert.equal(casoAntes.percentual, 75);
+assert.equal(
+  casoAntes.mensagem,
+  "Faltam definir 2 vagas para atingir a quantidade prevista no contrato."
+);
+assert.ok(casoAntes.mensagemComplemento?.includes("ASOs em aberto"));
+
+// Confirmar 2 ASOs em aberto
+const casoDepois = buildContratoAgendamentoContagem(8, 8, 0, {
+  agendados: 3,
+  programadosFuturos: 3,
+  emAberto: 2,
+});
+assert.equal(casoDepois.pendentesDefinicao, 0);
+assert.equal(casoDepois.emAberto, 2);
+assert.equal(casoDepois.comprometidos, 8);
+assert.equal(casoDepois.percentual, 100);
+assert.equal(
+  casoDepois.mensagem,
+  "A quantidade prevista do contrato foi totalmente classificada."
+);
+assert.ok(casoDepois.mensagemComplemento?.includes("2 ASOs disponíveis"));
+
+// Confirmar somente 1
+const casoParcial = buildContratoAgendamentoContagem(8, 7, 0, {
+  agendados: 3,
+  programadosFuturos: 3,
+  emAberto: 1,
+});
+assert.equal(casoParcial.pendentesDefinicao, 1);
+assert.equal(casoParcial.emAberto, 1);
+assert.equal(casoParcial.comprometidos, 7);
+assert.equal(casoParcial.percentual, 88);
+
+// Remover 1 ASO em aberto → volta para pendentes
+const casoRemovido = buildContratoAgendamentoContagem(8, 7, 0, {
+  agendados: 3,
+  programadosFuturos: 3,
+  emAberto: 1,
+});
+assert.equal(casoRemovido.pendentesDefinicao, 1);
+
+// Utilizar 1 ASO em agendamento: agendados sobe, em aberto desce, comprometidos igual
+const casoUsado = buildContratoAgendamentoContagem(8, 8, 0, {
+  agendados: 4,
+  programadosFuturos: 3,
+  emAberto: 1,
+});
+assert.equal(casoUsado.agendados, 4);
+assert.equal(casoUsado.emAberto, 1);
+assert.equal(casoUsado.comprometidos, 8);
+assert.equal(casoUsado.pendentesDefinicao, 0);
+assert.equal(casoUsado.percentual, 100);
+
 // --- Contagem: 1 ag + 1 futuro + 1 aberto = 3 / 100%
 const c = buildContratoAgendamentoContagem(3, 3, 0, {
   agendados: 1,
@@ -28,6 +91,7 @@ assert.equal(c.emAberto, 1);
 assert.equal(c.comprometidos, 3);
 assert.equal(c.percentual, 100);
 assert.equal(c.concluido, true);
+assert.equal(c.pendentesDefinicao, 0);
 
 // Após uso do crédito: 2 ag + 1 futuro + 0 aberto = 3
 const depois = buildContratoAgendamentoContagem(3, 3, 0, {
