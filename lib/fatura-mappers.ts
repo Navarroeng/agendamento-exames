@@ -30,7 +30,18 @@ export function buildFaturaItensFromAgendamentos(
           ? Number(exam.valor_cliente)
           : Number(exam.custo_clinica);
 
-      if (!isExameFaturavel({ status: ag.status, valor })) return;
+      if (
+        !isExameFaturavel({
+          status: ag.status,
+          valor,
+          inclusoCreditoContrato: Boolean(
+            (exam as { incluso_credito_contrato?: boolean | null })
+              .incluso_credito_contrato
+          ),
+        })
+      ) {
+        return;
+      }
 
       itens.push({
         agendamento_id: ag.id,

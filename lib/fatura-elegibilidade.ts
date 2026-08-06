@@ -45,12 +45,15 @@ export function isAgendamentoElegivelFatura(
 
 /**
  * Regra única de exame faturável (Faturas Clientes e demais cálculos).
- * TRUE somente quando valor >= R$ 1,00 e status ≠ Cancelado.
+ * TRUE somente quando valor >= R$ 1,00, status ≠ Cancelado e
+ * o exame não estiver coberto por crédito contratual utilizado.
  */
 export function isExameFaturavel(params: {
   status: string | null | undefined;
   valor: number | null | undefined;
+  inclusoCreditoContrato?: boolean | null;
 }): boolean {
+  if (params.inclusoCreditoContrato === true) return false;
   if (normalizeAgendamentoStatusForFatura(params.status) === "cancelado") {
     return false;
   }

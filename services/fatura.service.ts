@@ -24,7 +24,8 @@ export async function listarAgendamentosParaFatura(
         agendamento_id,
         tipo_exame,
         valor_cliente,
-        custo_clinica
+        custo_clinica,
+        incluso_credito_contrato
       )
     `
     )
