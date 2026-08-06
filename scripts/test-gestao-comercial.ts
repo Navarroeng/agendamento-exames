@@ -191,4 +191,39 @@ assert.ok(ago);
 assert.equal(ago!.valorFechado, 1400);
 assert.equal(ago!.quantidade, 1);
 
+// 9) Histórico 2023/2024: evolução e comparação sem contratos fictícios
+const historicoCompleto: GestaoComercialHistoricoMensal[] = [
+  ...historico,
+  { ano: 2023, mes: 1, valorFechado: 32480.5, origemDado: "historico_manual" },
+  { ano: 2023, mes: 3, valorFechado: 46910, origemDado: "historico_manual" },
+  { ano: 2024, mes: 1, valorFechado: 18455, origemDado: "historico_manual" },
+  { ano: 2024, mes: 4, valorFechado: 43835, origemDado: "historico_manual" },
+];
+const dash2024 = buildGestaoComercialDashboard(
+  [],
+  { ...filtersBase, ano: 2024, mes: 1 },
+  historicoCompleto
+);
+assert.equal(dash2024.valorFechado, 18455);
+assert.equal(dash2024.origemValorPeriodo, "historico_manual");
+assert.equal(dash2024.indicadoresDetalhadosDisponiveis, false);
+assert.equal(dash2024.rows.length, 0);
+assert.equal(dash2024.anoComparacaoA, 2023);
+assert.equal(dash2024.anoComparacaoB, 2024);
+const janCmp = dash2024.serieComparacaoAnual.find((s) => s.mes === 1);
+assert.equal(janCmp?.valorAnoA, 32480.5);
+assert.equal(janCmp?.valorAnoB, 18455);
+assert.equal(janCmp?.origemAnoA, "historico_manual");
+assert.equal(janCmp?.origemAnoB, "historico_manual");
+const serieMar2023 = dash2024.serieMensalAno.find((s) => s.mes === 1);
+assert.equal(serieMar2023?.valorFechado, 18455);
+
+const dash2026Cmp = buildGestaoComercialDashboard(
+  rowsJul,
+  { ...filtersBase, mes: 7 },
+  historicoCompleto
+);
+assert.equal(dash2026Cmp.anoComparacaoA, 2025);
+assert.equal(dash2026Cmp.anoComparacaoB, 2026);
+
 console.log("test-gestao-comercial: OK");

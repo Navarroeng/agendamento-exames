@@ -670,8 +670,9 @@ export function buildGestaoComercialDashboard(
     0
   );
 
-  const anoComparacaoA = 2025;
-  const anoComparacaoB = 2026;
+  // Comparativo: ano selecionado × ano anterior (ex.: 2026×2025, 2024×2023).
+  const anoComparacaoB = ano;
+  const anoComparacaoA = ano - 1;
   const serieComparacaoAnual: GestaoComercialSerieAnualMes[] = MESES_PT.map(
     (label, idx) => {
       const mes = idx + 1;
@@ -689,14 +690,16 @@ export function buildGestaoComercialDashboard(
         mes,
         historicoMap
       );
+      const futuroA =
+        anoComparacaoA === now.getFullYear() && mes > now.getMonth() + 1;
       const futuroB =
         anoComparacaoB === now.getFullYear() && mes > now.getMonth() + 1;
       return {
         mes,
         label,
-        valorAnoA: a.valorFechado,
+        valorAnoA: futuroA ? null : a.valorFechado,
         valorAnoB: futuroB ? null : b.valorFechado,
-        origemAnoA: a.origem,
+        origemAnoA: futuroA ? null : a.origem,
         origemAnoB: futuroB ? null : b.origem,
       };
     }
