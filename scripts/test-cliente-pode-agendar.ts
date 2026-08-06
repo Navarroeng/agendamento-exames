@@ -46,7 +46,16 @@ assert.equal(
 );
 assert.equal(
   clientePodeAgendar({ disponivel_agendamento: false }, [orcamentoPago]),
-  true
+  true,
+  "sem bloqueio manual, contrato pago ainda libera (legado automático)"
+);
+assert.equal(
+  clientePodeAgendar(
+    { disponivel_agendamento: false, agendamento_bloqueio_manual: true },
+    [orcamentoPago]
+  ),
+  false,
+  "bloqueio manual tem prioridade sobre contrato pago"
 );
 assert.equal(
   clientePodeAgendar({ disponivel_agendamento: true }, [

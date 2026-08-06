@@ -2,8 +2,9 @@
  * Disponibilidade para novos agendamentos.
  *
  * Fonte de verdade no cadastro: `clientes.disponivel_agendamento`,
- * mantida por `recompute_cliente_disponivel_agendamento` com a regra de
- * `lib/cliente-pode-agendar.ts` (orçamento só libera com boleto pago).
+ * mantida por `recompute_cliente_disponivel_agendamento`.
+ * Bloqueio manual (`agendamento_bloqueio_manual`) tem prioridade e impede
+ * qualquer liberação automática.
  */
 import { SIM_NAO } from "@/lib/constants";
 

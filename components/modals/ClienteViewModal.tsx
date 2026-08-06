@@ -120,7 +120,9 @@ export function ClienteViewModal({
       const disponivelAnterior = isClienteDisponivelAgendamento(
         cliente.disponivel_agendamento
       );
-      const updated = await atualizarCliente(cliente.id, payload);
+      const updated = await atualizarCliente(cliente.id, payload, {
+        usuarioNome: auditContext.usuarioNome,
+      });
       if (procuracaoAnterior !== payload.procuracao) {
         await registrarProcuracaoClienteAlterada(auditContext, {
           clienteId: updated.id,

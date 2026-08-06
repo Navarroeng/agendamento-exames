@@ -15,14 +15,15 @@
  * - cnpj_digits (text, generated) — CNPJ só com dígitos; índice único (migration 031)
  * - procuracao (text) — pendente | ativa | nao_necessaria (migrations 033/071)
  * - disponivel_agendamento (boolean) — migration 043
+ * - agendamento_bloqueio_manual / motivo / em / por — migration 076
  */
 export const CLIENTE_DB_COLUMNS =
-  "id, nome, cnpj, procuracao, disponivel_agendamento, contato, telefone, email, endereco, setor, created_at" as const;
+  "id, nome, cnpj, procuracao, disponivel_agendamento, agendamento_bloqueio_manual, agendamento_bloqueio_motivo, agendamento_bloqueado_em, agendamento_bloqueado_por, contato, telefone, email, endereco, setor, created_at" as const;
 
 /** Colunas para busca normalizada (inclui contatos legados). */
 export const CLIENTE_LIST_COLUMNS =
-  "id, nome, cnpj, procuracao, disponivel_agendamento, email, telefone, contato, created_at" as const;
+  "id, nome, cnpj, procuracao, disponivel_agendamento, agendamento_bloqueio_manual, email, telefone, contato, created_at" as const;
 
 /** Colunas mínimas para selects e autocompletes (carrega todos os clientes). */
 export const CLIENTE_SELECT_COLUMNS =
-  "id, nome, cnpj, procuracao, disponivel_agendamento, contato, telefone, email, endereco, setor" as const;
+  "id, nome, cnpj, procuracao, disponivel_agendamento, agendamento_bloqueio_manual, contato, telefone, email, endereco, setor" as const;

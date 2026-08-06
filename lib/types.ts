@@ -299,6 +299,10 @@ export interface ClienteInsert {
   cnpj: string;
   procuracao: ClienteProcuracao;
   disponivel_agendamento: boolean;
+  agendamento_bloqueio_manual?: boolean;
+  agendamento_bloqueio_motivo?: string | null;
+  agendamento_bloqueado_em?: string | null;
+  agendamento_bloqueado_por?: string | null;
   origem_cadastro?: "manual" | "orcamento";
   contato?: string | null;
   telefone?: string | null;
@@ -312,6 +316,10 @@ export interface ClienteUpdate {
   cnpj: string;
   procuracao: ClienteProcuracao;
   disponivel_agendamento: boolean;
+  agendamento_bloqueio_manual?: boolean;
+  agendamento_bloqueio_motivo?: string | null;
+  agendamento_bloqueado_em?: string | null;
+  agendamento_bloqueado_por?: string | null;
   contato?: string | null;
   telefone?: string | null;
   email?: string | null;
@@ -327,6 +335,10 @@ export interface ClienteRecord extends ClienteInsert {
   endereco?: string | null;
   setor?: string | null;
   created_at?: string | null;
+  agendamento_bloqueio_manual?: boolean;
+  agendamento_bloqueio_motivo?: string | null;
+  agendamento_bloqueado_em?: string | null;
+  agendamento_bloqueado_por?: string | null;
 }
 
 export type ClienteContratoStatus =

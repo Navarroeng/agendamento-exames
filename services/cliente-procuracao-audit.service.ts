@@ -14,16 +14,22 @@ export async function registrarDisponivelAgendamentoClienteAlterada(
     clienteNome: string;
     disponivelAnterior: boolean;
     disponivelNova: boolean;
+    motivo?: string | null;
   }
 ): Promise<void> {
   const liberou = params.disponivelNova;
   const acao = liberou
     ? AUDITORIA_ACOES.agendamento_cliente_liberado
     : AUDITORIA_ACOES.agendamento_cliente_bloqueado;
+  const motivo = (params.motivo ?? "").trim();
 
   const descricao = liberou
-    ? `${context.usuarioNome} liberou o cliente ${params.clienteNome} para agendamentos.`
-    : `${context.usuarioNome} bloqueou o cliente ${params.clienteNome} para novos agendamentos.`;
+    ? `${context.usuarioNome} liberou o cliente ${params.clienteNome} para novos agendamentos.${
+        motivo ? ` Motivo: ${motivo}.` : ""
+      }`
+    : `${context.usuarioNome} bloqueou o cliente ${params.clienteNome} para novos agendamentos.${
+        motivo ? ` Motivo: ${motivo}.` : ""
+      }`;
 
   await registrarAuditoria({
     usuarioId: context.usuarioId,
@@ -35,7 +41,11 @@ export async function registrarDisponivelAgendamentoClienteAlterada(
     registroNome: params.clienteNome,
     descricao,
     dadosAntes: { disponivel_agendamento: params.disponivelAnterior },
-    dadosDepois: { disponivel_agendamento: params.disponivelNova },
+    dadosDepois: {
+      disponivel_agendamento: params.disponivelNova,
+      agendamento_bloqueio_manual: !liberou,
+      ...(motivo ? { motivo } : {}),
+    },
   });
 }
 
