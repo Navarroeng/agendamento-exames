@@ -62,14 +62,37 @@ export interface GestaoComercialComparacao {
   percentual: number | null;
   tendencia: "alta" | "baixa" | "igual" | "sem_base";
   label: string;
+  origemAtual?: GestaoComercialOrigemDado | null;
+  origemAnterior?: GestaoComercialOrigemDado | null;
+}
+
+export type GestaoComercialOrigemDado = "sistema" | "historico_manual";
+
+export interface GestaoComercialHistoricoMensal {
+  ano: number;
+  mes: number;
+  valorFechado: number;
+  origemDado: "historico_manual";
+  observacao?: string | null;
 }
 
 export interface GestaoComercialSerieMes {
   mes: number; // 1-12
   label: string;
-  valorFechado: number;
-  quantidade: number;
-  ticketMedio: number;
+  /** null = mês sem valor (não exibir como zero real). */
+  valorFechado: number | null;
+  quantidade: number | null;
+  ticketMedio: number | null;
+  origem: GestaoComercialOrigemDado | null;
+}
+
+export interface GestaoComercialSerieAnualMes {
+  mes: number;
+  label: string;
+  valorAnoA: number | null;
+  valorAnoB: number | null;
+  origemAnoA: GestaoComercialOrigemDado | null;
+  origemAnoB: GestaoComercialOrigemDado | null;
 }
 
 export interface GestaoComercialGrupoResumo {
@@ -92,6 +115,9 @@ export interface GestaoComercialDashboard {
   filtrosEfetivos: { inicio: string; fim: string; mesRef: number; anoRef: number };
   rows: GestaoComercialFechamentoRow[];
   valorFechado: number;
+  /** false quando o valor do período vem só do histórico consolidado. */
+  indicadoresDetalhadosDisponiveis: boolean;
+  origemValorPeriodo: GestaoComercialOrigemDado | null;
   contratosFechados: number;
   ticketMedio: number;
   novosClientes: number;
@@ -100,6 +126,10 @@ export interface GestaoComercialDashboard {
   contratosAtivos: number;
   comparacao: GestaoComercialComparacao;
   serieMensalAno: GestaoComercialSerieMes[];
+  serieComparacaoAnual: GestaoComercialSerieAnualMes[];
+  anoComparacaoA: number;
+  anoComparacaoB: number;
+  totalAnualValor: number;
   porOrigem: GestaoComercialGrupoResumo[];
   porResponsavel: GestaoComercialGrupoResumo[];
   novosVsRenovacao: {
@@ -107,6 +137,7 @@ export interface GestaoComercialDashboard {
     renovacoes: GestaoComercialGrupoResumo;
   };
   pagamento: GestaoComercialPagamentoResumo;
+  mensagemDetalhesIndisponiveis: string | null;
 }
 
 export const MESES_PT = [
@@ -258,9 +289,17 @@ export function mesAnterior(ano: number, mes: number): { ano: number; mes: numbe
 
 export function calcComparacaoMes(
   valorAtual: number,
-  valorAnterior: number
+  valorAnterior: number,
+  meta?: {
+    origemAtual?: GestaoComercialOrigemDado | null;
+    origemAnterior?: GestaoComercialOrigemDado | null;
+  }
 ): GestaoComercialComparacao {
   const diferenca = valorAtual - valorAnterior;
+  const base = {
+    origemAtual: meta?.origemAtual ?? null,
+    origemAnterior: meta?.origemAnterior ?? null,
+  };
   if (valorAnterior === 0) {
     return {
       valorAtual,
@@ -269,6 +308,7 @@ export function calcComparacaoMes(
       percentual: null,
       tendencia: "sem_base",
       label: "Sem base de comparação no mês anterior.",
+      ...base,
     };
   }
   const percentual = (diferenca / valorAnterior) * 100;
@@ -280,6 +320,7 @@ export function calcComparacaoMes(
       percentual: 0,
       tendencia: "igual",
       label: "0% em relação ao mês anterior",
+      ...base,
     };
   }
   const sinal = percentual > 0 ? "+" : "";
@@ -290,6 +331,7 @@ export function calcComparacaoMes(
     percentual,
     tendencia: percentual > 0 ? "alta" : "baixa",
     label: `${sinal}${percentual.toFixed(0)}% em relação ao mês anterior`,
+    ...base,
   };
 }
 
@@ -353,10 +395,125 @@ export function filterFechamentos(
   });
 }
 
+export const GESTAO_COMERCIAL_DETALHES_INDISPONIVEIS_MSG =
+  "Informação indisponível para o período anterior ao sistema.";
+
+export function historicoKey(ano: number, mes: number): string {
+  return `${ano}-${String(mes).padStart(2, "0")}`;
+}
+
+export function indexHistoricoMensal(
+  items: GestaoComercialHistoricoMensal[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const item of items) {
+    map.set(historicoKey(item.ano, item.mes), item.valorFechado);
+  }
+  return map;
+}
+
+/**
+ * Histórico manual só entra em totais de valor quando não há filtros
+ * dimensionais (responsável/origem/tipo) e o status não é só "encerrados".
+ */
+export function podeUsarHistoricoManual(filters: GestaoComercialFilters): boolean {
+  if (filters.statusContrato === "encerrados") return false;
+  if (filters.responsavel) return false;
+  if (filters.origem) return false;
+  if (filters.tipo) return false;
+  return true;
+}
+
+export interface GestaoComercialMesResolvido {
+  valorFechado: number | null;
+  quantidade: number | null;
+  ticketMedio: number | null;
+  origem: GestaoComercialOrigemDado | null;
+  rows: GestaoComercialFechamentoRow[];
+}
+
+/**
+ * Prioridade: dado real do sistema (se houver ≥1 fechamento no mês) >
+ * histórico manual > sem valor (null, não zero fictício).
+ * Nunca soma histórico + real no mesmo mês.
+ */
+export function resolveValorMesGestaoComercial(
+  allRows: GestaoComercialFechamentoRow[],
+  filters: GestaoComercialFilters,
+  ano: number,
+  mes: number,
+  historicoMap: Map<string, number>
+): GestaoComercialMesResolvido {
+  const range = rangeMes(ano, mes);
+  const rows = filterFechamentos(allRows, filters, range);
+  if (rows.length > 0) {
+    const valorFechado = sumValor(rows);
+    return {
+      valorFechado,
+      quantidade: rows.length,
+      ticketMedio: ticket(rows),
+      origem: "sistema",
+      rows,
+    };
+  }
+
+  if (podeUsarHistoricoManual(filters)) {
+    const hist = historicoMap.get(historicoKey(ano, mes));
+    if (hist != null && Number.isFinite(hist)) {
+      return {
+        valorFechado: hist,
+        quantidade: null,
+        ticketMedio: null,
+        origem: "historico_manual",
+        rows: [],
+      };
+    }
+  }
+
+  return {
+    valorFechado: null,
+    quantidade: null,
+    ticketMedio: null,
+    origem: null,
+    rows: [],
+  };
+}
+
+export function labelOrigemGestaoComercial(
+  origem: GestaoComercialOrigemDado | null | undefined
+): string {
+  if (origem === "historico_manual") {
+    return "Histórico anterior ao sistema";
+  }
+  if (origem === "sistema") {
+    return "Dados reais do sistema";
+  }
+  return "Sem dados";
+}
+
+function emptyDetalheGroups(valorFechado: number) {
+  return {
+    porOrigem: [] as GestaoComercialGrupoResumo[],
+    porResponsavel: [] as GestaoComercialGrupoResumo[],
+    novosVsRenovacao: {
+      novos: grupoFrom([], "novo", "Novos clientes", valorFechado),
+      renovacoes: grupoFrom([], "renovacao", "Renovações", valorFechado),
+    },
+    pagamento: {
+      avistaQtd: 0,
+      parceladoQtd: 0,
+      avistaValor: 0,
+      parceladoValor: 0,
+    },
+  };
+}
+
 export function buildGestaoComercialDashboard(
   allRows: GestaoComercialFechamentoRow[],
-  filters: GestaoComercialFilters
+  filters: GestaoComercialFilters,
+  historico: GestaoComercialHistoricoMensal[] = []
 ): GestaoComercialDashboard {
+  const historicoMap = indexHistoricoMensal(historico);
   const ano = filters.ano;
   const mesRef = filters.mes ?? new Date().getMonth() + 1;
 
@@ -370,95 +527,234 @@ export function buildGestaoComercialDashboard(
     rangeCards = rangeMes(ano, mesRef);
   }
 
-  const rows = filterFechamentos(allRows, filters, rangeCards);
-  const valorFechado = sumValor(rows);
-  const contratosFechados = rows.length;
-  const renovacoesRows = rows.filter((r) => isRenovacaoOrigem(r.origem));
-  const novosRows = rows.filter((r) => !isRenovacaoOrigem(r.origem));
+  const mesAtual = resolveValorMesGestaoComercial(
+    allRows,
+    filters,
+    ano,
+    mesRef,
+    historicoMap
+  );
 
-  // Card separado: sempre a qtd de encerrados/cancelados no período (demais filtros).
+  // Período personalizado: soma meses cobertos (sem duplicar histórico+real).
+  let valorFechado: number;
+  let origemValorPeriodo: GestaoComercialOrigemDado | null;
+  let indicadoresDetalhadosDisponiveis: boolean;
+  let rows: GestaoComercialFechamentoRow[];
+
+  if (filters.usarPeriodoPersonalizado && filters.periodoInicio && filters.periodoFim) {
+    const inicio = new Date(`${filters.periodoInicio}T12:00:00`);
+    const fim = new Date(`${filters.periodoFim}T12:00:00`);
+    let total = 0;
+    let temSistema = false;
+    let temHistorico = false;
+    const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+    const end = new Date(fim.getFullYear(), fim.getMonth(), 1);
+    while (cursor <= end) {
+      const resolved = resolveValorMesGestaoComercial(
+        allRows,
+        filters,
+        cursor.getFullYear(),
+        cursor.getMonth() + 1,
+        historicoMap
+      );
+      if (resolved.valorFechado != null) total += resolved.valorFechado;
+      if (resolved.origem === "sistema") temSistema = true;
+      if (resolved.origem === "historico_manual") temHistorico = true;
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    valorFechado = total;
+    rows = filterFechamentos(allRows, filters, rangeCards);
+    indicadoresDetalhadosDisponiveis = temSistema && rows.length > 0;
+    origemValorPeriodo = temSistema
+      ? "sistema"
+      : temHistorico
+        ? "historico_manual"
+        : null;
+  } else {
+    valorFechado = mesAtual.valorFechado ?? 0;
+    rows = mesAtual.rows;
+    origemValorPeriodo = mesAtual.origem;
+    indicadoresDetalhadosDisponiveis = mesAtual.origem === "sistema";
+  }
+
+  const contratosFechados = indicadoresDetalhadosDisponiveis ? rows.length : 0;
+  const renovacoesRows = indicadoresDetalhadosDisponiveis
+    ? rows.filter((r) => isRenovacaoOrigem(r.origem))
+    : [];
+  const novosRows = indicadoresDetalhadosDisponiveis
+    ? rows.filter((r) => !isRenovacaoOrigem(r.origem))
+    : [];
+
   const noPeriodo = filterFechamentos(allRows, filters, rangeCards, {
     ignoreStatusFilter: true,
   });
-  const encerrados = noPeriodo.filter((r) =>
-    isContratoEncerradoOuCancelado({
-      statusContrato: r.statusContrato,
-      orcamentoStatus: r.orcamentoStatus,
-    })
-  ).length;
-  const ativos = noPeriodo.filter((r) =>
-    isContratoContabilizavel({
-      statusContrato: r.statusContrato,
-      orcamentoStatus: r.orcamentoStatus,
-    })
-  ).length;
+  const encerrados = indicadoresDetalhadosDisponiveis
+    ? noPeriodo.filter((r) =>
+        isContratoEncerradoOuCancelado({
+          statusContrato: r.statusContrato,
+          orcamentoStatus: r.orcamentoStatus,
+        })
+      ).length
+    : 0;
+  const ativos = indicadoresDetalhadosDisponiveis
+    ? noPeriodo.filter((r) =>
+        isContratoContabilizavel({
+          statusContrato: r.statusContrato,
+          orcamentoStatus: r.orcamentoStatus,
+        })
+      ).length
+    : 0;
 
   const ant = mesAnterior(ano, mesRef);
-  const rangeAnt = rangeMes(ant.ano, ant.mes);
-  const rowsAnt = filterFechamentos(allRows, filters, rangeAnt);
-  const comparacao = calcComparacaoMes(valorFechado, sumValor(rowsAnt));
+  const mesAntResolvido = resolveValorMesGestaoComercial(
+    allRows,
+    filters,
+    ant.ano,
+    ant.mes,
+    historicoMap
+  );
+  const valorAnterior = mesAntResolvido.valorFechado ?? 0;
+  const comparacao = calcComparacaoMes(valorFechado, valorAnterior, {
+    origemAtual: origemValorPeriodo,
+    origemAnterior: mesAntResolvido.origem,
+  });
 
-  const rangeAnoFull = rangeAno(ano);
-  const rowsAno = filterFechamentos(allRows, filters, rangeAnoFull);
+  const now = new Date();
   const serieMensalAno: GestaoComercialSerieMes[] = MESES_PT.map((label, idx) => {
     const mes = idx + 1;
-    const { inicio, fim } = rangeMes(ano, mes);
-    const doMes = rowsAno.filter((r) => inRange(r.aprovadoEm, inicio, fim));
-    const now = new Date();
+    if (ano > now.getFullYear()) {
+      return {
+        mes,
+        label,
+        valorFechado: null,
+        quantidade: null,
+        ticketMedio: null,
+        origem: null,
+      };
+    }
     if (ano === now.getFullYear() && mes > now.getMonth() + 1) {
       return {
         mes,
         label,
-        valorFechado: 0,
-        quantidade: 0,
-        ticketMedio: 0,
+        valorFechado: null,
+        quantidade: null,
+        ticketMedio: null,
+        origem: null,
       };
     }
+    const resolved = resolveValorMesGestaoComercial(
+      allRows,
+      filters,
+      ano,
+      mes,
+      historicoMap
+    );
     return {
       mes,
       label,
-      valorFechado: sumValor(doMes),
-      quantidade: doMes.length,
-      ticketMedio: ticket(doMes),
+      valorFechado: resolved.valorFechado,
+      quantidade: resolved.quantidade,
+      ticketMedio: resolved.ticketMedio,
+      origem: resolved.origem,
     };
   }).filter((s) => {
-    const now = new Date();
     if (ano < now.getFullYear()) return true;
     if (ano > now.getFullYear()) return false;
     return s.mes <= now.getMonth() + 1;
   });
 
-  const origemMap = new Map<string, GestaoComercialFechamentoRow[]>();
-  for (const row of rows) {
-    const key = row.origem ?? "__null__";
-    const list = origemMap.get(key) ?? [];
-    list.push(row);
-    origemMap.set(key, list);
-  }
-  const porOrigem = Array.from(origemMap.entries())
-    .map(([chave, list]) =>
-      grupoFrom(
-        list,
-        chave,
-        formatOrcamentoOrigemCliente(chave === "__null__" ? null : chave),
-        valorFechado
-      )
-    )
-    .sort((a, b) => b.valorFechado - a.valorFechado);
+  const totalAnualValor = serieMensalAno.reduce(
+    (s, m) => s + (m.valorFechado ?? 0),
+    0
+  );
 
-  const respMap = new Map<string, GestaoComercialFechamentoRow[]>();
-  for (const row of rows) {
-    const key = row.responsavelNoFechamento || "Não informado";
-    const list = respMap.get(key) ?? [];
-    list.push(row);
-    respMap.set(key, list);
-  }
-  const porResponsavel = Array.from(respMap.entries())
-    .map(([chave, list]) => grupoFrom(list, chave, chave, valorFechado))
-    .sort((a, b) => b.valorFechado - a.valorFechado);
+  const anoComparacaoA = 2025;
+  const anoComparacaoB = 2026;
+  const serieComparacaoAnual: GestaoComercialSerieAnualMes[] = MESES_PT.map(
+    (label, idx) => {
+      const mes = idx + 1;
+      const a = resolveValorMesGestaoComercial(
+        allRows,
+        filters,
+        anoComparacaoA,
+        mes,
+        historicoMap
+      );
+      const b = resolveValorMesGestaoComercial(
+        allRows,
+        filters,
+        anoComparacaoB,
+        mes,
+        historicoMap
+      );
+      const futuroB =
+        anoComparacaoB === now.getFullYear() && mes > now.getMonth() + 1;
+      return {
+        mes,
+        label,
+        valorAnoA: a.valorFechado,
+        valorAnoB: futuroB ? null : b.valorFechado,
+        origemAnoA: a.origem,
+        origemAnoB: futuroB ? null : b.origem,
+      };
+    }
+  );
 
-  const avista = rows.filter((r) => r.formaPagamento === "avista");
-  const parcelado = rows.filter((r) => r.formaPagamento === "parcelado");
+  const detalhes = indicadoresDetalhadosDisponiveis
+    ? (() => {
+        const origemMap = new Map<string, GestaoComercialFechamentoRow[]>();
+        for (const row of rows) {
+          const key = row.origem ?? "__null__";
+          const list = origemMap.get(key) ?? [];
+          list.push(row);
+          origemMap.set(key, list);
+        }
+        const porOrigem = Array.from(origemMap.entries())
+          .map(([chave, list]) =>
+            grupoFrom(
+              list,
+              chave,
+              formatOrcamentoOrigemCliente(chave === "__null__" ? null : chave),
+              valorFechado
+            )
+          )
+          .sort((a, b) => b.valorFechado - a.valorFechado);
+
+        const respMap = new Map<string, GestaoComercialFechamentoRow[]>();
+        for (const row of rows) {
+          const key = row.responsavelNoFechamento || "Não informado";
+          const list = respMap.get(key) ?? [];
+          list.push(row);
+          respMap.set(key, list);
+        }
+        const porResponsavel = Array.from(respMap.entries())
+          .map(([chave, list]) => grupoFrom(list, chave, chave, valorFechado))
+          .sort((a, b) => b.valorFechado - a.valorFechado);
+
+        const avista = rows.filter((r) => r.formaPagamento === "avista");
+        const parcelado = rows.filter((r) => r.formaPagamento === "parcelado");
+
+        return {
+          porOrigem,
+          porResponsavel,
+          novosVsRenovacao: {
+            novos: grupoFrom(novosRows, "novo", "Novos clientes", valorFechado),
+            renovacoes: grupoFrom(
+              renovacoesRows,
+              "renovacao",
+              "Renovações",
+              valorFechado
+            ),
+          },
+          pagamento: {
+            avistaQtd: avista.length,
+            parceladoQtd: parcelado.length,
+            avistaValor: sumValor(avista),
+            parceladoValor: sumValor(parcelado),
+          },
+        };
+      })()
+    : emptyDetalheGroups(valorFechado);
 
   return {
     filtrosEfetivos: {
@@ -467,33 +763,28 @@ export function buildGestaoComercialDashboard(
       mesRef,
       anoRef: ano,
     },
-    rows: [...rows].sort((a, b) => b.aprovadoEm.localeCompare(a.aprovadoEm)),
+    rows: indicadoresDetalhadosDisponiveis
+      ? [...rows].sort((a, b) => b.aprovadoEm.localeCompare(a.aprovadoEm))
+      : [],
     valorFechado,
+    indicadoresDetalhadosDisponiveis,
+    origemValorPeriodo,
     contratosFechados,
-    ticketMedio: ticket(rows),
+    ticketMedio: indicadoresDetalhadosDisponiveis ? ticket(rows) : 0,
     novosClientes: novosRows.length,
     renovacoes: renovacoesRows.length,
     contratosEncerrados: encerrados,
     contratosAtivos: ativos,
     comparacao,
     serieMensalAno,
-    porOrigem,
-    porResponsavel,
-    novosVsRenovacao: {
-      novos: grupoFrom(novosRows, "novo", "Novos clientes", valorFechado),
-      renovacoes: grupoFrom(
-        renovacoesRows,
-        "renovacao",
-        "Renovações",
-        valorFechado
-      ),
-    },
-    pagamento: {
-      avistaQtd: avista.length,
-      parceladoQtd: parcelado.length,
-      avistaValor: sumValor(avista),
-      parceladoValor: sumValor(parcelado),
-    },
+    serieComparacaoAnual,
+    anoComparacaoA,
+    anoComparacaoB,
+    totalAnualValor,
+    ...detalhes,
+    mensagemDetalhesIndisponiveis: indicadoresDetalhadosDisponiveis
+      ? null
+      : GESTAO_COMERCIAL_DETALHES_INDISPONIVEIS_MSG,
   };
 }
 
@@ -502,3 +793,4 @@ export function formatComparacaoDiferenca(comp: GestaoComercialComparacao): stri
   const sinal = comp.diferenca > 0 ? "+" : "";
   return `${sinal}${formatCurrency(comp.diferenca)}`;
 }
+

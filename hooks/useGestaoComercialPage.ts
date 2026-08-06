@@ -7,11 +7,13 @@ import {
   type GestaoComercialDashboard,
   type GestaoComercialFechamentoRow,
   type GestaoComercialFilters,
+  type GestaoComercialHistoricoMensal,
 } from "@/lib/gestao-comercial";
 import { ORCAMENTO_ORIGEM_OPTIONS } from "@/lib/orcamento-origem";
 import {
   GestaoComercialForbiddenError,
   listarFechamentosGestaoComercial,
+  listarHistoricoMensalGestaoComercial,
 } from "@/services/gestao-comercial.service";
 
 export function useGestaoComercialPage() {
@@ -19,6 +21,9 @@ export function useGestaoComercialPage() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [allRows, setAllRows] = useState<GestaoComercialFechamentoRow[]>([]);
+  const [historico, setHistorico] = useState<GestaoComercialHistoricoMensal[]>(
+    []
+  );
   const [filters, setFilters] = useState<GestaoComercialFilters>(() =>
     defaultGestaoComercialFilters()
   );
@@ -28,12 +33,17 @@ export function useGestaoComercialPage() {
     setError(null);
     setForbidden(false);
     try {
-      const rows = await listarFechamentosGestaoComercial();
+      const [rows, hist] = await Promise.all([
+        listarFechamentosGestaoComercial(),
+        listarHistoricoMensalGestaoComercial(),
+      ]);
       setAllRows(rows);
+      setHistorico(hist);
     } catch (err) {
       if (err instanceof GestaoComercialForbiddenError) {
         setForbidden(true);
         setAllRows([]);
+        setHistorico([]);
       } else {
         setError(
           err instanceof Error ? err.message : "Falha ao carregar Gestão Comercial."
@@ -49,8 +59,8 @@ export function useGestaoComercialPage() {
   }, [reload]);
 
   const dashboard: GestaoComercialDashboard = useMemo(
-    () => buildGestaoComercialDashboard(allRows, filters),
-    [allRows, filters]
+    () => buildGestaoComercialDashboard(allRows, filters, historico),
+    [allRows, filters, historico]
   );
 
   const responsaveisOptions = useMemo(() => {
@@ -69,8 +79,11 @@ export function useGestaoComercialPage() {
       const y = Number(row.aprovadoEm.slice(0, 4));
       if (Number.isFinite(y)) set.add(y);
     }
+    for (const h of historico) {
+      if (Number.isFinite(h.ano)) set.add(h.ano);
+    }
     return Array.from(set).sort((a, b) => b - a);
-  }, [allRows]);
+  }, [allRows, historico]);
 
   const handleFilterChange = useCallback(
     <K extends keyof GestaoComercialFilters>(
