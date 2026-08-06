@@ -6,8 +6,14 @@ import {
   buildImplantacaoProcesso,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
+import {
+  classifyOrcamentoFluxoImplantacao,
+  resolveItensParaFluxoImplantacao,
+  resolveTreinamentosServicoId,
+} from "@/lib/servico-treinamentos";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
 import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
+import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
 
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
@@ -30,7 +36,7 @@ export async function listarProcessosImplantacao(): Promise<
 > {
   const supabase = createClient();
 
-  const [aprovacoesRes, contratosRes, orcamentosAprovadosRes] =
+  const [aprovacoesRes, contratosRes, orcamentosAprovadosRes, servicosRes] =
     await Promise.all([
       supabase
         .from("orcamento_aprovacoes")
@@ -41,11 +47,17 @@ export async function listarProcessosImplantacao(): Promise<
         .select("*")
         .not("orcamento_id", "is", null),
       supabase.from("orcamentos").select("*").eq("status", "aprovado"),
+      supabase.from("servicos_sst").select("id, nome"),
     ]);
 
   if (aprovacoesRes.error) throw aprovacoesRes.error;
   if (contratosRes.error) throw contratosRes.error;
   if (orcamentosAprovadosRes.error) throw orcamentosAprovadosRes.error;
+  if (servicosRes.error) throw servicosRes.error;
+
+  const treinamentosServicoId = resolveTreinamentosServicoId(
+    (servicosRes.data ?? []) as Array<{ id: string; nome: string }>
+  );
 
   const aprovacoes = (aprovacoesRes.data ?? []).map((row) =>
     sortAprovacao(row as OrcamentoAprovacaoRecord)
@@ -92,11 +104,51 @@ export async function listarProcessosImplantacao(): Promise<
       contratoByOrcamento.set(c.orcamento_id, c);
       continue;
     }
-    // Preferir o mais recente por aprovado_em / created_at
     const prevKey = prev.aprovado_em ?? prev.created_at ?? "";
     const nextKey = c.aprovado_em ?? c.created_at ?? "";
     if (nextKey > prevKey) contratoByOrcamento.set(c.orcamento_id, c);
   }
+
+  const idsArray = Array.from(orcamentoIds);
+  const itensByOrcamento = new Map<
+    string,
+    Array<{ servico_id?: string | null; servico_nome?: string | null }>
+  >();
+
+  for (const a of aprovacoes) {
+    const itens = a.orcamento_aprovacao_itens ?? [];
+    if (itens.length > 0) {
+      itensByOrcamento.set(a.orcamento_id, itens);
+    }
+  }
+  // Completa com itens do orçamento quando aprovação não trouxe serviços úteis
+  const needItens = idsArray.filter((id) => {
+    const current = itensByOrcamento.get(id) ?? [];
+    return (
+      resolveItensParaFluxoImplantacao({
+        aprovacaoItens: current,
+        orcamentoItens: [],
+      }).length === 0
+    );
+  });
+  if (needItens.length > 0) {
+    const { data: itensRows, error: itensErr } = await supabase
+      .from("orcamento_itens")
+      .select("orcamento_id, servico_id, servico_nome")
+      .in("orcamento_id", needItens);
+    if (itensErr) throw itensErr;
+    for (const row of itensRows ?? []) {
+      const list = itensByOrcamento.get(row.orcamento_id) ?? [];
+      list.push({
+        servico_id: row.servico_id,
+        servico_nome: row.servico_nome,
+      });
+      itensByOrcamento.set(row.orcamento_id, list);
+    }
+  }
+
+  const treinamentosByOrcamento =
+    await buscarTreinamentosPorOrcamentoIds(idsArray);
 
   const contratoIds = Array.from(
     new Set(
@@ -116,7 +168,6 @@ export async function listarProcessosImplantacao(): Promise<
     const orcamento = orcamentoById.get(id);
     if (!orcamento) continue;
 
-    // Cancelado sem ter passado por aprovação: fora da implantação
     const aprovacao = aprovacaoByOrcamento.get(id) ?? null;
     const contrato = contratoByOrcamento.get(id) ?? null;
     const foiAprovado =
@@ -125,11 +176,8 @@ export async function listarProcessosImplantacao(): Promise<
       Boolean(contrato);
 
     if (!foiAprovado) continue;
-
-    // Reprovado nunca entra
     if (orcamento.status === "reprovado") continue;
 
-    // Em elaboração / enviado / em negociação sem aprovação: não entra
     if (
       !aprovacao &&
       !contrato &&
@@ -145,6 +193,16 @@ export async function listarProcessosImplantacao(): Promise<
       ? programacoesPorContrato.get(contrato.id) ?? 0
       : 0;
 
+    const itens = resolveItensParaFluxoImplantacao({
+      aprovacaoItens: itensByOrcamento.get(id) ?? [],
+      orcamentoItens: [],
+    });
+    const fluxoImplantacao = classifyOrcamentoFluxoImplantacao(
+      itens,
+      treinamentosServicoId
+    );
+    const treinamento = treinamentosByOrcamento.get(id) ?? null;
+
     processos.push(
       buildImplantacaoProcesso({
         orcamento,
@@ -152,6 +210,8 @@ export async function listarProcessosImplantacao(): Promise<
         contrato,
         agendamentosRealizados: agendados,
         examesProgramadosFuturos: programados,
+        fluxoImplantacao,
+        treinamento,
       })
     );
   }

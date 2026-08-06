@@ -1,5 +1,10 @@
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { isProcuracaoStatusConcluida } from "@/lib/cliente-procuracao";
+import {
+  isTreinamentoEtapaConcluida,
+  type ImplantacaoTreinamentoRecord,
+} from "@/lib/implantacao-treinamento";
+import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 
 export type OrcamentoEtapaId =
   | "resumo"
@@ -10,11 +15,19 @@ export type OrcamentoEtapaId =
   | "funcionarios"
   | "logo"
   | "visita"
-  | "agendamentos";
+  | "agendamentos"
+  | "treinamento";
 
-export type OrcamentoEtapaEstado = "concluida" | "atual" | "bloqueada" | "disponivel";
+export type OrcamentoEtapaEstado =
+  | "concluida"
+  | "atual"
+  | "bloqueada"
+  | "disponivel";
 
-export const ORCAMENTO_ETAPAS: Array<{ id: OrcamentoEtapaId; label: string }> = [
+export const ORCAMENTO_ETAPAS_PADRAO: Array<{
+  id: OrcamentoEtapaId;
+  label: string;
+}> = [
   { id: "resumo", label: "Resumo" },
   { id: "aprovado", label: "Orçamento aprovado" },
   { id: "contrato", label: "Contrato" },
@@ -26,10 +39,55 @@ export const ORCAMENTO_ETAPAS: Array<{ id: OrcamentoEtapaId; label: string }> = 
   { id: "agendamentos", label: "Agendamentos" },
 ];
 
+/** @deprecated Prefer buildOrcamentoEtapas(fluxo) */
+export const ORCAMENTO_ETAPAS = ORCAMENTO_ETAPAS_PADRAO;
+
+/**
+ * Montagem dinâmica das abas:
+ * - somente_treinamentos: 5 abas (sem docs SST / exames)
+ * - combinado: fluxo SST completo + Agendamento do Treinamento (após Financeiro)
+ * - padrao: fluxo atual
+ */
+export function buildOrcamentoEtapas(
+  fluxo: OrcamentoFluxoImplantacao = "padrao"
+): Array<{ id: OrcamentoEtapaId; label: string }> {
+  if (fluxo === "somente_treinamentos") {
+    return [
+      { id: "resumo", label: "Resumo" },
+      { id: "aprovado", label: "Orçamento aprovado" },
+      { id: "contrato", label: "Contrato" },
+      { id: "financeiro", label: "Financeiro" },
+      { id: "treinamento", label: "Agendamento do Treinamento" },
+    ];
+  }
+
+  if (fluxo === "combinado") {
+    const etapas: Array<{ id: OrcamentoEtapaId; label: string }> = [];
+    for (const etapa of ORCAMENTO_ETAPAS_PADRAO) {
+      etapas.push(etapa);
+      if (etapa.id === "financeiro") {
+        etapas.push({
+          id: "treinamento",
+          label: "Agendamento do Treinamento",
+        });
+      }
+    }
+    return etapas;
+  }
+
+  return [...ORCAMENTO_ETAPAS_PADRAO];
+}
+
 export type OrcamentoEtapasContagemAgendamentos = {
   quantidadeContratada: number;
   agendamentosRealizados: number;
   agendamentosDispensados?: boolean;
+};
+
+export type OrcamentoEtapasContexto = {
+  fluxo?: OrcamentoFluxoImplantacao;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
+  contagem?: OrcamentoEtapasContagemAgendamentos | null;
 };
 
 export function isContratoEtapaConcluida(
@@ -82,7 +140,6 @@ export function isLogoEtapaConcluida(
   if (aprovacao.possui_logo === false) {
     return Boolean(aprovacao.logo_salva_em);
   }
-  // Sim (explícito ou legado com arquivo): precisa ter logo anexada.
   if (aprovacao.logo_path) return true;
   return false;
 }
@@ -108,12 +165,14 @@ export function isAgendamentosEtapaConcluida(
   return feitos >= qtd;
 }
 
-/** Etapa liberada para clique (não necessariamente a atual). */
 export function isOrcamentoEtapaLiberada(
   etapa: OrcamentoEtapaId,
   aprovacao: OrcamentoAprovacaoRecord | null,
-  orcamentoAprovado: boolean
+  orcamentoAprovado: boolean,
+  ctx?: OrcamentoEtapasContexto
 ): boolean {
+  const fluxo = ctx?.fluxo ?? "padrao";
+
   switch (etapa) {
     case "resumo":
     case "aprovado":
@@ -122,15 +181,22 @@ export function isOrcamentoEtapaLiberada(
       return Boolean(aprovacao) || orcamentoAprovado;
     case "financeiro":
       return isContratoEtapaConcluida(aprovacao);
+    case "treinamento":
+      return isFinanceiroEtapaConcluida(aprovacao);
     case "procuracao":
+      if (fluxo === "somente_treinamentos") return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "funcionarios":
+      if (fluxo === "somente_treinamentos") return false;
       return isProcuracaoEtapaConcluida(aprovacao);
     case "logo":
+      if (fluxo === "somente_treinamentos") return false;
       return isFuncionariosEtapaConcluida(aprovacao);
     case "visita":
+      if (fluxo === "somente_treinamentos") return false;
       return isLogoEtapaConcluida(aprovacao);
     case "agendamentos":
+      if (fluxo === "somente_treinamentos") return false;
       return isVisitaEtapaConcluida(aprovacao);
     default:
       return false;
@@ -141,7 +207,8 @@ export function isOrcamentoEtapaConcluida(
   etapa: OrcamentoEtapaId,
   aprovacao: OrcamentoAprovacaoRecord | null,
   orcamentoAprovado: boolean,
-  contagem?: OrcamentoEtapasContagemAgendamentos | null
+  contagem?: OrcamentoEtapasContagemAgendamentos | null,
+  ctx?: OrcamentoEtapasContexto
 ): boolean {
   switch (etapa) {
     case "resumo":
@@ -152,6 +219,8 @@ export function isOrcamentoEtapaConcluida(
       return isContratoEtapaConcluida(aprovacao);
     case "financeiro":
       return isFinanceiroEtapaConcluida(aprovacao);
+    case "treinamento":
+      return isTreinamentoEtapaConcluida(ctx?.treinamento);
     case "procuracao":
       return isProcuracaoEtapaConcluida(aprovacao);
     case "funcionarios":
@@ -161,7 +230,10 @@ export function isOrcamentoEtapaConcluida(
     case "visita":
       return isVisitaEtapaConcluida(aprovacao);
     case "agendamentos":
-      return isAgendamentosEtapaConcluida(aprovacao, contagem);
+      return isAgendamentosEtapaConcluida(
+        aprovacao,
+        contagem ?? ctx?.contagem
+      );
     default:
       return false;
   }
@@ -170,17 +242,26 @@ export function isOrcamentoEtapaConcluida(
 export function resolveOrcamentoEtapaAtual(
   aprovacao: OrcamentoAprovacaoRecord | null,
   orcamentoAprovado: boolean,
-  contagem?: OrcamentoEtapasContagemAgendamentos | null
+  contagem?: OrcamentoEtapasContagemAgendamentos | null,
+  ctx?: OrcamentoEtapasContexto
 ): OrcamentoEtapaId {
-  for (const etapa of ORCAMENTO_ETAPAS) {
+  const fluxo = ctx?.fluxo ?? "padrao";
+  const etapas = buildOrcamentoEtapas(fluxo);
+  for (const etapa of etapas) {
     if (
-      isOrcamentoEtapaLiberada(etapa.id, aprovacao, orcamentoAprovado) &&
-      !isOrcamentoEtapaConcluida(etapa.id, aprovacao, orcamentoAprovado, contagem)
+      isOrcamentoEtapaLiberada(etapa.id, aprovacao, orcamentoAprovado, ctx) &&
+      !isOrcamentoEtapaConcluida(
+        etapa.id,
+        aprovacao,
+        orcamentoAprovado,
+        contagem ?? ctx?.contagem,
+        ctx
+      )
     ) {
       return etapa.id;
     }
   }
-  return "agendamentos";
+  return etapas[etapas.length - 1]?.id ?? "agendamentos";
 }
 
 export function resolveOrcamentoEtapaEstado(
@@ -188,11 +269,25 @@ export function resolveOrcamentoEtapaEstado(
   aprovacao: OrcamentoAprovacaoRecord | null,
   orcamentoAprovado: boolean,
   tabAtiva: OrcamentoEtapaId,
-  contagem?: OrcamentoEtapasContagemAgendamentos | null
+  contagem?: OrcamentoEtapasContagemAgendamentos | null,
+  ctx?: OrcamentoEtapasContexto
 ): OrcamentoEtapaEstado {
-  const liberada = isOrcamentoEtapaLiberada(etapa, aprovacao, orcamentoAprovado);
+  const liberada = isOrcamentoEtapaLiberada(
+    etapa,
+    aprovacao,
+    orcamentoAprovado,
+    ctx
+  );
   if (!liberada) return "bloqueada";
-  if (isOrcamentoEtapaConcluida(etapa, aprovacao, orcamentoAprovado, contagem)) {
+  if (
+    isOrcamentoEtapaConcluida(
+      etapa,
+      aprovacao,
+      orcamentoAprovado,
+      contagem ?? ctx?.contagem,
+      ctx
+    )
+  ) {
     return tabAtiva === etapa ? "atual" : "concluida";
   }
   if (tabAtiva === etapa) return "atual";

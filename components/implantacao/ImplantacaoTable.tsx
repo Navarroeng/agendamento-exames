@@ -7,7 +7,6 @@ import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   IMPLANTACAO_AGENDAMENTO_BADGE,
-  IMPLANTACAO_ETAPAS_OPERACIONAIS,
   resolveImplantacaoEtapaVisual,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
@@ -38,7 +37,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
         {processo.progressoLabel} etapas
       </p>
       <div className="flex items-center gap-0.5">
-        {IMPLANTACAO_ETAPAS_OPERACIONAIS.map((etapa) => {
+        {processo.etapasOperacionais.map((etapa) => {
           const estado = resolveImplantacaoEtapaVisual(
             etapa.id,
             processo.etapaAtual,
@@ -47,6 +46,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               quantidadeContratada: processo.quantidadeContratada,
               agendamentosRealizados: processo.agendamentosRealizados,
               agendamentosDispensados: processo.agendamentosIniciaisDispensados,
+              treinamento: processo.treinamento,
             }
           );
           const tone =
@@ -187,7 +187,9 @@ export function ImplantacaoTable({
                     </td>
                     <td className="text-center">
                       {processo.etapaAtual !== "concluido" &&
+                      processo.etapaAtual !== "treinamento_agendado" &&
                       processo.etapaAtual !== "contrato_encerrado" &&
+                      processo.etapaAtual !== "treinamento_cancelado" &&
                       processo.orcamento.status !== "cancelado" &&
                       processo.orcamento.status !== "contrato_encerrado" ? (
                         <button

@@ -1,14 +1,25 @@
 "use client";
 
-import type { OrcamentoEtapaEstado, OrcamentoEtapaId } from "@/lib/orcamento-etapas";
-import { ORCAMENTO_ETAPAS, resolveOrcamentoEtapaEstado } from "@/lib/orcamento-etapas";
+import type {
+  OrcamentoEtapaEstado,
+  OrcamentoEtapaId,
+  OrcamentoEtapasContexto,
+} from "@/lib/orcamento-etapas";
+import {
+  buildOrcamentoEtapas,
+  resolveOrcamentoEtapaEstado,
+} from "@/lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
+import type { ImplantacaoTreinamentoRecord } from "@/lib/implantacao-treinamento";
 
 interface OrcamentoEtapasNavProps {
   tab: OrcamentoEtapaId;
   aprovacao: OrcamentoAprovacaoRecord | null;
   orcamentoAprovado: boolean;
   disabled?: boolean;
+  fluxo?: OrcamentoFluxoImplantacao;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
   contagemAgendamentos?: {
     quantidadeContratada: number;
     agendamentosRealizados: number;
@@ -29,18 +40,28 @@ export function OrcamentoEtapasNav({
   aprovacao,
   orcamentoAprovado,
   disabled,
+  fluxo = "padrao",
+  treinamento = null,
   contagemAgendamentos = null,
   onChange,
 }: OrcamentoEtapasNavProps) {
+  const etapas = buildOrcamentoEtapas(fluxo);
+  const ctx: OrcamentoEtapasContexto = {
+    fluxo,
+    treinamento,
+    contagem: contagemAgendamentos,
+  };
+
   return (
     <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
-      {ORCAMENTO_ETAPAS.map((item) => {
+      {etapas.map((item) => {
         const estado = resolveOrcamentoEtapaEstado(
           item.id,
           aprovacao,
           orcamentoAprovado,
           tab,
-          contagemAgendamentos
+          contagemAgendamentos,
+          ctx
         );
         const bloqueada = estado === "bloqueada";
         const ativa = tab === item.id;

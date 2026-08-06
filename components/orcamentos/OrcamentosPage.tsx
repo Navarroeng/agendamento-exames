@@ -47,6 +47,8 @@ export function OrcamentosPage() {
     resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
+    aprovarTreinamento,
+    aprovarTreinamentoEventos,
     setField,
     addItem,
     removeItem,
@@ -85,6 +87,7 @@ export function OrcamentosPage() {
     handleSubstituirLogo,
     handleRemoverLogo,
     handleSalvarVisita,
+    handleSalvarTreinamento,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,
@@ -209,6 +212,9 @@ export function OrcamentosPage() {
         onSubstituirLogo={handleSubstituirLogo}
         onRemoverLogo={handleRemoverLogo}
         onSalvarVisita={handleSalvarVisita}
+        treinamento={aprovarTreinamento}
+        treinamentoEventos={aprovarTreinamentoEventos}
+        onSalvarTreinamento={handleSalvarTreinamento}
         onVerComprovante={(path) => {
           void handleVerComprovante(path);
         }}

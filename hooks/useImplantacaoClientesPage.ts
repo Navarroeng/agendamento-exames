@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useServicosSstList } from "@/hooks/useServicosSstList";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS, type AuditoriaAcao } from "@/lib/auditoria";
 import {
   EMPTY_IMPLANTACAO_FILTERS,
   computeImplantacaoSummary,
@@ -60,6 +60,13 @@ import {
 } from "@/services/orcamento-onboarding.service";
 import { uploadOrcamentoComprovantePagamento, obterUrlOrcamentoComprovante } from "@/services/orcamento-comprovante.service";
 import { buscarOrcamentoComItens } from "@/services/orcamento.service";
+import type { ImplantacaoTreinamentoEventoRecord, ImplantacaoTreinamentoRecord, ImplantacaoTreinamentoSavePayload } from "@/lib/implantacao-treinamento";
+import {
+  buscarTreinamentoPorAprovacaoId,
+  listarEventosTreinamento,
+  salvarImplantacaoTreinamento,
+} from "@/services/implantacao-treinamento.service";
+import { IMPLANTACAO_TREINAMENTO_STATUS_LABELS } from "@/lib/implantacao-treinamento";
 
 export function useImplantacaoClientesPage() {
   const auditContext = useAuditoriaUsuario();
@@ -89,6 +96,11 @@ export function useImplantacaoClientesPage() {
     string | null
   >(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [modalTreinamento, setModalTreinamento] =
+    useState<ImplantacaoTreinamentoRecord | null>(null);
+  const [modalTreinamentoEventos, setModalTreinamentoEventos] = useState<
+    ImplantacaoTreinamentoEventoRecord[]
+  >([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -168,6 +180,21 @@ export function useImplantacaoClientesPage() {
         setModalInitialTab(tab);
         setFuncionariosPreviewUrl(null);
         setLogoPreviewUrl(null);
+        setModalTreinamento(null);
+        setModalTreinamentoEventos([]);
+        if (aprovacao?.id) {
+          try {
+            const treino = await buscarTreinamentoPorAprovacaoId(aprovacao.id);
+            setModalTreinamento(treino);
+            if (treino) {
+              setModalTreinamentoEventos(
+                await listarEventosTreinamento(treino.id)
+              );
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
         if (aprovacao?.funcionarios_lista_path) {
           try {
             setFuncionariosPreviewUrl(
@@ -210,9 +237,15 @@ export function useImplantacaoClientesPage() {
     async (orcamentoId: string) => {
       const processo = processos.find((p) => p.orcamento.id === orcamentoId);
       const etapa = processo?.etapaAtual ?? "contrato";
-      if (etapa === "concluido") {
+      if (etapa === "concluido" || etapa === "treinamento_agendado") {
         toast.message("Processo já concluído. Abrindo consulta.");
-        await openProcesso(orcamentoId, "agendamentos");
+        await openProcesso(
+          orcamentoId,
+          processo?.fluxoImplantacao === "somente_treinamentos" ||
+            processo?.fluxoImplantacao === "combinado"
+            ? "treinamento"
+            : "agendamentos"
+        );
         return;
       }
       await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
@@ -228,6 +261,8 @@ export function useImplantacaoClientesPage() {
     setModalInitialTab(null);
     setFuncionariosPreviewUrl(null);
     setLogoPreviewUrl(null);
+    setModalTreinamento(null);
+    setModalTreinamentoEventos([]);
     void refresh();
   }, [modalSaving, refresh]);
 
@@ -786,6 +821,83 @@ export function useImplantacaoClientesPage() {
     [auditContext, modalOrcamento, refresh]
   );
 
+  const handleSalvarTreinamento = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: ImplantacaoTreinamentoSavePayload
+    ) => {
+      if (!modalOrcamento) return;
+      setModalSaving(true);
+      try {
+        const before = modalTreinamento;
+        const saved = await salvarImplantacaoTreinamento({
+          orcamentoId: modalOrcamento.id,
+          aprovacaoId,
+          payload,
+          usuarioNome: auditContext.usuarioNome,
+        });
+        setModalTreinamento(saved);
+        setModalTreinamentoEventos(await listarEventosTreinamento(saved.id));
+
+        let acao: AuditoriaAcao = AUDITORIA_ACOES.edicao;
+        let descricao = `Agendamento de treinamento atualizado (${IMPLANTACAO_TREINAMENTO_STATUS_LABELS[saved.status]}).`;
+        if (!before) {
+          acao = AUDITORIA_ACOES.criacao;
+          descricao = `Agendamento de treinamento criado (${IMPLANTACAO_TREINAMENTO_STATUS_LABELS[saved.status]}).`;
+        } else if (saved.status === "cancelado" && before.status !== "cancelado") {
+          acao = AUDITORIA_ACOES.treinamento_cancelado;
+          descricao = `Treinamento cancelado. Motivo: ${saved.motivo_cancelamento ?? "—"}.`;
+        } else if (saved.status === "reagendado" || (before.data_treinamento && before.data_treinamento !== saved.data_treinamento)) {
+          acao = AUDITORIA_ACOES.treinamento_reagendado;
+          descricao = `Treinamento reagendado para ${saved.data_treinamento ?? "—"} ${saved.horario_inicio ?? ""}.`;
+        } else if (saved.status === "confirmado" && before.status !== "confirmado") {
+          acao = AUDITORIA_ACOES.treinamento_confirmado;
+          descricao = "Treinamento confirmado.";
+        } else if (saved.status === "realizado" && before.status !== "realizado") {
+          acao = AUDITORIA_ACOES.treinamento_realizado;
+          descricao = "Treinamento marcado como realizado.";
+        } else if (saved.status === "agendado") {
+          acao = AUDITORIA_ACOES.treinamento_agendado;
+          descricao = `Treinamento agendado para ${saved.data_treinamento ?? "—"} ${saved.horario_inicio ?? ""}.`;
+        }
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao,
+          registroId: modalOrcamento.id,
+          registroNome: modalOrcamento.numero,
+          descricao,
+          dadosAntes: before
+            ? {
+                status: before.status,
+                data: before.data_treinamento,
+                horario: before.horario_inicio,
+              }
+            : null,
+          dadosDepois: {
+            status: saved.status,
+            data: saved.data_treinamento,
+            horario: saved.horario_inicio,
+          },
+        });
+        toast.success("Agendamento do treinamento salvo.");
+        void refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao salvar agendamento do treinamento."
+        );
+        throw err;
+      } finally {
+        setModalSaving(false);
+      }
+    },
+    [auditContext, modalOrcamento, modalTreinamento, refresh]
+  );
+
   const handleVerComprovante = useCallback(async (path: string) => {
     try {
       const url = await obterUrlOrcamentoComprovante(path);
@@ -814,6 +926,8 @@ export function useImplantacaoClientesPage() {
     usuarioNome: auditContext.usuarioNome,
     funcionariosPreviewUrl,
     logoPreviewUrl,
+    modalTreinamento,
+    modalTreinamentoEventos,
     handleFilterChange,
     clearFilters,
     handleMesChange,
@@ -833,6 +947,7 @@ export function useImplantacaoClientesPage() {
     handleSubstituirLogo,
     handleRemoverLogo,
     handleSalvarVisita,
+    handleSalvarTreinamento,
     handleVerComprovante,
   };
 }
