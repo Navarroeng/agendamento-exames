@@ -16,8 +16,10 @@ type SortKey =
 
 export function GestaoComercialTabela({
   rows,
+  statusFiltro,
 }: {
   rows: GestaoComercialFechamentoRow[];
+  statusFiltro: "ativos" | "encerrados" | "todos";
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("aprovadoEm");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -68,9 +70,25 @@ export function GestaoComercialTabela({
       <h4 className="mb-1 text-sm font-extrabold text-navy">
         Detalhamento dos fechamentos
       </h4>
-      <p className="mb-4 text-xs text-app-muted">
+      <p className="mb-2 text-xs text-app-muted">
         Soma desta tabela = valor dos cards e do gráfico do período filtrado.
       </p>
+      {statusFiltro === "encerrados" ? (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+          Exibindo apenas contratos encerrados/cancelados — excluídos dos totais
+          comerciais ativos.
+        </p>
+      ) : statusFiltro === "ativos" ? (
+        <p className="mb-4 text-xs text-app-muted">
+          Exibindo somente contratos contabilizáveis (ativos). Encerrados e
+          cancelados ficam fora destes totais.
+        </p>
+      ) : (
+        <p className="mb-4 text-xs text-app-muted">
+          Exibindo todos os status. Os indicadores acima seguem o filtro
+          “Todos”.
+        </p>
+      )}
       {sorted.length === 0 ? (
         <p className="py-8 text-center text-sm text-app-muted">
           Nenhum contrato fechado no período.

@@ -10,21 +10,24 @@ import {
 import type { ClienteContratoStatus } from "@/lib/types";
 
 export const GESTAO_COMERCIAL_DISCLAIMER =
-  "Valores comerciais fechados, independentemente do recebimento.";
+  "Valores comerciais fechados de contratos ativos (contabilizáveis), independentemente do recebimento. Encerrados e cancelados ficam fora dos totais principais.";
 
 export type GestaoComercialFormaPagamento = "avista" | "parcelado";
 
 export type GestaoComercialTipoContratoFiltro = "novo" | "renovacao" | "";
 
+/** Filtro de status comercial (padrão: ativos/contabilizáveis). */
+export type GestaoComercialStatusFiltro = "ativos" | "encerrados" | "todos";
+
 export interface GestaoComercialFilters {
   ano: number;
-  mes: number | null; // 1-12; null = ano todo nos cards? User wants current month for cards, year for chart
+  mes: number | null; // 1-12
   periodoInicio: string; // YYYY-MM-DD personalizado (opcional)
   periodoFim: string;
   responsavel: string;
   origem: "" | OrcamentoOrigemCliente;
   tipo: GestaoComercialTipoContratoFiltro;
-  statusContrato: "" | ClienteContratoStatus;
+  statusContrato: GestaoComercialStatusFiltro;
   usarPeriodoPersonalizado: boolean;
 }
 
@@ -132,7 +135,7 @@ export function defaultGestaoComercialFilters(
     responsavel: "",
     origem: "",
     tipo: "",
-    statusContrato: "",
+    statusContrato: "ativos",
     usarPeriodoPersonalizado: false,
   };
 }
@@ -180,22 +183,50 @@ export function isRenovacaoOrigem(
   return origem === "renovacao";
 }
 
+/**
+ * Contratos/orçamentos encerrados ou cancelados NÃO entram nos totais comerciais ativos.
+ * Centraliza a regra da Gestão Comercial.
+ */
+export function isContratoContabilizavel(params: {
+  statusContrato?: string | null;
+  orcamentoStatus?: string | null;
+}): boolean {
+  return !isContratoEncerradoOuCancelado(params);
+}
+
+export function isContratoEncerradoOuCancelado(params: {
+  statusContrato?: string | null;
+  orcamentoStatus?: string | null;
+}): boolean {
+  const contrato = (params.statusContrato ?? "").trim().toLowerCase();
+  const orcamento = (params.orcamentoStatus ?? "").trim().toLowerCase();
+
+  if (contrato === "encerrado" || contrato === "cancelado") return true;
+  if (orcamento === "contrato_encerrado" || orcamento === "cancelado") {
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated Prefer isContratoEncerradoOuCancelado / isContratoContabilizavel */
 export function isContratoEncerradoStatus(
   status: string | null | undefined,
   orcamentoStatus?: string | null
 ): boolean {
-  if (status === "encerrado" || status === "cancelado") return true;
-  if (orcamentoStatus === "contrato_encerrado") return true;
-  return false;
+  return isContratoEncerradoOuCancelado({
+    statusContrato: status,
+    orcamentoStatus,
+  });
 }
 
 export function isContratoAtivoStatus(
   status: string | null | undefined,
   orcamentoStatus?: string | null
 ): boolean {
-  if (isContratoEncerradoStatus(status, orcamentoStatus)) return false;
-  if (!status) return orcamentoStatus === "aprovado";
-  return status === "ativo" || status === "pago" || status === "assinado";
+  return isContratoContabilizavel({
+    statusContrato: status,
+    orcamentoStatus,
+  });
 }
 
 function toDateOnlyIso(iso: string): string {
@@ -291,7 +322,8 @@ function grupoFrom(
 export function filterFechamentos(
   rows: GestaoComercialFechamentoRow[],
   filters: GestaoComercialFilters,
-  range: { inicio: string; fim: string }
+  range: { inicio: string; fim: string },
+  options?: { ignoreStatusFilter?: boolean }
 ): GestaoComercialFechamentoRow[] {
   return rows.filter((row) => {
     if (!inRange(row.aprovadoEm, range.inicio, range.fim)) return false;
@@ -308,8 +340,14 @@ export function filterFechamentos(
     if (filters.tipo === "novo" && isRenovacaoOrigem(row.origem)) {
       return false;
     }
-    if (filters.statusContrato) {
-      if (row.statusContrato !== filters.statusContrato) return false;
+    if (!options?.ignoreStatusFilter) {
+      const contabilizavel = isContratoContabilizavel({
+        statusContrato: row.statusContrato,
+        orcamentoStatus: row.orcamentoStatus,
+      });
+      if (filters.statusContrato === "ativos" && !contabilizavel) return false;
+      if (filters.statusContrato === "encerrados" && contabilizavel) return false;
+      // "todos" → sem filtro de status
     }
     return true;
   });
@@ -337,11 +375,22 @@ export function buildGestaoComercialDashboard(
   const contratosFechados = rows.length;
   const renovacoesRows = rows.filter((r) => isRenovacaoOrigem(r.origem));
   const novosRows = rows.filter((r) => !isRenovacaoOrigem(r.origem));
-  const encerrados = rows.filter((r) =>
-    isContratoEncerradoStatus(r.statusContrato, r.orcamentoStatus)
+
+  // Card separado: sempre a qtd de encerrados/cancelados no período (demais filtros).
+  const noPeriodo = filterFechamentos(allRows, filters, rangeCards, {
+    ignoreStatusFilter: true,
+  });
+  const encerrados = noPeriodo.filter((r) =>
+    isContratoEncerradoOuCancelado({
+      statusContrato: r.statusContrato,
+      orcamentoStatus: r.orcamentoStatus,
+    })
   ).length;
-  const ativos = rows.filter((r) =>
-    isContratoAtivoStatus(r.statusContrato, r.orcamentoStatus)
+  const ativos = noPeriodo.filter((r) =>
+    isContratoContabilizavel({
+      statusContrato: r.statusContrato,
+      orcamentoStatus: r.orcamentoStatus,
+    })
   ).length;
 
   const ant = mesAnterior(ano, mesRef);
@@ -355,7 +404,6 @@ export function buildGestaoComercialDashboard(
     const mes = idx + 1;
     const { inicio, fim } = rangeMes(ano, mes);
     const doMes = rowsAno.filter((r) => inRange(r.aprovadoEm, inicio, fim));
-    // Ocultar meses futuros no ano atual
     const now = new Date();
     if (ano === now.getFullYear() && mes > now.getMonth() + 1) {
       return {

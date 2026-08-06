@@ -57,13 +57,19 @@ export function GestaoComercialPage() {
               <p className="text-sm text-app-muted">Carregando…</p>
             ) : (
               <>
-                <GestaoComercialCards dashboard={dashboard} />
+                <GestaoComercialCards
+                  dashboard={dashboard}
+                  statusFiltro={filters.statusContrato}
+                />
                 <GestaoComercialEvolucaoChart
                   data={dashboard.serieMensalAno}
                   ano={filters.ano}
                 />
                 <GestaoComercialBreakdowns dashboard={dashboard} />
-                <GestaoComercialTabela rows={dashboard.rows} />
+                <GestaoComercialTabela
+                  rows={dashboard.rows}
+                  statusFiltro={filters.statusContrato}
+                />
               </>
             )}
           </>

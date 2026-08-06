@@ -125,16 +125,9 @@ export function GestaoComercialFiltersBar({
               )
             }
           >
-            <option value="">Todos</option>
-            <option value="ativo">Ativo</option>
-            <option value="encerrado">Encerrado</option>
-            <option value="aguardando_envio">Aguardando envio</option>
-            <option value="enviado">Enviado</option>
-            <option value="assinado">Assinado</option>
-            <option value="aguardando_pagamento">Aguardando pagamento</option>
-            <option value="pago">Pago</option>
-            <option value="cancelado">Cancelado</option>
-            <option value="em_renovacao">Em renovação</option>
+            <option value="ativos">Ativos</option>
+            <option value="encerrados">Encerrados/Cancelados</option>
+            <option value="todos">Todos</option>
           </select>
         </label>
         <label className="flex items-end gap-2 text-xs font-semibold text-[#5b6577]">

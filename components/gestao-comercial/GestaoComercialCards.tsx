@@ -43,8 +43,10 @@ function Card({
 
 export function GestaoComercialCards({
   dashboard,
+  statusFiltro,
 }: {
   dashboard: GestaoComercialDashboard;
+  statusFiltro: "ativos" | "encerrados" | "todos";
 }) {
   const { comparacao } = dashboard;
   const tone =
@@ -57,6 +59,7 @@ export function GestaoComercialCards({
           : "neutral";
 
   const mesLabel = MESES_PT[dashboard.filtrosEfetivos.mesRef - 1] ?? "";
+  const filtersStatus = statusFiltro;
 
   return (
     <section className="space-y-3">
@@ -78,7 +81,13 @@ export function GestaoComercialCards({
         <Card
           label="Contratos fechados"
           value={String(dashboard.contratosFechados)}
-          hint={`Ativos no recorte: ${dashboard.contratosAtivos}`}
+          hint={
+            filtersStatus === "ativos"
+              ? `Contabilizados (ativos). Encerrados/cancelados no período: ${dashboard.contratosEncerrados}`
+              : filtersStatus === "encerrados"
+                ? "Somente encerrados/cancelados (fora dos totais ativos)."
+                : `Ativos: ${dashboard.contratosAtivos} · Encerrados/cancelados: ${dashboard.contratosEncerrados}`
+          }
         />
         <Card
           label="Ticket médio"
@@ -89,7 +98,7 @@ export function GestaoComercialCards({
         <Card
           label="Contratos encerrados"
           value={String(dashboard.contratosEncerrados)}
-          hint="Encerrados depois do fechamento ainda contam no histórico do mês."
+          hint="Indicador separado — não compõe valor fechado, ticket nem rankings no filtro Ativos."
           tone="muted"
         />
       </div>

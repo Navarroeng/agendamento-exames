@@ -1,8 +1,9 @@
-/** Smoke: camada única Gestão Comercial. */
+/** Smoke: camada única Gestão Comercial (exclui encerrados/cancelados). */
 import assert from "node:assert/strict";
 import {
   buildGestaoComercialDashboard,
   calcComparacaoMes,
+  isContratoContabilizavel,
   resolveValorFechado,
   type GestaoComercialFechamentoRow,
 } from "../lib/gestao-comercial";
@@ -29,20 +30,39 @@ const base = (
   formaPagamento: partial.formaPagamento ?? "avista",
   condicaoPagamento: "À vista",
   statusContrato: partial.statusContrato ?? "ativo",
-  orcamentoStatus: "aprovado",
+  orcamentoStatus: partial.orcamentoStatus ?? "aprovado",
 });
 
-// Fallback valor
+assert.equal(
+  isContratoContabilizavel({ statusContrato: "ativo", orcamentoStatus: "aprovado" }),
+  true
+);
+assert.equal(
+  isContratoContabilizavel({
+    statusContrato: "encerrado",
+    orcamentoStatus: "aprovado",
+  }),
+  false
+);
+assert.equal(
+  isContratoContabilizavel({
+    statusContrato: "ativo",
+    orcamentoStatus: "contrato_encerrado",
+  }),
+  false
+);
+assert.equal(
+  isContratoContabilizavel({
+    statusContrato: null,
+    orcamentoStatus: "cancelado",
+  }),
+  false
+);
+
 assert.deepEqual(resolveValorFechado(1400, 1500), {
   valor: 1400,
   usouFallback: false,
 });
-assert.deepEqual(resolveValorFechado(0, 1500), {
-  valor: 1500,
-  usouFallback: true,
-});
-
-// Comparação sem base
 assert.equal(calcComparacaoMes(1000, 0).tendencia, "sem_base");
 assert.equal(calcComparacaoMes(20000, 16000).percentual, 25);
 
@@ -52,6 +72,7 @@ const rows: GestaoComercialFechamentoRow[] = [
     aprovadoEm: "2026-08-05T10:00:00.000Z",
     valorFechado: 1400,
     origem: "google",
+    statusContrato: "ativo",
   }),
   base({
     aprovacaoId: "2",
@@ -65,10 +86,11 @@ const rows: GestaoComercialFechamentoRow[] = [
     aprovadoEm: "2026-07-20T10:00:00.000Z",
     valorFechado: 1000,
     origem: "indicacao",
+    statusContrato: "ativo",
   }),
 ];
 
-const dash = buildGestaoComercialDashboard(rows, {
+const dashAtivos = buildGestaoComercialDashboard(rows, {
   ano: 2026,
   mes: 8,
   periodoInicio: "",
@@ -76,24 +98,39 @@ const dash = buildGestaoComercialDashboard(rows, {
   responsavel: "",
   origem: "",
   tipo: "",
-  statusContrato: "",
+  statusContrato: "ativos",
   usarPeriodoPersonalizado: false,
 });
 
-assert.equal(dash.contratosFechados, 2);
-assert.equal(dash.valorFechado, 3400);
-assert.equal(dash.novosClientes, 1);
-assert.equal(dash.renovacoes, 1);
-assert.equal(dash.contratosEncerrados, 1);
+assert.equal(dashAtivos.contratosFechados, 1, "só o ativo");
+assert.equal(dashAtivos.valorFechado, 1400);
+assert.equal(dashAtivos.novosClientes, 1);
+assert.equal(dashAtivos.renovacoes, 0);
+assert.equal(dashAtivos.contratosEncerrados, 1, "card separado");
+assert.equal(dashAtivos.ticketMedio, 1400);
 assert.equal(
-  dash.rows.reduce((s, r) => s + r.valorFechado, 0),
-  dash.valorFechado,
-  "tabela = cards"
+  dashAtivos.rows.reduce((s, r) => s + r.valorFechado, 0),
+  dashAtivos.valorFechado
 );
 
-const ago = dash.serieMensalAno.find((s) => s.mes === 8);
+const ago = dashAtivos.serieMensalAno.find((s) => s.mes === 8);
 assert.ok(ago);
-assert.equal(ago!.valorFechado, 3400);
-assert.equal(ago!.quantidade, 2);
+assert.equal(ago!.valorFechado, 1400);
+assert.equal(ago!.quantidade, 1);
+
+const dashEnc = buildGestaoComercialDashboard(rows, {
+  ano: 2026,
+  mes: 8,
+  periodoInicio: "",
+  periodoFim: "",
+  responsavel: "",
+  origem: "",
+  tipo: "",
+  statusContrato: "encerrados",
+  usarPeriodoPersonalizado: false,
+});
+assert.equal(dashEnc.contratosFechados, 1);
+assert.equal(dashEnc.valorFechado, 2000);
+assert.equal(dashEnc.rows[0]?.statusContrato, "encerrado");
 
 console.log("test-gestao-comercial: OK");
