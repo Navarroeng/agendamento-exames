@@ -9,12 +9,20 @@ import {
   type OrcamentoRecord,
 } from "@/lib/orcamento-types";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import {
+  ORCAMENTO_MES_VAZIO_MSG,
+  type OrcamentoYearMonth,
+} from "@/lib/orcamento-meses";
+import { OrcamentoMesTabs } from "./OrcamentoMesTabs";
 import { OrcamentoRowActionsMenu } from "./OrcamentoRowActionsMenu";
 
 interface OrcamentosTableProps {
   orcamentos: OrcamentoRecord[];
   loading: boolean;
   error: string | null;
+  mesSelecionado: OrcamentoYearMonth;
+  onMesChange: (mes: OrcamentoYearMonth) => void;
+  onYearChange: (year: number) => void;
   podeEncerrarContrato?: boolean;
   resolvePodeAlterarResponsavel?: (orcamento: OrcamentoRecord) => boolean;
   onVisualizar: (id: string) => void;
@@ -29,6 +37,9 @@ export function OrcamentosTable({
   orcamentos,
   loading,
   error,
+  mesSelecionado,
+  onMesChange,
+  onYearChange,
   podeEncerrarContrato = false,
   resolvePodeAlterarResponsavel,
   onVisualizar,
@@ -44,6 +55,12 @@ export function OrcamentosTable({
       icon={<IconFileText />}
       iconTone="blue"
     >
+      <OrcamentoMesTabs
+        selected={mesSelecionado}
+        onSelect={onMesChange}
+        onYearChange={onYearChange}
+      />
+
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (
           <p className="py-8 text-center text-sm text-app-muted">Carregando...</p>
@@ -53,7 +70,7 @@ export function OrcamentosTable({
         )}
         {!loading && !error && orcamentos.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
-            Nenhum orçamento encontrado.
+            {ORCAMENTO_MES_VAZIO_MSG}
           </p>
         )}
         {!loading && !error && orcamentos.length > 0 && (

@@ -20,6 +20,9 @@ export function OrcamentosPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
+    handleMesChange,
+    handleYearChange,
     clientes,
     servicos,
     servicosLoading,
@@ -115,6 +118,9 @@ export function OrcamentosPage() {
         orcamentos={orcamentos}
         loading={loading}
         error={error}
+        mesSelecionado={mesSelecionado}
+        onMesChange={handleMesChange}
+        onYearChange={handleYearChange}
         podeEncerrarContrato={podeEncerrarContrato}
         resolvePodeAlterarResponsavel={resolvePodeAlterarResponsavel}
         onVisualizar={handleVisualizar}

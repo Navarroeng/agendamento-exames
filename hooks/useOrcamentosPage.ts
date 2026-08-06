@@ -55,6 +55,12 @@ import {
 import type { PerfilUsuario } from "@/lib/types";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
+import {
+  filterOrcamentosPorMes,
+  resolveInitialOrcamentoMes,
+  resolveOrcamentoMesParaAno,
+  type OrcamentoYearMonth,
+} from "@/lib/orcamento-meses";
 import { gerarPdfOrcamento } from "@/lib/orcamento-pdf";
 import { gerarNumeroOrcamento } from "@/services/orcamento.service";
 import {
@@ -145,6 +151,9 @@ export function useOrcamentosPage() {
   const [filters, setFilters] = useState<OrcamentoFilters>(
     EMPTY_ORCAMENTO_FILTERS
   );
+  const [mesSelecionado, setMesSelecionado] = useState<OrcamentoYearMonth>(
+    () => resolveInitialOrcamentoMes()
+  );
   const [editingResponsavel, setEditingResponsavel] = useState("");
   const [editingOrigemInicial, setEditingOrigemInicial] = useState<
     string | null
@@ -213,10 +222,11 @@ export function useOrcamentosPage() {
     setSaving,
   } = useOrcamentoForm();
 
-  const orcamentosFiltrados = useMemo(
-    () => filterOrcamentos(orcamentos, filters),
-    [orcamentos, filters]
-  );
+  const orcamentosFiltrados = useMemo(() => {
+    // Ordem: ano/mês → status → busca (paginação consome o resultado).
+    const porMes = filterOrcamentosPorMes(orcamentos, mesSelecionado);
+    return filterOrcamentos(porMes, filters);
+  }, [orcamentos, filters, mesSelecionado]);
 
   const formDirty = isOrcamentoFormDirty(form, formBaseline);
 
@@ -1652,6 +1662,16 @@ export function useOrcamentosPage() {
     setFilters(EMPTY_ORCAMENTO_FILTERS);
   }, []);
 
+  const handleMesChange = useCallback((mes: OrcamentoYearMonth) => {
+    setMesSelecionado(mes);
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setMesSelecionado((prev) =>
+      resolveOrcamentoMesParaAno(year, prev.month)
+    );
+  }, []);
+
   const handleSelectCliente = useCallback(
     (clienteId: string) => {
       if (!clienteId) {
@@ -1671,6 +1691,9 @@ export function useOrcamentosPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
+    handleMesChange,
+    handleYearChange,
     clientes,
     servicos,
     servicosLoading,
