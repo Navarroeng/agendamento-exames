@@ -12,6 +12,7 @@ import {
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
+import { contarCreditosDisponiveisPorContratos } from "@/services/contrato-creditos-aso.service";
 import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
 import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
 
@@ -161,6 +162,8 @@ export async function listarProcessosImplantacao(): Promise<
     await contarColaboradoresPorContratos(contratoIds);
   const programacoesPorContrato =
     await contarProgramacoesFuturasPorContratos(contratoIds);
+  const creditosPorContrato =
+    await contarCreditosDisponiveisPorContratos(contratoIds);
 
   const processos: ImplantacaoProcesso[] = [];
 
@@ -192,6 +195,9 @@ export async function listarProcessosImplantacao(): Promise<
     const programados = contrato
       ? programacoesPorContrato.get(contrato.id) ?? 0
       : 0;
+    const emAberto = contrato
+      ? creditosPorContrato.get(contrato.id) ?? 0
+      : 0;
 
     const itens = resolveItensParaFluxoImplantacao({
       aprovacaoItens: itensByOrcamento.get(id) ?? [],
@@ -210,6 +216,7 @@ export async function listarProcessosImplantacao(): Promise<
         contrato,
         agendamentosRealizados: agendados,
         examesProgramadosFuturos: programados,
+        asosContratuaisEmAberto: emAberto,
         fluxoImplantacao,
         treinamento,
       })

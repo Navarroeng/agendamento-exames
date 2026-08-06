@@ -288,6 +288,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   ).length;
 
   let programados = 0;
+  let emAberto = 0;
   if (!dispensado) {
     const { count, error: pErr } = await supabase
       .from("periodicos_futuros")
@@ -297,15 +298,28 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       .in("status", ["ativo", "reagendado"]);
     if (pErr) throw pErr;
     programados = count ?? 0;
+
+    const { count: credCount, error: cErr } = await supabase
+      .from("contrato_creditos_aso")
+      .select("id", { count: "exact", head: true })
+      .eq("contrato_id", contrato.id)
+      .eq("status", "disponivel");
+    if (cErr) throw cErr;
+    emAberto = credCount ?? 0;
   }
 
   return {
     itens,
     contagem: buildContratoAgendamentoContagem(
       quantidadeContratada,
-      utilizadosAg + programados,
+      utilizadosAg + programados + emAberto,
       adicionais,
-      { dispensado }
+      {
+        dispensado,
+        agendados: utilizadosAg,
+        programadosFuturos: programados,
+        emAberto,
+      }
     ),
   };
 }
@@ -363,7 +377,19 @@ export async function salvarSelecaoAgendamentosContrato(params: {
   if (progErr) throw progErr;
 
   const programados = progCount ?? 0;
-  if (agendamentoIdsSelecionados.length + programados > quantidadePrevista) {
+
+  const { count: creditoCount, error: creditoErr } = await supabase
+    .from("contrato_creditos_aso")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", contratoId)
+    .eq("status", "disponivel");
+  if (creditoErr) throw creditoErr;
+  const emAberto = creditoCount ?? 0;
+
+  if (
+    agendamentoIdsSelecionados.length + programados + emAberto >
+    quantidadePrevista
+  ) {
     throw new Error(
       `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
     );
@@ -567,6 +593,7 @@ export async function invalidarContabilizacaoPorCancelamento(
 ): Promise<void> {
   const supabase = createClient();
   const agora = new Date().toISOString();
+  const hoje = agora.slice(0, 10);
 
   const { data: vinculos } = await supabase
     .from("contrato_agendamentos")
@@ -575,50 +602,91 @@ export async function invalidarContabilizacaoPorCancelamento(
     .eq("contabiliza_previsao", true)
     .is("removido_em", null);
 
-  if (!vinculos?.length) return;
+  let contratoVigente = false;
+  const contratoId = vinculos?.[0]?.contrato_id
+    ? String(vinculos[0].contrato_id)
+    : null;
 
-  const { error } = await supabase
-    .from("contrato_agendamentos")
-    .update({
-      contabiliza_previsao: false,
-      removido_em: agora,
-      removido_por: usuarioNome,
-      updated_at: agora,
-    })
-    .eq("agendamento_id", agendamentoId)
-    .eq("contabiliza_previsao", true)
-    .is("removido_em", null);
-  if (error) throw error;
-
-  const { data: ag } = await supabase
-    .from("agendamentos")
-    .select("colaborador")
-    .eq("id", agendamentoId)
-    .maybeSingle();
-  const colaborador = String(ag?.colaborador ?? agendamentoId);
-
-  const { registrarAuditoria } = await import("@/services/auditoria.service");
-  const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
-    "@/lib/auditoria"
-  );
-
-  for (const v of vinculos) {
+  async function resolveVigente(cid: string, validoAte?: string | null) {
     const { data: ctr } = await supabase
       .from("cliente_contratos")
-      .select("numero")
-      .eq("id", v.contrato_id)
+      .select("status, data_fim")
+      .eq("id", cid)
       .maybeSingle();
-    const numero = String(ctr?.numero ?? v.contrato_id);
-    await registrarAuditoria({
-      usuarioNome,
-      usuarioEmail: "",
-      modulo: AUDITORIA_MODULOS.agendamentos,
-      acao: AUDITORIA_ACOES.cancelamento,
-      registroId: String(v.contrato_id),
-      registroNome: numero,
-      descricao: `${usuarioNome} cancelou o agendamento de ${colaborador}; a contabilização no contrato ${numero} foi removida automaticamente.`,
-    });
+    const fim = (validoAte || ctr?.data_fim || "").toString().slice(0, 10);
+    return ctr?.status === "ativo" && (!fim || fim >= hoje);
   }
+
+  if (contratoId) {
+    contratoVigente = await resolveVigente(contratoId);
+  } else {
+    const { data: credito } = await supabase
+      .from("contrato_creditos_aso")
+      .select("contrato_id, valido_ate")
+      .eq("agendamento_id", agendamentoId)
+      .eq("status", "utilizado")
+      .maybeSingle();
+    if (credito?.contrato_id) {
+      contratoVigente = await resolveVigente(
+        String(credito.contrato_id),
+        credito.valido_ate ? String(credito.valido_ate) : null
+      );
+    }
+  }
+
+  if (vinculos?.length) {
+    const { error } = await supabase
+      .from("contrato_agendamentos")
+      .update({
+        contabiliza_previsao: false,
+        removido_em: agora,
+        removido_por: usuarioNome,
+        updated_at: agora,
+      })
+      .eq("agendamento_id", agendamentoId)
+      .eq("contabiliza_previsao", true)
+      .is("removido_em", null);
+    if (error) throw error;
+
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("colaborador")
+      .eq("id", agendamentoId)
+      .maybeSingle();
+    const colaborador = String(ag?.colaborador ?? agendamentoId);
+
+    const { registrarAuditoria } = await import("@/services/auditoria.service");
+    const { AUDITORIA_ACOES, AUDITORIA_MODULOS } = await import(
+      "@/lib/auditoria"
+    );
+
+    for (const v of vinculos) {
+      const { data: ctr } = await supabase
+        .from("cliente_contratos")
+        .select("numero")
+        .eq("id", v.contrato_id)
+        .maybeSingle();
+      const numero = String(ctr?.numero ?? v.contrato_id);
+      await registrarAuditoria({
+        usuarioNome,
+        usuarioEmail: "",
+        modulo: AUDITORIA_MODULOS.agendamentos,
+        acao: AUDITORIA_ACOES.cancelamento,
+        registroId: String(v.contrato_id),
+        registroNome: numero,
+        descricao: `${usuarioNome} cancelou o agendamento de ${colaborador}; a contabilização no contrato ${numero} foi removida automaticamente.`,
+      });
+    }
+  }
+
+  const { devolverCreditoAsoPorCancelamento } = await import(
+    "@/services/contrato-creditos-aso.service"
+  );
+  await devolverCreditoAsoPorCancelamento({
+    agendamentoId,
+    usuarioNome,
+    contratoVigente,
+  });
 }
 
 export async function dispensarAgendamentosIniciaisContrato(params: {

@@ -8,6 +8,11 @@ import {
   InformarExameFuturoModal,
   type InformarExameFuturoFormResult,
 } from "@/components/orcamentos/InformarExameFuturoModal";
+import { AsosContratuaisEmAbertoSection } from "@/components/orcamentos/AsosContratuaisEmAbertoSection";
+import {
+  RegistrarAsoEmAbertoModal,
+  type RegistrarAsoEmAbertoFormResult,
+} from "@/components/orcamentos/RegistrarAsoEmAbertoModal";
 import { ReabrirAgendamentosIniciaisModal } from "@/components/orcamentos/ReabrirAgendamentosIniciaisModal";
 import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
@@ -19,6 +24,7 @@ import {
   resolveClassificacaoAgendamento,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
+import type { ContratoCreditoAsoRecord } from "@/lib/contrato-creditos-aso";
 import {
   formatMesAnoPrevisto,
   labelMotivoExameFuturo,
@@ -36,6 +42,12 @@ import {
   salvarSelecaoAgendamentosContrato,
   type AgendamentoNaVigenciaItem,
 } from "@/services/contrato-agendamentos.service";
+import {
+  atualizarObservacaoCreditoAso,
+  listarCreditosDoContrato,
+  registrarCreditosAsoEmAberto,
+  removerCreditoAsoEmAberto,
+} from "@/services/contrato-creditos-aso.service";
 import {
   criarExameFuturoImplantacao,
   listarProgramacoesFuturasDoContrato,
@@ -177,6 +189,11 @@ export function OrcamentoAbaAgendamentos({
   const [reabrirModalOpen, setReabrirModalOpen] = useState(false);
   const [exameFuturoModalOpen, setExameFuturoModalOpen] = useState(false);
   const [exameFuturoSaving, setExameFuturoSaving] = useState(false);
+  const [asoAbertoModalOpen, setAsoAbertoModalOpen] = useState(false);
+  const [asoAbertoSaving, setAsoAbertoSaving] = useState(false);
+  const [creditosAso, setCreditosAso] = useState<ContratoCreditoAsoRecord[]>(
+    []
+  );
   const [programacoes, setProgramacoes] = useState<
     PeriodicoProgramadoContrato[]
   >([]);
@@ -194,6 +211,9 @@ export function OrcamentoAbaAgendamentos({
 
   const dispensado = contratoTemAgendamentosIniciaisDispensados(contrato);
   const programacoesAtivas = programacoes.length;
+  const creditosDisponiveis = creditosAso.filter(
+    (c) => c.status === "disponivel"
+  ).length;
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -217,20 +237,23 @@ export function OrcamentoAbaAgendamentos({
           setItens([]);
           setSelectedIds(new Set());
           setProgramacoes([]);
+          setCreditosAso([]);
           setSugestoesColaboradores([]);
           onContagemChangeRef.current?.(empty);
           return;
         }
 
-        const [resumo, progs] = await Promise.all([
+        const [resumo, progs, creditos] = await Promise.all([
           carregarAgendamentosVigenciaContrato({
             contrato: contratoRow,
             quantidadeContratada: qtd,
           }),
           listarProgramacoesFuturasDoContrato(contratoRow.id),
+          listarCreditosDoContrato(contratoRow.id),
         ]);
         setItens(resumo.itens);
         setProgramacoes(progs);
+        setCreditosAso(creditos);
         setSelectedIds(
           new Set(
             resumo.itens
@@ -305,8 +328,13 @@ export function OrcamentoAbaAgendamentos({
     ).length;
     return buildContratoAgendamentoContagem(
       quantidadePrevista,
-      utilizadosAg + programacoesAtivas,
-      adicionais
+      utilizadosAg + programacoesAtivas + creditosDisponiveis,
+      adicionais,
+      {
+        agendados: utilizadosAg,
+        programadosFuturos: programacoesAtivas,
+        emAberto: creditosDisponiveis,
+      }
     );
   }, [
     itens,
@@ -314,6 +342,7 @@ export function OrcamentoAbaAgendamentos({
     quantidadePrevista,
     dispensado,
     programacoesAtivas,
+    creditosDisponiveis,
   ]);
 
   useEffect(() => {
@@ -346,7 +375,7 @@ export function OrcamentoAbaAgendamentos({
         next.delete(item.agendamento.id);
         return next;
       }
-      if (next.size + programacoesAtivas >= quantidadePrevista) {
+      if (next.size + programacoesAtivas + creditosDisponiveis >= quantidadePrevista) {
         toast.error(
           `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
         );
@@ -395,6 +424,92 @@ export function OrcamentoAbaAgendamentos({
       );
     } finally {
       setExameFuturoSaving(false);
+    }
+  }
+
+  async function handleConfirmarAsoEmAberto(
+    data: RegistrarAsoEmAbertoFormResult
+  ) {
+    if (!contrato) return;
+    setAsoAbertoSaving(true);
+    try {
+      await registrarCreditosAsoEmAberto({
+        contratoId: contrato.id,
+        orcamentoId,
+        clienteId: contrato.cliente_id,
+        clienteCnpj: null,
+        quantidade: data.quantidade,
+        observacao: data.observacao,
+        validoAte: contrato.data_fim,
+        usuarioNome,
+        numeroContrato: contrato.numero,
+      });
+      toast.success(
+        data.quantidade === 1
+          ? "1 ASO contratual em aberto registrado."
+          : `${data.quantidade} ASOs contratuais em aberto registrados.`
+      );
+      setAsoAbertoModalOpen(false);
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível registrar o ASO em aberto."
+      );
+    } finally {
+      setAsoAbertoSaving(false);
+    }
+  }
+
+  async function handleRemoverCredito(credito: ContratoCreditoAsoRecord) {
+    if (
+      !window.confirm(
+        "Remover a classificação deste ASO em aberto? A vaga voltará a aparecer como disponível e o progresso será recalculado."
+      )
+    ) {
+      return;
+    }
+    try {
+      await removerCreditoAsoEmAberto({
+        creditoId: credito.id,
+        usuarioNome,
+        numeroContrato: contrato?.numero ?? null,
+      });
+      toast.success("Classificação de ASO em aberto removida.");
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível remover o crédito."
+      );
+    }
+  }
+
+  async function handleEditarObservacaoCredito(
+    credito: ContratoCreditoAsoRecord
+  ) {
+    const atual = credito.observacao ?? "";
+    const next = window.prompt("Observação do ASO em aberto:", atual);
+    if (next === null) return;
+    try {
+      await atualizarObservacaoCreditoAso({
+        creditoId: credito.id,
+        observacao: next.trim() || null,
+        usuarioNome,
+      });
+      toast.success("Observação atualizada.");
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível atualizar a observação."
+      );
     }
   }
 
@@ -689,12 +804,20 @@ export function OrcamentoAbaAgendamentos({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4 xl:grid-cols-7">
           <Card label="Previstos" value={String(contagemPreview.previstos)} />
-          <Card label="Utilizados" value={String(contagemPreview.utilizados)} />
           <Card
-            label="Disponíveis"
-            value={String(contagemPreview.disponiveis)}
+            label="Agendados"
+            value={String(contagemPreview.agendados)}
+          />
+          <Card
+            label="Programados p/ futuro"
+            value={String(contagemPreview.programadosFuturos)}
+          />
+          <Card label="Em aberto" value={String(contagemPreview.emAberto)} />
+          <Card
+            label="Comprometidos"
+            value={String(contagemPreview.comprometidos)}
           />
           {dispensado ? (
             <Card
@@ -735,14 +858,26 @@ export function OrcamentoAbaAgendamentos({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {!dispensado && contagemPreview.disponiveis > 0 ? (
-              <button
-                type="button"
-                className="btn btn-muted text-xs"
-                disabled={saving || loading || !contrato || exameFuturoSaving}
-                onClick={() => setExameFuturoModalOpen(true)}
-              >
-                Informar exame futuro
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-muted text-xs"
+                  disabled={saving || loading || !contrato || exameFuturoSaving}
+                  onClick={() => setExameFuturoModalOpen(true)}
+                >
+                  Informar exame futuro
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-muted text-xs"
+                  disabled={
+                    saving || loading || !contrato || asoAbertoSaving
+                  }
+                  onClick={() => setAsoAbertoModalOpen(true)}
+                >
+                  Manter ASO em aberto
+                </button>
+              </>
             ) : null}
             <button
               type="button"
@@ -850,6 +985,19 @@ export function OrcamentoAbaAgendamentos({
         </section>
       ) : null}
 
+      {!dispensado ? (
+        <AsosContratuaisEmAbertoSection
+          creditos={creditosAso}
+          numeroContrato={contrato?.numero ?? null}
+          onEditarObservacao={(c) => {
+            void handleEditarObservacaoCredito(c);
+          }}
+          onRemover={(c) => {
+            void handleRemoverCredito(c);
+          }}
+        />
+      ) : null}
+
       <AgendamentoViewModal
         agendamento={viewAgendamento}
         onClose={() => setViewAgendamento(null)}
@@ -879,6 +1027,20 @@ export function OrcamentoAbaAgendamentos({
         sugestoes={sugestoesColaboradores}
         onClose={() => setExameFuturoModalOpen(false)}
         onConfirm={(data) => void handleConfirmarExameFuturo(data)}
+      />
+
+      <RegistrarAsoEmAbertoModal
+        open={asoAbertoModalOpen}
+        saving={asoAbertoSaving}
+        numeroContrato={contrato?.numero ?? null}
+        quantidadePrevista={quantidadePrevista}
+        quantidadeVinculada={
+          contagemPreview.agendados + contagemPreview.programadosFuturos
+        }
+        quantidadeDisponivel={contagemPreview.disponiveis}
+        dataFim={contrato?.data_fim ?? null}
+        onClose={() => setAsoAbertoModalOpen(false)}
+        onConfirm={(data) => void handleConfirmarAsoEmAberto(data)}
       />
     </div>
   );

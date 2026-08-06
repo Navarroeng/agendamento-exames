@@ -162,6 +162,13 @@ export async function criarExameFuturoImplantacao(
     .in("status", ["ativo", "reagendado"]);
   if (progErr) throw progErr;
 
+  const { count: creditoCount, error: creditoErr } = await supabase
+    .from("contrato_creditos_aso")
+    .select("id", { count: "exact", head: true })
+    .eq("contrato_id", input.contratoId)
+    .eq("status", "disponivel");
+  if (creditoErr) throw creditoErr;
+
   const { data: contrato, error: cErr } = await supabase
     .from("cliente_contratos")
     .select("id, numero, quantidade_colaboradores, orcamento_id")
@@ -181,7 +188,8 @@ export async function criarExameFuturoImplantacao(
     if (Number.isFinite(q) && q > 0) previstos = Math.floor(q);
   }
 
-  const utilizados = utilizadosAg + (progCount ?? 0);
+  const utilizados =
+    utilizadosAg + (progCount ?? 0) + (creditoCount ?? 0);
   if (previstos > 0 && utilizados >= previstos) {
     throw new Error(
       "Não há vagas disponíveis neste contrato para programar exame futuro."

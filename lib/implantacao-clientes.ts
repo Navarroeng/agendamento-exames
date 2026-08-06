@@ -262,6 +262,8 @@ export interface ImplantacaoProcesso {
   agendamentosRealizados: number;
   /** Exames futuros que também consomem vaga do contrato. */
   examesProgramadosFuturos: number;
+  /** ASOs contratuais em aberto (status disponivel). */
+  asosContratuaisEmAberto: number;
   agendamentosIniciaisDispensados: boolean;
   /**
    * Concluído porque a previsão foi preenchida com pelo menos um exame
@@ -440,6 +442,7 @@ export function buildImplantacaoProcesso(params: {
   contrato: ClienteContratoRecord | null;
   agendamentosRealizados?: number;
   examesProgramadosFuturos?: number;
+  asosContratuaisEmAberto?: number;
   fluxoImplantacao?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
 }): ImplantacaoProcesso {
@@ -455,9 +458,15 @@ export function buildImplantacaoProcesso(params: {
     0,
     params.examesProgramadosFuturos ?? 0
   );
+  const asosContratuaisEmAberto = Math.max(
+    0,
+    params.asosContratuaisEmAberto ?? 0
+  );
   const agendamentosRealizados = Math.max(
     0,
-    (params.agendamentosRealizados ?? 0) + examesProgramadosFuturos
+    (params.agendamentosRealizados ?? 0) +
+      examesProgramadosFuturos +
+      asosContratuaisEmAberto
   );
   const agendamentosIniciaisDispensados = Boolean(
     contrato?.agendamentos_iniciais_dispensados
@@ -522,6 +531,7 @@ export function buildImplantacaoProcesso(params: {
     quantidadeContratada,
     agendamentosRealizados,
     examesProgramadosFuturos,
+    asosContratuaisEmAberto,
     agendamentosIniciaisDispensados,
     concluidoComExamesFuturos,
     fluxoImplantacao: fluxo,

@@ -4,7 +4,16 @@ export type ContratoAgendamentoContagem = {
   contratados: number;
   previstos: number;
   realizados: number;
+  /** @deprecated Preferir `comprometidos` — mantido por compat. */
   utilizados: number;
+  /** Agendamentos válidos vinculados ao contrato. */
+  agendados: number;
+  /** Exames futuros que consomem previsão. */
+  programadosFuturos: number;
+  /** ASOs contratuais em aberto (status disponivel). */
+  emAberto: number;
+  /** Total comprometido (agendados + futuros + em aberto). */
+  comprometidos: number;
   pendentes: number;
   disponiveis: number;
   adicionais: number;
@@ -28,10 +37,18 @@ export function buildContratoAgendamentoContagem(
   quantidadeContratada: number,
   utilizados: number,
   adicionais = 0,
-  opts?: { dispensado?: boolean }
+  opts?: {
+    dispensado?: boolean;
+    agendados?: number;
+    programadosFuturos?: number;
+    emAberto?: number;
+  }
 ): ContratoAgendamentoContagem {
   const previstos = Math.max(0, quantidadeContratada || 0);
   const dispensado = Boolean(opts?.dispensado);
+  const agendados = Math.max(0, opts?.agendados ?? utilizados);
+  const programadosFuturos = Math.max(0, opts?.programadosFuturos ?? 0);
+  const emAberto = Math.max(0, opts?.emAberto ?? 0);
 
   if (dispensado) {
     const extras = Math.max(0, adicionais);
@@ -40,6 +57,10 @@ export function buildContratoAgendamentoContagem(
       previstos,
       realizados: 0,
       utilizados: 0,
+      agendados: 0,
+      programadosFuturos: 0,
+      emAberto: 0,
+      comprometidos: 0,
       pendentes: 0,
       disponiveis: 0,
       adicionais: extras,
@@ -86,6 +107,10 @@ export function buildContratoAgendamentoContagem(
     previstos,
     realizados: usados,
     utilizados: usados,
+    agendados,
+    programadosFuturos,
+    emAberto,
+    comprometidos: usados,
     pendentes: disponiveis,
     disponiveis,
     adicionais: extras,
