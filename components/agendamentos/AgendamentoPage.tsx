@@ -24,6 +24,7 @@ import { TopActions } from "./TopActions";
 import { useAgendamentosPage } from "@/hooks/useAgendamentosPage";
 import { AGENDAMENTOS_PAGE_SIZE } from "@/lib/agendamento-filters";
 import { AGENDAMENTO_FATURA_SOMENTE_DOCUMENTACAO_MSG } from "@/lib/agendamento-documentacao";
+import { parseDateBRToIso } from "@/lib/agendamento-datetime";
 
 export function AgendamentoPage() {
   const {
@@ -99,8 +100,10 @@ export function AgendamentoPage() {
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
     periodicoVinculoOpen,
-    periodicoVinculo,
-    closePeriodicoVinculoModal,
+    periodicoVinculoList,
+    periodicoContratoNumeros,
+    handleCpfBlur,
+    handleCancelarPeriodicoVinculo,
     handleContinuarComPeriodicoPendente,
     handleUtilizarPeriodicoPendente,
     cargoChangeModalOpen,
@@ -167,6 +170,7 @@ export function AgendamentoPage() {
             formularioClienteLiberado={formularioClienteLiberado}
             dataFieldError={dataFieldError}
             onDataBlur={handleDataBlur}
+            onCpfBlur={handleCpfBlur}
           />
           <ExamSection
             exams={exams}
@@ -274,11 +278,18 @@ export function AgendamentoPage() {
       />
       <PeriodicoFuturoVinculoModal
         open={periodicoVinculoOpen}
-        periodico={periodicoVinculo}
+        periodicos={periodicoVinculoList}
+        colaboradorNome={form.colaborador}
+        dataAgendamentoIso={
+          form.data_agendamento.trim().length >= 10
+            ? parseDateBRToIso(form.data_agendamento)
+            : null
+        }
+        contratoNumeros={periodicoContratoNumeros}
         saving={saving}
-        onCancelar={closePeriodicoVinculoModal}
-        onContinuar={handleContinuarComPeriodicoPendente}
-        onUtilizar={handleUtilizarPeriodicoPendente}
+        onCancelar={handleCancelarPeriodicoVinculo}
+        onContinuarSemVincular={handleContinuarComPeriodicoPendente}
+        onAnteciparEVincular={handleUtilizarPeriodicoPendente}
       />
       <AgendamentoCargoChangeModal
         open={cargoChangeModalOpen}

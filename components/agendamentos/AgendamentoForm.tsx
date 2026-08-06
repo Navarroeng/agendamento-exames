@@ -37,6 +37,7 @@ interface AgendamentoFormProps {
   formularioClienteLiberado?: boolean;
   dataFieldError?: string | null;
   onDataBlur?: () => void;
+  onCpfBlur?: () => void;
 }
 
 const SELECT_PLACEHOLDER = "Selecione...";
@@ -64,6 +65,7 @@ export function AgendamentoForm({
   formularioClienteLiberado = true,
   dataFieldError = null,
   onDataBlur,
+  onCpfBlur,
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
@@ -180,6 +182,7 @@ export function AgendamentoForm({
               value={form.colaborador_cpf}
               disabled={camposDependentesClienteDesabilitados}
               onChange={(e) => onChange("colaborador_cpf", e.target.value)}
+              onBlur={() => onCpfBlur?.()}
             />
           </Field>
         </div>

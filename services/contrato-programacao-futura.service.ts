@@ -199,6 +199,8 @@ export async function criarExameFuturoImplantacao(
     exame_nome: tipoAso,
     data_realizada: null,
     proxima_data: dataPrevista,
+    data_prevista_original: dataPrevista,
+    antecipado: false,
     status: "ativo" as const,
     origem: ORIGEM_PERIODICO_IMPLANTACAO,
     motivo: input.motivo,
@@ -234,32 +236,37 @@ export async function criarExameFuturoImplantacao(
 }
 
 /**
- * Busca periódico futuro ativo do colaborador (CPF preferencial; senão nome + empresa).
- * Retorna o mais próximo por data prevista.
+ * Busca periódicos futuros ativos do colaborador (CPF normalizado prioritário).
+ * Filtra por empresa e, se informado, por tipo de ASO.
  */
-export async function buscarPeriodicoPendenteColaborador(params: {
+export async function listarPeriodicosPendentesColaborador(params: {
   clienteNome: string;
   colaborador: string;
   colaboradorCpf?: string | null;
-}): Promise<PeriodicoFuturoRecord | null> {
+  tipoAso?: string | null;
+}): Promise<PeriodicoFuturoRecord[]> {
   const supabase = createClient();
   const cliente = params.clienteNome.trim();
   const colaborador = params.colaborador.trim();
   const cpf = params.colaboradorCpf
     ? normalizeCpfDigits(params.colaboradorCpf)
     : "";
+  const tipoAso = (params.tipoAso ?? "").trim();
 
-  if (!cliente || (!colaborador && !cpf)) return null;
+  if (!cliente || (!colaborador && cpf.length !== 11)) return [];
 
   let query = supabase
     .from("periodicos_futuros")
     .select("*")
     .eq("status", "ativo")
     .order("proxima_data", { ascending: true })
-    .limit(20);
+    .limit(100);
 
   if (cpf.length === 11) {
-    query = query.eq("colaborador_cpf", cpf);
+    const masked = `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+    query = query.or(
+      `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
+    );
   } else {
     query = query
       .ilike("cliente_nome", cliente)
@@ -269,23 +276,69 @@ export async function buscarPeriodicoPendenteColaborador(params: {
   const { data, error } = await query;
   if (error) throw error;
 
-  const rows = (data ?? []) as PeriodicoFuturoRecord[];
-  if (rows.length === 0) return null;
+  let rows = (data ?? []) as PeriodicoFuturoRecord[];
+  if (rows.length === 0) return [];
 
-  // Se buscou por CPF, ainda filtra empresa quando possível
+  if (cpf.length === 11) {
+    rows = rows.filter(
+      (r) => normalizeCpfDigits(r.colaborador_cpf) === cpf
+    );
+  }
+
   const clienteNorm = cliente.toLowerCase();
   const matchEmpresa = rows.filter(
     (r) => (r.cliente_nome ?? "").trim().toLowerCase() === clienteNorm
   );
-  const pool = matchEmpresa.length > 0 ? matchEmpresa : rows;
-  return pool[0] ?? null;
+  rows = matchEmpresa.length > 0 ? matchEmpresa : rows;
+
+  if (tipoAso) {
+    const asoNorm = tipoAso.toLowerCase();
+    const matchAso = rows.filter((r) => {
+      const tipo = (r.tipo_aso ?? "").trim().toLowerCase();
+      const exame = (r.exame_nome ?? r.tipo_exame ?? "").trim().toLowerCase();
+      return tipo === asoNorm || exame.includes(asoNorm);
+    });
+    // Se há match por ASO, prioriza; senão mantém todos para o usuário decidir
+    if (matchAso.length > 0) rows = matchAso;
+  }
+
+  return rows;
+}
+
+/**
+ * Busca periódico futuro ativo do colaborador (CPF preferencial; senão nome + empresa).
+ * Retorna o mais próximo por data prevista.
+ */
+export async function buscarPeriodicoPendenteColaborador(params: {
+  clienteNome: string;
+  colaborador: string;
+  colaboradorCpf?: string | null;
+  tipoAso?: string | null;
+}): Promise<PeriodicoFuturoRecord | null> {
+  const rows = await listarPeriodicosPendentesColaborador(params);
+  return rows[0] ?? null;
+}
+
+export function isAntecipacaoPeriodico(
+  dataAgendamentoIso: string | null | undefined,
+  dataPrevistaIso: string | null | undefined
+): boolean {
+  const ag = (dataAgendamentoIso ?? "").slice(0, 10);
+  const prev = (dataPrevistaIso ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ag) || !/^\d{4}-\d{2}-\d{2}$/.test(prev)) {
+    return false;
+  }
+  return ag < prev;
 }
 
 export async function vincularPeriodicoAoAgendamento(params: {
   periodicoId: string;
   agendamentoId: string;
   usuarioNome: string;
-}): Promise<void> {
+  dataAgendamentoIso?: string | null;
+  usuarioEmail?: string;
+  usuarioId?: string | null;
+}): Promise<{ antecipado: boolean; dataPrevistaOriginal: string }> {
   const supabase = createClient();
   const { data: record, error: findErr } = await supabase
     .from("periodicos_futuros")
@@ -298,23 +351,56 @@ export async function vincularPeriodicoAoAgendamento(params: {
     throw new Error("Este periódico futuro já foi atendido ou cancelado.");
   }
 
+  const dataPrevistaOriginal =
+    (record.data_prevista_original as string | null)?.slice(0, 10) ||
+    String(record.proxima_data).slice(0, 10);
+  const dataAgLabel = (params.dataAgendamentoIso ?? "").slice(0, 10);
+  const antecipado = isAntecipacaoPeriodico(
+    params.dataAgendamentoIso,
+    dataPrevistaOriginal
+  );
+
   const { error } = await supabase
     .from("periodicos_futuros")
     .update({
       agendamento_id: params.agendamentoId,
       status: "reagendado",
+      data_prevista_original: dataPrevistaOriginal,
+      antecipado,
+      ...(dataAgLabel && /^\d{4}-\d{2}-\d{2}$/.test(dataAgLabel)
+        ? { proxima_data: dataAgLabel }
+        : {}),
     })
     .eq("id", params.periodicoId)
     .eq("status", "ativo");
   if (error) throw error;
 
+  const descricao = antecipado
+    ? `${params.usuarioNome} antecipou o exame ${record.tipo_aso || record.exame_nome || "Periódico"} de ${record.colaborador}, originalmente previsto para ${dataPrevistaOriginal}, vinculando-o ao agendamento de ${dataAgLabel || params.agendamentoId}.`
+    : `${params.usuarioNome} vinculou o agendamento ${dataAgLabel || params.agendamentoId} ao periódico futuro de ${record.colaborador} (${record.cliente_nome}), previsto para ${dataPrevistaOriginal}.`;
+
   await registrarAuditoria({
+    usuarioId: params.usuarioId ?? null,
     usuarioNome: params.usuarioNome,
-    usuarioEmail: "",
+    usuarioEmail: params.usuarioEmail ?? "",
     modulo: AUDITORIA_MODULOS.periodicos_futuros,
     acao: AUDITORIA_ACOES.reagendamento,
     registroId: params.periodicoId,
     registroNome: String(record.colaborador ?? ""),
-    descricao: `${params.usuarioNome} vinculou o agendamento ${params.agendamentoId} ao periódico futuro de ${record.colaborador} (${record.cliente_nome}).`,
+    descricao,
+    dadosAntes: {
+      status: "ativo",
+      proxima_data: record.proxima_data,
+      data_prevista_original: dataPrevistaOriginal,
+    },
+    dadosDepois: {
+      status: "reagendado",
+      agendamento_id: params.agendamentoId,
+      antecipado,
+      data_prevista_original: dataPrevistaOriginal,
+      data_agendamento: dataAgLabel || null,
+    },
   });
+
+  return { antecipado, dataPrevistaOriginal };
 }

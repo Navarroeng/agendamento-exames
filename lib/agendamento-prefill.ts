@@ -3,6 +3,7 @@ export const AGENDAMENTO_PREFILL_STORAGE_KEY = "agendamento_prefill_v1";
 export interface AgendamentoPrefillData {
   cliente_nome: string;
   colaborador: string;
+  colaborador_cpf?: string;
   cargo_id?: string;
   cargo_nome?: string;
   exame_nome?: string;
