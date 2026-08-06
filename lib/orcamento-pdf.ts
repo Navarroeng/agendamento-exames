@@ -827,7 +827,10 @@ function drawResumoFinanceiroCard(
   let lineY = bodyY + FINANCIAL_CARD_BODY_PAD;
 
   const valorTotal = Number(orcamento.valor_total);
-  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+  const pagamento = calcCondicoesPagamentoProposta(
+    valorTotal,
+    orcamento.quantidade_parcelas
+  );
 
   lineY = drawFinancialPremiumRow(
     doc,

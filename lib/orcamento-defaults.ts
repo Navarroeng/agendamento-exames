@@ -32,6 +32,7 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     origem_cliente: "",
     observacoes: "",
     forma_pagamento: "",
+    quantidade_parcelas: "",
     itens: [createEmptyOrcamentoItem()],
   };
 }

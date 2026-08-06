@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   formatUppercaseInput,
   isUppercaseField,
@@ -19,7 +19,10 @@ import {
   resolveQuantidadeColaboradoresOrcamento,
   validateOrcamentoItensValores,
 } from "@/lib/orcamento-calculo";
-import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  calcCondicoesPagamentoProposta,
+  resolveQuantidadeParcelasEscolhida,
+} from "@/lib/orcamento-pagamento";
 import {
   calcValidadePropostaIso,
   resolveValidadePropostaIso,
@@ -213,6 +216,15 @@ export function useOrcamentoForm() {
         : "",
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
+      quantidade_parcelas:
+        orcamento.quantidade_parcelas != null
+          ? String(
+              resolveQuantidadeParcelasEscolhida(
+                Number(orcamento.valor_total) || 0,
+                orcamento.quantidade_parcelas
+              )
+            )
+          : "",
       itens:
         itensDb.length > 0
           ? itensDb.map((item) => {
@@ -236,12 +248,32 @@ export function useOrcamentoForm() {
   const totals = useMemo(() => {
     const subtotal = calcSubtotalItens(form.itens);
     const valorTotal = subtotal;
-    const condicoesPagamento = calcCondicoesPagamentoProposta(valorTotal);
+    const quantidadeEscolhida =
+      form.quantidade_parcelas.trim() === ""
+        ? null
+        : Number(form.quantidade_parcelas);
+    const condicoesPagamento = calcCondicoesPagamentoProposta(
+      valorTotal,
+      quantidadeEscolhida
+    );
     const validadeProposta = form.data_proposta.trim()
       ? calcValidadePropostaIso(form.data_proposta)
       : "";
     return { subtotal, valorTotal, condicoesPagamento, validadeProposta };
-  }, [form.data_proposta, form.itens]);
+  }, [form.data_proposta, form.itens, form.quantidade_parcelas]);
+
+  useEffect(() => {
+    const max = totals.condicoesPagamento.maxParcelas;
+    const raw = form.quantidade_parcelas.trim();
+    if (raw === "") return;
+    const atual = Number(raw);
+    if (!Number.isFinite(atual) || atual < 1 || atual > max) {
+      setForm((prev) => ({
+        ...prev,
+        quantidade_parcelas: String(max),
+      }));
+    }
+  }, [form.quantidade_parcelas, totals.condicoesPagamento.maxParcelas]);
 
   const buildPayload = useCallback(
     (responsavel: string): OrcamentoInsertPayload => {
@@ -264,6 +296,12 @@ export function useOrcamentoForm() {
     const itens = applyPacoteCompletoSstPrecoItensPayload(itensRaw);
     const subtotal = itens.reduce((sum, item) => sum + item.valor_total, 0);
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
+    const quantidadeParcelas = resolveQuantidadeParcelasEscolhida(
+      subtotal,
+      form.quantidade_parcelas.trim() === ""
+        ? null
+        : Number(form.quantidade_parcelas)
+    );
 
     if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
       throw new Error("Informe a origem do cliente.");
@@ -285,6 +323,7 @@ export function useOrcamentoForm() {
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual: 0,
       forma_pagamento: null,
+      quantidade_parcelas: quantidadeParcelas,
       validade_proposta: validadeIso,
       subtotal,
       valor_total: subtotal,

@@ -33,6 +33,32 @@ export function calcQuantidadeParcelas(valorTotal: number): number {
   return 1;
 }
 
+/** Opções válidas de parcelamento para o valor total (1 .. máximo permitido). */
+export function listOpcoesParcelas(valorTotal: number): number[] {
+  const max = calcQuantidadeParcelas(valorTotal);
+  return Array.from({ length: max }, (_, index) => index + 1);
+}
+
+/**
+ * Resolve a quantidade efetiva: usa a escolhida se válida; senão limita ao máximo.
+ * Sem escolha (null/undefined/NaN), mantém o máximo permitido (legado).
+ */
+export function resolveQuantidadeParcelasEscolhida(
+  valorTotal: number,
+  quantidadeEscolhida?: number | null
+): number {
+  const max = calcQuantidadeParcelas(valorTotal);
+  if (
+    quantidadeEscolhida == null ||
+    !Number.isFinite(Number(quantidadeEscolhida))
+  ) {
+    return max;
+  }
+  const n = Math.floor(Number(quantidadeEscolhida));
+  if (n < 1) return 1;
+  return Math.min(n, max);
+}
+
 export function calcValorParcela(valorTotal: number, parcelas: number): number {
   if (parcelas <= 0) return valorTotal;
   return Math.round((valorTotal / parcelas) * 100) / 100;
@@ -41,25 +67,34 @@ export function calcValorParcela(valorTotal: number, parcelas: number): number {
 export interface CondicoesPagamentoProposta {
   valorTotal: number;
   parcelas: number;
+  maxParcelas: number;
+  opcoesParcelas: number[];
   valorParcela: number;
   valorAVista: number;
   textoParcelado: string;
   textoAVista: string;
 }
 
-/** Condições automáticas de pagamento para exibição (não alteram o valor salvo). */
+/** Condições de pagamento da proposta (parcelas manuais, limitadas pelo valor). */
 export function calcCondicoesPagamentoProposta(
-  valorTotal: number
+  valorTotal: number,
+  quantidadeParcelas?: number | null
 ): CondicoesPagamentoProposta {
   const total = Number(valorTotal);
   const safeTotal = Number.isFinite(total) && total > 0 ? total : 0;
-  const parcelas = calcQuantidadeParcelas(safeTotal);
+  const maxParcelas = calcQuantidadeParcelas(safeTotal);
+  const parcelas = resolveQuantidadeParcelasEscolhida(
+    safeTotal,
+    quantidadeParcelas
+  );
   const valorParcela = calcValorParcela(safeTotal, parcelas);
   const valorAVista = calcValorAVistaProposta(safeTotal);
 
   return {
     valorTotal: safeTotal,
     parcelas,
+    maxParcelas,
+    opcoesParcelas: listOpcoesParcelas(safeTotal),
     valorParcela,
     valorAVista,
     textoParcelado: `${parcelas}x de ${formatCurrency(valorParcela)}`,

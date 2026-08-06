@@ -260,11 +260,35 @@ export function OrcamentoForm({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
               Pagamento parcelado
             </p>
-            <p className="mt-1 text-sm font-bold text-navy">
-              {condicoesPagamento.textoParcelado}
-            </p>
-            <p className="mt-1 text-[11px] text-[#64748b]">
-              Calculado automaticamente (parcela mínima de R$ 500,00, até 10x).
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <div className="min-w-[140px] flex-1">
+                <label className="mb-1.5 block text-xs font-bold text-navy">
+                  Quantidade de parcelas
+                </label>
+                <select
+                  className="field-input"
+                  value={String(condicoesPagamento.parcelas)}
+                  onChange={(e) =>
+                    onChange("quantidade_parcelas", e.target.value)
+                  }
+                >
+                  {condicoesPagamento.opcoesParcelas.map((qtd) => (
+                    <option key={qtd} value={qtd}>
+                      {qtd}x
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="pb-2">
+                <p className="text-[11px] text-[#64748b]">Valor de cada parcela</p>
+                <p className="text-sm font-bold text-navy">
+                  {formatCurrency(condicoesPagamento.valorParcela)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-[#64748b]">
+              Parcela mínima de R$ 500,00 · até {condicoesPagamento.maxParcelas}x
+              para este valor.
             </p>
           </div>
           <div className="rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-4 py-3">

@@ -106,6 +106,8 @@ export interface OrcamentoRecord {
   cancelado_por: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;
+  /** Parcelas escolhidas na proposta (1–10). Null = legado (máximo permitido). */
+  quantidade_parcelas?: number | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;
@@ -159,6 +161,8 @@ export interface OrcamentoFormValues {
   origem_cliente: "" | OrcamentoOrigemCliente;
   observacoes: string;
   forma_pagamento: string;
+  /** Quantidade de parcelas escolhida (string do Select). Vazio = máximo permitido. */
+  quantidade_parcelas: string;
   itens: OrcamentoItemFormItem[];
 }
 
@@ -190,6 +194,7 @@ export interface OrcamentoInsertPayload {
   observacoes: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;
+  quantidade_parcelas: number | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;

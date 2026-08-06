@@ -70,7 +70,8 @@ export function OrcamentoViewBody({
     (a, b) => a.ordem - b.ordem
   );
   const condicoesPagamento = calcCondicoesPagamentoProposta(
-    Number(orcamento.valor_total)
+    Number(orcamento.valor_total),
+    orcamento.quantidade_parcelas
   );
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;

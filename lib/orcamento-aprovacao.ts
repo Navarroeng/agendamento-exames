@@ -277,7 +277,10 @@ export function buildResumoComercialOrcamento(
 ): OrcamentoResumoComercial {
   const quantidade = resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
   const valorTotal = Number(orcamento.valor_total) || 0;
-  const pagamento = calcCondicoesPagamentoProposta(valorTotal);
+  const pagamento = calcCondicoesPagamentoProposta(
+    valorTotal,
+    orcamento.quantidade_parcelas
+  );
   return {
     quantidadeColaboradores: quantidade,
     valorTotal,
