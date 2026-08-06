@@ -20,6 +20,8 @@ import {
   FATURA_SEM_ELEGIVEIS_MSG,
   FATURA_SEM_VALOR_COMPETENCIA_MSG,
   isAgendamentoElegivelFatura,
+  isExameFaturavel,
+  isValorTotalFaturavel,
 } from "@/lib/fatura-elegibilidade";
 import {
   COMPROVANTE_OBRIGATORIO_MSG,
@@ -187,7 +189,18 @@ async function validarItensFaturaElegiveis(
     throw new Error(FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG);
   }
 
-  return itens;
+  const itensFaturaveis = itens.filter((item) =>
+    isExameFaturavel({
+      status: statusById.get(item.agendamento_id!),
+      valor: Number(item.valor_unitario),
+    })
+  );
+
+  if (itensFaturaveis.length === 0) {
+    throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
+  }
+
+  return itensFaturaveis;
 }
 
 export async function salvarFatura(
@@ -205,7 +218,7 @@ export async function salvarFatura(
     (sum, item) => sum + Number(item.valor_total),
     0
   );
-  if (input.tipo === "cliente" && valorTotal <= 0) {
+  if (input.tipo === "cliente" && !isValorTotalFaturavel(valorTotal)) {
     throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
   }
   const totalExames = itens.length;
@@ -515,7 +528,7 @@ export async function reemitirFaturaCliente(
     (sum, item) => sum + Number(item.valor_total),
     0
   );
-  if (valorTotal <= 0) {
+  if (!isValorTotalFaturavel(valorTotal)) {
     throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
   }
 

@@ -4,6 +4,7 @@ import {
 } from "@/lib/agendamento-datetime";
 import {
   filterAgendamentosElegiveisFatura,
+  isExameFaturavel,
 } from "@/lib/fatura-elegibilidade";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
@@ -28,6 +29,8 @@ export function buildFaturaItensFromAgendamentos(
         tipo === "cliente"
           ? Number(exam.valor_cliente)
           : Number(exam.custo_clinica);
+
+      if (!isExameFaturavel({ status: ag.status, valor })) return;
 
       itens.push({
         agendamento_id: ag.id,

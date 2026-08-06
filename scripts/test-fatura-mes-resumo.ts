@@ -302,6 +302,19 @@ assert.equal(
 assert.equal(fanZerado.resumo.totalReferencias, 0);
 assert.equal(fanZerado.resumo.valorPrevisto, 0);
 
+// Centavos abaixo de R$ 1,00 também somem da listagem
+const fanCentavos = buildResumoClientesMes(
+  [ag("fan-c", "FAN CENTAVOS", "2026-07-10", 0.99)],
+  [fatura("f-fan-c", "FAN CENTAVOS", "2026-07", "rascunho")],
+  "07/2026"
+);
+assert.ok(fanCentavos);
+assert.equal(
+  fanCentavos.rows.length,
+  0,
+  "rascunho com total < R$ 1,00 não deve aparecer"
+);
+
 // Mesmo rascunho volta a aparecer se surgir valor faturável
 const fanComValor = buildResumoClientesMes(
   [

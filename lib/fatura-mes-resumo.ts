@@ -7,6 +7,7 @@ import {
   formatPeriodoFatura,
   type FaturaFilters,
 } from "@/lib/fatura-filters";
+import { isValorTotalFaturavel } from "@/lib/fatura-elegibilidade";
 import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
@@ -196,9 +197,9 @@ function compareFaturaMesRows(a: FaturaMesRow, b: FaturaMesRow): number {
   });
 }
 
-/** Entra na listagem operacional somente com valor faturável > 0. */
+/** Entra na listagem operacional somente com total faturável (>= R$ 1,00). */
 export function isReferenciaFaturavelNoMes(valorTotal: number): boolean {
-  return valorTotal > 0;
+  return isValorTotalFaturavel(valorTotal);
 }
 
 /** Linha ativa exige ao menos um agendamento elegível no período. */
@@ -235,8 +236,11 @@ function buildMetricsFromAgendamentos(
   tipo: FaturaTipo
 ): Pick<FaturaMesRow, "qtdAgendamentos" | "qtdExames" | "valorTotal"> {
   const itens = buildFaturaItensFromAgendamentos(ags, tipo);
+  const agendamentosComExameFaturavel = new Set(
+    itens.map((item) => item.agendamento_id).filter(Boolean)
+  );
   return {
-    qtdAgendamentos: ags.length,
+    qtdAgendamentos: agendamentosComExameFaturavel.size,
     qtdExames: itens.length,
     valorTotal: calcTotalFaturaItens(itens),
   };

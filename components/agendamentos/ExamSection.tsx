@@ -97,7 +97,13 @@ export function ExamSection({
           <thead>
             <tr>
               <th className={TH}>Tipo do exame</th>
-              <th className={TH}>Valor Cliente (R$)</th>
+              <th className={TH}>
+                Valor Cliente (R$)
+                <span className="mt-0.5 block max-w-[160px] font-medium normal-case tracking-normal text-[9px] leading-snug text-[#94a3b8]">
+                  Exames com valor inferior a R$ 1,00 ou com status Cancelado não
+                  serão incluídos no faturamento.
+                </span>
+              </th>
               <th className={TH}>Custo Clínica (R$)</th>
               <th className={TH}>Lucro (R$)</th>
               <th className={TH}>Tipo de preço</th>
