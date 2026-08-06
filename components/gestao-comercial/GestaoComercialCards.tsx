@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/money";
 import {
   formatComparacaoDiferenca,
   GESTAO_COMERCIAL_DISCLAIMER,
+  labelOrigemGestaoComercial,
   MESES_PT,
   type GestaoComercialDashboard,
 } from "@/lib/gestao-comercial";
@@ -48,7 +49,7 @@ export function GestaoComercialCards({
   dashboard: GestaoComercialDashboard;
   statusFiltro: "ativos" | "encerrados" | "todos";
 }) {
-  const { comparacao } = dashboard;
+  const { comparacao, indicadoresDetalhadosDisponiveis } = dashboard;
   const tone =
     comparacao.tendencia === "alta"
       ? "up"
@@ -60,13 +61,23 @@ export function GestaoComercialCards({
 
   const mesLabel = MESES_PT[dashboard.filtrosEfetivos.mesRef - 1] ?? "";
   const filtersStatus = statusFiltro;
+  const origemLabel = labelOrigemGestaoComercial(dashboard.origemValorPeriodo);
+  const semDados = "Sem dados";
 
   return (
     <section className="space-y-3">
       <p className="text-xs font-medium text-app-muted">
         {GESTAO_COMERCIAL_DISCLAIMER} · Referência: {mesLabel}/
         {dashboard.filtrosEfetivos.anoRef}
+        {dashboard.origemValorPeriodo
+          ? ` · Origem: ${origemLabel}`
+          : ""}
       </p>
+      {!indicadoresDetalhadosDisponiveis && dashboard.mensagemDetalhesIndisponiveis ? (
+        <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs font-semibold text-[#92400e]">
+          {dashboard.mensagemDetalhesIndisponiveis}
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Card
           label="Valor fechado no mês"
@@ -80,25 +91,61 @@ export function GestaoComercialCards({
         />
         <Card
           label="Contratos fechados"
-          value={String(dashboard.contratosFechados)}
-          hint={
-            filtersStatus === "ativos"
-              ? `Contabilizados (ativos). Encerrados/cancelados no período: ${dashboard.contratosEncerrados}`
-              : filtersStatus === "encerrados"
-                ? "Somente encerrados/cancelados (fora dos totais ativos)."
-                : `Ativos: ${dashboard.contratosAtivos} · Encerrados/cancelados: ${dashboard.contratosEncerrados}`
+          value={
+            indicadoresDetalhadosDisponiveis
+              ? String(dashboard.contratosFechados)
+              : semDados
           }
+          hint={
+            !indicadoresDetalhadosDisponiveis
+              ? dashboard.mensagemDetalhesIndisponiveis ?? undefined
+              : filtersStatus === "ativos"
+                ? `Contabilizados (ativos). Encerrados/cancelados no período: ${dashboard.contratosEncerrados}`
+                : filtersStatus === "encerrados"
+                  ? "Somente encerrados/cancelados (fora dos totais ativos)."
+                  : `Ativos: ${dashboard.contratosAtivos} · Encerrados/cancelados: ${dashboard.contratosEncerrados}`
+          }
+          tone={!indicadoresDetalhadosDisponiveis ? "muted" : undefined}
         />
         <Card
           label="Ticket médio"
-          value={formatCurrency(dashboard.ticketMedio)}
+          value={
+            indicadoresDetalhadosDisponiveis
+              ? formatCurrency(dashboard.ticketMedio)
+              : semDados
+          }
+          tone={!indicadoresDetalhadosDisponiveis ? "muted" : undefined}
         />
-        <Card label="Novos clientes" value={String(dashboard.novosClientes)} />
-        <Card label="Renovações" value={String(dashboard.renovacoes)} />
+        <Card
+          label="Novos clientes"
+          value={
+            indicadoresDetalhadosDisponiveis
+              ? String(dashboard.novosClientes)
+              : semDados
+          }
+          tone={!indicadoresDetalhadosDisponiveis ? "muted" : undefined}
+        />
+        <Card
+          label="Renovações"
+          value={
+            indicadoresDetalhadosDisponiveis
+              ? String(dashboard.renovacoes)
+              : semDados
+          }
+          tone={!indicadoresDetalhadosDisponiveis ? "muted" : undefined}
+        />
         <Card
           label="Contratos encerrados"
-          value={String(dashboard.contratosEncerrados)}
-          hint="Indicador separado — não compõe valor fechado, ticket nem rankings no filtro Ativos."
+          value={
+            indicadoresDetalhadosDisponiveis
+              ? String(dashboard.contratosEncerrados)
+              : semDados
+          }
+          hint={
+            indicadoresDetalhadosDisponiveis
+              ? "Indicador separado — não compõe valor fechado, ticket nem rankings no filtro Ativos."
+              : dashboard.mensagemDetalhesIndisponiveis ?? undefined
+          }
           tone="muted"
         />
       </div>

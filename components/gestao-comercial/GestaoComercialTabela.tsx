@@ -17,9 +17,11 @@ type SortKey =
 export function GestaoComercialTabela({
   rows,
   statusFiltro,
+  emptyMessage,
 }: {
   rows: GestaoComercialFechamentoRow[];
   statusFiltro: "ativos" | "encerrados" | "todos";
+  emptyMessage?: string | null;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("aprovadoEm");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -91,7 +93,7 @@ export function GestaoComercialTabela({
       )}
       {sorted.length === 0 ? (
         <p className="py-8 text-center text-sm text-app-muted">
-          Nenhum contrato fechado no período.
+          {emptyMessage?.trim() || "Nenhum contrato fechado no período."}
         </p>
       ) : (
         <div className="overflow-x-auto">

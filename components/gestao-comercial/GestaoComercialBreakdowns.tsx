@@ -53,6 +53,15 @@ export function GestaoComercialBreakdowns({
 }: {
   dashboard: GestaoComercialDashboard;
 }) {
+  if (!dashboard.indicadoresDetalhadosDisponiveis) {
+    return (
+      <div className="rounded-2xl border border-[#e8edf5] bg-white p-5 text-sm text-app-muted shadow-[0_4px_18px_rgba(15,23,42,0.04)]">
+        {dashboard.mensagemDetalhesIndisponiveis ??
+          "Informação indisponível para o período anterior ao sistema."}
+      </div>
+    );
+  }
+
   const { novos, renovacoes } = dashboard.novosVsRenovacao;
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

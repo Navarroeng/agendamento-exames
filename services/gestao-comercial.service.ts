@@ -3,6 +3,7 @@ import {
   resolveFormaPagamentoFechamento,
   resolveValorFechado,
   type GestaoComercialFechamentoRow,
+  type GestaoComercialHistoricoMensal,
 } from "@/lib/gestao-comercial";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { isPerfilAdmin } from "@/lib/permissions";
@@ -167,6 +168,43 @@ export async function listarFechamentosGestaoComercial(): Promise<
       statusContrato: (contrato?.status as ClienteContratoStatus | null) ?? null,
       orcamentoStatus: orc.status,
     });
+  }
+
+  return rows;
+}
+
+export async function listarHistoricoMensalGestaoComercial(): Promise<
+  GestaoComercialHistoricoMensal[]
+> {
+  await assertAdminGestaoComercial();
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("gestao_comercial_historico_mensal")
+    .select("ano, mes, valor_fechado, origem_dado, observacao")
+    .order("ano", { ascending: true })
+    .order("mes", { ascending: true });
+
+  if (error) {
+    console.error(
+      "[gestao-comercial] falha ao ler gestao_comercial_historico_mensal:",
+      error
+    );
+    throw error;
+  }
+
+  const rows = (data ?? []).map((row) => ({
+    ano: Number(row.ano),
+    mes: Number(row.mes),
+    valorFechado: Number(row.valor_fechado) || 0,
+    origemDado: "historico_manual" as const,
+    observacao: row.observacao ?? null,
+  }));
+
+  if (rows.length === 0) {
+    console.warn(
+      "[gestao-comercial] gestao_comercial_historico_mensal retornou 0 linhas. Verifique seed/RLS/GRANT."
+    );
   }
 
   return rows;

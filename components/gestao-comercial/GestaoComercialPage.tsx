@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconChart } from "@/components/ui/icons/OutlineIcons";
 import { GestaoComercialBreakdowns } from "@/components/gestao-comercial/GestaoComercialBreakdowns";
 import { GestaoComercialCards } from "@/components/gestao-comercial/GestaoComercialCards";
+import { GestaoComercialComparacaoAnualChart } from "@/components/gestao-comercial/GestaoComercialComparacaoAnualChart";
 import { GestaoComercialEvolucaoChart } from "@/components/gestao-comercial/GestaoComercialEvolucaoChart";
 import { GestaoComercialFiltersBar } from "@/components/gestao-comercial/GestaoComercialFiltersBar";
 import { GestaoComercialTabela } from "@/components/gestao-comercial/GestaoComercialTabela";
@@ -64,11 +65,22 @@ export function GestaoComercialPage() {
                 <GestaoComercialEvolucaoChart
                   data={dashboard.serieMensalAno}
                   ano={filters.ano}
+                  totalAnual={dashboard.totalAnualValor}
+                />
+                <GestaoComercialComparacaoAnualChart
+                  data={dashboard.serieComparacaoAnual}
+                  anoA={dashboard.anoComparacaoA}
+                  anoB={dashboard.anoComparacaoB}
                 />
                 <GestaoComercialBreakdowns dashboard={dashboard} />
                 <GestaoComercialTabela
                   rows={dashboard.rows}
                   statusFiltro={filters.statusContrato}
+                  emptyMessage={
+                    !dashboard.indicadoresDetalhadosDisponiveis
+                      ? dashboard.mensagemDetalhesIndisponiveis
+                      : null
+                  }
                 />
               </>
             )}
