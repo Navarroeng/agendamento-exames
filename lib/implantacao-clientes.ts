@@ -7,6 +7,12 @@ import {
   isVisitaEtapaConcluida,
   type OrcamentoEtapaId,
 } from "@/lib/orcamento-etapas";
+import {
+  isTreinamentoCancelado,
+  isTreinamentoEtapaConcluida,
+  type ImplantacaoTreinamentoRecord,
+} from "@/lib/implantacao-treinamento";
+import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import type { OrcamentoRecord, OrcamentoStatus } from "@/lib/orcamento-types";
@@ -28,11 +34,15 @@ export type ImplantacaoEtapaOperacionalId =
   | "funcionarios"
   | "logo"
   | "visita"
-  | "agendamentos";
+  | "agendamentos"
+  | "treinamento";
 
 export type ImplantacaoEtapaId =
-  | Exclude<ImplantacaoEtapaOperacionalId, "agendamentos">
+  | Exclude<ImplantacaoEtapaOperacionalId, "agendamentos" | "treinamento">
   | "aguardando_agendamentos"
+  | "agendamento_treinamento"
+  | "treinamento_agendado"
+  | "treinamento_cancelado"
   | "concluido"
   | "contrato_encerrado";
 
@@ -49,6 +59,33 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS: Array<{
   { id: "agendamentos", label: "Agendamentos" },
 ];
 
+export const IMPLANTACAO_ETAPAS_OPERACIONAIS_TREINAMENTOS: Array<{
+  id: ImplantacaoEtapaOperacionalId;
+  label: string;
+}> = [
+  { id: "contrato", label: "Contrato" },
+  { id: "financeiro", label: "Aguardando pagamento" },
+  { id: "treinamento", label: "Agendamento do treinamento" },
+];
+
+export function buildImplantacaoEtapasOperacionais(
+  fluxo: OrcamentoFluxoImplantacao = "padrao"
+): Array<{ id: ImplantacaoEtapaOperacionalId; label: string }> {
+  if (fluxo === "somente_treinamentos") {
+    return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_TREINAMENTOS];
+  }
+  if (fluxo === "combinado") {
+    const etapas = [...IMPLANTACAO_ETAPAS_OPERACIONAIS];
+    const finIdx = etapas.findIndex((e) => e.id === "financeiro");
+    etapas.splice(finIdx + 1, 0, {
+      id: "treinamento",
+      label: "Agendamento do treinamento",
+    });
+    return etapas;
+  }
+  return [...IMPLANTACAO_ETAPAS_OPERACIONAIS];
+}
+
 export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
   value: ImplantacaoEtapaId;
   label: string;
@@ -60,6 +97,9 @@ export const IMPLANTACAO_ETAPA_OPTIONS: Array<{
   { value: "logo", label: "Logo da empresa" },
   { value: "visita", label: "Visita agendada" },
   { value: "aguardando_agendamentos", label: "Aguardando agendamentos" },
+  { value: "agendamento_treinamento", label: "Agendamento do treinamento" },
+  { value: "treinamento_agendado", label: "Treinamento agendado" },
+  { value: "treinamento_cancelado", label: "Treinamento cancelado" },
   { value: "concluido", label: "Concluído" },
   { value: "contrato_encerrado", label: "Contrato encerrado" },
 ];
@@ -72,6 +112,9 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   logo: "Logo da empresa",
   visita: "Visita agendada",
   aguardando_agendamentos: "Aguardando agendamentos",
+  agendamento_treinamento: "Agendamento do treinamento",
+  treinamento_agendado: "Treinamento agendado",
+  treinamento_cancelado: "Treinamento cancelado",
   concluido: "Concluído",
   contrato_encerrado: "Contrato encerrado",
 };
@@ -90,6 +133,7 @@ export type ImplantacaoEtapaBadgeTone = {
     | "logo"
     | "visita"
     | "agendamentos"
+    | "treinamento"
     | "concluido"
     | "encerrado";
 };
@@ -136,6 +180,19 @@ export const IMPLANTACAO_ETAPA_BADGE: Record<
   aguardando_agendamentos: {
     family: "agendamentos",
     className: "border-[#f9a8d4] bg-[#fce7f3] text-[#be185d]",
+  },
+  // Teal — Agendamento do treinamento
+  agendamento_treinamento: {
+    family: "treinamento",
+    className: "border-[#99f6e4] bg-[#f0fdfa] text-[#0f766e]",
+  },
+  treinamento_agendado: {
+    family: "treinamento",
+    className: "border-[#5eead4] bg-[#ccfbf1] text-[#0f766e]",
+  },
+  treinamento_cancelado: {
+    family: "encerrado",
+    className: "border-[#fca5a5] bg-[#fee2e2] text-[#b91c1c]",
   },
   // Verde — Concluído
   concluido: {
@@ -211,6 +268,9 @@ export interface ImplantacaoProcesso {
    * programado para o futuro (não apenas agendamentos já feitos).
    */
   concluidoComExamesFuturos: boolean;
+  fluxoImplantacao: OrcamentoFluxoImplantacao;
+  treinamento: ImplantacaoTreinamentoRecord | null;
+  etapasOperacionais: Array<{ id: ImplantacaoEtapaOperacionalId; label: string }>;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -249,6 +309,8 @@ export function resolveImplantacaoEtapaAtual(
     orcamentoStatus?: OrcamentoStatus;
     contratoStatus?: string | null;
     contratoEncerradoEm?: string | null;
+    fluxo?: OrcamentoFluxoImplantacao;
+    treinamento?: ImplantacaoTreinamentoRecord | null;
   }
 ): ImplantacaoEtapaId {
   if (
@@ -258,23 +320,50 @@ export function resolveImplantacaoEtapaAtual(
   ) {
     return "contrato_encerrado";
   }
+
+  const fluxo = opts?.fluxo ?? "padrao";
+  const treino = opts?.treinamento ?? null;
+
+  if (fluxo === "somente_treinamentos") {
+    if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
+    if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
+    if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
+    if (!isTreinamentoEtapaConcluida(treino)) return "agendamento_treinamento";
+    if (treino?.status === "realizado") return "concluido";
+    return "treinamento_agendado";
+  }
+
   if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
   if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
+
+  if (fluxo === "combinado") {
+    if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
+    // Continua o fluxo SST; treinamento pode avançar em paralelo após financeiro.
+  }
+
   if (!isProcuracaoEtapaConcluida(aprovacao)) return "procuracao";
   if (!isFuncionariosEtapaConcluida(aprovacao)) return "funcionarios";
   if (!isLogoEtapaConcluida(aprovacao)) return "logo";
   if (!isVisitaEtapaConcluida(aprovacao)) return "visita";
   const qtd = Math.max(0, opts?.quantidadeContratada ?? 0);
   const feitos = Math.max(0, opts?.agendamentosRealizados ?? 0);
-  if (
-    isAgendamentosImplantacaoConcluida(
-      qtd,
-      feitos,
-      Boolean(opts?.agendamentosDispensados)
-    )
-  ) {
-    return "concluido";
+  const agendamentosOk = isAgendamentosImplantacaoConcluida(
+    qtd,
+    feitos,
+    Boolean(opts?.agendamentosDispensados)
+  );
+
+  if (fluxo === "combinado") {
+    const treinoOk = isTreinamentoEtapaConcluida(treino);
+    if (agendamentosOk && treinoOk) {
+      if (treino?.status === "realizado") return "concluido";
+      return "treinamento_agendado";
+    }
+    if (agendamentosOk && !treinoOk) return "agendamento_treinamento";
+    return "aguardando_agendamentos";
   }
+
+  if (agendamentosOk) return "concluido";
   return "aguardando_agendamentos";
 }
 
@@ -284,11 +373,31 @@ export function countImplantacaoEtapasConcluidas(
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
     agendamentosDispensados?: boolean;
+    fluxo?: OrcamentoFluxoImplantacao;
+    treinamento?: ImplantacaoTreinamentoRecord | null;
+    /** Para fluxo somente_treinamentos: conta as 5 abas (inclui resumo/aprovado). */
+    orcamentoAprovado?: boolean;
   }
 ): number {
+  const fluxo = opts?.fluxo ?? "padrao";
+
+  if (fluxo === "somente_treinamentos") {
+    let n = 0;
+    // Resumo + Orçamento aprovado (sempre contam no progresso 5 etapas)
+    n += 1;
+    if (opts?.orcamentoAprovado || aprovacao) n += 1;
+    if (isContratoEtapaConcluida(aprovacao)) n += 1;
+    if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
+    if (isTreinamentoEtapaConcluida(opts?.treinamento)) n += 1;
+    return n;
+  }
+
   let n = 0;
   if (isContratoEtapaConcluida(aprovacao)) n += 1;
   if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
+  if (fluxo === "combinado" && isTreinamentoEtapaConcluida(opts?.treinamento)) {
+    n += 1;
+  }
   if (isProcuracaoEtapaConcluida(aprovacao)) n += 1;
   if (isFuncionariosEtapaConcluida(aprovacao)) n += 1;
   if (isLogoEtapaConcluida(aprovacao)) n += 1;
@@ -315,6 +424,13 @@ export function implantacaoEtapaToModalTab(
   ) {
     return "agendamentos";
   }
+  if (
+    etapa === "agendamento_treinamento" ||
+    etapa === "treinamento_agendado" ||
+    etapa === "treinamento_cancelado"
+  ) {
+    return "treinamento";
+  }
   return etapa;
 }
 
@@ -324,8 +440,13 @@ export function buildImplantacaoProcesso(params: {
   contrato: ClienteContratoRecord | null;
   agendamentosRealizados?: number;
   examesProgramadosFuturos?: number;
+  fluxoImplantacao?: OrcamentoFluxoImplantacao;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
 }): ImplantacaoProcesso {
   const { orcamento, aprovacao, contrato } = params;
+  const fluxo = params.fluxoImplantacao ?? "padrao";
+  const treinamento = params.treinamento ?? null;
+  const etapasOperacionais = buildImplantacaoEtapasOperacionais(fluxo);
   const quantidadeContratada = resolveQuantidadeContratadaImplantacao(
     aprovacao,
     contrato
@@ -348,25 +469,37 @@ export function buildImplantacaoProcesso(params: {
     orcamentoStatus: orcamento.status,
     contratoStatus: contrato?.status ?? null,
     contratoEncerradoEm: contrato?.encerrado_em ?? null,
+    fluxo,
+    treinamento,
+    orcamentoAprovado:
+      orcamento.status === "aprovado" || Boolean(aprovacao),
   };
   const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao, contagemOpts);
   const etapasConcluidas =
     etapaAtual === "contrato_encerrado"
       ? 0
       : countImplantacaoEtapasConcluidas(aprovacao, contagemOpts);
-  const totalEtapas = IMPLANTACAO_ETAPAS_OPERACIONAIS.length;
+  const totalEtapas =
+    fluxo === "somente_treinamentos"
+      ? 5
+      : etapasOperacionais.length;
   const agendamentoLiberado =
-    etapaAtual === "contrato_encerrado"
+    etapaAtual === "contrato_encerrado" ||
+    etapaAtual === "treinamento_cancelado"
       ? false
-      : contrato
-        ? contratoLiberaAgendamento(contrato)
-        : false;
+      : fluxo === "somente_treinamentos"
+        ? false
+        : contrato
+          ? contratoLiberaAgendamento(contrato)
+          : false;
   const cancelado =
     orcamento.status === "cancelado" ||
     orcamento.status === "contrato_encerrado";
-  const concluido = etapaAtual === "concluido";
+  const concluido =
+    etapaAtual === "concluido" ||
+    etapaAtual === "treinamento_agendado";
   const concluidoComExamesFuturos =
-    concluido &&
+    etapaAtual === "concluido" &&
     !agendamentosIniciaisDispensados &&
     examesProgramadosFuturos > 0;
 
@@ -391,6 +524,9 @@ export function buildImplantacaoProcesso(params: {
     examesProgramadosFuturos,
     agendamentosIniciaisDispensados,
     concluidoComExamesFuturos,
+    fluxoImplantacao: fluxo,
+    treinamento,
+    etapasOperacionais,
   };
 }
 
@@ -414,8 +550,11 @@ export function computeImplantacaoSummary(
   );
 
   return {
-    totalEmImplantacao: ativos.filter((p) => p.etapaAtual !== "concluido")
-      .length,
+    totalEmImplantacao: ativos.filter(
+      (p) =>
+        p.etapaAtual !== "concluido" &&
+        p.etapaAtual !== "treinamento_agendado"
+    ).length,
     aguardandoContrato: ativos.filter((p) => p.etapaAtual === "contrato")
       .length,
     aguardandoPagamento: ativos.filter((p) => p.etapaAtual === "financeiro")
@@ -462,9 +601,16 @@ export function filterImplantacaoProcessos(
           return false;
         }
       }
-      if (etapaAtual === "concluido") return false;
+      if (etapaAtual === "concluido" || etapaAtual === "treinamento_agendado") {
+        return false;
+      }
     } else if (filters.andamento === "concluidos") {
-      if (etapaAtual !== "concluido") return false;
+      if (
+        etapaAtual !== "concluido" &&
+        etapaAtual !== "treinamento_agendado"
+      ) {
+        return false;
+      }
     }
 
     if (filters.etapa && etapaAtual !== filters.etapa) return false;
@@ -517,8 +663,11 @@ const ETAPA_SORT_ORDER: Record<ImplantacaoEtapaId, number> = {
   logo: 5,
   visita: 6,
   aguardando_agendamentos: 7,
+  agendamento_treinamento: 7,
+  treinamento_agendado: 8,
   concluido: 8,
-  contrato_encerrado: 9,
+  treinamento_cancelado: 9,
+  contrato_encerrado: 10,
 };
 
 export function sortImplantacaoProcessos(
@@ -549,7 +698,9 @@ export function sortImplantacaoProcessos(
       ) {
         return 3;
       }
-      if (p.etapaAtual === "concluido") return 2;
+      if (p.etapaAtual === "concluido" || p.etapaAtual === "treinamento_agendado") {
+        return 2;
+      }
       return 1;
     };
     const sa = score(a);
@@ -602,6 +753,7 @@ export function resolveImplantacaoEtapaVisual(
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
     agendamentosDispensados?: boolean;
+    treinamento?: ImplantacaoTreinamentoRecord | null;
   }
 ): ImplantacaoEtapaVisualEstado {
   const agendamentosDone = isAgendamentosImplantacaoConcluida(
@@ -609,6 +761,7 @@ export function resolveImplantacaoEtapaVisual(
     opts?.agendamentosRealizados ?? 0,
     Boolean(opts?.agendamentosDispensados)
   );
+  const treinamentoDone = isTreinamentoEtapaConcluida(opts?.treinamento);
 
   const doneMap: Record<ImplantacaoEtapaOperacionalId, boolean> = {
     contrato: isContratoEtapaConcluida(aprovacao),
@@ -618,12 +771,24 @@ export function resolveImplantacaoEtapaVisual(
     logo: isLogoEtapaConcluida(aprovacao),
     visita: isVisitaEtapaConcluida(aprovacao),
     agendamentos: agendamentosDone,
+    treinamento: treinamentoDone,
   };
 
   if (doneMap[etapa]) return "concluida";
 
   if (etapa === "agendamentos") {
     if (etapaAtual === "aguardando_agendamentos") return "atual";
+    return "bloqueada";
+  }
+
+  if (etapa === "treinamento") {
+    if (
+      etapaAtual === "agendamento_treinamento" ||
+      etapaAtual === "treinamento_agendado" ||
+      etapaAtual === "treinamento_cancelado"
+    ) {
+      return "atual";
+    }
     return "bloqueada";
   }
 

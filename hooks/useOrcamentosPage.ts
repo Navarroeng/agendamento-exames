@@ -8,7 +8,13 @@ import { useOrcamentosList } from "@/hooks/useOrcamentosList";
 import { useServicosSstList } from "@/hooks/useServicosSstList";
 import { useClientesList } from "@/hooks/useClientesList";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { AUDITORIA_ACOES, AUDITORIA_MODULOS, type AuditoriaAcao } from "@/lib/auditoria";
+import {
+  IMPLANTACAO_TREINAMENTO_STATUS_LABELS,
+  type ImplantacaoTreinamentoEventoRecord,
+  type ImplantacaoTreinamentoRecord,
+  type ImplantacaoTreinamentoSavePayload,
+} from "@/lib/implantacao-treinamento";
 import { emptyToNull, parseMoney } from "@/lib/money";
 import {
   buildAprovacaoDiffs,
@@ -100,6 +106,11 @@ import {
   salvarOrcamentoProcuracao,
   salvarOrcamentoVisitaTecnica,
 } from "@/services/orcamento-onboarding.service";
+import {
+  buscarTreinamentoPorAprovacaoId,
+  listarEventosTreinamento,
+  salvarImplantacaoTreinamento,
+} from "@/services/implantacao-treinamento.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 function focusOrcamentoPrimeiroCampo(): void {
@@ -174,6 +185,11 @@ export function useOrcamentosPage() {
     string | null
   >(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [aprovarTreinamento, setAprovarTreinamento] =
+    useState<ImplantacaoTreinamentoRecord | null>(null);
+  const [aprovarTreinamentoEventos, setAprovarTreinamentoEventos] = useState<
+    ImplantacaoTreinamentoEventoRecord[]
+  >([]);
 
   const { orcamentos, loading, error, refresh } = useOrcamentosList();
   const { clientes, refresh: refreshClientes } = useClientesList();
@@ -325,6 +341,21 @@ export function useOrcamentosPage() {
         setAprovarAprovacao(aprovacao);
         setFuncionariosPreviewUrl(null);
         setLogoPreviewUrl(null);
+        setAprovarTreinamento(null);
+        setAprovarTreinamentoEventos([]);
+        if (aprovacao?.id) {
+          try {
+            const treino = await buscarTreinamentoPorAprovacaoId(aprovacao.id);
+            setAprovarTreinamento(treino);
+            if (treino) {
+              setAprovarTreinamentoEventos(
+                await listarEventosTreinamento(treino.id)
+              );
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
         if (aprovacao?.funcionarios_lista_path) {
           try {
             setFuncionariosPreviewUrl(
@@ -805,6 +836,8 @@ export function useOrcamentosPage() {
     setAprovarMode("aprovacao");
     setFuncionariosPreviewUrl(null);
     setLogoPreviewUrl(null);
+    setAprovarTreinamento(null);
+    setAprovarTreinamentoEventos([]);
   }, [aprovarSaving]);
 
   const handleSalvarAprovacao = useCallback(
@@ -1509,6 +1542,95 @@ export function useOrcamentosPage() {
     [aprovarOrcamento, auditContext]
   );
 
+  const handleSalvarTreinamento = useCallback(
+    async (
+      aprovacaoId: string,
+      payload: ImplantacaoTreinamentoSavePayload
+    ) => {
+      if (!aprovarOrcamento) return;
+      setAprovarSaving(true);
+      try {
+        const before = aprovarTreinamento;
+        const saved = await salvarImplantacaoTreinamento({
+          orcamentoId: aprovarOrcamento.id,
+          aprovacaoId,
+          payload,
+          usuarioNome: auditContext.usuarioNome,
+        });
+        setAprovarTreinamento(saved);
+        setAprovarTreinamentoEventos(await listarEventosTreinamento(saved.id));
+
+        let acao: AuditoriaAcao = AUDITORIA_ACOES.edicao;
+        let descricao = `Agendamento de treinamento atualizado (${IMPLANTACAO_TREINAMENTO_STATUS_LABELS[saved.status]}).`;
+        if (!before) {
+          acao = AUDITORIA_ACOES.criacao;
+          descricao = `Agendamento de treinamento criado (${IMPLANTACAO_TREINAMENTO_STATUS_LABELS[saved.status]}).`;
+        } else if (
+          saved.status === "cancelado" &&
+          before.status !== "cancelado"
+        ) {
+          acao = AUDITORIA_ACOES.treinamento_cancelado;
+          descricao = `Treinamento cancelado. Motivo: ${saved.motivo_cancelamento ?? "—"}.`;
+        } else if (
+          saved.status === "reagendado" ||
+          (before.data_treinamento &&
+            before.data_treinamento !== saved.data_treinamento)
+        ) {
+          acao = AUDITORIA_ACOES.treinamento_reagendado;
+          descricao = `Treinamento reagendado para ${saved.data_treinamento ?? "—"} ${saved.horario_inicio ?? ""}.`;
+        } else if (
+          saved.status === "confirmado" &&
+          before.status !== "confirmado"
+        ) {
+          acao = AUDITORIA_ACOES.treinamento_confirmado;
+          descricao = "Treinamento confirmado.";
+        } else if (
+          saved.status === "realizado" &&
+          before.status !== "realizado"
+        ) {
+          acao = AUDITORIA_ACOES.treinamento_realizado;
+          descricao = "Treinamento marcado como realizado.";
+        } else if (saved.status === "agendado") {
+          acao = AUDITORIA_ACOES.treinamento_agendado;
+          descricao = `Treinamento agendado para ${saved.data_treinamento ?? "—"} ${saved.horario_inicio ?? ""}.`;
+        }
+
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.orcamentos,
+          acao,
+          registroId: aprovarOrcamento.id,
+          registroNome: aprovarOrcamento.numero,
+          descricao,
+          dadosAntes: before
+            ? {
+                status: before.status,
+                data: before.data_treinamento,
+                horario: before.horario_inicio,
+              }
+            : null,
+          dadosDepois: {
+            status: saved.status,
+            data: saved.data_treinamento,
+            horario: saved.horario_inicio,
+          },
+        });
+        toast.success("Agendamento do treinamento salvo.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao salvar agendamento do treinamento."
+        );
+        throw err;
+      } finally {
+        setAprovarSaving(false);
+      }
+    },
+    [aprovarOrcamento, aprovarTreinamento, auditContext]
+  );
+
   const handleVerComprovante = useCallback(async (path: string) => {
     try {
       const url = await obterUrlOrcamentoComprovante(path);
@@ -1576,6 +1698,8 @@ export function useOrcamentosPage() {
     resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
+    aprovarTreinamento,
+    aprovarTreinamentoEventos,
     setField,
     addItem,
     removeItem,
@@ -1615,6 +1739,7 @@ export function useOrcamentosPage() {
     handleSubstituirLogo,
     handleRemoverLogo,
     handleSalvarVisita,
+    handleSalvarTreinamento,
     handleVerComprovante,
     handleFilterChange,
     clearFilters,

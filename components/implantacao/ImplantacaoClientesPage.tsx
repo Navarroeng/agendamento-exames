@@ -27,6 +27,8 @@ export function ImplantacaoClientesPage() {
     usuarioNome,
     funcionariosPreviewUrl,
     logoPreviewUrl,
+    modalTreinamento,
+    modalTreinamentoEventos,
     handleFilterChange,
     clearFilters,
     handleMesChange,
@@ -46,6 +48,7 @@ export function ImplantacaoClientesPage() {
     handleSubstituirLogo,
     handleRemoverLogo,
     handleSalvarVisita,
+    handleSalvarTreinamento,
     handleVerComprovante,
   } = useImplantacaoClientesPage();
 
@@ -108,6 +111,9 @@ export function ImplantacaoClientesPage() {
         onSubstituirLogo={handleSubstituirLogo}
         onRemoverLogo={handleRemoverLogo}
         onSalvarVisita={handleSalvarVisita}
+        treinamento={modalTreinamento}
+        treinamentoEventos={modalTreinamentoEventos}
+        onSalvarTreinamento={handleSalvarTreinamento}
         onVerComprovante={(path) => {
           void handleVerComprovante(path);
         }}

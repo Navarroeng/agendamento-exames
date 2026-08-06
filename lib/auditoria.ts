@@ -58,6 +58,11 @@ export const AUDITORIA_ACOES = {
   sem_vinculo_contrato_implantacao: "sem_vinculo_contrato_implantacao",
   dispensa_agendamentos_iniciais: "dispensa_agendamentos_iniciais",
   reabertura_agendamentos_iniciais: "reabertura_agendamentos_iniciais",
+  treinamento_agendado: "treinamento_agendado",
+  treinamento_confirmado: "treinamento_confirmado",
+  treinamento_reagendado: "treinamento_reagendado",
+  treinamento_realizado: "treinamento_realizado",
+  treinamento_cancelado: "treinamento_cancelado",
 } as const;
 
 export type AuditoriaAcao =
@@ -121,6 +126,11 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   sem_vinculo_contrato_implantacao: "Sem vínculo ao contrato (implantação)",
   dispensa_agendamentos_iniciais: "Dispensa de agendamentos iniciais",
   reabertura_agendamentos_iniciais: "Reabertura de agendamentos iniciais",
+  treinamento_agendado: "Treinamento agendado",
+  treinamento_confirmado: "Treinamento confirmado",
+  treinamento_reagendado: "Treinamento reagendado",
+  treinamento_realizado: "Treinamento realizado",
+  treinamento_cancelado: "Treinamento cancelado",
 };
 
 export interface AuditoriaUsuarioContext {

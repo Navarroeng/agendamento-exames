@@ -44,10 +44,16 @@ import {
   OrcamentoAbaVisitaTecnica,
 } from "./OrcamentoEtapasExtras";
 import { OrcamentoAbaAgendamentos } from "./OrcamentoAbaAgendamentos";
+import {
+  emptyTreinamentoForm,
+  OrcamentoAbaTreinamento,
+  type OrcamentoAbaTreinamentoForm,
+} from "./OrcamentoAbaTreinamento";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
 import {
   isOrcamentoEtapaLiberada,
   type OrcamentoEtapaId,
+  type OrcamentoEtapasContexto,
 } from "@/lib/orcamento-etapas";
 import { buildMensagemVisitaTecnica } from "@/lib/orcamento-visita-mensagem";
 import type { ContratoAgendamentoContagem } from "@/lib/contrato-agendamentos";
@@ -56,6 +62,17 @@ import {
   normalizeProcuracaoStatus,
   type ProcuracaoStatus,
 } from "@/lib/cliente-procuracao";
+import {
+  buildMensagemConfirmacaoTreinamento,
+  validateTreinamentoPayload,
+  type ImplantacaoTreinamentoEventoRecord,
+  type ImplantacaoTreinamentoRecord,
+  type ImplantacaoTreinamentoSavePayload,
+} from "@/lib/implantacao-treinamento";
+import {
+  classifyOrcamentoFluxoImplantacao,
+  resolveTreinamentosServicoId,
+} from "@/lib/servico-treinamentos";
 
 type TabId = OrcamentoEtapaId;
 
@@ -115,6 +132,12 @@ interface OrcamentoAprovarModalProps {
       visita_tecnica_observacoes: string | null;
     }
   ) => Promise<void>;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
+  treinamentoEventos?: ImplantacaoTreinamentoEventoRecord[];
+  onSalvarTreinamento?: (
+    aprovacaoId: string,
+    payload: ImplantacaoTreinamentoSavePayload
+  ) => Promise<void>;
   onVerComprovante: (path: string) => void;
 }
 
@@ -148,6 +171,9 @@ export function OrcamentoAprovarModal({
   onSubstituirLogo,
   onRemoverLogo,
   onSalvarVisita,
+  treinamento = null,
+  treinamentoEventos = [],
+  onSalvarTreinamento,
   onVerComprovante,
 }: OrcamentoAprovarModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -183,6 +209,8 @@ export function OrcamentoAprovarModal({
   const [visitaObservacoes, setVisitaObservacoes] = useState("");
   const [agendamentosContagem, setAgendamentosContagem] =
     useState<ContratoAgendamentoContagem | null>(null);
+  const [treinoForm, setTreinoForm] =
+    useState<OrcamentoAbaTreinamentoForm>(emptyTreinamentoForm);
 
   useEffect(() => {
     setMounted(true);
@@ -190,11 +218,26 @@ export function OrcamentoAprovarModal({
 
   useEffect(() => {
     if (!open || !orcamento) return;
-    const orcamentoAprovado =
+    const treinamentosId = resolveTreinamentosServicoId(servicos);
+    const itens =
+      aprovacao?.orcamento_aprovacao_itens?.length
+        ? aprovacao.orcamento_aprovacao_itens
+        : orcamento.orcamento_itens ?? [];
+    const fluxo = classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
+    const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
+    const ctxInit: OrcamentoEtapasContexto = {
+      fluxo,
+      treinamento,
+    };
     const tabInicial: TabId =
       initialTab &&
-      isOrcamentoEtapaLiberada(initialTab, aprovacao, orcamentoAprovado)
+      isOrcamentoEtapaLiberada(
+        initialTab,
+        aprovacao,
+        orcamentoAprovadoInit,
+        ctxInit
+      )
         ? initialTab
         : "resumo";
     setTab(tabInicial);
@@ -238,7 +281,32 @@ export function OrcamentoAprovarModal({
     setVisitaHorario(aprovacao?.visita_tecnica_horario ?? "");
     setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
     setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
-  }, [open, orcamento, aprovacao, mode, initialTab]);
+  }, [open, orcamento, aprovacao, mode, initialTab, servicos, treinamento]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!treinamento) {
+      setTreinoForm(emptyTreinamentoForm());
+      return;
+    }
+    setTreinoForm({
+      data_treinamento: treinamento.data_treinamento,
+      horario_inicio: treinamento.horario_inicio,
+      horario_termino: treinamento.horario_termino,
+      modalidade: treinamento.modalidade,
+      local_treinamento: treinamento.local_treinamento,
+      endereco: treinamento.endereco,
+      link_reuniao: treinamento.link_reuniao,
+      tipo_nome: treinamento.tipo_nome,
+      quantidade_participantes: treinamento.quantidade_participantes,
+      instrutor_responsavel: treinamento.instrutor_responsavel,
+      contato_empresa: treinamento.contato_empresa,
+      observacoes: treinamento.observacoes,
+      status: treinamento.status,
+      motivo_cancelamento: treinamento.motivo_cancelamento,
+      motivo_reagendamento: treinamento.motivo_reagendamento,
+    });
+  }, [open, treinamento]);
 
   useEffect(() => {
     if (!open || !aprovacao?.id) {
@@ -290,6 +358,35 @@ export function OrcamentoAprovarModal({
   const acompanhamentoBloqueado = saving;
   const orcamentoAprovado =
     orcamento?.status === "aprovado" || Boolean(aprovacao);
+  const fluxoImplantacao = useMemo(() => {
+    if (!orcamento) return "padrao" as const;
+    const treinamentosId = resolveTreinamentosServicoId(servicos);
+    const itens =
+      aprovacao?.orcamento_aprovacao_itens?.length
+        ? aprovacao.orcamento_aprovacao_itens
+        : orcamento.orcamento_itens ?? [];
+    return classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
+  }, [orcamento, aprovacao, servicos]);
+  const etapasCtx: OrcamentoEtapasContexto = useMemo(
+    () => ({
+      fluxo: fluxoImplantacao,
+      treinamento,
+      contagem: agendamentosContagem
+        ? {
+            quantidadeContratada: agendamentosContagem.contratados,
+            agendamentosRealizados: agendamentosContagem.realizados,
+            agendamentosDispensados: agendamentosContagem.dispensado,
+          }
+        : aprovacao
+          ? {
+              quantidadeContratada:
+                Number(aprovacao.quantidade_colaboradores) || 0,
+              agendamentosRealizados: 0,
+            }
+          : null,
+    }),
+    [fluxoImplantacao, treinamento, agendamentosContagem, aprovacao]
+  );
   const mensagemVisita = useMemo(
     () =>
       buildMensagemVisitaTecnica({
@@ -298,6 +395,14 @@ export function OrcamentoAprovarModal({
         endereco: visitaEndereco,
       }),
     [visitaData, visitaHorario, visitaEndereco]
+  );
+  const mensagemTreinamento = useMemo(
+    () =>
+      buildMensagemConfirmacaoTreinamento({
+        empresa: orcamento?.cliente_nome ?? "",
+        treino: treinoForm,
+      }),
+    [orcamento?.cliente_nome, treinoForm]
   );
 
   const updateFormField = useCallback(
@@ -461,7 +566,14 @@ export function OrcamentoAprovarModal({
     await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
     if (boletoPago) {
-      setTab("procuracao");
+      if (
+        fluxoImplantacao === "somente_treinamentos" ||
+        fluxoImplantacao === "combinado"
+      ) {
+        setTab("treinamento");
+      } else {
+        setTab("procuracao");
+      }
     }
   }
 
@@ -560,9 +672,34 @@ export function OrcamentoAprovarModal({
     setTab("agendamentos");
   }
 
+  async function handleSalvarTreinamentoClick() {
+    if (!aprovacao || !onSalvarTreinamento) return;
+    if (treinoForm.status === "cancelado") {
+      const ok = window.confirm(
+        "Confirma o cancelamento deste treinamento? O processo de implantação será mantido."
+      );
+      if (!ok) return;
+    }
+    const err = validateTreinamentoPayload(treinoForm);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    await onSalvarTreinamento(aprovacao.id, treinoForm);
+  }
+
   async function handleCopiarMensagemVisita() {
     try {
       await navigator.clipboard.writeText(mensagemVisita);
+      toast.success("Mensagem copiada.");
+    } catch {
+      toast.error("Não foi possível copiar a mensagem.");
+    }
+  }
+
+  async function handleCopiarMensagemTreinamento() {
+    try {
+      await navigator.clipboard.writeText(mensagemTreinamento);
       toast.success("Mensagem copiada.");
     } catch {
       toast.error("Não foi possível copiar a mensagem.");
@@ -646,6 +783,8 @@ export function OrcamentoAprovarModal({
             aprovacao={aprovacao}
             orcamentoAprovado={orcamentoAprovado}
             disabled={saving}
+            fluxo={fluxoImplantacao}
+            treinamento={treinamento}
             contagemAgendamentos={
               agendamentosContagem
                 ? {
@@ -1201,7 +1340,8 @@ export function OrcamentoAprovarModal({
           isOrcamentoEtapaLiberada(
             "financeiro",
             aprovacao,
-            orcamentoAprovado
+            orcamentoAprovado,
+            etapasCtx
           ) ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
@@ -1306,7 +1446,12 @@ export function OrcamentoAprovarModal({
 
           {tab === "procuracao" &&
           aprovacao &&
-          isOrcamentoEtapaLiberada("procuracao", aprovacao, orcamentoAprovado) ? (
+          isOrcamentoEtapaLiberada(
+            "procuracao",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
             <OrcamentoAbaProcuracao
               status={procuracaoStatus}
               observacoes={observacaoProcuracao}
@@ -1322,7 +1467,8 @@ export function OrcamentoAprovarModal({
           isOrcamentoEtapaLiberada(
             "funcionarios",
             aprovacao,
-            orcamentoAprovado
+            orcamentoAprovado,
+            etapasCtx
           ) ? (
             <OrcamentoAbaFuncionarios
               file={funcionariosFile}
@@ -1345,7 +1491,12 @@ export function OrcamentoAprovarModal({
 
           {tab === "logo" &&
           aprovacao &&
-          isOrcamentoEtapaLiberada("logo", aprovacao, orcamentoAprovado) ? (
+          isOrcamentoEtapaLiberada(
+            "logo",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
             <OrcamentoAbaLogo
               possuiLogo={possuiLogo}
               file={logoFile}
@@ -1374,7 +1525,12 @@ export function OrcamentoAprovarModal({
 
           {tab === "visita" &&
           aprovacao &&
-          isOrcamentoEtapaLiberada("visita", aprovacao, orcamentoAprovado) ? (
+          isOrcamentoEtapaLiberada(
+            "visita",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
             <OrcamentoAbaVisitaTecnica
               necessaria={visitaNecessaria}
               data={visitaData}
@@ -1398,7 +1554,8 @@ export function OrcamentoAprovarModal({
           isOrcamentoEtapaLiberada(
             "agendamentos",
             aprovacao,
-            orcamentoAprovado
+            orcamentoAprovado,
+            etapasCtx
           ) ? (
             <OrcamentoAbaAgendamentos
               orcamentoId={orcamento.id}
@@ -1406,6 +1563,28 @@ export function OrcamentoAprovarModal({
               usuarioNome={usuarioNome}
               clienteNome={orcamento.cliente_nome}
               onContagemChange={setAgendamentosContagem}
+            />
+          ) : null}
+
+          {tab === "treinamento" &&
+          aprovacao &&
+          onSalvarTreinamento &&
+          isOrcamentoEtapaLiberada(
+            "treinamento",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaTreinamento
+              form={treinoForm}
+              mensagem={mensagemTreinamento}
+              saving={saving}
+              eventos={treinamentoEventos}
+              onChange={(patch) =>
+                setTreinoForm((prev) => ({ ...prev, ...patch }))
+              }
+              onCopiarMensagem={() => void handleCopiarMensagemTreinamento()}
+              onSalvar={() => void handleSalvarTreinamentoClick()}
             />
           ) : null}
         </div>
@@ -1488,7 +1667,8 @@ export function OrcamentoAprovarModal({
           isOrcamentoEtapaLiberada(
             "financeiro",
             aprovacao,
-            orcamentoAprovado
+            orcamentoAprovado,
+            etapasCtx
           ) ? (
             <button
               type="button"

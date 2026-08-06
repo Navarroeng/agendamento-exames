@@ -52,6 +52,17 @@ function processo(partial: {
     examesProgramadosFuturos: 0,
     agendamentosIniciaisDispensados: false,
     concluidoComExamesFuturos: false,
+    fluxoImplantacao: "padrao",
+    treinamento: null,
+    etapasOperacionais: [
+      { id: "contrato", label: "Contrato" },
+      { id: "financeiro", label: "Aguardando pagamento" },
+      { id: "procuracao", label: "Aguardando procuração" },
+      { id: "funcionarios", label: "Lista de funcionários" },
+      { id: "logo", label: "Logo da empresa" },
+      { id: "visita", label: "Visita técnica" },
+      { id: "agendamentos", label: "Agendamentos" },
+    ],
   };
 }
 
