@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { clienteRecordMatchesBusca } from "@/lib/cliente-busca";
+import { buildCamposBloqueioManualAgendamento } from "@/lib/cliente-bloqueio-manual";
 import {
   CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
   isClienteDisponivelAgendamento,
@@ -130,14 +131,33 @@ export function isClienteIndisponivelAgendamentoError(
   return error instanceof ClienteIndisponivelAgendamentoError;
 }
 
-export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
+export async function salvarCliente(
+  cliente: ClienteInsert,
+  options?: { usuarioNome?: string | null; motivoBloqueio?: string | null }
+): Promise<string> {
   await assertCnpjClienteDisponivel(cliente.cnpj);
 
   const supabase = createClient();
+  const payload: ClienteInsert = { ...cliente };
+
+  if (cliente.disponivel_agendamento === false) {
+    const bloqueio = buildCamposBloqueioManualAgendamento({
+      disponivelNova: false,
+      manualAnterior: false,
+      motivo: options?.motivoBloqueio,
+      usuarioNome: options?.usuarioNome,
+    });
+    Object.assign(payload, bloqueio);
+  } else {
+    payload.agendamento_bloqueio_manual = false;
+    payload.agendamento_bloqueio_motivo = null;
+    payload.agendamento_bloqueado_em = null;
+    payload.agendamento_bloqueado_por = null;
+  }
 
   const { data, error } = await supabase
     .from("clientes")
-    .insert(cliente)
+    .insert(payload)
     .select("id")
     .single();
 
@@ -148,20 +168,78 @@ export async function salvarCliente(cliente: ClienteInsert): Promise<string> {
 
 export async function atualizarCliente(
   id: string,
-  cliente: ClienteUpdate
+  cliente: ClienteUpdate,
+  options?: { usuarioNome?: string | null; motivoBloqueio?: string | null }
 ): Promise<ClienteRecord> {
   await assertCnpjClienteDisponivel(cliente.cnpj, id);
 
   const supabase = createClient();
 
+  const { data: atual, error: atualError } = await supabase
+    .from("clientes")
+    .select(
+      "disponivel_agendamento, agendamento_bloqueio_manual, agendamento_bloqueado_em, agendamento_bloqueado_por, agendamento_bloqueio_motivo"
+    )
+    .eq("id", id)
+    .single();
+
+  if (atualError) throw atualError;
+
+  const disponivelAnterior = isClienteDisponivelAgendamento(
+    atual.disponivel_agendamento
+  );
+  const manualAnterior = atual.agendamento_bloqueio_manual === true;
+  const disponivelNova = cliente.disponivel_agendamento === true;
+
+  const bloqueioFields = buildCamposBloqueioManualAgendamento({
+    disponivelNova,
+    manualAnterior,
+    bloqueadoEmAnterior: atual.agendamento_bloqueado_em,
+    bloqueadoPorAnterior: atual.agendamento_bloqueado_por,
+    motivoAnterior: atual.agendamento_bloqueio_motivo,
+    motivo: options?.motivoBloqueio,
+    usuarioNome: options?.usuarioNome,
+  });
+
+  const payload: ClienteUpdate = {
+    ...cliente,
+    ...bloqueioFields,
+  };
+
+  // Se a disponibilidade não mudou e não havia bloqueio manual, não force limpar metadados
+  if (
+    disponivelNova === disponivelAnterior &&
+    !manualAnterior &&
+    disponivelNova
+  ) {
+    payload.agendamento_bloqueio_manual = false;
+    payload.agendamento_bloqueio_motivo = null;
+    payload.agendamento_bloqueado_em = null;
+    payload.agendamento_bloqueado_por = null;
+  }
+
   const { data, error } = await supabase
     .from("clientes")
-    .update(cliente)
+    .update(payload)
     .eq("id", id)
     .select(CLIENTE_DB_COLUMNS)
     .single();
 
   if (error) throwClienteSaveError(error);
+
+  // Após liberação manual, recalcula regras automáticas (sem flag manual).
+  if (disponivelNova && (manualAnterior || !disponivelAnterior)) {
+    await supabase.rpc("recompute_cliente_disponivel_agendamento", {
+      p_cliente_id: id,
+    });
+    const { data: refreshed, error: refreshError } = await supabase
+      .from("clientes")
+      .select(CLIENTE_DB_COLUMNS)
+      .eq("id", id)
+      .single();
+    if (refreshError) throw refreshError;
+    return refreshed as ClienteRecord;
+  }
 
   return data as ClienteRecord;
 }

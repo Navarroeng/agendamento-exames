@@ -10,6 +10,7 @@ export type ContratoParaAgendamento = Pick<
 
 export type ClienteParaAgendamento = {
   disponivel_agendamento?: boolean | null;
+  agendamento_bloqueio_manual?: boolean | null;
 };
 
 /**
@@ -33,13 +34,17 @@ export function contratoLiberaAgendamento(
 }
 
 /**
- * Cliente pode agendar se algum contrato libera,
- * ou (sem contratos de orçamento) se o flag legado permitir.
+ * Cliente pode agendar se não houver bloqueio manual e
+ * (algum contrato libera, ou — sem contratos de orçamento — o flag legado permitir).
  */
 export function clientePodeAgendar(
   cliente: ClienteParaAgendamento,
   contratos: ContratoParaAgendamento[]
 ): boolean {
+  if (cliente.agendamento_bloqueio_manual === true) {
+    return false;
+  }
+
   if (contratos.some((c) => contratoLiberaAgendamento(c))) {
     return true;
   }

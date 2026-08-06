@@ -94,7 +94,9 @@ export function ClientesPage() {
     setSaving(true);
     try {
       const payload = buildPayload();
-      const id = await salvarCliente(payload);
+      const id = await salvarCliente(payload, {
+        usuarioNome: auditContext.usuarioNome,
+      });
       await registrarAuditoria({
         usuarioId: auditContext.usuarioId,
         usuarioNome: auditContext.usuarioNome,
@@ -105,6 +107,22 @@ export function ClientesPage() {
         registroNome: payload.nome,
         descricao: `${auditContext.usuarioNome} criou o cliente ${payload.nome}.`,
       });
+      if (payload.disponivel_agendamento === false) {
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.clientes,
+          acao: AUDITORIA_ACOES.agendamento_cliente_bloqueado,
+          registroId: id,
+          registroNome: payload.nome,
+          descricao: `${auditContext.usuarioNome} bloqueou o cliente ${payload.nome} para novos agendamentos.`,
+          dadosDepois: {
+            disponivel_agendamento: false,
+            agendamento_bloqueio_manual: true,
+          },
+        });
+      }
       toast.success("Cliente salvo com sucesso!");
 
       resetForm();
