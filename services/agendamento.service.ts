@@ -106,6 +106,7 @@ export async function salvarAgendamentoComExames(
     clienteNome: agendamento.cliente_nome,
     colaboradorCpf: agendamento.colaborador_cpf,
     dataAgendamentoIso: agendamento.data_agendamento,
+    tipoAso: agendamento.aso ?? "",
   });
   await assertClienteSemInadimplencia(agendamento.cliente_nome);
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo);
@@ -225,6 +226,7 @@ export async function atualizarAgendamentoComExames(
     colaboradorCpf: agendamento.colaborador_cpf,
     dataAgendamentoIso: agendamento.data_agendamento,
     ignorarAgendamentoId: id,
+    tipoAso: agendamento.aso ?? "",
   });
   await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome, {
     agendamentoIdAtual: id,

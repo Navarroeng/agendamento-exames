@@ -7,10 +7,18 @@ export const AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG =
 export const AGENDAMENTO_DUPLICIDADE_90_DIAS_COMPLEMENTO =
   "Não é permitido cadastrar um novo agendamento para o mesmo colaborador dentro deste período.";
 
+export const AGENDAMENTO_DUPLICIDADE_90_DIAS_AVISO_MSG =
+  "Este colaborador possui um agendamento recente para esta empresa, porém o tipo de ASO é diferente do novo agendamento.";
+
+export const AGENDAMENTO_DUPLICIDADE_90_DIAS_AVISO_COMPLEMENTO =
+  "Verifique os dados antes de continuar.";
+
 export const AGENDAMENTO_DUPLICIDADE_90_DIAS_DB_CODE =
   "AGENDAMENTO_DUPLICIDADE_90_DIAS";
 
 export const AGENDAMENTO_DUPLICIDADE_90_DIAS_LIMITE = 90;
+
+export type Duplicidade90DiasDecisao = "permitir" | "bloquear" | "avisar";
 
 export interface AgendamentoDuplicidade90DiasInfo {
   id: string;
@@ -22,6 +30,11 @@ export interface AgendamentoDuplicidade90DiasInfo {
   tipo_aso: string;
   status: AgendamentoStatus;
   dias_entre: number;
+  /** Tipo do novo ASO que gerou a verificação. */
+  tipo_aso_novo?: string;
+  /** Data pretendida do novo agendamento (ISO). */
+  data_nova?: string;
+  decisao: Exclude<Duplicidade90DiasDecisao, "permitir">;
 }
 
 export class AgendamentoDuplicidade90DiasError extends Error {
@@ -41,6 +54,10 @@ export function isAgendamentoDuplicidade90DiasError(
 }
 
 export function normalizeEmpresaNome(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+export function normalizeTipoAso(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
@@ -69,6 +86,69 @@ export function violaDuplicidade90Dias(diasEntre: number): boolean {
   return diasEntre < AGENDAMENTO_DUPLICIDADE_90_DIAS_LIMITE;
 }
 
+export function isStatusCanceladoAgendamento(
+  status: string | null | undefined
+): boolean {
+  return normalizeTipoAso(status) === "cancelado";
+}
+
+export function isRecontratacaoDemissionalAdmissional(
+  tipoAnterior: string | null | undefined,
+  tipoNovo: string | null | undefined
+): boolean {
+  return (
+    normalizeTipoAso(tipoAnterior) === "demissional" &&
+    normalizeTipoAso(tipoNovo) === "admissional"
+  );
+}
+
+/**
+ * Matriz de decisão da duplicidade 90 dias.
+ * Bloqueio rígido somente com o mesmo tipo de ASO.
+ * Tipos diferentes → avisar (confirmação no frontend).
+ */
+export function classificarDuplicidade90Dias(input: {
+  cpfNovo: string;
+  cpfExistente: string;
+  empresaNova: string;
+  empresaExistente: string;
+  dataNova: string;
+  dataExistente: string;
+  statusExistente: string;
+  tipoAsoNovo: string;
+  tipoAsoExistente: string;
+}): Duplicidade90DiasDecisao {
+  if (isStatusCanceladoAgendamento(input.statusExistente)) return "permitir";
+
+  const tipoNovo = normalizeTipoAso(input.tipoAsoNovo);
+  if (!tipoNovo) return "permitir";
+
+  const cpfNovo = normalizeCpfDigits(input.cpfNovo);
+  const cpfExistente = normalizeCpfDigits(input.cpfExistente);
+  if (cpfNovo.length !== 11 || cpfExistente.length !== 11) return "permitir";
+  if (cpfNovo !== cpfExistente) return "permitir";
+
+  if (
+    normalizeEmpresaNome(input.empresaNova) !==
+    normalizeEmpresaNome(input.empresaExistente)
+  ) {
+    return "permitir";
+  }
+
+  if (
+    !violaDuplicidade90Dias(
+      diasEntreAgendamentos(input.dataNova, input.dataExistente)
+    )
+  ) {
+    return "permitir";
+  }
+
+  const tipoExistente = normalizeTipoAso(input.tipoAsoExistente);
+  if (tipoExistente && tipoExistente === tipoNovo) return "bloquear";
+  return "avisar";
+}
+
+/** @deprecated Preferir `classificarDuplicidade90Dias` — true = bloquear rígido. */
 export function evaluaConflitoDuplicidade90Dias(input: {
   cpfNovo: string;
   cpfExistente: string;
@@ -77,24 +157,32 @@ export function evaluaConflitoDuplicidade90Dias(input: {
   dataNova: string;
   dataExistente: string;
   statusExistente: string;
+  tipoAsoNovo?: string;
+  tipoAsoExistente?: string;
 }): boolean {
-  if (input.statusExistente === "cancelado") return false;
-
-  const cpfNovo = normalizeCpfDigits(input.cpfNovo);
-  const cpfExistente = normalizeCpfDigits(input.cpfExistente);
-  if (cpfNovo.length !== 11 || cpfExistente.length !== 11) return false;
-  if (cpfNovo !== cpfExistente) return false;
-
-  if (
-    normalizeEmpresaNome(input.empresaNova) !==
-    normalizeEmpresaNome(input.empresaExistente)
-  ) {
-    return false;
-  }
-
-  return violaDuplicidade90Dias(
-    diasEntreAgendamentos(input.dataNova, input.dataExistente)
+  return (
+    classificarDuplicidade90Dias({
+      ...input,
+      tipoAsoNovo: input.tipoAsoNovo ?? "",
+      tipoAsoExistente: input.tipoAsoExistente ?? "",
+    }) === "bloquear"
   );
+}
+
+export function chaveConfirmacaoDuplicidadeAviso(params: {
+  existenteId: string;
+  cpf: string;
+  empresa: string;
+  tipoAsoNovo: string;
+  dataNovaIso: string;
+}): string {
+  return [
+    params.existenteId,
+    normalizeCpfDigits(params.cpf),
+    normalizeEmpresaNome(params.empresa),
+    normalizeTipoAso(params.tipoAsoNovo),
+    params.dataNovaIso.split("T")[0],
+  ].join("|");
 }
 
 export function isPostgresDuplicidade90DiasError(error: unknown): boolean {

@@ -3,9 +3,11 @@ import {
   addDaysIso,
   AgendamentoDuplicidade90DiasError,
   type AgendamentoDuplicidade90DiasInfo,
+  type Duplicidade90DiasDecisao,
+  classificarDuplicidade90Dias,
   diasEntreAgendamentos,
-  evaluaConflitoDuplicidade90Dias,
   normalizeEmpresaNome,
+  normalizeTipoAso,
 } from "@/lib/agendamento-duplicidade-90dias";
 import {
   AUDITORIA_ACOES,
@@ -67,7 +69,9 @@ function referenciaMatches(
 
 function toDuplicidadeInfo(
   row: Record<string, unknown>,
-  novaDataIso: string
+  novaDataIso: string,
+  tipoAsoNovo: string,
+  decisao: Exclude<Duplicidade90DiasDecisao, "permitir">
 ): AgendamentoDuplicidade90DiasInfo {
   const dataExistente = String(row.data_agendamento);
   return {
@@ -77,9 +81,12 @@ function toDuplicidadeInfo(
     colaborador_cpf: String(row.colaborador_cpf ?? ""),
     data_agendamento: dataExistente,
     clinica_nome: String(row.clinica_nome),
-    tipo_aso: String(row.aso),
+    tipo_aso: String(row.aso ?? ""),
     status: row.status as AgendamentoStatus,
     dias_entre: diasEntreAgendamentos(novaDataIso, dataExistente),
+    tipo_aso_novo: tipoAsoNovo,
+    data_nova: novaDataIso,
+    decisao,
   };
 }
 
@@ -87,8 +94,13 @@ export async function verificarDuplicidadeAgendamento90Dias(params: {
   clienteNome: string;
   colaboradorCpf: string;
   dataAgendamentoIso: string;
+  tipoAso: string;
   ignorarAgendamentoId?: string | null;
 }): Promise<AgendamentoDuplicidade90DiasInfo | null> {
+  const tipoAsoNovo = normalizeTipoAso(params.tipoAso);
+  // Sem tipo de ASO não dá para decidir bloqueio vs aviso.
+  if (!tipoAsoNovo) return null;
+
   const cpfDigits = normalizeCpfDigits(params.colaboradorCpf);
   if (cpfDigits.length !== 11) return null;
 
@@ -117,8 +129,11 @@ export async function verificarDuplicidadeAgendamento90Dias(params: {
   const { data, error } = await query;
   if (error) throw error;
 
-  const found = (data ?? []).find((row) =>
-    evaluaConflitoDuplicidade90Dias({
+  let bloqueio: AgendamentoDuplicidade90DiasInfo | null = null;
+  let aviso: AgendamentoDuplicidade90DiasInfo | null = null;
+
+  for (const row of data ?? []) {
+    const decisao = classificarDuplicidade90Dias({
       cpfNovo: cpfDigits,
       cpfExistente: String(row.colaborador_cpf ?? ""),
       empresaNova: params.clienteNome,
@@ -126,22 +141,36 @@ export async function verificarDuplicidadeAgendamento90Dias(params: {
       dataNova: baseDate,
       dataExistente: String(row.data_agendamento),
       statusExistente: String(row.status),
-    })
-  );
+      tipoAsoNovo: params.tipoAso,
+      tipoAsoExistente: String(row.aso ?? ""),
+    });
+    if (decisao === "permitir") continue;
+    const info = toDuplicidadeInfo(
+      row as Record<string, unknown>,
+      baseDate,
+      params.tipoAso.trim(),
+      decisao
+    );
+    if (decisao === "bloquear") {
+      bloqueio = info;
+      break;
+    }
+    if (!aviso) aviso = info;
+  }
 
-  if (!found) return null;
-
-  return toDuplicidadeInfo(found as Record<string, unknown>, baseDate);
+  return bloqueio ?? aviso;
 }
 
 export async function assertAgendamentoSemDuplicidade90Dias(params: {
   clienteNome: string;
   colaboradorCpf: string;
   dataAgendamentoIso: string;
+  tipoAso: string;
   ignorarAgendamentoId?: string | null;
 }): Promise<void> {
   const existente = await verificarDuplicidadeAgendamento90Dias(params);
-  if (existente) {
+  // Aviso (tipos diferentes) é tratado no frontend com confirmação.
+  if (existente?.decisao === "bloquear") {
     throw new AgendamentoDuplicidade90DiasError(existente);
   }
 }
@@ -154,10 +183,13 @@ export async function registrarTentativaBloqueadaDuplicidadeAgendamento(
     colaborador: string;
     colaboradorCpf: string;
     clienteNome: string;
+    tipoAsoNovo?: string;
   }
 ): Promise<void> {
   const cpfFormatado = formatCPF(params.colaboradorCpf);
   const novaData = params.novaDataAgendamento.split("T")[0];
+  const tipoNovo =
+    params.tipoAsoNovo?.trim() || params.existente.tipo_aso_novo || "—";
 
   await registrarAuditoria({
     usuarioId: context.usuarioId,
@@ -170,14 +202,55 @@ export async function registrarTentativaBloqueadaDuplicidadeAgendamento(
     descricao:
       `Tentativa bloqueada: ${params.colaborador} (CPF ${cpfFormatado}) — ` +
       `empresa ${params.clienteNome}. Agendamento existente em ${params.existente.data_agendamento} ` +
-      `(${params.existente.tipo_aso}). Novo agendamento em ${novaData}.`,
+      `(${params.existente.tipo_aso}). Novo ASO ${tipoNovo} em ${novaData}.`,
     dadosDepois: {
       empresa: params.clienteNome,
       colaborador: params.colaborador,
       cpf: cpfFormatado,
       data_agendamento_existente: params.existente.data_agendamento,
       aso_existente: params.existente.tipo_aso,
+      aso_novo: tipoNovo,
       data_novo_agendamento: novaData,
+      agendamento_existente_id: params.existente.id,
+    },
+  });
+}
+
+export async function registrarConfirmacaoDuplicidadeAsoDiferente(
+  context: AuditoriaUsuarioContext,
+  params: {
+    existente: AgendamentoDuplicidade90DiasInfo;
+    novaDataAgendamento: string;
+    colaborador: string;
+    colaboradorCpf: string;
+    clienteNome: string;
+    tipoAsoNovo: string;
+  }
+): Promise<void> {
+  const cpfFormatado = formatCPF(params.colaboradorCpf);
+  const novaData = params.novaDataAgendamento.split("T")[0];
+  const dataAnterior = params.existente.data_agendamento.split("T")[0];
+
+  await registrarAuditoria({
+    usuarioId: context.usuarioId,
+    usuarioNome: context.usuarioNome,
+    usuarioEmail: context.usuarioEmail,
+    modulo: AUDITORIA_MODULOS.agendamentos,
+    acao: AUDITORIA_ACOES.confirmacao_duplicidade_aso_diferente,
+    registroId: params.existente.id,
+    registroNome: params.colaborador,
+    descricao:
+      `${context.usuarioNome} confirmou novo ASO ${params.tipoAsoNovo} para ${params.colaborador}, ` +
+      `apesar da existência de ASO ${params.existente.tipo_aso} realizado em ${dataAnterior}.`,
+    dadosDepois: {
+      empresa: params.clienteNome,
+      colaborador: params.colaborador,
+      cpf: cpfFormatado,
+      aso_anterior: params.existente.tipo_aso,
+      data_anterior: dataAnterior,
+      aso_novo: params.tipoAsoNovo,
+      data_nova: novaData,
+      confirmacao: true,
       agendamento_existente_id: params.existente.id,
     },
   });

@@ -51,6 +51,7 @@ import {
 import {
   isAgendamentoDuplicidade90DiasError,
   AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG,
+  chaveConfirmacaoDuplicidadeAviso,
 } from "@/lib/agendamento-duplicidade-90dias";
 import {
   ESOCIAL_RECIBO_DUPLICADO_COMPLEMENTO,
@@ -59,6 +60,7 @@ import {
 import {
   verificarDuplicidadeAgendamento90Dias,
   registrarTentativaBloqueadaDuplicidadeAgendamento,
+  registrarConfirmacaoDuplicidadeAsoDiferente,
   type AgendamentoDuplicidade90DiasInfo,
 } from "@/services/duplicidade.service";
 import { useAgendamentoForm } from "@/hooks/useAgendamentoForm";
@@ -235,6 +237,13 @@ export function useAgendamentosPage() {
   const [duplicidade90DiasOpen, setDuplicidade90DiasOpen] = useState(false);
   const [duplicidade90DiasInfo, setDuplicidade90DiasInfo] =
     useState<AgendamentoDuplicidade90DiasInfo | null>(null);
+  const [duplicidade90DiasAvisoOpen, setDuplicidade90DiasAvisoOpen] =
+    useState(false);
+  const [duplicidade90DiasAvisoInfo, setDuplicidade90DiasAvisoInfo] =
+    useState<AgendamentoDuplicidade90DiasInfo | null>(null);
+  const [duplicidade90DiasAvisoConfirming, setDuplicidade90DiasAvisoConfirming] =
+    useState(false);
+  const duplicidadeAvisoConfirmadaRef = useRef<string | null>(null);
   const [periodicoVinculoOpen, setPeriodicoVinculoOpen] = useState(false);
   const [periodicoVinculoList, setPeriodicoVinculoList] = useState<
     PeriodicoFuturoRecord[]
@@ -1820,7 +1829,9 @@ export function useAgendamentosPage() {
       existente: AgendamentoDuplicidade90DiasInfo,
       novaDataIso: string
     ) => {
-      setDuplicidade90DiasInfo(existente);
+      setDuplicidade90DiasAvisoOpen(false);
+      setDuplicidade90DiasAvisoInfo(null);
+      setDuplicidade90DiasInfo({ ...existente, decisao: "bloquear" });
       setDuplicidade90DiasOpen(true);
       await registrarTentativaBloqueadaDuplicidadeAgendamento(auditContext, {
         existente,
@@ -1828,9 +1839,30 @@ export function useAgendamentosPage() {
         colaborador: form.colaborador,
         colaboradorCpf: form.colaborador_cpf,
         clienteNome: form.cliente_nome,
+        tipoAsoNovo: form.aso,
       });
     },
-    [auditContext, form.colaborador, form.colaborador_cpf, form.cliente_nome]
+    [
+      auditContext,
+      form.aso,
+      form.colaborador,
+      form.colaborador_cpf,
+      form.cliente_nome,
+    ]
+  );
+
+  const avisarDuplicidade90Dias = useCallback(
+    (
+      existente: AgendamentoDuplicidade90DiasInfo,
+      status: AgendamentoStatus
+    ) => {
+      pendingSaveStatusRef.current = status;
+      setDuplicidade90DiasOpen(false);
+      setDuplicidade90DiasInfo(null);
+      setDuplicidade90DiasAvisoInfo({ ...existente, decisao: "avisar" });
+      setDuplicidade90DiasAvisoOpen(true);
+    },
+    []
   );
 
   const executeSave = useCallback(
@@ -2018,12 +2050,36 @@ export function useAgendamentosPage() {
           clienteNome: form.cliente_nome,
           colaboradorCpf: form.colaborador_cpf,
           dataAgendamentoIso: dataIso,
+          tipoAso: form.aso,
           ignorarAgendamentoId: editingId,
         });
 
-        if (existente) {
+        if (existente?.decisao === "bloquear") {
           await bloquearDuplicidade90Dias(existente, dataIso);
           return;
+        }
+
+        if (existente?.decisao === "avisar") {
+          const chave = chaveConfirmacaoDuplicidadeAviso({
+            existenteId: existente.id,
+            cpf: form.colaborador_cpf,
+            empresa: form.cliente_nome,
+            tipoAsoNovo: form.aso,
+            dataNovaIso: dataIso,
+          });
+          if (duplicidadeAvisoConfirmadaRef.current !== chave) {
+            avisarDuplicidade90Dias(existente, status);
+            return;
+          }
+          await registrarConfirmacaoDuplicidadeAsoDiferente(auditContext, {
+            existente,
+            novaDataAgendamento: dataIso,
+            colaborador: form.colaborador,
+            colaboradorCpf: form.colaborador_cpf,
+            clienteNome: form.cliente_nome,
+            tipoAsoNovo: form.aso,
+          });
+          duplicidadeAvisoConfirmadaRef.current = null;
         }
       }
 
@@ -2281,6 +2337,9 @@ export function useAgendamentosPage() {
 
         setDuplicidade90DiasOpen(false);
         setDuplicidade90DiasInfo(null);
+        setDuplicidade90DiasAvisoOpen(false);
+        setDuplicidade90DiasAvisoInfo(null);
+        duplicidadeAvisoConfirmadaRef.current = null;
         setPeriodicoVinculoOpen(false);
         setPeriodicoVinculoList([]);
         periodicoDecisionRef.current = "none";
@@ -2323,10 +2382,15 @@ export function useAgendamentosPage() {
             clienteNome: form.cliente_nome,
             colaboradorCpf: form.colaborador_cpf,
             dataAgendamentoIso: dataIso,
+            tipoAso: form.aso,
             ignorarAgendamentoId: editingId,
           });
-          if (existente) {
+          if (existente?.decisao === "bloquear") {
             await bloquearDuplicidade90Dias(existente, dataIso);
+            return;
+          }
+          if (existente?.decisao === "avisar") {
+            avisarDuplicidade90Dias(existente, status);
             return;
           }
         }
@@ -2357,6 +2421,8 @@ export function useAgendamentosPage() {
       historicoUsuario,
       auditContext,
       bloquearDuplicidade90Dias,
+      avisarDuplicidade90Dias,
+      auditContext,
       exibirBloqueioInadimplencia,
       resolverInfoClienteInadimplencia,
       historicoUsuario,
@@ -2479,6 +2545,62 @@ export function useAgendamentosPage() {
     setDuplicidade90DiasInfo(null);
   }, []);
 
+  const closeDuplicidade90DiasAvisoModal = useCallback(() => {
+    setDuplicidade90DiasAvisoOpen(false);
+    setDuplicidade90DiasAvisoInfo(null);
+    setDuplicidade90DiasAvisoConfirming(false);
+    duplicidadeAvisoConfirmadaRef.current = null;
+    pendingSaveStatusRef.current = null;
+  }, []);
+
+  const handleConfirmarDuplicidade90DiasAviso = useCallback(async () => {
+    const existente = duplicidade90DiasAvisoInfo;
+    const pending = pendingSaveStatusRef.current;
+    if (!existente || !pending) {
+      closeDuplicidade90DiasAvisoModal();
+      return;
+    }
+    const dataIso = parseDateBRToIso(form.data_agendamento);
+    if (!dataIso) {
+      toast.error("Informe a data do agendamento.");
+      return;
+    }
+    const chave = chaveConfirmacaoDuplicidadeAviso({
+      existenteId: existente.id,
+      cpf: form.colaborador_cpf,
+      empresa: form.cliente_nome,
+      tipoAsoNovo: form.aso,
+      dataNovaIso: dataIso,
+    });
+    duplicidadeAvisoConfirmadaRef.current = chave;
+    setDuplicidade90DiasAvisoConfirming(true);
+    setDuplicidade90DiasAvisoOpen(false);
+    try {
+      await executeSave(pending);
+    } finally {
+      setDuplicidade90DiasAvisoConfirming(false);
+      setDuplicidade90DiasAvisoInfo(null);
+    }
+  }, [
+    closeDuplicidade90DiasAvisoModal,
+    duplicidade90DiasAvisoInfo,
+    executeSave,
+    form.aso,
+    form.cliente_nome,
+    form.colaborador_cpf,
+    form.data_agendamento,
+  ]);
+
+  // Se o usuário alterar empresa/CPF/ASO/data após confirmar aviso, exige nova confirmação.
+  useEffect(() => {
+    duplicidadeAvisoConfirmadaRef.current = null;
+  }, [
+    form.cliente_nome,
+    form.colaborador_cpf,
+    form.aso,
+    form.data_agendamento,
+  ]);
+
   const handleCopyMensagemClinica = useCallback(async () => {
     const message = buildMensagemClinicaWhatsApp({
       form,
@@ -2581,6 +2703,11 @@ export function useAgendamentosPage() {
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
+    duplicidade90DiasAvisoOpen,
+    duplicidade90DiasAvisoInfo,
+    duplicidade90DiasAvisoConfirming,
+    closeDuplicidade90DiasAvisoModal,
+    handleConfirmarDuplicidade90DiasAviso,
     periodicoVinculoOpen,
     periodicoVinculoList,
     periodicoContratoNumeros,

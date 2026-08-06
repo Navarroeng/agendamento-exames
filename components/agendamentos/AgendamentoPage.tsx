@@ -9,6 +9,7 @@ import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCarg
 import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
+import { AgendamentoDuplicidade90DiasAvisoModal } from "@/components/modals/AgendamentoDuplicidade90DiasAvisoModal";
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
 import { PeriodicoFuturoVinculoModal } from "@/components/agendamentos/PeriodicoFuturoVinculoModal";
 import { CreditoAsoDisponivelModal } from "@/components/agendamentos/CreditoAsoDisponivelModal";
@@ -108,6 +109,11 @@ export function AgendamentoPage() {
     duplicidade90DiasOpen,
     duplicidade90DiasInfo,
     closeDuplicidade90DiasModal,
+    duplicidade90DiasAvisoOpen,
+    duplicidade90DiasAvisoInfo,
+    duplicidade90DiasAvisoConfirming,
+    closeDuplicidade90DiasAvisoModal,
+    handleConfirmarDuplicidade90DiasAviso,
     periodicoVinculoOpen,
     periodicoVinculoList,
     periodicoContratoNumeros,
@@ -290,6 +296,19 @@ export function AgendamentoPage() {
         open={duplicidade90DiasOpen}
         agendamento={duplicidade90DiasInfo}
         onClose={closeDuplicidade90DiasModal}
+      />
+      <AgendamentoDuplicidade90DiasAvisoModal
+        open={duplicidade90DiasAvisoOpen}
+        agendamento={duplicidade90DiasAvisoInfo}
+        tipoAsoNovo={form.aso}
+        dataNovaIso={
+          form.data_agendamento.trim().length >= 10
+            ? parseDateBRToIso(form.data_agendamento)
+            : null
+        }
+        confirming={duplicidade90DiasAvisoConfirming}
+        onCancel={closeDuplicidade90DiasAvisoModal}
+        onConfirm={() => void handleConfirmarDuplicidade90DiasAviso()}
       />
       <PeriodicoFuturoVinculoModal
         open={periodicoVinculoOpen}

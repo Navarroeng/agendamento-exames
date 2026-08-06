@@ -1,4 +1,4 @@
-/** Testes da regra de duplicidade de agendamento (90 dias + CPF). */
+/** Testes da regra de duplicidade (90 dias + CPF + tipo ASO). */
 
 function onlyDigits(value) {
   return String(value ?? "").replace(/\D/g, "");
@@ -9,6 +9,10 @@ function normalizeCpfDigits(value) {
 }
 
 function normalizeEmpresaNome(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normalizeTipoAso(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
@@ -28,29 +32,40 @@ function violaDuplicidade90Dias(diasEntre) {
   return diasEntre < 90;
 }
 
-function evaluaConflitoDuplicidade90Dias(input) {
-  if (input.statusExistente === "cancelado") return false;
+function classificarDuplicidade90Dias(input) {
+  if (normalizeTipoAso(input.statusExistente) === "cancelado") return "permitir";
+  const tipoNovo = normalizeTipoAso(input.tipoAsoNovo);
+  if (!tipoNovo) return "permitir";
 
   const cpfNovo = normalizeCpfDigits(input.cpfNovo);
   const cpfExistente = normalizeCpfDigits(input.cpfExistente);
-  if (cpfNovo.length !== 11 || cpfExistente.length !== 11) return false;
-  if (cpfNovo !== cpfExistente) return false;
+  if (cpfNovo.length !== 11 || cpfExistente.length !== 11) return "permitir";
+  if (cpfNovo !== cpfExistente) return "permitir";
 
   if (
     normalizeEmpresaNome(input.empresaNova) !==
     normalizeEmpresaNome(input.empresaExistente)
   ) {
-    return false;
+    return "permitir";
   }
 
-  return violaDuplicidade90Dias(
-    diasEntreAgendamentos(input.dataNova, input.dataExistente)
-  );
+  if (
+    !violaDuplicidade90Dias(
+      diasEntreAgendamentos(input.dataNova, input.dataExistente)
+    )
+  ) {
+    return "permitir";
+  }
+
+  const tipoExistente = normalizeTipoAso(input.tipoAsoExistente);
+  if (tipoExistente && tipoExistente === tipoNovo) return "bloquear";
+  return "avisar";
 }
 
-const CPF = "529.982.247-25";
-const EMPRESA = "CLUB COFFEE";
-const BASE = "2026-03-01";
+const CPF = "459.872.378-58";
+const EMPRESA = "ALUMINIO FIRENZE";
+const BASE = "2026-06-24";
+const NOVA = "2026-08-10";
 
 let failed = 0;
 
@@ -65,102 +80,130 @@ function test(name, fn) {
   }
 }
 
-function assertBloqueia(dias) {
-  const dataNova = new Date(parseIsoDateOnly(BASE));
-  dataNova.setUTCDate(dataNova.getUTCDate() + dias);
-  const isoNova = dataNova.toISOString().slice(0, 10);
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: CPF,
-    cpfExistente: CPF,
-    empresaNova: EMPRESA,
-    empresaExistente: EMPRESA,
-    dataNova: isoNova,
-    dataExistente: BASE,
-    statusExistente: "agendado",
-  });
-  if (!conflito) {
-    throw new Error(`deveria bloquear com ${dias} dias`);
+function assertEq(actual, expected) {
+  if (actual !== expected) {
+    throw new Error(`esperado ${expected}, recebeu ${actual}`);
   }
 }
 
-function assertPermite(dias) {
-  const dataNova = new Date(parseIsoDateOnly(BASE));
-  dataNova.setUTCDate(dataNova.getUTCDate() + dias);
-  const isoNova = dataNova.toISOString().slice(0, 10);
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: CPF,
-    cpfExistente: CPF,
-    empresaNova: EMPRESA,
-    empresaExistente: EMPRESA,
-    dataNova: isoNova,
-    dataExistente: BASE,
-    statusExistente: "agendado",
-  });
-  if (conflito) {
-    throw new Error(`deveria permitir com ${dias} dias`);
-  }
-}
-
-test("Mesmo CPF + mesma empresa + 10 dias → BLOQUEAR", () => assertBloqueia(10));
-test("Mesmo CPF + mesma empresa + 45 dias → BLOQUEAR", () => assertBloqueia(45));
-test("Mesmo CPF + mesma empresa + 89 dias → BLOQUEAR", () => assertBloqueia(89));
-test("Mesmo CPF + mesma empresa + 90 dias → PERMITIR", () => assertPermite(90));
-test("Mesmo CPF + mesma empresa + 120 dias → PERMITIR", () => assertPermite(120));
-
-test("Mesmo CPF + empresa diferente → PERMITIR", () => {
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: CPF,
-    cpfExistente: CPF,
-    empresaNova: "OUTRA EMPRESA",
-    empresaExistente: EMPRESA,
-    dataNova: "2026-03-15",
-    dataExistente: BASE,
-    statusExistente: "agendado",
-  });
-  if (conflito) throw new Error("empresa diferente deveria permitir");
+test("Caso real Demissional → Admissional → AVISAR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "agendado",
+      tipoAsoNovo: "Admissional",
+      tipoAsoExistente: "Demissional",
+    }),
+    "avisar"
+  );
 });
 
-test("Mesmo nome + CPF diferente → PERMITIR", () => {
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: "111.444.777-35",
-    cpfExistente: CPF,
-    empresaNova: EMPRESA,
-    empresaExistente: EMPRESA,
-    dataNova: "2026-03-15",
-    dataExistente: BASE,
-    statusExistente: "agendado",
-  });
-  if (conflito) throw new Error("CPF diferente deveria permitir");
+test("Admissional → Admissional < 90 dias → BLOQUEAR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "agendado",
+      tipoAsoNovo: "Admissional",
+      tipoAsoExistente: "Admissional",
+    }),
+    "bloquear"
+  );
 });
 
-test("Mesmo CPF + registro anterior cancelado → PERMITIR", () => {
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: CPF,
-    cpfExistente: CPF,
-    empresaNova: EMPRESA,
-    empresaExistente: EMPRESA,
-    dataNova: "2026-03-15",
-    dataExistente: BASE,
-    statusExistente: "cancelado",
-  });
-  if (conflito) throw new Error("cancelado deveria permitir");
+test("Periódico → Periódico < 90 dias → BLOQUEAR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "agendado",
+      tipoAsoNovo: "Periódico",
+      tipoAsoExistente: "Periódico",
+    }),
+    "bloquear"
+  );
 });
 
-test("Nome do colaborador não é chave (CPF igual, nomes diferentes)", () => {
-  const conflito = evaluaConflitoDuplicidade90Dias({
-    cpfNovo: CPF,
-    cpfExistente: CPF,
-    empresaNova: EMPRESA,
-    empresaExistente: EMPRESA,
-    dataNova: "2026-04-15",
-    dataExistente: BASE,
-    statusExistente: "agendado",
-  });
-  if (!conflito) throw new Error("CPF igual deve bloquear independente do nome");
+test("Cancelado → PERMITIR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "cancelado",
+      tipoAsoNovo: "Admissional",
+      tipoAsoExistente: "Admissional",
+    }),
+    "permitir"
+  );
 });
 
-if (failed > 0) {
-  process.exit(1);
-}
+test("Mesmo ASO após 90 dias → PERMITIR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: "2026-05-01",
+      dataExistente: "2026-01-01",
+      statusExistente: "agendado",
+      tipoAsoNovo: "Admissional",
+      tipoAsoExistente: "Admissional",
+    }),
+    "permitir"
+  );
+});
 
+test("Empresa diferente → PERMITIR", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: "OUTRA",
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "agendado",
+      tipoAsoNovo: "Admissional",
+      tipoAsoExistente: "Admissional",
+    }),
+    "permitir"
+  );
+});
+
+test("Sem tipo novo → PERMITIR (ainda não decide)", () => {
+  assertEq(
+    classificarDuplicidade90Dias({
+      cpfNovo: CPF,
+      cpfExistente: CPF,
+      empresaNova: EMPRESA,
+      empresaExistente: EMPRESA,
+      dataNova: NOVA,
+      dataExistente: BASE,
+      statusExistente: "agendado",
+      tipoAsoNovo: "",
+      tipoAsoExistente: "Demissional",
+    }),
+    "permitir"
+  );
+});
+
+if (failed > 0) process.exit(1);
 console.log("\nagendamento-duplicidade-90dias: todos os testes passaram");
