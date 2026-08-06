@@ -185,13 +185,27 @@ export async function listarHistoricoMensalGestaoComercial(): Promise<
     .order("ano", { ascending: true })
     .order("mes", { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error(
+      "[gestao-comercial] falha ao ler gestao_comercial_historico_mensal:",
+      error
+    );
+    throw error;
+  }
 
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []).map((row) => ({
     ano: Number(row.ano),
     mes: Number(row.mes),
     valorFechado: Number(row.valor_fechado) || 0,
     origemDado: "historico_manual" as const,
     observacao: row.observacao ?? null,
   }));
+
+  if (rows.length === 0) {
+    console.warn(
+      "[gestao-comercial] gestao_comercial_historico_mensal retornou 0 linhas. Verifique seed/RLS/GRANT."
+    );
+  }
+
+  return rows;
 }

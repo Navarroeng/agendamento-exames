@@ -413,8 +413,10 @@ export function indexHistoricoMensal(
 }
 
 /**
- * Histórico manual só entra em totais de valor quando não há filtros
- * dimensionais (responsável/origem/tipo) e o status não é só "encerrados".
+ * Histórico manual entra nos totais de valor mesmo com filtro "Ativos",
+ * porque não há status de contrato individual nesses consolidados.
+ * Só fica de fora quando o filtro é exclusivamente "encerrados" ou
+ * quando há filtros dimensionais (responsável/origem/tipo).
  */
 export function podeUsarHistoricoManual(filters: GestaoComercialFilters): boolean {
   if (filters.statusContrato === "encerrados") return false;
