@@ -106,6 +106,7 @@ const processo = buildImplantacaoProcesso({
   } as ClienteContratoRecord,
   agendamentosRealizados: 2,
   examesProgramadosFuturos: 1,
+    asosContratuaisEmAberto: 0,
 });
 
 assert.equal(processo.etapaAtual, "concluido");

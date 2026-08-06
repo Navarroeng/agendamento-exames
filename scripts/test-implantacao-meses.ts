@@ -50,6 +50,7 @@ function processo(partial: {
     quantidadeContratada: 0,
     agendamentosRealizados: 0,
     examesProgramadosFuturos: 0,
+    asosContratuaisEmAberto: 0,
     agendamentosIniciaisDispensados: false,
     concluidoComExamesFuturos: false,
     fluxoImplantacao: "padrao",
