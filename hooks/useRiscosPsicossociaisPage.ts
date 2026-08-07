@@ -23,6 +23,16 @@ import {
   criarCampanhaRiscos,
 } from "@/services/riscos-campanha.service";
 import {
+  atualizarParticipanteCampanha,
+  criarParticipanteCampanha,
+  listarParticipantesCampanha,
+  removerParticipanteCampanha,
+} from "@/services/riscos-campanha-participantes.service";
+import type {
+  RiscosCampanhaParticipanteRecord,
+  RiscosParticipanteInput,
+} from "@/lib/riscos-campanha-participantes";
+import {
   removerAnexoListaPresenca,
   salvarRecebimentoListaPresenca,
   salvarSolicitacaoListaPresenca,
@@ -36,6 +46,10 @@ export function useRiscosPsicossociaisPage() {
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
   const [savingCampanha, setSavingCampanha] = useState(false);
+  const [savingParticipante, setSavingParticipante] = useState(false);
+  const [modalParticipantes, setModalParticipantes] = useState<
+    RiscosCampanhaParticipanteRecord[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RiscosPsicossociaisFilters>(
     EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS
@@ -147,14 +161,33 @@ export function useRiscosPsicossociaisPage() {
     setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
   }, []);
 
-  const openProcesso = useCallback((processo: RiscosPsicossociaisProcesso) => {
-    setModalProcesso(processo);
-    setModalTab(processo.etapaAtual);
+  const carregarParticipantes = useCallback(async (campanhaId: string) => {
+    try {
+      const rows = await listarParticipantesCampanha(campanhaId);
+      setModalParticipantes(rows);
+    } catch (err) {
+      console.error(err);
+      setModalParticipantes([]);
+    }
   }, []);
+
+  const openProcesso = useCallback(
+    (processo: RiscosPsicossociaisProcesso) => {
+      setModalProcesso(processo);
+      setModalTab(processo.etapaAtual);
+      if (processo.campanha?.id) {
+        void carregarParticipantes(processo.campanha.id);
+      } else {
+        setModalParticipantes([]);
+      }
+    },
+    [carregarParticipantes]
+  );
 
   const closeModal = useCallback(() => {
     setModalProcesso(null);
     setModalTab("laudos_sst");
+    setModalParticipantes([]);
   }, []);
 
   const handleSalvarSolicitacaoLista = useCallback(
@@ -352,6 +385,7 @@ export function useRiscosPsicossociaisPage() {
               : p
           )
         );
+        setModalParticipantes([]);
         toast.success("Campanha criada com sucesso.");
       } catch (err) {
         console.error(err);
@@ -365,6 +399,79 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext]
   );
 
+  const handleCriarParticipante = useCallback(
+    async (input: RiscosParticipanteInput) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) {
+        throw new Error("Crie a pesquisa antes de cadastrar participantes.");
+      }
+      setSavingParticipante(true);
+      try {
+        await criarParticipanteCampanha(
+          { campanhaId, input },
+          { auditContext }
+        );
+        await carregarParticipantes(campanhaId);
+        toast.success("Participante cadastrado.");
+      } catch (err) {
+        console.error(err);
+        throw err instanceof Error
+          ? err
+          : new Error("Erro ao cadastrar participante.");
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes]
+  );
+
+  const handleEditarParticipante = useCallback(
+    async (participanteId: string, input: RiscosParticipanteInput) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      setSavingParticipante(true);
+      try {
+        await atualizarParticipanteCampanha(
+          { participanteId, input },
+          { auditContext }
+        );
+        await carregarParticipantes(campanhaId);
+        toast.success("Participante atualizado.");
+      } catch (err) {
+        console.error(err);
+        throw err instanceof Error
+          ? err
+          : new Error("Erro ao editar participante.");
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes]
+  );
+
+  const handleRemoverParticipante = useCallback(
+    async (participanteId: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      setSavingParticipante(true);
+      try {
+        await removerParticipanteCampanha(participanteId, { auditContext });
+        await carregarParticipantes(campanhaId);
+        toast.success("Participante removido.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao remover participante."
+        );
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes]
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -374,8 +481,10 @@ export function useRiscosPsicossociaisPage() {
     responsaveis,
     modalProcesso,
     modalTab,
+    modalParticipantes,
     savingLista,
     savingCampanha,
+    savingParticipante,
     setModalTab,
     handleFilterChange,
     clearFilters,
@@ -388,6 +497,9 @@ export function useRiscosPsicossociaisPage() {
     handleRemoverAnexoLista,
     handleVisualizarAnexoLista,
     handleCriarCampanha,
+    handleCriarParticipante,
+    handleEditarParticipante,
+    handleRemoverParticipante,
     refresh,
   };
 }

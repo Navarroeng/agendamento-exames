@@ -10,22 +10,40 @@ import {
   pathAvaliacaoCampanha,
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
+import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
+import type {
+  RiscosCampanhaParticipanteRecord,
+  RiscosParticipanteInput,
+} from "@/lib/riscos-campanha-participantes";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
 interface RiscosCampanhaTabProps {
   processo: RiscosPsicossociaisProcesso;
   saving?: boolean;
+  participantes?: RiscosCampanhaParticipanteRecord[];
+  savingParticipante?: boolean;
   onCriarCampanha: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
     quantidadePrevista: number;
   }) => Promise<void>;
+  onCriarParticipante?: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditarParticipante?: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
+  onRemoverParticipante?: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosCampanhaTab({
   processo,
   saving = false,
+  participantes = [],
+  savingParticipante = false,
   onCriarCampanha,
+  onCriarParticipante,
+  onEditarParticipante,
+  onRemoverParticipante,
 }: RiscosCampanhaTabProps) {
   const campanha = processo.campanha;
   const { orcamento } = processo.implantacao;
@@ -65,7 +83,21 @@ export function RiscosCampanhaTab({
   }
 
   if (campanha) {
-    return <CampanhaCard campanha={campanha} />;
+    return (
+      <div className="space-y-6">
+        <CampanhaCard campanha={campanha} />
+        {onCriarParticipante && onEditarParticipante && onRemoverParticipante ? (
+          <RiscosCampanhaParticipantesSection
+            campanha={campanha}
+            participantes={participantes}
+            saving={savingParticipante}
+            onCriar={onCriarParticipante}
+            onEditar={onEditarParticipante}
+            onRemover={onRemoverParticipante}
+          />
+        ) : null}
+      </div>
+    );
   }
 
   if (!showForm) {

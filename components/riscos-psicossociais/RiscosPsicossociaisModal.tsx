@@ -4,6 +4,10 @@ import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaTab } from "@/components/riscos-psicossociais/RiscosCampanhaTab";
 import { RiscosListaPresencaTab } from "@/components/riscos-psicossociais/RiscosListaPresencaTab";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import type {
+  RiscosCampanhaParticipanteRecord,
+  RiscosParticipanteInput,
+} from "@/lib/riscos-campanha-participantes";
 import {
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   isRiscosEtapaAutomatica,
@@ -19,6 +23,8 @@ interface RiscosPsicossociaisModalProps {
   tab: RiscosPsicossociaisEtapaId;
   savingLista?: boolean;
   savingCampanha?: boolean;
+  participantes?: RiscosCampanhaParticipanteRecord[];
+  savingParticipante?: boolean;
   onTabChange: (tab: RiscosPsicossociaisEtapaId) => void;
   onClose: () => void;
   onSalvarSolicitacaoLista?: (input: {
@@ -33,6 +39,12 @@ interface RiscosPsicossociaisModalProps {
     dataEncerramentoIso: string;
     quantidadePrevista: number;
   }) => Promise<void>;
+  onCriarParticipante?: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditarParticipante?: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
+  onRemoverParticipante?: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosPsicossociaisModal({
@@ -41,6 +53,8 @@ export function RiscosPsicossociaisModal({
   tab,
   savingLista = false,
   savingCampanha = false,
+  participantes = [],
+  savingParticipante = false,
   onTabChange,
   onClose,
   onSalvarSolicitacaoLista,
@@ -48,6 +62,9 @@ export function RiscosPsicossociaisModal({
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
   onCriarCampanha,
+  onCriarParticipante,
+  onEditarParticipante,
+  onRemoverParticipante,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
 
@@ -182,9 +199,14 @@ export function RiscosPsicossociaisModal({
           <RiscosCampanhaTab
             processo={processo}
             saving={savingCampanha}
+            participantes={participantes}
+            savingParticipante={savingParticipante}
             onCriarCampanha={async (input) => {
               await onCriarCampanha?.(input);
             }}
+            onCriarParticipante={onCriarParticipante}
+            onEditarParticipante={onEditarParticipante}
+            onRemoverParticipante={onRemoverParticipante}
           />
         ) : (
           <div className="rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-5 py-10 text-center">
