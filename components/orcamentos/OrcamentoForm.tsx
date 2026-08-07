@@ -161,15 +161,23 @@ export function OrcamentoForm({
             <label className="mb-1.5 block text-xs font-bold text-navy">
               Setor
             </label>
-            <input
-              className="field-input"
-              placeholder="Setor / área"
-              maxLength={30}
-              value={form.cliente_setor}
-              onChange={(e) =>
-                onChange("cliente_setor", e.target.value.slice(0, 30))
-              }
-            />
+            <div className="relative">
+              <input
+                className="field-input pr-14"
+                placeholder="Setor / área"
+                maxLength={30}
+                value={form.cliente_setor}
+                onChange={(e) =>
+                  onChange("cliente_setor", e.target.value.slice(0, 30))
+                }
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-1.5 right-2.5 text-[10px] tabular-nums text-[#94a3b8]"
+              >
+                {form.cliente_setor.length} / 30
+              </span>
+            </div>
           </div>
           <div className="md:col-span-2 lg:col-span-1">
             <label className="mb-1.5 block text-xs font-bold text-navy">
