@@ -23,6 +23,17 @@ import {
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
+/**
+ * Modo de desenvolvimento do módulo Riscos Psicossociais.
+ *
+ * `true`  → todas as abas do modal ficam navegáveis (bloqueio sequencial ignorado).
+ * `false` → restaura o fluxo normal (exige conclusão das etapas anteriores).
+ *
+ * Não altera status, regras de negócio persistidas nem o banco — apenas a
+ * liberação de navegação na UI, via `isRiscosEtapaLiberada`.
+ */
+export const DEVELOPMENT_UNLOCK_ALL_TABS = true;
+
 /** Etapas manuais na UI (ordem do fluxo). */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
   { id: "lista_presenca", label: "Lista de presença" },
@@ -189,8 +200,11 @@ export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
   return isLaudosSstConcluido(trackingLaudos);
 }
 
-/** Etapas manuais só liberam após Laudos SST; Cadastro+ após Lista de Presença. */
-export function isRiscosEtapaLiberada(
+/**
+ * Regra real de liberação sequencial (sempre preservada).
+ * Usada por `isRiscosEtapaLiberada` quando o modo de desenvolvimento está off.
+ */
+export function isRiscosEtapaLiberadaByFluxo(
   processo: Pick<
     RiscosPsicossociaisProcesso,
     "laudosSstConcluido" | "listaPresencaConcluida"
@@ -201,6 +215,18 @@ export function isRiscosEtapaLiberada(
   if (!processo.laudosSstConcluido) return false;
   if (etapaId === "lista_presenca") return true;
   return processo.listaPresencaConcluida;
+}
+
+/** Etapas manuais só liberam após Laudos SST; Cadastro+ após Lista de Presença. */
+export function isRiscosEtapaLiberada(
+  processo: Pick<
+    RiscosPsicossociaisProcesso,
+    "laudosSstConcluido" | "listaPresencaConcluida"
+  >,
+  etapaId: RiscosPsicossociaisEtapaId
+): boolean {
+  if (DEVELOPMENT_UNLOCK_ALL_TABS) return true;
+  return isRiscosEtapaLiberadaByFluxo(processo, etapaId);
 }
 
 export function mensagemBloqueioEtapaRiscos(

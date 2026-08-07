@@ -7,6 +7,7 @@ import {
   buildRiscosPsicossociaisProcesso,
   isProcessoElegivelRiscosPsicossociais,
   isRiscosEtapaLiberada,
+  isRiscosEtapaLiberadaByFluxo,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS,
@@ -59,9 +60,12 @@ assert.equal(riscosAguardando.laudosSstConcluido, false);
 assert.equal(riscosAguardando.etapasConcluidas, 0);
 assert.equal(riscosAguardando.progressoLabel, "0 de 7");
 assert.equal(riscosAguardando.dataEntrada, "2026-08-12T15:00:00Z");
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "laudos_sst"), true);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "lista_presenca"), false);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "cadastro_empresa"), false);
 assert.equal(isRiscosEtapaLiberada(riscosAguardando, "laudos_sst"), true);
-assert.equal(isRiscosEtapaLiberada(riscosAguardando, "lista_presenca"), false);
-assert.equal(isRiscosEtapaLiberada(riscosAguardando, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberada(riscosAguardando, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberada(riscosAguardando, "cadastro_empresa"), true);
 
 const laudosConcluido = buildLaudosSstProcesso(implantacao, {
   orcamento_id: "o1",
@@ -86,8 +90,9 @@ assert.equal(riscosLiberado.etapasConcluidas, 1);
 assert.equal(riscosLiberado.progressoLabel, "1 de 7");
 // Conclusão de Laudos NÃO altera o mês/data de entrada em Riscos.
 assert.equal(riscosLiberado.dataEntrada, "2026-08-12T15:00:00Z");
-assert.equal(isRiscosEtapaLiberada(riscosLiberado, "lista_presenca"), true);
-assert.equal(isRiscosEtapaLiberada(riscosLiberado, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosLiberado, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosLiberado, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberada(riscosLiberado, "cadastro_empresa"), true);
 
 const riscosComTracking = buildRiscosPsicossociaisProcesso(laudosConcluido, {
   orcamento_id: "o1",
@@ -102,6 +107,7 @@ const riscosComTracking = buildRiscosPsicossociaisProcesso(laudosConcluido, {
 });
 assert.equal(riscosComTracking.etapaAtual, "envio_qr_code");
 assert.equal(riscosComTracking.progressoLabel, "3 de 7");
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosComTracking, "cadastro_empresa"), true);
 assert.equal(isRiscosEtapaLiberada(riscosComTracking, "cadastro_empresa"), true);
 
 const riscosSemTracking = buildRiscosPsicossociaisProcesso(

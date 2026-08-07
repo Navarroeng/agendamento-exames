@@ -11,6 +11,7 @@ import {
 import {
   buildRiscosPsicossociaisProcesso,
   isRiscosEtapaLiberada,
+  isRiscosEtapaLiberadaByFluxo,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
 } from "../lib/riscos-psicossociais";
 
@@ -54,8 +55,10 @@ const soSolicitacao = buildRiscosPsicossociaisProcesso(laudosConcluido, {
 assert.equal(isSolicitacaoListaConcluida(soSolicitacao.listaPresenca), true);
 assert.equal(soSolicitacao.listaPresencaConcluida, false);
 assert.equal(soSolicitacao.etapasConcluidas, 1); // só Laudos automático
+assert.equal(isRiscosEtapaLiberadaByFluxo(soSolicitacao, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberadaByFluxo(soSolicitacao, "cadastro_empresa"), false);
 assert.equal(isRiscosEtapaLiberada(soSolicitacao, "lista_presenca"), true);
-assert.equal(isRiscosEtapaLiberada(soSolicitacao, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberada(soSolicitacao, "cadastro_empresa"), true);
 
 const completa = buildRiscosPsicossociaisProcesso(laudosConcluido, {
   orcamento_id: "o1",
@@ -75,6 +78,7 @@ assert.equal(completa.listaPresencaConcluida, true);
 assert.equal(completa.etapasConcluidas, 2);
 assert.equal(completa.progressoLabel, `2 de ${RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS}`);
 assert.equal(completa.etapaAtual, "cadastro_empresa");
+assert.equal(isRiscosEtapaLiberadaByFluxo(completa, "cadastro_empresa"), true);
 assert.equal(isRiscosEtapaLiberada(completa, "cadastro_empresa"), true);
 
 const semAnexo = buildRiscosPsicossociaisProcesso(laudosConcluido, {
@@ -89,6 +93,7 @@ const semAnexo = buildRiscosPsicossociaisProcesso(laudosConcluido, {
   lista_anexo_path: null,
 });
 assert.equal(semAnexo.listaPresencaConcluida, false);
-assert.equal(isRiscosEtapaLiberada(semAnexo, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberadaByFluxo(semAnexo, "cadastro_empresa"), false);
+assert.equal(isRiscosEtapaLiberada(semAnexo, "cadastro_empresa"), true);
 
 console.log("test-riscos-lista-presenca: OK");
