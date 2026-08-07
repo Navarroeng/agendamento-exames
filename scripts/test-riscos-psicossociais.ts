@@ -12,13 +12,16 @@ import {
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS,
 } from "../lib/riscos-psicossociais";
 
-assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS.length, 7);
-assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS, 7);
-assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS, 6);
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS.length, 8);
+assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS, 8);
+assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS, 7);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].id, "laudos_sst");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].automatica, true);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].id, "lista_presenca");
-assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[6].id, "enviado_cliente");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[2].id, "cadastro_empresa");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[3].id, "pesquisa_psicossocial");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[4].id, "envio_qr_code");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[7].id, "enviado_cliente");
 
 const implantacao = {
   orcamento: {

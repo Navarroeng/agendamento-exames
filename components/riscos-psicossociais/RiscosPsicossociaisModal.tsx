@@ -178,7 +178,7 @@ export function RiscosPsicossociaisModal({
               await onVisualizarAnexoLista?.();
             }}
           />
-        ) : tab === "envio_qr_code" && tabLiberada ? (
+        ) : tab === "pesquisa_psicossocial" && tabLiberada ? (
           <RiscosCampanhaTab
             processo={processo}
             saving={savingCampanha}

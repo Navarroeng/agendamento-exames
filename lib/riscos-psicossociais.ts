@@ -23,10 +23,11 @@ import {
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
-/** Etapas manuais (persistidas em orcamento_riscos_psicossociais.etapa_atual). */
+/** Etapas manuais na UI (ordem do fluxo). */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
   { id: "lista_presenca", label: "Lista de presença" },
   { id: "cadastro_empresa", label: "Cadastro da empresa" },
+  { id: "pesquisa_psicossocial", label: "Pesquisa Psicossocial" },
   { id: "envio_qr_code", label: "Envio do QR Code" },
   { id: "preenchimento_finalizado", label: "Preenchimento finalizado" },
   { id: "laudo_elaborado", label: "Laudo elaborado" },
@@ -35,6 +36,22 @@ export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
 
 export type RiscosPsicossociaisEtapaManualId =
   (typeof RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS)[number]["id"];
+
+/**
+ * IDs aceitos em `orcamento_riscos_psicossociais.etapa_atual` (constraint atual).
+ * `pesquisa_psicossocial` é etapa de UI; persistência desse id virá em migration futura.
+ */
+export const RISCOS_PSICOSSOCIAIS_ETAPAS_PERSISTIDAS = [
+  "lista_presenca",
+  "cadastro_empresa",
+  "envio_qr_code",
+  "preenchimento_finalizado",
+  "laudo_elaborado",
+  "enviado_cliente",
+] as const;
+
+export type RiscosPsicossociaisEtapaPersistidaId =
+  (typeof RISCOS_PSICOSSOCIAIS_ETAPAS_PERSISTIDAS)[number];
 
 /** Sequência completa na UI (inclui etapa automática dependente de Laudos SST). */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
@@ -57,7 +74,7 @@ export type RiscosPsicossociaisStatus = "em_andamento" | "concluido";
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS =
   RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.length;
 
-/** Total exibido (1 automática + 6 manuais). */
+/** Total exibido (1 automática + 7 manuais). */
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS =
   RISCOS_PSICOSSOCIAIS_ETAPAS.length;
 
@@ -68,10 +85,10 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   RISCOS_PSICOSSOCIAIS_ETAPAS.map((e) => [e.id, e.label])
 ) as Record<RiscosPsicossociaisEtapaId, string>;
 
-/** Tracking persistido: apenas etapas manuais (0–6). */
+/** Tracking persistido: etapas manuais persistíveis (0–6 no banco atual). */
 export interface OrcamentoRiscosPsicossociaisRecord {
   orcamento_id: string;
-  etapa_atual: RiscosPsicossociaisEtapaManualId;
+  etapa_atual: RiscosPsicossociaisEtapaPersistidaId;
   etapas_concluidas: number;
   status?: RiscosPsicossociaisStatus | null;
   entrada_em?: string | null;
@@ -96,9 +113,9 @@ export interface RiscosPsicossociaisProcesso {
   implantacao: ImplantacaoProcesso;
   laudos: LaudosSstProcesso;
   etapaAtual: RiscosPsicossociaisEtapaId;
-  /** Progresso total exibido (0–7), incluindo a etapa automática. */
+  /** Progresso total exibido (0–8), incluindo a etapa automática. */
   etapasConcluidas: number;
-  /** Etapas manuais concluídas (0–6). */
+  /** Etapas manuais concluídas (0–7 na UI). */
   etapasManuaisConcluidas: number;
   totalEtapas: number;
   progressoLabel: string;
@@ -131,6 +148,14 @@ export function isRiscosPsicossociaisEtapaManualId(
   value: string
 ): value is RiscosPsicossociaisEtapaManualId {
   return RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.some((e) => e.id === value);
+}
+
+export function isRiscosPsicossociaisEtapaPersistidaId(
+  value: string
+): value is RiscosPsicossociaisEtapaPersistidaId {
+  return (RISCOS_PSICOSSOCIAIS_ETAPAS_PERSISTIDAS as readonly string[]).includes(
+    value
+  );
 }
 
 export function isRiscosPsicossociaisEtapaId(
@@ -230,7 +255,7 @@ export function buildRiscosPsicossociaisProcesso(
     etapaAtual = "enviado_cliente";
   } else if (
     tracking &&
-    isRiscosPsicossociaisEtapaManualId(tracking.etapa_atual) &&
+    isRiscosPsicossociaisEtapaPersistidaId(tracking.etapa_atual) &&
     tracking.etapa_atual !== "lista_presenca"
   ) {
     etapaAtual = tracking.etapa_atual;
