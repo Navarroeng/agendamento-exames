@@ -16,6 +16,7 @@ import {
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
 import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
+import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
@@ -274,9 +275,11 @@ export async function atualizarProximaDataPeriodico(
   if (!record) {
     throw new Error("Periódico futuro não encontrado.");
   }
-  if (record.status !== "ativo") {
+  if (!canEditarProximaDataPeriodico(record)) {
     throw new Error(
-      "Só é possível editar a próxima data de periódicos ativos."
+      record.status !== "ativo"
+        ? "Só é possível editar a próxima data de periódicos ativos."
+        : "Não é possível editar a próxima data de um periódico já realizado."
     );
   }
 
@@ -296,6 +299,7 @@ export async function atualizarProximaDataPeriodico(
     })
     .eq("id", id)
     .eq("status", "ativo")
+    .is("data_realizada", null)
     .select("*")
     .maybeSingle();
 

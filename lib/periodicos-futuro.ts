@@ -263,3 +263,17 @@ export function isPeriodicoActionable(
 ): boolean {
   return status === "ativo";
 }
+
+/** Oficial: coluna “Realizado em” (`data_realizada`). */
+export function isPeriodicoRealizado(
+  record: Pick<PeriodicoFuturoRecord, "data_realizada">
+): boolean {
+  return Boolean(record.data_realizada?.trim());
+}
+
+/** Editar próxima data só para ativo ainda sem exame realizado. */
+export function canEditarProximaDataPeriodico(
+  record: Pick<PeriodicoFuturoRecord, "status" | "data_realizada">
+): boolean {
+  return isPeriodicoActionable(record.status) && !isPeriodicoRealizado(record);
+}

@@ -7,6 +7,7 @@ import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
 import {
   EMPTY_PERIODICO_FUTURO_FILTERS,
+  canEditarProximaDataPeriodico,
   countPeriodicosByDisplayStatus,
   extractPeriodicoFilterOptions,
   filterPeriodicosFuturos,
@@ -220,6 +221,12 @@ export function usePeriodicosFuturosPage() {
 
   const handleAbrirEditarProximaData = useCallback(
     (record: PeriodicoFuturoRow) => {
+      if (!canEditarProximaDataPeriodico(record)) {
+        toast.error(
+          "Não é possível editar a próxima data de um periódico já realizado."
+        );
+        return;
+      }
       setEditProximaDataRecord(record);
     },
     []

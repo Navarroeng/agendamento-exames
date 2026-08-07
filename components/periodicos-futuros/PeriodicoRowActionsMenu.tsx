@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
 import type { PeriodicoFuturoRow } from "@/lib/types";
 
 interface PeriodicoRowActionsMenuProps {
@@ -51,6 +52,8 @@ export function PeriodicoRowActionsMenu({
     Boolean(record.agendamento_id) &&
     Boolean(onVisualizarAgendamento);
 
+  const podeEditarProximaData = canEditarProximaDataPeriodico(record);
+
   const items: MenuItem[] = [];
 
   // Criar / Ver: mantém a regra anterior (disponível fora de cancelado só quando há vínculo;
@@ -66,8 +69,10 @@ export function PeriodicoRowActionsMenu({
   }
 
   if (canAct) {
+    if (podeEditarProximaData) {
+      items.push({ key: "editar_data", label: "Editar próxima data" });
+    }
     items.push(
-      { key: "editar_data", label: "Editar próxima data" },
       { key: "reagendar", label: "Reagendar" },
       { key: "cancelar", label: "Cancelar", danger: true }
     );
@@ -90,6 +95,7 @@ export function PeriodicoRowActionsMenu({
         }
         break;
       case "editar_data":
+        if (!canEditarProximaDataPeriodico(record)) return;
         onEditarProximaData(record);
         break;
       case "reagendar":
