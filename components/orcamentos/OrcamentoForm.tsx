@@ -164,8 +164,11 @@ export function OrcamentoForm({
             <input
               className="field-input"
               placeholder="Setor / área"
+              maxLength={30}
               value={form.cliente_setor}
-              onChange={(e) => onChange("cliente_setor", e.target.value)}
+              onChange={(e) =>
+                onChange("cliente_setor", e.target.value.slice(0, 30))
+              }
             />
           </div>
           <div className="md:col-span-2 lg:col-span-1">

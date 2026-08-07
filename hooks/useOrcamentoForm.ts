@@ -180,7 +180,7 @@ export function useOrcamentoForm() {
         cliente_nome: cliente.nome,
         cliente_cnpj: maskCNPJInput(cliente.cnpj ?? ""),
         cliente_endereco: cliente.endereco ?? "",
-        cliente_setor: cliente.setor ?? "",
+        cliente_setor: (cliente.setor ?? "").slice(0, 30),
         contato: cliente.contato ?? "",
         email: cliente.email ?? "",
         telefone: cliente.telefone ?? "",
@@ -207,7 +207,7 @@ export function useOrcamentoForm() {
       cliente_nome: orcamento.cliente_nome,
       cliente_cnpj: orcamento.cliente_cnpj ?? "",
       cliente_endereco: orcamento.cliente_endereco ?? "",
-      cliente_setor: orcamento.cliente_setor ?? "",
+      cliente_setor: (orcamento.cliente_setor ?? "").slice(0, 30),
       contato: orcamento.contato ?? "",
       email: orcamento.email ?? "",
       telefone: orcamento.telefone ?? "",
@@ -314,7 +314,9 @@ export function useOrcamentoForm() {
       cliente_nome: form.cliente_nome.trim(),
       cliente_cnpj: emptyToNull(maskCNPJInput(form.cliente_cnpj.trim())),
       cliente_endereco: emptyToNull(form.cliente_endereco),
-      cliente_setor: emptyToNull(normalizeUppercaseField(form.cliente_setor)),
+      cliente_setor: emptyToNull(
+        normalizeUppercaseField(form.cliente_setor).slice(0, 30)
+      ),
       contato: emptyToNull(normalizeUppercaseField(form.contato)),
       email: emptyToNull(form.email),
       telefone: emptyToNull(form.telefone),
@@ -342,6 +344,9 @@ export function useOrcamentoForm() {
     }
     if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
       return "Informe a origem do cliente.";
+    }
+    if (form.cliente_setor.length > 30) {
+      return "O setor deve ter no máximo 30 caracteres.";
     }
 
     const itensValidos = form.itens.filter(
