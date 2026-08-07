@@ -1,7 +1,6 @@
 "use client";
 
 import { maskDateBR } from "@/lib/agendamento-datetime";
-import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import {
   ESOCIAL_STATUS_OPTIONS,
   hasActiveESocialFilters,
@@ -166,15 +165,6 @@ export function ESocialFiltersPanel({
                   </option>
                 ))}
               </select>
-            </FilterField>
-
-            <FilterField label="Mês de referência">
-              <MonthReferenceSelect
-                className={inputClass}
-                value={filters.mesReferencia}
-                allowEmpty
-                onChange={(value) => onChange("mesReferencia", value)}
-              />
             </FilterField>
 
             <FilterField label="Data início">

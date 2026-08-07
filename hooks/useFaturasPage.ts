@@ -30,6 +30,13 @@ import {
   filterFaturaMesRowsByStatus,
 } from "@/lib/fatura-mes-resumo";
 import {
+  mesReferenciaBRToYearMonth,
+  resolveInitialMesListagem,
+  resolveMesParaAno,
+  yearMonthToMesReferenciaBR,
+  type YearMonth,
+} from "@/lib/listagem-meses";
+import {
   buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
   faturaComItensToPreview,
@@ -447,8 +454,38 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     []
   );
 
+  const mesSelecionado = useMemo<YearMonth>(() => {
+    return (
+      mesReferenciaBRToYearMonth(filters.mesReferencia) ??
+      resolveInitialMesListagem()
+    );
+  }, [filters.mesReferencia]);
+
+  const handleMesChange = useCallback((mes: YearMonth) => {
+    setFilters((prev) => ({
+      ...prev,
+      mesReferencia: yearMonthToMesReferenciaBR(mes),
+    }));
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setFilters((prev) => {
+      const current =
+        mesReferenciaBRToYearMonth(prev.mesReferencia) ??
+        resolveInitialMesListagem();
+      const next = resolveMesParaAno(year, current.month);
+      return {
+        ...prev,
+        mesReferencia: yearMonthToMesReferenciaBR(next),
+      };
+    });
+  }, []);
+
   const handleClearFilters = useCallback(() => {
-    setFilters(EMPTY_FATURA_FILTERS);
+    setFilters({
+      ...EMPTY_FATURA_FILTERS,
+      mesReferencia: getCurrentMonthYearBR(),
+    });
   }, []);
 
   const handleHistoricoFilterChange = useCallback(
@@ -1455,6 +1492,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   return {
     pageTipo,
     filters,
+    mesSelecionado,
     historicoFilters,
     filterOptions,
     agendamentosFiltrados,
@@ -1471,6 +1509,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     previewOpen,
     preview,
     handleFilterChange,
+    handleMesChange,
+    handleYearChange,
     handleClearFilters,
     handleHistoricoFilterChange,
     handleClearHistoricoFilters,

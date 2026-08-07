@@ -1,6 +1,11 @@
 import { computeProximaDataPeriodico } from "@/lib/cargo-periodico";
 import { mesReferenciaIsoFromBR } from "@/lib/duplicidade-validations";
+import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { formatDateBR } from "@/lib/format";
+import {
+  LISTAGEM_MES_VAZIO_MSG,
+  type YearMonth,
+} from "@/lib/listagem-meses";
 import type {
   PeriodicoFuturoDisplayStatus,
   PeriodicoFuturoFilters,
@@ -10,6 +15,7 @@ import type {
 } from "@/lib/types";
 
 export const PERIODICO_FUTURO_MESES = 6;
+export const PERIODICO_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
 
 export const EMPTY_PERIODICO_FUTURO_FILTERS: PeriodicoFuturoFilters = {
   empresa: "",
@@ -161,6 +167,14 @@ export function filterPeriodicosFuturos(
 
     return true;
   });
+}
+
+/** Filtra pela Próxima Data do periódico (entrada/referência do módulo). */
+export function filterPeriodicosFuturosPorMes(
+  records: PeriodicoFuturoRow[],
+  mes: YearMonth
+): PeriodicoFuturoRow[] {
+  return filterByEtapaEntradaMes(records, (r) => r.proxima_data, mes);
 }
 
 export function countPeriodicosByDisplayStatus(

@@ -4,10 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EMPTY_LAUDOS_SST_FILTERS,
   filterLaudosSstProcessos,
+  filterLaudosSstProcessosPorMes,
   type LaudosSstEtapaId,
   type LaudosSstFilters,
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
+import {
+  resolveInitialMesListagem,
+  resolveMesParaAno,
+  type YearMonth,
+} from "@/lib/listagem-meses";
 import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
 
 export function useLaudosSstPage() {
@@ -16,6 +22,9 @@ export function useLaudosSstPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<LaudosSstFilters>(
     EMPTY_LAUDOS_SST_FILTERS
+  );
+  const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
+    resolveInitialMesListagem()
   );
   const [modalProcesso, setModalProcesso] = useState<LaudosSstProcesso | null>(
     null
@@ -45,10 +54,10 @@ export function useLaudosSstPage() {
     void refresh();
   }, [refresh]);
 
-  const filtrados = useMemo(
-    () => filterLaudosSstProcessos(processos, filters),
-    [processos, filters]
-  );
+  const filtrados = useMemo(() => {
+    const porMes = filterLaudosSstProcessosPorMes(processos, mesSelecionado);
+    return filterLaudosSstProcessos(porMes, filters);
+  }, [processos, filters, mesSelecionado]);
 
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -71,6 +80,14 @@ export function useLaudosSstPage() {
     setFilters(EMPTY_LAUDOS_SST_FILTERS);
   }, []);
 
+  const handleMesChange = useCallback((mes: YearMonth) => {
+    setMesSelecionado(mes);
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
+  }, []);
+
   const openProcesso = useCallback((processo: LaudosSstProcesso) => {
     setModalProcesso(processo);
     setModalTab(processo.etapaAtual);
@@ -86,12 +103,15 @@ export function useLaudosSstPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     responsaveis,
     modalProcesso,
     modalTab,
     setModalTab,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
+    handleYearChange,
     openProcesso,
     closeModal,
     refresh,

@@ -13,6 +13,7 @@ export function PeriodicosFuturosPage() {
     saving,
     error,
     filters,
+    mesSelecionado,
     filterOptions,
     filteredRecords,
     paginatedRecords,
@@ -22,6 +23,8 @@ export function PeriodicosFuturosPage() {
     activeCard,
     handleFilterChange,
     handleClearFilters,
+    handleMesChange,
+    handleYearChange,
     handleCardClick,
     setPage,
     handleCriarAgendamento,
@@ -60,6 +63,9 @@ export function PeriodicosFuturosPage() {
           loading={loading}
           error={error}
           saving={saving}
+          mesSelecionado={mesSelecionado}
+          onMesChange={handleMesChange}
+          onYearChange={handleYearChange}
           canActOnRecord={canActOnRecord}
           onCriarAgendamento={handleCriarAgendamento}
           onMarcarReagendado={handleMarcarReagendado}

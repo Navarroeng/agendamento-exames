@@ -67,13 +67,18 @@ function processo(partial: {
   };
 }
 
-const abas = listImplantacaoMesAbas();
+const abas = listImplantacaoMesAbas(2026);
 assert.equal(abas.length, 6);
 assert.deepEqual(abas[0], { year: 2026, month: 7 });
 assert.deepEqual(abas[5], { year: 2026, month: 12 });
 assert.equal(formatImplantacaoMesLabel(abas[0]), "Julho");
 assert.equal(formatImplantacaoMesLabel(abas[1]), "Agosto");
 assert.equal(yearMonthKey(abas[1]), "2026-08");
+
+const abas2027 = listImplantacaoMesAbas(2027);
+assert.equal(abas2027.length, 12);
+assert.deepEqual(abas2027[0], { year: 2027, month: 1 });
+assert.deepEqual(abas2027[11], { year: 2027, month: 12 });
 
 // Mês atual em agosto/2026
 const agoraAgosto = new Date(2026, 7, 15); // monthIndex 7 = agosto

@@ -118,10 +118,17 @@ function matchesText(value: string, query: string): boolean {
 }
 
 function matchesPeriodo(
-  dataAgendamentoIso: string,
+  agendamento: Pick<
+    AgendamentoWithExames,
+    "esocial_entrada_em" | "data_agendamento" | "created_at"
+  >,
   filters: ESocialFilters
 ): boolean {
-  const data = dataAgendamentoIso.split("T")[0];
+  const entradaIso =
+    agendamento.esocial_entrada_em ??
+    agendamento.created_at ??
+    agendamento.data_agendamento;
+  const data = String(entradaIso).split("T")[0];
 
   if (filters.mesReferencia.trim()) {
     const range = parseMonthYearBRToIsoRange(filters.mesReferencia);
@@ -175,7 +182,7 @@ export function filterAgendamentosESocial(
     if (!matchesText(item.cliente_nome, filters.cliente)) return false;
     if (!matchesText(item.colaborador, filters.colaborador)) return false;
     if (!matchesStatusFilter(item, filters.statusEsocial)) return false;
-    if (!matchesPeriodo(item.data_agendamento, filters)) return false;
+    if (!matchesPeriodo(item, filters)) return false;
     return true;
   });
 }

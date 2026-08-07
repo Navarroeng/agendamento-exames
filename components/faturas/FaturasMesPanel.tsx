@@ -1,7 +1,7 @@
 "use client";
 
 import { Field } from "@/components/ui/Field";
-import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import { Panel } from "@/components/ui/Panel";
 import {
   IconReceipt,
@@ -18,6 +18,7 @@ import {
   type FaturaMesStatus,
 } from "@/lib/fatura-mes-resumo";
 import { FATURA_ALTERACAO_POS_EMISSAO_MSG } from "@/lib/fatura-alteracao-pos-emissao";
+import type { YearMonth } from "@/lib/listagem-meses";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaTipo } from "@/lib/types";
 import { FaturasMesRowActions } from "./FaturasMesRowActions";
@@ -49,10 +50,10 @@ const PANEL_CONFIG: Record<
     datalistId: "fatura-mes-clientes",
     listTitle: "Faturamento por cliente",
     entityColumn: "Cliente / Empresa",
-    emptyNone: "Nenhum cliente com agendamentos faturáveis neste mês",
+    emptyNone: "Nenhum registro encontrado para este período.",
     emptyFiltered: " para o filtro informado",
     invalidMonth:
-      "Informe um mês de referência válido (MM/AAAA) para listar os clientes faturáveis.",
+      "Informe um mês de referência válido para listar os clientes faturáveis.",
     helpText: (
       <>
         Apenas agendamentos com status{" "}
@@ -79,10 +80,10 @@ const PANEL_CONFIG: Record<
     datalistId: "fatura-mes-clinicas",
     listTitle: "Custos por clínica",
     entityColumn: "Clínica",
-    emptyNone: "Nenhuma clínica com custos conferíveis neste mês",
+    emptyNone: "Nenhum registro encontrado para este período.",
     emptyFiltered: " para o filtro informado",
     invalidMonth:
-      "Informe um mês de referência válido (MM/AAAA) para listar as clínicas com custos.",
+      "Informe um mês de referência válido para listar as clínicas com custos.",
     helpText: (
       <>
         Apenas agendamentos com status{" "}
@@ -132,6 +133,7 @@ function statusBadge(
 interface FaturasMesPanelProps {
   variant: FaturaTipo;
   filters: FaturaFilters;
+  mesSelecionado: YearMonth;
   options: { clientes: ClienteFilterOption[]; clinicas: string[] };
   rows: FaturaMesRow[];
   resumo: FaturaMesResumoGeral | null;
@@ -139,6 +141,8 @@ interface FaturasMesPanelProps {
   loading: boolean;
   saving: boolean;
   onChange: (field: keyof FaturaFilters, value: string) => void;
+  onMesChange: (mes: YearMonth) => void;
+  onYearChange: (year: number) => void;
   onVisualizarAgendamentos: (referenciaNome: string) => void;
   onEmitir: (referenciaNome: string) => void;
   onVisualizarFatura: (id: string) => void;
@@ -156,6 +160,7 @@ interface FaturasMesPanelProps {
 export function FaturasMesPanel({
   variant,
   filters,
+  mesSelecionado,
   options,
   rows,
   resumo,
@@ -163,6 +168,8 @@ export function FaturasMesPanel({
   loading,
   saving,
   onChange,
+  onMesChange,
+  onYearChange,
   onVisualizarAgendamentos,
   onEmitir,
   onVisualizarFatura,
@@ -236,23 +243,27 @@ export function FaturasMesPanel({
   return (
     <div className="space-y-5">
       <Panel title="Mês de referência" icon={<IconSearch />}>
+        <ListagemMesAnoTabs
+          selected={mesSelecionado}
+          onSelect={onMesChange}
+          onYearChange={onYearChange}
+          ariaLabel={
+            variant === "cliente"
+              ? "Filtrar faturas pelo mês de referência"
+              : "Filtrar custos pelo mês de referência"
+          }
+          monthTitlePrefix={
+            variant === "cliente"
+              ? "Faturas de"
+              : "Custos de"
+          }
+        />
+
         <div
-          className={`grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2 ${
-            variant === "cliente" ? "lg:grid-cols-3" : ""
+          className={`mt-3 grid grid-cols-1 items-start gap-x-4 gap-y-3.5 sm:grid-cols-2 ${
+            variant === "cliente" ? "lg:grid-cols-2" : ""
           }`}
         >
-          <Field label="Mês de referência">
-            <MonthReferenceSelect
-              value={filters.mesReferencia}
-              disabled={disabled}
-              allowEmpty
-              onChange={(value) => onChange("mesReferencia", value)}
-            />
-            <p className="text-[10px] text-[#94a3b8]">
-              Mês completo (ex.: 06/2026 = 01/06 a 30/06)
-            </p>
-          </Field>
-
           <Field label={config.filterLabel}>
             {variant === "cliente" ? (
               <>

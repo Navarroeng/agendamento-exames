@@ -138,7 +138,7 @@ export function ESocialTable({
 
         {!loading && !error && totalFiltrados === 0 && (
           <p className="py-6 text-center text-sm text-app-muted">
-            Nenhum ASO pendente de ação com os filtros aplicados.
+            Nenhum registro encontrado para este período.
           </p>
         )}
 

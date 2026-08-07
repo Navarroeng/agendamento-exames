@@ -4,6 +4,8 @@ import {
   type LaudosSstProcesso,
   type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
+import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
+import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /** Etapas exclusivas de Riscos Psicossociais (ordem fixa). */
@@ -152,6 +154,15 @@ export function filterRiscosPsicossociaisProcessos(
     return false;
   });
 }
+
+export function filterRiscosPsicossociaisProcessosPorMes(
+  processos: RiscosPsicossociaisProcesso[],
+  mes: YearMonth
+): RiscosPsicossociaisProcesso[] {
+  return filterByEtapaEntradaMes(processos, (p) => p.dataEntrada, mes);
+}
+
+export const RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
 
 export function sortRiscosPsicossociaisProcessos(
   processos: RiscosPsicossociaisProcesso[]

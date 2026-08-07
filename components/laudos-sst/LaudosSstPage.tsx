@@ -13,12 +13,15 @@ export function LaudosSstPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     responsaveis,
     modalProcesso,
     modalTab,
     setModalTab,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
+    handleYearChange,
     openProcesso,
     closeModal,
   } = useLaudosSstPage();
@@ -43,6 +46,9 @@ export function LaudosSstPage() {
         processos={processos}
         loading={loading}
         error={error}
+        mesSelecionado={mesSelecionado}
+        onMesChange={handleMesChange}
+        onYearChange={handleYearChange}
         onVisualizar={openProcesso}
       />
 

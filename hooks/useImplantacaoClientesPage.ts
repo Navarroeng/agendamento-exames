@@ -18,6 +18,7 @@ import {
 } from "@/lib/implantacao-clientes";
 import {
   resolveInitialImplantacaoMes,
+  resolveImplantacaoMesParaAno,
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
@@ -163,6 +164,12 @@ export function useImplantacaoClientesPage() {
 
   const handleMesChange = useCallback((mes: ImplantacaoYearMonth) => {
     setMesSelecionado(mes);
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setMesSelecionado((prev) =>
+      resolveImplantacaoMesParaAno(year, prev.month)
+    );
   }, []);
 
   const openProcesso = useCallback(
@@ -931,6 +938,7 @@ export function useImplantacaoClientesPage() {
     handleFilterChange,
     clearFilters,
     handleMesChange,
+    handleYearChange,
     handleVisualizar,
     handleContinuar,
     closeModal,

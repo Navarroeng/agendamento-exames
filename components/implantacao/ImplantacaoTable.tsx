@@ -24,6 +24,7 @@ interface ImplantacaoTableProps {
   error: string | null;
   mesSelecionado: ImplantacaoYearMonth;
   onMesChange: (mes: ImplantacaoYearMonth) => void;
+  onYearChange: (year: number) => void;
   onVisualizar: (orcamentoId: string) => void;
   onContinuar: (orcamentoId: string) => void;
 }
@@ -75,6 +76,7 @@ export function ImplantacaoTable({
   error,
   mesSelecionado,
   onMesChange,
+  onYearChange,
   onVisualizar,
   onContinuar,
 }: ImplantacaoTableProps) {
@@ -84,7 +86,11 @@ export function ImplantacaoTable({
       icon={<IconChecklist />}
       iconTone="blue"
     >
-      <ImplantacaoMesTabs selected={mesSelecionado} onSelect={onMesChange} />
+      <ImplantacaoMesTabs
+        selected={mesSelecionado}
+        onSelect={onMesChange}
+        onYearChange={onYearChange}
+      />
 
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (

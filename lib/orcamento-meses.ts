@@ -3,11 +3,13 @@
  */
 
 import {
+  LISTAGEM_MES_VAZIO_MSG,
   belongsToYearMonth,
   isMesDisponivel,
   listAnosDisponiveis,
-  listMesAbasDoAno,
-  resolveInitialMes,
+  listMesAbasListagem,
+  resolveInitialMesListagem,
+  resolveMesParaAno,
   type YearMonth,
 } from "@/lib/listagem-meses";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
@@ -18,8 +20,7 @@ export type OrcamentoYearMonth = YearMonth;
 export const ORCAMENTO_MESES_ANO_INICIO = 2026;
 export const ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO = 7;
 
-export const ORCAMENTO_MES_VAZIO_MSG =
-  "Nenhum orçamento encontrado para este período.";
+export const ORCAMENTO_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
 
 /** Anos do seletor: 2026 … ano civil atual. */
 export function listOrcamentoAnos(now: Date = new Date()): number[] {
@@ -32,22 +33,20 @@ export function listOrcamentoAnos(now: Date = new Date()): number[] {
  * - demais anos → janeiro–dezembro
  */
 export function listOrcamentoMesAbas(year: number): OrcamentoYearMonth[] {
-  const startMonth =
-    year === ORCAMENTO_MESES_ANO_INICIO
-      ? ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO
-      : 1;
-  return listMesAbasDoAno(year, startMonth);
+  return listMesAbasListagem(year, {
+    startYear: ORCAMENTO_MESES_ANO_INICIO,
+    startMonthFirstYear: ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO,
+  });
 }
 
 export function resolveInitialOrcamentoMes(
   now: Date = new Date()
 ): OrcamentoYearMonth {
-  const year = now.getFullYear();
-  const anos = listOrcamentoAnos(now);
-  const selectedYear = anos.includes(year)
-    ? year
-    : anos[anos.length - 1] ?? ORCAMENTO_MESES_ANO_INICIO;
-  return resolveInitialMes(now, listOrcamentoMesAbas(selectedYear));
+  return resolveInitialMesListagem({
+    startYear: ORCAMENTO_MESES_ANO_INICIO,
+    startMonthFirstYear: ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO,
+    now,
+  });
 }
 
 /**
@@ -59,17 +58,11 @@ export function resolveOrcamentoMesParaAno(
   preferredMonth: number,
   now: Date = new Date()
 ): OrcamentoYearMonth {
-  const abas = listOrcamentoMesAbas(year);
-  if (abas.length === 0) {
-    return { year, month: preferredMonth };
-  }
-
-  const preferred = abas.find((a) => a.month === preferredMonth);
-  if (preferred && isMesDisponivel(preferred, now)) {
-    return preferred;
-  }
-
-  return resolveInitialMes(now, abas);
+  return resolveMesParaAno(year, preferredMonth, {
+    startYear: ORCAMENTO_MESES_ANO_INICIO,
+    startMonthFirstYear: ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO,
+    now,
+  });
 }
 
 export function orcamentoBelongsToMes(
@@ -86,3 +79,6 @@ export function filterOrcamentosPorMes(
 ): OrcamentoRecord[] {
   return orcamentos.filter((o) => orcamentoBelongsToMes(o, mes));
 }
+
+// re-export used by tests
+export { isMesDisponivel };

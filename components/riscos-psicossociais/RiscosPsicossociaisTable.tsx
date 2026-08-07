@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import { Panel } from "@/components/ui/Panel";
 import { IconEye, IconShield } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
@@ -8,14 +9,19 @@ import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
+  RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import type { YearMonth } from "@/lib/listagem-meses";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 interface RiscosPsicossociaisTableProps {
   processos: RiscosPsicossociaisProcesso[];
   loading: boolean;
   error: string | null;
+  mesSelecionado: YearMonth;
+  onMesChange: (mes: YearMonth) => void;
+  onYearChange: (year: number) => void;
   onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
 }
 
@@ -58,6 +64,9 @@ export function RiscosPsicossociaisTable({
   processos,
   loading,
   error,
+  mesSelecionado,
+  onMesChange,
+  onYearChange,
   onVisualizar,
 }: RiscosPsicossociaisTableProps) {
   return (
@@ -66,6 +75,14 @@ export function RiscosPsicossociaisTable({
       icon={<IconShield />}
       iconTone="blue"
     >
+      <ListagemMesAnoTabs
+        selected={mesSelecionado}
+        onSelect={onMesChange}
+        onYearChange={onYearChange}
+        ariaLabel="Filtrar Riscos Psicossociais pelo mês de entrada na etapa"
+        monthTitlePrefix="Entradas em Riscos Psicossociais de"
+      />
+
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (
           <p className="py-8 text-center text-sm text-app-muted">Carregando...</p>
@@ -75,7 +92,7 @@ export function RiscosPsicossociaisTable({
         )}
         {!loading && !error && processos.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
-            Nenhum processo com Laudos SST concluído para Riscos Psicossociais.
+            {RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG}
           </p>
         )}
         {!loading && !error && processos.length > 0 && (

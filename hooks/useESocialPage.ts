@@ -22,6 +22,13 @@ import {
   type ESocialFilters,
 } from "@/lib/esocial-filters";
 import {
+  resolveInitialMesListagem,
+  resolveMesParaAno,
+  yearMonthToMesReferenciaBR,
+  mesReferenciaBRToYearMonth,
+  type YearMonth,
+} from "@/lib/listagem-meses";
+import {
   cycleESocialTableSort,
   orderESocialForTable,
   type ESocialTableSortColumn,
@@ -69,7 +76,10 @@ export function useESocialPage() {
   } = useAgendamentosList();
   const { clientes } = useClientesList();
 
-  const [filters, setFilters] = useState<ESocialFilters>(EMPTY_ESOCIAL_FILTERS);
+  const [filters, setFilters] = useState<ESocialFilters>(() => ({
+    ...EMPTY_ESOCIAL_FILTERS,
+    mesReferencia: yearMonthToMesReferenciaBR(resolveInitialMesListagem()),
+  }));
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<ESocialTableSortState | null>(null);
@@ -177,6 +187,13 @@ export function useESocialPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  const mesSelecionado = useMemo<YearMonth>(() => {
+    return (
+      mesReferenciaBRToYearMonth(filters.mesReferencia) ??
+      resolveInitialMesListagem()
+    );
+  }, [filters.mesReferencia]);
+
   const handleFilterChange = useCallback(
     (field: keyof ESocialFilters, value: string) => {
       setFilters((prev) => ({ ...prev, [field]: value }));
@@ -185,8 +202,35 @@ export function useESocialPage() {
   );
 
   const handleClearFilters = useCallback(() => {
-    setFilters(EMPTY_ESOCIAL_FILTERS);
+    setFilters({
+      ...EMPTY_ESOCIAL_FILTERS,
+      mesReferencia: yearMonthToMesReferenciaBR(resolveInitialMesListagem()),
+    });
     setPage(1);
+  }, []);
+
+  const handleMesChange = useCallback((mes: YearMonth) => {
+    setFilters((prev) => ({
+      ...prev,
+      mesReferencia: yearMonthToMesReferenciaBR(mes),
+      dataInicio: "",
+      dataFim: "",
+    }));
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setFilters((prev) => {
+      const current =
+        mesReferenciaBRToYearMonth(prev.mesReferencia) ??
+        resolveInitialMesListagem();
+      const next = resolveMesParaAno(year, current.month);
+      return {
+        ...prev,
+        mesReferencia: yearMonthToMesReferenciaBR(next),
+        dataInicio: "",
+        dataFim: "",
+      };
+    });
   }, []);
 
   const toggleFilters = useCallback(() => {
@@ -537,6 +581,7 @@ export function useESocialPage() {
     error,
     saving,
     filters,
+    mesSelecionado,
     filtersExpanded,
     filterOptions,
     filteredAgendamentos,
@@ -549,6 +594,8 @@ export function useESocialPage() {
     handleSortColumn,
     handleFilterChange,
     handleClearFilters,
+    handleMesChange,
+    handleYearChange,
     toggleFilters,
     setPage,
     viewAgendamento,

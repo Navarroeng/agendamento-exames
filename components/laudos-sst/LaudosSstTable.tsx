@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import { Panel } from "@/components/ui/Panel";
 import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
@@ -8,14 +9,19 @@ import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   LAUDOS_SST_ETAPA_LABELS,
   LAUDOS_SST_ETAPAS,
+  LAUDOS_SST_MES_VAZIO_MSG,
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
+import type { YearMonth } from "@/lib/listagem-meses";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 interface LaudosSstTableProps {
   processos: LaudosSstProcesso[];
   loading: boolean;
   error: string | null;
+  mesSelecionado: YearMonth;
+  onMesChange: (mes: YearMonth) => void;
+  onYearChange: (year: number) => void;
   onVisualizar: (processo: LaudosSstProcesso) => void;
 }
 
@@ -54,10 +60,21 @@ export function LaudosSstTable({
   processos,
   loading,
   error,
+  mesSelecionado,
+  onMesChange,
+  onYearChange,
   onVisualizar,
 }: LaudosSstTableProps) {
   return (
     <Panel title="Processos de Laudos SST" icon={<IconFileText />} iconTone="blue">
+      <ListagemMesAnoTabs
+        selected={mesSelecionado}
+        onSelect={onMesChange}
+        onYearChange={onYearChange}
+        ariaLabel="Filtrar Laudos SST pelo mês de entrada na etapa"
+        monthTitlePrefix="Entradas em Laudos SST de"
+      />
+
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (
           <p className="py-8 text-center text-sm text-app-muted">Carregando...</p>
@@ -67,14 +84,14 @@ export function LaudosSstTable({
         )}
         {!loading && !error && processos.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
-            Nenhum processo com implantação concluída para Laudos SST.
+            {LAUDOS_SST_MES_VAZIO_MSG}
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
           <table className="table-premium w-full min-w-[1100px]">
             <thead>
               <tr>
-                <th>Data de conclusão</th>
+                <th>Data de entrada</th>
                 <th>Orçamento</th>
                 <th>Contrato</th>
                 <th>Cliente</th>
@@ -90,15 +107,13 @@ export function LaudosSstTable({
               {processos.map((processo) => {
                 const { orcamento, numeroContrato } = processo.implantacao;
                 const cnpj = orcamento.cliente_cnpj;
-                const dataConclusao = processo.dataConclusaoImplantacao
-                  ? formatDateIsoToBR(
-                      processo.dataConclusaoImplantacao.slice(0, 10)
-                    )
+                const dataEntrada = processo.dataEntrada
+                  ? formatDateIsoToBR(processo.dataEntrada.slice(0, 10))
                   : "—";
 
                 return (
                   <tr key={orcamento.id}>
-                    <td className="whitespace-nowrap">{dataConclusao}</td>
+                    <td className="whitespace-nowrap">{dataEntrada}</td>
                     <td className="font-bold text-navy">{orcamento.numero}</td>
                     <td className="whitespace-nowrap">
                       {numeroContrato?.trim() || "—"}

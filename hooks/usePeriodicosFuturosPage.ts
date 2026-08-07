@@ -10,9 +10,15 @@ import {
   countPeriodicosByDisplayStatus,
   extractPeriodicoFilterOptions,
   filterPeriodicosFuturos,
+  filterPeriodicosFuturosPorMes,
   isPeriodicoActionable,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
+import {
+  resolveInitialMesListagem,
+  resolveMesParaAno,
+  type YearMonth,
+} from "@/lib/listagem-meses";
 import type {
   PeriodicoFuturoDisplayStatus,
   PeriodicoFuturoFilters,
@@ -41,6 +47,9 @@ export function usePeriodicosFuturosPage() {
   const [activeCard, setActiveCard] = useState<
     PeriodicoFuturoDisplayStatus | ""
   >("");
+  const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
+    resolveInitialMesListagem()
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -61,22 +70,28 @@ export function usePeriodicosFuturosPage() {
     refresh();
   }, [refresh]);
 
+  const recordsDoMes = useMemo(
+    () => filterPeriodicosFuturosPorMes(records, mesSelecionado),
+    [records, mesSelecionado]
+  );
+
   const filterOptions = useMemo(
-    () => extractPeriodicoFilterOptions(records),
-    [records]
+    () => extractPeriodicoFilterOptions(recordsDoMes),
+    [recordsDoMes]
   );
 
   const filteredRecords = useMemo(() => {
     const mergedFilters: PeriodicoFuturoFilters = {
       ...filters,
+      mesReferencia: "",
       status: activeCard || filters.status,
     };
-    return filterPeriodicosFuturos(records, mergedFilters);
-  }, [records, filters, activeCard]);
+    return filterPeriodicosFuturos(recordsDoMes, mergedFilters);
+  }, [recordsDoMes, filters, activeCard]);
 
   const counts = useMemo(
-    () => countPeriodicosByDisplayStatus(records),
-    [records]
+    () => countPeriodicosByDisplayStatus(recordsDoMes),
+    [recordsDoMes]
   );
 
   const totalPages = useMemo(
@@ -91,7 +106,7 @@ export function usePeriodicosFuturosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters, activeCard]);
+  }, [filters, activeCard, mesSelecionado]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -108,6 +123,14 @@ export function usePeriodicosFuturosPage() {
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_PERIODICO_FUTURO_FILTERS);
     setActiveCard("");
+  }, []);
+
+  const handleMesChange = useCallback((mes: YearMonth) => {
+    setMesSelecionado(mes);
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
   }, []);
 
   const handleCardClick = useCallback((status: PeriodicoFuturoDisplayStatus) => {
@@ -183,6 +206,7 @@ export function usePeriodicosFuturosPage() {
     saving,
     error,
     filters,
+    mesSelecionado,
     filterOptions,
     filteredRecords,
     paginatedRecords,
@@ -192,6 +216,8 @@ export function usePeriodicosFuturosPage() {
     activeCard,
     handleFilterChange,
     handleClearFilters,
+    handleMesChange,
+    handleYearChange,
     handleCardClick,
     setPage,
     handleCriarAgendamento,

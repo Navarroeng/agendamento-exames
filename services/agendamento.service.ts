@@ -112,9 +112,15 @@ export async function salvarAgendamentoComExames(
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo);
   const supabase = createClient();
 
+  const payload = {
+    ...agendamento,
+    esocial_entrada_em:
+      agendamento.esocial_entrada_em ?? new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from("agendamentos")
-    .insert(agendamento)
+    .insert(payload)
     .select("id")
     .single();
 

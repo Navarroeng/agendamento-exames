@@ -39,6 +39,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
   const meta = PAGE_META[tipo];
   const {
     filters,
+    mesSelecionado,
     filterOptions,
     mesReferenciaValido,
     resumoMes,
@@ -47,6 +48,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     previewOpen,
     preview,
     handleFilterChange,
+    handleMesChange,
+    handleYearChange,
     handleClosePreview,
     handleSaveDraft,
     handleEmit,
@@ -88,6 +91,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         <FaturasMesPanel
           variant={tipo}
           filters={filters}
+          mesSelecionado={mesSelecionado}
           options={filterOptions}
           rows={resumoMes?.rows ?? []}
           resumo={resumoMes?.resumo ?? null}
@@ -95,6 +99,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           loading={loading}
           saving={saving}
           onChange={handleFilterChange}
+          onMesChange={handleMesChange}
+          onYearChange={handleYearChange}
           onVisualizarAgendamentos={handleVisualizarAgendamentos}
           onEmitir={handleEmitirReferencia}
           onVisualizarFatura={handleVisualizar}

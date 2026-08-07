@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconEsocial } from "@/components/ui/icons/OutlineIcons";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { useESocialPage } from "@/hooks/useESocialPage";
 import { ESocialCancelarEnvioModal } from "./ESocialCancelarEnvioModal";
@@ -17,6 +18,7 @@ export function ESocialPage() {
     error,
     saving,
     filters,
+    mesSelecionado,
     filtersExpanded,
     filterOptions,
     filteredAgendamentos,
@@ -28,6 +30,8 @@ export function ESocialPage() {
     handleSortColumn,
     handleFilterChange,
     handleClearFilters,
+    handleMesChange,
+    handleYearChange,
     toggleFilters,
     setPage,
     viewAgendamento,
@@ -62,6 +66,14 @@ export function ESocialPage() {
       icon={<IconEsocial size={20} />}
     >
       <div className="space-y-5">
+        <ListagemMesAnoTabs
+          selected={mesSelecionado}
+          onSelect={handleMesChange}
+          onYearChange={handleYearChange}
+          ariaLabel="Filtrar e-Social pelo mês de entrada na etapa"
+          monthTitlePrefix="Entradas no e-Social de"
+        />
+
         <ESocialSummaryCards stats={summary} />
 
         <ESocialFiltersPanel

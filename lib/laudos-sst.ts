@@ -1,4 +1,6 @@
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
+import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
+import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /** Etapas exclusivas do módulo Laudos SST (ordem fixa). */
@@ -27,6 +29,8 @@ export interface OrcamentoLaudosSstRecord {
   etapa_atual: LaudosSstEtapaId;
   etapas_concluidas: number;
   status?: LaudosSstStatus | null;
+  /** Momento em que o processo entrou em Laudos SST. */
+  entrada_em?: string | null;
   concluido_em?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -39,6 +43,8 @@ export interface LaudosSstProcesso {
   totalEtapas: number;
   progressoLabel: string;
   status: LaudosSstStatus;
+  /** Data de entrada na etapa Laudos SST. */
+  dataEntrada: string | null;
   /** Quando o Laudo SST ficou concluído (6/6). */
   concluidoEm: string | null;
   /** Reservado: data de conclusão da implantação. */
@@ -120,6 +126,7 @@ export function buildLaudosSstProcesso(
     totalEtapas: LAUDOS_SST_TOTAL_ETAPAS,
     progressoLabel: `${concluido ? LAUDOS_SST_TOTAL_ETAPAS : etapasConcluidas} de ${LAUDOS_SST_TOTAL_ETAPAS}`,
     status: concluido ? "concluido" : "em_andamento",
+    dataEntrada: tracking?.entrada_em ?? tracking?.created_at ?? null,
     concluidoEm: concluido ? tracking?.concluido_em ?? null : null,
     dataConclusaoImplantacao: null,
   };
@@ -166,12 +173,21 @@ export function filterLaudosSstProcessos(
   });
 }
 
+export function filterLaudosSstProcessosPorMes(
+  processos: LaudosSstProcesso[],
+  mes: YearMonth
+): LaudosSstProcesso[] {
+  return filterByEtapaEntradaMes(processos, (p) => p.dataEntrada, mes);
+}
+
+export const LAUDOS_SST_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
+
 export function sortLaudosSstProcessos(
   processos: LaudosSstProcesso[]
 ): LaudosSstProcesso[] {
   return [...processos].sort((a, b) => {
-    const da = a.implantacao.dataAprovacao ?? "";
-    const db = b.implantacao.dataAprovacao ?? "";
+    const da = a.dataEntrada ?? "";
+    const db = b.dataEntrada ?? "";
     if (da !== db) return db.localeCompare(da);
     return a.implantacao.orcamento.numero.localeCompare(
       b.implantacao.orcamento.numero,

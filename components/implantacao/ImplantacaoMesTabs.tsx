@@ -1,38 +1,35 @@
 "use client";
 
-import { MesAnoTabs } from "@/components/ui/MesAnoTabs";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import {
-  formatImplantacaoMesLabel,
-  listImplantacaoMesAbas,
+  IMPLANTACAO_MESES_ANO_INICIO,
+  IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO,
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
 
 interface ImplantacaoMesTabsProps {
   selected: ImplantacaoYearMonth;
   onSelect: (mes: ImplantacaoYearMonth) => void;
+  onYearChange: (year: number) => void;
   now?: Date;
 }
 
 export function ImplantacaoMesTabs({
   selected,
   onSelect,
+  onYearChange,
   now = new Date(),
 }: ImplantacaoMesTabsProps) {
-  const abas = listImplantacaoMesAbas();
-
   return (
-    <MesAnoTabs
-      months={abas}
+    <ListagemMesAnoTabs
       selected={selected}
       onSelect={onSelect}
+      onYearChange={onYearChange}
+      startYear={IMPLANTACAO_MESES_ANO_INICIO}
+      startMonthFirstYear={IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO}
       now={now}
-      ariaLabel="Filtrar processos pelo mês da aprovação"
-      monthTitle={(mes, disponivel) => {
-        const label = formatImplantacaoMesLabel(mes);
-        return disponivel
-          ? `Aprovações de ${label} de ${mes.year}`
-          : `${label} de ${mes.year} ainda não disponível`;
-      }}
+      ariaLabel="Filtrar processos pelo mês de entrada na Implantação"
+      monthTitlePrefix="Entradas em Implantação de"
     />
   );
 }

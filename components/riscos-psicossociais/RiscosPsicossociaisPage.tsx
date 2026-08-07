@@ -13,12 +13,15 @@ export function RiscosPsicossociaisPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     responsaveis,
     modalProcesso,
     modalTab,
     setModalTab,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
+    handleYearChange,
     openProcesso,
     closeModal,
   } = useRiscosPsicossociaisPage();
@@ -43,6 +46,9 @@ export function RiscosPsicossociaisPage() {
         processos={processos}
         loading={loading}
         error={error}
+        mesSelecionado={mesSelecionado}
+        onMesChange={handleMesChange}
+        onYearChange={handleYearChange}
         onVisualizar={openProcesso}
       />
 

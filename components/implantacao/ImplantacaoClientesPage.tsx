@@ -32,6 +32,7 @@ export function ImplantacaoClientesPage() {
     handleFilterChange,
     clearFilters,
     handleMesChange,
+    handleYearChange,
     handleVisualizar,
     handleContinuar,
     closeModal,
@@ -78,6 +79,7 @@ export function ImplantacaoClientesPage() {
         error={error}
         mesSelecionado={mesSelecionado}
         onMesChange={handleMesChange}
+        onYearChange={handleYearChange}
         onVisualizar={(id) => {
           void handleVisualizar(id);
         }}

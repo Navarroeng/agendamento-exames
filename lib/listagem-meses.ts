@@ -156,3 +156,120 @@ export function listAnosDisponiveis(
   for (let y = startYear; y <= end; y += 1) years.push(y);
   return years;
 }
+
+/** Ano inicial padrão das listagens operacionais. */
+export const LISTAGEM_ANO_INICIO = 2026;
+
+export const LISTAGEM_MES_VAZIO_MSG =
+  "Nenhum registro encontrado para este período.";
+
+/**
+ * Abas mensais de um ano.
+ * Se `startMonthFirstYear` for informado e `year === startYear`,
+ * o primeiro ano começa nesse mês (ex.: jul/2026).
+ */
+export function listMesAbasListagem(
+  year: number,
+  opts?: {
+    startYear?: number;
+    startMonthFirstYear?: number;
+  }
+): YearMonth[] {
+  const startYear = opts?.startYear ?? LISTAGEM_ANO_INICIO;
+  const startMonthFirstYear = opts?.startMonthFirstYear ?? 1;
+  const startMonth =
+    year === startYear ? startMonthFirstYear : 1;
+  return listMesAbasDoAno(year, startMonth);
+}
+
+/**
+ * Ao trocar o ano, mantém o mês se ainda for válido/disponível;
+ * senão escolhe o melhor mês disponível daquele ano.
+ */
+export function resolveMesParaAno(
+  year: number,
+  preferredMonth: number,
+  opts?: {
+    startYear?: number;
+    startMonthFirstYear?: number;
+    now?: Date;
+  }
+): YearMonth {
+  const now = opts?.now ?? new Date();
+  const abas = listMesAbasListagem(year, opts);
+  if (abas.length === 0) {
+    return { year, month: preferredMonth };
+  }
+
+  const preferred = abas.find((a) => a.month === preferredMonth);
+  if (preferred && isMesDisponivel(preferred, now)) {
+    return preferred;
+  }
+
+  return resolveInitialMes(now, abas);
+}
+
+export function resolveInitialMesListagem(
+  opts?: {
+    startYear?: number;
+    startMonthFirstYear?: number;
+    now?: Date;
+  }
+): YearMonth {
+  const now = opts?.now ?? new Date();
+  const startYear = opts?.startYear ?? LISTAGEM_ANO_INICIO;
+  const anos = listAnosDisponiveis(startYear, now);
+  const year = now.getFullYear();
+  const selectedYear = anos.includes(year)
+    ? year
+    : anos[anos.length - 1] ?? startYear;
+  return resolveInitialMes(
+    now,
+    listMesAbasListagem(selectedYear, opts)
+  );
+}
+
+/** Converte YearMonth → MM/AAAA (filtros legados de fatura/periódico). */
+export function yearMonthToMesReferenciaBR(mes: YearMonth): string {
+  return `${String(mes.month).padStart(2, "0")}/${mes.year}`;
+}
+
+/** Converte MM/AAAA → YearMonth. */
+export function mesReferenciaBRToYearMonth(
+  value: string | null | undefined
+): YearMonth | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const month = Number(match[1]);
+  const year = Number(match[2]);
+  if (
+    !Number.isFinite(month) ||
+    !Number.isFinite(year) ||
+    month < 1 ||
+    month > 12
+  ) {
+    return null;
+  }
+  return { year, month };
+}
+
+/** Converte YYYY-MM (mes_referencia ISO) → YearMonth. */
+export function mesReferenciaIsoToYearMonth(
+  value: string | null | undefined
+): YearMonth | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (
+    !Number.isFinite(month) ||
+    !Number.isFinite(year) ||
+    month < 1 ||
+    month > 12
+  ) {
+    return null;
+  }
+  return { year, month };
+}

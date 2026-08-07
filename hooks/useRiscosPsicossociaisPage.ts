@@ -4,10 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS,
   filterRiscosPsicossociaisProcessos,
+  filterRiscosPsicossociaisProcessosPorMes,
   type RiscosPsicossociaisEtapaId,
   type RiscosPsicossociaisFilters,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import {
+  resolveInitialMesListagem,
+  resolveMesParaAno,
+  type YearMonth,
+} from "@/lib/listagem-meses";
 import { listarProcessosRiscosPsicossociais } from "@/services/riscos-psicossociais.service";
 
 export function useRiscosPsicossociaisPage() {
@@ -16,6 +22,9 @@ export function useRiscosPsicossociaisPage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RiscosPsicossociaisFilters>(
     EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS
+  );
+  const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
+    resolveInitialMesListagem()
   );
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
@@ -45,10 +54,13 @@ export function useRiscosPsicossociaisPage() {
     void refresh();
   }, [refresh]);
 
-  const filtrados = useMemo(
-    () => filterRiscosPsicossociaisProcessos(processos, filters),
-    [processos, filters]
-  );
+  const filtrados = useMemo(() => {
+    const porMes = filterRiscosPsicossociaisProcessosPorMes(
+      processos,
+      mesSelecionado
+    );
+    return filterRiscosPsicossociaisProcessos(porMes, filters);
+  }, [processos, filters, mesSelecionado]);
 
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -74,6 +86,14 @@ export function useRiscosPsicossociaisPage() {
     setFilters(EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS);
   }, []);
 
+  const handleMesChange = useCallback((mes: YearMonth) => {
+    setMesSelecionado(mes);
+  }, []);
+
+  const handleYearChange = useCallback((year: number) => {
+    setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
+  }, []);
+
   const openProcesso = useCallback((processo: RiscosPsicossociaisProcesso) => {
     setModalProcesso(processo);
     setModalTab(processo.etapaAtual);
@@ -89,12 +109,15 @@ export function useRiscosPsicossociaisPage() {
     loading,
     error,
     filters,
+    mesSelecionado,
     responsaveis,
     modalProcesso,
     modalTab,
     setModalTab,
     handleFilterChange,
     clearFilters,
+    handleMesChange,
+    handleYearChange,
     openProcesso,
     closeModal,
     refresh,

@@ -1,12 +1,11 @@
 "use client";
 
-import { MesAnoTabs } from "@/components/ui/MesAnoTabs";
+import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import {
-  listOrcamentoAnos,
-  listOrcamentoMesAbas,
+  ORCAMENTO_MESES_ANO_INICIO,
+  ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO,
   type OrcamentoYearMonth,
 } from "@/lib/orcamento-meses";
-import { formatMesLabel } from "@/lib/listagem-meses";
 
 interface OrcamentoMesTabsProps {
   selected: OrcamentoYearMonth;
@@ -21,25 +20,16 @@ export function OrcamentoMesTabs({
   onYearChange,
   now = new Date(),
 }: OrcamentoMesTabsProps) {
-  const years = listOrcamentoAnos(now);
-  const months = listOrcamentoMesAbas(selected.year);
-
   return (
-    <MesAnoTabs
-      months={months}
+    <ListagemMesAnoTabs
       selected={selected}
       onSelect={onSelect}
-      year={selected.year}
-      years={years}
       onYearChange={onYearChange}
+      startYear={ORCAMENTO_MESES_ANO_INICIO}
+      startMonthFirstYear={ORCAMENTO_MESES_MES_INICIO_PRIMEIRO_ANO}
       now={now}
       ariaLabel="Filtrar orçamentos pelo mês da data da proposta"
-      monthTitle={(mes, disponivel) => {
-        const label = formatMesLabel(mes);
-        return disponivel
-          ? `Orçamentos de ${label} de ${mes.year}`
-          : `${label} de ${mes.year} ainda não disponível`;
-      }}
+      monthTitlePrefix="Orçamentos de"
     />
   );
 }

@@ -46,6 +46,8 @@ export interface AgendamentoInsert {
   envio_esocial: boolean;
   data_envio_esocial: string | null;
   esocial_recibo?: string | null;
+  /** Momento em que o agendamento entrou na etapa eSocial. */
+  esocial_entrada_em?: string | null;
   esocial_envio_cancelado?: boolean;
   esocial_cancelado_em?: string | null;
   esocial_cancelado_por?: string | null;

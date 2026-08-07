@@ -1,17 +1,20 @@
 /**
  * Abas mensais da listagem “Processos de implantação”.
- * Configuração centralizada (mês/ano) — fácil estender para 2027+.
+ * Filtro pela data de entrada na etapa (= aprovado_em).
  */
 
 import {
+  LISTAGEM_MES_VAZIO_MSG,
   belongsToYearMonth,
   compareYearMonth,
   formatMesLabel,
   getNowYearMonth,
   isMesDisponivel,
   isSameYearMonth,
-  listMesAbas,
-  resolveInitialMes,
+  listAnosDisponiveis,
+  listMesAbasListagem,
+  resolveInitialMesListagem,
+  resolveMesParaAno,
   yearMonthFromIsoDate,
   yearMonthKey,
   type YearMonth,
@@ -19,13 +22,17 @@ import {
 
 export type ImplantacaoYearMonth = YearMonth;
 
-/** Início do intervalo de abas exibido na UI. */
+/** Mesmo marco do sistema (julho/2026). */
+export const IMPLANTACAO_MESES_ANO_INICIO = 2026;
+export const IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO = 7;
+
+/** @deprecated Use IMPLANTACAO_MESES_ANO_INICIO + listagem anual. */
 export const IMPLANTACAO_MESES_ABAS_INICIO: ImplantacaoYearMonth = {
   year: 2026,
   month: 7,
 };
 
-/** Fim do intervalo de abas exibido na UI. */
+/** @deprecated */
 export const IMPLANTACAO_MESES_ABAS_FIM: ImplantacaoYearMonth = {
   year: 2026,
   month: 12,
@@ -42,15 +49,19 @@ export function formatImplantacaoMesLabel(mes: ImplantacaoYearMonth): string {
   return formatMesLabel(mes);
 }
 
-/** Lista inclusiva de abas entre `from` e `to` (padrão: jul–dez/2026). */
-export function listImplantacaoMesAbas(
-  from: ImplantacaoYearMonth = IMPLANTACAO_MESES_ABAS_INICIO,
-  to: ImplantacaoYearMonth = IMPLANTACAO_MESES_ABAS_FIM
-): ImplantacaoYearMonth[] {
-  return listMesAbas(from, to);
+export function listImplantacaoAnos(now: Date = new Date()): number[] {
+  return listAnosDisponiveis(IMPLANTACAO_MESES_ANO_INICIO, now);
 }
 
-/** Mês futuro (após o mês civil atual) fica desabilitado. Passados e atual liberados. */
+export function listImplantacaoMesAbas(
+  year: number = new Date().getFullYear()
+): ImplantacaoYearMonth[] {
+  return listMesAbasListagem(year, {
+    startYear: IMPLANTACAO_MESES_ANO_INICIO,
+    startMonthFirstYear: IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO,
+  });
+}
+
 export function isImplantacaoMesDisponivel(
   mes: ImplantacaoYearMonth,
   now: Date = new Date()
@@ -58,20 +69,31 @@ export function isImplantacaoMesDisponivel(
   return isMesDisponivel(mes, now);
 }
 
-/**
- * Aba inicial: mês atual se estiver no intervalo e disponível;
- * senão, o último mês disponível da lista; fallback no primeiro.
- */
 export function resolveInitialImplantacaoMes(
-  now: Date = new Date(),
-  abas: ImplantacaoYearMonth[] = listImplantacaoMesAbas()
+  now: Date = new Date()
 ): ImplantacaoYearMonth {
-  return resolveInitialMes(now, abas);
+  return resolveInitialMesListagem({
+    startYear: IMPLANTACAO_MESES_ANO_INICIO,
+    startMonthFirstYear: IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO,
+    now,
+  });
+}
+
+export function resolveImplantacaoMesParaAno(
+  year: number,
+  preferredMonth: number,
+  now: Date = new Date()
+): ImplantacaoYearMonth {
+  return resolveMesParaAno(year, preferredMonth, {
+    startYear: IMPLANTACAO_MESES_ANO_INICIO,
+    startMonthFirstYear: IMPLANTACAO_MESES_MES_INICIO_PRIMEIRO_ANO,
+    now,
+  });
 }
 
 /**
- * Extrai ano/mês da data de aprovação (mesmo critério da coluna:
- * primeiros 10 chars ISO `YYYY-MM-DD`).
+ * Extrai ano/mês da data de entrada na Implantação
+ * (`aprovado_em` / coluna “Data da aprovação”).
  */
 export function yearMonthFromDataAprovacao(
   dataAprovacao: string | null | undefined
@@ -86,5 +108,4 @@ export function processoBelongsToMesAprovacao(
   return belongsToYearMonth(dataAprovacao, mes);
 }
 
-export const IMPLANTACAO_MES_VAZIO_MSG =
-  "Nenhum processo de implantação encontrado para este mês.";
+export const IMPLANTACAO_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
