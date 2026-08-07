@@ -131,8 +131,15 @@ async function auditarPeriodico(
     PeriodicoFuturoRecord,
     "id" | "colaborador" | "cliente_nome" | "exame_nome"
   >,
-  acao: typeof AUDITORIA_ACOES.reagendamento | typeof AUDITORIA_ACOES.cancelamento,
-  verbo: string
+  acao:
+    | typeof AUDITORIA_ACOES.reagendamento
+    | typeof AUDITORIA_ACOES.cancelamento
+    | typeof AUDITORIA_ACOES.edicao,
+  verbo: string,
+  extra?: {
+    dadosAntes?: Record<string, unknown>;
+    dadosDepois?: Record<string, unknown>;
+  }
 ): Promise<void> {
   const nome = auditOptions?.auditContext?.usuarioNome ?? "Sistema";
   await registrarAuditoria({
@@ -144,6 +151,8 @@ async function auditarPeriodico(
     registroId: record.id,
     registroNome: record.colaborador,
     descricao: `${nome} ${verbo} o acompanhamento periódico de ${record.colaborador} (${record.cliente_nome}) — exame ${record.exame_nome}.`,
+    dadosAntes: extra?.dadosAntes,
+    dadosDepois: extra?.dadosDepois,
   });
 }
 
@@ -249,4 +258,62 @@ export async function cancelarAcompanhamentoPeriodico(
       "cancelou o acompanhamento de"
     );
   }
+}
+
+export async function atualizarProximaDataPeriodico(
+  id: string,
+  novaDataIso: string,
+  auditOptions?: PeriodicoAuditOptions
+): Promise<PeriodicoFuturoRecord> {
+  const data = novaDataIso.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    throw new Error("Informe uma data válida (AAAA-MM-DD).");
+  }
+
+  const record = await buscarPeriodicoPorId(id);
+  if (!record) {
+    throw new Error("Periódico futuro não encontrado.");
+  }
+  if (record.status !== "ativo") {
+    throw new Error(
+      "Só é possível editar a próxima data de periódicos ativos."
+    );
+  }
+
+  const dataAnterior = String(record.proxima_data ?? "").slice(0, 10);
+  const dataOriginal =
+    (record.data_prevista_original as string | null)?.slice(0, 10) ||
+    dataAnterior ||
+    null;
+
+  const supabase = createClient();
+  const { data: updated, error } = await supabase
+    .from("periodicos_futuros")
+    .update({
+      proxima_data: data,
+      ...(dataOriginal && data !== dataOriginal ? { antecipado: true } : {}),
+      ...(dataOriginal && data === dataOriginal ? { antecipado: false } : {}),
+    })
+    .eq("id", id)
+    .eq("status", "ativo")
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!updated) {
+    throw new Error("Não foi possível atualizar a próxima data.");
+  }
+
+  await auditarPeriodico(
+    auditOptions,
+    record,
+    AUDITORIA_ACOES.edicao,
+    "alterou a próxima data de",
+    {
+      dadosAntes: { proxima_data: dataAnterior },
+      dadosDepois: { proxima_data: data },
+    }
+  );
+
+  return updated as PeriodicoFuturoRecord;
 }

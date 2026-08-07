@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { IconClock } from "@/components/ui/icons/OutlineIcons";
 import { usePeriodicosFuturosPage } from "@/hooks/usePeriodicosFuturosPage";
+import { PeriodicoEditarProximaDataModal } from "./PeriodicoEditarProximaDataModal";
 import { PeriodicosFuturosCards } from "./PeriodicosFuturosCards";
 import { PeriodicosFuturosFilters } from "./PeriodicosFuturosFilters";
 import { PeriodicosFuturosTable } from "./PeriodicosFuturosTable";
@@ -22,6 +23,7 @@ export function PeriodicosFuturosPage() {
     page,
     totalPages,
     activeCard,
+    editProximaDataRecord,
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
@@ -32,6 +34,9 @@ export function PeriodicosFuturosPage() {
     handleVisualizarAgendamento,
     handleMarcarReagendado,
     handleCancelarAcompanhamento,
+    handleAbrirEditarProximaData,
+    handleFecharEditarProximaData,
+    handleSalvarProximaData,
     canActOnRecord,
   } = usePeriodicosFuturosPage();
 
@@ -70,6 +75,7 @@ export function PeriodicosFuturosPage() {
           onYearChange={handleYearChange}
           canActOnRecord={canActOnRecord}
           onCriarAgendamento={handleCriarAgendamento}
+          onEditarProximaData={handleAbrirEditarProximaData}
           onMarcarReagendado={handleMarcarReagendado}
           onCancelarAcompanhamento={handleCancelarAcompanhamento}
           onVisualizarAgendamento={handleVisualizarAgendamento}
@@ -99,6 +105,14 @@ export function PeriodicosFuturosPage() {
           </button>
         </div>
       )}
+
+      <PeriodicoEditarProximaDataModal
+        open={Boolean(editProximaDataRecord)}
+        record={editProximaDataRecord}
+        saving={saving}
+        onClose={handleFecharEditarProximaData}
+        onSave={handleSalvarProximaData}
+      />
     </AppShell>
   );
 }

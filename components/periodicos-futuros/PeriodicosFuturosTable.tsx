@@ -12,6 +12,7 @@ import { formatDateBR } from "@/lib/format";
 import type { PeriodicoFuturoRow } from "@/lib/types";
 import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import type { YearMonth } from "@/lib/listagem-meses";
+import { PeriodicoRowActionsMenu } from "./PeriodicoRowActionsMenu";
 
 interface PeriodicosFuturosTableProps {
   records: PeriodicoFuturoRow[];
@@ -24,6 +25,7 @@ interface PeriodicosFuturosTableProps {
   onYearChange: (year: number) => void;
   canActOnRecord: (record: PeriodicoFuturoRow) => boolean;
   onCriarAgendamento: (record: PeriodicoFuturoRow) => void;
+  onEditarProximaData: (record: PeriodicoFuturoRow) => void;
   onMarcarReagendado: (id: string) => void;
   onCancelarAcompanhamento: (id: string) => void;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
@@ -40,6 +42,7 @@ export function PeriodicosFuturosTable({
   onYearChange,
   canActOnRecord,
   onCriarAgendamento,
+  onEditarProximaData,
   onMarcarReagendado,
   onCancelarAcompanhamento,
   onVisualizarAgendamento,
@@ -82,7 +85,7 @@ export function PeriodicosFuturosTable({
                 <th className="px-3 py-2.5">Motivo</th>
                 <th className="px-3 py-2.5">Observações</th>
                 <th className="px-3 py-2.5">Status</th>
-                <th className="px-3 py-2.5">Ações</th>
+                <th className="w-[72px] px-3 py-2.5 text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -163,54 +166,17 @@ export function PeriodicosFuturosTable({
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex flex-wrap gap-2">
-                        {record.status === "reagendado" &&
-                        record.agendamento_id &&
-                        onVisualizarAgendamento ? (
-                          <button
-                            type="button"
-                            className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
-                            disabled={saving}
-                            onClick={() =>
-                              onVisualizarAgendamento(record.agendamento_id!)
-                            }
-                          >
-                            Ver agendamento
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
-                            disabled={saving}
-                            onClick={() => onCriarAgendamento(record)}
-                          >
-                            Criar agendamento
-                          </button>
-                        )}
-                        {actionable && (
-                          <>
-                            <button
-                              type="button"
-                              className="text-[10px] font-bold text-[#475569] disabled:opacity-40"
-                              disabled={saving}
-                              onClick={() => onMarcarReagendado(record.id)}
-                            >
-                              Reagendado
-                            </button>
-                            <button
-                              type="button"
-                              className="text-[10px] font-bold text-brand-red disabled:opacity-40"
-                              disabled={saving}
-                              onClick={() =>
-                                onCancelarAcompanhamento(record.id)
-                              }
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        )}
-                      </div>
+                    <td className="px-3 py-2.5 text-center">
+                      <PeriodicoRowActionsMenu
+                        record={record}
+                        canAct={actionable}
+                        disabled={saving}
+                        onCriarAgendamento={onCriarAgendamento}
+                        onVisualizarAgendamento={onVisualizarAgendamento}
+                        onEditarProximaData={onEditarProximaData}
+                        onReagendar={onMarcarReagendado}
+                        onCancelar={onCancelarAcompanhamento}
+                      />
                     </td>
                   </tr>
                 );

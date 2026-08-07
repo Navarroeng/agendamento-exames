@@ -27,6 +27,7 @@ import type {
 } from "@/lib/types";
 import {
   cancelarAcompanhamentoPeriodico,
+  atualizarProximaDataPeriodico,
   listarPeriodicosFuturos,
   marcarPeriodicoReagendado,
 } from "@/services/periodico-futuro.service";
@@ -51,6 +52,8 @@ export function usePeriodicosFuturosPage() {
   const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
     resolveInitialMesPeriodicos([])
   );
+  const [editProximaDataRecord, setEditProximaDataRecord] =
+    useState<PeriodicoFuturoRow | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -215,6 +218,40 @@ export function usePeriodicosFuturosPage() {
     [refresh, auditOptions]
   );
 
+  const handleAbrirEditarProximaData = useCallback(
+    (record: PeriodicoFuturoRow) => {
+      setEditProximaDataRecord(record);
+    },
+    []
+  );
+
+  const handleFecharEditarProximaData = useCallback(() => {
+    if (saving) return;
+    setEditProximaDataRecord(null);
+  }, [saving]);
+
+  const handleSalvarProximaData = useCallback(
+    async (id: string, novaDataIso: string) => {
+      setSaving(true);
+      try {
+        await atualizarProximaDataPeriodico(id, novaDataIso, auditOptions);
+        toast.success("Próxima data atualizada.");
+        setEditProximaDataRecord(null);
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Erro ao atualizar a próxima data.";
+        toast.error(message);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [refresh, auditOptions]
+  );
+
   const canActOnRecord = useCallback(
     (record: PeriodicoFuturoRow) => isPeriodicoActionable(record.status),
     []
@@ -235,6 +272,7 @@ export function usePeriodicosFuturosPage() {
     page,
     totalPages,
     activeCard,
+    editProximaDataRecord,
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
@@ -245,6 +283,9 @@ export function usePeriodicosFuturosPage() {
     handleVisualizarAgendamento,
     handleMarcarReagendado,
     handleCancelarAcompanhamento,
+    handleAbrirEditarProximaData,
+    handleFecharEditarProximaData,
+    handleSalvarProximaData,
     canActOnRecord,
     refresh,
   };
