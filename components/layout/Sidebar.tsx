@@ -85,7 +85,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col overflow-y-auto px-0.5 py-0.5 pb-3">
+      <nav className="sidebar-nav-scroll flex flex-1 flex-col overflow-y-auto px-0.5 py-0.5 pb-3">
         {navSections.map((section, sectionIndex) => (
           <div
             key={section.title}
