@@ -10,6 +10,9 @@ export type ProfilePermissionConfig = {
 /**
  * Permissões por perfil. Perfis com `fullAccess` acessam todas as rotas.
  * Demais perfis usam `deniedPaths` (prefixos bloqueados).
+ *
+ * Grupos GESTÃO e ADMINISTRAÇÃO são exclusivos do admin:
+ * /gestao-comercial, /relatorios, /usuarios, /auditoria.
  */
 export const PROFILE_PERMISSIONS: Record<string, ProfilePermissionConfig> = {
   admin: { fullAccess: true },
@@ -20,6 +23,7 @@ export const PROFILE_PERMISSIONS: Record<string, ProfilePermissionConfig> = {
       "/configuracoes",
       "/auditoria",
       "/gestao-comercial",
+      "/usuarios",
     ],
   },
 };

@@ -54,15 +54,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    title: "Cadastros",
-    items: [
-      { iconKey: "users", label: "Clientes", href: "/clientes" },
-      { iconKey: "briefcase", label: "Cargos", href: "/cargos" },
-      { iconKey: "flask", label: "Exames", href: "/exames" },
-      { iconKey: "building", label: "Clínicas", href: "/clinicas" },
-    ],
-  },
-  {
     title: "Gestão Comercial",
     items: [
       { iconKey: "document", label: "Orçamentos", href: "/orcamentos" },
@@ -70,11 +61,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         iconKey: "checklist",
         label: "Implantação de Clientes",
         href: "/implantacao",
-      },
-      {
-        iconKey: "chart",
-        label: "Gestão Comercial",
-        href: "/gestao-comercial",
       },
     ],
   },
@@ -94,9 +80,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    title: "Gestão",
+    title: "Faturas",
     items: [
-      { iconKey: "chart", label: "Relatórios", href: "/relatorios" },
       {
         iconKey: "receipt",
         label: "Faturas Clientes",
@@ -107,6 +92,26 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Custos Clínicas",
         href: "/custos-clinicas",
       },
+    ],
+  },
+  {
+    title: "Cadastros",
+    items: [
+      { iconKey: "users", label: "Clientes", href: "/clientes" },
+      { iconKey: "briefcase", label: "Cargos", href: "/cargos" },
+      { iconKey: "flask", label: "Exames", href: "/exames" },
+      { iconKey: "building", label: "Clínicas", href: "/clinicas" },
+    ],
+  },
+  {
+    title: "Gestão",
+    items: [
+      {
+        iconKey: "chart",
+        label: "Gestão Comercial",
+        href: "/gestao-comercial",
+      },
+      { iconKey: "chart", label: "Relatórios", href: "/relatorios" },
     ],
   },
   {
