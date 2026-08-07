@@ -1,4 +1,5 @@
 /** Smoke: navegação Ano/Mês de Periódicos Futuros (proxima_data). */
+/** Garante anos futuros e meses previstos acessíveis no seletor. */
 
 import assert from "node:assert/strict";
 import {
