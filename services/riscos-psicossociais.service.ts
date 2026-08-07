@@ -6,6 +6,7 @@ import {
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import { listarCampanhasPorOrcamentos } from "@/services/riscos-campanha.service";
 import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
@@ -23,13 +24,18 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
   if (laudosProcessos.length === 0) return [];
 
   const riscosMap = await garantirTrackingRiscosPsicossociais(laudosProcessos);
-
-  const processos = laudosProcessos.map((laudos) =>
-    buildRiscosPsicossociaisProcesso(
-      laudos,
-      riscosMap.get(laudos.implantacao.orcamento.id) ?? null
-    )
+  const campanhasMap = await listarCampanhasPorOrcamentos(
+    laudosProcessos.map((p) => p.implantacao.orcamento.id)
   );
+
+  const processos = laudosProcessos.map((laudos) => {
+    const orcamentoId = laudos.implantacao.orcamento.id;
+    return buildRiscosPsicossociaisProcesso(
+      laudos,
+      riscosMap.get(orcamentoId) ?? null,
+      campanhasMap.get(orcamentoId) ?? null
+    );
+  });
 
   return sortRiscosPsicossociaisProcessos(processos);
 }

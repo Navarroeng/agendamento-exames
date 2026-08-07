@@ -78,6 +78,7 @@ export const AUDITORIA_ACOES = {
   riscos_lista_recebida: "riscos_lista_recebida",
   riscos_lista_anexo_removido: "riscos_lista_anexo_removido",
   riscos_lista_anexo_substituido: "riscos_lista_anexo_substituido",
+  riscos_campanha_criada: "riscos_campanha_criada",
 } as const;
 
 export type AuditoriaAcao =
@@ -161,6 +162,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   riscos_lista_recebida: "Lista de presença recebida",
   riscos_lista_anexo_removido: "Anexo da lista de presença removido",
   riscos_lista_anexo_substituido: "Anexo da lista de presença substituído",
+  riscos_campanha_criada: "Campanha de avaliação criada",
 };
 
 export interface AuditoriaUsuarioContext {

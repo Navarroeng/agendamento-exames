@@ -1,6 +1,7 @@
 "use client";
 
 import { Modal } from "@/components/ui/Modal";
+import { RiscosCampanhaTab } from "@/components/riscos-psicossociais/RiscosCampanhaTab";
 import { RiscosListaPresencaTab } from "@/components/riscos-psicossociais/RiscosListaPresencaTab";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
@@ -17,6 +18,7 @@ interface RiscosPsicossociaisModalProps {
   processo: RiscosPsicossociaisProcesso | null;
   tab: RiscosPsicossociaisEtapaId;
   savingLista?: boolean;
+  savingCampanha?: boolean;
   onTabChange: (tab: RiscosPsicossociaisEtapaId) => void;
   onClose: () => void;
   onSalvarSolicitacaoLista?: (input: {
@@ -26,6 +28,11 @@ interface RiscosPsicossociaisModalProps {
   onSalvarRecebimentoLista?: (file: File) => Promise<void>;
   onRemoverAnexoLista?: () => Promise<void>;
   onVisualizarAnexoLista?: () => Promise<void>;
+  onCriarCampanha?: (input: {
+    dataInicioIso: string;
+    dataEncerramentoIso: string;
+    quantidadePrevista: number;
+  }) => Promise<void>;
 }
 
 export function RiscosPsicossociaisModal({
@@ -33,12 +40,14 @@ export function RiscosPsicossociaisModal({
   processo,
   tab,
   savingLista = false,
+  savingCampanha = false,
   onTabChange,
   onClose,
   onSalvarSolicitacaoLista,
   onSalvarRecebimentoLista,
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
+  onCriarCampanha,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
 
@@ -167,6 +176,14 @@ export function RiscosPsicossociaisModal({
             }}
             onVisualizarAnexo={async () => {
               await onVisualizarAnexoLista?.();
+            }}
+          />
+        ) : tab === "envio_qr_code" && tabLiberada ? (
+          <RiscosCampanhaTab
+            processo={processo}
+            saving={savingCampanha}
+            onCriarCampanha={async (input) => {
+              await onCriarCampanha?.(input);
             }}
           />
         ) : (

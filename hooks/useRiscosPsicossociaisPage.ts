@@ -20,6 +20,9 @@ import {
 } from "@/lib/listagem-meses";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
+  criarCampanhaRiscos,
+} from "@/services/riscos-campanha.service";
+import {
   removerAnexoListaPresenca,
   salvarRecebimentoListaPresenca,
   salvarSolicitacaoListaPresenca,
@@ -32,6 +35,7 @@ export function useRiscosPsicossociaisPage() {
   const [processos, setProcessos] = useState<RiscosPsicossociaisProcesso[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
+  const [savingCampanha, setSavingCampanha] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<RiscosPsicossociaisFilters>(
     EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS
@@ -96,7 +100,11 @@ export function useRiscosPsicossociaisPage() {
     (tracking: Parameters<typeof buildRiscosPsicossociaisProcesso>[1]) => {
       setModalProcesso((prev) => {
         if (!prev || !tracking) return prev;
-        return buildRiscosPsicossociaisProcesso(prev.laudos, tracking);
+        return buildRiscosPsicossociaisProcesso(
+          prev.laudos,
+          tracking,
+          prev.campanha
+        );
       });
       setProcessos((prev) =>
         prev.map((p) => {
@@ -106,7 +114,11 @@ export function useRiscosPsicossociaisPage() {
           ) {
             return p;
           }
-          return buildRiscosPsicossociaisProcesso(p.laudos, tracking);
+          return buildRiscosPsicossociaisProcesso(
+            p.laudos,
+            tracking,
+            p.campanha
+          );
         })
       );
     },
@@ -302,6 +314,57 @@ export function useRiscosPsicossociaisPage() {
     }
   }, [modalProcesso]);
 
+  const handleCriarCampanha = useCallback(
+    async (input: {
+      dataInicioIso: string;
+      dataEncerramentoIso: string;
+      quantidadePrevista: number;
+    }) => {
+      if (!modalProcesso) return;
+      const { orcamento } = modalProcesso.implantacao;
+      if (modalProcesso.campanha) {
+        toast.error("Já existe uma campanha para este processo.");
+        return;
+      }
+
+      setSavingCampanha(true);
+      try {
+        const campanha = await criarCampanhaRiscos(
+          {
+            orcamentoId: orcamento.id,
+            clienteId: orcamento.cliente_id ?? null,
+            cnpj: orcamento.cliente_cnpj ?? "",
+            empresaNome: orcamento.cliente_nome ?? "",
+            dataInicioIso: input.dataInicioIso,
+            dataEncerramentoIso: input.dataEncerramentoIso,
+            quantidadePrevista: input.quantidadePrevista,
+          },
+          { auditContext }
+        );
+
+        setModalProcesso((prev) =>
+          prev ? { ...prev, campanha } : prev
+        );
+        setProcessos((prev) =>
+          prev.map((p) =>
+            p.implantacao.orcamento.id === orcamento.id
+              ? { ...p, campanha }
+              : p
+          )
+        );
+        toast.success("Campanha criada com sucesso.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao criar a campanha."
+        );
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [modalProcesso, auditContext]
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -312,6 +375,7 @@ export function useRiscosPsicossociaisPage() {
     modalProcesso,
     modalTab,
     savingLista,
+    savingCampanha,
     setModalTab,
     handleFilterChange,
     clearFilters,
@@ -323,6 +387,7 @@ export function useRiscosPsicossociaisPage() {
     handleSalvarRecebimentoLista,
     handleRemoverAnexoLista,
     handleVisualizarAnexoLista,
+    handleCriarCampanha,
     refresh,
   };
 }

@@ -20,6 +20,7 @@ import {
   mapListaPresencaFromTracking,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
+import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /** Etapas manuais (persistidas em orcamento_riscos_psicossociais.etapa_atual). */
@@ -107,6 +108,8 @@ export interface RiscosPsicossociaisProcesso {
   /** Lista de presença concluída (solicitação + recebimento com anexo). */
   listaPresencaConcluida: boolean;
   listaPresenca: RiscosListaPresencaDados;
+  /** Campanha de avaliação vinculada ao processo (se já criada). */
+  campanha: RiscosCampanhaRecord | null;
   /**
    * Data de entrada em Riscos (= entrada simultânea com Laudos, na conclusão
    * da Implantação). Não muda quando Laudos é concluído depois.
@@ -191,7 +194,8 @@ export function mensagemBloqueioEtapaRiscos(
 
 export function buildRiscosPsicossociaisProcesso(
   laudos: LaudosSstProcesso,
-  tracking: OrcamentoRiscosPsicossociaisRecord | null
+  tracking: OrcamentoRiscosPsicossociaisRecord | null,
+  campanha: RiscosCampanhaRecord | null = null
 ): RiscosPsicossociaisProcesso {
   const laudosSstConcluido = laudos.status === "concluido";
   const listaPresenca = mapListaPresencaFromTracking(tracking);
@@ -252,6 +256,7 @@ export function buildRiscosPsicossociaisProcesso(
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
+    campanha,
     dataEntrada: tracking?.entrada_em ?? laudos.dataEntrada ?? null,
   };
 }
