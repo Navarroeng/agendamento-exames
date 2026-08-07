@@ -29,7 +29,7 @@ export function useRiscosPsicossociaisPage() {
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
   const [modalTab, setModalTab] =
-    useState<RiscosPsicossociaisEtapaId>("lista_presenca");
+    useState<RiscosPsicossociaisEtapaId>("laudos_sst");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -37,6 +37,13 @@ export function useRiscosPsicossociaisPage() {
     try {
       const data = await listarProcessosRiscosPsicossociais();
       setProcessos(data);
+      setModalProcesso((prev) => {
+        if (!prev) return null;
+        const updated = data.find(
+          (p) => p.implantacao.orcamento.id === prev.implantacao.orcamento.id
+        );
+        return updated ?? prev;
+      });
     } catch (err) {
       console.error(err);
       setError(
@@ -101,7 +108,7 @@ export function useRiscosPsicossociaisPage() {
 
   const closeModal = useCallback(() => {
     setModalProcesso(null);
-    setModalTab("lista_presenca");
+    setModalTab("laudos_sst");
   }, []);
 
   return {

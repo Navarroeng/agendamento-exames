@@ -1,45 +1,30 @@
 import { createClient } from "@/lib/supabase/client";
-import {
-  buildLaudosSstProcesso,
-  isLaudosSstConcluido,
-  isProcessoElegivelLaudosSst,
-} from "@/lib/laudos-sst";
+import type { LaudosSstProcesso } from "@/lib/laudos-sst";
 import {
   buildRiscosPsicossociaisProcesso,
   sortRiscosPsicossociaisProcessos,
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
-import { listarProcessosImplantacao } from "@/services/implantacao-clientes.service";
-import { buscarTrackingLaudosSst } from "@/services/laudos-sst.service";
+import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
+
+const RISCOS_TRACKING_SELECT =
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at";
 
 /**
- * Lista processos de Riscos Psicossociais a partir de Laudos SST concluídos.
+ * Lista processos de Riscos Psicossociais a partir da Implantação concluída
+ * (mesmo conjunto de Laudos SST — entrada simultânea).
  * Não duplica cliente/orçamento/contrato.
  */
 export async function listarProcessosRiscosPsicossociais(): Promise<
   RiscosPsicossociaisProcesso[]
 > {
-  const implantacao = await listarProcessosImplantacao();
-  const elegiveisLaudos = implantacao.filter(isProcessoElegivelLaudosSst);
-  if (elegiveisLaudos.length === 0) return [];
+  const laudosProcessos = await listarProcessosLaudosSst();
+  if (laudosProcessos.length === 0) return [];
 
-  const ids = elegiveisLaudos.map((p) => p.orcamento.id);
-  const laudosTracking = await buscarTrackingLaudosSst(ids);
+  const riscosMap = await garantirTrackingRiscosPsicossociais(laudosProcessos);
 
-  const laudosConcluidos = elegiveisLaudos
-    .map((p) => {
-      const tracking = laudosTracking.get(p.orcamento.id) ?? null;
-      if (!isLaudosSstConcluido(tracking)) return null;
-      return buildLaudosSstProcesso(p, tracking);
-    })
-    .filter((p): p is NonNullable<typeof p> => p != null);
-
-  if (laudosConcluidos.length === 0) return [];
-
-  const riscosMap = await garantirTrackingRiscosPsicossociais(laudosConcluidos);
-
-  const processos = laudosConcluidos.map((laudos) =>
+  const processos = laudosProcessos.map((laudos) =>
     buildRiscosPsicossociaisProcesso(
       laudos,
       riscosMap.get(laudos.implantacao.orcamento.id) ?? null
@@ -50,18 +35,16 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
 }
 
 async function garantirTrackingRiscosPsicossociais(
-  laudosConcluidos: ReturnType<typeof buildLaudosSstProcesso>[]
+  laudosProcessos: LaudosSstProcesso[]
 ): Promise<Map<string, OrcamentoRiscosPsicossociaisRecord>> {
   const map = new Map<string, OrcamentoRiscosPsicossociaisRecord>();
-  const ids = laudosConcluidos.map((p) => p.implantacao.orcamento.id);
+  const ids = laudosProcessos.map((p) => p.implantacao.orcamento.id);
   if (ids.length === 0) return map;
 
   const supabase = createClient();
   const { data, error } = await supabase
     .from("orcamento_riscos_psicossociais")
-    .select(
-      "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at"
-    )
+    .select(RISCOS_TRACKING_SELECT)
     .in("orcamento_id", ids);
 
   if (error) {
@@ -73,13 +56,14 @@ async function garantirTrackingRiscosPsicossociais(
     map.set(row.orcamento_id, row as OrcamentoRiscosPsicossociaisRecord);
   }
 
-  const faltantes = laudosConcluidos.filter(
+  const faltantes = laudosProcessos.filter(
     (p) => !map.has(p.implantacao.orcamento.id)
   );
 
   for (const laudos of faltantes) {
     const orcamentoId = laudos.implantacao.orcamento.id;
-    const entradaEm = laudos.concluidoEm ?? new Date().toISOString();
+    // Entrada simultânea com Laudos (conclusão da Implantação) — não usar concluidoEm.
+    const entradaEm = laudos.dataEntrada ?? new Date().toISOString();
     const { data: inserted, error: insertError } = await supabase
       .from("orcamento_riscos_psicossociais")
       .upsert(
@@ -92,9 +76,7 @@ async function garantirTrackingRiscosPsicossociais(
         },
         { onConflict: "orcamento_id", ignoreDuplicates: true }
       )
-      .select(
-        "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at"
-      )
+      .select(RISCOS_TRACKING_SELECT)
       .maybeSingle();
 
     if (insertError) {

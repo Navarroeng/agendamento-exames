@@ -1,6 +1,15 @@
+/**
+ * Riscos Psicossociais — fluxo pós-Implantação.
+ *
+ * Entrada: mesma elegibilidade de Laudos SST (Implantação concluída).
+ * A 1ª aba "Laudos SST" é automática e deriva do status real de Laudos SST
+ * (não é persistida em campo próprio para evitar divergência).
+ */
+
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import {
   isLaudosSstConcluido,
+  isProcessoElegivelLaudosSst,
   type LaudosSstProcesso,
   type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
@@ -8,8 +17,8 @@ import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
-/** Etapas exclusivas de Riscos Psicossociais (ordem fixa). */
-export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
+/** Etapas manuais (persistidas em orcamento_riscos_psicossociais.etapa_atual). */
+export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
   { id: "lista_presenca", label: "Lista de presença" },
   { id: "cadastro_empresa", label: "Cadastro da empresa" },
   { id: "envio_qr_code", label: "Envio do QR Code" },
@@ -18,11 +27,31 @@ export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
   { id: "enviado_cliente", label: "Enviado para o cliente" },
 ] as const;
 
+export type RiscosPsicossociaisEtapaManualId =
+  (typeof RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS)[number]["id"];
+
+/** Sequência completa na UI (inclui etapa automática dependente de Laudos SST). */
+export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
+  {
+    id: "laudos_sst",
+    label: "Laudos SST",
+    automatica: true as const,
+  },
+  ...RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.map((e) => ({
+    ...e,
+    automatica: false as const,
+  })),
+] as const;
+
 export type RiscosPsicossociaisEtapaId =
   (typeof RISCOS_PSICOSSOCIAIS_ETAPAS)[number]["id"];
 
 export type RiscosPsicossociaisStatus = "em_andamento" | "concluido";
 
+export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS =
+  RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.length;
+
+/** Total exibido (1 automática + 6 manuais). */
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS =
   RISCOS_PSICOSSOCIAIS_ETAPAS.length;
 
@@ -33,9 +62,10 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   RISCOS_PSICOSSOCIAIS_ETAPAS.map((e) => [e.id, e.label])
 ) as Record<RiscosPsicossociaisEtapaId, string>;
 
+/** Tracking persistido: apenas etapas manuais (0–6). */
 export interface OrcamentoRiscosPsicossociaisRecord {
   orcamento_id: string;
-  etapa_atual: RiscosPsicossociaisEtapaId;
+  etapa_atual: RiscosPsicossociaisEtapaManualId;
   etapas_concluidas: number;
   status?: RiscosPsicossociaisStatus | null;
   entrada_em?: string | null;
@@ -48,11 +78,19 @@ export interface RiscosPsicossociaisProcesso {
   implantacao: ImplantacaoProcesso;
   laudos: LaudosSstProcesso;
   etapaAtual: RiscosPsicossociaisEtapaId;
+  /** Progresso total exibido (0–7), incluindo a etapa automática. */
   etapasConcluidas: number;
+  /** Etapas manuais concluídas persistidas (0–6). */
+  etapasManuaisConcluidas: number;
   totalEtapas: number;
   progressoLabel: string;
   status: RiscosPsicossociaisStatus;
-  /** Data de entrada na etapa (conclusão do Laudos SST / criação do tracking). */
+  /** Se a aba automática Laudos SST está concluída (derivado do módulo Laudos). */
+  laudosSstConcluido: boolean;
+  /**
+   * Data de entrada em Riscos (= entrada simultânea com Laudos, na conclusão
+   * da Implantação). Não muda quando Laudos é concluído depois.
+   */
   dataEntrada: string | null;
 }
 
@@ -66,14 +104,36 @@ export const EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS: RiscosPsicossociaisFilters = {
   responsavel: "",
 };
 
+export function isRiscosPsicossociaisEtapaManualId(
+  value: string
+): value is RiscosPsicossociaisEtapaManualId {
+  return RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.some((e) => e.id === value);
+}
+
 export function isRiscosPsicossociaisEtapaId(
   value: string
 ): value is RiscosPsicossociaisEtapaId {
   return RISCOS_PSICOSSOCIAIS_ETAPAS.some((e) => e.id === value);
 }
 
-/** Elegível a Riscos quando o Laudos SST do mesmo orçamento está concluído. */
+export function isRiscosEtapaAutomatica(
+  etapaId: RiscosPsicossociaisEtapaId
+): boolean {
+  return etapaId === "laudos_sst";
+}
+
+/**
+ * Elegível a Riscos desde a Implantação concluída
+ * (mesmo critério de entrada em Laudos SST).
+ */
 export function isProcessoElegivelRiscosPsicossociais(
+  implantacao: ImplantacaoProcesso
+): boolean {
+  return isProcessoElegivelLaudosSst(implantacao);
+}
+
+/** @deprecated Use isProcessoElegivelRiscosPsicossociais(implantacao). */
+export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
   laudos: LaudosSstProcesso,
   trackingLaudos: OrcamentoLaudosSstRecord | null
 ): boolean {
@@ -81,36 +141,67 @@ export function isProcessoElegivelRiscosPsicossociais(
   return isLaudosSstConcluido(trackingLaudos);
 }
 
+/** Etapas manuais só liberam após Laudos SST concluído. */
+export function isRiscosEtapaLiberada(
+  processo: Pick<RiscosPsicossociaisProcesso, "laudosSstConcluido">,
+  etapaId: RiscosPsicossociaisEtapaId
+): boolean {
+  if (etapaId === "laudos_sst") return true;
+  return processo.laudosSstConcluido;
+}
+
 export function buildRiscosPsicossociaisProcesso(
   laudos: LaudosSstProcesso,
   tracking: OrcamentoRiscosPsicossociaisRecord | null
 ): RiscosPsicossociaisProcesso {
-  const etapaAtual =
-    tracking && isRiscosPsicossociaisEtapaId(tracking.etapa_atual)
-      ? tracking.etapa_atual
-      : "lista_presenca";
-  const etapasConcluidas = Math.min(
-    RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
+  const laudosSstConcluido = laudos.status === "concluido";
+
+  const etapasManuaisConcluidas = Math.min(
+    RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS,
     Math.max(0, Number(tracking?.etapas_concluidas) || 0)
   );
+
+  const etapasConcluidas =
+    (laudosSstConcluido ? 1 : 0) + etapasManuaisConcluidas;
+
+  const manuaisConcluidasTodas =
+    etapasManuaisConcluidas >= RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS;
   const concluido =
-    tracking?.status === "concluido" ||
-    etapasConcluidas >= RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS;
+    laudosSstConcluido &&
+    (tracking?.status === "concluido" || manuaisConcluidasTodas);
+
+  let etapaAtual: RiscosPsicossociaisEtapaId;
+  if (!laudosSstConcluido) {
+    etapaAtual = "laudos_sst";
+  } else if (concluido) {
+    etapaAtual = "enviado_cliente";
+  } else if (
+    tracking &&
+    isRiscosPsicossociaisEtapaManualId(tracking.etapa_atual)
+  ) {
+    etapaAtual = tracking.etapa_atual;
+  } else {
+    etapaAtual = "lista_presenca";
+  }
 
   return {
     implantacao: laudos.implantacao,
     laudos,
-    etapaAtual: concluido ? "enviado_cliente" : etapaAtual,
+    etapaAtual,
     etapasConcluidas: concluido
       ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS
       : etapasConcluidas,
+    etapasManuaisConcluidas: concluido
+      ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS
+      : etapasManuaisConcluidas,
     totalEtapas: RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
     progressoLabel: `${
       concluido ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS : etapasConcluidas
     } de ${RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS}`,
     status: concluido ? "concluido" : "em_andamento",
+    laudosSstConcluido,
     dataEntrada:
-      tracking?.entrada_em ?? laudos.concluidoEm ?? null,
+      tracking?.entrada_em ?? laudos.dataEntrada ?? null,
   };
 }
 

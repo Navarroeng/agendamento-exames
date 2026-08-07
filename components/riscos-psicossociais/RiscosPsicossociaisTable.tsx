@@ -42,15 +42,24 @@ function ProgressoRiscos({
             !concluida &&
             etapa.id === processo.etapaAtual &&
             processo.etapasConcluidas < processo.totalEtapas;
+          const automatica = etapa.id === "laudos_sst";
           const tone = concluida
-            ? "bg-brand-green"
+            ? automatica
+              ? "bg-[#0f766e]"
+              : "bg-brand-green"
             : atual
-              ? "bg-brand-blue"
+              ? automatica
+                ? "bg-[#14b8a6]"
+                : "bg-brand-blue"
               : "bg-[#e2e8f0]";
           return (
             <span
               key={etapa.id}
-              title={etapa.label}
+              title={
+                automatica
+                  ? `${etapa.label} (automática)`
+                  : etapa.label
+              }
               className={`h-1.5 flex-1 rounded-full ${tone}`}
             />
           );
@@ -137,6 +146,10 @@ export function RiscosPsicossociaisTable({
                       {processo.status === "concluido" ? (
                         <span className="inline-flex rounded-full bg-brand-green-soft px-2.5 py-0.5 text-[10px] font-extrabold text-brand-green">
                           Concluído
+                        </span>
+                      ) : processo.etapaAtual === "laudos_sst" ? (
+                        <span className="inline-flex rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-[10px] font-extrabold text-[#b45309]">
+                          Aguardando Laudos SST
                         </span>
                       ) : (
                         <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">

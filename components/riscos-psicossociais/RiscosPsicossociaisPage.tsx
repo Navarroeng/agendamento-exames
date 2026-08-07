@@ -29,7 +29,7 @@ export function RiscosPsicossociaisPage() {
   return (
     <AppShell
       title="Riscos Psicossociais"
-      subtitle="Continuidade operacional dos processos com Laudos SST concluídos."
+      subtitle="Continuidade operacional dos processos com implantação concluída. A primeira etapa depende da conclusão de Laudos SST."
       icon={<IconShield size={20} />}
     >
       <div className="mb-[18px]">

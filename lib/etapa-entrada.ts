@@ -9,7 +9,7 @@
  * | Orçamentos               | orcamentos.data_proposta           |
  * | Implantação              | orcamento_aprovacoes.aprovado_em   |
  * | Laudos SST               | orcamento_laudos_sst.entrada_em    |
- * | Riscos Psicossociais     | orcamento_riscos_psicossociais.entrada_em |
+ * | Riscos Psicossociais     | orcamento_riscos_psicossociais.entrada_em (simultânea à entrada em Laudos, na conclusão da Implantação) |
  * | eSocial                  | agendamentos.esocial_entrada_em    |
  * | Periódicos Futuros       | periodicos_futuros.proxima_data    |
  * | Faturas / Custos         | faturas.mes_referencia             |
