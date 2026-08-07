@@ -193,6 +193,8 @@ export function resolveMesParaAno(
     startYear?: number;
     startMonthFirstYear?: number;
     now?: Date;
+    /** Quando true, não bloqueia meses futuros ao trocar o ano. */
+    allowFutureMonths?: boolean;
   }
 ): YearMonth {
   const now = opts?.now ?? new Date();
@@ -202,11 +204,30 @@ export function resolveMesParaAno(
   }
 
   const preferred = abas.find((a) => a.month === preferredMonth);
-  if (preferred && isMesDisponivel(preferred, now)) {
-    return preferred;
+  if (preferred) {
+    if (opts?.allowFutureMonths || isMesDisponivel(preferred, now)) {
+      return preferred;
+    }
+  }
+
+  if (opts?.allowFutureMonths) {
+    const clamped = Math.min(12, Math.max(1, preferredMonth));
+    return abas.find((a) => a.month === clamped) ?? abas[0];
   }
 
   return resolveInitialMes(now, abas);
+}
+
+/** Une anos existentes nos registros com o ano civil atual (se ainda não houver dados). */
+export function mergeAnosComAtual(
+  anosExistentes: number[],
+  now: Date = new Date()
+): number[] {
+  const set = new Set(
+    anosExistentes.filter((y) => Number.isFinite(y) && y >= 1900 && y <= 2100)
+  );
+  set.add(now.getFullYear());
+  return Array.from(set).sort((a, b) => a - b);
 }
 
 export function resolveInitialMesListagem(

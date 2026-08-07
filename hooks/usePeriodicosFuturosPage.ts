@@ -12,10 +12,11 @@ import {
   filterPeriodicosFuturos,
   filterPeriodicosFuturosPorMes,
   isPeriodicoActionable,
+  listPeriodicoAnosDisponiveis,
+  resolveInitialMesPeriodicos,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
 import {
-  resolveInitialMesListagem,
   resolveMesParaAno,
   type YearMonth,
 } from "@/lib/listagem-meses";
@@ -48,7 +49,7 @@ export function usePeriodicosFuturosPage() {
     PeriodicoFuturoDisplayStatus | ""
   >("");
   const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
-    resolveInitialMesListagem()
+    resolveInitialMesPeriodicos([])
   );
 
   const refresh = useCallback(async () => {
@@ -69,6 +70,23 @@ export function usePeriodicosFuturosPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const anosDisponiveis = useMemo(
+    () => listPeriodicoAnosDisponiveis(records),
+    [records]
+  );
+
+  // Garante que o ano selecionado exista no seletor após o carregamento.
+  useEffect(() => {
+    if (anosDisponiveis.length === 0) return;
+    if (!anosDisponiveis.includes(mesSelecionado.year)) {
+      setMesSelecionado((prev) =>
+        resolveMesParaAno(anosDisponiveis[0], prev.month, {
+          allowFutureMonths: true,
+        })
+      );
+    }
+  }, [anosDisponiveis, mesSelecionado.year]);
 
   const recordsDoMes = useMemo(
     () => filterPeriodicosFuturosPorMes(records, mesSelecionado),
@@ -130,7 +148,9 @@ export function usePeriodicosFuturosPage() {
   }, []);
 
   const handleYearChange = useCallback((year: number) => {
-    setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
+    setMesSelecionado((prev) =>
+      resolveMesParaAno(year, prev.month, { allowFutureMonths: true })
+    );
   }, []);
 
   const handleCardClick = useCallback((status: PeriodicoFuturoDisplayStatus) => {
@@ -207,6 +227,7 @@ export function usePeriodicosFuturosPage() {
     error,
     filters,
     mesSelecionado,
+    anosDisponiveis,
     filterOptions,
     filteredRecords,
     paginatedRecords,

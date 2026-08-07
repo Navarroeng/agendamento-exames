@@ -20,6 +20,16 @@ export interface ListagemMesAnoTabsProps {
    * Anos seguintes: janeiro–dezembro.
    */
   startMonthFirstYear?: number;
+  /**
+   * Quando informado, substitui a faixa fixa startYear→ano atual
+   * (ex.: anos derivados dos registros de Periódicos Futuros).
+   */
+  years?: number[];
+  /**
+   * Quando false, meses futuros ficam habilitados.
+   * Padrão true (comportamento Orçamentos / Implantação).
+   */
+  disableFutureMonths?: boolean;
   now?: Date;
   ariaLabel?: string;
   /** Prefixo do title das abas, ex.: "Orçamentos de". */
@@ -37,12 +47,14 @@ export function ListagemMesAnoTabs({
   onYearChange,
   startYear = LISTAGEM_ANO_INICIO,
   startMonthFirstYear = 1,
+  years: yearsProp,
+  disableFutureMonths = true,
   now = new Date(),
   ariaLabel = "Filtrar por mês",
   monthTitlePrefix,
   monthTitle,
 }: ListagemMesAnoTabsProps) {
-  const years = listAnosDisponiveis(startYear, now);
+  const years = yearsProp ?? listAnosDisponiveis(startYear, now);
   const months = listMesAbasListagem(selected.year, {
     startYear,
     startMonthFirstYear,
@@ -57,6 +69,7 @@ export function ListagemMesAnoTabs({
       years={years}
       onYearChange={onYearChange}
       now={now}
+      disableFutureMonths={disableFutureMonths}
       ariaLabel={ariaLabel}
       monthTitle={
         monthTitle ??

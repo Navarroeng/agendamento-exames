@@ -17,6 +17,12 @@ interface MesAnoTabsProps {
   years?: number[];
   onYearChange?: (year: number) => void;
   now?: Date;
+  /**
+   * Quando false, meses futuros permanecem clicáveis
+   * (ex.: Periódicos Futuros com próxima data à frente).
+   * Padrão true (Orçamentos / Implantação).
+   */
+  disableFutureMonths?: boolean;
   ariaLabel?: string;
   monthTitle?: (mes: YearMonth, disponivel: boolean) => string;
 }
@@ -29,6 +35,7 @@ export function MesAnoTabs({
   years,
   onYearChange,
   now = new Date(),
+  disableFutureMonths = true,
   ariaLabel = "Filtrar por mês",
   monthTitle,
 }: MesAnoTabsProps) {
@@ -63,7 +70,9 @@ export function MesAnoTabs({
       <div className="overflow-x-auto" role="tablist" aria-label={ariaLabel}>
         <div className="flex w-max min-w-full items-center gap-1.5">
           {months.map((mes) => {
-            const disponivel = isMesDisponivel(mes, now);
+            const disponivel = disableFutureMonths
+              ? isMesDisponivel(mes, now)
+              : true;
             const ativo = isSameYearMonth(mes, selected);
             const label = formatMesLabel(mes);
             const key = yearMonthKey(mes);

@@ -14,6 +14,7 @@ export function PeriodicosFuturosPage() {
     error,
     filters,
     mesSelecionado,
+    anosDisponiveis,
     filterOptions,
     filteredRecords,
     paginatedRecords,
@@ -64,6 +65,7 @@ export function PeriodicosFuturosPage() {
           error={error}
           saving={saving}
           mesSelecionado={mesSelecionado}
+          anosDisponiveis={anosDisponiveis}
           onMesChange={handleMesChange}
           onYearChange={handleYearChange}
           canActOnRecord={canActOnRecord}

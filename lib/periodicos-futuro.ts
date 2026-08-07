@@ -4,6 +4,10 @@ import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { formatDateBR } from "@/lib/format";
 import {
   LISTAGEM_MES_VAZIO_MSG,
+  getNowYearMonth,
+  listMesAbasDoAno,
+  mergeAnosComAtual,
+  yearMonthFromIsoDate,
   type YearMonth,
 } from "@/lib/listagem-meses";
 import type {
@@ -175,6 +179,65 @@ export function filterPeriodicosFuturosPorMes(
   mes: YearMonth
 ): PeriodicoFuturoRow[] {
   return filterByEtapaEntradaMes(records, (r) => r.proxima_data, mes);
+}
+
+/** Anos presentes em `proxima_data` (sem limitar ao ano civil atual). */
+export function extractPeriodicoAnos(
+  records: Pick<PeriodicoFuturoRecord, "proxima_data">[]
+): number[] {
+  const years = new Set<number>();
+  for (const record of records) {
+    const ym = yearMonthFromIsoDate(record.proxima_data);
+    if (ym) years.add(ym.year);
+  }
+  return Array.from(years).sort((a, b) => a - b);
+}
+
+/** Anos do seletor: existentes nos registros + ano atual (fallback de UI). */
+export function listPeriodicoAnosDisponiveis(
+  records: Pick<PeriodicoFuturoRecord, "proxima_data">[],
+  now: Date = new Date()
+): number[] {
+  return mergeAnosComAtual(extractPeriodicoAnos(records), now);
+}
+
+/** Contagem por ano civil da próxima data. */
+export function countPeriodicosPorAno(
+  records: Pick<PeriodicoFuturoRecord, "proxima_data">[]
+): Record<number, number> {
+  const counts: Record<number, number> = {};
+  for (const record of records) {
+    const ym = yearMonthFromIsoDate(record.proxima_data);
+    if (!ym) continue;
+    counts[ym.year] = (counts[ym.year] || 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Mês inicial: mês civil atual se o ano existir nos dados (ou na lista);
+ * senão, primeiro ano com registros (janeiro).
+ * Meses futuros NÃO são bloqueados neste módulo.
+ */
+export function resolveInitialMesPeriodicos(
+  records: Pick<PeriodicoFuturoRecord, "proxima_data">[],
+  now: Date = new Date()
+): YearMonth {
+  const current = getNowYearMonth(now);
+  const anos = listPeriodicoAnosDisponiveis(records, now);
+  if (anos.includes(current.year)) {
+    return current;
+  }
+  const anosComDados = extractPeriodicoAnos(records);
+  if (anosComDados.length > 0) {
+    return { year: anosComDados[0], month: 1 };
+  }
+  return current;
+}
+
+/** 12 meses do ano (sempre janeiro–dezembro neste módulo). */
+export function listPeriodicoMesAbas(year: number): YearMonth[] {
+  return listMesAbasDoAno(year, 1);
 }
 
 export function countPeriodicosByDisplayStatus(

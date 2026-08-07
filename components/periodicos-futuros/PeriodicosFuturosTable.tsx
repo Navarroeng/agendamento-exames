@@ -19,6 +19,7 @@ interface PeriodicosFuturosTableProps {
   error: string | null;
   saving: boolean;
   mesSelecionado: YearMonth;
+  anosDisponiveis: number[];
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
   canActOnRecord: (record: PeriodicoFuturoRow) => boolean;
@@ -34,6 +35,7 @@ export function PeriodicosFuturosTable({
   error,
   saving,
   mesSelecionado,
+  anosDisponiveis,
   onMesChange,
   onYearChange,
   canActOnRecord,
@@ -48,6 +50,8 @@ export function PeriodicosFuturosTable({
         selected={mesSelecionado}
         onSelect={onMesChange}
         onYearChange={onYearChange}
+        years={anosDisponiveis}
+        disableFutureMonths={false}
         ariaLabel="Filtrar periódicos pela próxima data"
         monthTitlePrefix="Periódicos com próxima data em"
       />
