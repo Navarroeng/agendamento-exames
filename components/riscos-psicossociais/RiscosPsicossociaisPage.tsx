@@ -17,6 +17,7 @@ export function RiscosPsicossociaisPage() {
     responsaveis,
     modalProcesso,
     modalTab,
+    savingLista,
     setModalTab,
     handleFilterChange,
     clearFilters,
@@ -24,6 +25,10 @@ export function RiscosPsicossociaisPage() {
     handleYearChange,
     openProcesso,
     closeModal,
+    handleSalvarSolicitacaoLista,
+    handleSalvarRecebimentoLista,
+    handleRemoverAnexoLista,
+    handleVisualizarAnexoLista,
   } = useRiscosPsicossociaisPage();
 
   return (
@@ -56,8 +61,13 @@ export function RiscosPsicossociaisPage() {
         open={Boolean(modalProcesso)}
         processo={modalProcesso}
         tab={modalTab}
+        savingLista={savingLista}
         onTabChange={setModalTab}
         onClose={closeModal}
+        onSalvarSolicitacaoLista={handleSalvarSolicitacaoLista}
+        onSalvarRecebimentoLista={handleSalvarRecebimentoLista}
+        onRemoverAnexoLista={handleRemoverAnexoLista}
+        onVisualizarAnexoLista={handleVisualizarAnexoLista}
       />
     </AppShell>
   );

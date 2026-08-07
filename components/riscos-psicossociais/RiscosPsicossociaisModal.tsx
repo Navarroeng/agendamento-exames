@@ -1,11 +1,13 @@
 "use client";
 
 import { Modal } from "@/components/ui/Modal";
+import { RiscosListaPresencaTab } from "@/components/riscos-psicossociais/RiscosListaPresencaTab";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   isRiscosEtapaAutomatica,
   isRiscosEtapaLiberada,
+  mensagemBloqueioEtapaRiscos,
   type RiscosPsicossociaisEtapaId,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
@@ -14,22 +16,36 @@ interface RiscosPsicossociaisModalProps {
   open: boolean;
   processo: RiscosPsicossociaisProcesso | null;
   tab: RiscosPsicossociaisEtapaId;
+  savingLista?: boolean;
   onTabChange: (tab: RiscosPsicossociaisEtapaId) => void;
   onClose: () => void;
+  onSalvarSolicitacaoLista?: (input: {
+    dataSolicitacaoIso: string;
+    email: string;
+  }) => Promise<void>;
+  onSalvarRecebimentoLista?: (file: File) => Promise<void>;
+  onRemoverAnexoLista?: () => Promise<void>;
+  onVisualizarAnexoLista?: () => Promise<void>;
 }
 
 export function RiscosPsicossociaisModal({
   open,
   processo,
   tab,
+  savingLista = false,
   onTabChange,
   onClose,
+  onSalvarSolicitacaoLista,
+  onSalvarRecebimentoLista,
+  onRemoverAnexoLista,
+  onVisualizarAnexoLista,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
 
   const { orcamento, numeroContrato } = processo.implantacao;
   const etapaAtual = RISCOS_PSICOSSOCIAIS_ETAPAS.find((e) => e.id === tab);
   const tabLiberada = isRiscosEtapaLiberada(processo, tab);
+  const bloqueioMsg = mensagemBloqueioEtapaRiscos(processo, tab);
 
   return (
     <Modal
@@ -58,17 +74,17 @@ export function RiscosPsicossociaisModal({
             const active = etapa.id === tab;
             const liberada = isRiscosEtapaLiberada(processo, etapa.id);
             const automatica = isRiscosEtapaAutomatica(etapa.id);
+            const bloqueio = mensagemBloqueioEtapaRiscos(processo, etapa.id);
             return (
               <button
                 key={etapa.id}
                 type="button"
                 disabled={!liberada}
                 title={
-                  !liberada
-                    ? "Aguardando finalização do processo de Laudos SST."
-                    : automatica
-                      ? "Etapa automática (sincronizada com Laudos SST)"
-                      : etapa.label
+                  bloqueio ??
+                  (automatica
+                    ? "Etapa automática (sincronizada com Laudos SST)"
+                    : etapa.label)
                 }
                 onClick={() => {
                   if (!liberada) return;
@@ -136,6 +152,23 @@ export function RiscosPsicossociaisModal({
               </>
             )}
           </div>
+        ) : tab === "lista_presenca" && tabLiberada ? (
+          <RiscosListaPresencaTab
+            processo={processo}
+            saving={savingLista}
+            onSalvarSolicitacao={async (input) => {
+              await onSalvarSolicitacaoLista?.(input);
+            }}
+            onSalvarRecebimento={async (file) => {
+              await onSalvarRecebimentoLista?.(file);
+            }}
+            onRemoverAnexo={async () => {
+              await onRemoverAnexoLista?.();
+            }}
+            onVisualizarAnexo={async () => {
+              await onVisualizarAnexoLista?.();
+            }}
+          />
         ) : (
           <div className="rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-5 py-10 text-center">
             {!tabLiberada ? (
@@ -144,7 +177,8 @@ export function RiscosPsicossociaisModal({
                   {etapaAtual?.label ?? "Etapa"}
                 </p>
                 <p className="mt-2 text-sm text-app-muted">
-                  Aguardando finalização do processo de Laudos SST.
+                  {bloqueioMsg ??
+                    "Aguardando finalização do processo de Laudos SST."}
                 </p>
               </>
             ) : (

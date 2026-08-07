@@ -9,7 +9,7 @@ import {
 import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
-  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at";
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
 
 /**
  * Lista processos de Riscos Psicossociais a partir da Implantação concluída

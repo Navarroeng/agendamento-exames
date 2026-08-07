@@ -84,15 +84,22 @@ assert.equal(riscosLiberado.progressoLabel, "1 de 7");
 // Conclusão de Laudos NÃO altera o mês/data de entrada em Riscos.
 assert.equal(riscosLiberado.dataEntrada, "2026-08-12T15:00:00Z");
 assert.equal(isRiscosEtapaLiberada(riscosLiberado, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberada(riscosLiberado, "cadastro_empresa"), false);
 
 const riscosComTracking = buildRiscosPsicossociaisProcesso(laudosConcluido, {
   orcamento_id: "o1",
   etapa_atual: "envio_qr_code",
   etapas_concluidas: 2,
   entrada_em: "2026-08-12T15:00:00Z",
+  lista_solicitada: true,
+  lista_solicitada_em: "2026-08-10",
+  lista_solicitada_email: "cliente@empresa.com.br",
+  lista_recebida: true,
+  lista_anexo_path: "o1/lista.pdf",
 });
 assert.equal(riscosComTracking.etapaAtual, "envio_qr_code");
 assert.equal(riscosComTracking.progressoLabel, "3 de 7");
+assert.equal(isRiscosEtapaLiberada(riscosComTracking, "cadastro_empresa"), true);
 
 const riscosSemTracking = buildRiscosPsicossociaisProcesso(
   laudosEmAndamento,

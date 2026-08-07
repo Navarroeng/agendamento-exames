@@ -12,6 +12,7 @@ export const AUDITORIA_MODULOS = {
   periodicos_futuros: "periodicos_futuros",
   usuarios: "usuarios",
   orcamentos: "orcamentos",
+  riscos_psicossociais: "riscos_psicossociais",
 } as const;
 
 export type AuditoriaModulo =
@@ -73,6 +74,10 @@ export const AUDITORIA_ACOES = {
   credito_aso_expirado: "credito_aso_expirado",
   credito_aso_removido: "credito_aso_removido",
   credito_aso_observacao_editada: "credito_aso_observacao_editada",
+  riscos_lista_solicitada: "riscos_lista_solicitada",
+  riscos_lista_recebida: "riscos_lista_recebida",
+  riscos_lista_anexo_removido: "riscos_lista_anexo_removido",
+  riscos_lista_anexo_substituido: "riscos_lista_anexo_substituido",
 } as const;
 
 export type AuditoriaAcao =
@@ -90,6 +95,7 @@ export const AUDITORIA_MODULO_LABELS: Record<AuditoriaModulo, string> = {
   periodicos_futuros: "Periódicos Futuros",
   usuarios: "Usuários",
   orcamentos: "Orçamentos",
+  riscos_psicossociais: "Riscos Psicossociais",
 };
 
 export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
@@ -151,6 +157,10 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   credito_aso_expirado: "ASO contratual expirado",
   credito_aso_removido: "ASO contratual em aberto removido",
   credito_aso_observacao_editada: "Observação do ASO em aberto editada",
+  riscos_lista_solicitada: "Lista de presença solicitada",
+  riscos_lista_recebida: "Lista de presença recebida",
+  riscos_lista_anexo_removido: "Anexo da lista de presença removido",
+  riscos_lista_anexo_substituido: "Anexo da lista de presença substituído",
 };
 
 export interface AuditoriaUsuarioContext {
