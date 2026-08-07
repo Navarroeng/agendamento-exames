@@ -39,6 +39,15 @@ export function normalizeUppercaseField(value: string | null | undefined): strin
     .trim();
 }
 
+/** Exibe texto em caixa alta (não altera o valor persistido). */
+export function formatUppercaseDisplay(
+  value: string | null | undefined,
+  emptyLabel = "—"
+): string {
+  const formatted = normalizeUppercaseField(value);
+  return formatted || emptyLabel;
+}
+
 export function isUppercaseField(
   module: keyof typeof UPPERCASE_FIELDS_BY_MODULE,
   field: string

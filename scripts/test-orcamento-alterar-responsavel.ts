@@ -75,7 +75,7 @@ assert.equal(
     criado_por: "Bruna",
     responsavel: "Rafaela",
   }),
-  "Bruna"
+  "BRUNA"
 );
 
 assert.ok(

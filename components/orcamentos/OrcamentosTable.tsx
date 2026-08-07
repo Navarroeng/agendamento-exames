@@ -13,6 +13,7 @@ import {
   ORCAMENTO_MES_VAZIO_MSG,
   type OrcamentoYearMonth,
 } from "@/lib/orcamento-meses";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { OrcamentoMesTabs } from "./OrcamentoMesTabs";
 import { OrcamentoRowActionsMenu } from "./OrcamentoRowActionsMenu";
 
@@ -101,7 +102,9 @@ export function OrcamentosTable({
                     <td>
                       {formatOrcamentoOrigemCliente(orcamento.origem_cliente)}
                     </td>
-                    <td>{orcamento.responsavel}</td>
+                    <td>
+                      {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
+                    </td>
                     <td className="font-semibold text-navy">
                       {formatCurrency(Number(orcamento.valor_total))}
                     </td>

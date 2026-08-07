@@ -5,13 +5,16 @@ import type {
   GestaoComercialDashboard,
   GestaoComercialGrupoResumo,
 } from "@/lib/gestao-comercial";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 function GrupoTable({
   title,
   rows,
+  formatLabel,
 }: {
   title: string;
   rows: GestaoComercialGrupoResumo[];
+  formatLabel?: (label: string) => string;
 }) {
   return (
     <div className="rounded-2xl border border-[#e8edf5] bg-white p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)]">
@@ -33,7 +36,9 @@ function GrupoTable({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.chave} className="border-b border-[#f5f7fb]">
-                  <td className="py-2 font-semibold text-[#1f2937]">{row.label}</td>
+                  <td className="py-2 font-semibold text-[#1f2937]">
+                    {formatLabel ? formatLabel(row.label) : row.label}
+                  </td>
                   <td className="py-2">{row.quantidade}</td>
                   <td className="py-2">{formatCurrency(row.valorFechado)}</td>
                   <td className="py-2">{formatCurrency(row.ticketMedio)}</td>
@@ -73,6 +78,7 @@ export function GestaoComercialBreakdowns({
       <GrupoTable
         title="Resultado por responsável (no fechamento)"
         rows={dashboard.porResponsavel}
+        formatLabel={formatResponsavelOrcamentoDisplay}
       />
       <div className="rounded-2xl border border-[#e8edf5] bg-white p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)]">
         <h4 className="mb-3 text-sm font-extrabold text-navy">

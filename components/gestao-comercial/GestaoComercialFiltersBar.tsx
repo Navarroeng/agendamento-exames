@@ -3,6 +3,7 @@
 import type { GestaoComercialFilters } from "@/lib/gestao-comercial";
 import { MESES_PT } from "@/lib/gestao-comercial";
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 interface GestaoComercialFiltersProps {
   filters: GestaoComercialFilters;
@@ -77,7 +78,7 @@ export function GestaoComercialFiltersBar({
             <option value="">Todos</option>
             {responsaveisOptions.map((nome) => (
               <option key={nome} value={nome}>
-                {nome}
+                {formatResponsavelOrcamentoDisplay(nome)}
               </option>
             ))}
           </select>

@@ -68,6 +68,19 @@ test("valor final salvo em caixa alta", () => {
   }
 });
 
+test("exibicao em caixa alta", () => {
+  function formatUppercaseDisplay(value, emptyLabel = "—") {
+    const formatted = normalizeUppercaseField(value);
+    return formatted || emptyLabel;
+  }
+  if (formatUppercaseDisplay("Bruna") !== "BRUNA") {
+    throw new Error("deveria exibir BRUNA");
+  }
+  if (formatUppercaseDisplay("  ") !== "—") {
+    throw new Error("deveria exibir vazio como —");
+  }
+});
+
 test("auditoria compara valor final", () => {
   const oldNorm = normalizeUppercaseField("joão da silva");
   const newNorm = normalizeUppercaseField("JOÃO DA SILVA");

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { RequiredMark } from "@/components/ui/Field";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import type { PerfilUsuario } from "@/lib/types";
 
 interface OrcamentoAlterarResponsavelModalProps {
@@ -97,7 +98,7 @@ export function OrcamentoAlterarResponsavelModal({
         <div>
           <p className="mb-1.5 text-xs font-bold text-navy">Responsável atual</p>
           <p className="rounded-xl border border-[#e4ebf4] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#334155]">
-            {responsavelAtual || "—"}
+            {formatResponsavelOrcamentoDisplay(responsavelAtual)}
           </p>
         </div>
 
@@ -119,7 +120,7 @@ export function OrcamentoAlterarResponsavelModal({
             </option>
             {opcoes.map((u) => (
               <option key={u.user_id} value={u.user_id}>
-                {u.nome}
+                {formatResponsavelOrcamentoDisplay(u.nome)}
               </option>
             ))}
           </select>

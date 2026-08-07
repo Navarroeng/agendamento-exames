@@ -1,6 +1,7 @@
 import { isPerfilAdmin, type PerfilUsuarioTipo } from "@/lib/permissions";
 import { normalizePerfilUsuario } from "@/lib/contrato-permissoes";
 import type { OrcamentoStatus } from "@/lib/orcamento-types";
+import { formatUppercaseDisplay } from "@/lib/text-normalize";
 
 export const ORCAMENTO_RESPONSAVEL_BLOQUEADO_MSG =
   "Não é possível alterar o responsável de um processo cancelado ou encerrado.";
@@ -54,6 +55,13 @@ export function podeAlterarResponsavelProcesso(params: {
   );
 }
 
+/** Nome do responsável do orçamento para exibição (sempre maiúsculas). */
+export function formatResponsavelOrcamentoDisplay(
+  value: string | null | undefined
+): string {
+  return formatUppercaseDisplay(value);
+}
+
 export function formatCriadoPorOrcamento(
   orcamento: {
     criado_por?: string | null;
@@ -61,6 +69,6 @@ export function formatCriadoPorOrcamento(
   }
 ): string {
   const criado = orcamento.criado_por?.trim();
-  if (criado) return criado;
-  return orcamento.responsavel?.trim() || "—";
+  if (criado) return formatUppercaseDisplay(criado);
+  return formatUppercaseDisplay(orcamento.responsavel);
 }

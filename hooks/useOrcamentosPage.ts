@@ -46,6 +46,7 @@ import {
 } from "@/lib/contrato-permissoes";
 import {
   ORCAMENTO_RESPONSAVEL_BLOQUEADO_MSG,
+  formatResponsavelOrcamentoDisplay,
   podeAlterarResponsavelProcesso,
 } from "@/lib/orcamento-responsavel";
 import {
@@ -692,12 +693,16 @@ export function useOrcamentosPage() {
           acao: AUDITORIA_ACOES.alteracao_responsavel_processo,
           registroId: result.orcamento.id,
           registroNome: result.orcamento.numero,
-          descricao: `${auditContext.usuarioNome} alterou o responsável do processo ${result.orcamento.numero} de ${result.responsavelAnterior} para ${result.responsavelNovo}.${contratoTxt}\nMotivo:\n${result.motivo}`,
+          descricao: `${formatResponsavelOrcamentoDisplay(auditContext.usuarioNome)} alterou o responsável do processo ${result.orcamento.numero} de ${formatResponsavelOrcamentoDisplay(result.responsavelAnterior)} para ${formatResponsavelOrcamentoDisplay(result.responsavelNovo)}.${contratoTxt}\nMotivo:\n${result.motivo}`,
           dadosAntes: {
-            responsavel: result.responsavelAnterior,
+            responsavel: formatResponsavelOrcamentoDisplay(
+              result.responsavelAnterior
+            ),
           },
           dadosDepois: {
-            responsavel: result.responsavelNovo,
+            responsavel: formatResponsavelOrcamentoDisplay(
+              result.responsavelNovo
+            ),
             motivo: result.motivo,
             contrato: result.numeroContrato,
           },

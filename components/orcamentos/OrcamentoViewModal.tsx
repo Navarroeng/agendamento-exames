@@ -12,6 +12,7 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
 
 interface OrcamentoViewModalProps {
@@ -110,7 +111,7 @@ export function OrcamentoViewModal({
                 <span>
                   Responsável:{" "}
                   <strong className="font-semibold text-white">
-                    {orcamento.responsavel?.trim() || "—"}
+                    {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
                   </strong>
                 </span>
                 <span>
@@ -142,7 +143,9 @@ export function OrcamentoViewModal({
         <div className="flex shrink-0 flex-col gap-2 border-t border-[#e4ebf4] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
           <div className="hidden items-center gap-2 text-[11px] text-[#94a3b8] sm:flex">
             <IconUser size={14} />
-            <span>{orcamento.responsavel?.trim() || "—"}</span>
+            <span>
+              {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
+            </span>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <button

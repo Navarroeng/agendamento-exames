@@ -16,6 +16,7 @@ import {
 } from "@/lib/implantacao-meses";
 import { EtapaAtualBadge } from "@/components/implantacao/EtapaAtualBadge";
 import { ImplantacaoMesTabs } from "@/components/implantacao/ImplantacaoMesTabs";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
@@ -149,7 +150,11 @@ export function ImplantacaoTable({
                           : cnpj
                         : "—"}
                     </td>
-                    <td>{processo.orcamento.responsavel}</td>
+                    <td>
+                      {formatResponsavelOrcamentoDisplay(
+                        processo.orcamento.responsavel
+                      )}
+                    </td>
                     <td>
                       <EtapaAtualBadge
                         etapa={processo.etapaAtual}

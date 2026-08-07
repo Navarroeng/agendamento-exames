@@ -9,6 +9,7 @@ import {
   type ImplantacaoFilters,
 } from "@/lib/implantacao-clientes";
 import { ORCAMENTO_ORIGEM_OPTIONS } from "@/lib/orcamento-origem";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { ORCAMENTO_STATUS_OPTIONS } from "@/lib/orcamento-types";
 
 interface ImplantacaoSearchPanelProps {
@@ -215,7 +216,7 @@ export function ImplantacaoSearchPanel({
                   <option value="">Todos</option>
                   {responsaveis.map((nome) => (
                     <option key={nome} value={nome}>
-                      {nome}
+                      {formatResponsavelOrcamentoDisplay(nome)}
                     </option>
                   ))}
                 </select>

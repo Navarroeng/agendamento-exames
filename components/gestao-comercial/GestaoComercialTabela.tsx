@@ -5,6 +5,7 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatCurrency } from "@/lib/money";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import type { GestaoComercialFechamentoRow } from "@/lib/gestao-comercial";
 
 type SortKey =
@@ -147,7 +148,9 @@ export function GestaoComercialTabela({
                     {formatOrcamentoOrigemCliente(row.origem)}
                   </td>
                   <td className="px-2 py-2">
-                    {row.responsavelNoFechamento}
+                    {formatResponsavelOrcamentoDisplay(
+                      row.responsavelNoFechamento
+                    )}
                     {row.responsavelAproximado ? (
                       <span
                         className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"

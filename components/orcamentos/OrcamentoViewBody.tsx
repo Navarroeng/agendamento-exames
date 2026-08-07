@@ -17,6 +17,7 @@ import {
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
 function displayValue(value: string | null | undefined): string {
@@ -105,13 +106,11 @@ export function OrcamentoViewBody({
           />
           <ClientField
             label="Criado por"
-            value={displayValue(
-              orcamento.criado_por?.trim() || orcamento.responsavel
-            )}
+            value={formatCriadoPorOrcamento(orcamento)}
           />
           <ClientField
             label="Responsável atual"
-            value={displayValue(orcamento.responsavel)}
+            value={formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
           />
         </div>
       </section>
