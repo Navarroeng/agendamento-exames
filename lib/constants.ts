@@ -35,17 +35,20 @@ export type NavItem = {
 };
 
 export type NavSection = {
+  /** Título do grupo. String vazia = item isolado sem cabeçalho (ex.: Dashboard). */
   title: string;
   items: readonly NavItem[];
 };
 
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
-    title: "Operação",
+    title: "",
+    items: [{ iconKey: "home", label: "Dashboard", href: "/dashboard" }],
+  },
+  {
+    title: "Exames",
     items: [
-      { iconKey: "home", label: "Dashboard", href: "/dashboard" },
       { iconKey: "calendar", label: "Agendamentos", href: "/" },
-      { iconKey: "esocial", label: "e-Social", href: "/e-social" },
       {
         iconKey: "clock",
         label: "Periódicos Futuros",
@@ -67,6 +70,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     title: "Laudos",
     items: [
+      { iconKey: "esocial", label: "e-Social", href: "/e-social" },
       {
         iconKey: "document",
         label: "Laudos SST",

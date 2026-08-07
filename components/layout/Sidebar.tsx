@@ -88,12 +88,14 @@ export function Sidebar() {
       <nav className="sidebar-nav-scroll flex flex-1 flex-col overflow-y-auto px-0.5 py-0.5 pb-3">
         {navSections.map((section, sectionIndex) => (
           <div
-            key={section.title}
+            key={section.title || section.items[0]?.label || sectionIndex}
             className={sectionIndex > 0 ? "mt-1" : undefined}
           >
-            <p className="px-3 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35 first:pt-0">
-              {section.title}
-            </p>
+            {section.title ? (
+              <p className="px-3 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35 first:pt-0">
+                {section.title}
+              </p>
+            ) : null}
             <div className="flex flex-col gap-0.5">
               {section.items.map((item) => (
                 <NavLink
