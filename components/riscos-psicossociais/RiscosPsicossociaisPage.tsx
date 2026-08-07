@@ -2,17 +2,57 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconShield } from "@/components/ui/icons/OutlineIcons";
+import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/RiscosPsicossociaisModal";
+import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
+import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
+import { useRiscosPsicossociaisPage } from "@/hooks/useRiscosPsicossociaisPage";
 
 export function RiscosPsicossociaisPage() {
+  const {
+    processos,
+    loading,
+    error,
+    filters,
+    responsaveis,
+    modalProcesso,
+    modalTab,
+    setModalTab,
+    handleFilterChange,
+    clearFilters,
+    openProcesso,
+    closeModal,
+  } = useRiscosPsicossociaisPage();
+
   return (
     <AppShell
       title="Riscos Psicossociais"
-      subtitle="Módulo em preparação."
+      subtitle="Continuidade operacional dos processos com Laudos SST concluídos."
       icon={<IconShield size={20} />}
     >
-      <div className="rounded-2xl border border-[#e8edf5] bg-white px-6 py-16 text-center shadow-[0_4px_18px_rgba(15,23,42,0.04)]">
-        <p className="text-sm font-semibold text-app-muted">Em desenvolvimento</p>
+      <div className="mb-[18px]">
+        <RiscosPsicossociaisSearchPanel
+          filters={filters}
+          totalFiltrados={processos.length}
+          responsaveis={responsaveis}
+          onChange={handleFilterChange}
+          onClear={clearFilters}
+        />
       </div>
+
+      <RiscosPsicossociaisTable
+        processos={processos}
+        loading={loading}
+        error={error}
+        onVisualizar={openProcesso}
+      />
+
+      <RiscosPsicossociaisModal
+        open={Boolean(modalProcesso)}
+        processo={modalProcesso}
+        tab={modalTab}
+        onTabChange={setModalTab}
+        onClose={closeModal}
+      />
     </AppShell>
   );
 }

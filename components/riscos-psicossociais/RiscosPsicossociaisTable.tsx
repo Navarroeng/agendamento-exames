@@ -2,31 +2,35 @@
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { Panel } from "@/components/ui/Panel";
-import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { IconEye, IconShield } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
-  LAUDOS_SST_ETAPA_LABELS,
-  LAUDOS_SST_ETAPAS,
-  type LaudosSstProcesso,
-} from "@/lib/laudos-sst";
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
+  RISCOS_PSICOSSOCIAIS_ETAPAS,
+  type RiscosPsicossociaisProcesso,
+} from "@/lib/riscos-psicossociais";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
-interface LaudosSstTableProps {
-  processos: LaudosSstProcesso[];
+interface RiscosPsicossociaisTableProps {
+  processos: RiscosPsicossociaisProcesso[];
   loading: boolean;
   error: string | null;
-  onVisualizar: (processo: LaudosSstProcesso) => void;
+  onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
 }
 
-function ProgressoLaudos({ processo }: { processo: LaudosSstProcesso }) {
+function ProgressoRiscos({
+  processo,
+}: {
+  processo: RiscosPsicossociaisProcesso;
+}) {
   return (
     <div className="min-w-[140px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
         {processo.progressoLabel} etapas
       </p>
       <div className="flex items-center gap-0.5">
-        {LAUDOS_SST_ETAPAS.map((etapa, index) => {
+        {RISCOS_PSICOSSOCIAIS_ETAPAS.map((etapa, index) => {
           const concluida = index < processo.etapasConcluidas;
           const atual =
             !concluida &&
@@ -50,14 +54,18 @@ function ProgressoLaudos({ processo }: { processo: LaudosSstProcesso }) {
   );
 }
 
-export function LaudosSstTable({
+export function RiscosPsicossociaisTable({
   processos,
   loading,
   error,
   onVisualizar,
-}: LaudosSstTableProps) {
+}: RiscosPsicossociaisTableProps) {
   return (
-    <Panel title="Processos de Laudos SST" icon={<IconFileText />} iconTone="blue">
+    <Panel
+      title="Processos de Riscos Psicossociais"
+      icon={<IconShield />}
+      iconTone="blue"
+    >
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
         {loading && (
           <p className="py-8 text-center text-sm text-app-muted">Carregando...</p>
@@ -67,16 +75,14 @@ export function LaudosSstTable({
         )}
         {!loading && !error && processos.length === 0 && (
           <p className="py-8 text-center text-sm text-app-muted">
-            Nenhum processo com implantação concluída para Laudos SST.
+            Nenhum processo com Laudos SST concluído para Riscos Psicossociais.
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[1100px]">
+          <table className="table-premium w-full min-w-[1080px]">
             <thead>
               <tr>
-                <th>Data de conclusão</th>
-                <th>Orçamento</th>
-                <th>Contrato</th>
+                <th>Data de entrada</th>
                 <th>Cliente</th>
                 <th>CNPJ</th>
                 <th>Responsável</th>
@@ -88,22 +94,16 @@ export function LaudosSstTable({
             </thead>
             <tbody>
               {processos.map((processo) => {
-                const { orcamento, numeroContrato } = processo.implantacao;
+                const { orcamento } = processo.implantacao;
                 const cnpj = orcamento.cliente_cnpj;
-                const dataConclusao = processo.dataConclusaoImplantacao
-                  ? formatDateIsoToBR(
-                      processo.dataConclusaoImplantacao.slice(0, 10)
-                    )
+                const dataEntrada = processo.dataEntrada
+                  ? formatDateIsoToBR(processo.dataEntrada.slice(0, 10))
                   : "—";
 
                 return (
                   <tr key={orcamento.id}>
-                    <td className="whitespace-nowrap">{dataConclusao}</td>
-                    <td className="font-bold text-navy">{orcamento.numero}</td>
-                    <td className="whitespace-nowrap">
-                      {numeroContrato?.trim() || "—"}
-                    </td>
-                    <td className="max-w-[200px] truncate">
+                    <td className="whitespace-nowrap">{dataEntrada}</td>
+                    <td className="max-w-[220px] truncate font-semibold text-navy">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
                     </td>
                     <td className="whitespace-nowrap text-[12px]">
@@ -123,19 +123,19 @@ export function LaudosSstTable({
                         </span>
                       ) : (
                         <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">
-                          {LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual]}
+                          {RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
                         </span>
                       )}
                     </td>
                     <td>
-                      <ProgressoLaudos processo={processo} />
+                      <ProgressoRiscos processo={processo} />
                     </td>
                     <td className="text-center">
                       <button
                         type="button"
                         onClick={() => onVisualizar(processo)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e2e8f0] bg-white text-[#64748b] transition hover:border-brand-blue/30 hover:bg-brand-blue-soft hover:text-brand-blue"
-                        aria-label={`Visualizar laudos ${orcamento.numero}`}
+                        aria-label={`Visualizar riscos ${orcamento.numero}`}
                         title="Visualizar"
                       >
                         <IconEye size={14} />

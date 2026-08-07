@@ -116,6 +116,7 @@ const built = buildLaudosSstProcesso(
 assert.equal(built.etapaAtual, "epis");
 assert.equal(built.etapasConcluidas, 0);
 assert.equal(built.progressoLabel, "0 de 6");
+assert.equal(built.status, "em_andamento");
 assert.equal(built.dataConclusaoImplantacao, null);
 
 const withTracking = buildLaudosSstProcesso(
@@ -129,6 +130,22 @@ const withTracking = buildLaudosSstProcesso(
 assert.equal(withTracking.etapaAtual, "cronograma_acoes");
 assert.equal(withTracking.etapasConcluidas, 2);
 assert.equal(withTracking.progressoLabel, "2 de 6");
+assert.equal(withTracking.status, "em_andamento");
+
+const concluido = buildLaudosSstProcesso(
+  baseProcesso({ etapaAtual: "concluido" }),
+  {
+    orcamento_id: "o1",
+    etapa_atual: "envio_cliente",
+    etapas_concluidas: 6,
+    status: "concluido",
+    concluido_em: "2026-08-07T12:00:00Z",
+  }
+);
+assert.equal(concluido.status, "concluido");
+assert.equal(concluido.etapasConcluidas, 6);
+assert.equal(concluido.progressoLabel, "6 de 6");
+assert.equal(concluido.etapaAtual, "envio_cliente");
 
 const filtrados = filterLaudosSstProcessos([built], {
   busca: "acme",
