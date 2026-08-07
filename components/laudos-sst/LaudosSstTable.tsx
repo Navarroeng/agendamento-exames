@@ -88,12 +88,11 @@ export function LaudosSstTable({
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[1100px]">
+          <table className="table-premium w-full min-w-[980px]">
             <thead>
               <tr>
                 <th>Data de entrada</th>
                 <th>Orçamento</th>
-                <th>Contrato</th>
                 <th>Cliente</th>
                 <th>CNPJ</th>
                 <th>Responsável</th>
@@ -105,7 +104,7 @@ export function LaudosSstTable({
             </thead>
             <tbody>
               {processos.map((processo) => {
-                const { orcamento, numeroContrato } = processo.implantacao;
+                const { orcamento } = processo.implantacao;
                 const cnpj = orcamento.cliente_cnpj;
                 const dataEntrada = processo.dataEntrada
                   ? formatDateIsoToBR(processo.dataEntrada.slice(0, 10))
@@ -115,10 +114,7 @@ export function LaudosSstTable({
                   <tr key={orcamento.id}>
                     <td className="whitespace-nowrap">{dataEntrada}</td>
                     <td className="font-bold text-navy">{orcamento.numero}</td>
-                    <td className="whitespace-nowrap">
-                      {numeroContrato?.trim() || "—"}
-                    </td>
-                    <td className="max-w-[200px] truncate">
+                    <td className="max-w-[240px] truncate">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
                     </td>
                     <td className="whitespace-nowrap text-[12px]">
