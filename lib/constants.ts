@@ -72,14 +72,24 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         href: "/implantacao",
       },
       {
+        iconKey: "chart",
+        label: "Gestão Comercial",
+        href: "/gestao-comercial",
+      },
+    ],
+  },
+  {
+    title: "Laudos",
+    items: [
+      {
         iconKey: "document",
         label: "Laudos SST",
         href: "/laudos-sst",
       },
       {
-        iconKey: "chart",
-        label: "Gestão Comercial",
-        href: "/gestao-comercial",
+        iconKey: "shield",
+        label: "Riscos Psicossociais",
+        href: "/riscos-psicossociais",
       },
     ],
   },
