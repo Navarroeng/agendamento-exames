@@ -8,7 +8,7 @@ import {
   mergeAnosComAtual,
   resolveMesParaAno,
   yearMonthFromIsoDate,
-} from "../lib/listagem-meses.ts";
+} from "../lib/listagem-meses";
 
 const agoraAgosto = new Date(2026, 7, 7); // 07/08/2026
 
