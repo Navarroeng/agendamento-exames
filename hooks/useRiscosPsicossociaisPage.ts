@@ -541,6 +541,43 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes]
   );
 
+  const handleInvalidarParticipante = useCallback(
+    async (participanteId: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      setSavingParticipante(true);
+      try {
+        const res = await fetch(
+          `/api/riscos/participante/${encodeURIComponent(participanteId)}/invalidar`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              usuarioNome: auditContext?.usuarioNome,
+              usuarioEmail: auditContext?.usuarioEmail,
+            }),
+          }
+        );
+        const json = (await res.json()) as { ok?: boolean; error?: string };
+        if (!res.ok || !json.ok) {
+          throw new Error(json.error || "Erro ao invalidar participação.");
+        }
+        await carregarParticipantes(campanhaId);
+        toast.success("Participação invalidada. Resultados atualizados.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao invalidar participação."
+        );
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes]
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -569,6 +606,7 @@ export function useRiscosPsicossociaisPage() {
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,
+    handleInvalidarParticipante,
     refresh,
   };
 }

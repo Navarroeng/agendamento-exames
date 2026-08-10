@@ -34,9 +34,10 @@ export async function obterResultadosCampanhaRiscos(
 
   const { data: sessoesRaw, error: errSessoes } = await supabase
     .from("riscos_avaliacao_sessoes")
-    .select("id, campanha_id, status")
+    .select("id, campanha_id, status, valida")
     .eq("campanha_id", id)
-    .eq("status", "concluida");
+    .eq("status", "concluida")
+    .eq("valida", true);
 
   if (errSessoes) throw errSessoes;
 

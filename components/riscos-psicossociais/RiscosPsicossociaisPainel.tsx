@@ -37,6 +37,7 @@ interface RiscosPsicossociaisPainelProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
+  onInvalidarParticipante: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosPsicossociaisPainel({
@@ -55,6 +56,7 @@ export function RiscosPsicossociaisPainel({
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
+  onInvalidarParticipante,
 }: RiscosPsicossociaisPainelProps) {
   const { orcamento, numeroContrato } = processo.implantacao;
   const campanha = processo.campanha;
@@ -142,6 +144,7 @@ export function RiscosPsicossociaisPainel({
         onCriarParticipante={onCriarParticipante}
         onEditarParticipante={onEditarParticipante}
         onRemoverParticipante={onRemoverParticipante}
+        onInvalidarParticipante={onInvalidarParticipante}
       />
     </div>
   );

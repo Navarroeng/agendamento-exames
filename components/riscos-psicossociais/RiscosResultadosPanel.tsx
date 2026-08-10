@@ -81,9 +81,14 @@ function StatChip({
 
 interface RiscosResultadosPanelProps {
   campanha: RiscosCampanhaRecord | null;
+  /** Muda após invalidação/remoção para recarregar consolidação. */
+  refreshKey?: string;
 }
 
-export function RiscosResultadosPanel({ campanha }: RiscosResultadosPanelProps) {
+export function RiscosResultadosPanel({
+  campanha,
+  refreshKey = "",
+}: RiscosResultadosPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ResultadosPayload | null>(null);
@@ -125,7 +130,7 @@ export function RiscosResultadosPanel({ campanha }: RiscosResultadosPanelProps) 
     return () => {
       cancelled = true;
     };
-  }, [campanha?.id]);
+  }, [campanha?.id, refreshKey]);
 
   if (!campanha) {
     return (

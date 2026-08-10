@@ -39,6 +39,7 @@ export function classificarSituacaoParticipante(input: {
 }): SituacaoParticipantePortal {
   if (
     input.statusParticipante === "respondido" ||
+    input.statusParticipante === "invalidado" ||
     Boolean(input.concluiuEm) ||
     input.statusSessao === "concluida"
   ) {

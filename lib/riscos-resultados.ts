@@ -1,6 +1,6 @@
 /**
  * Consolidação anônima de resultados COPSOQ por campanha.
- * Não usa nome/CPF/participante_id — apenas sessões concluídas + respostas.
+ * Não usa nome/CPF/participante_id — apenas sessões concluídas válidas + respostas.
  */
 
 import { getPerguntasOrdenadas } from "@/lib/copsoq/instrument";
@@ -10,11 +10,14 @@ import {
   type CopsoqEngineResult,
   type CopsoqRespostasRespondente,
 } from "@/lib/copsoq-engine";
+import { sessaoContaNosResultados } from "@/lib/riscos-invalidacao";
 
 export type SessaoAvaliacaoConsolidacao = {
   id: string;
   campanha_id: string;
   status: string;
+  /** false = invalidada administrativamente; ausente/true = válida. */
+  valida?: boolean | null;
 };
 
 export type RespostaAvaliacaoConsolidacao = {
@@ -52,15 +55,15 @@ export const RISCO_GERAL_NAO_DEFINIDO =
   "Risco geral: não definido pelo instrumento/documentação utilizada.";
 
 /**
- * Filtra apenas sessões concluídas da campanha informada.
- * Sessões em andamento e de outras campanhas são ignoradas.
+ * Filtra sessões concluídas e válidas da campanha informada.
+ * Em andamento, inválidas e de outras campanhas são ignoradas.
  */
 export function filtrarSessoesConcluidasCampanha(
   sessoes: SessaoAvaliacaoConsolidacao[],
   campanhaId: string
 ): SessaoAvaliacaoConsolidacao[] {
   return sessoes.filter(
-    (s) => s.campanha_id === campanhaId && s.status === "concluida"
+    (s) => s.campanha_id === campanhaId && sessaoContaNosResultados(s)
   );
 }
 

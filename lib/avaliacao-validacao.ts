@@ -147,6 +147,7 @@ export function validarAcessoAvaliacao(input: {
 
   if (
     input.participante.status === "respondido" ||
+    input.participante.status === "invalidado" ||
     input.participante.concluiu_em
   ) {
     return { ok: false, motivo: "participante_ja_concluiu" };
@@ -193,6 +194,8 @@ export function participanteJaConcluiu(
   participante: Pick<ParticipanteAcessoRow, "status" | "concluiu_em">
 ): boolean {
   return (
-    participante.status === "respondido" || Boolean(participante.concluiu_em)
+    participante.status === "respondido" ||
+    participante.status === "invalidado" ||
+    Boolean(participante.concluiu_em)
   );
 }

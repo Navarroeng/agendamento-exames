@@ -9,7 +9,12 @@ import {
   maskCpfParticipante,
   type RiscosCampanhaParticipanteRecord,
   type RiscosParticipanteInput,
+  type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
+import {
+  podeInvalidarParticipacao,
+  podeRemoverParticipanteComum,
+} from "@/lib/riscos-invalidacao";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { RiscosParticipanteFormModal } from "@/components/riscos-psicossociais/RiscosParticipanteFormModal";
 
@@ -23,6 +28,7 @@ interface RiscosCampanhaParticipantesSectionProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
+  onInvalidar: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosCampanhaParticipantesSection({
@@ -32,6 +38,7 @@ export function RiscosCampanhaParticipantesSection({
   onCriar,
   onEditar,
   onRemover,
+  onInvalidar,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -81,11 +88,34 @@ export function RiscosCampanhaParticipantesSection({
 
   async function handleRemover(p: RiscosCampanhaParticipanteRecord) {
     setMenuOpenId(null);
+    if (!podeRemoverParticipanteComum(p.status)) {
+      toast.error(
+        "Participante que já concluiu não pode ser removido. Use “Invalidar participação”."
+      );
+      return;
+    }
     const ok = window.confirm(
       `Remover o participante ${p.nome_completo}? Esta ação não pode ser desfeita.`
     );
     if (!ok) return;
     await onRemover(p.id);
+  }
+
+  async function handleInvalidar(p: RiscosCampanhaParticipanteRecord) {
+    setMenuOpenId(null);
+    if (!podeInvalidarParticipacao(p.status)) {
+      toast.error(
+        p.status === "invalidado"
+          ? "Esta participação já está invalidada."
+          : "Somente participantes que concluíram podem ser invalidados."
+      );
+      return;
+    }
+    const ok = window.confirm(
+      `Este participante já concluiu a pesquisa.\n\nInvalidar esta participação fará com que suas respostas deixem de compor os resultados consolidados desta campanha.\n\nO histórico da operação será preservado.\n\nDeseja continuar?`
+    );
+    if (!ok) return;
+    await onInvalidar(p.id);
   }
 
   function placeholderAction(label: string) {
@@ -178,15 +208,7 @@ export function RiscosCampanhaParticipantesSection({
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                        p.status === "respondido"
-                          ? "bg-brand-green-soft text-brand-green"
-                          : "bg-[#fef3c7] text-[#b45309]"
-                      }`}
-                    >
-                      {RISCOS_PARTICIPANTE_STATUS_LABELS[p.status]}
-                    </span>
+                    <StatusBadge status={p.status} />
                   </td>
                   <td className="hidden px-3 py-2.5 tabular-nums text-[#64748b] lg:table-cell">
                     {p.created_at
@@ -197,12 +219,14 @@ export function RiscosCampanhaParticipantesSection({
                     <ParticipanteActionsMenu
                       open={menuOpenId === p.id}
                       disabled={saving}
+                      status={p.status}
                       onToggle={() =>
                         setMenuOpenId((id) => (id === p.id ? null : p.id))
                       }
                       onClose={() => setMenuOpenId(null)}
                       onEditar={() => openEdit(p)}
                       onRemover={() => void handleRemover(p)}
+                      onInvalidar={() => void handleInvalidar(p)}
                       onPlaceholder={placeholderAction}
                     />
                   </td>
@@ -226,6 +250,22 @@ export function RiscosCampanhaParticipantesSection({
         onSave={handleSalvar}
       />
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: RiscosParticipanteStatus }) {
+  const className =
+    status === "respondido"
+      ? "bg-brand-green-soft text-brand-green"
+      : status === "invalidado"
+        ? "bg-[#fee2e2] text-[#b91c1c]"
+        : "bg-[#fef3c7] text-[#b45309]";
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${className}`}
+    >
+      {RISCOS_PARTICIPANTE_STATUS_LABELS[status]}
+    </span>
   );
 }
 
@@ -259,21 +299,27 @@ function ResumoCard({
 function ParticipanteActionsMenu({
   open,
   disabled,
+  status,
   onToggle,
   onClose,
   onEditar,
   onRemover,
+  onInvalidar,
   onPlaceholder,
 }: {
   open: boolean;
   disabled?: boolean;
+  status: RiscosParticipanteStatus;
   onToggle: () => void;
   onClose: () => void;
   onEditar: () => void;
   onRemover: () => void;
+  onInvalidar: () => void;
   onPlaceholder: (label: string) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const podeRemover = podeRemoverParticipanteComum(status);
+  const podeInvalidar = podeInvalidarParticipacao(status);
 
   useEffect(() => {
     if (!open) return;
@@ -307,7 +353,7 @@ function ParticipanteActionsMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
         >
           <MenuItem label="Editar" onClick={onEditar} />
           <MenuItem
@@ -331,7 +377,21 @@ function ParticipanteActionsMenu({
             onClick={() => onPlaceholder("Ver histórico")}
           />
           <div className="my-1 border-t border-[#eef2f7]" />
-          <MenuItem label="Remover" danger onClick={onRemover} />
+          {podeRemover ? (
+            <MenuItem label="Remover" danger onClick={onRemover} />
+          ) : null}
+          {podeInvalidar ? (
+            <MenuItem
+              label="Invalidar participação"
+              danger
+              onClick={onInvalidar}
+            />
+          ) : null}
+          {status === "invalidado" ? (
+            <p className="px-3 py-2 text-[11px] font-semibold text-[#64748b]">
+              Participação já invalidada
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

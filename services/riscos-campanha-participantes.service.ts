@@ -284,6 +284,14 @@ export async function removerParticipanteCampanha(
   if (!atual) throw new Error("Participante não encontrado.");
 
   const before = mapParticipante(atual as Record<string, unknown>);
+  if (before.status !== "pendente") {
+    throw new Error(
+      before.status === "respondido"
+        ? "Participante já concluiu a pesquisa. Use “Invalidar participação”."
+        : "Participante invalidado não pode ser removido pela ação comum."
+    );
+  }
+
   const { error } = await supabase
     .from("riscos_campanha_participantes")
     .delete()

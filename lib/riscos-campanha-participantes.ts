@@ -4,7 +4,11 @@ import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { parseDataNascimentoBr } from "@/lib/date-br";
 import { gerarCodigoPublicoCampanha } from "@/lib/riscos-campanha";
 
-export const RISCOS_PARTICIPANTE_STATUS = ["pendente", "respondido"] as const;
+export const RISCOS_PARTICIPANTE_STATUS = [
+  "pendente",
+  "respondido",
+  "invalidado",
+] as const;
 
 export type RiscosParticipanteStatus =
   (typeof RISCOS_PARTICIPANTE_STATUS)[number];
@@ -15,6 +19,7 @@ export const RISCOS_PARTICIPANTE_STATUS_LABELS: Record<
 > = {
   pendente: "Pendente",
   respondido: "Concluído",
+  invalidado: "Invalidado",
 };
 
 export const RISCOS_PARTICIPANTE_ORIGENS = ["manual", "importacao"] as const;
@@ -63,6 +68,7 @@ export type RiscosParticipantesResumo = {
   cadastrados: number;
   pendentes: number;
   respondidos: number;
+  invalidados: number;
 };
 
 export function isRiscosParticipanteStatus(
@@ -109,8 +115,10 @@ export function buildParticipantesResumo(
 ): RiscosParticipantesResumo {
   let pendentes = 0;
   let respondidos = 0;
+  let invalidados = 0;
   for (const p of participantes) {
     if (p.status === "respondido") respondidos += 1;
+    else if (p.status === "invalidado") invalidados += 1;
     else pendentes += 1;
   }
   return {
@@ -118,5 +126,6 @@ export function buildParticipantesResumo(
     cadastrados: participantes.length,
     pendentes,
     respondidos,
+    invalidados,
   };
 }

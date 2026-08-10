@@ -47,6 +47,7 @@ interface RiscosPainelCardsProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
+  onInvalidarParticipante: (participanteId: string) => Promise<void>;
 }
 
 function PanelCard({
@@ -116,6 +117,7 @@ export function RiscosPainelCards({
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
+  onInvalidarParticipante,
 }: RiscosPainelCardsProps) {
   const campanha = processo.campanha;
 
@@ -366,6 +368,7 @@ export function RiscosPainelCards({
             onCriar={onCriarParticipante}
             onEditar={onEditarParticipante}
             onRemover={onRemoverParticipante}
+            onInvalidar={onInvalidarParticipante}
           />
         ) : (
           <PlaceholderNote>
@@ -478,7 +481,10 @@ export function RiscosPainelCards({
       {/* Linha 4 — Resultados | Relatório */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <PanelCard title="Resultados">
-          <RiscosResultadosPanel campanha={campanha} />
+          <RiscosResultadosPanel
+            campanha={campanha}
+            refreshKey={participantes.map((p) => `${p.id}:${p.status}`).join("|")}
+          />
         </PanelCard>
 
         <PanelCard title="Relatório">

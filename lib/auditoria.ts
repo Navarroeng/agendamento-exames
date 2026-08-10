@@ -83,6 +83,7 @@ export const AUDITORIA_ACOES = {
   riscos_participante_criado: "riscos_participante_criado",
   riscos_participante_editado: "riscos_participante_editado",
   riscos_participante_removido: "riscos_participante_removido",
+  riscos_participacao_invalidada: "riscos_participacao_invalidada",
 } as const;
 
 export type AuditoriaAcao =
@@ -171,6 +172,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   riscos_participante_criado: "Participante da pesquisa cadastrado",
   riscos_participante_editado: "Participante da pesquisa editado",
   riscos_participante_removido: "Participante da pesquisa removido",
+  riscos_participacao_invalidada: "Participação da pesquisa invalidada",
 };
 
 export interface AuditoriaUsuarioContext {
