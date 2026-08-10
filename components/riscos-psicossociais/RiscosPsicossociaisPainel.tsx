@@ -66,6 +66,10 @@ export function RiscosPsicossociaisPainel({
     return "Em andamento";
   }, [processo.status, campanha]);
 
+  const progressoPct = Math.round(
+    (processo.etapasConcluidas / Math.max(processo.totalEtapas, 1)) * 100
+  );
+
   return (
     <div className="space-y-4">
       <header className="rounded-2xl border border-[#dbeafe] bg-gradient-to-br from-[#f8fbff] to-white px-4 py-3.5 shadow-sm sm:px-5">
@@ -90,6 +94,34 @@ export function RiscosPsicossociaisPainel({
           ) : null}
         </p>
       </header>
+
+      <section className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5 shadow-sm sm:px-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+              <div
+                className="h-full rounded-full bg-brand-blue transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, Math.max(0, progressoPct))}%`,
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="text-lg font-extrabold tabular-nums text-navy">
+                {progressoPct}%
+              </span>
+              <span className="font-semibold text-[#64748b]">
+                {processo.etapasConcluidas} de {processo.totalEtapas} etapas
+                concluídas
+              </span>
+            </div>
+          </div>
+          <p className="text-xs font-semibold text-[#64748b]">
+            Status:{" "}
+            <span className="font-extrabold text-navy">{statusLabel}</span>
+          </p>
+        </div>
+      </section>
 
       <RiscosPainelCards
         processo={processo}

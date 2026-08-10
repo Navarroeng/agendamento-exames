@@ -15,6 +15,8 @@ interface RiscosPainelPreRequisitosProps {
   onSalvarRecebimentoLista: (file: File) => Promise<void>;
   onRemoverAnexoLista: () => Promise<void>;
   onVisualizarAnexoLista: () => Promise<void>;
+  /** Quando true, não renderiza o container externo (usa o PanelCard pai). */
+  embedded?: boolean;
 }
 
 function StatusPill({
@@ -44,21 +46,15 @@ export function RiscosPainelPreRequisitos({
   onSalvarRecebimentoLista,
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
+  embedded = false,
 }: RiscosPainelPreRequisitosProps) {
   const [listaExpandida, setListaExpandida] = useState(false);
   const lista = processo.listaPresenca;
   const laudosAtualizacao =
     processo.laudos.concluidoEm ?? processo.laudos.dataEntrada;
 
-  return (
-    <section className="rounded-2xl border border-[#e8edf5] bg-white p-4 shadow-sm sm:p-5">
-      <div className="mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          Card 2
-        </p>
-        <h3 className="text-sm font-extrabold text-navy">Pré-requisitos</h3>
-      </div>
-
+  const body = (
+    <>
       <div className="grid gap-2 sm:grid-cols-2">
         <div
           className={`rounded-xl border px-3 py-2.5 ${
@@ -144,6 +140,15 @@ export function RiscosPainelPreRequisitos({
           />
         </div>
       ) : null}
+    </>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <section className="flex h-full flex-col rounded-2xl border border-[#e8edf5] bg-white p-4 shadow-sm sm:p-5">
+      <h3 className="mb-3 text-sm font-extrabold text-navy">Pré-requisitos</h3>
+      {body}
     </section>
   );
 }

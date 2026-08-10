@@ -86,44 +86,37 @@ export function RiscosCampanhaParticipantesSection({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-extrabold text-navy">
-            Colaboradores autorizados a responder
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-            onClick={() =>
-              toast.message(
-                "Importação por Excel será disponibilizada em etapa futura."
-              )
-            }
-          >
-            Importar Excel
-          </button>
-          <button
-            type="button"
-            className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-            disabled={saving}
-            onClick={openCreate}
-          >
-            + Cadastrar participante
-          </button>
-        </div>
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+          onClick={() =>
+            toast.message(
+              "Importação por Excel será disponibilizada em etapa futura."
+            )
+          }
+        >
+          Importar Excel
+        </button>
+        <button
+          type="button"
+          className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+          disabled={saving}
+          onClick={openCreate}
+        >
+          + Cadastrar participante
+        </button>
       </div>
 
       {participantes.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center text-sm text-app-muted">
+        <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center text-sm text-app-muted">
           Nenhum participante cadastrado. Use “+ Cadastrar participante” para
           incluir.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
-          <table className="w-full min-w-[720px] text-left text-xs">
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[#e8edf5] bg-white">
+          <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
                 <th className="px-3 py-2.5">Nome</th>
