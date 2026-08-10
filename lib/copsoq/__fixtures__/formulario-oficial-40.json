@@ -1,0 +1,1852 @@
+{
+  "fonte": "COPSOQ II - Formulário de Aplicação",
+  "total": 40,
+  "perguntas": [
+    {
+      "id": "p-1a",
+      "codigo": "1A",
+      "ordem": 1,
+      "questaoPrincipal": 1,
+      "texto": "Você atrasa a entrega do seu trabalho?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-1b",
+      "codigo": "1B",
+      "ordem": 2,
+      "questaoPrincipal": 1,
+      "texto": "O tempo para realizar as suas tarefas no trabalho é suficiente?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": true,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-2a",
+      "codigo": "2A",
+      "ordem": 3,
+      "questaoPrincipal": 2,
+      "texto": "É necessário manter um ritmo acelerado no trabalho?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-2b",
+      "codigo": "2B",
+      "ordem": 4,
+      "questaoPrincipal": 2,
+      "texto": "Você trabalha em ritmo acelerado ao longo de toda jornada?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-3a",
+      "codigo": "3A",
+      "ordem": 5,
+      "questaoPrincipal": 3,
+      "texto": "Seu trabalho coloca você em situações emocionalmente desgastantes?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-3b",
+      "codigo": "3B",
+      "ordem": 6,
+      "questaoPrincipal": 3,
+      "texto": "Você tem que lidar com os problemas pessoais de outras pessoas como parte do seu trabalho?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "demandas-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-4a",
+      "codigo": "4A",
+      "ordem": 7,
+      "questaoPrincipal": 4,
+      "texto": "Você tem um alto grau de influência nas decisões sobre o seu trabalho?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "influencia-desenvolvimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-4b",
+      "codigo": "4B",
+      "ordem": 8,
+      "questaoPrincipal": 4,
+      "texto": "Você pode interferir na quantidade de trabalho atribuída a você?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "influencia-desenvolvimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-5a",
+      "codigo": "5A",
+      "ordem": 9,
+      "questaoPrincipal": 5,
+      "texto": "Você tem a possibilidade de aprender coisas novas através do seu trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "influencia-desenvolvimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-5b",
+      "codigo": "5B",
+      "ordem": 10,
+      "questaoPrincipal": 5,
+      "texto": "Seu trabalho exige que você tome iniciativas?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "influencia-desenvolvimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-6a",
+      "codigo": "6A",
+      "ordem": 11,
+      "questaoPrincipal": 6,
+      "texto": "Seu trabalho é significativo?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "significado-comprometimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-6b",
+      "codigo": "6B",
+      "ordem": 12,
+      "questaoPrincipal": 6,
+      "texto": "Você sente que o trabalho que faz é importante?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "significado-comprometimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-7a",
+      "codigo": "7A",
+      "ordem": 13,
+      "questaoPrincipal": 7,
+      "texto": "Você sente que o seu local de trabalho é muito importante para você?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "significado-comprometimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-7b",
+      "codigo": "7B",
+      "ordem": 14,
+      "questaoPrincipal": 7,
+      "texto": "Você recomendaria a um amigo que se candidatasse a uma vaga no seu local de trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "significado-comprometimento",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-8a",
+      "codigo": "8A",
+      "ordem": 15,
+      "questaoPrincipal": 8,
+      "texto": "No seu local de trabalho, você é informado antecipadamente sobre decisões importantes, mudanças ou planos para o futuro?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-8b",
+      "codigo": "8B",
+      "ordem": 16,
+      "questaoPrincipal": 8,
+      "texto": "Você recebe toda a informação necessária para fazer bem o seu trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-9a",
+      "codigo": "9A",
+      "ordem": 17,
+      "questaoPrincipal": 9,
+      "texto": "O seu trabalho é reconhecido e valorizado pelos seus superiores?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-9b",
+      "codigo": "9B",
+      "ordem": 18,
+      "questaoPrincipal": 9,
+      "texto": "Você é tratado de forma justa no seu local de trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-10a",
+      "codigo": "10A",
+      "ordem": 19,
+      "questaoPrincipal": 10,
+      "texto": "O seu trabalho tem objetivos/metas claros(as)?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-10b",
+      "codigo": "10B",
+      "ordem": 20,
+      "questaoPrincipal": 10,
+      "texto": "Você sabe exatamente o que se espera de você no trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "relacoes-interpessoais",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-11a",
+      "codigo": "11A",
+      "ordem": 21,
+      "questaoPrincipal": 11,
+      "texto": "Você diria que o seu superior imediato dá alta prioridade para a satisfação com trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "lideranca",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-11b",
+      "codigo": "11B",
+      "ordem": 22,
+      "questaoPrincipal": 11,
+      "texto": "Você diria que o seu superior imediato é bom no planejamento do trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "lideranca",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-12a",
+      "codigo": "12A",
+      "ordem": 23,
+      "questaoPrincipal": 12,
+      "texto": "Com que frequência o seu superior imediato está disposto a ouvir os seus problemas no trabalho?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "lideranca",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-12b",
+      "codigo": "12B",
+      "ordem": 24,
+      "questaoPrincipal": 12,
+      "texto": "Com que frequência você recebe ajuda e suporte do seu superior imediato?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "lideranca",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-13",
+      "codigo": "13",
+      "ordem": 25,
+      "questaoPrincipal": 13,
+      "texto": "Qual o seu nível de satisfação com o seu trabalho como um todo, considerando todos os aspectos?",
+      "tipoEscala": "satisfacao",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "interface-trabalho-individuo",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "sat-muito-satisfeito",
+          "label": "Muito satisfeito",
+          "pontuacao": 3,
+          "ordem": 1
+        },
+        {
+          "id": "sat-satisfeito",
+          "label": "Satisfeito",
+          "pontuacao": 2,
+          "ordem": 2
+        },
+        {
+          "id": "sat-insatisfeito",
+          "label": "Insatisfeito",
+          "pontuacao": 1,
+          "ordem": 3
+        },
+        {
+          "id": "sat-muito-insatisfeito",
+          "label": "Muito insatisfeito",
+          "pontuacao": 0,
+          "ordem": 4
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-14a",
+      "codigo": "14A",
+      "ordem": 26,
+      "questaoPrincipal": 14,
+      "texto": "Você sente que o seu trabalho consome tanto sua energia que ele tem um efeito negativo na sua vida particular?",
+      "tipoEscala": "impacto_vida_particular",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "conflitos-familia-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "imp-certeza",
+          "label": "Sim, com certeza",
+          "pontuacao": 3,
+          "ordem": 1
+        },
+        {
+          "id": "imp-certo-ponto",
+          "label": "Sim, até certo ponto",
+          "pontuacao": 2,
+          "ordem": 2
+        },
+        {
+          "id": "imp-pouco",
+          "label": "Sim, mas muito pouco",
+          "pontuacao": 1,
+          "ordem": 3
+        },
+        {
+          "id": "imp-nao",
+          "label": "Não, realmente não",
+          "pontuacao": 0,
+          "ordem": 4
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-14b",
+      "codigo": "14B",
+      "ordem": 27,
+      "questaoPrincipal": 14,
+      "texto": "Você sente que o seu trabalho ocupa tanto tempo que ele tem um efeito negativo na sua vida particular?",
+      "tipoEscala": "impacto_vida_particular",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "conflitos-familia-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "imp-certeza",
+          "label": "Sim, com certeza",
+          "pontuacao": 3,
+          "ordem": 1
+        },
+        {
+          "id": "imp-certo-ponto",
+          "label": "Sim, até certo ponto",
+          "pontuacao": 2,
+          "ordem": 2
+        },
+        {
+          "id": "imp-pouco",
+          "label": "Sim, mas muito pouco",
+          "pontuacao": 1,
+          "ordem": 3
+        },
+        {
+          "id": "imp-nao",
+          "label": "Não, realmente não",
+          "pontuacao": 0,
+          "ordem": 4
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-15a",
+      "codigo": "15A",
+      "ordem": 28,
+      "questaoPrincipal": 15,
+      "texto": "Você pode confiar nas informações que vêm dos seus superiores?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "valores-local-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-15b",
+      "codigo": "15B",
+      "ordem": 29,
+      "questaoPrincipal": 15,
+      "texto": "Os seus superiores confiam que os funcionários farão bem seu trabalho?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "valores-local-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-16a",
+      "codigo": "16A",
+      "ordem": 30,
+      "questaoPrincipal": 16,
+      "texto": "Os conflitos são resolvidos de forma justa?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "valores-local-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-16b",
+      "codigo": "16B",
+      "ordem": 31,
+      "questaoPrincipal": 16,
+      "texto": "O trabalho é distribuído de forma justa?",
+      "tipoEscala": "intensidade",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "valores-local-trabalho",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "int-grande",
+          "label": "Em grande parte",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "int-boa",
+          "label": "Em boa parte",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "int-certa",
+          "label": "De certa forma",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "int-pouco",
+          "label": "Pouco",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "int-muito-pouco",
+          "label": "Muito pouco",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-17",
+      "codigo": "17",
+      "ordem": 32,
+      "questaoPrincipal": 17,
+      "texto": "Em geral, você diria que a sua saúde é:",
+      "tipoEscala": "saude",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "saude-geral",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "sau-excelente",
+          "label": "Excelente",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "sau-muito-boa",
+          "label": "Muito boa",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "sau-boa",
+          "label": "Boa",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "sau-razoavel",
+          "label": "Razoável",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "sau-ruim",
+          "label": "Ruim",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-18a",
+      "codigo": "18A",
+      "ordem": 33,
+      "questaoPrincipal": 18,
+      "texto": "Com que frequência você tem se sentido fisicamente esgotado?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "burnout-estresse",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-18b",
+      "codigo": "18B",
+      "ordem": 34,
+      "questaoPrincipal": 18,
+      "texto": "Com que frequência você tem se sentido emocionalmente esgotado?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "burnout-estresse",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-19a",
+      "codigo": "19A",
+      "ordem": 35,
+      "questaoPrincipal": 19,
+      "texto": "Com que frequência você tem se sentido estressado?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "burnout-estresse",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-19b",
+      "codigo": "19B",
+      "ordem": 36,
+      "questaoPrincipal": 19,
+      "texto": "Com que frequência você tem se sentido irritado?",
+      "tipoEscala": "frequencia",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": true,
+      "obrigatoria": true,
+      "dimensaoId": "burnout-estresse",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "freq-sempre",
+          "label": "Sempre",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "freq-frequentemente",
+          "label": "Frequentemente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "freq-as-vezes",
+          "label": "Às vezes",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "freq-raramente",
+          "label": "Raramente",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "freq-nunca",
+          "label": "Nunca",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": null
+    },
+    {
+      "id": "p-20",
+      "codigo": "20",
+      "ordem": 37,
+      "questaoPrincipal": 20,
+      "texto": "Você foi exposto a atenção sexual indesejada no seu local de trabalho durante os últimos 12 meses?",
+      "tipoEscala": "exposicao",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": false,
+      "obrigatoria": true,
+      "dimensaoId": "comportamentos-ofensivos",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "exp-diariamente",
+          "label": "Sim, diariamente",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "exp-semanalmente",
+          "label": "Sim, semanalmente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "exp-mensalmente",
+          "label": "Sim, mensalmente",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "exp-poucas",
+          "label": "Sim, poucas vezes",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "exp-nao",
+          "label": "Não",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": {
+        "id": "p-20-fontes",
+        "texto": "Se sim, de quem? (Você pode assinalar mais de uma opção)",
+        "tipoEscala": "fonte_exposicao",
+        "multiplaEscolha": true,
+        "exibirQuandoRespostaDiferenteDe": "Não"
+      }
+    },
+    {
+      "id": "p-21",
+      "codigo": "21",
+      "ordem": 38,
+      "questaoPrincipal": 21,
+      "texto": "Você foi exposto a ameaças de violência no seu local de trabalho nos últimos 12 meses?",
+      "tipoEscala": "exposicao",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": false,
+      "obrigatoria": true,
+      "dimensaoId": "comportamentos-ofensivos",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "exp-diariamente",
+          "label": "Sim, diariamente",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "exp-semanalmente",
+          "label": "Sim, semanalmente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "exp-mensalmente",
+          "label": "Sim, mensalmente",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "exp-poucas",
+          "label": "Sim, poucas vezes",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "exp-nao",
+          "label": "Não",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": {
+        "id": "p-21-fontes",
+        "texto": "Se sim, de quem? (Você pode assinalar mais de uma opção)",
+        "tipoEscala": "fonte_exposicao",
+        "multiplaEscolha": true,
+        "exibirQuandoRespostaDiferenteDe": "Não"
+      }
+    },
+    {
+      "id": "p-22",
+      "codigo": "22",
+      "ordem": 39,
+      "questaoPrincipal": 22,
+      "texto": "Você foi exposto a violência física em seu local de trabalho durante os últimos 12 meses?",
+      "tipoEscala": "exposicao",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": false,
+      "obrigatoria": true,
+      "dimensaoId": "comportamentos-ofensivos",
+      "textoAjuda": null,
+      "alternativas": [
+        {
+          "id": "exp-diariamente",
+          "label": "Sim, diariamente",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "exp-semanalmente",
+          "label": "Sim, semanalmente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "exp-mensalmente",
+          "label": "Sim, mensalmente",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "exp-poucas",
+          "label": "Sim, poucas vezes",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "exp-nao",
+          "label": "Não",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": {
+        "id": "p-22-fontes",
+        "texto": "Se sim, de quem? (Você pode assinalar mais de uma opção)",
+        "tipoEscala": "fonte_exposicao",
+        "multiplaEscolha": true,
+        "exibirQuandoRespostaDiferenteDe": "Não"
+      }
+    },
+    {
+      "id": "p-23",
+      "codigo": "23",
+      "ordem": 40,
+      "questaoPrincipal": 23,
+      "texto": "Você foi exposto a “bullying” no seu local de trabalho nos últimos 12 meses?",
+      "tipoEscala": "exposicao",
+      "pontuacaoInvertida": false,
+      "entraNoCalculo": false,
+      "obrigatoria": true,
+      "dimensaoId": "comportamentos-ofensivos",
+      "textoAjuda": "“Bullying” significa que uma pessoa é repetidamente exposta a tratamento desagradável ou degradante, do qual a vítima tem dificuldade para se defender.",
+      "alternativas": [
+        {
+          "id": "exp-diariamente",
+          "label": "Sim, diariamente",
+          "pontuacao": 4,
+          "ordem": 1
+        },
+        {
+          "id": "exp-semanalmente",
+          "label": "Sim, semanalmente",
+          "pontuacao": 3,
+          "ordem": 2
+        },
+        {
+          "id": "exp-mensalmente",
+          "label": "Sim, mensalmente",
+          "pontuacao": 2,
+          "ordem": 3
+        },
+        {
+          "id": "exp-poucas",
+          "label": "Sim, poucas vezes",
+          "pontuacao": 1,
+          "ordem": 4
+        },
+        {
+          "id": "exp-nao",
+          "label": "Não",
+          "pontuacao": 0,
+          "ordem": 5
+        }
+      ],
+      "followUp": {
+        "id": "p-23-fontes",
+        "texto": "Se sim, de quem? (Você pode assinalar mais de uma opção)",
+        "tipoEscala": "fonte_exposicao",
+        "multiplaEscolha": true,
+        "exibirQuandoRespostaDiferenteDe": "Não"
+      }
+    }
+  ]
+}

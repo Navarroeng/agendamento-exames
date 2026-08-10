@@ -97,7 +97,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     ordem: 9,
     descricao: "Dimensão de proteção sobre a percepção geral de saúde.",
     textoIntroducao:
-      "As próximas perguntas são sobre a sua própria saúde e bem-estar. Por favor, tente não distinguir entre sintomas que são causados pelo trabalho e sintomas que se devem a outras causas. Descreva como você está no geral. As perguntas são sobre a sua saúde e bem-estar nas últimas quatro semanas:",
+      "As próximas cinco perguntas são sobre a sua própria saúde e bem-estar. Por favor, tente não distinguir entre sintomas que são causados pelo trabalho e sintomas que se devem a outras causas. Descreva como você está no geral. As perguntas são sobre a sua saúde e bem-estar nas últimas quatro semanas:",
     entraNoCalculo: true,
   },
   {

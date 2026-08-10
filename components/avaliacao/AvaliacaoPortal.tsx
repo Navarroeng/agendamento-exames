@@ -109,7 +109,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     return {
       pct: Math.round((num / TOTAL_PERGUNTAS) * 100),
       numero: num,
-      dimensaoNome: itemAtual.dimensao.nome,
+      dimensaoNome: itemAtual.titulo,
     };
   }, [itemAtual]);
 
@@ -637,8 +637,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                 <TransicaoStep
                   progresso={progresso}
                   totalPerguntas={TOTAL_PERGUNTAS}
-                  texto={itemAtual.dimensao.textoIntroducao}
-                  dimensaoNome={itemAtual.dimensao.nome}
+                  titulo={itemAtual.titulo}
+                  texto={itemAtual.texto}
                   podeVoltar={flowIndex > 0 && !salvandoResposta && !finalizando}
                   onAnterior={handleAnteriorFlow}
                   onProxima={() => void handleProximaFlow()}
@@ -1201,16 +1201,16 @@ function OrientacaoItem({
 function TransicaoStep({
   progresso,
   totalPerguntas,
+  titulo,
   texto,
-  dimensaoNome,
   podeVoltar,
   onAnterior,
   onProxima,
 }: {
   progresso: { pct: number; numero: number; dimensaoNome: string };
   totalPerguntas: number;
+  titulo: string;
   texto: string;
-  dimensaoNome: string;
   podeVoltar: boolean;
   onAnterior: () => void;
   onProxima: () => void;
@@ -1221,14 +1221,14 @@ function TransicaoStep({
         pct={progresso.pct}
         numero={progresso.numero}
         total={totalPerguntas}
-        dimensaoNome={dimensaoNome}
+        dimensaoNome={progresso.dimensaoNome}
       />
 
       <div className="flex min-h-[180px] flex-col items-center justify-center px-1 py-6 text-center sm:min-h-[220px]">
         <p className="text-[10px] font-bold uppercase tracking-wide text-brand-blue">
-          Nova dimensão
+          {titulo}
         </p>
-        <p className="mt-3 text-lg font-extrabold leading-snug text-navy sm:text-xl">
+        <p className="mt-3 text-base font-semibold leading-relaxed text-navy sm:text-lg">
           {texto}
         </p>
       </div>

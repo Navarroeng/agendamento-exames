@@ -14,6 +14,11 @@ export { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 export { COPSOQ_ESCALAS, getCopsoqEscala } from "@/lib/copsoq/escalas";
 export { COPSOQ_PERGUNTAS } from "@/lib/copsoq/perguntas";
 export {
+  COPSOQ_INTERSTICIAIS_INVENTADOS_PROIBIDOS,
+  COPSOQ_INTERSTICIAIS_OFICIAIS,
+  COPSOQ_INTERSTICIAL_ANTES_DE_CODIGOS,
+} from "@/lib/copsoq/intersticiais";
+export {
   COPSOQ_INSTRUMENTO,
   buildCopsoqFlow,
   getAlternativasDaPergunta,

@@ -89,6 +89,12 @@ export type CopsoqFlowItem =
   | {
       type: "transicao";
       key: string;
+      /** Título curto da orientação (ex.: Orientação). */
+      titulo: string;
+      /** Texto oficial do Formulário. */
+      texto: string;
+      /** Código da pergunta que vem em seguida. */
+      antesDeCodigo: string;
       dimensao: CopsoqDimensao;
       primeiraPerguntaOrdem: number;
     }

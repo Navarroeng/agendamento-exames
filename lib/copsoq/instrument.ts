@@ -1,5 +1,6 @@
 import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 import { COPSOQ_ESCALAS, getCopsoqEscala } from "@/lib/copsoq/escalas";
+import { COPSOQ_INTERSTICIAIS_OFICIAIS } from "@/lib/copsoq/intersticiais";
 import { COPSOQ_PERGUNTAS } from "@/lib/copsoq/perguntas";
 import type {
   CopsoqAlternativa,
@@ -42,17 +43,19 @@ export function getAlternativasDaPergunta(
 }
 
 /**
- * Fluxo do portal: introdução da dimensão → perguntas da dimensão.
- * Transições NÃO entram na contagem de progresso.
+ * Fluxo do portal: perguntas + somente interstícios oficiais do Formulário.
+ * Dimensões internas NÃO geram telas intermediárias automaticamente.
  */
 export function buildCopsoqFlow(): {
   items: CopsoqFlowItem[];
   totalPerguntas: number;
 } {
   const perguntas = getPerguntasOrdenadas();
+  const interPorCodigo = new Map(
+    COPSOQ_INTERSTICIAIS_OFICIAIS.map((i) => [i.antesDeCodigo, i])
+  );
   const items: CopsoqFlowItem[] = [];
   let perguntaIndex = 0;
-  let dimAnterior: string | null = null;
 
   for (const pergunta of perguntas) {
     const dimensao = getDimensaoById(pergunta.dimensaoId);
@@ -62,14 +65,17 @@ export function buildCopsoqFlow(): {
       );
     }
 
-    if (pergunta.dimensaoId !== dimAnterior) {
+    const inter = interPorCodigo.get(pergunta.codigo);
+    if (inter) {
       items.push({
         type: "transicao",
-        key: `t-${dimensao.id}-antes-${pergunta.codigo}`,
+        key: `t-${inter.id}`,
+        titulo: inter.titulo,
+        texto: inter.texto,
+        antesDeCodigo: inter.antesDeCodigo,
         dimensao,
         primeiraPerguntaOrdem: pergunta.ordem,
       });
-      dimAnterior = pergunta.dimensaoId;
     }
 
     items.push({

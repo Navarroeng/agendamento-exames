@@ -3,6 +3,7 @@ import {
   COPSOQ_DIMENSOES,
   COPSOQ_ESCALAS,
   COPSOQ_INSTRUMENTO,
+  COPSOQ_INTERSTICIAIS_OFICIAIS,
   COPSOQ_PERGUNTAS,
   buildCopsoqFlow,
   getPerguntasOrdenadas,
@@ -36,8 +37,8 @@ assert.ok(perguntas[39]?.texto.toLowerCase().includes("bullying"));
 const soPerguntas = items.filter((i) => i.type === "pergunta");
 const transicoes = items.filter((i) => i.type === "transicao");
 assert.equal(soPerguntas.length, 40);
-assert.equal(transicoes.length, COPSOQ_DIMENSOES.length);
-assert.equal(items[0]?.type, "transicao");
+assert.equal(transicoes.length, COPSOQ_INTERSTICIAIS_OFICIAIS.length);
+assert.equal(items[0]?.type, "pergunta");
 
 for (const d of COPSOQ_DIMENSOES) {
   assert.ok(
@@ -64,5 +65,5 @@ assert.ok(escalaIds.has("saude"));
 assert.ok(escalaIds.has("exposicao"));
 
 console.log(
-  `OK  COPSOQ oficial: ${report.totais.questoesPrincipais} questões, ${report.totais.perguntasAvaliativas} itens, ${transicoes.length} dimensões/transições, ${report.totais.escalas} escalas`
+  `OK  COPSOQ oficial: ${report.totais.questoesPrincipais} questões, ${report.totais.perguntasAvaliativas} itens, ${transicoes.length} interstícios oficiais, ${report.totais.escalas} escalas`
 );
