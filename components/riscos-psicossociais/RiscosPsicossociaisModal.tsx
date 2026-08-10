@@ -66,12 +66,12 @@ export function RiscosPsicossociaisModal({
       subtitle={`${formatClienteNomeDisplay(orcamento.cliente_nome)}${
         numeroContrato ? ` · Contrato ${numeroContrato}` : ""
       } · ${processo.progressoLabel}`}
-      size="xl"
+      size="xxl"
       footer={
         <div className="flex justify-end">
           <button
             type="button"
-            className="btn justify-center sm:w-auto"
+            className="btn btn-primary justify-center px-6 sm:w-auto"
             onClick={onClose}
           >
             Fechar

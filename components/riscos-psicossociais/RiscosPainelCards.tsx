@@ -48,7 +48,7 @@ function PanelCard({
 }) {
   return (
     <section
-      className={`flex flex-col rounded-2xl border border-[#e8edf5] bg-white p-5 shadow-sm ${className}`}
+      className={`flex flex-col rounded-2xl border border-[#e8edf5] bg-white p-4 shadow-sm sm:p-5 ${className}`}
     >
       <div className="mb-3">
         {eyebrow ? (
@@ -68,6 +68,33 @@ function PlaceholderNote({ children }: { children: React.ReactNode }) {
     <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-3 py-3 text-xs text-[#64748b]">
       {children}
     </p>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: number | string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border px-2.5 py-2 ${
+        emphasize
+          ? "border-[#fde68a] bg-[#fffbeb]"
+          : "border-[#e8edf5] bg-[#f8fafc]"
+      }`}
+    >
+      <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+        {label}
+      </p>
+      <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -106,6 +133,8 @@ export function RiscosPainelCards({
     () => buildParticipantesResumo(previstos, participantes),
     [previstos, participantes]
   );
+
+  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
 
   const baseParticipacao =
     resumo.previstos > 0
@@ -157,11 +186,11 @@ export function RiscosPainelCards({
   }
 
   const historico = buildHistorico(processo, participantes);
+  const relatorioDisponivel = false;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* 1. Dados da pesquisa */}
         <PanelCard title="Dados da pesquisa" eyebrow="Card 1">
           {!campanha && !criarAberto ? (
             <>
@@ -296,7 +325,7 @@ export function RiscosPainelCards({
                     {processo.implantacao.orcamento.responsavel?.trim() || "—"}
                   </dd>
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
                     Situação
                   </dt>
@@ -304,6 +333,26 @@ export function RiscosPainelCards({
                     <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
                       {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
                     </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                    Data de criação
+                  </dt>
+                  <dd className="mt-0.5 font-semibold text-navy">
+                    {campanha.created_at
+                      ? formatDateIsoToBR(campanha.created_at.slice(0, 10))
+                      : "—"}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                    Última atualização
+                  </dt>
+                  <dd className="mt-0.5 font-semibold text-navy">
+                    {campanha.updated_at
+                      ? formatDateIsoToBR(campanha.updated_at.slice(0, 10))
+                      : "—"}
                   </dd>
                 </div>
               </dl>
@@ -324,17 +373,23 @@ export function RiscosPainelCards({
           ) : null}
         </PanelCard>
 
-        {/* 2. Participantes */}
         <PanelCard title="Participantes" eyebrow="Card 2">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Metric label="Previstos" value={resumo.previstos} />
+            <Metric label="Cadastrados" value={resumo.cadastrados} />
+            <Metric
+              label="Faltam cadastrar"
+              value={faltamCadastrar}
+              emphasize={faltamCadastrar > 0}
+            />
             <Metric label="Responderam" value={resumo.respondidos} />
             <Metric label="Pendentes" value={resumo.pendentes} />
           </div>
-          <p className="mt-2 text-[11px] text-[#94a3b8]">
-            Cadastrados: {resumo.cadastrados}
-            {!campanha ? " · Crie a pesquisa para gerenciar participantes." : ""}
-          </p>
+          {!campanha ? (
+            <p className="mt-2 text-[11px] text-[#94a3b8]">
+              Crie a pesquisa para gerenciar participantes.
+            </p>
+          ) : null}
           <div className="mt-auto flex flex-wrap gap-2 pt-4">
             <button
               type="button"
@@ -376,18 +431,17 @@ export function RiscosPainelCards({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* 3. Distribuição */}
         <PanelCard title="Distribuição" eyebrow="Card 3">
-          <div className="flex flex-1 items-center gap-5">
+          <div className="flex flex-1 items-center gap-4">
             <div
-              className="relative grid h-24 w-24 shrink-0 place-items-center rounded-full"
+              className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full"
               style={{
                 background: `conic-gradient(#2563eb ${participacaoPct}%, #e2e8f0 0)`,
               }}
               aria-hidden
             >
-              <div className="grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full bg-white text-center">
-                <span className="text-lg font-extrabold tabular-nums text-navy">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-center">
+                <span className="text-sm font-extrabold tabular-nums text-navy">
                   {participacaoPct}%
                 </span>
               </div>
@@ -396,20 +450,17 @@ export function RiscosPainelCards({
               <p className="font-semibold text-navy">
                 {resumo.respondidos} responderam
               </p>
+              <p className="text-[#64748b]">{resumo.pendentes} pendentes</p>
               <p className="text-[#64748b]">
-                {resumo.pendentes} pendentes
-                {resumo.cadastrados === 0 && resumo.previstos === 0
-                  ? " · sem base ainda"
-                  : ""}
+                {faltamCadastrar} ainda não cadastrados
               </p>
             </div>
           </div>
         </PanelCard>
 
-        {/* 4. Convites */}
         <PanelCard title="Convites" eyebrow="Card 4">
           {campanha ? (
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2 text-sm">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Link da pesquisa
@@ -421,10 +472,6 @@ export function RiscosPainelCards({
                   Código: {campanha.codigo_publico}
                 </p>
               </div>
-              <PlaceholderNote>
-                QR Code e envio de convites serão disponibilizados em etapa
-                futura.
-              </PlaceholderNote>
             </div>
           ) : (
             <PlaceholderNote>
@@ -442,9 +489,20 @@ export function RiscosPainelCards({
             </button>
             <button
               type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled
+              title="QR Code será disponibilizado em etapa futura"
+            >
+              Gerar QR Code
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={!campanha}
               onClick={() =>
-                toast.message("Reenvio de convite será disponibilizado em breve.")
+                toast.message(
+                  "Reenvio de convite será disponibilizado em breve."
+                )
               }
             >
               Reenviar convite
@@ -452,12 +510,34 @@ export function RiscosPainelCards({
           </div>
         </PanelCard>
 
-        {/* 5. Questionário */}
         <PanelCard title="Questionário" eyebrow="Card 5">
-          <PlaceholderNote>
-            Questionário padrão ainda não configurado nesta etapa. Visualização e
-            edição das perguntas virão em seguida.
-          </PlaceholderNote>
+          <div className="space-y-2">
+            <p className="text-sm font-extrabold text-navy">Questionário NR-01</p>
+            <dl className="grid gap-2 text-xs sm:grid-cols-3">
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Perguntas
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Dimensões
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Última atualização
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+            </dl>
+            <PlaceholderNote>
+              Estrutura preparada para a próxima etapa. Conteúdo do questionário
+              ainda não configurado.
+            </PlaceholderNote>
+          </div>
           <div className="mt-auto flex flex-wrap gap-2 pt-4">
             <button
               type="button"
@@ -480,17 +560,21 @@ export function RiscosPainelCards({
           </div>
         </PanelCard>
 
-        {/* 6. Resultados */}
         <PanelCard title="Resultados" eyebrow="Card 6">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Metric label="Respondidos" value={resumo.respondidos} />
             <Metric label="Participação" value={`${participacaoPct}%`} />
             <Metric label="Dimensões" value="—" />
+            <Metric label="Risco geral" value="—" />
+            <Metric
+              label="Status"
+              value={
+                campanha
+                  ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
+                  : "—"
+              }
+            />
           </div>
-          <PlaceholderNote>
-            Indicadores parciais ficarão disponíveis conforme as respostas forem
-            registradas.
-          </PlaceholderNote>
           <div className="mt-auto pt-4">
             <button
               type="button"
@@ -504,92 +588,58 @@ export function RiscosPainelCards({
           </div>
         </PanelCard>
 
-        {/* 7. Relatório */}
-        <PanelCard title="Relatório" eyebrow="Card 7">
-          {campanha?.status === "encerrada" ? (
-            <>
-              <p className="text-sm text-[#475569]">
-                A pesquisa foi encerrada. Gere o relatório quando estiver pronto.
-              </p>
-              <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
-                  onClick={() =>
-                    toast.message("Geração de relatório em breve.")
-                  }
-                >
-                  Gerar relatório
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-                  onClick={() =>
-                    toast.message("Visualização de relatório em breve.")
-                  }
-                >
-                  Visualizar relatório
-                </button>
-              </div>
-            </>
-          ) : (
-            <PlaceholderNote>
-              Relatório ainda não disponível. Ficará liberado após o
-              encerramento da pesquisa.
-            </PlaceholderNote>
-          )}
+        <PanelCard title="Relatório Psicossocial" eyebrow="Card 7">
+          <PlaceholderNote>
+            Nenhum relatório disponível.
+            <br />
+            Será liberado após o encerramento da pesquisa.
+          </PlaceholderNote>
+          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={!relatorioDisponivel}
+              title="Disponível após encerramento e implementação da geração"
+            >
+              Gerar relatório
+            </button>
+          </div>
         </PanelCard>
 
-        {/* 8. Histórico */}
         <PanelCard
           title="Histórico"
           eyebrow="Card 8"
           className="lg:col-span-2"
         >
-          <ol className="space-y-3">
+          <ol className="relative ml-1 space-y-0 border-l-2 border-[#e2e8f0] pl-5">
             {historico.map((item) => (
-              <li key={item.id} className="flex gap-3 text-sm">
+              <li key={item.id} className="relative pb-4 last:pb-0">
                 <span
-                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                  className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white ${
                     item.done ? "bg-brand-blue" : "bg-[#cbd5e1]"
                   }`}
                 />
-                <div>
+                <p
+                  className={`text-sm font-semibold ${
+                    item.done ? "text-navy" : "text-[#94a3b8]"
+                  }`}
+                >
+                  {item.label}
+                </p>
+                {item.detail ? (
                   <p
-                    className={`font-semibold ${
-                      item.done ? "text-navy" : "text-[#94a3b8]"
+                    className={`text-[11px] ${
+                      item.done ? "text-[#64748b]" : "text-[#cbd5e1]"
                     }`}
                   >
-                    {item.label}
+                    {item.detail}
                   </p>
-                  {item.detail ? (
-                    <p className="text-[11px] text-[#64748b]">{item.detail}</p>
-                  ) : null}
-                </div>
+                ) : null}
               </li>
             ))}
           </ol>
         </PanelCard>
       </div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
-      <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-        {label}
-      </p>
-      <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-        {value}
-      </p>
     </div>
   );
 }
@@ -616,7 +666,7 @@ function buildHistorico(
     },
     {
       id: "lista",
-      label: "Lista de presença",
+      label: "Lista de presença concluída",
       detail: processo.listaPresencaConcluida
         ? [
             lista.lista_solicitada_em
@@ -643,12 +693,15 @@ function buildHistorico(
       done: Boolean(campanha),
     },
     {
-      id: "lista_importada",
-      label: "Lista importada",
+      id: "participantes",
+      label:
+        participantes.length > 0
+          ? "Participante cadastrado"
+          : "Participantes cadastrados",
       detail:
         participantes.length > 0
           ? `${participantes.length} participante(s) cadastrado(s)`
-          : "Aguardando importação ou cadastro",
+          : "Aguardando cadastro",
       done: participantes.length > 0,
     },
     {
@@ -660,10 +713,9 @@ function buildHistorico(
     {
       id: "respostas",
       label: "Primeiras respostas",
-      detail:
-        participantes.some((p) => p.status === "respondido")
-          ? "Respostas registradas"
-          : "Aguardando respostas",
+      detail: participantes.some((p) => p.status === "respondido")
+        ? "Respostas registradas"
+        : "Aguardando respostas",
       done: participantes.some((p) => p.status === "respondido"),
     },
     {

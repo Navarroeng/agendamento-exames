@@ -15,6 +15,7 @@ import {
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 import { RiscosPainelCards } from "@/components/riscos-psicossociais/RiscosPainelCards";
 import { RiscosPainelPreRequisitos } from "@/components/riscos-psicossociais/RiscosPainelPreRequisitos";
+import { RiscosPainelSituacaoAtual } from "@/components/riscos-psicossociais/RiscosPainelSituacaoAtual";
 
 interface RiscosPsicossociaisPainelProps {
   processo: RiscosPsicossociaisProcesso;
@@ -66,6 +67,8 @@ export function RiscosPsicossociaisPainel({
     return buildParticipantesResumo(previstos, participantes);
   }, [campanha?.quantidade_prevista, participantes]);
 
+  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
+
   const baseParticipacao =
     resumo.previstos > 0
       ? resumo.previstos
@@ -92,18 +95,28 @@ export function RiscosPsicossociaisPainel({
     ? formatPeriodoCampanha(campanha.data_inicio, campanha.data_encerramento)
     : "—";
 
+  const headerMetrics = [
+    { label: "Previstos", value: String(resumo.previstos) },
+    { label: "Cadastrados", value: String(resumo.cadastrados) },
+    { label: "Responderam", value: String(resumo.respondidos) },
+    { label: "Pendentes", value: String(resumo.pendentes) },
+    { label: "Participação", value: `${participacaoPct}%` },
+  ];
+
   return (
-    <div className="space-y-5">
-      <header className="rounded-2xl border border-[#dbeafe] bg-gradient-to-br from-[#f8fbff] to-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Painel da pesquisa
-            </p>
-            <h2 className="mt-0.5 truncate text-lg font-extrabold text-navy">
-              {formatClienteNomeDisplay(orcamento.cliente_nome)}
-            </h2>
-            <p className="mt-1 text-xs text-[#64748b]">
+    <div className="space-y-4">
+      <header className="rounded-2xl border border-[#dbeafe] bg-gradient-to-br from-[#f8fbff] to-white px-4 py-3.5 shadow-sm sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-base font-extrabold text-navy sm:text-lg">
+                {formatClienteNomeDisplay(orcamento.cliente_nome)}
+              </h2>
+              <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">
+                {statusLabel}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-[#64748b] sm:text-xs">
               CNPJ{" "}
               <span className="tabular-nums font-semibold text-navy">
                 {cnpj.replace(/\D/g, "").length === 14
@@ -112,37 +125,42 @@ export function RiscosPsicossociaisPainel({
               </span>
               {numeroContrato ? (
                 <>
-                  {" "}
-                  · Contrato{" "}
+                  {" · "}Contrato{" "}
                   <span className="font-semibold text-navy">{numeroContrato}</span>
                 </>
               ) : null}
-              {" · "}
-              Resp.{" "}
+              {" · "}Resp.{" "}
               <span className="font-semibold text-navy">
                 {orcamento.responsavel?.trim() || "—"}
               </span>
-            </p>
-            <p className="mt-1 text-xs text-[#64748b]">
-              Período:{" "}
+              {" · "}Período{" "}
               <span className="font-semibold text-navy">{periodo}</span>
             </p>
           </div>
-          <span className="inline-flex rounded-full bg-[#eef2ff] px-3 py-1 text-[11px] font-extrabold text-[#4338ca]">
-            {statusLabel}
-          </span>
         </div>
 
-        <div className="mt-4 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-[#64748b]">
-            <span>
-              Progresso geral · {processo.progressoLabel}
-            </span>
-            <span className="tabular-nums text-navy">
-              {participacaoPct}% participação
-            </span>
+        <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+          {headerMetrics.map((m) => (
+            <div
+              key={m.label}
+              className="rounded-xl border border-[#e8edf5] bg-white/80 px-2.5 py-1.5"
+            >
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                {m.label}
+              </p>
+              <p className="text-sm font-extrabold tabular-nums text-navy">
+                {m.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold text-[#64748b]">
+            <span>Progresso geral · {processo.progressoLabel}</span>
+            <span className="tabular-nums text-navy">{participacaoPct}% part.</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
             <div
               className="h-full rounded-full bg-brand-blue transition-all"
               style={{ width: `${Math.min(100, Math.max(0, progressoPct))}%` }}
@@ -150,6 +168,13 @@ export function RiscosPsicossociaisPainel({
           </div>
         </div>
       </header>
+
+      <RiscosPainelSituacaoAtual
+        processo={processo}
+        resumo={resumo}
+        faltamCadastrar={faltamCadastrar}
+        participacaoPct={participacaoPct}
+      />
 
       <RiscosPainelPreRequisitos
         processo={processo}

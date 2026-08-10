@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type ModalSize = "default" | "wide" | "extraWide" | "xl";
+type ModalSize = "default" | "wide" | "extraWide" | "xl" | "xxl";
 
 interface ModalProps {
   open: boolean;
@@ -14,7 +14,7 @@ interface ModalProps {
   footer?: ReactNode;
   wide?: boolean;
   extraWide?: boolean;
-  /** Largura premium (~1320px) para formulários grandes. */
+  /** Largura premium (~1320px) para formulários grandes. `xxl` ~1480px. */
   size?: ModalSize;
   /** Quando false, clique no overlay não fecha (útil com formulário dirty). */
   closeOnOverlayClick?: boolean;
@@ -25,6 +25,7 @@ function resolveWidthClass(
   wide: boolean,
   extraWide: boolean
 ): string {
+  if (size === "xxl") return "max-w-[1480px]";
   if (size === "xl") return "max-w-[1320px]";
   if (size === "extraWide" || extraWide) return "max-w-5xl";
   if (size === "wide" || wide) return "max-w-3xl";
