@@ -84,7 +84,7 @@ export function RiscosPainelPreRequisitos({
           className={`rounded-xl border px-3 py-2.5 ${
             processo.listaPresencaConcluida
               ? "border-[#bbf7d0] bg-[#f0fdf4]/50"
-              : "border-[#e8edf5] bg-[#f8fafc]"
+              : "border-[#fde68a] bg-[#fffbeb]/50"
           }`}
         >
           <div className="flex items-center justify-between gap-2">
@@ -95,51 +95,77 @@ export function RiscosPainelPreRequisitos({
               pendingLabel="Pendente"
             />
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#64748b]">
-            <span>
-              Solicitada:{" "}
-              <span className="font-semibold text-navy">
+
+          <dl className="mt-2.5 grid gap-x-4 gap-y-2 text-[11px] sm:grid-cols-2">
+            <div>
+              <dt className="text-[#94a3b8]">Solicitada</dt>
+              <dd className="mt-0.5 font-semibold text-navy">
                 {lista.lista_solicitada ? "Sim" : "Não"}
-              </span>
-            </span>
-            <span>
-              Recebida:{" "}
-              <span className="font-semibold text-navy">
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#94a3b8]">Data da solicitação</dt>
+              <dd className="mt-0.5 font-semibold text-navy">
+                {lista.lista_solicitada_em
+                  ? formatDateIsoToBR(lista.lista_solicitada_em.slice(0, 10))
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#94a3b8]">E-mail utilizado</dt>
+              <dd className="mt-0.5 break-all font-semibold text-navy">
+                {lista.lista_solicitada_email?.trim() || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#94a3b8]">Anexo</dt>
+              <dd className="mt-0.5 break-words font-semibold text-navy">
+                {lista.lista_anexo_path
+                  ? lista.lista_anexo_nome?.trim() || "Arquivo anexado"
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#94a3b8]">Recebida</dt>
+              <dd className="mt-0.5 font-semibold text-navy">
                 {lista.lista_recebida ? "Sim" : "Não"}
-              </span>
-            </span>
-            <button
-              type="button"
-              className="font-bold text-brand-blue hover:underline"
-              onClick={() => setListaExpandida((v) => !v)}
-            >
-              {listaExpandida ? "Ocultar gestão" : "Gerenciar"}
-            </button>
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-3 flex flex-wrap gap-2">
             {lista.lista_anexo_path ? (
               <button
                 type="button"
-                className="font-bold text-navy hover:underline"
+                className="rounded-xl border border-[#e2e8f0] bg-white/80 px-3 py-1.5 text-[11px] font-bold text-navy"
                 onClick={() => void onVisualizarAnexoLista()}
               >
                 Ver anexo
               </button>
             ) : null}
+            <button
+              type="button"
+              className="rounded-xl bg-[#082b63] px-3 py-1.5 text-[11px] font-bold text-white"
+              onClick={() => setListaExpandida((v) => !v)}
+            >
+              {listaExpandida ? "Ocultar gestão" : "Gerenciar lista"}
+            </button>
           </div>
+
+          {listaExpandida ? (
+            <div className="mt-3 border-t border-[#e8edf5]/80 pt-3">
+              <RiscosListaPresencaTab
+                processo={processo}
+                saving={savingLista}
+                onSalvarSolicitacao={onSalvarSolicitacaoLista}
+                onSalvarRecebimento={onSalvarRecebimentoLista}
+                onRemoverAnexo={onRemoverAnexoLista}
+                onVisualizarAnexo={onVisualizarAnexoLista}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
-
-      {listaExpandida ? (
-        <div className="mt-3 border-t border-[#e8edf5] pt-3">
-          <RiscosListaPresencaTab
-            processo={processo}
-            saving={savingLista}
-            onSalvarSolicitacao={onSalvarSolicitacaoLista}
-            onSalvarRecebimento={onSalvarRecebimentoLista}
-            onRemoverAnexo={onRemoverAnexoLista}
-            onVisualizarAnexo={onVisualizarAnexoLista}
-          />
-        </div>
-      ) : null}
     </>
   );
 
