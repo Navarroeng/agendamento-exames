@@ -431,22 +431,72 @@ export function RiscosPainelCards({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <PanelCard title="Distribuição" eyebrow="Card 3">
-          <div className="flex flex-1 items-center gap-4">
+        <PanelCard title="Questionário" eyebrow="Card 3">
+          <div className="space-y-2">
+            <p className="text-sm font-extrabold text-navy">Questionário NR-01</p>
+            <dl className="grid gap-2 text-xs sm:grid-cols-3">
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Perguntas
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Dimensões
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
+                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Última atualização
+                </dt>
+                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+              </div>
+            </dl>
+            <PlaceholderNote>
+              Estrutura preparada para a próxima etapa. Conteúdo do questionário
+              ainda não configurado.
+            </PlaceholderNote>
+          </div>
+          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+              onClick={() =>
+                toast.message("Visualização das perguntas em breve.")
+              }
+            >
+              Visualizar perguntas
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+              onClick={() =>
+                toast.message("Edição do questionário em breve.")
+              }
+            >
+              Editar questionário
+            </button>
+          </div>
+        </PanelCard>
+
+        <PanelCard title="Resultados da Pesquisa" eyebrow="Card 4">
+          <div className="flex items-center gap-4">
             <div
-              className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full"
+              className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
               style={{
                 background: `conic-gradient(#2563eb ${participacaoPct}%, #e2e8f0 0)`,
               }}
               aria-hidden
             >
-              <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-center">
-                <span className="text-sm font-extrabold tabular-nums text-navy">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-center">
+                <span className="text-xs font-extrabold tabular-nums text-navy">
                   {participacaoPct}%
                 </span>
               </div>
             </div>
-            <div className="space-y-1 text-sm">
+            <div className="space-y-0.5 text-sm">
               <p className="font-semibold text-navy">
                 {resumo.respondidos} responderam
               </p>
@@ -456,9 +506,54 @@ export function RiscosPainelCards({
               </p>
             </div>
           </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Metric label="Participação" value={`${participacaoPct}%`} />
+            <Metric label="Respondidos" value={resumo.respondidos} />
+            <Metric label="Dimensões" value="—" />
+            <Metric label="Risco geral" value="—" />
+            <Metric
+              label="Status"
+              value={
+                campanha
+                  ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
+                  : "—"
+              }
+            />
+          </div>
+
+          <div className="mt-auto pt-4">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+              onClick={() =>
+                toast.message("Visualização de resultados em breve.")
+              }
+            >
+              Visualizar resultados
+            </button>
+          </div>
         </PanelCard>
 
-        <PanelCard title="Convites" eyebrow="Card 4">
+        <PanelCard title="Relatório Psicossocial" eyebrow="Card 5">
+          <PlaceholderNote>
+            Nenhum relatório disponível.
+            <br />
+            Será liberado após o encerramento da pesquisa.
+          </PlaceholderNote>
+          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={!relatorioDisponivel}
+              title="Disponível após encerramento e implementação da geração"
+            >
+              Gerar relatório
+            </button>
+          </div>
+        </PanelCard>
+
+        <PanelCard title="Convites" eyebrow="Card 6">
           {campanha ? (
             <div className="space-y-2 text-sm">
               <div>
@@ -510,105 +605,9 @@ export function RiscosPainelCards({
           </div>
         </PanelCard>
 
-        <PanelCard title="Questionário" eyebrow="Card 5">
-          <div className="space-y-2">
-            <p className="text-sm font-extrabold text-navy">Questionário NR-01</p>
-            <dl className="grid gap-2 text-xs sm:grid-cols-3">
-              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
-                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Perguntas
-                </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
-              </div>
-              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
-                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Dimensões
-                </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
-              </div>
-              <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
-                <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Última atualização
-                </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
-              </div>
-            </dl>
-            <PlaceholderNote>
-              Estrutura preparada para a próxima etapa. Conteúdo do questionário
-              ainda não configurado.
-            </PlaceholderNote>
-          </div>
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-              onClick={() =>
-                toast.message("Visualização das perguntas em breve.")
-              }
-            >
-              Visualizar perguntas
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-              onClick={() =>
-                toast.message("Edição do questionário em breve.")
-              }
-            >
-              Editar questionário
-            </button>
-          </div>
-        </PanelCard>
-
-        <PanelCard title="Resultados" eyebrow="Card 6">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Metric label="Respondidos" value={resumo.respondidos} />
-            <Metric label="Participação" value={`${participacaoPct}%`} />
-            <Metric label="Dimensões" value="—" />
-            <Metric label="Risco geral" value="—" />
-            <Metric
-              label="Status"
-              value={
-                campanha
-                  ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
-                  : "—"
-              }
-            />
-          </div>
-          <div className="mt-auto pt-4">
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-              onClick={() =>
-                toast.message("Visualização de resultados em breve.")
-              }
-            >
-              Visualizar resultados
-            </button>
-          </div>
-        </PanelCard>
-
-        <PanelCard title="Relatório Psicossocial" eyebrow="Card 7">
-          <PlaceholderNote>
-            Nenhum relatório disponível.
-            <br />
-            Será liberado após o encerramento da pesquisa.
-          </PlaceholderNote>
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
-            <button
-              type="button"
-              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              disabled={!relatorioDisponivel}
-              title="Disponível após encerramento e implementação da geração"
-            >
-              Gerar relatório
-            </button>
-          </div>
-        </PanelCard>
-
         <PanelCard
           title="Histórico"
-          eyebrow="Card 8"
+          eyebrow="Card 7"
           className="lg:col-span-2"
         >
           <ol className="relative ml-1 space-y-0 border-l-2 border-[#e2e8f0] pl-5">
