@@ -26,6 +26,8 @@ export type RiscosCampanhaRecord = {
   quantidade_prevista: number;
   status: RiscosCampanhaStatus;
   codigo_publico: string;
+  /** Código compartilhado da campanha (admin). Nunca enviar ao portal público. */
+  codigo_acesso_exibicao: string | null;
   criado_por: string | null;
   created_at?: string;
   updated_at?: string;

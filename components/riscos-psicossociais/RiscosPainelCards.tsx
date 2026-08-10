@@ -27,6 +27,8 @@ interface RiscosPainelCardsProps {
     dataEncerramentoIso: string;
     quantidadePrevista: number;
   }) => Promise<void>;
+  onAbrirCampanha: () => Promise<void>;
+  onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante: (
     participanteId: string,
@@ -104,6 +106,8 @@ export function RiscosPainelCards({
   savingCampanha = false,
   savingParticipante = false,
   onCriarCampanha,
+  onAbrirCampanha,
+  onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
@@ -555,7 +559,7 @@ export function RiscosPainelCards({
 
         <PanelCard title="Convites" eyebrow="Card 6">
           {campanha ? (
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Link da pesquisa
@@ -564,13 +568,43 @@ export function RiscosPainelCards({
                   {pathAvaliacaoCampanha(campanha.codigo_publico)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[#94a3b8]">
-                  Código: {campanha.codigo_publico}
+                  Código da campanha (URL):{" "}
+                  <span className="font-mono font-semibold text-navy">
+                    {campanha.codigo_publico}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Código de acesso (compartilhado)
+                </p>
+                {campanha.codigo_acesso_exibicao ? (
+                  <p className="mt-0.5 font-mono text-sm font-extrabold tracking-wider text-navy">
+                    {campanha.codigo_acesso_exibicao}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-[11px] text-[#94a3b8]">
+                    Ainda não gerado para esta pesquisa.
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-[#64748b]">
+                  Todos os participantes desta pesquisa usam o mesmo código.
+                  Cada um informa o próprio CPF.
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Status
+                </p>
+                <p className="mt-0.5 text-xs font-semibold text-navy">
+                  {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
                 </p>
               </div>
             </div>
           ) : (
             <PlaceholderNote>
-              Crie a pesquisa para gerar o link e preparar os convites.
+              Crie a pesquisa para gerar o link e o código de acesso
+              compartilhado.
             </PlaceholderNote>
           )}
           <div className="mt-auto flex flex-wrap gap-2 pt-4">
@@ -585,22 +619,38 @@ export function RiscosPainelCards({
             <button
               type="button"
               className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled
-              title="QR Code será disponibilizado em etapa futura"
+              disabled={!campanha || savingCampanha}
+              onClick={() =>
+                void onGarantirCodigoAcesso(
+                  Boolean(campanha?.codigo_acesso_exibicao)
+                )
+              }
             >
-              Gerar QR Code
+              {campanha?.codigo_acesso_exibicao
+                ? "Regenerar código"
+                : "Gerar código de acesso"}
             </button>
             <button
               type="button"
               className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled={!campanha}
-              onClick={() =>
-                toast.message(
-                  "Reenvio de convite será disponibilizado em breve."
-                )
+              disabled={
+                !campanha ||
+                savingCampanha ||
+                campanha.status === "aberta" ||
+                campanha.status === "encerrada"
               }
+              onClick={() => void onAbrirCampanha()}
+              title="Libera o portal para respostas (status Aberta)"
             >
-              Reenviar convite
+              Abrir pesquisa
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled
+              title="QR Code será disponibilizado em etapa futura"
+            >
+              Gerar QR Code
             </button>
           </div>
         </PanelCard>

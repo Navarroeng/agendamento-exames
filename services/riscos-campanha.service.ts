@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 const CAMPANHA_SELECT =
-  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, criado_por, created_at, updated_at";
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
 
 type CampanhaAuditOptions = {
   auditContext?: AuditoriaUsuarioContext;
@@ -38,9 +38,47 @@ function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
     quantidade_prevista: Number(row.quantidade_prevista) || 0,
     status,
     codigo_publico: String(row.codigo_publico ?? ""),
+    codigo_acesso_exibicao: row.codigo_acesso_exibicao
+      ? String(row.codigo_acesso_exibicao)
+      : null,
     criado_por: row.criado_por ? String(row.criado_por) : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+async function gerarCodigoAcessoViaApi(): Promise<{
+  salt: string;
+  hash: string;
+  exibicao: string;
+}> {
+  const res = await fetch("/api/riscos/campanha/gerar-codigo-acesso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    salt?: string;
+    hash?: string;
+    exibicao?: string;
+    error?: string;
+  };
+  if (
+    !res.ok ||
+    !json.ok ||
+    !json.salt ||
+    !json.hash ||
+    !json.exibicao
+  ) {
+    throw new Error(
+      json.error || "Não foi possível gerar o código de acesso da campanha."
+    );
+  }
+  return {
+    salt: json.salt,
+    hash: json.hash,
+    exibicao: json.exibicao,
   };
 }
 
@@ -120,6 +158,7 @@ export async function criarCampanhaRiscos(
 
   const supabase = createClient();
   const codigo = await gerarCodigoUnico(supabase);
+  const acesso = await gerarCodigoAcessoViaApi();
   const cnpjDigits = input.cnpj.replace(/\D/g, "");
   const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
 
@@ -133,6 +172,9 @@ export async function criarCampanhaRiscos(
     quantidade_prevista: Math.trunc(Number(input.quantidadePrevista)),
     status: "em_preparacao" as const,
     codigo_publico: codigo,
+    codigo_acesso_salt: acesso.salt,
+    codigo_acesso_hash: acesso.hash,
+    codigo_acesso_exibicao: acesso.exibicao,
     criado_por: usuarioNome,
   };
 
@@ -174,4 +216,75 @@ export async function criarCampanhaRiscos(
   });
 
   return record;
+}
+
+export async function abrirCampanhaRiscos(
+  campanhaId: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("riscos_campanhas")
+    .update({ status: "aberta" })
+    .eq("id", campanhaId)
+    .select(CAMPANHA_SELECT)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("Campanha não encontrada.");
+
+  const record = mapCampanhaRow(data as Record<string, unknown>);
+  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+    acao: AUDITORIA_ACOES.riscos_campanha_criada,
+    registroId: record.id,
+    registroNome: record.empresa_nome,
+    descricao: `${nome} abriu a campanha ${record.codigo_publico} para respostas.`,
+    dadosDepois: { status: record.status, codigo_publico: record.codigo_publico },
+  });
+
+  return record;
+}
+
+export async function garantirCodigoAcessoCampanha(
+  campanhaId: string,
+  options?: { regenerar?: boolean }
+): Promise<RiscosCampanhaRecord> {
+  const supabase = createClient();
+  const { data: atual, error: errAtual } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("id", campanhaId)
+    .maybeSingle();
+  if (errAtual) throw errAtual;
+  if (!atual) throw new Error("Campanha não encontrada.");
+
+  const mapped = mapCampanhaRow(atual as Record<string, unknown>);
+  if (mapped.codigo_acesso_exibicao && !options?.regenerar) return mapped;
+
+  const res = await fetch("/api/riscos/campanha/gerar-codigo-acesso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ campanhaId }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+  };
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Falha ao gerar código de acesso.");
+  }
+
+  const { data, error } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("id", campanhaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Campanha não encontrada.");
+  return mapCampanhaRow(data as Record<string, unknown>);
 }

@@ -19,7 +19,9 @@ import {
 } from "@/lib/listagem-meses";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
+  abrirCampanhaRiscos,
   criarCampanhaRiscos,
+  garantirCodigoAcessoCampanha,
 } from "@/services/riscos-campanha.service";
 import {
   atualizarParticipanteCampanha,
@@ -394,6 +396,77 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext]
   );
 
+  const atualizarCampanhaNoEstado = useCallback(
+    (campanha: NonNullable<RiscosPsicossociaisProcesso["campanha"]>) => {
+      setModalProcesso((prev) => (prev ? { ...prev, campanha } : prev));
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.campanha?.id === campanha.id ||
+          p.implantacao.orcamento.id === campanha.orcamento_id
+            ? { ...p, campanha }
+            : p
+        )
+      );
+    },
+    []
+  );
+
+  const handleAbrirCampanha = useCallback(async () => {
+    const campanhaId = modalProcesso?.campanha?.id;
+    if (!campanhaId) return;
+    setSavingCampanha(true);
+    try {
+      const campanha = await abrirCampanhaRiscos(campanhaId, { auditContext });
+      atualizarCampanhaNoEstado(campanha);
+      toast.success("Pesquisa aberta para respostas.");
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao abrir a pesquisa."
+      );
+    } finally {
+      setSavingCampanha(false);
+    }
+  }, [modalProcesso, auditContext, atualizarCampanhaNoEstado]);
+
+  const handleGarantirCodigoAcesso = useCallback(
+    async (regenerar = false) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      if (
+        regenerar &&
+        typeof window !== "undefined" &&
+        !window.confirm(
+          "Gerar um novo código invalida o código anterior. Continuar?"
+        )
+      ) {
+        return;
+      }
+      setSavingCampanha(true);
+      try {
+        const campanha = await garantirCodigoAcessoCampanha(campanhaId, {
+          regenerar,
+        });
+        atualizarCampanhaNoEstado(campanha);
+        toast.success(
+          regenerar
+            ? "Novo código de acesso gerado."
+            : "Código de acesso disponível."
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao gerar código de acesso."
+        );
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [modalProcesso, atualizarCampanhaNoEstado]
+  );
+
   const handleCriarParticipante = useCallback(
     async (input: RiscosParticipanteInput) => {
       const campanhaId = modalProcesso?.campanha?.id;
@@ -490,6 +563,8 @@ export function useRiscosPsicossociaisPage() {
     handleRemoverAnexoLista,
     handleVisualizarAnexoLista,
     handleCriarCampanha,
+    handleAbrirCampanha,
+    handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,

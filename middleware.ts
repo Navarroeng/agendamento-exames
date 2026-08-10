@@ -8,6 +8,13 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/avaliacao" || pathname.startsWith("/avaliacao/")) {
     return true;
   }
+  // APIs públicas de validação/sessão do portal (sem lista de CPF no client).
+  if (
+    pathname === "/api/avaliacao" ||
+    pathname.startsWith("/api/avaliacao/")
+  ) {
+    return true;
+  }
   return false;
 }
 

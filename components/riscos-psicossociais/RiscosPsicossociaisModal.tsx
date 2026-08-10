@@ -29,6 +29,8 @@ interface RiscosPsicossociaisModalProps {
     dataEncerramentoIso: string;
     quantidadePrevista: number;
   }) => Promise<void>;
+  onAbrirCampanha?: () => Promise<void>;
+  onGarantirCodigoAcesso?: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante?: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante?: (
     participanteId: string,
@@ -50,6 +52,8 @@ export function RiscosPsicossociaisModal({
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
   onCriarCampanha,
+  onAbrirCampanha,
+  onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
@@ -99,6 +103,12 @@ export function RiscosPsicossociaisModal({
         }}
         onCriarCampanha={async (input) => {
           await onCriarCampanha?.(input);
+        }}
+        onAbrirCampanha={async () => {
+          await onAbrirCampanha?.();
+        }}
+        onGarantirCodigoAcesso={async (regenerar) => {
+          await onGarantirCodigoAcesso?.(regenerar);
         }}
         onCriarParticipante={async (input) => {
           await onCriarParticipante?.(input);
