@@ -4,6 +4,11 @@ import {
   MENSAGEM_VALIDACAO_GENERICA,
   createAvaliacaoSessionToken,
 } from "@/lib/avaliacao-acesso";
+import {
+  checkAvaliacaoRateLimit,
+  getClientIpFromRequest,
+} from "@/lib/avaliacao-rate-limit";
+import { parseDataNascimentoBr } from "@/lib/date-br";
 import { normalizeCpfDigits, isValidCPF } from "@/lib/cpf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validarAcessoAvaliacao } from "@/lib/avaliacao-validacao";
@@ -11,26 +16,41 @@ import { validarAcessoAvaliacao } from "@/lib/avaliacao-validacao";
 export const runtime = "nodejs";
 
 const CAMPANHA_SELECT =
-  "id, codigo_publico, cliente_id, cnpj, empresa_nome, status, data_inicio, data_encerramento, codigo_acesso_hash, codigo_acesso_salt";
+  "id, codigo_publico, cliente_id, cnpj, empresa_nome, status, data_inicio, data_encerramento";
 
 const PARTICIPANTE_SELECT =
-  "id, campanha_id, cpf, nome_completo, status, concluiu_em";
+  "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em";
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIpFromRequest(request);
     const body = (await request.json()) as {
       codigoPublico?: string;
       cpf?: string;
-      codigoAcesso?: string;
+      dataNascimento?: string;
     };
 
     const codigoPublico = String(body.codigoPublico ?? "")
       .trim()
       .toUpperCase();
-    const codigoAcesso = String(body.codigoAcesso ?? "");
     const cpfDigits = normalizeCpfDigits(body.cpf);
+    const dataNascimentoIso = parseDataNascimentoBr(body.dataNascimento);
 
-    if (!codigoPublico || !codigoAcesso.trim() || !isValidCPF(cpfDigits)) {
+    const rateKey = `avaliacao:${ip}:${codigoPublico || "none"}`;
+    const rate = checkAvaliacaoRateLimit(rateKey);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
+        {
+          status: 429,
+          headers: rate.retryAfterSec
+            ? { "Retry-After": String(rate.retryAfterSec) }
+            : undefined,
+        }
+      );
+    }
+
+    if (!codigoPublico || !isValidCPF(cpfDigits) || !dataNascimentoIso) {
       return NextResponse.json(
         { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
         { status: 400 }
@@ -62,7 +82,7 @@ export async function POST(request: Request) {
 
     const resultado = validarAcessoAvaliacao({
       codigoPublicoUrl: codigoPublico,
-      codigoAcessoInformado: codigoAcesso,
+      dataNascimentoIso,
       campanha: campanha
         ? {
             id: String(campanha.id),
@@ -75,12 +95,6 @@ export async function POST(request: Request) {
             status: String(campanha.status ?? ""),
             data_inicio: String(campanha.data_inicio ?? ""),
             data_encerramento: String(campanha.data_encerramento ?? ""),
-            codigo_acesso_hash: campanha.codigo_acesso_hash
-              ? String(campanha.codigo_acesso_hash)
-              : null,
-            codigo_acesso_salt: campanha.codigo_acesso_salt
-              ? String(campanha.codigo_acesso_salt)
-              : null,
           }
         : null,
       participante: participante
@@ -88,6 +102,9 @@ export async function POST(request: Request) {
             id: String(participante.id),
             campanha_id: String(participante.campanha_id),
             cpf: String(participante.cpf),
+            data_nascimento: participante.data_nascimento
+              ? String(participante.data_nascimento).slice(0, 10)
+              : null,
             nome_completo: String(participante.nome_completo ?? ""),
             status: String(participante.status ?? ""),
             concluiu_em: participante.concluiu_em

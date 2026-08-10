@@ -52,6 +52,7 @@ export function RiscosCampanhaParticipantesSection({
     return {
       nomeCompleto: p.nome_completo,
       cpf: p.cpf,
+      dataNascimento: p.data_nascimento ?? "",
       cargo: p.cargo ?? "",
       setor: p.setor ?? "",
       email: p.email ?? "",

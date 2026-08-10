@@ -1,8 +1,3 @@
-import {
-  normalizeCodigoAcessoCampanha,
-  verificarCodigoAcessoCampanha,
-} from "@/lib/avaliacao-acesso";
-
 export type CampanhaAcessoRow = {
   id: string;
   codigo_publico: string;
@@ -12,14 +7,14 @@ export type CampanhaAcessoRow = {
   status: string;
   data_inicio: string;
   data_encerramento: string;
-  codigo_acesso_hash: string | null;
-  codigo_acesso_salt: string | null;
 };
 
 export type ParticipanteAcessoRow = {
   id: string;
   campanha_id: string;
   cpf: string;
+  /** YYYY-MM-DD cadastrado. */
+  data_nascimento: string | null;
   nome_completo: string;
   status: string;
   concluiu_em: string | null;
@@ -41,9 +36,10 @@ export type AvaliacaoValidacaoFail = {
     | "campanha_inexistente"
     | "codigo_publico_divergente"
     | "campanha_indisponivel"
-    | "codigo_acesso_invalido"
     | "participante_nao_encontrado"
     | "participante_campanha_divergente"
+    | "data_nascimento_invalida"
+    | "data_nascimento_divergente"
     | "participante_nao_autorizado"
     | "participante_ja_concluiu";
 };
@@ -65,19 +61,19 @@ function campanhaDisponivel(
 }
 
 /**
- * Validação completa CPF + campanha + CNPJ implícito (via campanha) + código.
+ * Validação: campanha da URL + CPF do participante da mesma campanha + data de nascimento.
  * Nunca consulta participante só por CPF: o caller deve buscar por campanha_id + CPF.
  */
 export function validarAcessoAvaliacao(input: {
   codigoPublicoUrl: string;
-  codigoAcessoInformado: string;
+  /** YYYY-MM-DD já parseado. */
+  dataNascimentoIso: string | null;
   campanha: CampanhaAcessoRow | null;
-  /** Já filtrado por campanha_id + cpf (+ vínculo). */
+  /** Já filtrado por campanha_id + cpf. */
   participante: ParticipanteAcessoRow | null;
   hojeIso?: string;
 }): AvaliacaoValidacaoResult {
-  const hoje =
-    input.hojeIso ?? new Date().toISOString().slice(0, 10);
+  const hoje = input.hojeIso ?? new Date().toISOString().slice(0, 10);
   const codigoUrl = input.codigoPublicoUrl.trim().toUpperCase();
 
   if (!input.campanha) {
@@ -92,14 +88,8 @@ export function validarAcessoAvaliacao(input: {
     return { ok: false, motivo: "campanha_indisponivel" };
   }
 
-  if (
-    !verificarCodigoAcessoCampanha(
-      input.codigoAcessoInformado,
-      input.campanha.codigo_acesso_salt,
-      input.campanha.codigo_acesso_hash
-    )
-  ) {
-    return { ok: false, motivo: "codigo_acesso_invalido" };
+  if (!input.dataNascimentoIso) {
+    return { ok: false, motivo: "data_nascimento_invalida" };
   }
 
   if (!input.participante) {
@@ -108,6 +98,17 @@ export function validarAcessoAvaliacao(input: {
 
   if (input.participante.campanha_id !== input.campanha.id) {
     return { ok: false, motivo: "participante_campanha_divergente" };
+  }
+
+  const nascCadastro = String(input.participante.data_nascimento ?? "").slice(
+    0,
+    10
+  );
+  if (
+    !nascCadastro ||
+    nascCadastro !== input.dataNascimentoIso.slice(0, 10)
+  ) {
+    return { ok: false, motivo: "data_nascimento_divergente" };
   }
 
   if (
@@ -140,5 +141,3 @@ export function assertCodigoPublicoSessao(
     urlCodigoPublico.trim().toUpperCase()
   );
 }
-
-export { normalizeCodigoAcessoCampanha };

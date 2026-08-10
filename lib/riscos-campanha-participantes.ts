@@ -1,6 +1,7 @@
 /** Participantes da Pesquisa Psicossocial (campanha). */
 
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { parseDataNascimentoBr } from "@/lib/date-br";
 import { gerarCodigoPublicoCampanha } from "@/lib/riscos-campanha";
 
 export const RISCOS_PARTICIPANTE_STATUS = ["pendente", "respondido"] as const;
@@ -28,10 +29,13 @@ export type RiscosCampanhaParticipanteRecord = {
   cliente_id: string | null;
   nome_completo: string;
   cpf: string;
+  /** YYYY-MM-DD */
+  data_nascimento: string | null;
   cargo: string | null;
   setor: string | null;
   email: string | null;
   status: RiscosParticipanteStatus;
+  /** Identificador interno do participante (não é login do portal). */
   codigo_acesso: string;
   origem: RiscosParticipanteOrigem;
   criado_por: string | null;
@@ -42,10 +46,17 @@ export type RiscosCampanhaParticipanteRecord = {
 export type RiscosParticipanteInput = {
   nomeCompleto: string;
   cpf: string;
+  /** DD/MM/AAAA ou YYYY-MM-DD */
+  dataNascimento: string;
   cargo?: string;
   setor?: string;
   email?: string;
 };
+
+/**
+ * Colunas previstas para importação Excel futura:
+ * Nome | CPF | Data de nascimento | Cargo | Setor | E-mail
+ */
 
 export type RiscosParticipantesResumo = {
   previstos: number;
@@ -81,6 +92,9 @@ export function validateRiscosParticipanteInput(
   }
   if (!isValidCPF(input.cpf)) {
     return "Informe um CPF válido.";
+  }
+  if (!parseDataNascimentoBr(input.dataNascimento)) {
+    return "Informe a data de nascimento (DD/MM/AAAA).";
   }
   const email = input.email?.trim() ?? "";
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

@@ -4,6 +4,7 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import { normalizeCpfDigits } from "@/lib/cpf";
+import { parseDataNascimentoBr } from "@/lib/date-br";
 import {
   gerarCodigoAcessoParticipante,
   isRiscosParticipanteStatus,
@@ -18,7 +19,7 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import { buscarCampanhaPorOrcamento } from "@/services/riscos-campanha.service";
 
 const PARTICIPANTE_SELECT =
-  "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at";
+  "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at";
 
 type AuditOptions = { auditContext?: AuditoriaUsuarioContext };
 
@@ -40,6 +41,9 @@ function mapParticipante(
     cliente_id: row.cliente_id ? String(row.cliente_id) : null,
     nome_completo: String(row.nome_completo ?? ""),
     cpf: String(row.cpf ?? ""),
+    data_nascimento: row.data_nascimento
+      ? String(row.data_nascimento).slice(0, 10)
+      : null,
     cargo: row.cargo ? String(row.cargo) : null,
     setor: row.setor ? String(row.setor) : null,
     email: row.email ? String(row.email) : null,
@@ -119,6 +123,10 @@ export async function criarParticipanteCampanha(
 
   const codigo = await gerarCodigoAcessoUnico(supabase);
   const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
+  const dataNascimento = parseDataNascimentoBr(params.input.dataNascimento);
+  if (!dataNascimento) {
+    throw new Error("Informe a data de nascimento (DD/MM/AAAA).");
+  }
 
   const { data, error } = await supabase
     .from("riscos_campanha_participantes")
@@ -128,6 +136,7 @@ export async function criarParticipanteCampanha(
       cliente_id: campanha.cliente_id,
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,
+      data_nascimento: dataNascimento,
       cargo: params.input.cargo?.trim() || null,
       setor: params.input.setor?.trim() || null,
       email: params.input.email?.trim() || null,
@@ -190,6 +199,10 @@ export async function atualizarParticipanteCampanha(
 
   const before = mapParticipante(atual as Record<string, unknown>);
   const cpf = normalizeCpfDigits(params.input.cpf);
+  const dataNascimento = parseDataNascimentoBr(params.input.dataNascimento);
+  if (!dataNascimento) {
+    throw new Error("Informe a data de nascimento (DD/MM/AAAA).");
+  }
 
   if (cpf !== before.cpf) {
     const { data: duplicado, error: dupErr } = await supabase
@@ -210,6 +223,7 @@ export async function atualizarParticipanteCampanha(
     .update({
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,
+      data_nascimento: dataNascimento,
       cargo: params.input.cargo?.trim() || null,
       setor: params.input.setor?.trim() || null,
       email: params.input.email?.trim() || null,

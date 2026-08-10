@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import {
   createAvaliacaoSessionToken,
-  criarHashCodigoAcessoCampanha,
-  verificarCodigoAcessoCampanha,
   verifyAvaliacaoSessionToken,
 } from "../lib/avaliacao-acesso";
 import {
@@ -11,17 +9,14 @@ import {
   type CampanhaAcessoRow,
   type ParticipanteAcessoRow,
 } from "../lib/avaliacao-validacao";
+import { parseDataNascimentoBr } from "../lib/date-br";
+import { isAvaliacaoDemoCodigo } from "../lib/avaliacao-demo";
 
 const hoje = "2026-08-10";
 
 function campanhaBase(
-  overrides: Partial<CampanhaAcessoRow> & {
-    codigoPlain?: string;
-  } = {}
-): CampanhaAcessoRow & { codigoPlain: string } {
-  const codigoPlain = overrides.codigoPlain ?? "NAV2026";
-  const hashed = criarHashCodigoAcessoCampanha(codigoPlain);
-  const { codigoPlain: _ignored, ...rest } = overrides;
+  overrides: Partial<CampanhaAcessoRow> = {}
+): CampanhaAcessoRow {
   return {
     id: "camp-a",
     codigo_publico: "5UA22W",
@@ -31,10 +26,7 @@ function campanhaBase(
     status: "aberta",
     data_inicio: "2026-08-01",
     data_encerramento: "2026-08-31",
-    codigo_acesso_hash: hashed.hash,
-    codigo_acesso_salt: hashed.salt,
-    codigoPlain,
-    ...rest,
+    ...overrides,
   };
 }
 
@@ -45,6 +37,7 @@ function participanteBase(
     id: "part-joao",
     campanha_id: "camp-a",
     cpf: "52998224725",
+    data_nascimento: "1990-05-15",
     nome_completo: "João Silva",
     status: "pendente",
     concluiu_em: null,
@@ -52,23 +45,17 @@ function participanteBase(
   };
 }
 
-function run(
-  name: string,
-  fn: () => void
-) {
+function run(name: string, fn: () => void) {
   fn();
   console.log(`OK  ${name}`);
 }
 
-// Hash
-run("hash verifica código correto", () => {
-  const { salt, hash, exibicao } = criarHashCodigoAcessoCampanha("nav2026");
-  assert.equal(exibicao, "NAV2026");
-  assert.equal(verificarCodigoAcessoCampanha("NAV2026", salt, hash), true);
-  assert.equal(verificarCodigoAcessoCampanha("ERRADO", salt, hash), false);
+run("parse data nascimento BR", () => {
+  assert.equal(parseDataNascimentoBr("15/05/1990"), "1990-05-15");
+  assert.equal(parseDataNascimentoBr("15051990"), "1990-05-15");
+  assert.equal(parseDataNascimentoBr("31/02/1990"), null);
 });
 
-// Sessão
 run("sessão assina e verifica", () => {
   const token = createAvaliacaoSessionToken({
     campanhaId: "camp-a",
@@ -78,10 +65,9 @@ run("sessão assina e verifica", () => {
   const parsed = verifyAvaliacaoSessionToken(token);
   assert.ok(parsed);
   assert.equal(parsed!.campanhaId, "camp-a");
-  assert.equal(parsed!.codigoPublico, "5UA22W");
 });
 
-run("TESTE 8 sessão não aceita outra campanha na URL", () => {
+run("TESTE 7 sessão não aceita outra campanha na URL", () => {
   assert.equal(assertCodigoPublicoSessao("5UA22W", "5UA22W"), true);
   assert.equal(assertCodigoPublicoSessao("5UA22W", "OUTRA1"), false);
 });
@@ -89,10 +75,10 @@ run("TESTE 8 sessão não aceita outra campanha na URL", () => {
 const campA = campanhaBase();
 const joao = participanteBase();
 
-run("TESTE 1 permitir campanha A + CPF A + código A", () => {
+run("TESTE 1 permitir CPF + nascimento corretos na campanha", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: campA,
     participante: joao,
     hojeIso: hoje,
@@ -100,22 +86,22 @@ run("TESTE 1 permitir campanha A + CPF A + código A", () => {
   assert.equal(r.ok, true);
 });
 
-run("TESTE 2 bloquear código errado", () => {
+run("TESTE 2 bloquear nascimento errado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: "ERRADO1",
+    dataNascimentoIso: "1991-01-01",
     campanha: campA,
     participante: joao,
     hojeIso: hoje,
   });
   assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "codigo_acesso_invalido");
+  if (!r.ok) assert.equal(r.motivo, "data_nascimento_divergente");
 });
 
 run("TESTE 3 bloquear CPF de outra empresa (sem vínculo na campanha)", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: campA,
     participante: null,
     hojeIso: hoje,
@@ -127,7 +113,7 @@ run("TESTE 3 bloquear CPF de outra empresa (sem vínculo na campanha)", () => {
 run("TESTE 4 bloquear CPF existente fora da campanha", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: campA,
     participante: null,
     hojeIso: hoje,
@@ -135,27 +121,10 @@ run("TESTE 4 bloquear CPF existente fora da campanha", () => {
   assert.equal(r.ok, false);
 });
 
-run("TESTE 5 bloquear código da campanha B", () => {
-  const campB = campanhaBase({
-    id: "camp-b",
-    codigo_publico: "BBB111",
-    codigoPlain: "CODIGOB",
-  });
+run("TESTE 5 bloquear campanha encerrada", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campB.codigoPlain,
-    campanha: campA,
-    participante: joao,
-    hojeIso: hoje,
-  });
-  assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "codigo_acesso_invalido");
-});
-
-run("TESTE 6 bloquear campanha encerrada", () => {
-  const r = validarAcessoAvaliacao({
-    codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: { ...campA, status: "encerrada" },
     participante: joao,
     hojeIso: hoje,
@@ -164,10 +133,10 @@ run("TESTE 6 bloquear campanha encerrada", () => {
   if (!r.ok) assert.equal(r.motivo, "campanha_indisponivel");
 });
 
-run("TESTE 7 bloquear participante que já concluiu", () => {
+run("TESTE 6 bloquear participante que já concluiu", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: campA,
     participante: {
       ...joao,
@@ -180,10 +149,15 @@ run("TESTE 7 bloquear participante que já concluiu", () => {
   if (!r.ok) assert.equal(r.motivo, "participante_ja_concluiu");
 });
 
+run("TESTE 8 DEMO01 isolado", () => {
+  assert.equal(isAvaliacaoDemoCodigo("DEMO01"), true);
+  assert.equal(isAvaliacaoDemoCodigo("5UA22W"), false);
+});
+
 run("isolamento: participante com campanha_id divergente", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    codigoAcessoInformado: campA.codigoPlain,
+    dataNascimentoIso: "1990-05-15",
     campanha: campA,
     participante: { ...joao, campanha_id: "outra" },
     hojeIso: hoje,
@@ -192,4 +166,4 @@ run("isolamento: participante com campanha_id divergente", () => {
   if (!r.ok) assert.equal(r.motivo, "participante_campanha_divergente");
 });
 
-console.log("\nTodos os testes de acesso à avaliação passaram.");
+console.log("\nTodos os testes de acesso (CPF + nascimento) passaram.");

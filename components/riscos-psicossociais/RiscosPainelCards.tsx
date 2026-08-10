@@ -568,28 +568,14 @@ export function RiscosPainelCards({
                   {pathAvaliacaoCampanha(campanha.codigo_publico)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[#94a3b8]">
-                  Código da campanha (URL):{" "}
+                  Código da campanha (URL/QR):{" "}
                   <span className="font-mono font-semibold text-navy">
                     {campanha.codigo_publico}
                   </span>
                 </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Código de acesso (compartilhado)
-                </p>
-                {campanha.codigo_acesso_exibicao ? (
-                  <p className="mt-0.5 font-mono text-sm font-extrabold tracking-wider text-navy">
-                    {campanha.codigo_acesso_exibicao}
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-[11px] text-[#94a3b8]">
-                    Ainda não gerado para esta pesquisa.
-                  </p>
-                )}
-                <p className="mt-1 text-[11px] text-[#64748b]">
-                  Todos os participantes desta pesquisa usam o mesmo código.
-                  Cada um informa o próprio CPF.
+                <p className="mt-2 text-[11px] text-[#64748b]">
+                  O participante acessa pelo link informando CPF e data de
+                  nascimento. Não é necessário código de acesso adicional.
                 </p>
               </div>
               <div>
@@ -603,8 +589,7 @@ export function RiscosPainelCards({
             </div>
           ) : (
             <PlaceholderNote>
-              Crie a pesquisa para gerar o link e o código de acesso
-              compartilhado.
+              Crie a pesquisa para gerar o link e o QR Code da campanha.
             </PlaceholderNote>
           )}
           <div className="mt-auto flex flex-wrap gap-2 pt-4">
@@ -615,20 +600,6 @@ export function RiscosPainelCards({
               onClick={() => void handleCopiarLink()}
             >
               Copiar link
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled={!campanha || savingCampanha}
-              onClick={() =>
-                void onGarantirCodigoAcesso(
-                  Boolean(campanha?.codigo_acesso_exibicao)
-                )
-              }
-            >
-              {campanha?.codigo_acesso_exibicao
-                ? "Regenerar código"
-                : "Gerar código de acesso"}
             </button>
             <button
               type="button"

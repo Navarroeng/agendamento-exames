@@ -22,6 +22,10 @@ import {
   type CopsoqFlowItem,
 } from "@/lib/copsoq-ii-br";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  maskDataNascimentoInput,
+  parseDataNascimentoBr,
+} from "@/lib/date-br";
 
 type Step =
   | "landing"
@@ -43,7 +47,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   const isDemo = isAvaliacaoDemoCodigo(codigoDisplay);
   const [step, setStep] = useState<Step>("landing");
   const [cpf, setCpf] = useState("");
-  const [codigoAcesso, setCodigoAcesso] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
   const [flowIndex, setFlowIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [empresaNome, setEmpresaNome] = useState(
@@ -179,13 +183,13 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
 
   async function handleValidar() {
     setErroIdentificacao(null);
+    const digits = normalizeCpfDigits(cpf);
+    const nascIso = parseDataNascimentoBr(dataNascimento);
 
     // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
     if (isDemo) {
-      if (!cpf.trim() || !codigoAcesso.trim()) {
-        setErroIdentificacao(
-          "Informe CPF e código de acesso para continuar na demonstração."
-        );
+      if (!isValidCPF(digits) || !nascIso) {
+        setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
         return;
       }
       setValidando(true);
@@ -199,8 +203,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       return;
     }
 
-    const digits = normalizeCpfDigits(cpf);
-    if (!isValidCPF(digits) || !codigoAcesso.trim()) {
+    if (!isValidCPF(digits) || !nascIso) {
       setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
       return;
     }
@@ -213,7 +216,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         body: JSON.stringify({
           codigoPublico: codigoDisplay,
           cpf: digits,
-          codigoAcesso,
+          dataNascimento: nascIso,
         }),
       });
       const json = (await res.json()) as {
@@ -290,7 +293,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     setFlowIndex(0);
     setRespostas({});
     setCpf("");
-    setCodigoAcesso("");
+    setDataNascimento("");
     setParticipanteNome("");
   }
 
@@ -324,12 +327,12 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
           {step === "identificacao" ? (
             <IdentificacaoStep
               cpf={cpf}
-              codigoAcesso={codigoAcesso}
+              dataNascimento={dataNascimento}
               erro={erroIdentificacao}
               loading={validando}
               isDemo={isDemo}
               onCpfChange={setCpf}
-              onCodigoChange={setCodigoAcesso}
+              onDataNascimentoChange={setDataNascimento}
               onBack={() => setStep("landing")}
               onContinue={() => void handleValidar()}
             />
@@ -535,22 +538,22 @@ function LandingStep({
 
 function IdentificacaoStep({
   cpf,
-  codigoAcesso,
+  dataNascimento,
   erro,
   loading,
   isDemo,
   onCpfChange,
-  onCodigoChange,
+  onDataNascimentoChange,
   onBack,
   onContinue,
 }: {
   cpf: string;
-  codigoAcesso: string;
+  dataNascimento: string;
   erro: string | null;
   loading: boolean;
   isDemo: boolean;
   onCpfChange: (v: string) => void;
-  onCodigoChange: (v: string) => void;
+  onDataNascimentoChange: (v: string) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -560,8 +563,8 @@ function IdentificacaoStep({
         <h2 className="text-lg font-extrabold text-navy">Identificação</h2>
         <p className="mt-1 text-sm text-[#64748b]">
           {isDemo
-            ? "Demonstração: informe qualquer CPF e qualquer código para continuar."
-            : "Informe seu CPF e o código de acesso compartilhado da pesquisa."}
+            ? "Demonstração: informe um CPF válido e qualquer data de nascimento válida (DD/MM/AAAA)."
+            : "Informe seu CPF e sua data de nascimento para acessar a pesquisa."}
         </p>
       </div>
 
@@ -585,19 +588,18 @@ function IdentificacaoStep({
         <Field
           label={
             <>
-              Código de acesso <RequiredMark />
+              Data de nascimento <RequiredMark />
             </>
           }
         >
           <input
-            className="field-input min-h-[48px] w-full text-base tracking-widest"
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="Ex.: NAV2026"
-            value={codigoAcesso}
+            className="field-input min-h-[48px] w-full text-base"
+            inputMode="numeric"
+            autoComplete="bday"
+            placeholder="DD/MM/AAAA"
+            value={dataNascimento}
             onChange={(e) =>
-              onCodigoChange(e.target.value.toUpperCase().replace(/\s+/g, ""))
+              onDataNascimentoChange(maskDataNascimentoInput(e.target.value))
             }
           />
         </Field>

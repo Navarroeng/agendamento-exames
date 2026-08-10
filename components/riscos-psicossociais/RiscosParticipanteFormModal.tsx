@@ -4,11 +4,16 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  formatDataNascimentoBr,
+  maskDataNascimentoInput,
+} from "@/lib/date-br";
 import type { RiscosParticipanteInput } from "@/lib/riscos-campanha-participantes";
 
 const EMPTY_FORM: RiscosParticipanteInput = {
   nomeCompleto: "",
   cpf: "",
+  dataNascimento: "",
   cargo: "",
   setor: "",
   email: "",
@@ -33,22 +38,29 @@ export function RiscosParticipanteFormModal({
 }: RiscosParticipanteFormModalProps) {
   const [form, setForm] = useState<RiscosParticipanteInput>(EMPTY_FORM);
   const [cpfMasked, setCpfMasked] = useState("");
+  const [nascMasked, setNascMasked] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     if (initial) {
+      const nasc =
+        formatDataNascimentoBr(initial.dataNascimento) ||
+        maskDataNascimentoInput(initial.dataNascimento);
       setForm({
         nomeCompleto: initial.nomeCompleto,
         cpf: initial.cpf,
+        dataNascimento: nasc,
         cargo: initial.cargo ?? "",
         setor: initial.setor ?? "",
         email: initial.email ?? "",
       });
       setCpfMasked(maskCPFInput(initial.cpf));
+      setNascMasked(nasc);
     } else {
       setForm(EMPTY_FORM);
       setCpfMasked("");
+      setNascMasked("");
     }
     setError(null);
   }, [open, initial]);
@@ -64,6 +76,7 @@ export function RiscosParticipanteFormModal({
       await onSave({
         nomeCompleto: form.nomeCompleto,
         cpf: form.cpf,
+        dataNascimento: nascMasked,
         cargo: form.cargo,
         setor: form.setor,
         email: form.email,
@@ -152,15 +165,25 @@ export function RiscosParticipanteFormModal({
               }}
             />
           </Field>
-          <Field label="E-mail (opcional)">
+          <Field
+            label={
+              <>
+                Data de nascimento <RequiredMark />
+              </>
+            }
+          >
             <input
-              type="email"
               className="field-input w-full"
-              value={form.email ?? ""}
+              inputMode="numeric"
+              placeholder="DD/MM/AAAA"
+              autoComplete="bday"
+              value={nascMasked}
               disabled={saving}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, email: e.target.value }))
-              }
+              onChange={(e) => {
+                const masked = maskDataNascimentoInput(e.target.value);
+                setNascMasked(masked);
+                setForm((prev) => ({ ...prev, dataNascimento: masked }));
+              }}
             />
           </Field>
           <Field label="Cargo">
@@ -183,38 +206,46 @@ export function RiscosParticipanteFormModal({
               }
             />
           </Field>
+          <Field label="E-mail (opcional)" className="sm:col-span-2">
+            <input
+              type="email"
+              className="field-input w-full"
+              value={form.email ?? ""}
+              disabled={saving}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, email: e.target.value }))
+              }
+            />
+          </Field>
         </div>
 
         <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-            Dados de acesso do participante
+            Acesso ao portal
           </p>
           <p className="mt-1 text-xs text-[#64748b]">
-            Após o envio da pesquisa, este participante acessará utilizando o
-            CPF e um código/senha gerado automaticamente pelo sistema.
+            O participante acessa pelo link/QR da campanha informando CPF e
+            data de nascimento. Esses dados validam a autorização e não entram
+            nos resultados da pesquisa.
           </p>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Login
+                CPF
               </dt>
               <dd className="mt-0.5 font-semibold tabular-nums text-navy">
-                CPF informado · {loginCpf}
+                {loginCpf}
               </dd>
             </div>
             <div>
               <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Senha
+                Data de nascimento
               </dt>
-              <dd className="mt-0.5 font-semibold text-navy">
-                Será gerada automaticamente quando a pesquisa for enviada.
+              <dd className="mt-0.5 font-semibold tabular-nums text-navy">
+                {nascMasked || "Informe a data"}
               </dd>
             </div>
           </dl>
-          <p className="mt-3 text-[11px] text-[#94a3b8]">
-            Neste momento estamos apenas cadastrando os participantes. O acesso
-            será liberado quando a campanha for enviada.
-          </p>
         </div>
 
         {error ? (
