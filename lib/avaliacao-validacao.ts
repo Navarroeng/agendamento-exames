@@ -1,3 +1,5 @@
+import { datasNascimentoIguais, hojeCivilIso } from "@/lib/date-br";
+
 export type CampanhaAcessoRow = {
   id: string;
   codigo_publico: string;
@@ -57,6 +59,9 @@ export type CampanhaPeriodoStatus =
   | "encerrada"
   | "indisponivel";
 
+/** Status de participante aceitos para iniciar a pesquisa (admin: "Pendente"). */
+export const PARTICIPANTE_STATUS_APTOS_INICIO = ["pendente"] as const;
+
 /** Avalia período/status da campanha (sem dados do participante). */
 export function avaliarPeriodoCampanha(
   campanha: Pick<
@@ -66,7 +71,7 @@ export function avaliarPeriodoCampanha(
   hojeIso?: string
 ): CampanhaPeriodoStatus {
   if (!campanha) return "inexistente";
-  const hoje = hojeIso ?? new Date().toISOString().slice(0, 10);
+  const hoje = hojeIso ?? hojeCivilIso();
   const inicio = String(campanha.data_inicio ?? "").slice(0, 10);
   const fim = String(campanha.data_encerramento ?? "").slice(0, 10);
   const status = String(campanha.status ?? "");
@@ -100,7 +105,7 @@ export function validarAcessoAvaliacao(input: {
   participante: ParticipanteAcessoRow | null;
   hojeIso?: string;
 }): AvaliacaoValidacaoResult {
-  const hoje = input.hojeIso ?? new Date().toISOString().slice(0, 10);
+  const hoje = input.hojeIso ?? hojeCivilIso();
   const codigoUrl = input.codigoPublicoUrl.trim().toUpperCase();
 
   if (!input.campanha) {
@@ -131,13 +136,11 @@ export function validarAcessoAvaliacao(input: {
     return { ok: false, motivo: "participante_campanha_divergente" };
   }
 
-  const nascCadastro = String(input.participante.data_nascimento ?? "").slice(
-    0,
-    10
-  );
   if (
-    !nascCadastro ||
-    nascCadastro !== input.dataNascimentoIso.slice(0, 10)
+    !datasNascimentoIguais(
+      input.participante.data_nascimento,
+      input.dataNascimentoIso
+    )
   ) {
     return { ok: false, motivo: "data_nascimento_divergente" };
   }
@@ -149,7 +152,11 @@ export function validarAcessoAvaliacao(input: {
     return { ok: false, motivo: "participante_ja_concluiu" };
   }
 
-  if (input.participante.status !== "pendente") {
+  if (
+    !(PARTICIPANTE_STATUS_APTOS_INICIO as readonly string[]).includes(
+      input.participante.status
+    )
+  ) {
     return { ok: false, motivo: "participante_nao_autorizado" };
   }
 

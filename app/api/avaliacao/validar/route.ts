@@ -48,6 +48,9 @@ export async function POST(request: Request) {
     const rateKey = `avaliacao:${ip}:${codigoPublico || "none"}`;
     const rate = checkAvaliacaoRateLimit(rateKey);
     if (!rate.allowed) {
+      console.info("[avaliacao/validar] motivo=rate_limit", {
+        codigoPublico: codigoPublico || null,
+      });
       return NextResponse.json(
         {
           ok: false,
@@ -64,6 +67,12 @@ export async function POST(request: Request) {
     }
 
     if (!codigoPublico || !isValidCPF(cpfDigits) || !dataNascimentoIso) {
+      console.info("[avaliacao/validar] motivo=entrada_invalida", {
+        codigoPublico: codigoPublico || null,
+        cpfLen: cpfDigits.length,
+        cpfValido: isValidCPF(cpfDigits),
+        nascimentoParseOk: Boolean(dataNascimentoIso),
+      });
       return NextResponse.json(
         {
           ok: false,
@@ -87,6 +96,7 @@ export async function POST(request: Request) {
     let participante = null;
     if (campanha?.id) {
       // Isolamento: sempre campanha_id + CPF (nunca CPF sozinho).
+      // CPF no banco é armazenado só com dígitos (normalizeCpfDigits no cadastro).
       const { data, error } = await supabase
         .from("riscos_campanha_participantes")
         .select(PARTICIPANTE_SELECT)
@@ -133,6 +143,13 @@ export async function POST(request: Request) {
 
     if (!resultado.ok) {
       const codigo = codigoErroPublico(resultado.motivo);
+      console.info("[avaliacao/validar] motivo=" + resultado.motivo, {
+        codigoPublico,
+        codigoPublicoErro: codigo,
+        participanteEncontrado: Boolean(participante),
+        participanteStatus: participante?.status ?? null,
+        temConcluiuEm: Boolean(participante?.concluiu_em),
+      });
 
       if (resultado.motivo === "campanha_encerrada" && campanha?.id) {
         await registrarAuditoriaPortal(supabase, {

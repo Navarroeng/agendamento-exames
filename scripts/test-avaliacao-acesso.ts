@@ -5,11 +5,16 @@ import {
 } from "../lib/avaliacao-acesso";
 import {
   assertCodigoPublicoSessao,
+  codigoErroPublico,
   validarAcessoAvaliacao,
   type CampanhaAcessoRow,
   type ParticipanteAcessoRow,
 } from "../lib/avaliacao-validacao";
-import { parseDataNascimentoBr } from "../lib/date-br";
+import {
+  datasNascimentoIguais,
+  parseDataNascimentoBr,
+} from "../lib/date-br";
+import { normalizeCpfDigits, isValidCPF } from "../lib/cpf";
 import { isAvaliacaoDemoCodigo } from "../lib/avaliacao-demo";
 
 const hoje = "2026-08-10";
@@ -50,10 +55,30 @@ function run(name: string, fn: () => void) {
   console.log(`OK  ${name}`);
 }
 
-run("parse data nascimento BR", () => {
+run("parse data nascimento BR / ISO / dígitos", () => {
   assert.equal(parseDataNascimentoBr("15/05/1990"), "1990-05-15");
   assert.equal(parseDataNascimentoBr("15051990"), "1990-05-15");
+  assert.equal(parseDataNascimentoBr("1990-05-15"), "1990-05-15");
+  assert.equal(parseDataNascimentoBr("06/04/1991"), "1991-04-06");
+  assert.equal(parseDataNascimentoBr("1991-04-06"), "1991-04-06");
   assert.equal(parseDataNascimentoBr("31/02/1990"), null);
+  assert.equal(
+    datasNascimentoIguais("06/04/1991", "1991-04-06"),
+    true
+  );
+  assert.equal(
+    datasNascimentoIguais("1991-04-06T00:00:00.000Z", "1991-04-06"),
+    true
+  );
+});
+
+run("CPF máscara e sem máscara normalizam igual", () => {
+  assert.equal(normalizeCpfDigits("373.850.608-03"), "37385060803");
+  assert.equal(normalizeCpfDigits("37385060803"), "37385060803");
+  assert.equal(
+    normalizeCpfDigits("373.850.608-03"),
+    normalizeCpfDigits("37385060803")
+  );
 });
 
 run("sessão assina e verifica", () => {
@@ -67,7 +92,7 @@ run("sessão assina e verifica", () => {
   assert.equal(parsed!.campanhaId, "camp-a");
 });
 
-run("TESTE 7 sessão não aceita outra campanha na URL", () => {
+run("sessão não aceita outra campanha na URL", () => {
   assert.equal(assertCodigoPublicoSessao("5UA22W", "5UA22W"), true);
   assert.equal(assertCodigoPublicoSessao("5UA22W", "OUTRA1"), false);
 });
@@ -75,10 +100,10 @@ run("TESTE 7 sessão não aceita outra campanha na URL", () => {
 const campA = campanhaBase();
 const joao = participanteBase();
 
-run("TESTE 1 permitir CPF + nascimento corretos na campanha", () => {
+run("TESTE 1 CPF correto + nascimento correto + pendente → acesso", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
-    dataNascimentoIso: "1990-05-15",
+    dataNascimentoIso: parseDataNascimentoBr("15/05/1990"),
     campanha: campA,
     participante: joao,
     hojeIso: hoje,
@@ -86,7 +111,21 @@ run("TESTE 1 permitir CPF + nascimento corretos na campanha", () => {
   assert.equal(r.ok, true);
 });
 
-run("TESTE 2 bloquear nascimento errado", () => {
+run("TESTE 1b portal envia ISO (bug corrigido) → acesso", () => {
+  // Portal faz parse client-side e envia YYYY-MM-DD à API.
+  const fromPortal = parseDataNascimentoBr("1990-05-15");
+  assert.equal(fromPortal, "1990-05-15");
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "5UA22W",
+    dataNascimentoIso: fromPortal,
+    campanha: campA,
+    participante: joao,
+    hojeIso: hoje,
+  });
+  assert.equal(r.ok, true);
+});
+
+run("TESTE 2 CPF correto + nascimento errado → negado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1991-01-01",
@@ -96,9 +135,10 @@ run("TESTE 2 bloquear nascimento errado", () => {
   });
   assert.equal(r.ok, false);
   if (!r.ok) assert.equal(r.motivo, "data_nascimento_divergente");
+  assert.equal(codigoErroPublico("data_nascimento_divergente"), "nao_apto");
 });
 
-run("TESTE 3 bloquear CPF de outra empresa (sem vínculo na campanha)", () => {
+run("TESTE 3 CPF inexistente na campanha → negado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
@@ -110,42 +150,29 @@ run("TESTE 3 bloquear CPF de outra empresa (sem vínculo na campanha)", () => {
   if (!r.ok) assert.equal(r.motivo, "participante_nao_encontrado");
 });
 
-run("TESTE 4 bloquear CPF existente fora da campanha", () => {
+run("TESTE 4 CPF de outra campanha → negado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
     campanha: campA,
-    participante: null,
+    participante: null, // query é campanha_id + cpf — não encontra
     hojeIso: hoje,
   });
   assert.equal(r.ok, false);
-});
+  if (!r.ok) assert.equal(r.motivo, "participante_nao_encontrado");
 
-run("TESTE 5 bloquear campanha encerrada por status", () => {
-  const r = validarAcessoAvaliacao({
-    codigoPublicoUrl: "5UA22W",
-    dataNascimentoIso: "1990-05-15",
-    campanha: { ...campA, status: "encerrada" },
-    participante: joao,
-    hojeIso: hoje,
-  });
-  assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
-});
-
-run("TESTE 5b bloquear campanha após data de encerramento", () => {
-  const r = validarAcessoAvaliacao({
+  const r2 = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
     campanha: campA,
-    participante: joao,
-    hojeIso: "2026-09-01",
+    participante: { ...joao, campanha_id: "camp-b" },
+    hojeIso: hoje,
   });
-  assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
+  assert.equal(r2.ok, false);
+  if (!r2.ok) assert.equal(r2.motivo, "participante_campanha_divergente");
 });
 
-run("TESTE 6 bloquear participante que já concluiu", () => {
+run("TESTE 5 participante concluído → ja_respondida", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
@@ -159,23 +186,70 @@ run("TESTE 6 bloquear participante que já concluiu", () => {
   });
   assert.equal(r.ok, false);
   if (!r.ok) assert.equal(r.motivo, "participante_ja_concluiu");
+  assert.equal(codigoErroPublico("participante_ja_concluiu"), "ja_respondida");
 });
 
-run("TESTE 8 DEMO01 isolado", () => {
-  assert.equal(isAvaliacaoDemoCodigo("DEMO01"), true);
-  assert.equal(isAvaliacaoDemoCodigo("5UA22W"), false);
+run("TESTE 6 campanha encerrada → negado", () => {
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "5UA22W",
+    dataNascimentoIso: "1990-05-15",
+    campanha: { ...campA, status: "encerrada" },
+    participante: joao,
+    hojeIso: hoje,
+  });
+  assert.equal(r.ok, false);
+  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
 });
 
-run("isolamento: participante com campanha_id divergente", () => {
+run("TESTE 6b campanha após data de encerramento → negado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
     campanha: campA,
-    participante: { ...joao, campanha_id: "outra" },
-    hojeIso: hoje,
+    participante: joao,
+    hojeIso: "2026-09-01",
   });
   assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "participante_campanha_divergente");
+  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
+});
+
+run("TESTE 7 CPF com máscara e sem máscara", () => {
+  const masked = "529.982.247-25";
+  const plain = "52998224725";
+  assert.equal(normalizeCpfDigits(masked), plain);
+  assert.equal(isValidCPF(masked), isValidCPF(plain));
+  assert.equal(isValidCPF(plain), true);
+});
+
+run("TESTE 8 DD/MM/AAAA compara com DATE do banco", () => {
+  const digitado = parseDataNascimentoBr("15/05/1990");
+  const banco = "1990-05-15";
+  assert.equal(digitado, banco);
+  assert.equal(datasNascimentoIguais(digitado, banco), true);
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "5UA22W",
+    dataNascimentoIso: digitado,
+    campanha: campA,
+    participante: joao,
+    hojeIso: hoje,
+  });
+  assert.equal(r.ok, true);
+});
+
+run("status Pendente (admin) = pendente aceito", () => {
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "5UA22W",
+    dataNascimentoIso: "1990-05-15",
+    campanha: campA,
+    participante: { ...joao, status: "pendente" },
+    hojeIso: hoje,
+  });
+  assert.equal(r.ok, true);
+});
+
+run("DEMO01 isolado", () => {
+  assert.equal(isAvaliacaoDemoCodigo("DEMO01"), true);
+  assert.equal(isAvaliacaoDemoCodigo("5UA22W"), false);
 });
 
 console.log("\nTodos os testes de acesso (CPF + nascimento) passaram.");

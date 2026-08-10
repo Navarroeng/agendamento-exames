@@ -1,6 +1,23 @@
 /** Datas em formato brasileiro (exibição) e ISO (banco). */
 
-/** Aceita DD/MM/AAAA ou DDMMAAAA e retorna YYYY-MM-DD, ou null se inválida. */
+/** Hoje como data civil local (YYYY-MM-DD), sem conversão UTC. */
+export function hojeCivilIso(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Normaliza data de nascimento para YYYY-MM-DD (data civil).
+ * Aceita:
+ * - DD/MM/AAAA
+ * - DDMMAAAA
+ * - YYYY-MM-DD (já normalizado pelo portal/banco)
+ *
+ * Não aplica timezone: valida o calendário civil via UTC components
+ * apenas como âncora de dia/mês/ano, sem deslocar o fuso.
+ */
 export function parseDataNascimentoBr(
   value: string | null | undefined
 ): string | null {
@@ -11,8 +28,13 @@ export function parseDataNascimentoBr(
   let month: number;
   let year: number;
 
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   const masked = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
-  if (masked) {
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else if (masked) {
     day = Number(masked[1]);
     month = Number(masked[2]);
     year = Number(masked[3]);
@@ -31,6 +53,7 @@ export function parseDataNascimentoBr(
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
 
+  // Âncora civil (UTC) — só para validar existência do dia no calendário.
   const dt = new Date(Date.UTC(year, month - 1, day));
   if (
     dt.getUTCFullYear() !== year ||
@@ -40,18 +63,14 @@ export function parseDataNascimentoBr(
     return null;
   }
 
-  // Não aceitar data futura.
-  const hoje = new Date();
-  const hojeUtc = Date.UTC(
-    hoje.getFullYear(),
-    hoje.getMonth(),
-    hoje.getDate()
-  );
-  if (dt.getTime() > hojeUtc) return null;
-
   const mm = String(month).padStart(2, "0");
   const dd = String(day).padStart(2, "0");
-  return `${year}-${mm}-${dd}`;
+  const civil = `${year}-${mm}-${dd}`;
+
+  // Não aceitar data futura (comparação civil local).
+  if (civil > hojeCivilIso()) return null;
+
+  return civil;
 }
 
 /** Máscara de digitação DD/MM/AAAA. */
@@ -77,10 +96,12 @@ export function datasNascimentoIguais(
   a: string | null | undefined,
   b: string | null | undefined
 ): boolean {
-  const na = String(a ?? "").slice(0, 10);
-  const nb = String(b ?? "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(na) || !/^\d{4}-\d{2}-\d{2}$/.test(nb)) {
-    return false;
-  }
+  const na =
+    parseDataNascimentoBr(a) ??
+    parseDataNascimentoBr(String(a ?? "").slice(0, 10));
+  const nb =
+    parseDataNascimentoBr(b) ??
+    parseDataNascimentoBr(String(b ?? "").slice(0, 10));
+  if (!na || !nb) return false;
   return na === nb;
 }
