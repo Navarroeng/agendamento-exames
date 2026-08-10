@@ -58,7 +58,10 @@ export function RiscosPsicossociaisPainel({
 }: RiscosPsicossociaisPainelProps) {
   const { orcamento, numeroContrato } = processo.implantacao;
   const campanha = processo.campanha;
-  const cnpj = orcamento.cliente_cnpj ?? campanha?.cnpj ?? "";
+  const cnpjRaw = orcamento.cliente_cnpj ?? campanha?.cnpj ?? "";
+  const cnpjDigits = cnpjRaw.replace(/\D/g, "");
+  const cnpjDisplay =
+    cnpjDigits.length === 14 ? formatCNPJ(cnpjRaw) : cnpjRaw.trim() || "—";
 
   const statusLabel = useMemo(() => {
     if (processo.status === "concluido") return "Concluído";
@@ -73,29 +76,30 @@ export function RiscosPsicossociaisPainel({
   return (
     <div className="space-y-4">
       <header className="rounded-2xl border border-[#dbeafe] bg-gradient-to-br from-[#f8fbff] to-white px-4 py-3.5 shadow-sm sm:px-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="truncate text-base font-extrabold text-navy sm:text-lg">
+        <h2 className="text-base font-extrabold leading-snug text-navy sm:text-lg">
+          <span className="break-words">
             {formatClienteNomeDisplay(orcamento.cliente_nome)}
-          </h2>
-          <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">
-            {statusLabel}
           </span>
-        </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#64748b] sm:text-xs">
-          CNPJ{" "}
-          <span className="tabular-nums font-semibold text-navy">
-            {cnpj.replace(/\D/g, "").length === 14 ? formatCNPJ(cnpj) : cnpj || "—"}
+          <span className="font-semibold text-[#64748b]"> · </span>
+          <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-[#475569] sm:text-base">
+            CNPJ {cnpjDisplay}
           </span>
+        </h2>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-[#64748b] sm:text-xs">
           {numeroContrato ? (
             <>
-              {" · "}Contrato{" "}
+              Contrato{" "}
               <span className="font-semibold text-navy">{numeroContrato}</span>
+              {" · "}
             </>
           ) : null}
+          <span className="font-semibold text-navy">
+            {processo.etapasConcluidas} de {processo.totalEtapas} etapas
+          </span>
         </p>
       </header>
 
-      <section className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5 shadow-sm sm:px-5">
+      <section className="w-full rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5 shadow-sm sm:px-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-2">
             <div className="h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
@@ -106,15 +110,14 @@ export function RiscosPsicossociaisPainel({
                 }}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <span className="text-lg font-extrabold tabular-nums text-navy">
+            <p className="text-xs font-semibold text-[#64748b]">
+              <span className="text-base font-extrabold tabular-nums text-navy">
                 {progressoPct}%
               </span>
-              <span className="font-semibold text-[#64748b]">
-                {processo.etapasConcluidas} de {processo.totalEtapas} etapas
-                concluídas
-              </span>
-            </div>
+              {" · "}
+              {processo.etapasConcluidas} de {processo.totalEtapas} etapas
+              concluídas
+            </p>
           </div>
           <p className="text-xs font-semibold text-[#64748b]">
             Status:{" "}

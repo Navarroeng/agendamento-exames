@@ -196,8 +196,20 @@ export function RiscosPainelCards({
 
   return (
     <div className="space-y-4">
-      {/* Linha 1 — Pesquisa | Participantes */}
+      {/* Linha 1 — Pré-requisitos | Pesquisa */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <PanelCard title="Pré-requisitos">
+          <RiscosPainelPreRequisitos
+            embedded
+            processo={processo}
+            savingLista={savingLista}
+            onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
+            onSalvarRecebimentoLista={onSalvarRecebimentoLista}
+            onRemoverAnexoLista={onRemoverAnexoLista}
+            onVisualizarAnexoLista={onVisualizarAnexoLista}
+          />
+        </PanelCard>
+
         <PanelCard
           title="Pesquisa"
           actions={
@@ -346,48 +358,38 @@ export function RiscosPainelCards({
                 </div>
               </dl>
               <div className="grid grid-cols-3 gap-2">
-                <StatChip label="Cadastrados" value={resumo.cadastrados} />
+                <StatChip
+                  label="Participantes cadastrados"
+                  value={resumo.cadastrados}
+                />
                 <StatChip label="Responderam" value={resumo.respondidos} />
                 <StatChip label="Pendentes" value={resumo.pendentes} />
               </div>
             </div>
           ) : null}
         </PanelCard>
-
-        <PanelCard title="Participantes">
-          {campanha ? (
-            <div className="min-h-0 max-h-[320px] flex-1 overflow-hidden lg:max-h-[360px]">
-              <RiscosCampanhaParticipantesSection
-                campanha={campanha}
-                participantes={participantes}
-                saving={savingParticipante}
-                onCriar={onCriarParticipante}
-                onEditar={onEditarParticipante}
-                onRemover={onRemoverParticipante}
-              />
-            </div>
-          ) : (
-            <PlaceholderNote>
-              Crie a pesquisa para gerenciar participantes.
-            </PlaceholderNote>
-          )}
-        </PanelCard>
       </div>
 
-      {/* Linha 2 — Pré-requisitos | Convites */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <PanelCard title="Pré-requisitos">
-          <RiscosPainelPreRequisitos
-            embedded
-            processo={processo}
-            savingLista={savingLista}
-            onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
-            onSalvarRecebimentoLista={onSalvarRecebimentoLista}
-            onRemoverAnexoLista={onRemoverAnexoLista}
-            onVisualizarAnexoLista={onVisualizarAnexoLista}
+      {/* Linha 2 — Participantes (largura total) */}
+      <PanelCard title="Participantes">
+        {campanha ? (
+          <RiscosCampanhaParticipantesSection
+            campanha={campanha}
+            participantes={participantes}
+            saving={savingParticipante}
+            onCriar={onCriarParticipante}
+            onEditar={onEditarParticipante}
+            onRemover={onRemoverParticipante}
           />
-        </PanelCard>
+        ) : (
+          <PlaceholderNote>
+            Crie a pesquisa para gerenciar participantes.
+          </PlaceholderNote>
+        )}
+      </PanelCard>
 
+      {/* Linha 3 — Convites | Questionário */}
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <PanelCard title="Convites">
           {campanha ? (
             <div className="flex h-full flex-col gap-3">
@@ -452,10 +454,7 @@ export function RiscosPainelCards({
             </PlaceholderNote>
           )}
         </PanelCard>
-      </div>
 
-      {/* Linha 3 — Questionário | Resultados */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <PanelCard title="Questionário">
           <div className="flex h-full flex-col gap-3">
             <div className="grid grid-cols-3 gap-2 text-xs">
@@ -488,20 +487,26 @@ export function RiscosPainelCards({
             </div>
           </div>
         </PanelCard>
-
-        <PanelCard title="Resultados">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <StatChip label="Participação" value={`${participacaoPct}%`} />
-            <StatChip label="Responderam" value={resumo.respondidos} />
-            <StatChip label="Pendentes" value={resumo.pendentes} />
-            <StatChip label="Risco geral" value="—" />
-            <StatChip label="Status" value={statusResultados} />
-          </div>
-        </PanelCard>
       </div>
 
-      {/* Linha 4 — Relatório | Histórico */}
+      {/* Linha 4 — Resultados | Relatório */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <PanelCard title="Resultados">
+          {resumo.respondidos === 0 ? (
+            <PlaceholderNote>
+              Ainda não existem respostas para esta pesquisa.
+            </PlaceholderNote>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <StatChip label="Participação" value={`${participacaoPct}%`} />
+              <StatChip label="Responderam" value={resumo.respondidos} />
+              <StatChip label="Pendentes" value={resumo.pendentes} />
+              <StatChip label="Risco geral" value="—" />
+              <StatChip label="Status" value={statusResultados} />
+            </div>
+          )}
+        </PanelCard>
+
         <PanelCard title="Relatório">
           {!relatorioExiste ? (
             <PlaceholderNote>
@@ -524,7 +529,9 @@ export function RiscosPainelCards({
                 type="button"
                 className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
                 onClick={() =>
-                  toast.message("Exportação em PDF será disponibilizada em breve.")
+                  toast.message(
+                    "Exportação em PDF será disponibilizada em breve."
+                  )
                 }
               >
                 Exportar PDF
@@ -532,41 +539,42 @@ export function RiscosPainelCards({
             </div>
           )}
         </PanelCard>
+      </div>
 
-        <PanelCard title="Histórico">
-          {!historicoComEventos ? (
-            <PlaceholderNote>Nenhum evento registrado.</PlaceholderNote>
-          ) : (
-            <ol className="relative ml-1 max-h-[220px] space-y-0 overflow-y-auto border-l-2 border-[#e2e8f0] pl-5">
-              {historico.map((item) => (
-                <li key={item.id} className="relative pb-3 last:pb-0">
-                  <span
-                    className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white ${
-                      item.done ? "bg-brand-blue" : "bg-[#cbd5e1]"
-                    }`}
-                  />
+      {/* Linha 5 — Histórico (largura total) */}
+      <PanelCard title="Histórico">
+        {!historicoComEventos ? (
+          <PlaceholderNote>Nenhum evento registrado.</PlaceholderNote>
+        ) : (
+          <ol className="relative ml-1 space-y-0 border-l-2 border-[#e2e8f0] pl-5">
+            {historico.map((item) => (
+              <li key={item.id} className="relative pb-3 last:pb-0">
+                <span
+                  className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white ${
+                    item.done ? "bg-brand-blue" : "bg-[#cbd5e1]"
+                  }`}
+                />
+                <p
+                  className={`text-sm font-semibold ${
+                    item.done ? "text-navy" : "text-[#94a3b8]"
+                  }`}
+                >
+                  {item.label}
+                </p>
+                {item.detail ? (
                   <p
-                    className={`text-sm font-semibold ${
-                      item.done ? "text-navy" : "text-[#94a3b8]"
+                    className={`text-[11px] ${
+                      item.done ? "text-[#64748b]" : "text-[#cbd5e1]"
                     }`}
                   >
-                    {item.label}
+                    {item.detail}
                   </p>
-                  {item.detail ? (
-                    <p
-                      className={`text-[11px] ${
-                        item.done ? "text-[#64748b]" : "text-[#cbd5e1]"
-                      }`}
-                    >
-                      {item.detail}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          )}
-        </PanelCard>
-      </div>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </PanelCard>
 
       <Modal
         open={confirmAbrirOpen}

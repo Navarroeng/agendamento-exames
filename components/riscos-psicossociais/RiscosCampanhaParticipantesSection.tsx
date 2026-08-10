@@ -115,16 +115,22 @@ export function RiscosCampanhaParticipantesSection({
           incluir.
         </p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[#e8edf5] bg-white">
-          <table className="w-full min-w-[640px] text-left text-xs">
+        <div className="w-full overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
+          <table className="w-full min-w-0 table-fixed text-left text-xs lg:min-w-full">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
-                <th className="px-3 py-2.5">Nome</th>
-                <th className="px-3 py-2.5">CPF</th>
-                <th className="px-3 py-2.5">Cargo</th>
-                <th className="px-3 py-2.5">Setor</th>
-                <th className="px-3 py-2.5">Status</th>
-                <th className="px-3 py-2.5">Cadastro</th>
+                <th className="w-[28%] px-3 py-2.5">Nome</th>
+                <th className="w-[12%] px-3 py-2.5">CPF</th>
+                <th className="hidden w-[16%] px-3 py-2.5 sm:table-cell">
+                  Cargo
+                </th>
+                <th className="hidden w-[14%] px-3 py-2.5 md:table-cell">
+                  Setor
+                </th>
+                <th className="w-[14%] px-3 py-2.5">Status</th>
+                <th className="hidden w-[12%] px-3 py-2.5 lg:table-cell">
+                  Cadastro
+                </th>
                 <th className="w-[72px] px-3 py-2.5 text-center">Ações</th>
               </tr>
             </thead>
@@ -135,13 +141,23 @@ export function RiscosCampanhaParticipantesSection({
                   className="border-b border-[#f1f5f9] last:border-0"
                 >
                   <td className="px-3 py-2.5 font-medium text-navy">
-                    {p.nome_completo}
+                    <span className="line-clamp-2 break-words">
+                      {p.nome_completo}
+                    </span>
                   </td>
-                  <td className="px-3 py-2.5 tabular-nums">
+                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
                     {maskCpfParticipante(p.cpf)}
                   </td>
-                  <td className="px-3 py-2.5">{p.cargo?.trim() || "—"}</td>
-                  <td className="px-3 py-2.5">{p.setor?.trim() || "—"}</td>
+                  <td className="hidden px-3 py-2.5 sm:table-cell">
+                    <span className="line-clamp-2 break-words">
+                      {p.cargo?.trim() || "—"}
+                    </span>
+                  </td>
+                  <td className="hidden px-3 py-2.5 md:table-cell">
+                    <span className="line-clamp-2 break-words">
+                      {p.setor?.trim() || "—"}
+                    </span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
@@ -153,7 +169,7 @@ export function RiscosCampanhaParticipantesSection({
                       {RISCOS_PARTICIPANTE_STATUS_LABELS[p.status]}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 tabular-nums text-[#64748b]">
+                  <td className="hidden px-3 py-2.5 tabular-nums text-[#64748b] lg:table-cell">
                     {p.created_at
                       ? formatDateBR(p.created_at.slice(0, 10))
                       : "—"}
