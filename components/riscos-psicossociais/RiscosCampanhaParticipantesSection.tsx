@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { formatDateBR } from "@/lib/format";
 import {
   RISCOS_PARTICIPANTE_STATUS_LABELS,
-  buildParticipantesResumo,
   maskCpfParticipante,
   type RiscosCampanhaParticipanteRecord,
   type RiscosParticipanteInput,
@@ -26,7 +25,7 @@ interface RiscosCampanhaParticipantesSectionProps {
 }
 
 export function RiscosCampanhaParticipantesSection({
-  campanha,
+  campanha: _campanha,
   participantes,
   saving = false,
   onCriar,
@@ -36,14 +35,6 @@ export function RiscosCampanhaParticipantesSection({
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-
-  const resumo = useMemo(
-    () =>
-      buildParticipantesResumo(campanha.quantidade_prevista, participantes),
-    [campanha.quantidade_prevista, participantes]
-  );
-
-  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
 
   const editingInitial = useMemo(() => {
     if (!editingId) return null;
@@ -95,13 +86,10 @@ export function RiscosCampanhaParticipantesSection({
   }
 
   return (
-    <div className="space-y-4 border-t border-[#e8edf5] pt-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-            Participantes da Pesquisa
-          </p>
-          <p className="mt-0.5 text-sm font-extrabold text-navy">
+          <p className="text-sm font-extrabold text-navy">
             Colaboradores autorizados a responder
           </p>
         </div>
@@ -126,17 +114,6 @@ export function RiscosCampanhaParticipantesSection({
             + Cadastrar participante
           </button>
         </div>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-4">
-        <ResumoCard label="Previstos" value={resumo.previstos} />
-        <ResumoCard label="Cadastrados" value={resumo.cadastrados} />
-        <ResumoCard
-          label="Faltam cadastrar"
-          value={faltamCadastrar}
-          emphasize={faltamCadastrar > 0}
-        />
-        <ResumoCard label="Responderam" value={resumo.respondidos} />
       </div>
 
       {participantes.length === 0 ? (
@@ -220,33 +197,6 @@ export function RiscosCampanhaParticipantesSection({
         }}
         onSave={handleSalvar}
       />
-    </div>
-  );
-}
-
-function ResumoCard({
-  label,
-  value,
-  emphasize = false,
-}: {
-  label: string;
-  value: number;
-  emphasize?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border px-3 py-2.5 ${
-        emphasize
-          ? "border-[#fde68a] bg-[#fffbeb]"
-          : "border-[#e8edf5] bg-white"
-      }`}
-    >
-      <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-extrabold tabular-nums text-navy">
-        {value}
-      </p>
     </div>
   );
 }

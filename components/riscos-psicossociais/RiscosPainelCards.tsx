@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
+import { RiscosPainelPreRequisitos } from "@/components/riscos-psicossociais/RiscosPainelPreRequisitos";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   RISCOS_CAMPANHA_STATUS_LABELS,
   formatPeriodoCampanha,
   pathAvaliacaoCampanha,
 } from "@/lib/riscos-campanha";
-import {
-  COPSOQ_DIMENSOES,
-  COPSOQ_INSTRUMENTO,
-} from "@/lib/copsoq";
+import { COPSOQ_DIMENSOES, COPSOQ_INSTRUMENTO } from "@/lib/copsoq";
 import {
   buildParticipantesResumo,
   type RiscosCampanhaParticipanteRecord,
@@ -25,8 +24,16 @@ import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
   participantes: RiscosCampanhaParticipanteRecord[];
+  savingLista?: boolean;
   savingCampanha?: boolean;
   savingParticipante?: boolean;
+  onSalvarSolicitacaoLista: (input: {
+    dataSolicitacaoIso: string;
+    email: string;
+  }) => Promise<void>;
+  onSalvarRecebimentoLista: (file: File) => Promise<void>;
+  onRemoverAnexoLista: () => Promise<void>;
+  onVisualizarAnexoLista: () => Promise<void>;
   onCriarCampanha: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
@@ -47,25 +54,30 @@ function PanelCard({
   eyebrow,
   children,
   className = "",
+  actions,
 }: {
   title: string;
   eyebrow?: string;
   children: React.ReactNode;
   className?: string;
+  actions?: React.ReactNode;
 }) {
   return (
     <section
-      className={`flex flex-col rounded-2xl border border-[#e8edf5] bg-white p-4 shadow-sm sm:p-5 ${className}`}
+      className={`rounded-2xl border border-[#e8edf5] bg-white p-4 shadow-sm sm:p-5 ${className}`}
     >
-      <div className="mb-3">
-        {eyebrow ? (
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-            {eyebrow}
-          </p>
-        ) : null}
-        <h3 className="text-sm font-extrabold text-navy">{title}</h3>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          {eyebrow ? (
+            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h3 className="text-sm font-extrabold text-navy">{title}</h3>
+        </div>
+        {actions}
       </div>
-      <div className="flex flex-1 flex-col">{children}</div>
+      {children}
     </section>
   );
 }
@@ -78,23 +90,15 @@ function PlaceholderNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Metric({
+function StatChip({
   label,
   value,
-  emphasize = false,
 }: {
   label: string;
   value: number | string;
-  emphasize?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-xl border px-2.5 py-2 ${
-        emphasize
-          ? "border-[#fde68a] bg-[#fffbeb]"
-          : "border-[#e8edf5] bg-[#f8fafc]"
-      }`}
-    >
+    <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
       <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
         {label}
       </p>
@@ -108,35 +112,31 @@ function Metric({
 export function RiscosPainelCards({
   processo,
   participantes,
+  savingLista = false,
   savingCampanha = false,
   savingParticipante = false,
+  onSalvarSolicitacaoLista,
+  onSalvarRecebimentoLista,
+  onRemoverAnexoLista,
+  onVisualizarAnexoLista,
   onCriarCampanha,
   onAbrirCampanha,
-  onGarantirCodigoAcesso,
+  onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
 }: RiscosPainelCardsProps) {
   const campanha = processo.campanha;
+  const empresaNome = formatClienteNomeDisplay(
+    campanha?.empresa_nome || processo.implantacao.orcamento.cliente_nome
+  );
+
   const [criarAberto, setCriarAberto] = useState(false);
-  const [verParticipantes, setVerParticipantes] = useState(false);
   const [confirmAbrirOpen, setConfirmAbrirOpen] = useState(false);
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const participantesPanelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!verParticipantes) return;
-    const timer = window.setTimeout(() => {
-      participantesPanelRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }, 50);
-    return () => window.clearTimeout(timer);
-  }, [verParticipantes]);
 
   const previstos = campanha?.quantidade_prevista ?? 0;
   const resumo = useMemo(
@@ -144,7 +144,9 @@ export function RiscosPainelCards({
     [previstos, participantes]
   );
 
-  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
+  const temRespostas = resumo.respondidos > 0;
+  const pesquisaEncerrada = campanha?.status === "encerrada";
+  const relatorioDisponivel = pesquisaEncerrada;
 
   const baseParticipacao =
     resumo.previstos > 0
@@ -195,240 +197,255 @@ export function RiscosPainelCards({
     }
   }
 
-  const historico = buildHistorico(processo, participantes);
-  const relatorioDisponivel = false;
-
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PanelCard title="Dados da pesquisa" eyebrow="Card 1">
-          {!campanha && !criarAberto ? (
-            <>
-              <PlaceholderNote>
-                Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
-                prevista de colaboradores.
-              </PlaceholderNote>
-              <div className="mt-auto pt-4">
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-                  disabled={savingCampanha}
-                  onClick={() => setCriarAberto(true)}
-                >
-                  Criar pesquisa
-                </button>
-              </div>
-            </>
-          ) : null}
-
-          {!campanha && criarAberto ? (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                  label={
-                    <>
-                      Data de início <RequiredMark />
-                    </>
-                  }
-                >
-                  <input
-                    type="date"
-                    className="field-input w-full"
-                    value={dataInicio}
-                    disabled={savingCampanha}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label={
-                    <>
-                      Data de encerramento <RequiredMark />
-                    </>
-                  }
-                >
-                  <input
-                    type="date"
-                    className="field-input w-full"
-                    value={dataEncerramento}
-                    disabled={savingCampanha}
-                    onChange={(e) => setDataEncerramento(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label={
-                    <>
-                      Qtd. prevista <RequiredMark />
-                    </>
-                  }
-                  className="sm:col-span-2"
-                >
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    className="field-input w-full"
-                    value={quantidade}
-                    disabled={savingCampanha}
-                    onChange={(e) => setQuantidade(e.target.value)}
-                  />
-                </Field>
-              </div>
-              {formError ? (
-                <p className="text-xs font-medium text-brand-red">{formError}</p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
-                  disabled={savingCampanha}
-                  onClick={() => {
-                    setCriarAberto(false);
-                    setFormError(null);
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-                  disabled={savingCampanha}
-                  onClick={() => void handleSalvarCampanha()}
-                >
-                  {savingCampanha ? "Salvando..." : "Salvar pesquisa"}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {campanha ? (
-            <>
-              <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Início
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {formatDateIsoToBR(campanha.data_inicio.slice(0, 10))}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Encerramento previsto
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {formatDateIsoToBR(campanha.data_encerramento.slice(0, 10))}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Qtd. prevista
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {campanha.quantidade_prevista} colaboradores
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Responsável
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {processo.implantacao.orcamento.responsavel?.trim() || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Situação
-                  </dt>
-                  <dd className="mt-0.5">
-                    <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
-                      {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Data de criação
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {campanha.created_at
-                      ? formatDateIsoToBR(campanha.created_at.slice(0, 10))
-                      : "—"}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Última atualização
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {campanha.updated_at
-                      ? formatDateIsoToBR(campanha.updated_at.slice(0, 10))
-                      : "—"}
-                  </dd>
-                </div>
-              </dl>
-              <div className="mt-auto pt-4">
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-                  onClick={() =>
-                    toast.message(
-                      "Edição da pesquisa será disponibilizada em breve."
-                    )
-                  }
-                >
-                  Editar pesquisa
-                </button>
-              </div>
-            </>
-          ) : null}
-        </PanelCard>
-
-        <PanelCard title="Participantes" eyebrow="Card 2">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Metric label="Previstos" value={resumo.previstos} />
-            <Metric label="Cadastrados" value={resumo.cadastrados} />
-            <Metric
-              label="Faltam cadastrar"
-              value={faltamCadastrar}
-              emphasize={faltamCadastrar > 0}
-            />
-            <Metric label="Responderam" value={resumo.respondidos} />
-            <Metric label="Pendentes" value={resumo.pendentes} />
-          </div>
-          {!campanha ? (
-            <p className="mt-2 text-[11px] text-[#94a3b8]">
-              Crie a pesquisa para gerenciar participantes.
-            </p>
-          ) : null}
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+    <div className="space-y-3">
+      {/* Card 1 — Pesquisa */}
+      <PanelCard
+        title="Pesquisa"
+        eyebrow="Card 1"
+        actions={
+          campanha ? (
             <button
               type="button"
-              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              disabled={!campanha}
-              onClick={() => setVerParticipantes((v) => !v)}
-            >
-              {verParticipantes ? "Ocultar participantes" : "Ver participantes"}
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
               onClick={() =>
                 toast.message(
-                  "Importação por Excel será disponibilizada em etapa futura."
+                  "Edição da pesquisa será disponibilizada em breve."
                 )
               }
             >
-              Importar lista
+              Editar pesquisa
+            </button>
+          ) : null
+        }
+      >
+        {!campanha && !criarAberto ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <PlaceholderNote>
+              Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
+              prevista de colaboradores.
+            </PlaceholderNote>
+            <button
+              type="button"
+              className="shrink-0 rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setCriarAberto(true)}
+            >
+              Criar pesquisa
             </button>
           </div>
-        </PanelCard>
-      </div>
+        ) : null}
 
-      {campanha && verParticipantes ? (
-        <div
-          ref={participantesPanelRef}
-          className="rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4"
-        >
+        {!campanha && criarAberto ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field
+                label={
+                  <>
+                    Data de início <RequiredMark />
+                  </>
+                }
+              >
+                <input
+                  type="date"
+                  className="field-input w-full"
+                  value={dataInicio}
+                  disabled={savingCampanha}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={
+                  <>
+                    Data de encerramento <RequiredMark />
+                  </>
+                }
+              >
+                <input
+                  type="date"
+                  className="field-input w-full"
+                  value={dataEncerramento}
+                  disabled={savingCampanha}
+                  onChange={(e) => setDataEncerramento(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={
+                  <>
+                    Qtd. prevista <RequiredMark />
+                  </>
+                }
+              >
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="field-input w-full"
+                  value={quantidade}
+                  disabled={savingCampanha}
+                  onChange={(e) => setQuantidade(e.target.value)}
+                />
+              </Field>
+            </div>
+            {formError ? (
+              <p className="text-xs font-medium text-brand-red">{formError}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
+                disabled={savingCampanha}
+                onClick={() => {
+                  setCriarAberto(false);
+                  setFormError(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                disabled={savingCampanha}
+                onClick={() => void handleSalvarCampanha()}
+              >
+                {savingCampanha ? "Salvando..." : "Salvar pesquisa"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {campanha ? (
+          <div className="space-y-3">
+            <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Empresa
+                </dt>
+                <dd className="mt-0.5 truncate font-semibold text-navy">
+                  {empresaNome}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Status
+                </dt>
+                <dd className="mt-0.5">
+                  <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
+                    {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Período
+                </dt>
+                <dd className="mt-0.5 font-semibold text-navy">
+                  {formatPeriodoCampanha(
+                    campanha.data_inicio,
+                    campanha.data_encerramento
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Responsável
+                </dt>
+                <dd className="mt-0.5 font-semibold text-navy">
+                  {processo.implantacao.orcamento.responsavel?.trim() || "—"}
+                </dd>
+              </div>
+            </dl>
+            <div className="grid grid-cols-3 gap-2">
+              <StatChip
+                label="Participantes cadastrados"
+                value={resumo.cadastrados}
+              />
+              <StatChip label="Responderam" value={resumo.respondidos} />
+              <StatChip label="Pendentes" value={resumo.pendentes} />
+            </div>
+          </div>
+        ) : null}
+      </PanelCard>
+
+      {/* Card 2 — Pré-requisitos */}
+      <RiscosPainelPreRequisitos
+        processo={processo}
+        savingLista={savingLista}
+        onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
+        onSalvarRecebimentoLista={onSalvarRecebimentoLista}
+        onRemoverAnexoLista={onRemoverAnexoLista}
+        onVisualizarAnexoLista={onVisualizarAnexoLista}
+      />
+
+      {/* Card 3 — Convites */}
+      <PanelCard title="Convites" eyebrow="Card 3">
+        {campanha ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Link da pesquisa
+                </p>
+                <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
+                  {pathAvaliacaoCampanha(campanha.codigo_publico)}
+                </p>
+              </div>
+              <p className="text-[11px] text-[#64748b]">
+                Código:{" "}
+                <span className="font-mono font-semibold text-navy">
+                  {campanha.codigo_publico}
+                </span>
+                {" · "}O participante acessa pelo link com CPF e data de
+                nascimento.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
+                onClick={() => void handleCopiarLink()}
+              >
+                Copiar link
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                disabled
+                title="QR Code será disponibilizado em etapa futura"
+              >
+                Gerar QR Code
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                disabled={
+                  savingCampanha || campanha.status !== "em_preparacao"
+                }
+                onClick={() => setConfirmAbrirOpen(true)}
+                title="Libera o portal para respostas (status Aberta)"
+              >
+                Abrir pesquisa
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                disabled
+                title="Encerramento manual será disponibilizado em breve"
+              >
+                Encerrar pesquisa
+              </button>
+            </div>
+          </div>
+        ) : (
+          <PlaceholderNote>
+            Crie a pesquisa para gerar o link e o QR Code da campanha.
+          </PlaceholderNote>
+        )}
+      </PanelCard>
+
+      {/* Card 4 — Participantes */}
+      <PanelCard title="Participantes" eyebrow="Card 4">
+        {campanha ? (
           <RiscosCampanhaParticipantesSection
             campanha={campanha}
             participantes={participantes}
@@ -437,16 +454,21 @@ export function RiscosPainelCards({
             onEditar={onEditarParticipante}
             onRemover={onRemoverParticipante}
           />
-        </div>
-      ) : null}
+        ) : (
+          <PlaceholderNote>
+            Crie a pesquisa para gerenciar participantes.
+          </PlaceholderNote>
+        )}
+      </PanelCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <PanelCard title="Questionário" eyebrow="Card 3">
-          <div className="space-y-2">
+      {/* Card 5 — Questionário */}
+      <PanelCard title="Questionário" eyebrow="Card 5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-2">
             <p className="text-sm font-extrabold text-navy">
               COPSOQ II-Br · Pesquisa Psicossocial
             </p>
-            <dl className="grid gap-2 text-xs sm:grid-cols-3">
+            <dl className="grid grid-cols-3 gap-2 text-xs sm:max-w-md">
               <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
                 <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Perguntas
@@ -470,12 +492,8 @@ export function RiscosPainelCards({
                 <dd className="mt-0.5 font-extrabold text-navy">01 → 40</dd>
               </div>
             </dl>
-            <PlaceholderNote>
-              Instrumento com 40 perguntas oficiais na sequência fixa. Dimensões
-              organizam transições e cálculos futuros.
-            </PlaceholderNote>
           </div>
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <button
               type="button"
               className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
@@ -495,50 +513,44 @@ export function RiscosPainelCards({
               Editar questionário
             </button>
           </div>
-        </PanelCard>
+        </div>
+      </PanelCard>
 
-        <PanelCard title="Resultados da Pesquisa" eyebrow="Card 4">
-          <div className="flex items-center gap-4">
-            <div
-              className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
-              style={{
-                background: `conic-gradient(#2563eb ${participacaoPct}%, #e2e8f0 0)`,
-              }}
-              aria-hidden
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-center">
-                <span className="text-xs font-extrabold tabular-nums text-navy">
-                  {participacaoPct}%
-                </span>
+      {/* Card 6 — Resultados */}
+      <PanelCard title="Resultados" eyebrow="Card 6">
+        {!temRespostas ? (
+          <PlaceholderNote>
+            Ainda não existem respostas para esta pesquisa.
+          </PlaceholderNote>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div
+                className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
+                style={{
+                  background: `conic-gradient(#2563eb ${participacaoPct}%, #e2e8f0 0)`,
+                }}
+                aria-hidden
+              >
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-white text-center">
+                  <span className="text-xs font-extrabold tabular-nums text-navy">
+                    {participacaoPct}%
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-0.5 text-sm">
+                <p className="font-semibold text-navy">
+                  {resumo.respondidos} responderam
+                </p>
+                <p className="text-[#64748b]">{resumo.pendentes} pendentes</p>
               </div>
             </div>
-            <div className="space-y-0.5 text-sm">
-              <p className="font-semibold text-navy">
-                {resumo.respondidos} responderam
-              </p>
-              <p className="text-[#64748b]">{resumo.pendentes} pendentes</p>
-              <p className="text-[#64748b]">
-                {faltamCadastrar} ainda não cadastrados
-              </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatChip label="Participação" value={`${participacaoPct}%`} />
+              <StatChip label="Respondidos" value={resumo.respondidos} />
+              <StatChip label="Dimensões" value="—" />
+              <StatChip label="Risco geral" value="—" />
             </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Metric label="Participação" value={`${participacaoPct}%`} />
-            <Metric label="Respondidos" value={resumo.respondidos} />
-            <Metric label="Dimensões" value="—" />
-            <Metric label="Risco geral" value="—" />
-            <Metric
-              label="Status"
-              value={
-                campanha
-                  ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
-                  : "—"
-              }
-            />
-          </div>
-
-          <div className="mt-auto pt-4">
             <button
               type="button"
               className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
@@ -549,284 +561,99 @@ export function RiscosPainelCards({
               Visualizar resultados
             </button>
           </div>
-        </PanelCard>
+        )}
+      </PanelCard>
 
-        <PanelCard title="Relatório Psicossocial" eyebrow="Card 5">
+      {/* Card 7 — Relatório */}
+      <PanelCard title="Relatório" eyebrow="Card 7">
+        {!pesquisaEncerrada ? (
           <PlaceholderNote>
-            Nenhum relatório disponível.
-            <br />
-            Será liberado após o encerramento da pesquisa.
+            Relatório disponível após o encerramento da pesquisa.
           </PlaceholderNote>
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-[#64748b]">
+              Pesquisa encerrada
+              {campanha?.data_encerramento
+                ? ` em ${formatDateIsoToBR(
+                    campanha.data_encerramento.slice(0, 10)
+                  )}`
+                : ""}
+              . Gere o relatório psicossocial.
+            </p>
             <button
               type="button"
               className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
               disabled={!relatorioDisponivel}
-              title="Disponível após encerramento e implementação da geração"
+              onClick={() =>
+                toast.message(
+                  "Geração do relatório será disponibilizada em breve."
+                )
+              }
             >
               Gerar relatório
             </button>
           </div>
-        </PanelCard>
+        )}
+      </PanelCard>
 
-        <PanelCard title="Convites" eyebrow="Card 6">
-          {campanha ? (
-            <div className="space-y-3 text-sm">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Link da pesquisa
-                </p>
-                <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
-                  {pathAvaliacaoCampanha(campanha.codigo_publico)}
-                </p>
-                <p className="mt-0.5 text-[11px] text-[#94a3b8]">
-                  Código da campanha (URL/QR):{" "}
-                  <span className="font-mono font-semibold text-navy">
-                    {campanha.codigo_publico}
-                  </span>
-                </p>
-                <p className="mt-2 text-[11px] text-[#64748b]">
-                  O participante acessa pelo link informando CPF e data de
-                  nascimento. Não é necessário código de acesso adicional.
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Status
-                </p>
-                <p className="mt-0.5 text-xs font-semibold text-navy">
-                  {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <PlaceholderNote>
-              Crie a pesquisa para gerar o link e o QR Code da campanha.
-            </PlaceholderNote>
-          )}
-          <div className="mt-auto flex flex-wrap gap-2 pt-4">
+      <Modal
+        open={confirmAbrirOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmAbrirOpen(false);
+        }}
+        title="Abrir pesquisa"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmAbrirOpen(false)}
+            >
+              Cancelar
+            </button>
             <button
               type="button"
               className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              disabled={!campanha}
-              onClick={() => void handleCopiarLink()}
+              disabled={savingCampanha || !campanha}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await onAbrirCampanha();
+                    setConfirmAbrirOpen(false);
+                  } catch {
+                    // mantém o modal aberto; o hook já exibe o toast de erro
+                  }
+                })();
+              }}
             >
-              Copiar link
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled={
-                !campanha ||
-                savingCampanha ||
-                campanha.status !== "em_preparacao"
-              }
-              onClick={() => setConfirmAbrirOpen(true)}
-              title="Libera o portal para respostas (status Aberta)"
-            >
-              Abrir pesquisa
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled
-              title="Encerramento manual será disponibilizado em breve"
-            >
-              Encerrar pesquisa
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-              disabled
-              title="QR Code será disponibilizado em etapa futura"
-            >
-              Gerar QR Code
+              {savingCampanha ? "Abrindo…" : "Abrir pesquisa"}
             </button>
           </div>
-        </PanelCard>
-
-        <Modal
-          open={confirmAbrirOpen}
-          onClose={() => {
-            if (!savingCampanha) setConfirmAbrirOpen(false);
-          }}
-          title="Abrir pesquisa"
-          subtitle={
-            campanha
-              ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
-              : undefined
-          }
-          footer={
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                disabled={savingCampanha}
-                onClick={() => setConfirmAbrirOpen(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-                disabled={savingCampanha || !campanha}
-                onClick={() => {
-                  void (async () => {
-                    try {
-                      await onAbrirCampanha();
-                      setConfirmAbrirOpen(false);
-                    } catch {
-                      // mantém o modal aberto; o hook já exibe o toast de erro
-                    }
-                  })();
-                }}
-              >
-                {savingCampanha ? "Abrindo…" : "Abrir pesquisa"}
-              </button>
-            </div>
-          }
-        >
-          <p className="text-sm leading-relaxed text-[#475569]">
-            Após abrir a pesquisa, participantes autorizados poderão acessar o
-            Portal do Colaborador durante o período configurado.
+        }
+      >
+        <p className="text-sm leading-relaxed text-[#475569]">
+          Após abrir a pesquisa, participantes autorizados poderão acessar o
+          Portal do Colaborador durante o período configurado.
+        </p>
+        {campanha ? (
+          <p className="mt-3 text-xs text-[#64748b]">
+            Período:{" "}
+            <span className="font-semibold text-navy">
+              {formatPeriodoCampanha(
+                campanha.data_inicio,
+                campanha.data_encerramento
+              )}
+            </span>
           </p>
-          {campanha ? (
-            <p className="mt-3 text-xs text-[#64748b]">
-              Período:{" "}
-              <span className="font-semibold text-navy">
-                {formatPeriodoCampanha(
-                  campanha.data_inicio,
-                  campanha.data_encerramento
-                )}
-              </span>
-            </p>
-          ) : null}
-        </Modal>
-
-        <PanelCard
-          title="Histórico"
-          eyebrow="Card 7"
-          className="lg:col-span-2"
-        >
-          <ol className="relative ml-1 space-y-0 border-l-2 border-[#e2e8f0] pl-5">
-            {historico.map((item) => (
-              <li key={item.id} className="relative pb-4 last:pb-0">
-                <span
-                  className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white ${
-                    item.done ? "bg-brand-blue" : "bg-[#cbd5e1]"
-                  }`}
-                />
-                <p
-                  className={`text-sm font-semibold ${
-                    item.done ? "text-navy" : "text-[#94a3b8]"
-                  }`}
-                >
-                  {item.label}
-                </p>
-                {item.detail ? (
-                  <p
-                    className={`text-[11px] ${
-                      item.done ? "text-[#64748b]" : "text-[#cbd5e1]"
-                    }`}
-                  >
-                    {item.detail}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </PanelCard>
-      </div>
+        ) : null}
+      </Modal>
     </div>
   );
-}
-
-function buildHistorico(
-  processo: RiscosPsicossociaisProcesso,
-  participantes: RiscosCampanhaParticipanteRecord[]
-) {
-  const campanha = processo.campanha;
-  const lista = processo.listaPresenca;
-  const items: Array<{
-    id: string;
-    label: string;
-    detail?: string;
-    done: boolean;
-  }> = [
-    {
-      id: "laudos",
-      label: "Laudos SST",
-      detail: processo.laudosSstConcluido
-        ? "Dependência concluída"
-        : "Aguardando finalização",
-      done: processo.laudosSstConcluido,
-    },
-    {
-      id: "lista",
-      label: "Lista de presença concluída",
-      detail: processo.listaPresencaConcluida
-        ? [
-            lista.lista_solicitada_em
-              ? `Solicitada em ${formatDateIsoToBR(
-                  lista.lista_solicitada_em.slice(0, 10)
-                )}`
-              : null,
-            lista.lista_anexo_nome ? `Anexo: ${lista.lista_anexo_nome}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ") || "Concluída"
-        : "Pendente",
-      done: processo.listaPresencaConcluida,
-    },
-    {
-      id: "pesquisa",
-      label: "Pesquisa criada",
-      detail: campanha
-        ? `${formatPeriodoCampanha(
-            campanha.data_inicio,
-            campanha.data_encerramento
-          )} · ${RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}`
-        : undefined,
-      done: Boolean(campanha),
-    },
-    {
-      id: "participantes",
-      label:
-        participantes.length > 0
-          ? "Participante cadastrado"
-          : "Participantes cadastrados",
-      detail:
-        participantes.length > 0
-          ? `${participantes.length} participante(s) cadastrado(s)`
-          : "Aguardando cadastro",
-      done: participantes.length > 0,
-    },
-    {
-      id: "qr",
-      label: "QR Code enviado",
-      detail: "Em breve",
-      done: false,
-    },
-    {
-      id: "respostas",
-      label: "Primeiras respostas",
-      detail: participantes.some((p) => p.status === "respondido")
-        ? "Respostas registradas"
-        : "Aguardando respostas",
-      done: participantes.some((p) => p.status === "respondido"),
-    },
-    {
-      id: "encerrada",
-      label: "Pesquisa encerrada",
-      done: campanha?.status === "encerrada",
-    },
-    {
-      id: "relatorio",
-      label: "Relatório gerado",
-      detail: "Em breve",
-      done: false,
-    },
-  ];
-
-  return items;
 }
