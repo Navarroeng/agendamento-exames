@@ -6,6 +6,12 @@ import { Field, RequiredMark } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { MENSAGEM_VALIDACAO_GENERICA } from "@/lib/avaliacao-constantes";
 import {
+  AVALIACAO_DEMO_CAMPANHA_NOME,
+  AVALIACAO_DEMO_EMPRESA,
+  AVALIACAO_DEMO_PARTICIPANTE_NOME,
+  isAvaliacaoDemoCodigo,
+} from "@/lib/avaliacao-demo";
+import {
   TERMO_COMPLETO_PARAGRAPHOS,
   TERMO_RESUMO_ITENS,
   TERMO_TITULO,
@@ -33,16 +39,24 @@ const { items: FLOW_ITEMS, totalPerguntas: TOTAL_PERGUNTAS } = buildCopsoqFlow()
 
 export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   const codigoDisplay = codigo.trim().toUpperCase() || "";
+  // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
+  const isDemo = isAvaliacaoDemoCodigo(codigoDisplay);
   const [step, setStep] = useState<Step>("landing");
   const [cpf, setCpf] = useState("");
   const [codigoAcesso, setCodigoAcesso] = useState("");
   const [flowIndex, setFlowIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
-  const [empresaNome, setEmpresaNome] = useState("Carregando…");
-  const [campanhaNome, setCampanhaNome] = useState(
-    "Pesquisa de Riscos Psicossociais"
+  const [empresaNome, setEmpresaNome] = useState(
+    isDemo ? AVALIACAO_DEMO_EMPRESA : "Carregando…"
   );
-  const [disponivel, setDisponivel] = useState<boolean | null>(null);
+  const [campanhaNome, setCampanhaNome] = useState(
+    isDemo
+      ? AVALIACAO_DEMO_CAMPANHA_NOME
+      : "Pesquisa de Riscos Psicossociais"
+  );
+  const [disponivel, setDisponivel] = useState<boolean | null>(
+    isDemo ? true : null
+  );
   const [infoError, setInfoError] = useState<string | null>(null);
   const [validando, setValidando] = useState(false);
   const [erroIdentificacao, setErroIdentificacao] = useState<string | null>(
@@ -83,6 +97,16 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       setDisponivel(false);
       return;
     }
+
+    // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
+    if (isAvaliacaoDemoCodigo(codigoDisplay)) {
+      setEmpresaNome(AVALIACAO_DEMO_EMPRESA);
+      setCampanhaNome(AVALIACAO_DEMO_CAMPANHA_NOME);
+      setDisponivel(true);
+      setInfoError(null);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/avaliacao/${codigoDisplay}/info`);
       const json = (await res.json()) as {
@@ -113,6 +137,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
 
   const carregarSessao = useCallback(async () => {
     if (!codigoDisplay) return;
+    // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
+    if (isAvaliacaoDemoCodigo(codigoDisplay)) return;
+
     try {
       const res = await fetch(
         `/api/avaliacao/sessao?codigoPublico=${encodeURIComponent(codigoDisplay)}`
@@ -152,6 +179,26 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
 
   async function handleValidar() {
     setErroIdentificacao(null);
+
+    // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
+    if (isDemo) {
+      if (!cpf.trim() || !codigoAcesso.trim()) {
+        setErroIdentificacao(
+          "Informe CPF e código de acesso para continuar na demonstração."
+        );
+        return;
+      }
+      setValidando(true);
+      await new Promise((r) => setTimeout(r, 250));
+      setAutenticado(true);
+      setEmpresaNome(AVALIACAO_DEMO_EMPRESA);
+      setParticipanteNome(AVALIACAO_DEMO_PARTICIPANTE_NOME);
+      setTermosAceitos(false);
+      setStep("termos");
+      setValidando(false);
+      return;
+    }
+
     const digits = normalizeCpfDigits(cpf);
     if (!isValidCPF(digits) || !codigoAcesso.trim()) {
       setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
@@ -193,14 +240,16 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   }
 
   async function handleIniciarQuestionario() {
-    try {
-      await fetch("/api/avaliacao/iniciar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigoPublico: codigoDisplay }),
-      });
-    } catch {
-      // protótipo
+    if (!isDemo) {
+      try {
+        await fetch("/api/avaliacao/iniciar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigoPublico: codigoDisplay }),
+        });
+      } catch {
+        // protótipo
+      }
     }
     setFlowIndex(0);
     setAnimKey((k) => k + 1);
@@ -228,10 +277,12 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   }
 
   async function handleEncerrar() {
-    try {
-      await fetch("/api/avaliacao/logout", { method: "POST" });
-    } catch {
-      // ignore
+    if (!isDemo) {
+      try {
+        await fetch("/api/avaliacao/logout", { method: "POST" });
+      } catch {
+        // ignore
+      }
     }
     setAutenticado(false);
     setTermosAceitos(false);
@@ -265,6 +316,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
               disponivel={podeIniciar}
               mensagem={infoError}
               totalPerguntas={TOTAL_PERGUNTAS}
+              isDemo={isDemo}
               onStart={() => setStep("identificacao")}
             />
           ) : null}
@@ -275,6 +327,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
               codigoAcesso={codigoAcesso}
               erro={erroIdentificacao}
               loading={validando}
+              isDemo={isDemo}
               onCpfChange={setCpf}
               onCodigoChange={setCodigoAcesso}
               onBack={() => setStep("landing")}
@@ -405,6 +458,7 @@ function LandingStep({
   disponivel,
   mensagem,
   totalPerguntas,
+  isDemo,
   onStart,
 }: {
   empresaNome: string;
@@ -413,6 +467,7 @@ function LandingStep({
   disponivel: boolean;
   mensagem: string | null;
   totalPerguntas: number;
+  isDemo: boolean;
   onStart: () => void;
 }) {
   return (
@@ -431,6 +486,11 @@ function LandingStep({
             {codigoDisplay}
           </span>
         </p>
+        {isDemo ? (
+          <p className="mt-2 inline-flex rounded-full bg-brand-blue-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue">
+            Modo demonstração · UI/UX
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-left text-sm text-[#475569]">
@@ -478,6 +538,7 @@ function IdentificacaoStep({
   codigoAcesso,
   erro,
   loading,
+  isDemo,
   onCpfChange,
   onCodigoChange,
   onBack,
@@ -487,6 +548,7 @@ function IdentificacaoStep({
   codigoAcesso: string;
   erro: string | null;
   loading: boolean;
+  isDemo: boolean;
   onCpfChange: (v: string) => void;
   onCodigoChange: (v: string) => void;
   onBack: () => void;
@@ -497,7 +559,9 @@ function IdentificacaoStep({
       <div className="text-center">
         <h2 className="text-lg font-extrabold text-navy">Identificação</h2>
         <p className="mt-1 text-sm text-[#64748b]">
-          Informe seu CPF e o código de acesso compartilhado da pesquisa.
+          {isDemo
+            ? "Demonstração: informe qualquer CPF e qualquer código para continuar."
+            : "Informe seu CPF e o código de acesso compartilhado da pesquisa."}
         </p>
       </div>
 

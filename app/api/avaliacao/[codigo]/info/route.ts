@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  getAvaliacaoDemoInfo,
+  isAvaliacaoDemoCodigo,
+} from "@/lib/avaliacao-demo";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -16,6 +20,11 @@ export async function GET(
       .toUpperCase();
     if (!codigo) {
       return NextResponse.json({ ok: false }, { status: 404 });
+    }
+
+    // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
+    if (isAvaliacaoDemoCodigo(codigo)) {
+      return NextResponse.json(getAvaliacaoDemoInfo());
     }
 
     const supabase = createAdminClient();
