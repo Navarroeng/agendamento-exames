@@ -12,8 +12,8 @@ import {
 } from "@/lib/riscos-campanha";
 import {
   COPSOQ_DIMENSOES,
-  COPSOQ_TOTAL_PERGUNTAS,
-} from "@/lib/copsoq-ii-br";
+  COPSOQ_INSTRUMENTO,
+} from "@/lib/copsoq";
 import {
   buildParticipantesResumo,
   type RiscosCampanhaParticipanteRecord,
@@ -450,7 +450,7 @@ export function RiscosPainelCards({
                   Perguntas
                 </dt>
                 <dd className="mt-0.5 font-extrabold text-navy">
-                  {COPSOQ_TOTAL_PERGUNTAS}
+                  {COPSOQ_INSTRUMENTO.totalPerguntasAvaliativas}
                 </dd>
               </div>
               <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">

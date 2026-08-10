@@ -18,9 +18,9 @@ import {
 } from "@/lib/avaliacao-termos-navarro";
 import {
   buildCopsoqFlow,
-  getOpcoesEscala,
+  getAlternativasDaPergunta,
   type CopsoqFlowItem,
-} from "@/lib/copsoq-ii-br";
+} from "@/lib/copsoq";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
   maskDataNascimentoInput,
@@ -39,6 +39,7 @@ interface AvaliacaoPortalProps {
   codigo: string;
 }
 
+/** Fluxo gerado exclusivamente pelo instrumento oficial parametrizado. */
 const { items: FLOW_ITEMS, totalPerguntas: TOTAL_PERGUNTAS } = buildCopsoqFlow();
 
 export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
@@ -85,7 +86,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       };
     }
     const num = Math.min(
-      itemAtual.primeiraPerguntaIndex + 1,
+      itemAtual.primeiraPerguntaOrdem,
       TOTAL_PERGUNTAS
     );
     return {
@@ -365,7 +366,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                 <TransicaoStep
                   progresso={progresso}
                   totalPerguntas={TOTAL_PERGUNTAS}
-                  texto={itemAtual.dimensao.textoTransicao}
+                  texto={itemAtual.dimensao.textoIntroducao}
                   dimensaoNome={itemAtual.dimensao.nome}
                   podeVoltar={flowIndex > 0}
                   onAnterior={handleAnteriorFlow}
@@ -377,14 +378,53 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                   progresso={progresso}
                   totalPerguntas={TOTAL_PERGUNTAS}
                   selecionada={respostas[itemAtual.pergunta.id] ?? ""}
+                  fontesSelecionadas={
+                    itemAtual.pergunta.followUp
+                      ? (respostas[itemAtual.pergunta.followUp.id] ?? "")
+                          .split("|")
+                          .filter(Boolean)
+                      : []
+                  }
                   isUltima={flowIndex >= FLOW_ITEMS.length - 1}
                   podeVoltar={flowIndex > 0}
-                  onSelect={(valor) =>
-                    setRespostas((prev) => ({
-                      ...prev,
-                      [itemAtual.pergunta.id]: valor,
-                    }))
+                  onSelect={(alternativaId) =>
+                    setRespostas((prev) => {
+                      const next = {
+                        ...prev,
+                        [itemAtual.pergunta.id]: alternativaId,
+                      };
+                      const follow = itemAtual.pergunta.followUp;
+                      if (follow) {
+                        const alts = getAlternativasDaPergunta(
+                          itemAtual.pergunta
+                        );
+                        const escolhida = alts.find(
+                          (a) => a.id === alternativaId
+                        );
+                        if (
+                          escolhida?.label ===
+                          follow.exibirQuandoRespostaDiferenteDe
+                        ) {
+                          delete next[follow.id];
+                        }
+                      }
+                      return next;
+                    })
                   }
+                  onToggleFonte={(fonteId) => {
+                    const follow = itemAtual.pergunta.followUp;
+                    if (!follow) return;
+                    setRespostas((prev) => {
+                      const atual = (prev[follow.id] ?? "")
+                        .split("|")
+                        .filter(Boolean);
+                      const has = atual.includes(fonteId);
+                      const next = has
+                        ? atual.filter((id) => id !== fonteId)
+                        : [...atual, fonteId];
+                      return { ...prev, [follow.id]: next.join("|") };
+                    });
+                  }}
                   onAnterior={handleAnteriorFlow}
                   onProxima={handleProximaFlow}
                 />
@@ -879,9 +919,11 @@ function PerguntaStep({
   progresso,
   totalPerguntas,
   selecionada,
+  fontesSelecionadas,
   isUltima,
   podeVoltar,
   onSelect,
+  onToggleFonte,
   onAnterior,
   onProxima,
 }: {
@@ -889,13 +931,27 @@ function PerguntaStep({
   progresso: { pct: number; numero: number; dimensaoNome: string };
   totalPerguntas: number;
   selecionada: string;
+  fontesSelecionadas: string[];
   isUltima: boolean;
   podeVoltar: boolean;
-  onSelect: (valor: string) => void;
+  onSelect: (alternativaId: string) => void;
+  onToggleFonte: (fonteId: string) => void;
   onAnterior: () => void;
   onProxima: () => void;
 }) {
-  const opcoes = getOpcoesEscala(item.pergunta.escalaId);
+  const alternativas = getAlternativasDaPergunta(item.pergunta);
+  const follow = item.pergunta.followUp;
+  const escolhida = alternativas.find((a) => a.id === selecionada);
+  const mostrarFontes =
+    Boolean(follow) &&
+    Boolean(escolhida) &&
+    escolhida!.label !== follow!.exibirQuandoRespostaDiferenteDe;
+  const fontesAlts = follow
+    ? getAlternativasDaPergunta({
+        ...item.pergunta,
+        tipoEscala: follow.tipoEscala,
+      })
+    : [];
 
   return (
     <div className="space-y-5">
@@ -907,29 +963,32 @@ function PerguntaStep({
       />
 
       <div>
-        <h2 className="text-base font-extrabold leading-snug text-navy sm:text-lg">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+          {item.pergunta.codigo}
+        </p>
+        <h2 className="mt-1 text-base font-extrabold leading-snug text-navy sm:text-lg">
           {item.pergunta.texto}
         </h2>
-        {item.pergunta.ajuda ? (
+        {item.pergunta.textoAjuda ? (
           <p className="mt-2 text-sm leading-relaxed text-[#64748b]">
-            {item.pergunta.ajuda}
+            {item.pergunta.textoAjuda}
           </p>
         ) : null}
       </div>
 
       <div className="space-y-2">
-        {opcoes.map((opcao) => {
-          const active = selecionada === opcao.valor;
+        {alternativas.map((opcao, idx) => {
+          const active = selecionada === opcao.id;
           return (
             <button
-              key={opcao.valor}
+              key={opcao.id}
               type="button"
               className={`flex min-h-[52px] w-full items-center rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition ${
                 active
                   ? "border-brand-blue bg-[#eef2ff] text-navy shadow-[0_0_0_1px_rgba(79,99,255,0.25)]"
                   : "border-[#e8edf5] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fafc]"
               }`}
-              onClick={() => onSelect(opcao.valor)}
+              onClick={() => onSelect(opcao.id)}
             >
               <span
                 className={`mr-3 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-extrabold ${
@@ -938,13 +997,36 @@ function PerguntaStep({
                     : "border-[#cbd5e1] bg-white text-[#64748b]"
                 }`}
               >
-                {opcao.valor}
+                {idx + 1}
               </span>
               {opcao.label}
             </button>
           );
         })}
       </div>
+
+      {mostrarFontes && follow ? (
+        <div className="space-y-2 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-3 py-3">
+          <p className="text-sm font-bold text-navy">{follow.texto}</p>
+          {fontesAlts.map((fonte) => {
+            const checked = fontesSelecionadas.includes(fonte.id);
+            return (
+              <label
+                key={fonte.id}
+                className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-[#e8edf5] bg-white px-3 py-2.5 text-sm font-semibold text-[#475569]"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[#cbd5e1] text-brand-blue focus:ring-brand-blue/30"
+                  checked={checked}
+                  onChange={() => onToggleFonte(fonte.id)}
+                />
+                {fonte.label}
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2.5 sm:flex-row">
         <button
