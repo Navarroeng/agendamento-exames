@@ -6,21 +6,26 @@ import {
 } from "@/lib/avaliacao-acesso";
 import { registrarAuditoriaPortal } from "@/lib/avaliacao-auditoria";
 import { getClientIpFromRequest } from "@/lib/avaliacao-rate-limit";
+import {
+  carregarContextoPortal,
+  listarRespostasDaSessao,
+  obterOuCriarSessaoRespostas,
+  perguntasObrigatoriasPendentes,
+} from "@/lib/avaliacao-persistencia";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { participanteJaConcluiu } from "@/lib/avaliacao-validacao";
 
 export const runtime = "nodejs";
 
 /**
- * Conclui a pesquisa: grava concluiu_em + status respondido.
- * Impede segunda conclusão.
+ * Conclui a pesquisa: valida obrigatoriedade, fecha sessão anônima,
+ * marca participante como concluído e encerra cookie.
  */
 export async function POST(request: Request) {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get(AVALIACAO_SESSION_COOKIE)?.value;
-    const sessao = verifyAvaliacaoSessionToken(token);
-    if (!sessao) {
+    const portal = verifyAvaliacaoSessionToken(token);
+    if (!portal) {
       return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 401 });
     }
 
@@ -30,55 +35,93 @@ export async function POST(request: Request) {
     const codigo = String(body.codigoPublico ?? "")
       .trim()
       .toUpperCase();
-    if (codigo && codigo !== sessao.codigoPublico) {
+    if (codigo && codigo !== portal.codigoPublico) {
       return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 403 });
     }
 
     const supabase = createAdminClient();
     const ip = getClientIpFromRequest(request);
 
-    const { data: participante } = await supabase
-      .from("riscos_campanha_participantes")
-      .select("id, status, concluiu_em")
-      .eq("id", sessao.participanteId)
-      .eq("campanha_id", sessao.campanhaId)
-      .maybeSingle();
+    const ctx = await carregarContextoPortal(supabase, {
+      campanhaId: portal.campanhaId,
+      participanteId: portal.participanteId,
+      codigoPublico: portal.codigoPublico,
+    });
 
-    if (!participante) {
-      return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 401 });
+    if (!ctx.ok) {
+      if (ctx.codigo === "ja_respondida") {
+        await registrarAuditoriaPortal(supabase, {
+          evento: "tentativa_apos_conclusao",
+          campanhaId: portal.campanhaId,
+          participanteId: portal.participanteId,
+          codigoPublico: portal.codigoPublico,
+          ip,
+          detalhes: { origem: "concluir" },
+        });
+      }
+      return NextResponse.json(
+        { ok: false, codigo: ctx.codigo },
+        { status: 403 }
+      );
     }
 
-    if (
-      participanteJaConcluiu({
-        status: String(participante.status ?? ""),
-        concluiu_em: participante.concluiu_em
-          ? String(participante.concluiu_em)
-          : null,
-      })
-    ) {
-      await registrarAuditoriaPortal(supabase, {
-        evento: "tentativa_apos_conclusao",
-        campanhaId: sessao.campanhaId,
-        participanteId: sessao.participanteId,
-        codigoPublico: sessao.codigoPublico,
-        ip,
-        detalhes: { origem: "concluir" },
-      });
+    const sessao = await obterOuCriarSessaoRespostas(supabase, {
+      campanhaId: portal.campanhaId,
+      participanteId: portal.participanteId,
+    });
+
+    if (sessao.status === "concluida") {
       return NextResponse.json(
         { ok: false, codigo: "ja_respondida" },
         { status: 403 }
       );
     }
 
+    const respostas = await listarRespostasDaSessao(supabase, {
+      sessaoId: sessao.id,
+      campanhaId: portal.campanhaId,
+    });
+    const pendentes = perguntasObrigatoriasPendentes(respostas);
+    if (pendentes.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: "incompleto",
+          pendentes: pendentes.length,
+        },
+        { status: 400 }
+      );
+    }
+
     const nowIso = new Date().toISOString();
+
+    const { data: sessaoOk, error: sessaoErr } = await supabase
+      .from("riscos_avaliacao_sessoes")
+      .update({
+        status: "concluida",
+        concluido_em: nowIso,
+      })
+      .eq("id", sessao.id)
+      .eq("campanha_id", portal.campanhaId)
+      .eq("status", "em_andamento")
+      .select("id")
+      .maybeSingle();
+    if (sessaoErr) throw sessaoErr;
+    if (!sessaoOk) {
+      return NextResponse.json(
+        { ok: false, codigo: "ja_respondida" },
+        { status: 403 }
+      );
+    }
+
     const { data: updated, error } = await supabase
       .from("riscos_campanha_participantes")
       .update({
         status: "respondido",
         concluiu_em: nowIso,
       })
-      .eq("id", sessao.participanteId)
-      .eq("campanha_id", sessao.campanhaId)
+      .eq("id", portal.participanteId)
+      .eq("campanha_id", portal.campanhaId)
       .eq("status", "pendente")
       .is("concluiu_em", null)
       .select("id")
@@ -89,9 +132,9 @@ export async function POST(request: Request) {
     if (!updated) {
       await registrarAuditoriaPortal(supabase, {
         evento: "tentativa_apos_conclusao",
-        campanhaId: sessao.campanhaId,
-        participanteId: sessao.participanteId,
-        codigoPublico: sessao.codigoPublico,
+        campanhaId: portal.campanhaId,
+        participanteId: portal.participanteId,
+        codigoPublico: portal.codigoPublico,
         ip,
         detalhes: { origem: "concluir_conflito" },
       });
@@ -103,11 +146,15 @@ export async function POST(request: Request) {
 
     await registrarAuditoriaPortal(supabase, {
       evento: "conclusao",
-      campanhaId: sessao.campanhaId,
-      participanteId: sessao.participanteId,
-      codigoPublico: sessao.codigoPublico,
+      campanhaId: portal.campanhaId,
+      participanteId: portal.participanteId,
+      codigoPublico: portal.codigoPublico,
       ip,
-      detalhes: { concluiu_em: nowIso },
+      detalhes: {
+        concluiu_em: nowIso,
+        sessao_id: sessao.id,
+        identificador_anonimo: sessao.identificador_anonimo,
+      },
     });
 
     const response = NextResponse.json({
@@ -116,7 +163,6 @@ export async function POST(request: Request) {
       status: "respondido",
     });
 
-    // Encerra sessão para impedir reutilização.
     response.cookies.set(AVALIACAO_SESSION_COOKIE, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

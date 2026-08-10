@@ -81,6 +81,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   const [termosAceitos, setTermosAceitos] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [finalizando, setFinalizando] = useState(false);
+  const [salvandoResposta, setSalvandoResposta] = useState(false);
+  const [erroQuestionario, setErroQuestionario] = useState<string | null>(null);
 
   const itemAtual = FLOW_ITEMS[flowIndex] ?? FLOW_ITEMS[0];
 
@@ -171,6 +173,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         empresaNome?: string;
         participanteNome?: string;
         codigo?: AvaliacaoErroCodigo;
+        questionarioIniciado?: boolean;
+        flowIndex?: number;
+        respostas?: Record<string, string>;
       };
       if (json.codigo === "campanha_encerrada") {
         setAutenticado(false);
@@ -190,9 +195,23 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         setAutenticado(true);
         setEmpresaNome(json.empresaNome || empresaNome);
         setParticipanteNome(json.participanteNome || "");
-        setStep((atual) =>
-          atual === "landing" || atual === "identificacao" ? "termos" : atual
-        );
+        if (json.respostas) {
+          setRespostas(json.respostas);
+        }
+        if (json.questionarioIniciado) {
+          setFlowIndex(
+            Math.min(
+              Math.max(0, Number(json.flowIndex ?? 0)),
+              FLOW_ITEMS.length - 1
+            )
+          );
+          setAnimKey((k) => k + 1);
+          setStep("questionario");
+        } else {
+          setStep((atual) =>
+            atual === "landing" || atual === "identificacao" ? "termos" : atual
+          );
+        }
       }
     } catch {
       // ignora
@@ -292,6 +311,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         const json = (await res.json().catch(() => ({}))) as {
           ok?: boolean;
           codigo?: AvaliacaoErroCodigo;
+          flowIndex?: number;
+          respostas?: Record<string, string>;
         };
         if (!res.ok || !json.ok) {
           if (json.codigo === "ja_respondida") {
@@ -306,15 +327,84 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
           setStep("landing");
           return;
         }
+        if (json.respostas) {
+          setRespostas(json.respostas);
+        }
+        setFlowIndex(
+          Math.min(
+            Math.max(0, Number(json.flowIndex ?? 0)),
+            FLOW_ITEMS.length - 1
+          )
+        );
       } catch {
         setInfoError(MENSAGEM_VALIDACAO_GENERICA);
         setStep("landing");
         return;
       }
+    } else {
+      setFlowIndex(0);
     }
-    setFlowIndex(0);
+    setErroQuestionario(null);
     setAnimKey((k) => k + 1);
     setStep("questionario");
+  }
+
+  async function persistirRespostaAtual(): Promise<boolean> {
+    if (isDemo) return true;
+    const atual = FLOW_ITEMS[flowIndex];
+    if (!atual || atual.type !== "pergunta") return true;
+
+    const alternativaId = respostas[atual.pergunta.id];
+    if (!alternativaId) return false;
+
+    const fontes = atual.pergunta.followUp
+      ? (respostas[atual.pergunta.followUp.id] ?? "")
+          .split("|")
+          .filter(Boolean)
+      : [];
+
+    setSalvandoResposta(true);
+    setErroQuestionario(null);
+    try {
+      const res = await fetch("/api/avaliacao/resposta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          codigoPublico: codigoDisplay,
+          perguntaId: atual.pergunta.id,
+          alternativaId,
+          fontes,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        codigo?: AvaliacaoErroCodigo | "valor_invalido" | "incompleto";
+      };
+      if (json.codigo === "ja_respondida") {
+        setStep("ja_respondida");
+        return false;
+      }
+      if (json.codigo === "campanha_encerrada") {
+        setStep("campanha_encerrada");
+        return false;
+      }
+      if (!res.ok || !json.ok) {
+        setErroQuestionario(
+          json.codigo === "valor_invalido"
+            ? "Não foi possível salvar esta resposta. Tente novamente."
+            : MENSAGEM_VALIDACAO_GENERICA
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      setErroQuestionario(
+        "Não foi possível salvar a resposta. Verifique sua conexão e tente novamente."
+      );
+      return false;
+    } finally {
+      setSalvandoResposta(false);
+    }
   }
 
   async function handleConcluirPesquisa() {
@@ -324,7 +414,11 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     }
     if (finalizando) return;
     setFinalizando(true);
+    setErroQuestionario(null);
     try {
+      const salva = await persistirRespostaAtual();
+      if (!salva) return;
+
       const res = await fetch("/api/avaliacao/concluir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -332,7 +426,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       });
       const json = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
-        codigo?: AvaliacaoErroCodigo;
+        codigo?: AvaliacaoErroCodigo | "incompleto";
       };
       if (json.codigo === "ja_respondida") {
         setStep("ja_respondida");
@@ -342,22 +436,26 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         setStep("campanha_encerrada");
         return;
       }
+      if (json.codigo === "incompleto") {
+        setErroQuestionario(
+          "Ainda há perguntas obrigatórias sem resposta. Volte e complete a pesquisa."
+        );
+        return;
+      }
       if (!res.ok || !json.ok) {
-        setInfoError(MENSAGEM_VALIDACAO_GENERICA);
-        setStep("landing");
+        setErroQuestionario(MENSAGEM_VALIDACAO_GENERICA);
         return;
       }
       setAutenticado(false);
       setStep("final");
     } catch {
-      setInfoError(MENSAGEM_VALIDACAO_GENERICA);
-      setStep("landing");
+      setErroQuestionario(MENSAGEM_VALIDACAO_GENERICA);
     } finally {
       setFinalizando(false);
     }
   }
 
-  function handleProximaFlow() {
+  async function handleProximaFlow() {
     const atual = FLOW_ITEMS[flowIndex];
     if (!atual) return;
 
@@ -369,6 +467,12 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       void handleConcluirPesquisa();
       return;
     }
+
+    if (atual.type === "pergunta") {
+      const salva = await persistirRespostaAtual();
+      if (!salva) return;
+    }
+
     goFlow(flowIndex + 1);
   }
 
@@ -459,15 +563,20 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
               key={animKey}
               className="avaliacao-step-enter"
             >
+              {erroQuestionario ? (
+                <p className="mb-4 whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {erroQuestionario}
+                </p>
+              ) : null}
               {itemAtual.type === "transicao" ? (
                 <TransicaoStep
                   progresso={progresso}
                   totalPerguntas={TOTAL_PERGUNTAS}
                   texto={itemAtual.dimensao.textoIntroducao}
                   dimensaoNome={itemAtual.dimensao.nome}
-                  podeVoltar={flowIndex > 0}
+                  podeVoltar={flowIndex > 0 && !salvandoResposta && !finalizando}
                   onAnterior={handleAnteriorFlow}
-                  onProxima={handleProximaFlow}
+                  onProxima={() => void handleProximaFlow()}
                 />
               ) : (
                 <PerguntaStep
@@ -483,8 +592,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                       : []
                   }
                   isUltima={flowIndex >= FLOW_ITEMS.length - 1}
-                  finalizando={finalizando}
-                  podeVoltar={flowIndex > 0}
+                  finalizando={finalizando || salvandoResposta}
+                  podeVoltar={flowIndex > 0 && !salvandoResposta && !finalizando}
                   onSelect={(alternativaId) =>
                     setRespostas((prev) => {
                       const next = {
@@ -524,7 +633,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                     });
                   }}
                   onAnterior={handleAnteriorFlow}
-                  onProxima={handleProximaFlow}
+                  onProxima={() => void handleProximaFlow()}
                 />
               )}
             </div>

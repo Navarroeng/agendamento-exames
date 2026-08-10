@@ -6,11 +6,15 @@ import {
 } from "@/lib/avaliacao-acesso";
 import { registrarAuditoriaPortal } from "@/lib/avaliacao-auditoria";
 import { getClientIpFromRequest } from "@/lib/avaliacao-rate-limit";
-import { assertCodigoPublicoSessao } from "@/lib/avaliacao-validacao";
+import { buildCopsoqFlow } from "@/lib/copsoq";
 import {
-  avaliarPeriodoCampanha,
-  participanteJaConcluiu,
-} from "@/lib/avaliacao-validacao";
+  calcularFlowIndexRetomada,
+  carregarContextoPortal,
+  listarRespostasDaSessao,
+  mapRespostasParaEstadoLocal,
+  obterOuCriarSessaoRespostas,
+} from "@/lib/avaliacao-persistencia";
+import { assertCodigoPublicoSessao } from "@/lib/avaliacao-validacao";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -25,22 +29,18 @@ export async function GET(request: Request) {
 
     const cookieStore = cookies();
     const token = cookieStore.get(AVALIACAO_SESSION_COOKIE)?.value;
-    const sessao = verifyAvaliacaoSessionToken(token);
+    const portal = verifyAvaliacaoSessionToken(token);
 
-    if (!sessao) {
+    if (!portal) {
       return NextResponse.json({ ok: false, autenticado: false });
     }
 
     if (
       codigoPublico &&
-      !assertCodigoPublicoSessao(sessao.codigoPublico, codigoPublico)
+      !assertCodigoPublicoSessao(portal.codigoPublico, codigoPublico)
     ) {
       return NextResponse.json(
-        {
-          ok: false,
-          autenticado: false,
-          codigo: "nao_apto",
-        },
+        { ok: false, autenticado: false, codigo: "nao_apto" },
         { status: 403 }
       );
     }
@@ -48,91 +48,90 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const ip = getClientIpFromRequest(request);
 
-    const { data: campanha } = await supabase
-      .from("riscos_campanhas")
-      .select(
-        "id, empresa_nome, status, codigo_publico, data_inicio, data_encerramento"
-      )
-      .eq("id", sessao.campanhaId)
-      .maybeSingle();
+    const ctx = await carregarContextoPortal(supabase, {
+      campanhaId: portal.campanhaId,
+      participanteId: portal.participanteId,
+      codigoPublico: portal.codigoPublico,
+    });
+
+    if (!ctx.ok) {
+      if (ctx.codigo === "campanha_encerrada") {
+        await registrarAuditoriaPortal(supabase, {
+          evento: "tentativa_apos_encerramento",
+          campanhaId: portal.campanhaId,
+          participanteId: portal.participanteId,
+          codigoPublico: portal.codigoPublico,
+          ip,
+          detalhes: { origem: "sessao" },
+        });
+      }
+      if (ctx.codigo === "ja_respondida") {
+        await registrarAuditoriaPortal(supabase, {
+          evento: "tentativa_apos_conclusao",
+          campanhaId: portal.campanhaId,
+          participanteId: portal.participanteId,
+          codigoPublico: portal.codigoPublico,
+          ip,
+          detalhes: { origem: "sessao" },
+        });
+      }
+      return NextResponse.json(
+        { ok: false, autenticado: false, codigo: ctx.codigo },
+        { status: 403 }
+      );
+    }
 
     const { data: participante } = await supabase
       .from("riscos_campanha_participantes")
-      .select("id, nome_completo, status, concluiu_em, campanha_id")
-      .eq("id", sessao.participanteId)
-      .eq("campanha_id", sessao.campanhaId)
+      .select("nome_completo, iniciou_em")
+      .eq("id", portal.participanteId)
+      .eq("campanha_id", portal.campanhaId)
       .maybeSingle();
 
-    if (!campanha || !participante) {
-      return NextResponse.json({ ok: false, autenticado: false });
-    }
+    const { data: campanha } = await supabase
+      .from("riscos_campanhas")
+      .select("empresa_nome, codigo_publico")
+      .eq("id", portal.campanhaId)
+      .maybeSingle();
 
-    const periodo = avaliarPeriodoCampanha({
-      status: String(campanha.status ?? ""),
-      data_inicio: String(campanha.data_inicio ?? ""),
-      data_encerramento: String(campanha.data_encerramento ?? ""),
-    });
+    let respostasMap: Record<string, string> = {};
+    let flowIndex = 0;
+    let totalRespondidas = 0;
+    let questionarioIniciado = Boolean(participante?.iniciou_em);
 
-    if (periodo === "encerrada") {
-      await registrarAuditoriaPortal(supabase, {
-        evento: "tentativa_apos_encerramento",
-        campanhaId: sessao.campanhaId,
-        participanteId: sessao.participanteId,
-        codigoPublico: sessao.codigoPublico,
-        ip,
-        detalhes: { origem: "sessao" },
+    if (questionarioIniciado) {
+      const sessao = await obterOuCriarSessaoRespostas(supabase, {
+        campanhaId: portal.campanhaId,
+        participanteId: portal.participanteId,
       });
-      return NextResponse.json(
-        {
-          ok: false,
-          autenticado: false,
-          codigo: "campanha_encerrada",
-        },
-        { status: 403 }
-      );
-    }
-
-    if (periodo !== "ok") {
-      return NextResponse.json(
-        { ok: false, autenticado: false, codigo: "nao_apto" },
-        { status: 403 }
-      );
-    }
-
-    if (
-      participanteJaConcluiu({
-        status: String(participante.status ?? ""),
-        concluiu_em: participante.concluiu_em
-          ? String(participante.concluiu_em)
-          : null,
-      })
-    ) {
-      await registrarAuditoriaPortal(supabase, {
-        evento: "tentativa_apos_conclusao",
-        campanhaId: sessao.campanhaId,
-        participanteId: sessao.participanteId,
-        codigoPublico: sessao.codigoPublico,
-        ip,
-        detalhes: { origem: "sessao" },
+      if (sessao.status === "concluida") {
+        return NextResponse.json(
+          { ok: false, autenticado: false, codigo: "ja_respondida" },
+          { status: 403 }
+        );
+      }
+      const respostas = await listarRespostasDaSessao(supabase, {
+        sessaoId: sessao.id,
+        campanhaId: portal.campanhaId,
       });
-      return NextResponse.json(
-        {
-          ok: false,
-          autenticado: false,
-          codigo: "ja_respondida",
-        },
-        { status: 403 }
-      );
+      respostasMap = mapRespostasParaEstadoLocal(respostas);
+      totalRespondidas = respostas.length;
+      const { items } = buildCopsoqFlow();
+      flowIndex = calcularFlowIndexRetomada(items, respostas);
     }
 
     return NextResponse.json({
       ok: true,
       autenticado: true,
-      empresaNome: String(campanha.empresa_nome ?? ""),
-      participanteNome: String(participante.nome_completo ?? ""),
-      codigoPublico: String(campanha.codigo_publico ?? "").toUpperCase(),
-      campanhaId: sessao.campanhaId,
-      participanteId: sessao.participanteId,
+      empresaNome: String(campanha?.empresa_nome ?? ""),
+      participanteNome: String(participante?.nome_completo ?? ""),
+      codigoPublico: String(campanha?.codigo_publico ?? "").toUpperCase(),
+      campanhaId: portal.campanhaId,
+      participanteId: portal.participanteId,
+      questionarioIniciado,
+      flowIndex,
+      totalRespondidas,
+      respostas: respostasMap,
     });
   } catch (err) {
     console.error("[avaliacao/sessao]", err);
