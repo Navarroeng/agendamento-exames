@@ -6,6 +6,7 @@ import { Field, RequiredMark } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
 import { RiscosPainelPreRequisitos } from "@/components/riscos-psicossociais/RiscosPainelPreRequisitos";
+import { RiscosResultadosPanel } from "@/components/riscos-psicossociais/RiscosResultadosPanel";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   RISCOS_CAMPANHA_STATUS_LABELS,
@@ -134,21 +135,6 @@ export function RiscosPainelCards({
   const pesquisaEncerrada = campanha?.status === "encerrada";
   /** Relatório ainda não é gerado no produto; UI libera ações após encerrar. */
   const relatorioExiste = pesquisaEncerrada;
-
-  const baseParticipacao =
-    resumo.previstos > 0
-      ? resumo.previstos
-      : resumo.cadastrados > 0
-        ? resumo.cadastrados
-        : 0;
-  const participacaoPct =
-    baseParticipacao > 0
-      ? Math.round((resumo.respondidos / baseParticipacao) * 100)
-      : 0;
-
-  const statusResultados = campanha
-    ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
-    : "—";
 
   const historico = useMemo(
     () => buildHistorico(processo, participantes),
@@ -492,19 +478,7 @@ export function RiscosPainelCards({
       {/* Linha 4 — Resultados | Relatório */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <PanelCard title="Resultados">
-          {resumo.respondidos === 0 ? (
-            <PlaceholderNote>
-              Ainda não existem respostas para esta pesquisa.
-            </PlaceholderNote>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <StatChip label="Participação" value={`${participacaoPct}%`} />
-              <StatChip label="Responderam" value={resumo.respondidos} />
-              <StatChip label="Pendentes" value={resumo.pendentes} />
-              <StatChip label="Risco geral" value="—" />
-              <StatChip label="Status" value={statusResultados} />
-            </div>
-          )}
+          <RiscosResultadosPanel campanha={campanha} />
         </PanelCard>
 
         <PanelCard title="Relatório">
