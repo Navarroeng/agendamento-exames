@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
@@ -88,6 +88,18 @@ export function RiscosPainelCards({
   const [dataEncerramento, setDataEncerramento] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const participantesPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!verParticipantes) return;
+    const timer = window.setTimeout(() => {
+      participantesPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [verParticipantes]);
 
   const previstos = campanha?.quantidade_prevista ?? 0;
   const resumo = useMemo(
@@ -345,7 +357,25 @@ export function RiscosPainelCards({
             </button>
           </div>
         </PanelCard>
+      </div>
 
+      {campanha && verParticipantes ? (
+        <div
+          ref={participantesPanelRef}
+          className="rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4"
+        >
+          <RiscosCampanhaParticipantesSection
+            campanha={campanha}
+            participantes={participantes}
+            saving={savingParticipante}
+            onCriar={onCriarParticipante}
+            onEditar={onEditarParticipante}
+            onRemover={onRemoverParticipante}
+          />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* 3. Distribuição */}
         <PanelCard title="Distribuição" eyebrow="Card 3">
           <div className="flex flex-1 items-center gap-5">
@@ -541,19 +571,6 @@ export function RiscosPainelCards({
           </ol>
         </PanelCard>
       </div>
-
-      {campanha && verParticipantes ? (
-        <div className="rounded-2xl border border-[#dbeafe] bg-[#f8fbff] p-4">
-          <RiscosCampanhaParticipantesSection
-            campanha={campanha}
-            participantes={participantes}
-            saving={savingParticipante}
-            onCriar={onCriarParticipante}
-            onEditar={onEditarParticipante}
-            onRemover={onRemoverParticipante}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
