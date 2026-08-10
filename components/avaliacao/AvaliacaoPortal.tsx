@@ -765,8 +765,8 @@ function OrientacoesStep({
           Cerca de 8 a 12 minutos.
         </OrientacaoItem>
         <OrientacaoItem titulo="Quantidade de perguntas">
-          {totalPerguntas} perguntas, organizadas por dimensões (Demandas,
-          Liderança, Saúde e Bem-estar, entre outras).
+          {totalPerguntas} perguntas (COPSOQ), organizadas por dimensões com
+          telas de transição entre blocos.
         </OrientacaoItem>
         <OrientacaoItem titulo="Confidencialidade">
           Suas respostas individuais não serão divulgadas a gestores. Apenas

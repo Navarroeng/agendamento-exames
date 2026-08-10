@@ -11,6 +11,10 @@ import {
   pathAvaliacaoCampanha,
 } from "@/lib/riscos-campanha";
 import {
+  COPSOQ_DIMENSOES,
+  COPSOQ_TOTAL_PERGUNTAS,
+} from "@/lib/copsoq-ii-br";
+import {
   buildParticipantesResumo,
   type RiscosCampanhaParticipanteRecord,
   type RiscosParticipanteInput,
@@ -437,30 +441,36 @@ export function RiscosPainelCards({
       <div className="grid gap-4 lg:grid-cols-2">
         <PanelCard title="Questionário" eyebrow="Card 3">
           <div className="space-y-2">
-            <p className="text-sm font-extrabold text-navy">Questionário NR-01</p>
+            <p className="text-sm font-extrabold text-navy">
+              COPSOQ II-Br · Pesquisa Psicossocial
+            </p>
             <dl className="grid gap-2 text-xs sm:grid-cols-3">
               <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
                 <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Perguntas
                 </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+                <dd className="mt-0.5 font-extrabold text-navy">
+                  {COPSOQ_TOTAL_PERGUNTAS}
+                </dd>
               </div>
               <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
                 <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Dimensões
                 </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+                <dd className="mt-0.5 font-extrabold text-navy">
+                  {COPSOQ_DIMENSOES.length}
+                </dd>
               </div>
               <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-2.5 py-2">
                 <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Última atualização
+                  Ordem
                 </dt>
-                <dd className="mt-0.5 font-extrabold text-navy">—</dd>
+                <dd className="mt-0.5 font-extrabold text-navy">01 → 40</dd>
               </div>
             </dl>
             <PlaceholderNote>
-              Estrutura preparada para a próxima etapa. Conteúdo do questionário
-              ainda não configurado.
+              Instrumento com 40 perguntas oficiais na sequência fixa. Dimensões
+              organizam transições e cálculos futuros.
             </PlaceholderNote>
           </div>
           <div className="mt-auto flex flex-wrap gap-2 pt-4">
