@@ -6,15 +6,12 @@ import { Field, RequiredMark } from "@/components/ui/Field";
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import type { RiscosParticipanteInput } from "@/lib/riscos-campanha-participantes";
 
-type FormState = RiscosParticipanteInput & { unidade: string };
-
-const EMPTY_FORM: FormState = {
+const EMPTY_FORM: RiscosParticipanteInput = {
   nomeCompleto: "",
   cpf: "",
   cargo: "",
   setor: "",
   email: "",
-  unidade: "",
 };
 
 interface RiscosParticipanteFormModalProps {
@@ -34,7 +31,7 @@ export function RiscosParticipanteFormModal({
   onClose,
   onSave,
 }: RiscosParticipanteFormModalProps) {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<RiscosParticipanteInput>(EMPTY_FORM);
   const [cpfMasked, setCpfMasked] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +44,6 @@ export function RiscosParticipanteFormModal({
         cargo: initial.cargo ?? "",
         setor: initial.setor ?? "",
         email: initial.email ?? "",
-        unidade: "",
       });
       setCpfMasked(maskCPFInput(initial.cpf));
     } else {
@@ -65,7 +61,6 @@ export function RiscosParticipanteFormModal({
   async function handleSalvar() {
     setError(null);
     try {
-      // Unidade é apenas visual nesta etapa (sem coluna no banco).
       await onSave({
         nomeCompleto: form.nomeCompleto,
         cpf: form.cpf,
@@ -82,8 +77,12 @@ export function RiscosParticipanteFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === "edit" ? "Editar colaborador" : "Adicionar colaborador"}
-      subtitle="Cadastro do participante autorizado a responder a pesquisa"
+      title={
+        mode === "edit"
+          ? "Editar participante da pesquisa"
+          : "Cadastrar participante da pesquisa"
+      }
+      subtitle="Cadastre o participante que poderá responder ao Questionário de Riscos Psicossociais."
       size="wide"
       closeOnOverlayClick={!saving}
       footer={
@@ -106,7 +105,7 @@ export function RiscosParticipanteFormModal({
               ? "Salvando..."
               : mode === "edit"
                 ? "Salvar alterações"
-                : "Salvar colaborador"}
+                : "Salvar participante"}
           </button>
         </div>
       }
@@ -184,44 +183,38 @@ export function RiscosParticipanteFormModal({
               }
             />
           </Field>
-          <Field label="Unidade (opcional)" className="sm:col-span-2">
-            <input
-              className="field-input w-full"
-              value={form.unidade}
-              disabled={saving}
-              placeholder="Será persistida em etapa futura"
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, unidade: e.target.value }))
-              }
-            />
-          </Field>
         </div>
 
         <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-3">
           <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-            Dados de acesso
+            Dados de acesso do participante
           </p>
           <p className="mt-1 text-xs text-[#64748b]">
-            Informações preparatórias — autenticação ainda não está ativa.
+            Após o envio da pesquisa, este participante acessará utilizando o
+            CPF e um código/senha gerado automaticamente pelo sistema.
           </p>
-          <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
                 Login
               </dt>
               <dd className="mt-0.5 font-semibold tabular-nums text-navy">
-                CPF · {loginCpf}
+                CPF informado · {loginCpf}
               </dd>
             </div>
             <div>
               <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Senha provisória
+                Senha
               </dt>
               <dd className="mt-0.5 font-semibold text-navy">
-                Será gerada automaticamente
+                Será gerada automaticamente quando a pesquisa for enviada.
               </dd>
             </div>
           </dl>
+          <p className="mt-3 text-[11px] text-[#94a3b8]">
+            Neste momento estamos apenas cadastrando os participantes. O acesso
+            será liberado quando a campanha for enviada.
+          </p>
         </div>
 
         {error ? (

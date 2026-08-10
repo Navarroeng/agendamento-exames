@@ -122,7 +122,7 @@ export function RiscosCampanhaParticipantesSection({
             disabled={saving}
             onClick={openCreate}
           >
-            + Adicionar colaborador
+            + Cadastrar participante
           </button>
         </div>
       </div>
@@ -140,7 +140,7 @@ export function RiscosCampanhaParticipantesSection({
 
       {participantes.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center text-sm text-app-muted">
-          Nenhum participante cadastrado. Use “+ Adicionar colaborador” para
+          Nenhum participante cadastrado. Use “+ Cadastrar participante” para
           incluir.
         </p>
       ) : (
