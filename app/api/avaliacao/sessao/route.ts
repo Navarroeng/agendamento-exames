@@ -4,7 +4,13 @@ import {
   AVALIACAO_SESSION_COOKIE,
   verifyAvaliacaoSessionToken,
 } from "@/lib/avaliacao-acesso";
+import { registrarAuditoriaPortal } from "@/lib/avaliacao-auditoria";
+import { getClientIpFromRequest } from "@/lib/avaliacao-rate-limit";
 import { assertCodigoPublicoSessao } from "@/lib/avaliacao-validacao";
+import {
+  avaliarPeriodoCampanha,
+  participanteJaConcluiu,
+} from "@/lib/avaliacao-validacao";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -29,21 +35,24 @@ export async function GET(request: Request) {
       codigoPublico &&
       !assertCodigoPublicoSessao(sessao.codigoPublico, codigoPublico)
     ) {
-      // Troca manual de URL para outra campanha → bloquear.
       return NextResponse.json(
         {
           ok: false,
           autenticado: false,
-          error: "Sessão inválida para esta campanha.",
+          codigo: "nao_apto",
         },
         { status: 403 }
       );
     }
 
     const supabase = createAdminClient();
+    const ip = getClientIpFromRequest(request);
+
     const { data: campanha } = await supabase
       .from("riscos_campanhas")
-      .select("id, empresa_nome, status, codigo_publico")
+      .select(
+        "id, empresa_nome, status, codigo_publico, data_inicio, data_encerramento"
+      )
       .eq("id", sessao.campanhaId)
       .maybeSingle();
 
@@ -58,15 +67,59 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, autenticado: false });
     }
 
-    if (
-      participante.status === "respondido" ||
-      participante.concluiu_em
-    ) {
+    const periodo = avaliarPeriodoCampanha({
+      status: String(campanha.status ?? ""),
+      data_inicio: String(campanha.data_inicio ?? ""),
+      data_encerramento: String(campanha.data_encerramento ?? ""),
+    });
+
+    if (periodo === "encerrada") {
+      await registrarAuditoriaPortal(supabase, {
+        evento: "tentativa_apos_encerramento",
+        campanhaId: sessao.campanhaId,
+        participanteId: sessao.participanteId,
+        codigoPublico: sessao.codigoPublico,
+        ip,
+        detalhes: { origem: "sessao" },
+      });
       return NextResponse.json(
         {
           ok: false,
           autenticado: false,
-          error: "Esta pesquisa já foi concluída.",
+          codigo: "campanha_encerrada",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (periodo !== "ok") {
+      return NextResponse.json(
+        { ok: false, autenticado: false, codigo: "nao_apto" },
+        { status: 403 }
+      );
+    }
+
+    if (
+      participanteJaConcluiu({
+        status: String(participante.status ?? ""),
+        concluiu_em: participante.concluiu_em
+          ? String(participante.concluiu_em)
+          : null,
+      })
+    ) {
+      await registrarAuditoriaPortal(supabase, {
+        evento: "tentativa_apos_conclusao",
+        campanhaId: sessao.campanhaId,
+        participanteId: sessao.participanteId,
+        codigoPublico: sessao.codigoPublico,
+        ip,
+        detalhes: { origem: "sessao" },
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          autenticado: false,
+          codigo: "ja_respondida",
         },
         { status: 403 }
       );

@@ -14,7 +14,7 @@ export const RISCOS_PARTICIPANTE_STATUS_LABELS: Record<
   string
 > = {
   pendente: "Pendente",
-  respondido: "Respondido",
+  respondido: "Concluído",
 };
 
 export const RISCOS_PARTICIPANTE_ORIGENS = ["manual", "importacao"] as const;

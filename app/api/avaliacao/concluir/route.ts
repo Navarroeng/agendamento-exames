@@ -7,15 +7,13 @@ import {
 import { registrarAuditoriaPortal } from "@/lib/avaliacao-auditoria";
 import { getClientIpFromRequest } from "@/lib/avaliacao-rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  avaliarPeriodoCampanha,
-  participanteJaConcluiu,
-} from "@/lib/avaliacao-validacao";
+import { participanteJaConcluiu } from "@/lib/avaliacao-validacao";
 
 export const runtime = "nodejs";
 
 /**
- * Marca início do questionário. Requer sessão válida + campanha no período + não concluído.
+ * Conclui a pesquisa: grava concluiu_em + status respondido.
+ * Impede segunda conclusão.
  */
 export async function POST(request: Request) {
   try {
@@ -39,46 +37,15 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const ip = getClientIpFromRequest(request);
 
-    const { data: campanha } = await supabase
-      .from("riscos_campanhas")
-      .select("id, status, data_inicio, data_encerramento, codigo_publico")
-      .eq("id", sessao.campanhaId)
-      .maybeSingle();
-
     const { data: participante } = await supabase
       .from("riscos_campanha_participantes")
-      .select("id, status, concluiu_em, iniciou_em")
+      .select("id, status, concluiu_em")
       .eq("id", sessao.participanteId)
       .eq("campanha_id", sessao.campanhaId)
       .maybeSingle();
 
-    if (!campanha || !participante) {
+    if (!participante) {
       return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 401 });
-    }
-
-    const periodo = avaliarPeriodoCampanha({
-      status: String(campanha.status ?? ""),
-      data_inicio: String(campanha.data_inicio ?? ""),
-      data_encerramento: String(campanha.data_encerramento ?? ""),
-    });
-
-    if (periodo === "encerrada") {
-      await registrarAuditoriaPortal(supabase, {
-        evento: "tentativa_apos_encerramento",
-        campanhaId: sessao.campanhaId,
-        participanteId: sessao.participanteId,
-        codigoPublico: sessao.codigoPublico,
-        ip,
-        detalhes: { origem: "iniciar" },
-      });
-      return NextResponse.json(
-        { ok: false, codigo: "campanha_encerrada" },
-        { status: 403 }
-      );
-    }
-
-    if (periodo !== "ok") {
-      return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 403 });
     }
 
     if (
@@ -95,7 +62,7 @@ export async function POST(request: Request) {
         participanteId: sessao.participanteId,
         codigoPublico: sessao.codigoPublico,
         ip,
-        detalhes: { origem: "iniciar" },
+        detalhes: { origem: "concluir" },
       });
       return NextResponse.json(
         { ok: false, codigo: "ja_respondida" },
@@ -104,28 +71,63 @@ export async function POST(request: Request) {
     }
 
     const nowIso = new Date().toISOString();
-    const jaIniciou = Boolean(participante.iniciou_em);
-
-    await supabase
+    const { data: updated, error } = await supabase
       .from("riscos_campanha_participantes")
-      .update({ iniciou_em: nowIso })
+      .update({
+        status: "respondido",
+        concluiu_em: nowIso,
+      })
       .eq("id", sessao.participanteId)
       .eq("campanha_id", sessao.campanhaId)
-      .is("iniciou_em", null);
+      .eq("status", "pendente")
+      .is("concluiu_em", null)
+      .select("id")
+      .maybeSingle();
 
-    if (!jaIniciou) {
+    if (error) throw error;
+
+    if (!updated) {
       await registrarAuditoriaPortal(supabase, {
-        evento: "inicio_pesquisa",
+        evento: "tentativa_apos_conclusao",
         campanhaId: sessao.campanhaId,
         participanteId: sessao.participanteId,
         codigoPublico: sessao.codigoPublico,
         ip,
+        detalhes: { origem: "concluir_conflito" },
       });
+      return NextResponse.json(
+        { ok: false, codigo: "ja_respondida" },
+        { status: 403 }
+      );
     }
 
-    return NextResponse.json({ ok: true });
+    await registrarAuditoriaPortal(supabase, {
+      evento: "conclusao",
+      campanhaId: sessao.campanhaId,
+      participanteId: sessao.participanteId,
+      codigoPublico: sessao.codigoPublico,
+      ip,
+      detalhes: { concluiu_em: nowIso },
+    });
+
+    const response = NextResponse.json({
+      ok: true,
+      concluiuEm: nowIso,
+      status: "respondido",
+    });
+
+    // Encerra sessão para impedir reutilização.
+    response.cookies.set(AVALIACAO_SESSION_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    return response;
   } catch (err) {
-    console.error("[avaliacao/iniciar]", err);
+    console.error("[avaliacao/concluir]", err);
     return NextResponse.json({ ok: false, codigo: "nao_apto" }, { status: 500 });
   }
 }

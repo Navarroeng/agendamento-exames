@@ -3,6 +3,7 @@ import {
   getAvaliacaoDemoInfo,
   isAvaliacaoDemoCodigo,
 } from "@/lib/avaliacao-demo";
+import { avaliarPeriodoCampanha } from "@/lib/avaliacao-validacao";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(
     const { data, error } = await supabase
       .from("riscos_campanhas")
       .select(
-        "codigo_publico, empresa_nome, status, data_inicio, data_encerramento"
+        "id, codigo_publico, empresa_nome, status, data_inicio, data_encerramento"
       )
       .eq("codigo_publico", codigo)
       .maybeSingle();
@@ -41,19 +42,27 @@ export async function GET(
       return NextResponse.json({ ok: false }, { status: 404 });
     }
 
-    const hoje = new Date().toISOString().slice(0, 10);
-    const status = String(data.status ?? "");
-    const inicio = String(data.data_inicio ?? "").slice(0, 10);
-    const fim = String(data.data_encerramento ?? "").slice(0, 10);
-    const disponivel =
-      status === "aberta" && hoje >= inicio && hoje <= fim;
+    const periodo = avaliarPeriodoCampanha({
+      status: String(data.status ?? ""),
+      data_inicio: String(data.data_inicio ?? ""),
+      data_encerramento: String(data.data_encerramento ?? ""),
+    });
+
+    const disponivel = periodo === "ok";
+    const codigoErro =
+      periodo === "encerrada"
+        ? "campanha_encerrada"
+        : periodo === "ok"
+          ? null
+          : "nao_apto";
 
     return NextResponse.json({
       ok: true,
       codigoPublico: String(data.codigo_publico).toUpperCase(),
       empresaNome: String(data.empresa_nome ?? ""),
-      status,
+      status: String(data.status ?? ""),
       disponivel,
+      codigoErro,
       campanhaNome: "Pesquisa de Riscos Psicossociais",
     });
   } catch (err) {

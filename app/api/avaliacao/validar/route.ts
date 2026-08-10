@@ -4,14 +4,23 @@ import {
   MENSAGEM_VALIDACAO_GENERICA,
   createAvaliacaoSessionToken,
 } from "@/lib/avaliacao-acesso";
+import { registrarAuditoriaPortal } from "@/lib/avaliacao-auditoria";
 import {
   checkAvaliacaoRateLimit,
   getClientIpFromRequest,
 } from "@/lib/avaliacao-rate-limit";
+import {
+  MENSAGEM_CAMPANHA_ENCERRADA_CORPO,
+  MENSAGEM_JA_RESPONDIDA_CORPO,
+  mensagemPorCodigoErro,
+} from "@/lib/avaliacao-constantes";
 import { parseDataNascimentoBr } from "@/lib/date-br";
 import { normalizeCpfDigits, isValidCPF } from "@/lib/cpf";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { validarAcessoAvaliacao } from "@/lib/avaliacao-validacao";
+import {
+  codigoErroPublico,
+  validarAcessoAvaliacao,
+} from "@/lib/avaliacao-validacao";
 
 export const runtime = "nodejs";
 
@@ -19,7 +28,7 @@ const CAMPANHA_SELECT =
   "id, codigo_publico, cliente_id, cnpj, empresa_nome, status, data_inicio, data_encerramento";
 
 const PARTICIPANTE_SELECT =
-  "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em";
+  "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em, acessou_em";
 
 export async function POST(request: Request) {
   try {
@@ -40,7 +49,11 @@ export async function POST(request: Request) {
     const rate = checkAvaliacaoRateLimit(rateKey);
     if (!rate.allowed) {
       return NextResponse.json(
-        { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
+        {
+          ok: false,
+          codigo: "nao_apto",
+          error: MENSAGEM_VALIDACAO_GENERICA,
+        },
         {
           status: 429,
           headers: rate.retryAfterSec
@@ -52,7 +65,11 @@ export async function POST(request: Request) {
 
     if (!codigoPublico || !isValidCPF(cpfDigits) || !dataNascimentoIso) {
       return NextResponse.json(
-        { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
+        {
+          ok: false,
+          codigo: "nao_apto",
+          error: MENSAGEM_VALIDACAO_GENERICA,
+        },
         { status: 400 }
       );
     }
@@ -115,19 +132,70 @@ export async function POST(request: Request) {
     });
 
     if (!resultado.ok) {
+      const codigo = codigoErroPublico(resultado.motivo);
+
+      if (resultado.motivo === "campanha_encerrada" && campanha?.id) {
+        await registrarAuditoriaPortal(supabase, {
+          evento: "tentativa_apos_encerramento",
+          campanhaId: String(campanha.id),
+          participanteId: participante?.id
+            ? String(participante.id)
+            : null,
+          codigoPublico,
+          ip,
+          detalhes: { origem: "validar" },
+        });
+      }
+
+      if (
+        resultado.motivo === "participante_ja_concluiu" &&
+        campanha?.id &&
+        participante?.id
+      ) {
+        await registrarAuditoriaPortal(supabase, {
+          evento: "tentativa_apos_conclusao",
+          campanhaId: String(campanha.id),
+          participanteId: String(participante.id),
+          codigoPublico,
+          ip,
+          detalhes: { origem: "validar" },
+        });
+      }
+
+      const error =
+        codigo === "ja_respondida"
+          ? MENSAGEM_JA_RESPONDIDA_CORPO
+          : codigo === "campanha_encerrada"
+            ? MENSAGEM_CAMPANHA_ENCERRADA_CORPO
+            : mensagemPorCodigoErro(codigo);
+
       return NextResponse.json(
-        { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
+        { ok: false, codigo, error },
         { status: 401 }
       );
     }
 
     const nowIso = new Date().toISOString();
-    await supabase
+    const jaAcessou = Boolean(participante?.acessou_em);
+
+    const { error: updateError } = await supabase
       .from("riscos_campanha_participantes")
       .update({ acessou_em: nowIso })
       .eq("id", resultado.participanteId)
       .eq("campanha_id", resultado.campanhaId)
       .is("acessou_em", null);
+
+    if (updateError) throw updateError;
+
+    if (!jaAcessou) {
+      await registrarAuditoriaPortal(supabase, {
+        evento: "primeiro_acesso",
+        campanhaId: resultado.campanhaId,
+        participanteId: resultado.participanteId,
+        codigoPublico: resultado.codigoPublico,
+        ip,
+      });
+    }
 
     const token = createAvaliacaoSessionToken({
       campanhaId: resultado.campanhaId,
@@ -154,7 +222,11 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[avaliacao/validar]", err);
     return NextResponse.json(
-      { ok: false, error: MENSAGEM_VALIDACAO_GENERICA },
+      {
+        ok: false,
+        codigo: "nao_apto",
+        error: MENSAGEM_VALIDACAO_GENERICA,
+      },
       { status: 500 }
     );
   }

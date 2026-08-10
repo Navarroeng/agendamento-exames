@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { NavarroLogo } from "@/components/layout/NavarroLogo";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
-import { MENSAGEM_VALIDACAO_GENERICA } from "@/lib/avaliacao-constantes";
+import {
+  MENSAGEM_CAMPANHA_ENCERRADA_CORPO,
+  MENSAGEM_CAMPANHA_ENCERRADA_TITULO,
+  MENSAGEM_JA_RESPONDIDA_CORPO,
+  MENSAGEM_JA_RESPONDIDA_TITULO,
+  MENSAGEM_VALIDACAO_GENERICA,
+  type AvaliacaoErroCodigo,
+} from "@/lib/avaliacao-constantes";
 import {
   AVALIACAO_DEMO_CAMPANHA_NOME,
   AVALIACAO_DEMO_EMPRESA,
@@ -33,7 +40,9 @@ type Step =
   | "termos"
   | "orientacoes"
   | "questionario"
-  | "final";
+  | "final"
+  | "ja_respondida"
+  | "campanha_encerrada";
 
 interface AvaliacaoPortalProps {
   codigo: string;
@@ -71,6 +80,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   const [autenticado, setAutenticado] = useState(false);
   const [termosAceitos, setTermosAceitos] = useState(false);
   const [animKey, setAnimKey] = useState(0);
+  const [finalizando, setFinalizando] = useState(false);
 
   const itemAtual = FLOW_ITEMS[flowIndex] ?? FLOW_ITEMS[0];
 
@@ -119,6 +129,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         empresaNome?: string;
         campanhaNome?: string;
         disponivel?: boolean;
+        codigoErro?: AvaliacaoErroCodigo | null;
       };
       if (!res.ok || !json.ok) {
         setInfoError("Campanha não encontrada.");
@@ -129,6 +140,11 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       setEmpresaNome(json.empresaNome || "—");
       setCampanhaNome(json.campanhaNome || "Pesquisa de Riscos Psicossociais");
       setDisponivel(Boolean(json.disponivel));
+      if (json.codigoErro === "campanha_encerrada") {
+        setInfoError(null);
+        setStep("campanha_encerrada");
+        return;
+      }
       setInfoError(
         json.disponivel
           ? null
@@ -154,7 +170,18 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         autenticado?: boolean;
         empresaNome?: string;
         participanteNome?: string;
+        codigo?: AvaliacaoErroCodigo;
       };
+      if (json.codigo === "campanha_encerrada") {
+        setAutenticado(false);
+        setStep("campanha_encerrada");
+        return;
+      }
+      if (json.codigo === "ja_respondida") {
+        setAutenticado(false);
+        setStep("ja_respondida");
+        return;
+      }
       if (res.status === 403) {
         setAutenticado(false);
         return;
@@ -223,10 +250,21 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       const json = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        codigo?: AvaliacaoErroCodigo;
         empresaNome?: string;
         participanteNome?: string;
       };
       if (!res.ok || !json.ok) {
+        if (json.codigo === "ja_respondida") {
+          setAutenticado(false);
+          setStep("ja_respondida");
+          return;
+        }
+        if (json.codigo === "campanha_encerrada") {
+          setAutenticado(false);
+          setStep("campanha_encerrada");
+          return;
+        }
         setErroIdentificacao(json.error || MENSAGEM_VALIDACAO_GENERICA);
         setAutenticado(false);
         return;
@@ -246,18 +284,77 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   async function handleIniciarQuestionario() {
     if (!isDemo) {
       try {
-        await fetch("/api/avaliacao/iniciar", {
+        const res = await fetch("/api/avaliacao/iniciar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ codigoPublico: codigoDisplay }),
         });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          codigo?: AvaliacaoErroCodigo;
+        };
+        if (!res.ok || !json.ok) {
+          if (json.codigo === "ja_respondida") {
+            setStep("ja_respondida");
+            return;
+          }
+          if (json.codigo === "campanha_encerrada") {
+            setStep("campanha_encerrada");
+            return;
+          }
+          setInfoError(MENSAGEM_VALIDACAO_GENERICA);
+          setStep("landing");
+          return;
+        }
       } catch {
-        // protótipo
+        setInfoError(MENSAGEM_VALIDACAO_GENERICA);
+        setStep("landing");
+        return;
       }
     }
     setFlowIndex(0);
     setAnimKey((k) => k + 1);
     setStep("questionario");
+  }
+
+  async function handleConcluirPesquisa() {
+    if (isDemo) {
+      setStep("final");
+      return;
+    }
+    if (finalizando) return;
+    setFinalizando(true);
+    try {
+      const res = await fetch("/api/avaliacao/concluir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigoPublico: codigoDisplay }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        codigo?: AvaliacaoErroCodigo;
+      };
+      if (json.codigo === "ja_respondida") {
+        setStep("ja_respondida");
+        return;
+      }
+      if (json.codigo === "campanha_encerrada") {
+        setStep("campanha_encerrada");
+        return;
+      }
+      if (!res.ok || !json.ok) {
+        setInfoError(MENSAGEM_VALIDACAO_GENERICA);
+        setStep("landing");
+        return;
+      }
+      setAutenticado(false);
+      setStep("final");
+    } catch {
+      setInfoError(MENSAGEM_VALIDACAO_GENERICA);
+      setStep("landing");
+    } finally {
+      setFinalizando(false);
+    }
   }
 
   function handleProximaFlow() {
@@ -269,7 +366,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     }
 
     if (flowIndex >= FLOW_ITEMS.length - 1) {
-      setStep("final");
+      void handleConcluirPesquisa();
       return;
     }
     goFlow(flowIndex + 1);
@@ -386,6 +483,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
                       : []
                   }
                   isUltima={flowIndex >= FLOW_ITEMS.length - 1}
+                  finalizando={finalizando}
                   podeVoltar={flowIndex > 0}
                   onSelect={(alternativaId) =>
                     setRespostas((prev) => {
@@ -434,6 +532,24 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
 
           {step === "final" ? (
             <FinalStep onFinish={() => void handleEncerrar()} />
+          ) : null}
+
+          {step === "ja_respondida" ? (
+            <StatusMessageStep
+              titulo={MENSAGEM_JA_RESPONDIDA_TITULO}
+              corpo={MENSAGEM_JA_RESPONDIDA_CORPO}
+              tom="sucesso"
+              onClose={() => void handleEncerrar()}
+            />
+          ) : null}
+
+          {step === "campanha_encerrada" ? (
+            <StatusMessageStep
+              titulo={MENSAGEM_CAMPANHA_ENCERRADA_TITULO}
+              corpo={MENSAGEM_CAMPANHA_ENCERRADA_CORPO}
+              tom="encerrada"
+              onClose={() => void handleEncerrar()}
+            />
           ) : null}
         </div>
 
@@ -646,7 +762,7 @@ function IdentificacaoStep({
       </div>
 
       {erro ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {erro}
         </p>
       ) : null}
@@ -921,6 +1037,7 @@ function PerguntaStep({
   selecionada,
   fontesSelecionadas,
   isUltima,
+  finalizando,
   podeVoltar,
   onSelect,
   onToggleFonte,
@@ -933,6 +1050,7 @@ function PerguntaStep({
   selecionada: string;
   fontesSelecionadas: string[];
   isUltima: boolean;
+  finalizando?: boolean;
   podeVoltar: boolean;
   onSelect: (alternativaId: string) => void;
   onToggleFonte: (fonteId: string) => void;
@@ -1040,12 +1158,60 @@ function PerguntaStep({
         <button
           type="button"
           className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
-          disabled={!selecionada}
+          disabled={!selecionada || Boolean(finalizando)}
           onClick={onProxima}
         >
-          {isUltima ? "Finalizar pesquisa" : "Próxima"}
+          {finalizando
+            ? "Finalizando…"
+            : isUltima
+              ? "Finalizar pesquisa"
+              : "Próxima"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function StatusMessageStep({
+  titulo,
+  corpo,
+  tom,
+  onClose,
+}: {
+  titulo: string;
+  corpo: string;
+  tom: "sucesso" | "encerrada";
+  onClose: () => void;
+}) {
+  const paragraphs = corpo.split("\n\n").filter(Boolean);
+  return (
+    <div className="space-y-5 text-center">
+      <div
+        className={`mx-auto grid h-16 w-16 place-items-center rounded-full text-2xl font-extrabold text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] ${
+          tom === "sucesso"
+            ? "bg-gradient-to-br from-brand-green to-[#15803d]"
+            : "bg-gradient-to-br from-[#64748b] to-[#334155]"
+        }`}
+      >
+        {tom === "sucesso" ? "✓" : "!"}
+      </div>
+      <div>
+        <h2 className="text-xl font-extrabold text-navy sm:text-2xl">
+          {titulo}
+        </h2>
+        <div className="mt-3 space-y-3 text-sm leading-relaxed text-[#64748b]">
+          {paragraphs.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="btn btn-primary min-h-[52px] w-full justify-center py-3.5 text-[15px]"
+        onClick={onClose}
+      >
+        Fechar
+      </button>
     </div>
   );
 }

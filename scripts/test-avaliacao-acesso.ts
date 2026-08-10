@@ -121,7 +121,7 @@ run("TESTE 4 bloquear CPF existente fora da campanha", () => {
   assert.equal(r.ok, false);
 });
 
-run("TESTE 5 bloquear campanha encerrada", () => {
+run("TESTE 5 bloquear campanha encerrada por status", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
@@ -130,7 +130,19 @@ run("TESTE 5 bloquear campanha encerrada", () => {
     hojeIso: hoje,
   });
   assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "campanha_indisponivel");
+  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
+});
+
+run("TESTE 5b bloquear campanha após data de encerramento", () => {
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "5UA22W",
+    dataNascimentoIso: "1990-05-15",
+    campanha: campA,
+    participante: joao,
+    hojeIso: "2026-09-01",
+  });
+  assert.equal(r.ok, false);
+  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
 });
 
 run("TESTE 6 bloquear participante que já concluiu", () => {
