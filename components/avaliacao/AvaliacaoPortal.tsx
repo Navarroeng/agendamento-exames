@@ -33,10 +33,15 @@ import {
   maskDataNascimentoInput,
   parseDataNascimentoBr,
 } from "@/lib/date-br";
+import {
+  passoAposIdentificacao,
+  type SituacaoParticipantePortal,
+} from "@/lib/avaliacao-retomada";
 
 type Step =
   | "landing"
   | "identificacao"
+  | "retomada"
   | "termos"
   | "orientacoes"
   | "questionario"
@@ -158,70 +163,30 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     }
   }, [codigoDisplay]);
 
-  const carregarSessao = useCallback(async () => {
-    if (!codigoDisplay) return;
-    // Modo DEMO exclusivo para validação de UI/UX. Não utilizar para campanhas reais.
-    if (isAvaliacaoDemoCodigo(codigoDisplay)) return;
-
+  /**
+   * Nova abertura do link: limpa cookie anterior e NÃO auto-retoma.
+   * Isola aparelhos compartilhados — exige CPF + nascimento novamente.
+   */
+  const prepararAcessoLimpo = useCallback(async () => {
+    if (!codigoDisplay || isAvaliacaoDemoCodigo(codigoDisplay)) return;
     try {
-      const res = await fetch(
-        `/api/avaliacao/sessao?codigoPublico=${encodeURIComponent(codigoDisplay)}`
-      );
-      const json = (await res.json()) as {
-        ok?: boolean;
-        autenticado?: boolean;
-        empresaNome?: string;
-        participanteNome?: string;
-        codigo?: AvaliacaoErroCodigo;
-        questionarioIniciado?: boolean;
-        flowIndex?: number;
-        respostas?: Record<string, string>;
-      };
-      if (json.codigo === "campanha_encerrada") {
-        setAutenticado(false);
-        setStep("campanha_encerrada");
-        return;
-      }
-      if (json.codigo === "ja_respondida") {
-        setAutenticado(false);
-        setStep("ja_respondida");
-        return;
-      }
-      if (res.status === 403) {
-        setAutenticado(false);
-        return;
-      }
-      if (json.ok && json.autenticado) {
-        setAutenticado(true);
-        setEmpresaNome(json.empresaNome || empresaNome);
-        setParticipanteNome(json.participanteNome || "");
-        if (json.respostas) {
-          setRespostas(json.respostas);
-        }
-        if (json.questionarioIniciado) {
-          setFlowIndex(
-            Math.min(
-              Math.max(0, Number(json.flowIndex ?? 0)),
-              FLOW_ITEMS.length - 1
-            )
-          );
-          setAnimKey((k) => k + 1);
-          setStep("questionario");
-        } else {
-          setStep((atual) =>
-            atual === "landing" || atual === "identificacao" ? "termos" : atual
-          );
-        }
-      }
+      await fetch("/api/avaliacao/logout", { method: "POST" });
     } catch {
-      // ignora
+      // ignore
     }
-  }, [codigoDisplay, empresaNome]);
+    setAutenticado(false);
+    setParticipanteNome("");
+    setRespostas({});
+    setFlowIndex(0);
+    setTermosAceitos(false);
+  }, [codigoDisplay]);
 
   useEffect(() => {
-    void carregarInfo();
-    void carregarSessao();
-  }, [carregarInfo, carregarSessao]);
+    void (async () => {
+      await prepararAcessoLimpo();
+      await carregarInfo();
+    })();
+  }, [prepararAcessoLimpo, carregarInfo]);
 
   function goFlow(nextIndex: number) {
     setFlowIndex(nextIndex);
@@ -272,32 +237,112 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         codigo?: AvaliacaoErroCodigo;
         empresaNome?: string;
         participanteNome?: string;
+        situacao?: SituacaoParticipantePortal;
+        retomada?: {
+          flowIndex?: number;
+          totalRespondidas?: number;
+          respostas?: Record<string, string>;
+        } | null;
       };
       if (!res.ok || !json.ok) {
+        // Garante que cookie anterior/errado não permanece após falha.
+        try {
+          await fetch("/api/avaliacao/logout", { method: "POST" });
+        } catch {
+          // ignore
+        }
+        setAutenticado(false);
+        setRespostas({});
+        setFlowIndex(0);
         if (json.codigo === "ja_respondida") {
-          setAutenticado(false);
           setStep("ja_respondida");
           return;
         }
         if (json.codigo === "campanha_encerrada") {
-          setAutenticado(false);
           setStep("campanha_encerrada");
           return;
         }
         setErroIdentificacao(json.error || MENSAGEM_VALIDACAO_GENERICA);
-        setAutenticado(false);
         return;
       }
+
       setAutenticado(true);
       setEmpresaNome(json.empresaNome || empresaNome);
       setParticipanteNome(json.participanteNome || "");
       setTermosAceitos(false);
+
+      const situacao = json.situacao ?? "novo";
+      const passo = passoAposIdentificacao(situacao);
+
+      if (passo === "retomada") {
+        if (json.retomada?.respostas) {
+          setRespostas(json.retomada.respostas);
+        }
+        setFlowIndex(
+          Math.min(
+            Math.max(0, Number(json.retomada?.flowIndex ?? 0)),
+            FLOW_ITEMS.length - 1
+          )
+        );
+        setStep("retomada");
+        return;
+      }
+
+      setRespostas({});
+      setFlowIndex(0);
       setStep("termos");
     } catch {
       setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
     } finally {
       setValidando(false);
     }
+  }
+
+  async function handleContinuarRetomada() {
+    if (!isDemo) {
+      try {
+        const res = await fetch("/api/avaliacao/iniciar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigoPublico: codigoDisplay }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          codigo?: AvaliacaoErroCodigo;
+          flowIndex?: number;
+          respostas?: Record<string, string>;
+        };
+        if (!res.ok || !json.ok) {
+          if (json.codigo === "ja_respondida") {
+            setStep("ja_respondida");
+            return;
+          }
+          if (json.codigo === "campanha_encerrada") {
+            setStep("campanha_encerrada");
+            return;
+          }
+          setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
+          setStep("identificacao");
+          return;
+        }
+        if (json.respostas) {
+          setRespostas(json.respostas);
+        }
+        setFlowIndex(
+          Math.min(
+            Math.max(0, Number(json.flowIndex ?? 0)),
+            FLOW_ITEMS.length - 1
+          )
+        );
+      } catch {
+        setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
+        setStep("identificacao");
+        return;
+      }
+    }
+    setErroQuestionario(null);
+    setAnimKey((k) => k + 1);
+    setStep("questionario");
   }
 
   async function handleIniciarQuestionario() {
@@ -537,6 +582,26 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
               onDataNascimentoChange={setDataNascimento}
               onBack={() => setStep("landing")}
               onContinue={() => void handleValidar()}
+            />
+          ) : null}
+
+          {step === "retomada" ? (
+            <RetomadaStep
+              participanteNome={participanteNome}
+              onContinue={() => void handleContinuarRetomada()}
+              onBack={() => {
+                void (async () => {
+                  try {
+                    await fetch("/api/avaliacao/logout", { method: "POST" });
+                  } catch {
+                    // ignore
+                  }
+                  setAutenticado(false);
+                  setRespostas({});
+                  setFlowIndex(0);
+                  setStep("identificacao");
+                })();
+              }}
             />
           ) : null}
 
@@ -892,6 +957,56 @@ function IdentificacaoStep({
           onClick={onContinue}
         >
           {loading ? "Validando…" : "Continuar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RetomadaStep({
+  participanteNome,
+  onContinue,
+  onBack,
+}: {
+  participanteNome: string;
+  onContinue: () => void;
+  onBack: () => void;
+}) {
+  const primeiroNome = participanteNome.trim().split(/\s+/)[0];
+  return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <h2 className="text-lg font-extrabold text-navy">
+          Pesquisa em andamento
+        </h2>
+        <p className="mt-2 text-sm text-[#64748b]">
+          {primeiroNome ? `${primeiroNome}, ` : ""}Encontramos uma pesquisa em
+          andamento.
+        </p>
+        <p className="mt-1 text-sm font-semibold text-navy">
+          Você continuará de onde parou.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a8a]">
+        Suas respostas já gravadas foram recuperadas com segurança após a
+        identificação.
+      </div>
+
+      <div className="flex flex-col gap-2.5 sm:flex-row">
+        <button
+          type="button"
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
+          onClick={onBack}
+        >
+          Voltar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
+          onClick={onContinue}
+        >
+          Continuar pesquisa
         </button>
       </div>
     </div>

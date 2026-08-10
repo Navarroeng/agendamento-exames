@@ -16,6 +16,14 @@ import {
 } from "@/lib/avaliacao-constantes";
 import { parseDataNascimentoBr } from "@/lib/date-br";
 import { normalizeCpfDigits, isValidCPF } from "@/lib/cpf";
+import { buildCopsoqFlow } from "@/lib/copsoq";
+import {
+  calcularFlowIndexRetomada,
+  buscarSessaoExistente,
+  listarRespostasDaSessao,
+  mapRespostasParaEstadoLocal,
+} from "@/lib/avaliacao-persistencia";
+import { classificarSituacaoParticipante } from "@/lib/avaliacao-retomada";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   codigoErroPublico,
@@ -220,11 +228,83 @@ export async function POST(request: Request) {
       codigoPublico: resultado.codigoPublico,
     });
 
+    // Situação pós-identificação (retomada segura — nunca auto-login por cookie).
+    const { data: partDetalhe } = await supabase
+      .from("riscos_campanha_participantes")
+      .select("status, concluiu_em, iniciou_em")
+      .eq("id", resultado.participanteId)
+      .eq("campanha_id", resultado.campanhaId)
+      .maybeSingle();
+
+    let situacao = classificarSituacaoParticipante({
+      statusParticipante: String(partDetalhe?.status ?? "pendente"),
+      concluiuEm: partDetalhe?.concluiu_em
+        ? String(partDetalhe.concluiu_em)
+        : null,
+      iniciouEm: partDetalhe?.iniciou_em
+        ? String(partDetalhe.iniciou_em)
+        : null,
+      statusSessao: null,
+    });
+
+    let retomada: {
+      flowIndex: number;
+      totalRespondidas: number;
+      respostas: Record<string, string>;
+    } | null = null;
+
+    if (situacao !== "ja_respondida") {
+      const sessao = await buscarSessaoExistente(supabase, {
+        campanhaId: resultado.campanhaId,
+        participanteId: resultado.participanteId,
+      });
+      situacao = classificarSituacaoParticipante({
+        statusParticipante: String(partDetalhe?.status ?? "pendente"),
+        concluiuEm: partDetalhe?.concluiu_em
+          ? String(partDetalhe.concluiu_em)
+          : null,
+        iniciouEm: partDetalhe?.iniciou_em
+          ? String(partDetalhe.iniciou_em)
+          : null,
+        statusSessao: sessao?.status ?? null,
+      });
+
+      if (situacao === "em_andamento" && sessao) {
+        const respostas = await listarRespostasDaSessao(supabase, {
+          sessaoId: sessao.id,
+          campanhaId: resultado.campanhaId,
+        });
+        const { items } = buildCopsoqFlow();
+        retomada = {
+          flowIndex: calcularFlowIndexRetomada(items, respostas),
+          totalRespondidas: respostas.length,
+          respostas: mapRespostasParaEstadoLocal(respostas),
+        };
+      }
+    }
+
+    if (situacao === "ja_respondida") {
+      console.info("[avaliacao/validar] motivo=participante_ja_concluiu", {
+        codigoPublico,
+        situacao,
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: "ja_respondida",
+          error: MENSAGEM_JA_RESPONDIDA_CORPO,
+        },
+        { status: 401 }
+      );
+    }
+
     const response = NextResponse.json({
       ok: true,
       empresaNome: resultado.empresaNome,
       participanteNome: resultado.participanteNome,
       codigoPublico: resultado.codigoPublico,
+      situacao,
+      retomada,
     });
 
     response.cookies.set(AVALIACAO_SESSION_COOKIE, token, {

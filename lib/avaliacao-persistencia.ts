@@ -178,13 +178,13 @@ export async function carregarContextoPortal(
 }
 
 /**
- * Garante uma única sessão em andamento por participante/campanha.
- * Cria sessão anônima + vínculo segregado se ainda não existir.
+ * Localiza sessão existente do participante (sem criar).
+ * Usado na identificação/retomada segura.
  */
-export async function obterOuCriarSessaoRespostas(
+export async function buscarSessaoExistente(
   supabase: SupabaseClient,
   input: { campanhaId: string; participanteId: string }
-): Promise<AvaliacaoSessaoRow> {
+): Promise<AvaliacaoSessaoRow | null> {
   const { data: vinculo } = await supabase
     .from("riscos_avaliacao_vinculos")
     .select("sessao_id")
@@ -192,28 +192,39 @@ export async function obterOuCriarSessaoRespostas(
     .eq("participante_id", input.participanteId)
     .maybeSingle();
 
-  if (vinculo?.sessao_id) {
-    const { data: sessao, error } = await supabase
-      .from("riscos_avaliacao_sessoes")
-      .select(
-        "id, campanha_id, identificador_anonimo, status, iniciado_em, concluido_em"
-      )
-      .eq("id", vinculo.sessao_id)
-      .eq("campanha_id", input.campanhaId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!sessao) {
-      throw new Error("Vínculo sem sessão correspondente.");
-    }
-    return {
-      id: String(sessao.id),
-      campanha_id: String(sessao.campanha_id),
-      identificador_anonimo: String(sessao.identificador_anonimo),
-      status: sessao.status === "concluida" ? "concluida" : "em_andamento",
-      iniciado_em: String(sessao.iniciado_em),
-      concluido_em: sessao.concluido_em ? String(sessao.concluido_em) : null,
-    };
-  }
+  if (!vinculo?.sessao_id) return null;
+
+  const { data: sessao, error } = await supabase
+    .from("riscos_avaliacao_sessoes")
+    .select(
+      "id, campanha_id, identificador_anonimo, status, iniciado_em, concluido_em"
+    )
+    .eq("id", vinculo.sessao_id)
+    .eq("campanha_id", input.campanhaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!sessao) return null;
+
+  return {
+    id: String(sessao.id),
+    campanha_id: String(sessao.campanha_id),
+    identificador_anonimo: String(sessao.identificador_anonimo),
+    status: sessao.status === "concluida" ? "concluida" : "em_andamento",
+    iniciado_em: String(sessao.iniciado_em),
+    concluido_em: sessao.concluido_em ? String(sessao.concluido_em) : null,
+  };
+}
+
+/**
+ * Garante uma única sessão em andamento por participante/campanha.
+ * Cria sessão anônima + vínculo segregado se ainda não existir.
+ */
+export async function obterOuCriarSessaoRespostas(
+  supabase: SupabaseClient,
+  input: { campanhaId: string; participanteId: string }
+): Promise<AvaliacaoSessaoRow> {
+  const existente = await buscarSessaoExistente(supabase, input);
+  if (existente) return existente;
 
   const anon = gerarIdentificadorAnonimo();
   const { data: criada, error: createErr } = await supabase
@@ -239,33 +250,10 @@ export async function obterOuCriarSessaoRespostas(
 
   if (vinculoErr) {
     // Corrida: outro request criou o vínculo — reutiliza.
-    const { data: existente } = await supabase
-      .from("riscos_avaliacao_vinculos")
-      .select("sessao_id")
-      .eq("campanha_id", input.campanhaId)
-      .eq("participante_id", input.participanteId)
-      .maybeSingle();
-    if (!existente?.sessao_id) throw vinculoErr;
-
+    const reuso = await buscarSessaoExistente(supabase, input);
+    if (!reuso) throw vinculoErr;
     await supabase.from("riscos_avaliacao_sessoes").delete().eq("id", criada.id);
-
-    const { data: sessao } = await supabase
-      .from("riscos_avaliacao_sessoes")
-      .select(
-        "id, campanha_id, identificador_anonimo, status, iniciado_em, concluido_em"
-      )
-      .eq("id", existente.sessao_id)
-      .eq("campanha_id", input.campanhaId)
-      .single();
-
-    return {
-      id: String(sessao!.id),
-      campanha_id: String(sessao!.campanha_id),
-      identificador_anonimo: String(sessao!.identificador_anonimo),
-      status: sessao!.status === "concluida" ? "concluida" : "em_andamento",
-      iniciado_em: String(sessao!.iniciado_em),
-      concluido_em: sessao!.concluido_em ? String(sessao!.concluido_em) : null,
-    };
+    return reuso;
   }
 
   return {
