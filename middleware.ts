@@ -2,6 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set(["/login", "/sem-permissao"]);
 
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  // Portal do colaborador (pesquisa psicossocial) — UI pública.
+  if (pathname === "/avaliacao" || pathname.startsWith("/avaliacao/")) {
+    return true;
+  }
+  return false;
+}
+
 function hasSupabaseSession(request: NextRequest): boolean {
   return request.cookies.getAll().some((cookie) => {
     if (!cookie.name.includes("auth-token")) return false;
@@ -14,7 +23,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = hasSupabaseSession(request);
 
-  if (PUBLIC_PATHS.has(pathname)) {
+  if (isPublicPath(pathname)) {
     if (pathname === "/login" && hasSession) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
