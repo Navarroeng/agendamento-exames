@@ -6,13 +6,17 @@ import {
 import {
   gerarCodigoPublicoCampanha,
   isRiscosCampanhaStatus,
+  validateAbrirCampanhaRiscos,
+  validateEncerrarCampanhaRiscos,
   validateRiscosCampanhaCreateInput,
   type RiscosCampanhaCreateInput,
   type RiscosCampanhaRecord,
   type RiscosCampanhaStatus,
 } from "@/lib/riscos-campanha";
+import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { buscarPerfilUsuarioLogado } from "@/services/perfil.service";
 
 const CAMPANHA_SELECT =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
@@ -222,16 +226,38 @@ export async function abrirCampanhaRiscos(
   campanhaId: string,
   auditOptions?: CampanhaAuditOptions
 ): Promise<RiscosCampanhaRecord> {
+  const perfil = await buscarPerfilUsuarioLogado();
+  if (!isPerfilAdmin(perfil?.perfil)) {
+    throw new Error("Somente administradores podem abrir a pesquisa.");
+  }
+
   const supabase = createClient();
+  const { data: atual, error: errAtual } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("id", campanhaId)
+    .maybeSingle();
+  if (errAtual) throw errAtual;
+  if (!atual) throw new Error("Campanha não encontrada.");
+
+  const before = mapCampanhaRow(atual as Record<string, unknown>);
+  const validacao = validateAbrirCampanhaRiscos(before);
+  if (validacao) throw new Error(validacao);
+
   const { data, error } = await supabase
     .from("riscos_campanhas")
     .update({ status: "aberta" })
     .eq("id", campanhaId)
+    .eq("status", "em_preparacao")
     .select(CAMPANHA_SELECT)
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) throw new Error("Campanha não encontrada.");
+  if (!data) {
+    throw new Error(
+      "Não foi possível abrir a pesquisa. Verifique se ela ainda está em preparação."
+    );
+  }
 
   const record = mapCampanhaRow(data as Record<string, unknown>);
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
@@ -240,14 +266,57 @@ export async function abrirCampanhaRiscos(
     usuarioNome: nome,
     usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_campanha_criada,
+    acao: AUDITORIA_ACOES.riscos_campanha_aberta,
     registroId: record.id,
     registroNome: record.empresa_nome,
     descricao: `${nome} abriu a campanha ${record.codigo_publico} para respostas.`,
-    dadosDepois: { status: record.status, codigo_publico: record.codigo_publico },
+    dadosAntes: {
+      status: before.status,
+      codigo_publico: before.codigo_publico,
+      data_inicio: before.data_inicio,
+      data_encerramento: before.data_encerramento,
+    },
+    dadosDepois: {
+      status: record.status,
+      codigo_publico: record.codigo_publico,
+      data_inicio: record.data_inicio,
+      data_encerramento: record.data_encerramento,
+      updated_at: record.updated_at ?? null,
+    },
   });
 
   return record;
+}
+
+/**
+ * Encerramento manual — estrutura preparada; implementação futura.
+ * Não altera dados nesta etapa.
+ */
+export async function encerrarCampanhaRiscos(
+  campanhaId: string,
+  _auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const perfil = await buscarPerfilUsuarioLogado();
+  if (!isPerfilAdmin(perfil?.perfil)) {
+    throw new Error("Somente administradores podem encerrar a pesquisa.");
+  }
+
+  const supabase = createClient();
+  const { data: atual, error } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("id", campanhaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!atual) throw new Error("Campanha não encontrada.");
+
+  const record = mapCampanhaRow(atual as Record<string, unknown>);
+  const validacao = validateEncerrarCampanhaRiscos(record);
+  if (validacao) throw new Error(validacao);
+
+  throw new Error(
+    "O encerramento manual da pesquisa será disponibilizado em breve."
+  );
 }
 
 export async function garantirCodigoAcessoCampanha(

@@ -107,3 +107,55 @@ export function formatPeriodoCampanha(
 export function pathAvaliacaoCampanha(codigo: string): string {
   return `/avaliacao/${codigo.trim().toUpperCase()}`;
 }
+
+/**
+ * Valida se a campanha pode ser aberta para respostas no Portal.
+ * Não altera dados — apenas regras de negócio.
+ */
+export function validateAbrirCampanhaRiscos(
+  campanha: Pick<
+    RiscosCampanhaRecord,
+    "status" | "data_inicio" | "data_encerramento"
+  >,
+  hojeIso?: string
+): string | null {
+  if (campanha.status === "aberta") {
+    return "Esta pesquisa já está aberta.";
+  }
+  if (campanha.status === "encerrada") {
+    return "Não é possível abrir uma pesquisa encerrada.";
+  }
+  if (campanha.status !== "em_preparacao") {
+    return "Somente pesquisas em preparação podem ser abertas.";
+  }
+
+  const inicio = String(campanha.data_inicio ?? "").trim().slice(0, 10);
+  const fim = String(campanha.data_encerramento ?? "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
+    return "Informe a data de início antes de abrir a pesquisa.";
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fim)) {
+    return "Informe a data de encerramento antes de abrir a pesquisa.";
+  }
+  if (fim < inicio) {
+    return "A data de encerramento deve ser igual ou posterior ao início.";
+  }
+
+  const hoje = (hojeIso ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+  if (hoje < inicio || hoje > fim) {
+    return "A data atual precisa estar dentro do período configurado para abrir a pesquisa.";
+  }
+
+  return null;
+}
+
+/** Estrutura preparada para encerramento manual (ainda não implementado). */
+export function validateEncerrarCampanhaRiscos(
+  campanha: Pick<RiscosCampanhaRecord, "status">
+): string | null {
+  if (campanha.status !== "aberta") {
+    return "Somente pesquisas abertas podem ser encerradas.";
+  }
+  return null;
+}
+

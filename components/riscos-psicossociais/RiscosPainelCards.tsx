@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
+import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
@@ -119,6 +120,7 @@ export function RiscosPainelCards({
   const campanha = processo.campanha;
   const [criarAberto, setCriarAberto] = useState(false);
   const [verParticipantes, setVerParticipantes] = useState(false);
+  const [confirmAbrirOpen, setConfirmAbrirOpen] = useState(false);
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
   const [quantidade, setQuantidade] = useState("");
@@ -617,13 +619,20 @@ export function RiscosPainelCards({
               disabled={
                 !campanha ||
                 savingCampanha ||
-                campanha.status === "aberta" ||
-                campanha.status === "encerrada"
+                campanha.status !== "em_preparacao"
               }
-              onClick={() => void onAbrirCampanha()}
+              onClick={() => setConfirmAbrirOpen(true)}
               title="Libera o portal para respostas (status Aberta)"
             >
               Abrir pesquisa
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled
+              title="Encerramento manual será disponibilizado em breve"
+            >
+              Encerrar pesquisa
             </button>
             <button
               type="button"
@@ -635,6 +644,64 @@ export function RiscosPainelCards({
             </button>
           </div>
         </PanelCard>
+
+        <Modal
+          open={confirmAbrirOpen}
+          onClose={() => {
+            if (!savingCampanha) setConfirmAbrirOpen(false);
+          }}
+          title="Abrir pesquisa"
+          subtitle={
+            campanha
+              ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+              : undefined
+          }
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                disabled={savingCampanha}
+                onClick={() => setConfirmAbrirOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                disabled={savingCampanha || !campanha}
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await onAbrirCampanha();
+                      setConfirmAbrirOpen(false);
+                    } catch {
+                      // mantém o modal aberto; o hook já exibe o toast de erro
+                    }
+                  })();
+                }}
+              >
+                {savingCampanha ? "Abrindo…" : "Abrir pesquisa"}
+              </button>
+            </div>
+          }
+        >
+          <p className="text-sm leading-relaxed text-[#475569]">
+            Após abrir a pesquisa, participantes autorizados poderão acessar o
+            Portal do Colaborador durante o período configurado.
+          </p>
+          {campanha ? (
+            <p className="mt-3 text-xs text-[#64748b]">
+              Período:{" "}
+              <span className="font-semibold text-navy">
+                {formatPeriodoCampanha(
+                  campanha.data_inicio,
+                  campanha.data_encerramento
+                )}
+              </span>
+            </p>
+          ) : null}
+        </Modal>
 
         <PanelCard
           title="Histórico"

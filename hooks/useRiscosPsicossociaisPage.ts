@@ -424,6 +424,7 @@ export function useRiscosPsicossociaisPage() {
       toast.error(
         err instanceof Error ? err.message : "Erro ao abrir a pesquisa."
       );
+      throw err;
     } finally {
       setSavingCampanha(false);
     }
