@@ -192,6 +192,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   }
 
   function handleProxima() {
+    // Resposta obrigatória — não avança sem seleção na pergunta atual.
+    if (!respostas[perguntaIndex]) return;
     if (perguntaIndex >= TOTAL_PERGUNTAS - 1) {
       setStep("final");
       return;
@@ -563,6 +565,27 @@ function QuestionarioStep({
   onAnterior: () => void;
   onProxima: () => void;
 }) {
+  const [erroResposta, setErroResposta] = useState<string | null>(null);
+  const isUltima = perguntaNumero >= total;
+
+  useEffect(() => {
+    setErroResposta(null);
+  }, [perguntaNumero]);
+
+  function handleSelect(opcao: string) {
+    setErroResposta(null);
+    onSelect(opcao);
+  }
+
+  function handleAvancar() {
+    if (!selecionada) {
+      setErroResposta("Selecione uma resposta para continuar.");
+      return;
+    }
+    setErroResposta(null);
+    onProxima();
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -598,7 +621,7 @@ function QuestionarioStep({
                   ? "border-brand-blue bg-[#eef2ff] text-navy"
                   : "border-[#e8edf5] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fafc]"
               }`}
-              onClick={() => onSelect(opcao)}
+              onClick={() => handleSelect(opcao)}
             >
               <span
                 className={`mr-3 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
@@ -617,10 +640,19 @@ function QuestionarioStep({
         })}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      {erroResposta ? (
+        <p
+          className="text-center text-sm font-medium text-[#b45309]"
+          role="status"
+        >
+          {erroResposta}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
-          className="btn min-h-[48px] justify-center sm:flex-1"
+          className="btn min-h-[52px] justify-center px-4 text-[15px] sm:flex-1"
           disabled={perguntaNumero <= 1}
           onClick={onAnterior}
         >
@@ -628,11 +660,10 @@ function QuestionarioStep({
         </button>
         <button
           type="button"
-          className="btn btn-primary min-h-[48px] justify-center sm:flex-1"
-          disabled={!selecionada}
-          onClick={onProxima}
+          className="btn btn-primary min-h-[52px] justify-center px-4 text-[15px] sm:flex-1"
+          onClick={handleAvancar}
         >
-          {perguntaNumero >= total ? "Concluir" : "Próxima"}
+          {isUltima ? "Finalizar pesquisa" : "Próxima"}
         </button>
       </div>
     </div>
