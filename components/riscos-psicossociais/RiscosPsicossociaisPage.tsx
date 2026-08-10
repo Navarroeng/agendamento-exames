@@ -16,12 +16,10 @@ export function RiscosPsicossociaisPage() {
     mesSelecionado,
     responsaveis,
     modalProcesso,
-    modalTab,
     modalParticipantes,
     savingLista,
     savingCampanha,
     savingParticipante,
-    setModalTab,
     handleFilterChange,
     clearFilters,
     handleMesChange,
@@ -41,7 +39,7 @@ export function RiscosPsicossociaisPage() {
   return (
     <AppShell
       title="Riscos Psicossociais"
-      subtitle="Continuidade operacional dos processos com implantação concluída. A primeira etapa depende da conclusão de Laudos SST."
+      subtitle="Painel operacional das pesquisas psicossociais. Acompanhe pré-requisitos, participantes e andamento em uma única tela."
       icon={<IconShield size={20} />}
     >
       <div className="mb-[18px]">
@@ -67,12 +65,10 @@ export function RiscosPsicossociaisPage() {
       <RiscosPsicossociaisModal
         open={Boolean(modalProcesso)}
         processo={modalProcesso}
-        tab={modalTab}
         savingLista={savingLista}
         savingCampanha={savingCampanha}
         participantes={modalParticipantes}
         savingParticipante={savingParticipante}
-        onTabChange={setModalTab}
         onClose={closeModal}
         onSalvarSolicitacaoLista={handleSalvarSolicitacaoLista}
         onSalvarRecebimentoLista={handleSalvarRecebimentoLista}

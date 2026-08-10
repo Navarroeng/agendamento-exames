@@ -9,7 +9,6 @@ import {
   buildRiscosPsicossociaisProcesso,
   filterRiscosPsicossociaisProcessos,
   filterRiscosPsicossociaisProcessosPorMes,
-  type RiscosPsicossociaisEtapaId,
   type RiscosPsicossociaisFilters,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
@@ -59,8 +58,6 @@ export function useRiscosPsicossociaisPage() {
   );
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
-  const [modalTab, setModalTab] =
-    useState<RiscosPsicossociaisEtapaId>("laudos_sst");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -174,7 +171,6 @@ export function useRiscosPsicossociaisPage() {
   const openProcesso = useCallback(
     (processo: RiscosPsicossociaisProcesso) => {
       setModalProcesso(processo);
-      setModalTab(processo.etapaAtual);
       if (processo.campanha?.id) {
         void carregarParticipantes(processo.campanha.id);
       } else {
@@ -186,7 +182,6 @@ export function useRiscosPsicossociaisPage() {
 
   const closeModal = useCallback(() => {
     setModalProcesso(null);
-    setModalTab("laudos_sst");
     setModalParticipantes([]);
   }, []);
 
@@ -480,12 +475,10 @@ export function useRiscosPsicossociaisPage() {
     mesSelecionado,
     responsaveis,
     modalProcesso,
-    modalTab,
     modalParticipantes,
     savingLista,
     savingCampanha,
     savingParticipante,
-    setModalTab,
     handleFilterChange,
     clearFilters,
     handleMesChange,
