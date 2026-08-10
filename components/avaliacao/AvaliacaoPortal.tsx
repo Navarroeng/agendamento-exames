@@ -1,42 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { NavarroLogo } from "@/components/layout/NavarroLogo";
 import { Field, RequiredMark } from "@/components/ui/Field";
+import { Modal } from "@/components/ui/Modal";
 import { MENSAGEM_VALIDACAO_GENERICA } from "@/lib/avaliacao-constantes";
+import {
+  TERMO_COMPLETO_PARAGRAPHOS,
+  TERMO_RESUMO_ITENS,
+  TERMO_TITULO,
+} from "@/lib/avaliacao-termos-navarro";
+import {
+  buildCopsoqFlow,
+  getOpcoesEscala,
+  type CopsoqFlowItem,
+} from "@/lib/copsoq-ii-br";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 
-type Step = "landing" | "identificacao" | "apresentacao" | "questionario" | "final";
-
-const TOTAL_PERGUNTAS = 35;
-
-const PERGUNTAS_PROTOTIPO = [
-  "Com que frequência você se sente sobrecarregado(a) pelas demandas do trabalho?",
-  "Com que frequência você consegue conciliar as exigências do trabalho com sua vida pessoal?",
-  "Com que frequência você se sente reconhecido(a) pelo trabalho que realiza?",
-  "Com que frequência você tem clareza sobre suas responsabilidades no trabalho?",
-  "Com que frequência você se sente à vontade para expressar opiniões no ambiente de trabalho?",
-];
-
-const OPCOES = [
-  "Nunca",
-  "Raramente",
-  "Às vezes",
-  "Frequentemente",
-  "Sempre",
-] as const;
+type Step =
+  | "landing"
+  | "identificacao"
+  | "termos"
+  | "orientacoes"
+  | "questionario"
+  | "final";
 
 interface AvaliacaoPortalProps {
   codigo: string;
 }
+
+const { items: FLOW_ITEMS, totalPerguntas: TOTAL_PERGUNTAS } = buildCopsoqFlow();
 
 export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   const codigoDisplay = codigo.trim().toUpperCase() || "";
   const [step, setStep] = useState<Step>("landing");
   const [cpf, setCpf] = useState("");
   const [codigoAcesso, setCodigoAcesso] = useState("");
-  const [perguntaIndex, setPerguntaIndex] = useState(0);
-  const [respostas, setRespostas] = useState<Record<number, string>>({});
+  const [flowIndex, setFlowIndex] = useState(0);
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
   const [empresaNome, setEmpresaNome] = useState("Carregando…");
   const [campanhaNome, setCampanhaNome] = useState(
     "Pesquisa de Riscos Psicossociais"
@@ -49,17 +50,32 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
   );
   const [participanteNome, setParticipanteNome] = useState("");
   const [autenticado, setAutenticado] = useState(false);
+  const [termosAceitos, setTermosAceitos] = useState(false);
+  const [animKey, setAnimKey] = useState(0);
 
-  const progressoPct = Math.round(
-    ((perguntaIndex + 1) / TOTAL_PERGUNTAS) * 100
-  );
+  const itemAtual = FLOW_ITEMS[flowIndex] ?? FLOW_ITEMS[0];
 
-  const perguntaTexto = useMemo(() => {
-    return (
-      PERGUNTAS_PROTOTIPO[perguntaIndex % PERGUNTAS_PROTOTIPO.length] ??
-      PERGUNTAS_PROTOTIPO[0]
+  const progresso = useMemo(() => {
+    if (!itemAtual) {
+      return { pct: 0, numero: 1, dimensaoNome: "" };
+    }
+    if (itemAtual.type === "pergunta") {
+      return {
+        pct: Math.round((itemAtual.numero / TOTAL_PERGUNTAS) * 100),
+        numero: itemAtual.numero,
+        dimensaoNome: itemAtual.dimensao.nome,
+      };
+    }
+    const num = Math.min(
+      itemAtual.primeiraPerguntaIndex + 1,
+      TOTAL_PERGUNTAS
     );
-  }, [perguntaIndex]);
+    return {
+      pct: Math.round((num / TOTAL_PERGUNTAS) * 100),
+      numero: num,
+      dimensaoNome: itemAtual.dimensao.nome,
+    };
+  }, [itemAtual]);
 
   const carregarInfo = useCallback(async () => {
     if (!codigoDisplay) {
@@ -106,7 +122,6 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         autenticado?: boolean;
         empresaNome?: string;
         participanteNome?: string;
-        error?: string;
       };
       if (res.status === 403) {
         setAutenticado(false);
@@ -117,13 +132,11 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         setEmpresaNome(json.empresaNome || empresaNome);
         setParticipanteNome(json.participanteNome || "");
         setStep((atual) =>
-          atual === "landing" || atual === "identificacao"
-            ? "apresentacao"
-            : atual
+          atual === "landing" || atual === "identificacao" ? "termos" : atual
         );
       }
     } catch {
-      // ignora — usuário fará login
+      // ignora
     }
   }, [codigoDisplay, empresaNome]);
 
@@ -132,14 +145,15 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
     void carregarSessao();
   }, [carregarInfo, carregarSessao]);
 
+  function goFlow(nextIndex: number) {
+    setFlowIndex(nextIndex);
+    setAnimKey((k) => k + 1);
+  }
+
   async function handleValidar() {
     setErroIdentificacao(null);
     const digits = normalizeCpfDigits(cpf);
-    if (!isValidCPF(digits)) {
-      setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
-      return;
-    }
-    if (!codigoAcesso.trim()) {
+    if (!isValidCPF(digits) || !codigoAcesso.trim()) {
       setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
       return;
     }
@@ -169,7 +183,8 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       setAutenticado(true);
       setEmpresaNome(json.empresaNome || empresaNome);
       setParticipanteNome(json.participanteNome || "");
-      setStep("apresentacao");
+      setTermosAceitos(false);
+      setStep("termos");
     } catch {
       setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
     } finally {
@@ -185,25 +200,31 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         body: JSON.stringify({ codigoPublico: codigoDisplay }),
       });
     } catch {
-      // não bloqueia protótipo de perguntas
+      // protótipo
     }
-    setPerguntaIndex(0);
+    setFlowIndex(0);
+    setAnimKey((k) => k + 1);
     setStep("questionario");
   }
 
-  function handleProxima() {
-    // Resposta obrigatória — não avança sem seleção na pergunta atual.
-    if (!respostas[perguntaIndex]) return;
-    if (perguntaIndex >= TOTAL_PERGUNTAS - 1) {
+  function handleProximaFlow() {
+    const atual = FLOW_ITEMS[flowIndex];
+    if (!atual) return;
+
+    if (atual.type === "pergunta") {
+      if (!respostas[atual.pergunta.id]) return;
+    }
+
+    if (flowIndex >= FLOW_ITEMS.length - 1) {
       setStep("final");
       return;
     }
-    setPerguntaIndex((i) => i + 1);
+    goFlow(flowIndex + 1);
   }
 
-  function handleAnterior() {
-    if (perguntaIndex <= 0) return;
-    setPerguntaIndex((i) => i - 1);
+  function handleAnteriorFlow() {
+    if (flowIndex <= 0) return;
+    goFlow(flowIndex - 1);
   }
 
   async function handleEncerrar() {
@@ -213,8 +234,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       // ignore
     }
     setAutenticado(false);
+    setTermosAceitos(false);
     setStep("landing");
-    setPerguntaIndex(0);
+    setFlowIndex(0);
     setRespostas({});
     setCpf("");
     setCodigoAcesso("");
@@ -242,6 +264,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
               codigoDisplay={codigoDisplay}
               disponivel={podeIniciar}
               mensagem={infoError}
+              totalPerguntas={TOTAL_PERGUNTAS}
               onStart={() => setStep("identificacao")}
             />
           ) : null}
@@ -259,33 +282,58 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
             />
           ) : null}
 
-          {step === "apresentacao" ? (
-            <ApresentacaoStep
+          {step === "termos" ? (
+            <TermosStep
               participanteNome={participanteNome}
-              onBack={() => {
-                if (autenticado) {
-                  setStep("landing");
-                  return;
-                }
-                setStep("identificacao");
-              }}
+              aceito={termosAceitos}
+              onAceitoChange={setTermosAceitos}
+              onBack={() => setStep("identificacao")}
+              onContinue={() => setStep("orientacoes")}
+            />
+          ) : null}
+
+          {step === "orientacoes" ? (
+            <OrientacoesStep
+              totalPerguntas={TOTAL_PERGUNTAS}
+              onBack={() => setStep("termos")}
               onStart={() => void handleIniciarQuestionario()}
             />
           ) : null}
 
-          {step === "questionario" ? (
-            <QuestionarioStep
-              perguntaNumero={perguntaIndex + 1}
-              total={TOTAL_PERGUNTAS}
-              progressoPct={progressoPct}
-              perguntaTexto={perguntaTexto}
-              selecionada={respostas[perguntaIndex] ?? ""}
-              onSelect={(opcao) =>
-                setRespostas((prev) => ({ ...prev, [perguntaIndex]: opcao }))
-              }
-              onAnterior={handleAnterior}
-              onProxima={handleProxima}
-            />
+          {step === "questionario" && itemAtual ? (
+            <div
+              key={animKey}
+              className="avaliacao-step-enter"
+            >
+              {itemAtual.type === "transicao" ? (
+                <TransicaoStep
+                  progresso={progresso}
+                  totalPerguntas={TOTAL_PERGUNTAS}
+                  texto={itemAtual.dimensao.textoTransicao}
+                  dimensaoNome={itemAtual.dimensao.nome}
+                  podeVoltar={flowIndex > 0}
+                  onAnterior={handleAnteriorFlow}
+                  onProxima={handleProximaFlow}
+                />
+              ) : (
+                <PerguntaStep
+                  item={itemAtual}
+                  progresso={progresso}
+                  totalPerguntas={TOTAL_PERGUNTAS}
+                  selecionada={respostas[itemAtual.pergunta.id] ?? ""}
+                  isUltima={flowIndex >= FLOW_ITEMS.length - 1}
+                  podeVoltar={flowIndex > 0}
+                  onSelect={(valor) =>
+                    setRespostas((prev) => ({
+                      ...prev,
+                      [itemAtual.pergunta.id]: valor,
+                    }))
+                  }
+                  onAnterior={handleAnteriorFlow}
+                  onProxima={handleProximaFlow}
+                />
+              )}
+            </div>
           ) : null}
 
           {step === "final" ? (
@@ -314,12 +362,49 @@ function PortalBackground() {
   );
 }
 
+function ProgressHeader({
+  pct,
+  numero,
+  total,
+  dimensaoNome,
+}: {
+  pct: number;
+  numero: number;
+  total: number;
+  dimensaoNome: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold text-[#64748b]">
+            Pergunta {numero} de {total}
+          </p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-blue">
+            {dimensaoNome}
+          </p>
+        </div>
+        <p className="shrink-0 text-sm font-extrabold tabular-nums text-navy">
+          {pct}%
+        </p>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand-blue to-[#6b7cff] transition-all duration-300"
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function LandingStep({
   empresaNome,
   campanhaNome,
   codigoDisplay,
   disponivel,
   mensagem,
+  totalPerguntas,
   onStart,
 }: {
   empresaNome: string;
@@ -327,13 +412,14 @@ function LandingStep({
   codigoDisplay: string;
   disponivel: boolean;
   mensagem: string | null;
+  totalPerguntas: number;
   onStart: () => void;
 }) {
   return (
     <div className="space-y-5 text-center">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          Avaliação psicossocial
+          Avaliação psicossocial · COPSOQ II-Br
         </p>
         <h1 className="mt-1 text-xl font-extrabold tracking-[-0.3px] text-navy sm:text-2xl">
           {campanhaNome}
@@ -349,25 +435,22 @@ function LandingStep({
 
       <div className="rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-left text-sm text-[#475569]">
         <p>
-          Esta pesquisa é{" "}
-          <span className="font-semibold text-navy">confidencial</span>. Suas
-          respostas serão utilizadas apenas de forma agregada para apoiar ações
-          de saúde e segurança no trabalho.
+          Leva poucos minutos e suas respostas são{" "}
+          <span className="font-semibold text-navy">confidenciais</span>. Os
+          resultados apoiam ações de saúde e segurança no trabalho.
         </p>
         <dl className="mt-3 grid gap-2 sm:grid-cols-2">
           <div className="rounded-xl border border-[#eef2f7] bg-white px-3 py-2">
             <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
               Tempo estimado
             </dt>
-            <dd className="mt-0.5 font-extrabold text-navy">5 a 8 minutos</dd>
+            <dd className="mt-0.5 font-extrabold text-navy">8 a 12 minutos</dd>
           </div>
           <div className="rounded-xl border border-[#eef2f7] bg-white px-3 py-2">
             <dt className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Quantidade de perguntas
+              Perguntas
             </dt>
-            <dd className="mt-0.5 font-extrabold text-navy">
-              {TOTAL_PERGUNTAS}
-            </dd>
+            <dd className="mt-0.5 font-extrabold text-navy">{totalPerguntas}</dd>
           </div>
         </dl>
       </div>
@@ -380,7 +463,7 @@ function LandingStep({
 
       <button
         type="button"
-        className="btn btn-primary min-h-[48px] w-full justify-center py-3.5 text-[15px]"
+        className="btn btn-primary min-h-[52px] w-full justify-center py-3.5 text-[15px]"
         disabled={!disponivel}
         onClick={onStart}
       >
@@ -414,8 +497,7 @@ function IdentificacaoStep({
       <div className="text-center">
         <h2 className="text-lg font-extrabold text-navy">Identificação</h2>
         <p className="mt-1 text-sm text-[#64748b]">
-          Informe seu CPF e o código de acesso da pesquisa fornecido pela
-          empresa.
+          Informe seu CPF e o código de acesso compartilhado da pesquisa.
         </p>
       </div>
 
@@ -463,10 +545,10 @@ function IdentificacaoStep({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
-          className="btn min-h-[48px] justify-center sm:flex-1"
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
           disabled={loading}
           onClick={onBack}
         >
@@ -474,7 +556,7 @@ function IdentificacaoStep({
         </button>
         <button
           type="button"
-          className="btn btn-primary min-h-[48px] justify-center sm:flex-1"
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
           disabled={loading}
           onClick={onContinue}
         >
@@ -485,58 +567,164 @@ function IdentificacaoStep({
   );
 }
 
-function ApresentacaoStep({
+function TermosStep({
   participanteNome,
+  aceito,
+  onAceitoChange,
   onBack,
-  onStart,
+  onContinue,
 }: {
   participanteNome: string;
+  aceito: boolean;
+  onAceitoChange: (v: boolean) => void;
   onBack: () => void;
-  onStart: () => void;
+  onContinue: () => void;
 }) {
+  const [modalAberto, setModalAberto] = useState(false);
+  const primeiroNome = participanteNome.trim().split(/\s+/)[0];
+
   return (
     <div className="space-y-5">
       <div className="text-center">
-        <h2 className="text-xl font-extrabold text-navy">
-          {participanteNome ? `Olá, ${participanteNome.split(" ")[0]}!` : "Bem-vindo!"}
+        <h2 className="text-lg font-extrabold text-navy">
+          Termos de ciência e consentimento
         </h2>
-        <p className="mt-2 text-sm text-[#64748b]">
-          Antes de começar, veja algumas orientações importantes.
+        <p className="mt-1 text-sm text-[#64748b]">
+          {primeiroNome ? `${primeiroNome}, a` : "A"}o continuar você declara
+          ter lido e aceito os termos desta avaliação.
         </p>
       </div>
 
-      <ul className="space-y-2.5 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-sm text-[#475569]">
-        <li className="flex gap-2">
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" />
-          A pesquisa é{" "}
-          <span className="font-semibold text-navy">confidencial</span>.
-        </li>
-        <li className="flex gap-2">
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" />
-          Não existem respostas certas ou erradas.
-        </li>
-        <li className="flex gap-2">
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" />
-          Responda com sinceridade — isso ajuda a melhorar o ambiente de
-          trabalho.
-        </li>
-        <li className="flex gap-2">
-          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" />
-          A duração aproximada é de 5 a 8 minutos.
-        </li>
+      <ul className="space-y-2.5 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4">
+        {TERMO_RESUMO_ITENS.map((item) => (
+          <li key={item} className="flex items-start gap-2.5 text-sm text-[#334155]">
+            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-green-soft text-[11px] font-extrabold text-brand-green">
+              ✓
+            </span>
+            <span className="font-semibold text-navy">{item}</span>
+          </li>
+        ))}
       </ul>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <button
+        type="button"
+        className="w-full text-center text-sm font-bold text-brand-blue underline-offset-2 hover:underline"
+        onClick={() => setModalAberto(true)}
+      >
+        Ler termo completo
+      </button>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5">
+        <input
+          type="checkbox"
+          className="mt-1 h-5 w-5 shrink-0 rounded border-[#cbd5e1] text-brand-blue focus:ring-brand-blue/30"
+          checked={aceito}
+          onChange={(e) => onAceitoChange(e.target.checked)}
+        />
+        <span className="text-sm font-medium text-[#475569]">
+          Li e aceito o Termo de Ciência e Consentimento da Navarro Engenharia.
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
-          className="btn min-h-[48px] justify-center sm:flex-1"
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
           onClick={onBack}
         >
           Voltar
         </button>
         <button
           type="button"
-          className="btn btn-primary min-h-[48px] justify-center sm:flex-1"
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
+          disabled={!aceito}
+          onClick={onContinue}
+        >
+          Continuar
+        </button>
+      </div>
+
+      <Modal
+        open={modalAberto}
+        onClose={() => setModalAberto(false)}
+        title={TERMO_TITULO}
+        size="wide"
+        footer={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="btn btn-primary min-h-[44px] px-6"
+              onClick={() => setModalAberto(false)}
+            >
+              Fechar
+            </button>
+          </div>
+        }
+      >
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1 text-sm leading-relaxed text-[#475569]">
+          {TERMO_COMPLETO_PARAGRAPHOS.map((p) => (
+            <p key={p.slice(0, 48)}>{p}</p>
+          ))}
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function OrientacoesStep({
+  totalPerguntas,
+  onBack,
+  onStart,
+}: {
+  totalPerguntas: number;
+  onBack: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <h2 className="text-xl font-extrabold text-navy">Bem-vindo!</h2>
+        <p className="mt-2 text-sm text-[#64748b]">
+          Antes de começar, confira as orientações da pesquisa.
+        </p>
+      </div>
+
+      <ul className="space-y-3 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-sm text-[#475569]">
+        <OrientacaoItem titulo="Objetivo">
+          Mapear fatores psicossociais no trabalho com o instrumento{" "}
+          <span className="font-semibold text-navy">COPSOQ II-Br</span>, para
+          apoiar melhorias no ambiente laboral.
+        </OrientacaoItem>
+        <OrientacaoItem titulo="Tempo médio">
+          Cerca de 8 a 12 minutos.
+        </OrientacaoItem>
+        <OrientacaoItem titulo="Quantidade de perguntas">
+          {totalPerguntas} perguntas, organizadas por dimensões (Demandas,
+          Liderança, Saúde e Bem-estar, entre outras).
+        </OrientacaoItem>
+        <OrientacaoItem titulo="Confidencialidade">
+          Suas respostas individuais não serão divulgadas a gestores. Apenas
+          resultados consolidados.
+        </OrientacaoItem>
+        <OrientacaoItem titulo="Navegação">
+          Você pode voltar e alterar respostas enquanto não finalizar.
+        </OrientacaoItem>
+        <OrientacaoItem titulo="Após concluir">
+          Não será possível alterar as respostas.
+        </OrientacaoItem>
+      </ul>
+
+      <div className="flex flex-col gap-2.5 sm:flex-row">
+        <button
+          type="button"
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
+          onClick={onBack}
+        >
+          Voltar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
           onClick={onStart}
         >
           Iniciar questionário
@@ -546,122 +734,166 @@ function ApresentacaoStep({
   );
 }
 
-function QuestionarioStep({
-  perguntaNumero,
-  total,
-  progressoPct,
-  perguntaTexto,
-  selecionada,
-  onSelect,
+function OrientacaoItem({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex gap-2.5">
+      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-blue" />
+      <div>
+        <p className="font-bold text-navy">{titulo}</p>
+        <p className="mt-0.5 leading-relaxed">{children}</p>
+      </div>
+    </li>
+  );
+}
+
+function TransicaoStep({
+  progresso,
+  totalPerguntas,
+  texto,
+  dimensaoNome,
+  podeVoltar,
   onAnterior,
   onProxima,
 }: {
-  perguntaNumero: number;
-  total: number;
-  progressoPct: number;
-  perguntaTexto: string;
-  selecionada: string;
-  onSelect: (opcao: string) => void;
+  progresso: { pct: number; numero: number; dimensaoNome: string };
+  totalPerguntas: number;
+  texto: string;
+  dimensaoNome: string;
+  podeVoltar: boolean;
   onAnterior: () => void;
   onProxima: () => void;
 }) {
-  const [erroResposta, setErroResposta] = useState<string | null>(null);
-  const isUltima = perguntaNumero >= total;
-
-  useEffect(() => {
-    setErroResposta(null);
-  }, [perguntaNumero]);
-
-  function handleSelect(opcao: string) {
-    setErroResposta(null);
-    onSelect(opcao);
-  }
-
-  function handleAvancar() {
-    if (!selecionada) {
-      setErroResposta("Selecione uma resposta para continuar.");
-      return;
-    }
-    setErroResposta(null);
-    onProxima();
-  }
-
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#64748b]">
-          <span>
-            Pergunta {perguntaNumero} de {total}
-          </span>
-          <span className="tabular-nums text-navy">{progressoPct}%</span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e2e8f0]">
-          <div
-            className="h-full rounded-full bg-brand-blue transition-all"
-            style={{ width: `${Math.min(100, Math.max(0, progressoPct))}%` }}
-          />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <ProgressHeader
+        pct={progresso.pct}
+        numero={progresso.numero}
+        total={totalPerguntas}
+        dimensaoNome={dimensaoNome}
+      />
 
-      <div>
-        <h2 className="mt-1 text-base font-extrabold leading-snug text-navy sm:text-lg">
-          {perguntaTexto}
-        </h2>
-      </div>
-
-      <div className="space-y-2">
-        {OPCOES.map((opcao) => {
-          const active = selecionada === opcao;
-          return (
-            <button
-              key={opcao}
-              type="button"
-              className={`flex min-h-[48px] w-full items-center rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition ${
-                active
-                  ? "border-brand-blue bg-[#eef2ff] text-navy"
-                  : "border-[#e8edf5] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fafc]"
-              }`}
-              onClick={() => handleSelect(opcao)}
-            >
-              <span
-                className={`mr-3 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
-                  active
-                    ? "border-brand-blue bg-brand-blue"
-                    : "border-[#cbd5e1] bg-white"
-                }`}
-              >
-                {active ? (
-                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                ) : null}
-              </span>
-              {opcao}
-            </button>
-          );
-        })}
-      </div>
-
-      {erroResposta ? (
-        <p
-          className="text-center text-sm font-medium text-[#b45309]"
-          role="status"
-        >
-          {erroResposta}
+      <div className="flex min-h-[180px] flex-col items-center justify-center px-1 py-6 text-center sm:min-h-[220px]">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-blue">
+          Nova dimensão
         </p>
-      ) : null}
+        <p className="mt-3 text-lg font-extrabold leading-snug text-navy sm:text-xl">
+          {texto}
+        </p>
+      </div>
 
       <div className="flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
-          className="btn min-h-[52px] justify-center px-4 text-[15px] sm:flex-1"
-          disabled={perguntaNumero <= 1}
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
+          disabled={!podeVoltar}
           onClick={onAnterior}
         >
           Anterior
         </button>
         <button
           type="button"
-          className="btn btn-primary min-h-[52px] justify-center px-4 text-[15px] sm:flex-1"
-          onClick={handleAvancar}
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
+          onClick={onProxima}
+        >
+          Próxima
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PerguntaStep({
+  item,
+  progresso,
+  totalPerguntas,
+  selecionada,
+  isUltima,
+  podeVoltar,
+  onSelect,
+  onAnterior,
+  onProxima,
+}: {
+  item: Extract<CopsoqFlowItem, { type: "pergunta" }>;
+  progresso: { pct: number; numero: number; dimensaoNome: string };
+  totalPerguntas: number;
+  selecionada: string;
+  isUltima: boolean;
+  podeVoltar: boolean;
+  onSelect: (valor: string) => void;
+  onAnterior: () => void;
+  onProxima: () => void;
+}) {
+  const opcoes = getOpcoesEscala(item.pergunta.escalaId);
+
+  return (
+    <div className="space-y-5">
+      <ProgressHeader
+        pct={progresso.pct}
+        numero={item.numero}
+        total={totalPerguntas}
+        dimensaoNome={progresso.dimensaoNome}
+      />
+
+      <div>
+        <h2 className="text-base font-extrabold leading-snug text-navy sm:text-lg">
+          {item.pergunta.texto}
+        </h2>
+        {item.pergunta.ajuda ? (
+          <p className="mt-2 text-sm leading-relaxed text-[#64748b]">
+            {item.pergunta.ajuda}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        {opcoes.map((opcao) => {
+          const active = selecionada === opcao.valor;
+          return (
+            <button
+              key={opcao.valor}
+              type="button"
+              className={`flex min-h-[52px] w-full items-center rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition ${
+                active
+                  ? "border-brand-blue bg-[#eef2ff] text-navy shadow-[0_0_0_1px_rgba(79,99,255,0.25)]"
+                  : "border-[#e8edf5] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fafc]"
+              }`}
+              onClick={() => onSelect(opcao.valor)}
+            >
+              <span
+                className={`mr-3 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-extrabold ${
+                  active
+                    ? "border-brand-blue bg-brand-blue text-white"
+                    : "border-[#cbd5e1] bg-white text-[#64748b]"
+                }`}
+              >
+                {opcao.valor}
+              </span>
+              {opcao.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col gap-2.5 sm:flex-row">
+        <button
+          type="button"
+          className="btn min-h-[52px] justify-center text-[15px] sm:flex-1"
+          disabled={!podeVoltar}
+          onClick={onAnterior}
+        >
+          Anterior
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary min-h-[52px] justify-center text-[15px] sm:flex-1"
+          disabled={!selecionada}
+          onClick={onProxima}
         >
           {isUltima ? "Finalizar pesquisa" : "Próxima"}
         </button>
@@ -673,24 +905,35 @@ function QuestionarioStep({
 function FinalStep({ onFinish }: { onFinish: () => void }) {
   return (
     <div className="space-y-5 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-green-soft text-2xl font-extrabold text-brand-green">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-brand-green to-[#15803d] text-2xl font-extrabold text-white shadow-[0_12px_28px_rgba(31,157,85,0.35)]">
         ✓
       </div>
       <div>
-        <h2 className="text-xl font-extrabold text-navy">
-          Pesquisa concluída com sucesso.
+        <h2 className="text-xl font-extrabold text-navy sm:text-2xl">
+          Pesquisa concluída
         </h2>
-        <p className="mt-2 text-sm text-[#64748b]">
-          Agradecemos sua participação.
+        <p className="mt-2 text-base font-semibold text-[#334155]">
+          Obrigado pela sua participação.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-[#64748b]">
+          Sua contribuição é muito importante para a melhoria do ambiente de
+          trabalho.
         </p>
       </div>
-      <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-xs text-[#64748b]">
-        As respostas do questionário ainda não são gravadas nesta etapa. O
-        controle de participação (acesso/início) já é registrado.
-      </p>
+
+      <div className="space-y-2 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-left text-sm text-[#475569]">
+        <p>Suas respostas foram registradas com segurança.</p>
+        <p>
+          Nenhuma resposta individual será disponibilizada para gestores.
+        </p>
+        <p>
+          Apenas resultados consolidados serão utilizados nas análises.
+        </p>
+      </div>
+
       <button
         type="button"
-        className="btn btn-primary min-h-[48px] w-full justify-center py-3.5 text-[15px]"
+        className="btn btn-primary min-h-[52px] w-full justify-center py-3.5 text-[15px]"
         onClick={onFinish}
       >
         Encerrar

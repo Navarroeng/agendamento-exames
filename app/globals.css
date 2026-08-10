@@ -165,3 +165,18 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 .sidebar-nav-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.42);
 }
+
+@keyframes avaliacao-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.avaliacao-step-enter {
+  animation: avaliacao-step-enter 280ms ease-out;
+}
