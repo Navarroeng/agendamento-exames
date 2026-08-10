@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Field, RequiredMark } from "@/components/ui/Field";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { formatDateBR } from "@/lib/format";
-import { maskCPFInput } from "@/lib/cpf";
 import {
   RISCOS_PARTICIPANTE_STATUS_LABELS,
   buildParticipantesResumo,
@@ -12,6 +11,7 @@ import {
   type RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
+import { RiscosParticipanteFormModal } from "@/components/riscos-psicossociais/RiscosParticipanteFormModal";
 
 interface RiscosCampanhaParticipantesSectionProps {
   campanha: RiscosCampanhaRecord;
@@ -25,14 +25,6 @@ interface RiscosCampanhaParticipantesSectionProps {
   onRemover: (participanteId: string) => Promise<void>;
 }
 
-const EMPTY_FORM: RiscosParticipanteInput = {
-  nomeCompleto: "",
-  cpf: "",
-  cargo: "",
-  setor: "",
-  email: "",
-};
-
 export function RiscosCampanhaParticipantesSection({
   campanha,
   participantes,
@@ -43,9 +35,7 @@ export function RiscosCampanhaParticipantesSection({
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<RiscosParticipanteInput>(EMPTY_FORM);
-  const [cpfMasked, setCpfMasked] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const resumo = useMemo(
     () =>
@@ -53,57 +43,54 @@ export function RiscosCampanhaParticipantesSection({
     [campanha.quantidade_prevista, participantes]
   );
 
-  useEffect(() => {
-    if (!formOpen) {
-      setEditingId(null);
-      setForm(EMPTY_FORM);
-      setCpfMasked("");
-      setError(null);
-    }
-  }, [formOpen]);
+  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
 
-  function openCreate() {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    setCpfMasked("");
-    setError(null);
-    setFormOpen(true);
-  }
-
-  function openEdit(p: RiscosCampanhaParticipanteRecord) {
-    setEditingId(p.id);
-    setForm({
+  const editingInitial = useMemo(() => {
+    if (!editingId) return null;
+    const p = participantes.find((row) => row.id === editingId);
+    if (!p) return null;
+    return {
       nomeCompleto: p.nome_completo,
       cpf: p.cpf,
       cargo: p.cargo ?? "",
       setor: p.setor ?? "",
       email: p.email ?? "",
-    });
-    setCpfMasked(maskCPFInput(p.cpf));
-    setError(null);
+    } satisfies RiscosParticipanteInput;
+  }, [editingId, participantes]);
+
+  function openCreate() {
+    setEditingId(null);
     setFormOpen(true);
   }
 
-  async function handleSalvar() {
-    setError(null);
-    try {
-      if (editingId) {
-        await onEditar(editingId, form);
-      } else {
-        await onCriar(form);
-      }
-      setFormOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar.");
+  function openEdit(p: RiscosCampanhaParticipanteRecord) {
+    setMenuOpenId(null);
+    setEditingId(p.id);
+    setFormOpen(true);
+  }
+
+  async function handleSalvar(input: RiscosParticipanteInput) {
+    if (editingId) {
+      await onEditar(editingId, input);
+    } else {
+      await onCriar(input);
     }
+    setFormOpen(false);
+    setEditingId(null);
   }
 
   async function handleRemover(p: RiscosCampanhaParticipanteRecord) {
+    setMenuOpenId(null);
     const ok = window.confirm(
       `Remover o participante ${p.nome_completo}? Esta ação não pode ser desfeita.`
     );
     if (!ok) return;
     await onRemover(p.id);
+  }
+
+  function placeholderAction(label: string) {
+    setMenuOpenId(null);
+    toast.message(`${label} será disponibilizado em breve.`);
   }
 
   return (
@@ -117,126 +104,39 @@ export function RiscosCampanhaParticipantesSection({
             Colaboradores autorizados a responder
           </p>
         </div>
-        <button
-          type="button"
-          className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-          disabled={saving}
-          onClick={openCreate}
-        >
-          + Adicionar colaborador
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+            onClick={() =>
+              toast.message(
+                "Importação por Excel será disponibilizada em etapa futura."
+              )
+            }
+          >
+            Importar Excel
+          </button>
+          <button
+            type="button"
+            className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+            disabled={saving}
+            onClick={openCreate}
+          >
+            + Adicionar colaborador
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-4">
-        <ResumoCard label="Participantes previstos" value={resumo.previstos} />
+        <ResumoCard label="Previstos" value={resumo.previstos} />
+        <ResumoCard label="Cadastrados" value={resumo.cadastrados} />
         <ResumoCard
-          label="Participantes cadastrados"
-          value={resumo.cadastrados}
+          label="Faltam cadastrar"
+          value={faltamCadastrar}
+          emphasize={faltamCadastrar > 0}
         />
-        <ResumoCard label="Pendentes" value={resumo.pendentes} />
-        <ResumoCard label="Respondidos" value={resumo.respondidos} />
+        <ResumoCard label="Responderam" value={resumo.respondidos} />
       </div>
-
-      {formOpen ? (
-        <div className="rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-4">
-          <p className="mb-3 text-xs font-extrabold text-navy">
-            {editingId ? "Editar participante" : "Novo participante"}
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label={
-                <>
-                  Nome completo <RequiredMark />
-                </>
-              }
-              className="sm:col-span-2"
-            >
-              <input
-                className="field-input w-full"
-                value={form.nomeCompleto}
-                disabled={saving}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    nomeCompleto: e.target.value,
-                  }))
-                }
-              />
-            </Field>
-            <Field
-              label={
-                <>
-                  CPF <RequiredMark />
-                </>
-              }
-            >
-              <input
-                className="field-input w-full"
-                inputMode="numeric"
-                value={cpfMasked}
-                disabled={saving}
-                onChange={(e) => {
-                  const masked = maskCPFInput(e.target.value);
-                  setCpfMasked(masked);
-                  setForm((prev) => ({ ...prev, cpf: masked }));
-                }}
-              />
-            </Field>
-            <Field label="E-mail (opcional)">
-              <input
-                type="email"
-                className="field-input w-full"
-                value={form.email ?? ""}
-                disabled={saving}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, email: e.target.value }))
-                }
-              />
-            </Field>
-            <Field label="Cargo">
-              <input
-                className="field-input w-full"
-                value={form.cargo ?? ""}
-                disabled={saving}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, cargo: e.target.value }))
-                }
-              />
-            </Field>
-            <Field label="Setor">
-              <input
-                className="field-input w-full"
-                value={form.setor ?? ""}
-                disabled={saving}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, setor: e.target.value }))
-                }
-              />
-            </Field>
-          </div>
-          {error ? (
-            <p className="mt-2 text-xs font-medium text-brand-red">{error}</p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy disabled:opacity-40"
-              disabled={saving}
-              onClick={() => setFormOpen(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-              disabled={saving}
-              onClick={() => void handleSalvar()}
-            >
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {participantes.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center text-sm text-app-muted">
@@ -254,7 +154,7 @@ export function RiscosCampanhaParticipantesSection({
                 <th className="px-3 py-2.5">Setor</th>
                 <th className="px-3 py-2.5">Status</th>
                 <th className="px-3 py-2.5">Cadastro</th>
-                <th className="w-[120px] px-3 py-2.5 text-center">Ações</th>
+                <th className="w-[72px] px-3 py-2.5 text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -287,25 +187,18 @@ export function RiscosCampanhaParticipantesSection({
                       ? formatDateBR(p.created_at.slice(0, 10))
                       : "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        className="text-[10px] font-bold text-brand-blue disabled:opacity-40"
-                        disabled={saving}
-                        onClick={() => openEdit(p)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] font-bold text-brand-red disabled:opacity-40"
-                        disabled={saving}
-                        onClick={() => void handleRemover(p)}
-                      >
-                        Remover
-                      </button>
-                    </div>
+                  <td className="relative px-3 py-2.5 text-center">
+                    <ParticipanteActionsMenu
+                      open={menuOpenId === p.id}
+                      disabled={saving}
+                      onToggle={() =>
+                        setMenuOpenId((id) => (id === p.id ? null : p.id))
+                      }
+                      onClose={() => setMenuOpenId(null)}
+                      onEditar={() => openEdit(p)}
+                      onRemover={() => void handleRemover(p)}
+                      onPlaceholder={placeholderAction}
+                    />
                   </td>
                 </tr>
               ))}
@@ -314,16 +207,39 @@ export function RiscosCampanhaParticipantesSection({
         </div>
       )}
 
-      <p className="text-[11px] text-[#94a3b8]">
-        Importação por Excel será disponibilizada em etapa futura.
-      </p>
+      <RiscosParticipanteFormModal
+        open={formOpen}
+        mode={editingId ? "edit" : "create"}
+        saving={saving}
+        initial={editingInitial}
+        onClose={() => {
+          if (saving) return;
+          setFormOpen(false);
+          setEditingId(null);
+        }}
+        onSave={handleSalvar}
+      />
     </div>
   );
 }
 
-function ResumoCard({ label, value }: { label: string; value: number }) {
+function ResumoCard({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: number;
+  emphasize?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-[#e8edf5] bg-white px-3 py-2.5">
+    <div
+      className={`rounded-xl border px-3 py-2.5 ${
+        emphasize
+          ? "border-[#fde68a] bg-[#fffbeb]"
+          : "border-[#e8edf5] bg-white"
+      }`}
+    >
       <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
         {label}
       </p>
@@ -331,5 +247,116 @@ function ResumoCard({ label, value }: { label: string; value: number }) {
         {value}
       </p>
     </div>
+  );
+}
+
+function ParticipanteActionsMenu({
+  open,
+  disabled,
+  onToggle,
+  onClose,
+  onEditar,
+  onRemover,
+  onPlaceholder,
+}: {
+  open: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onEditar: () => void;
+  onRemover: () => void;
+  onPlaceholder: (label: string) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) onClose();
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div ref={rootRef} className="relative inline-flex justify-center">
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg font-bold text-[#64748b] hover:bg-[#f1f5f9] hover:text-navy disabled:opacity-40"
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Ações do participante"
+        onClick={onToggle}
+      >
+        ⋮
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
+        >
+          <MenuItem label="Editar" onClick={onEditar} />
+          <MenuItem
+            label="Redefinir senha"
+            muted
+            onClick={() => onPlaceholder("Redefinir senha")}
+          />
+          <MenuItem
+            label="Copiar link individual"
+            muted
+            onClick={() => onPlaceholder("Copiar link individual")}
+          />
+          <MenuItem
+            label="Enviar convite"
+            muted
+            onClick={() => onPlaceholder("Enviar convite")}
+          />
+          <MenuItem
+            label="Ver histórico"
+            muted
+            onClick={() => onPlaceholder("Ver histórico")}
+          />
+          <div className="my-1 border-t border-[#eef2f7]" />
+          <MenuItem label="Remover" danger onClick={onRemover} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuItem({
+  label,
+  onClick,
+  danger = false,
+  muted = false,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={`block w-full px-3 py-2 text-left text-xs font-semibold transition hover:bg-[#f8fafc] ${
+        danger
+          ? "text-brand-red"
+          : muted
+            ? "text-[#64748b]"
+            : "text-navy"
+      }`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
