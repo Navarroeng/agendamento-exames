@@ -62,6 +62,10 @@ export function RiscosPainelPreRequisitos({
           Dependência automática do módulo Laudos SST. O andamento aqui
           acompanha o status real daquele processo.
         </p>
+        {/* TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado. */}
+        <p className="mt-2 text-[11px] font-medium text-[#b45309]">
+          Temporariamente não bloqueia o restante do fluxo (modo desenvolvimento).
+        </p>
         <dl className="mt-3 grid gap-1 text-xs text-[#64748b]">
           <div className="flex justify-between gap-2">
             <dt>Status atual</dt>

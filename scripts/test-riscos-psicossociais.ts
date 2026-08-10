@@ -55,13 +55,13 @@ const riscosAguardando = buildRiscosPsicossociaisProcesso(laudosEmAndamento, {
   entrada_em: "2026-08-12T15:00:00Z",
 });
 
-assert.equal(riscosAguardando.etapaAtual, "laudos_sst");
+assert.equal(riscosAguardando.etapaAtual, "lista_presenca");
 assert.equal(riscosAguardando.laudosSstConcluido, false);
 assert.equal(riscosAguardando.etapasConcluidas, 0);
 assert.equal(riscosAguardando.progressoLabel, "0 de 8");
 assert.equal(riscosAguardando.dataEntrada, "2026-08-12T15:00:00Z");
 assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "laudos_sst"), true);
-assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "lista_presenca"), false);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "lista_presenca"), true);
 assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "cadastro_empresa"), false);
 assert.equal(isRiscosEtapaLiberada(riscosAguardando, "laudos_sst"), true);
 assert.equal(isRiscosEtapaLiberada(riscosAguardando, "lista_presenca"), true);
@@ -114,7 +114,7 @@ const riscosSemTracking = buildRiscosPsicossociaisProcesso(
   laudosEmAndamento,
   null
 );
-assert.equal(riscosSemTracking.etapaAtual, "laudos_sst");
+assert.equal(riscosSemTracking.etapaAtual, "lista_presenca");
 assert.equal(riscosSemTracking.dataEntrada, "2026-08-12T15:00:00Z");
 
 console.log("test-riscos-psicossociais: OK");

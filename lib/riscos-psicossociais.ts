@@ -26,13 +26,23 @@ import { normalizeSearchText } from "@/lib/text-normalize";
 /**
  * Modo de desenvolvimento do módulo Riscos Psicossociais.
  *
- * `true`  → todas as abas do modal ficam navegáveis (bloqueio sequencial ignorado).
+ * `true`  → todas as abas/etapas ficam navegáveis (bloqueio sequencial ignorado).
  * `false` → restaura o fluxo normal (exige conclusão das etapas anteriores).
  *
  * Não altera status, regras de negócio persistidas nem o banco — apenas a
  * liberação de navegação na UI, via `isRiscosEtapaLiberada`.
  */
 export const DEVELOPMENT_UNLOCK_ALL_TABS = true;
+
+/**
+ * TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
+ *
+ * Enquanto `true`, o status de Laudos SST continua sendo exibido no painel,
+ * mas não impede o uso do restante do fluxo (Lista de Presença, pesquisa,
+ * participantes, etc.). A regra de negócio permanece no código — apenas
+ * esta validação de avanço fica desabilitada.
+ */
+export const DEVELOPMENT_SKIP_LAUDOS_SST_GATE = true;
 
 /** Etapas manuais na UI (ordem do fluxo). */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
@@ -212,7 +222,10 @@ export function isRiscosEtapaLiberadaByFluxo(
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
   if (etapaId === "laudos_sst") return true;
-  if (!processo.laudosSstConcluido) return false;
+  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
+  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !processo.laudosSstConcluido) {
+    return false;
+  }
   if (etapaId === "lista_presenca") return true;
   return processo.listaPresencaConcluida;
 }
@@ -237,7 +250,8 @@ export function mensagemBloqueioEtapaRiscos(
   etapaId: RiscosPsicossociaisEtapaId
 ): string | null {
   if (isRiscosEtapaLiberada(processo, etapaId)) return null;
-  if (!processo.laudosSstConcluido) {
+  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
+  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !processo.laudosSstConcluido) {
     return "Aguardando finalização do processo de Laudos SST.";
   }
   return "Aguardando conclusão da Lista de Presença (recebimento e anexo).";
@@ -273,7 +287,8 @@ export function buildRiscosPsicossociaisProcesso(
     (tracking?.status === "concluido" || manuaisConcluidasTodas);
 
   let etapaAtual: RiscosPsicossociaisEtapaId;
-  if (!laudosSstConcluido) {
+  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
+  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !laudosSstConcluido) {
     etapaAtual = "laudos_sst";
   } else if (!listaPresencaConcluida) {
     etapaAtual = "lista_presenca";
