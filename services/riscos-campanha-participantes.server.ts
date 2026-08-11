@@ -373,6 +373,11 @@ export async function atualizarParticipanteCampanhaNoServidor(
   if (!atual) throw new Error("Participante não encontrado.");
 
   const before = mapParticipante(atual as Record<string, unknown>);
+  if (before.status !== "pendente") {
+    throw new Error(
+      "Só é possível editar participantes com status Pendente (ainda não iniciaram o questionário)."
+    );
+  }
   const cpf = normalizeCpfDigits(params.input.cpf);
   const dataNascimento = parseDataNascimentoBr(params.input.dataNascimento);
   if (!dataNascimento) {

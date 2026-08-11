@@ -51,10 +51,14 @@ interface RiscosPainelCardsProps {
   exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditarParticipante: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
   onImportarParticipantesExcel: (file: File) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
-  /** Admin only — remoção de participante. */
-  podeRemoverParticipante?: boolean;
+  /** Admin — editar (pendente) e remover participante. */
+  podeGerenciarParticipante?: boolean;
   /** Só exibe ações de Convites após status confirmado no banco. */
   campanhaStatusSincronizado?: boolean;
 }
@@ -128,9 +132,10 @@ export function RiscosPainelCards({
   exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
+  onEditarParticipante,
   onImportarParticipantesExcel,
   onRemoverParticipante,
-  podeRemoverParticipante = false,
+  podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
 }: RiscosPainelCardsProps) {
   const campanha = processo.campanha;
@@ -544,9 +549,10 @@ export function RiscosPainelCards({
             participantes={participantes}
             saving={savingParticipante}
             onCriar={onCriarParticipante}
+            onEditar={onEditarParticipante}
             onImportarExcel={onImportarParticipantesExcel}
             onRemover={onRemoverParticipante}
-            podeRemoverParticipante={podeRemoverParticipante}
+            podeGerenciarParticipante={podeGerenciarParticipante}
           />
         ) : (
           <PlaceholderNote>

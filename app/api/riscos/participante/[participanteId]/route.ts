@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPerfilAdmin } from "@/lib/permissions";
 import { CpfCampanhaAtivaError } from "@/lib/riscos-cpf-campanha-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { atualizarParticipanteCampanhaNoServidor } from "@/services/riscos-campanha-participantes.server";
@@ -6,6 +7,10 @@ import { atualizarParticipanteCampanhaNoServidor } from "@/services/riscos-campa
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Atualiza dados cadastrais do participante.
+ * Somente admin; somente status Pendente.
+ */
 export async function PATCH(
   request: Request,
   context: { params: { participanteId: string } }
@@ -27,6 +32,12 @@ export async function PATCH(
 
     if (!perfil || perfil.ativo === false) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+    if (!isPerfilAdmin(perfil.perfil)) {
+      return NextResponse.json(
+        { error: "Somente administradores podem editar participantes." },
+        { status: 403 }
+      );
     }
 
     const participanteId = String(context.params.participanteId ?? "").trim();
@@ -83,7 +94,9 @@ export async function PATCH(
     const status =
       message.includes("Já existe") ||
       message.includes("Informe") ||
-      message.includes("não encontrado")
+      message.includes("não encontrado") ||
+      message.includes("Pendente") ||
+      message.includes("editar")
         ? 400
         : 500;
     return NextResponse.json({ error: message }, { status });

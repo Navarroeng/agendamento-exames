@@ -11,6 +11,7 @@ import {
   type RiscosParticipanteInput,
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
+import { acoesMenuParticipantePorStatus } from "@/lib/riscos-participante-acoes";
 import { precisaConfirmacaoForteRemocao } from "@/lib/riscos-remocao-participante";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { RiscosParticipanteFormModal } from "@/components/riscos-psicossociais/RiscosParticipanteFormModal";
@@ -19,9 +20,13 @@ interface RiscosCampanhaParticipantesSectionProps {
   campanha: RiscosCampanhaRecord;
   participantes: RiscosCampanhaParticipanteRecord[];
   saving?: boolean;
-  /** Somente admin vê/usa Remover participante. */
-  podeRemoverParticipante?: boolean;
+  /** Somente admin vê/usa Editar e Remover participante. */
+  podeGerenciarParticipante?: boolean;
   onCriar: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditar: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
   onImportarExcel?: (file: File) => Promise<void>;
 }
@@ -30,12 +35,15 @@ export function RiscosCampanhaParticipantesSection({
   campanha,
   participantes,
   saving = false,
-  podeRemoverParticipante = false,
+  podeGerenciarParticipante = false,
   onCriar,
+  onEditar,
   onRemover,
   onImportarExcel,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
+  const [editando, setEditando] =
+    useState<RiscosCampanhaParticipanteRecord | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,12 +54,32 @@ export function RiscosCampanhaParticipantesSection({
   );
 
   async function handleSalvar(input: RiscosParticipanteInput) {
+    if (editando) {
+      await onEditar(editando.id, input);
+      setEditando(null);
+      setFormOpen(false);
+      return;
+    }
     await onCriar(input);
     setFormOpen(false);
   }
 
+  function handleAbrirEditar(p: RiscosCampanhaParticipanteRecord) {
+    if (!podeGerenciarParticipante) return;
+    const acoes = acoesMenuParticipantePorStatus(p.status);
+    if (!acoes.exibirEditar) {
+      toast.error(
+        "Só é possível editar participantes com status Pendente."
+      );
+      return;
+    }
+    setMenuOpenId(null);
+    setEditando(p);
+    setFormOpen(true);
+  }
+
   async function handleRemover(p: RiscosCampanhaParticipanteRecord) {
-    if (!podeRemoverParticipante) return;
+    if (!podeGerenciarParticipante) return;
     setMenuOpenId(null);
     const forte = precisaConfirmacaoForteRemocao(p.status);
     const ok = window.confirm(
@@ -111,7 +139,10 @@ export function RiscosCampanhaParticipantesSection({
           type="button"
           className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
           disabled={saving}
-          onClick={() => setFormOpen(true)}
+          onClick={() => {
+            setEditando(null);
+            setFormOpen(true);
+          }}
         >
           + Cadastrar participante
         </button>
@@ -141,49 +172,58 @@ export function RiscosCampanhaParticipantesSection({
               </tr>
             </thead>
             <tbody>
-              {participantes.map((p) => (
-                <tr
-                  key={p.id}
-                  className="border-b border-[#f1f5f9] last:border-0"
-                >
-                  <td className="px-3 py-2.5 font-medium text-navy">
-                    <span className="line-clamp-2 break-words">
-                      {p.nome_completo}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
-                    {maskCpfParticipante(p.cpf)}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
-                    {p.data_nascimento
-                      ? formatDateBR(p.data_nascimento.slice(0, 10))
-                      : "-"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <StatusBadge status={p.status} />
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
-                    {p.created_at
-                      ? formatDateBR(p.created_at.slice(0, 10))
-                      : "-"}
-                  </td>
-                  <td className="relative px-3 py-2.5 text-center">
-                    {podeRemoverParticipante ? (
-                      <ParticipanteActionsMenu
-                        open={menuOpenId === p.id}
-                        disabled={saving}
-                        onToggle={() =>
-                          setMenuOpenId((id) => (id === p.id ? null : p.id))
-                        }
-                        onClose={() => setMenuOpenId(null)}
-                        onRemover={() => void handleRemover(p)}
-                      />
-                    ) : (
-                      <span className="text-[11px] text-[#94a3b8]">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {participantes.map((p) => {
+                const acoes = acoesMenuParticipantePorStatus(p.status);
+                const mostraMenu =
+                  podeGerenciarParticipante &&
+                  (acoes.exibirEditar || acoes.exibirRemover);
+                return (
+                  <tr
+                    key={p.id}
+                    className="border-b border-[#f1f5f9] last:border-0"
+                  >
+                    <td className="px-3 py-2.5 font-medium text-navy">
+                      <span className="line-clamp-2 break-words">
+                        {p.nome_completo}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
+                      {maskCpfParticipante(p.cpf)}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
+                      {p.data_nascimento
+                        ? formatDateBR(p.data_nascimento.slice(0, 10))
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <StatusBadge status={p.status} />
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
+                      {p.created_at
+                        ? formatDateBR(p.created_at.slice(0, 10))
+                        : "-"}
+                    </td>
+                    <td className="relative px-3 py-2.5 text-center">
+                      {mostraMenu ? (
+                        <ParticipanteActionsMenu
+                          open={menuOpenId === p.id}
+                          disabled={saving}
+                          exibirEditar={acoes.exibirEditar}
+                          exibirRemover={acoes.exibirRemover}
+                          onToggle={() =>
+                            setMenuOpenId((id) => (id === p.id ? null : p.id))
+                          }
+                          onClose={() => setMenuOpenId(null)}
+                          onEditar={() => handleAbrirEditar(p)}
+                          onRemover={() => void handleRemover(p)}
+                        />
+                      ) : (
+                        <span className="text-[11px] text-[#94a3b8]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -191,11 +231,22 @@ export function RiscosCampanhaParticipantesSection({
 
       <RiscosParticipanteFormModal
         open={formOpen}
-        mode="create"
+        mode={editando ? "edit" : "create"}
         saving={saving}
+        initial={
+          editando
+            ? {
+                nomeCompleto: editando.nome_completo,
+                cpf: editando.cpf,
+                dataNascimento: editando.data_nascimento ?? "",
+                email: editando.email ?? "",
+              }
+            : null
+        }
         onClose={() => {
           if (saving) return;
           setFormOpen(false);
+          setEditando(null);
         }}
         onSave={handleSalvar}
       />
@@ -235,14 +286,20 @@ function ResumoCard({ label, value }: { label: string; value: number }) {
 function ParticipanteActionsMenu({
   open,
   disabled,
+  exibirEditar,
+  exibirRemover,
   onToggle,
   onClose,
+  onEditar,
   onRemover,
 }: {
   open: boolean;
   disabled?: boolean;
+  exibirEditar: boolean;
+  exibirRemover: boolean;
   onToggle: () => void;
   onClose: () => void;
+  onEditar: () => void;
   onRemover: () => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -281,14 +338,26 @@ function ParticipanteActionsMenu({
           role="menu"
           className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
         >
-          <button
-            type="button"
-            role="menuitem"
-            className="block w-full px-3 py-2 text-left text-xs font-semibold text-brand-red transition hover:bg-[#fef2f2]"
-            onClick={onRemover}
-          >
-            Remover participante
-          </button>
+          {exibirEditar ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left text-xs font-semibold text-navy transition hover:bg-[#f8fafc]"
+              onClick={onEditar}
+            >
+              Editar
+            </button>
+          ) : null}
+          {exibirRemover ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left text-xs font-semibold text-brand-red transition hover:bg-[#fef2f2]"
+              onClick={onRemover}
+            >
+              Remover participante
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

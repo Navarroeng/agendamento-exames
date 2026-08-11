@@ -37,9 +37,13 @@ interface RiscosPsicossociaisModalProps {
   exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso?: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante?: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditarParticipante?: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
   onImportarParticipantesExcel?: (file: File) => Promise<void>;
   onRemoverParticipante?: (participanteId: string) => Promise<void>;
-  podeRemoverParticipante?: boolean;
+  podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
 }
 
@@ -63,9 +67,10 @@ export function RiscosPsicossociaisModal({
   exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso,
   onCriarParticipante,
+  onEditarParticipante,
   onImportarParticipantesExcel,
   onRemoverParticipante,
-  podeRemoverParticipante = false,
+  podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
@@ -141,13 +146,16 @@ export function RiscosPsicossociaisModal({
         onCriarParticipante={async (input) => {
           await onCriarParticipante?.(input);
         }}
+        onEditarParticipante={async (id, input) => {
+          await onEditarParticipante?.(id, input);
+        }}
         onImportarParticipantesExcel={async (file) => {
           await onImportarParticipantesExcel?.(file);
         }}
         onRemoverParticipante={async (id) => {
           await onRemoverParticipante?.(id);
         }}
-        podeRemoverParticipante={podeRemoverParticipante}
+        podeGerenciarParticipante={podeGerenciarParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </Modal>

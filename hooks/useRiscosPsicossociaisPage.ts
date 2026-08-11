@@ -32,6 +32,7 @@ import {
   removerProcessoRiscos,
 } from "@/services/riscos-campanha.service";
 import {
+  atualizarParticipanteCampanha,
   criarParticipanteCampanha,
   importarParticipantesCampanhaExcel,
   listarParticipantesCampanha,
@@ -843,6 +844,36 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes]
   );
 
+  const handleEditarParticipante = useCallback(
+    async (participanteId: string, input: RiscosParticipanteInput) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) {
+        throw new Error("Pesquisa não encontrada.");
+      }
+      if (!isAdmin) {
+        toast.error("Somente administradores podem editar participantes.");
+        throw new Error("Somente administradores podem editar participantes.");
+      }
+      setSavingParticipante(true);
+      try {
+        await atualizarParticipanteCampanha(
+          { participanteId, input },
+          { auditContext }
+        );
+        await carregarParticipantes(campanhaId);
+        toast.success("Participante atualizado.");
+      } catch (err) {
+        console.error(err);
+        throw err instanceof Error
+          ? err
+          : new Error("Erro ao atualizar participante.");
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes, isAdmin]
+  );
+
   const handleImportarParticipantesExcel = useCallback(
     async (file: File) => {
       const campanhaId = modalProcesso?.campanha?.id;
@@ -953,6 +984,7 @@ export function useRiscosPsicossociaisPage() {
     savingRemoverProcesso,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
+    handleEditarParticipante,
     handleImportarParticipantesExcel,
     handleRemoverParticipante,
     campanhaStatusSincronizado,

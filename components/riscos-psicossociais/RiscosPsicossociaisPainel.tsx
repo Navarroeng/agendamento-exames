@@ -36,9 +36,13 @@ interface RiscosPsicossociaisPainelProps {
   exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
+  onEditarParticipante: (
+    participanteId: string,
+    input: RiscosParticipanteInput
+  ) => Promise<void>;
   onImportarParticipantesExcel: (file: File) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
-  podeRemoverParticipante?: boolean;
+  podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
 }
 
@@ -60,9 +64,10 @@ export function RiscosPsicossociaisPainel({
   exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso,
   onCriarParticipante,
+  onEditarParticipante,
   onImportarParticipantesExcel,
   onRemoverParticipante,
-  podeRemoverParticipante = false,
+  podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
 }: RiscosPsicossociaisPainelProps) {
   const { orcamento, numeroContrato } = processo.implantacao;
@@ -158,9 +163,10 @@ export function RiscosPsicossociaisPainel({
         exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}
         onGarantirCodigoAcesso={onGarantirCodigoAcesso}
         onCriarParticipante={onCriarParticipante}
+        onEditarParticipante={onEditarParticipante}
         onImportarParticipantesExcel={onImportarParticipantesExcel}
         onRemoverParticipante={onRemoverParticipante}
-        podeRemoverParticipante={podeRemoverParticipante}
+        podeGerenciarParticipante={podeGerenciarParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </div>
