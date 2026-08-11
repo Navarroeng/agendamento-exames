@@ -86,13 +86,11 @@ export function RiscosPainelPreRequisitos({
           </div>
         ) : null}
 
-        <div
-          className={`rounded-xl border px-3 py-2.5 ${
-            processo.listaPresencaConcluida
-              ? "border-[#bbf7d0] bg-[#f0fdf4]/50"
-              : "border-[#fde68a] bg-[#fffbeb]/50"
-          }`}
-        >
+        {/*
+          Lista de Presença: chrome visual fixo (igual nos fluxos normal e manual).
+          Status fica só no badge — não alternar amarelo/verde pelo estado.
+        */}
+        <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4]/50 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-extrabold text-navy">Lista de Presença</p>
             <StatusPill
