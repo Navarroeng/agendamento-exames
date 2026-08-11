@@ -120,8 +120,7 @@ export function RiscosCampanhaParticipantesSection({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <ResumoCard label="Previstos" value={resumo.previstos} />
+      <div className="grid grid-cols-3 gap-2">
         <ResumoCard label="Cadastrados" value={resumo.cadastrados} />
         <ResumoCard
           label="Faltam cadastrar"
