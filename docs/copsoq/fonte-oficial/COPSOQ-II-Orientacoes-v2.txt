@@ -1,0 +1,305 @@
+
+
+
+
+Este conteúdo tem caráter informativo e apresenta uma das metodologias 
+possíveis para a avaliação de riscos psicossociais no ambiente de trabalho. 
+
+Ressaltamos que não se trata de uma exigência legal específica, tampouco 
+de um modelo único ou obrigatório. 
+
+A escolha da ferramenta mais adequada deve ser feita conforme a realidade, 
+necessidades e critérios técnicos de cada empresa, respeitando a legislação 
+vigente e as diretrizes de gestão de riscos ocupacionais. 
+
+O Guia de informação sobre Fatores de Riscos Psicossociais Relacionados ao 
+Trabalho, publicado pelo MTE, cita duas informações importantes: 
+
+1º   "O MTE não indica nenhuma ferramenta ou metodologia específica para 
+identificação e avaliação de risco dos fatores de risco psicossociais relacionados 
+ao trabalho."
+Assim como mencionado acima, é responsabilidade da organização/empresa 
+selecionar a ferramenta ou metodologia específica adequada ao risco ou 
+circunstância em avaliação. 
+
+2º   “Ao utilizar uma ferramenta específica deve-se verificar se ela está 
+cientificamente fundamentada, ou seja, se existe estudo científico que lhe dê 
+embasamento e suporte.”
+
+Um dos critérios adotados pelo Sistema ESO para a utilização da ferramenta 
+COPSOQ é justamente seu sólido embasamento científico, com estudos e 
+referências que garantem maior confiabilidade ao questionário.
+
+Ministério do Trabalho e Emprego
+RECOMENDAÇÕES DO MTE
+
+O questionário apresenta algumas orientações importantes para sua aplicação. Cada uma 
+dessas orientações garantem o correto entendimento e a condução adequada da pesquisa. 
+Orientações Éticas sobre o Uso do Questionário
+“A participação é voluntária. Ninguém deve se sentir pressionado a participar.”
+A participação na pesquisa é totalmente voluntária. Nenhum colaborador deve se sentir obrigado 
+ou pressionado a responder o questionário. A decisão de participar ou não é de livre escolha de 
+cada indivíduo, sem qualquer consequência negativa. 
+“O participante é anônimo. Os resultados são calculados para os grupos e as 
+respostas de cada participante não poderão ser identificadas.” 
+As respostas devem ser coletadas de forma totalmente anônima. Isso significa que nenhuma 
+informação que permita identificar quem respondeu pode ser solicitada ou registrada. Os 
+resultados serão analisados apenas de forma agrupada, sem expor indivíduos.
+
+Caso exista qualquer possibilidade de identificação direta ou indireta dos participantes, o 
+questionário não deve ser aplicado. Garantir o anonimato é uma condição essencial para a 
+validade da pesquisa e para a segurança e confiança dos colaboradores envolvidos.
+*Essas orientações constam no PDF do Formulário de Aplicação.
+
+         
+Demandas de Trabalho (Risco)
+1A
+Você atrasa a entrega do seu trabalho?
+1B
+O tempo para realizar suas tarefas é suficiente?
+2A
+É necessário manter um ritmo acelerado no trabalho?
+2B
+Você trabalha em ritmo acelerado ao longo da jornada? 
+3A
+Seu trabalho coloca você em situações emocionalmente desgastantes? 
+3B
+Você tem que lidar com os problemas pessoais de outras pessoas como parte do seu trabalho? 
+Influência e possibilidade de desenvolvimento (Proteção)
+Significado do trabalho e comprometimento (Proteção)
+4AVocê tem um alto grau de influência nas decisões sobre o seu trabalho?
+4BVocê pode interferir na quantidade de trabalho atribuída a você?
+5AVocê tem a possibilidade de aprender coisas novas através do seu trabalho?
+5BSeu trabalho exige que você tome iniciativas?
+6ASeu trabalho é significativo?
+6BVocê sente que o trabalho que faz é importante?
+7AVocê sente que o seu local de trabalho é muito importante para você?
+7BVocê recomendaria a um amigo que se candidatasse a uma vaga no seu local de trabalho?
+Relações interpessoais (Proteção)
+8A
+No seu local de trabalho, você é informado antecipadamente sobre decisões importantes, mudanças ou planos para o 
+futuro?
+8BVocê recebe toda a informação necessária para fazer bem o seu trabalho? 
+9AO seu trabalho é reconhecido e valorizado pelos seus superiores?
+9BVocê é tratado de forma justa no seu local de trabalho? 
+10AO seu trabalho tem objetivos/metas claros(as)?
+10BVocê sabe exatamente o que se espera de você no trabalho? 
+Liderança (Proteção)
+11AVocê diria que o seu superior imediato dá alta prioridade para a satisfação com trabalho?
+11BVocê diria que o seu superior imediato é bom no planejamento do trabalho?
+12ACom que frequência o seu superior imediato está disposto a ouvir os seus problemas no trabalho?
+12BCom que frequência você recebe ajuda e suporte do seu superior imediato?
+
+         
+Interface trabalho-indivíduo (Proteção)
+13Qual o seu nível de satisfação com o seu trabalho como um todo, considerando todos os aspectos?
+Conflitos família e trabalho (Risco)
+14AVocê sente que o seu trabalho consome tanto sua energia que ele tem um efeito negativo na sua vida particular?
+14BVocê sente que o seu trabalho ocupa tanto tempo que ele tem um efeito negativo na sua vida particular?
+Valores do local de trabalho (Proteção)
+15AVocê pode confiar nas informações que vêm dos seus superiores?
+15BOs seus superiores confiam que os funcionários farão bem seu trabalho?
+16AOs conflitos são resolvidos de forma justa?
+16BO trabalho é distribuído de forma justa?
+Saúde Geral (Proteção)
+17Em geral, você diria que a sua saúde é:
+Burnout e Estresse (Risco)
+18A
+Com que frequência você tem se sentido fisicamente esgotado?
+18B
+Com que frequência você tem se sentido emocionalmente esgotado?
+19A
+Com que frequência você tem se sentido estressado?
+19B
+Com que frequência você tem se sentido irritado?
+Comportamentos ofensivos (Risco)
+20
+Você foi exposto a atenção sexual indesejada no seu local de trabalho durante os últimos 12 meses?
+Se sim, de quem? (Você pode assinalar mais de uma opção)
+21
+Você foi exposto a ameaças de violência no seu local de trabalho nos últimos 12 meses?
+Se sim, de quem? (Você pode assinalar mais de uma opção)
+22
+Você foi exposto a violência física em seu local de trabalho durante os últimos 12 meses?
+Se sim, de quem? (Você pode assinalar mais de uma opção)
+23
+Você foi exposto a “bullying” no seu local de trabalho nos últimos 12 meses?
+Se sim, de quem? (Você pode assinalar mais de uma opção)
+⚠ Atenção: As perguntas da dimensão Comportamentos Ofensivos são opcionais e não contabilizam no cálculo final. 
+
+O questionário COPSOQ avalia diferentes aspectos do trabalho e da saúde, 
+como estresse, satisfação, relações interpessoais, entre outros. Ele não mede 
+apenas um único fator, por isso os resultados devem ser analisados 
+separadamente para cada fator.
+
+
+Orientação sobre a Interpretação das 
+Dimensões do COPSOQ II
+Cada dimensão do COPSOQ é classificada como "Proteção" ou "Risco", e essa 
+classificação é essencial para interpretar corretamente os resultados.
+PROTEÇÃO
+
+Quando uma dimensão é considerada de proteção, uma pontuação mais alta 
+indica uma condição positiva para a saúde do trabalhador, ou seja, quanto 
+maior o valor, melhor.
+RISCO
+
+Já nas dimensões classificadas como risco, uma pontuação alta representa uma 
+exposição negativa — ou seja, quanto maior o valor, maior o risco à saúde.
+
+As seguintes dimensões são consideradas de risco, pois estão associadas a 
+sobrecarga, desgaste emocional ou situações negativas no ambiente de trabalho: 
+
+●Demandas de Trabalho 
+●Conflitos Família-Trabalho 
+●Burnout e Estresse 
+●Comportamentos Ofensivos 
+
+
+Orientação sobre a Interpretação das 
+Dimensões do COPSOQ II
+RISCOS
+Classificação Intervalo (0 a 5) Interpretação Ação recomendada 
+ Situação Favorável0 – 2,33 Baixo/Nenhum risco Condição psicossocial boa. Manter boas práticas. 
+ Risco Intermediário2,34 – 3,66 Médio risco 
+Moderado – pode indicar início de problemas. Monitorar, 
+promover ações de suporte. 
+ Risco para a SaúdeMaior que 3,66 Alto risco  
+Intervenção imediata, revisão organizacional. Alto risco 
+psicossocial. 
+Faixas de classificação
+
+Para essas dimensões os valores obtidos podem ser classificados em:
+Resumo:
+Dimensão classificada como RISCO: Maior pontuação = Resultado negativo.
+Comportamentos Ofensivos
+As perguntas da dimensão Comportamentos Ofensivos são opcionais, não entram no cálculo 
+da pontuação geral e devem ser analisadas apenas de forma qualitativa, para identificar 
+possíveis situações de risco no ambiente de trabalho.
+
+Estas dimensões são consideradas fatores de proteção, pois representam condições 
+positivas do ambiente de trabalho que fortalecem o bem-estar:
+
+●Influência e Possibilidade de Desenvolvimento 
+●Significado do Trabalho e Comprometimento 
+●Relações Interpessoais 
+●Liderança 
+●Interface Trabalho-Indivíduo 
+●Valores do Local de Trabalho 
+●Saúde Geral 
+PROTEÇÃO
+Classificação Intervalo (0 a 5) Interpretação Ação recomendada 
+ Situação FavorávelMaior que 3,66 Baixo/Nenhum riscoCondição psicossocial boa. Manter boas práticas. 
+ Risco Intermediário2,34 – 3,66 Médio risco 
+Moderado – pode indicar início de problemas. Monitorar, 
+promover ações de suporte. 
+ Risco para a Saúde0 - 2,33Alto risco
+Intervenção imediata, revisão organizacional. Alto risco 
+psicossocial. 
+Faixas de classificação
+
+Para essas dimensões os valores obtidos podem ser classificados em:
+Resumo:
+Dimensão classificada como PROTEÇÃO: Maior pontuação = Resultado positivo.
+Orientação sobre a Interpretação das 
+Dimensões do COPSOQ II
+
+Cálculo
+
+Cada dimensão possui um conjunto específico de perguntas, cujas respostas 
+variam de 1 a 5. Para calcular os resultados, primeiro determinamos a média das 
+respostas de cada trabalhador dentro daquela dimensão.  
+
+Em seguida, obtemos a média geral da dimensão considerando todos os 
+funcionários que responderam o questionário. 
+
+
+Média individual do funcionário
+
+Somamos as notas das perguntas dentro da dimensão e dividimos pelo número total 
+de perguntas. 
+Como funciona o cálculo
+Como Calcular
+Média geral da dimensão  
+
+Somamos as médias individuais dos funcionários e dividimos pelo total de 
+trabalhadores que responderam o questionário.
+Veja um exemplo à seguir:
+
+   Para facilitar a compreensão do cálculo, utilizaremos um exemplo fictício.
+
+Dimensão: Demandas de trabalho 
+Perguntas da dimensão: 1A, 1B , 2A, 2B, 3A, 3B
+Quantidade de questões da dimensão: 6 perguntas
+Fator de Risco ou de Proteção? Risco (Valores mais altos, são negativos)
+
+Respostas fictícias:
+
+
+Pergunta Resposta Pontuação 
+1A Às vezes 2 
+1B Raramente (invertido)3 
+2A Sempre 4 
+2B Frequentemente 3 
+3A Às vezes 2 
+3B Raramente 1 
+Cálculo da média individual 
+
+Basta somar as pontuações: 2 + 3 + 4 + 3 + 2 + 1 = 15 
+
+E dividir pelo número de questões: 6 
+
+Média = 15 / 6 = 2,5 
+
+ Cálculo da média dos funcionários: 
+
+Após calcular a média individual, você deverá somar os resultados de todos os trabalhadores.
+
+●Funcionário A: 2,5 
+●Funcionário B: 3,0 
+●Funcionário C: 1,8 
+
+Média geral da dimensão = (2,5 + 3,0 + 1,8) / 3 = 2,43
+
+
+Isso significa que a dimensão Demandas de Trabalho tem a média de 2,43, sendo classificada 
+como Risco Intermediário.
+
+
+
+Formulário de Aplicação
+Este PDF tem como objetivo orientar você em todo o processo de aplicação 
+do questionário aos seus colaboradores. Aqui, você encontrará todas as 
+informações necessárias para conduzir a aplicação de forma eficiente e saber 
+exatamente quais passos seguir após a coleta das respostas.
+
+Para tornar esse processo ainda mais simples, incluímos um formulário 
+pronto para uso. Esse é o documento que deve ser entregue aos 
+colaboradores para que respondam ao questionário.
+
+Para obter o questionário, clique aqui.
+
+    
+Demandas 
+Quantitativas 
+Sua carga de trabalho é distribuída de maneira desigual, acumulando-se? 
+Com que frequência você não tem tempo para concluir todas as suas tarefas de trabalho? 
+Você fica atrasado com seu trabalho?
+Você tem tempo suficiente para suas tarefas de trabalho? 
+12345
+12345
+1         2345
+12345
+O COPSOQ II é uma ferramenta essencial para avaliar os riscos 
+psicossociais e fornecer dados que sustentam o GRO e o PGR. 
+Seu uso permite que as organizações implementem ações preventivas e 
+corretivas, promovendo um ambiente de trabalho mais saudável e 
+produtivo, reduzindo afastamentos e aumentando o bem-estar dos 
+trabalhadores.
+Para informações completas sobre a ferramenta COPSOQ, acesse o site 
+oficial: https://www.copsoq-network.org/
+
+Material desenvolvido por:
+Este é um material GRATUITO fornecido pelo Sistema ESO e não tem fins lucrativos por si próprio.  Qualquer comercialização 
+lucrativa deste material deve ser considerada ilegítima. As imagens e informações contidas neste material não têm relação com 
+propagandas ou patrocínios para outras empresas. Imagens: unsplash/shutterstock/freepik

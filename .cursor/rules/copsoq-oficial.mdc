@@ -1,0 +1,15 @@
+---
+description: Fonte oficial permanente do COPSOQ II-Br — consultar docs/copsoq antes de qualquer mudança
+alwaysApply: true
+---
+
+# COPSOQ II-Br — documentação oficial permanente
+
+Antes de alterar qualquer coisa relacionada a COPSOQ, Pesquisa Psicossocial, Resultados, Dashboard, Relatórios, PDF, Estatísticas, Motor de cálculo, Questionário, Dimensões ou Classificações:
+
+1. Consultar **primeiro** a pasta `docs/copsoq/` (começar por `docs/copsoq/README.md`).
+2. Seguir `FORMULARIO-OFICIAL.md`, `ORIENTACOES-OFICIAIS.md`, `REGRAS-DE-CALCULO.md` e `CHECKLIST-DE-VALIDACAO.md`.
+3. Usar como binários oficiais apenas `docs/copsoq/fonte-oficial/*.pdf`.
+4. **Não** usar memória, conhecimento próprio, versões externas do COPSOQ ou regras presumidas.
+5. Se houver divergência ou lacuna oficial → parar e informar; não aproximar.
+6. Só voltar aos PDFs “de fora” do repositório quando houver **nova versão oficial** do instrumento (e então atualizar `docs/copsoq/fonte-oficial/` + markdowns).
