@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { removerParticipanteCampanhaSoft } from "@/services/riscos-remocao-participante.service";
 
@@ -6,7 +7,7 @@ export const runtime = "nodejs";
 
 /**
  * Soft-delete administrativo do participante (com invalidação de sessão se houver).
- * Não retorna respostas individuais.
+ * Não retorna respostas individuais. Somente admin.
  */
 export async function POST(
   request: Request,
@@ -22,6 +23,20 @@ export async function POST(
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
+    const { data: perfil, error: perfilErr } = await supabase
+      .from("perfis_usuarios")
+      .select("perfil, ativo, nome, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (perfilErr) throw perfilErr;
+    if (!perfil || perfil.ativo === false || !isPerfilAdmin(perfil.perfil)) {
+      return NextResponse.json(
+        { error: "Somente administradores podem remover participantes." },
+        { status: 403 }
+      );
+    }
+
     const participanteId = String(context.params.participanteId ?? "").trim();
     if (!participanteId) {
       return NextResponse.json(
@@ -31,8 +46,14 @@ export async function POST(
     }
 
     let motivo: string | undefined;
-    let usuarioNome = user.email || "Administrador";
-    let usuarioEmail = user.email || "";
+    let usuarioNome =
+      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
+      user.email ||
+      "Administrador";
+    let usuarioEmail =
+      (typeof perfil.email === "string" && perfil.email.trim()) ||
+      user.email ||
+      "";
     try {
       const body = (await request.json()) as {
         motivo?: string;

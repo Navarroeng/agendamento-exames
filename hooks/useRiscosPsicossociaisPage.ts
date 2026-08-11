@@ -31,7 +31,6 @@ import {
   removerProcessoRiscos,
 } from "@/services/riscos-campanha.service";
 import {
-  atualizarParticipanteCampanha,
   criarParticipanteCampanha,
   importarParticipantesCampanhaExcel,
   listarParticipantesCampanha,
@@ -825,34 +824,14 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes]
   );
 
-  const handleEditarParticipante = useCallback(
-    async (participanteId: string, input: RiscosParticipanteInput) => {
-      const campanhaId = modalProcesso?.campanha?.id;
-      if (!campanhaId) return;
-      setSavingParticipante(true);
-      try {
-        await atualizarParticipanteCampanha(
-          { participanteId, input },
-          { auditContext }
-        );
-        await carregarParticipantes(campanhaId);
-        toast.success("Participante atualizado.");
-      } catch (err) {
-        console.error(err);
-        throw err instanceof Error
-          ? err
-          : new Error("Erro ao editar participante.");
-      } finally {
-        setSavingParticipante(false);
-      }
-    },
-    [modalProcesso, auditContext, carregarParticipantes]
-  );
-
   const handleRemoverParticipante = useCallback(
     async (participanteId: string) => {
       const campanhaId = modalProcesso?.campanha?.id;
       if (!campanhaId) return;
+      if (!isAdmin) {
+        toast.error("Somente administradores podem remover participantes.");
+        return;
+      }
       setSavingParticipante(true);
       try {
         const res = await fetch(
@@ -883,7 +862,7 @@ export function useRiscosPsicossociaisPage() {
         setSavingParticipante(false);
       }
     },
-    [modalProcesso, auditContext, carregarParticipantes]
+    [modalProcesso, auditContext, carregarParticipantes, isAdmin]
   );
 
   return {
@@ -923,7 +902,6 @@ export function useRiscosPsicossociaisPage() {
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleImportarParticipantesExcel,
-    handleEditarParticipante,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
     refresh,

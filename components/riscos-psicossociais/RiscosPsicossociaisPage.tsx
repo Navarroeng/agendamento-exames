@@ -46,7 +46,6 @@ export function RiscosPsicossociaisPage() {
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleImportarParticipantesExcel,
-    handleEditarParticipante,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
   } = useRiscosPsicossociaisPage();
@@ -109,8 +108,8 @@ export function RiscosPsicossociaisPage() {
         onGarantirCodigoAcesso={handleGarantirCodigoAcesso}
         onCriarParticipante={handleCriarParticipante}
         onImportarParticipantesExcel={handleImportarParticipantesExcel}
-        onEditarParticipante={handleEditarParticipante}
         onRemoverParticipante={handleRemoverParticipante}
+        podeRemoverParticipante={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </AppShell>

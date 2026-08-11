@@ -38,11 +38,8 @@ interface RiscosPsicossociaisModalProps {
   onGarantirCodigoAcesso?: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante?: (input: RiscosParticipanteInput) => Promise<void>;
   onImportarParticipantesExcel?: (file: File) => Promise<void>;
-  onEditarParticipante?: (
-    participanteId: string,
-    input: RiscosParticipanteInput
-  ) => Promise<void>;
   onRemoverParticipante?: (participanteId: string) => Promise<void>;
+  podeRemoverParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
 }
 
@@ -67,8 +64,8 @@ export function RiscosPsicossociaisModal({
   onGarantirCodigoAcesso,
   onCriarParticipante,
   onImportarParticipantesExcel,
-  onEditarParticipante,
   onRemoverParticipante,
+  podeRemoverParticipante = false,
   campanhaStatusSincronizado = false,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
@@ -147,12 +144,10 @@ export function RiscosPsicossociaisModal({
         onImportarParticipantesExcel={async (file) => {
           await onImportarParticipantesExcel?.(file);
         }}
-        onEditarParticipante={async (id, input) => {
-          await onEditarParticipante?.(id, input);
-        }}
         onRemoverParticipante={async (id) => {
           await onRemoverParticipante?.(id);
         }}
+        podeRemoverParticipante={podeRemoverParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </Modal>

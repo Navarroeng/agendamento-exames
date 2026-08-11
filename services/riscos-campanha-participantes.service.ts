@@ -126,42 +126,6 @@ export async function criarParticipanteCampanha(
   return json.participante;
 }
 
-export async function atualizarParticipanteCampanha(
-  params: {
-    participanteId: string;
-    input: RiscosParticipanteInput;
-  },
-  auditOptions?: AuditOptions
-): Promise<RiscosCampanhaParticipanteRecord> {
-  const validationError = validateRiscosParticipanteInput(params.input);
-  if (validationError) throw new Error(validationError);
-
-  const res = await fetch(
-    `/api/riscos/participante/${encodeURIComponent(params.participanteId)}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...params.input,
-        usuarioNome: auditOptions?.auditContext?.usuarioNome,
-        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
-      }),
-    }
-  );
-
-  const json = (await res.json().catch(() => ({}))) as {
-    ok?: boolean;
-    error?: string;
-    participante?: RiscosCampanhaParticipanteRecord;
-  };
-
-  if (!res.ok || !json.ok || !json.participante) {
-    throw new Error(json.error || "Não foi possível atualizar o participante.");
-  }
-
-  return json.participante;
-}
-
 export type ImportacaoParticipantesClientResult = {
   importados: number;
   ignorados: number;

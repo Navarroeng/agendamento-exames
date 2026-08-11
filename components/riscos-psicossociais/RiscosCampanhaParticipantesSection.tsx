@@ -19,11 +19,9 @@ interface RiscosCampanhaParticipantesSectionProps {
   campanha: RiscosCampanhaRecord;
   participantes: RiscosCampanhaParticipanteRecord[];
   saving?: boolean;
+  /** Somente admin vê/usa Remover participante. */
+  podeRemoverParticipante?: boolean;
   onCriar: (input: RiscosParticipanteInput) => Promise<void>;
-  onEditar: (
-    participanteId: string,
-    input: RiscosParticipanteInput
-  ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
   onImportarExcel?: (file: File) => Promise<void>;
 }
@@ -32,13 +30,12 @@ export function RiscosCampanhaParticipantesSection({
   campanha,
   participantes,
   saving = false,
+  podeRemoverParticipante = false,
   onCriar,
-  onEditar,
   onRemover,
   onImportarExcel,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,40 +45,13 @@ export function RiscosCampanhaParticipantesSection({
     [campanha.quantidade_prevista, participantes]
   );
 
-  const editingInitial = useMemo(() => {
-    if (!editingId) return null;
-    const p = participantes.find((row) => row.id === editingId);
-    if (!p) return null;
-    return {
-      nomeCompleto: p.nome_completo,
-      cpf: p.cpf,
-      dataNascimento: p.data_nascimento ?? "",
-      email: p.email ?? "",
-    } satisfies RiscosParticipanteInput;
-  }, [editingId, participantes]);
-
-  function openCreate() {
-    setEditingId(null);
-    setFormOpen(true);
-  }
-
-  function openEdit(p: RiscosCampanhaParticipanteRecord) {
-    setMenuOpenId(null);
-    setEditingId(p.id);
-    setFormOpen(true);
-  }
-
   async function handleSalvar(input: RiscosParticipanteInput) {
-    if (editingId) {
-      await onEditar(editingId, input);
-    } else {
-      await onCriar(input);
-    }
+    await onCriar(input);
     setFormOpen(false);
-    setEditingId(null);
   }
 
   async function handleRemover(p: RiscosCampanhaParticipanteRecord) {
+    if (!podeRemoverParticipante) return;
     setMenuOpenId(null);
     const forte = precisaConfirmacaoForteRemocao(p.status);
     const ok = window.confirm(
@@ -91,11 +61,6 @@ export function RiscosCampanhaParticipantesSection({
     );
     if (!ok) return;
     await onRemover(p.id);
-  }
-
-  function placeholderAction(label: string) {
-    setMenuOpenId(null);
-    toast.message(`${label} será disponibilizado em breve.`);
   }
 
   return (
@@ -146,7 +111,7 @@ export function RiscosCampanhaParticipantesSection({
           type="button"
           className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
           disabled={saving}
-          onClick={openCreate}
+          onClick={() => setFormOpen(true)}
         >
           + Cadastrar participante
         </button>
@@ -164,15 +129,14 @@ export function RiscosCampanhaParticipantesSection({
         </p>
       ) : (
         <div className="w-full overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
-          <table className="w-full min-w-0 table-fixed text-left text-xs lg:min-w-full">
+          <table className="w-full min-w-[720px] table-fixed text-left text-xs">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
-                <th className="w-[42%] px-3 py-2.5">Nome</th>
-                <th className="w-[18%] px-3 py-2.5">CPF</th>
-                <th className="w-[16%] px-3 py-2.5">Status</th>
-                <th className="hidden w-[14%] px-3 py-2.5 sm:table-cell">
-                  Cadastro
-                </th>
+                <th className="w-[28%] px-3 py-2.5">Nome</th>
+                <th className="w-[16%] px-3 py-2.5">CPF</th>
+                <th className="w-[14%] px-3 py-2.5">Data de nasc.</th>
+                <th className="w-[14%] px-3 py-2.5">Status</th>
+                <th className="w-[14%] px-3 py-2.5">Cadastro</th>
                 <th className="w-[72px] px-3 py-2.5 text-center">Ações</th>
               </tr>
             </thead>
@@ -190,26 +154,33 @@ export function RiscosCampanhaParticipantesSection({
                   <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
                     {maskCpfParticipante(p.cpf)}
                   </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
+                    {p.data_nascimento
+                      ? formatDateBR(p.data_nascimento.slice(0, 10))
+                      : "-"}
+                  </td>
                   <td className="px-3 py-2.5">
                     <StatusBadge status={p.status} />
                   </td>
-                  <td className="hidden px-3 py-2.5 tabular-nums text-[#64748b] sm:table-cell">
+                  <td className="px-3 py-2.5 whitespace-nowrap tabular-nums text-[#64748b]">
                     {p.created_at
                       ? formatDateBR(p.created_at.slice(0, 10))
-                      : "—"}
+                      : "-"}
                   </td>
                   <td className="relative px-3 py-2.5 text-center">
-                    <ParticipanteActionsMenu
-                      open={menuOpenId === p.id}
-                      disabled={saving}
-                      onToggle={() =>
-                        setMenuOpenId((id) => (id === p.id ? null : p.id))
-                      }
-                      onClose={() => setMenuOpenId(null)}
-                      onEditar={() => openEdit(p)}
-                      onRemover={() => void handleRemover(p)}
-                      onPlaceholder={placeholderAction}
-                    />
+                    {podeRemoverParticipante ? (
+                      <ParticipanteActionsMenu
+                        open={menuOpenId === p.id}
+                        disabled={saving}
+                        onToggle={() =>
+                          setMenuOpenId((id) => (id === p.id ? null : p.id))
+                        }
+                        onClose={() => setMenuOpenId(null)}
+                        onRemover={() => void handleRemover(p)}
+                      />
+                    ) : (
+                      <span className="text-[11px] text-[#94a3b8]">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -220,13 +191,11 @@ export function RiscosCampanhaParticipantesSection({
 
       <RiscosParticipanteFormModal
         open={formOpen}
-        mode={editingId ? "edit" : "create"}
+        mode="create"
         saving={saving}
-        initial={editingInitial}
         onClose={() => {
           if (saving) return;
           setFormOpen(false);
-          setEditingId(null);
         }}
         onSave={handleSalvar}
       />
@@ -268,17 +237,13 @@ function ParticipanteActionsMenu({
   disabled,
   onToggle,
   onClose,
-  onEditar,
   onRemover,
-  onPlaceholder,
 }: {
   open: boolean;
   disabled?: boolean;
   onToggle: () => void;
   onClose: () => void;
-  onEditar: () => void;
   onRemover: () => void;
-  onPlaceholder: (label: string) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -314,62 +279,18 @@ function ParticipanteActionsMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-xl border border-[#e8edf5] bg-white py-1 text-left shadow-lg"
         >
-          <MenuItem label="Editar" onClick={onEditar} />
-          <MenuItem
-            label="Redefinir senha"
-            muted
-            onClick={() => onPlaceholder("Redefinir senha")}
-          />
-          <MenuItem
-            label="Copiar link individual"
-            muted
-            onClick={() => onPlaceholder("Copiar link individual")}
-          />
-          <MenuItem
-            label="Enviar convite"
-            muted
-            onClick={() => onPlaceholder("Enviar convite")}
-          />
-          <MenuItem
-            label="Ver histórico"
-            muted
-            onClick={() => onPlaceholder("Ver histórico")}
-          />
-          <div className="my-1 border-t border-[#eef2f7]" />
-          <MenuItem label="Remover participante" danger onClick={onRemover} />
+          <button
+            type="button"
+            role="menuitem"
+            className="block w-full px-3 py-2 text-left text-xs font-semibold text-brand-red transition hover:bg-[#fef2f2]"
+            onClick={onRemover}
+          >
+            Remover participante
+          </button>
         </div>
       ) : null}
     </div>
-  );
-}
-
-function MenuItem({
-  label,
-  onClick,
-  danger = false,
-  muted = false,
-}: {
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  muted?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      className={`block w-full px-3 py-2 text-left text-xs font-semibold transition hover:bg-[#f8fafc] ${
-        danger
-          ? "text-brand-red"
-          : muted
-            ? "text-[#64748b]"
-            : "text-navy"
-      }`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
   );
 }
