@@ -40,7 +40,23 @@ interface RiscosPsicossociaisPainelProps {
     participanteId: string,
     input: RiscosParticipanteInput
   ) => Promise<void>;
-  onImportarParticipantesExcel: (file: File) => Promise<void>;
+  onPrepararImportacaoParticipantesExcel: (
+    file: File
+  ) => Promise<{
+    arquivoNome: string;
+    linhasEncontradas: number;
+    validos: number;
+    comErro: number;
+    avaliadas: import("@/lib/riscos-participantes-excel").LinhaAvaliacaoImportacao[];
+    linhasProntas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[];
+  }>;
+  onConfirmarImportacaoParticipantesExcel: (
+    linhas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[]
+  ) => Promise<{
+    importados: number;
+    ignorados: number;
+    erros: Array<{ linha?: number; cpf: string; motivo: string }>;
+  }>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
   podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
@@ -65,7 +81,8 @@ export function RiscosPsicossociaisPainel({
   onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
-  onImportarParticipantesExcel,
+  onPrepararImportacaoParticipantesExcel,
+  onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
@@ -164,7 +181,12 @@ export function RiscosPsicossociaisPainel({
         onGarantirCodigoAcesso={onGarantirCodigoAcesso}
         onCriarParticipante={onCriarParticipante}
         onEditarParticipante={onEditarParticipante}
-        onImportarParticipantesExcel={onImportarParticipantesExcel}
+        onPrepararImportacaoParticipantesExcel={
+          onPrepararImportacaoParticipantesExcel
+        }
+        onConfirmarImportacaoParticipantesExcel={
+          onConfirmarImportacaoParticipantesExcel
+        }
         onRemoverParticipante={onRemoverParticipante}
         podeGerenciarParticipante={podeGerenciarParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}

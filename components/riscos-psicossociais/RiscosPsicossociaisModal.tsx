@@ -41,7 +41,23 @@ interface RiscosPsicossociaisModalProps {
     participanteId: string,
     input: RiscosParticipanteInput
   ) => Promise<void>;
-  onImportarParticipantesExcel?: (file: File) => Promise<void>;
+  onPrepararImportacaoParticipantesExcel?: (
+    file: File
+  ) => Promise<{
+    arquivoNome: string;
+    linhasEncontradas: number;
+    validos: number;
+    comErro: number;
+    avaliadas: import("@/lib/riscos-participantes-excel").LinhaAvaliacaoImportacao[];
+    linhasProntas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[];
+  }>;
+  onConfirmarImportacaoParticipantesExcel?: (
+    linhas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[]
+  ) => Promise<{
+    importados: number;
+    ignorados: number;
+    erros: Array<{ linha?: number; cpf: string; motivo: string }>;
+  }>;
   onRemoverParticipante?: (participanteId: string) => Promise<void>;
   podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
@@ -68,7 +84,8 @@ export function RiscosPsicossociaisModal({
   onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
-  onImportarParticipantesExcel,
+  onPrepararImportacaoParticipantesExcel,
+  onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
@@ -149,8 +166,17 @@ export function RiscosPsicossociaisModal({
         onEditarParticipante={async (id, input) => {
           await onEditarParticipante?.(id, input);
         }}
-        onImportarParticipantesExcel={async (file) => {
-          await onImportarParticipantesExcel?.(file);
+        onPrepararImportacaoParticipantesExcel={async (file) => {
+          if (!onPrepararImportacaoParticipantesExcel) {
+            throw new Error("Importação indisponível.");
+          }
+          return onPrepararImportacaoParticipantesExcel(file);
+        }}
+        onConfirmarImportacaoParticipantesExcel={async (linhas) => {
+          if (!onConfirmarImportacaoParticipantesExcel) {
+            throw new Error("Importação indisponível.");
+          }
+          return onConfirmarImportacaoParticipantesExcel(linhas);
         }}
         onRemoverParticipante={async (id) => {
           await onRemoverParticipante?.(id);

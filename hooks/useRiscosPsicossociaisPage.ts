@@ -34,14 +34,22 @@ import {
 } from "@/services/riscos-campanha.service";
 import {
   atualizarParticipanteCampanha,
+  confirmarImportacaoParticipantesCampanha,
   criarParticipanteCampanha,
-  importarParticipantesCampanhaExcel,
   listarParticipantesCampanha,
+  parseArquivoImportacaoParticipantes,
+  validarImportacaoParticipantesCampanha,
 } from "@/services/riscos-campanha-participantes.service";
 import type {
   RiscosCampanhaParticipanteRecord,
   RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
+import {
+  campanhaPermiteImportacaoParticipantes,
+  type LinhaAvaliacaoImportacao,
+  type SituacaoImportacaoParticipante,
+} from "@/lib/riscos-participantes-excel";
+import { normalizeCpfDigits } from "@/lib/cpf";
 import {
   removerAnexoListaPresenca,
   salvarRecebimentoListaPresenca,
@@ -880,27 +888,87 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes, isAdmin]
   );
 
-  const handleImportarParticipantesExcel = useCallback(
+  const handlePrepararImportacaoParticipantesExcel = useCallback(
     async (file: File) => {
+      const campanha = modalProcesso?.campanha;
+      const campanhaId = campanha?.id;
+      if (!campanhaId || !campanha) {
+        throw new Error("Crie a pesquisa antes de importar participantes.");
+      }
+      const bloqueio = campanhaPermiteImportacaoParticipantes(campanha.status);
+      if (bloqueio) throw new Error(bloqueio);
+
+      const parsed = await parseArquivoImportacaoParticipantes(file);
+      if (!parsed.ok) {
+        throw new Error(parsed.error);
+      }
+
+      const server = await validarImportacaoParticipantesCampanha({
+        campanhaId,
+        linhas: parsed.linhas,
+      });
+
+      const avaliadas: LinhaAvaliacaoImportacao[] = server.linhas.map((l) => ({
+        linha: l.linha,
+        nomeCompleto: l.nomeCompleto,
+        cpf: l.cpf,
+        cpfDigits: normalizeCpfDigits(l.cpf),
+        dataNascimento: l.dataNascimento,
+        email: l.email,
+        situacao: l.situacao as SituacaoImportacaoParticipante,
+        motivo: l.motivo,
+        pronto: l.pronto,
+        input: l.pronto
+          ? {
+              nomeCompleto: l.nomeCompleto,
+              cpf: normalizeCpfDigits(l.cpf),
+              dataNascimento: l.dataNascimento,
+              email: l.email || undefined,
+            }
+          : undefined,
+      }));
+
+      const linhasProntas = avaliadas
+        .filter((a) => a.pronto && a.input)
+        .map((a) => ({
+          linha: a.linha,
+          ...a.input!,
+        }));
+
+      return {
+        arquivoNome: file.name,
+        linhasEncontradas: parsed.totalLinhasDados,
+        validos: server.validos,
+        comErro: server.comErro,
+        avaliadas,
+        linhasProntas,
+      };
+    },
+    [modalProcesso]
+  );
+
+  const handleConfirmarImportacaoParticipantesExcel = useCallback(
+    async (
+      linhas: Array<{
+        nomeCompleto: string;
+        cpf: string;
+        dataNascimento: string;
+        email?: string;
+        linha?: number;
+      }>
+    ) => {
       const campanhaId = modalProcesso?.campanha?.id;
       if (!campanhaId) {
         throw new Error("Crie a pesquisa antes de importar participantes.");
       }
       setSavingParticipante(true);
       try {
-        const result = await importarParticipantesCampanhaExcel(
-          { campanhaId, file },
+        const result = await confirmarImportacaoParticipantesCampanha(
+          { campanhaId, linhas },
           { auditContext }
         );
         await carregarParticipantes(campanhaId);
-        const motivos = result.erros
-          .slice(0, 5)
-          .map((e) => `• ${e.motivo}`)
-          .join("\n");
-        toast.success(
-          `Importados: ${result.importados}\nIgnorados: ${result.ignorados}` +
-            (motivos ? `\n\n${motivos}` : "")
-        );
+        return result;
       } catch (err) {
         console.error(err);
         throw err instanceof Error
@@ -991,7 +1059,8 @@ export function useRiscosPsicossociaisPage() {
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
-    handleImportarParticipantesExcel,
+    handlePrepararImportacaoParticipantesExcel,
+    handleConfirmarImportacaoParticipantesExcel,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
     refresh,

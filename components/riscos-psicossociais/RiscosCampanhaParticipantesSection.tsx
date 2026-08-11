@@ -13,8 +13,15 @@ import {
 } from "@/lib/riscos-campanha-participantes";
 import { acoesMenuParticipantePorStatus } from "@/lib/riscos-participante-acoes";
 import { precisaConfirmacaoForteRemocao } from "@/lib/riscos-remocao-participante";
+import {
+  campanhaPermiteImportacaoParticipantes,
+  downloadModeloImportacaoParticipantesExcel,
+  type LinhaAvaliacaoImportacao,
+  type LinhaImportacaoParticipante,
+} from "@/lib/riscos-participantes-excel";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { RiscosParticipanteFormModal } from "@/components/riscos-psicossociais/RiscosParticipanteFormModal";
+import { RiscosImportacaoParticipantesModal } from "@/components/riscos-psicossociais/RiscosImportacaoParticipantesModal";
 
 interface RiscosCampanhaParticipantesSectionProps {
   campanha: RiscosCampanhaRecord;
@@ -28,7 +35,23 @@ interface RiscosCampanhaParticipantesSectionProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
-  onImportarExcel?: (file: File) => Promise<void>;
+  onPrepararImportacaoExcel?: (
+    file: File
+  ) => Promise<{
+    arquivoNome: string;
+    linhasEncontradas: number;
+    validos: number;
+    comErro: number;
+    avaliadas: LinhaAvaliacaoImportacao[];
+    linhasProntas: LinhaImportacaoParticipante[];
+  }>;
+  onConfirmarImportacaoExcel?: (
+    linhas: LinhaImportacaoParticipante[]
+  ) => Promise<{
+    importados: number;
+    ignorados: number;
+    erros: Array<{ linha?: number; cpf: string; motivo: string }>;
+  }>;
 }
 
 export function RiscosCampanhaParticipantesSection({
@@ -39,13 +62,37 @@ export function RiscosCampanhaParticipantesSection({
   onCriar,
   onEditar,
   onRemover,
-  onImportarExcel,
+  onPrepararImportacaoExcel,
+  onConfirmarImportacaoExcel,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] =
     useState<RiscosCampanhaParticipanteRecord | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFase, setImportFase] = useState<"preview" | "resultado">(
+    "preview"
+  );
+  const [importSaving, setImportSaving] = useState(false);
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [linhasEncontradas, setLinhasEncontradas] = useState(0);
+  const [validos, setValidos] = useState(0);
+  const [comErro, setComErro] = useState(0);
+  const [avaliadas, setAvaliadas] = useState<LinhaAvaliacaoImportacao[]>([]);
+  const [linhasProntas, setLinhasProntas] = useState<
+    LinhaImportacaoParticipante[]
+  >([]);
+  const [importados, setImportados] = useState(0);
+  const [naoImportados, setNaoImportados] = useState(0);
+
+  const bloqueioImportacao = campanhaPermiteImportacaoParticipantes(
+    campanha.status
+  );
+  const podeImportar =
+    Boolean(onPrepararImportacaoExcel && onConfirmarImportacaoExcel) &&
+    !bloqueioImportacao;
 
   const resumo = useMemo(
     () =>
@@ -91,6 +138,64 @@ export function RiscosCampanhaParticipantesSection({
     await onRemover(p.id);
   }
 
+  async function handleArquivoSelecionado(file: File) {
+    if (!onPrepararImportacaoExcel) return;
+    if (bloqueioImportacao) {
+      toast.error(bloqueioImportacao);
+      return;
+    }
+    try {
+      const preview = await onPrepararImportacaoExcel(file);
+      setArquivoNome(preview.arquivoNome);
+      setLinhasEncontradas(preview.linhasEncontradas);
+      setValidos(preview.validos);
+      setComErro(preview.comErro);
+      setAvaliadas(preview.avaliadas);
+      setLinhasProntas(preview.linhasProntas);
+      setImportados(0);
+      setNaoImportados(0);
+      setImportFase("preview");
+      setImportOpen(true);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Falha ao ler a planilha."
+      );
+    }
+  }
+
+  async function handleConfirmarImportacao() {
+    if (!onConfirmarImportacaoExcel) return;
+    if (linhasProntas.length === 0) {
+      toast.error("Nenhuma linha válida para importar.");
+      return;
+    }
+    setImportSaving(true);
+    try {
+      const result = await onConfirmarImportacaoExcel(linhasProntas);
+      setImportados(result.importados);
+      setNaoImportados(result.ignorados);
+      if (result.erros.length > 0) {
+        setAvaliadas((prev) => {
+          const byLinha = new Map(
+            result.erros.map((e) => [e.linha, e.motivo] as const)
+          );
+          return prev.map((a) => {
+            if (a.pronto) return a;
+            const motivoServer = byLinha.get(a.linha);
+            return motivoServer ? { ...a, motivo: motivoServer } : a;
+          });
+        });
+      }
+      setImportFase("resultado");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Falha ao importar participantes."
+      );
+    } finally {
+      setImportSaving(false);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex flex-wrap gap-2">
@@ -103,43 +208,48 @@ export function RiscosCampanhaParticipantesSection({
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
-            void (async () => {
-              try {
-                if (onImportarExcel) {
-                  await onImportarExcel(file);
-                } else {
-                  toast.message(
-                    "Importação por Excel será disponibilizada em etapa futura."
-                  );
-                }
-              } catch (err) {
-                toast.error(
-                  err instanceof Error
-                    ? err.message
-                    : "Falha ao importar a planilha."
-                );
-              }
-            })();
+            void handleArquivoSelecionado(file);
           }}
         />
         <button
           type="button"
           className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-          disabled={saving || !onImportarExcel}
+          disabled={saving || importSaving || !podeImportar}
           onClick={() => fileInputRef.current?.click()}
           title={
-            onImportarExcel
-              ? "Importar planilha (Nome | CPF | Data de nascimento | E-mail)"
-              : "Importação indisponível"
+            bloqueioImportacao
+              ? bloqueioImportacao
+              : podeImportar
+                ? "Importar planilha (NOME COMPLETO | CPF | DATA DE NASCIMENTO | E-MAIL)"
+                : "Importação indisponível"
           }
         >
           Importar Excel
         </button>
         <button
           type="button"
-          className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-          disabled={saving}
+          className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
           onClick={() => {
+            try {
+              downloadModeloImportacaoParticipantesExcel();
+            } catch {
+              toast.error("Não foi possível baixar o modelo.");
+            }
+          }}
+          title="Baixar modelo_importacao_participantes_riscos.xlsx"
+        >
+          Baixar modelo
+        </button>
+        <button
+          type="button"
+          className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+          disabled={saving || Boolean(bloqueioImportacao)}
+          title={bloqueioImportacao ?? undefined}
+          onClick={() => {
+            if (bloqueioImportacao) {
+              toast.error(bloqueioImportacao);
+              return;
+            }
             setEditando(null);
             setFormOpen(true);
           }}
@@ -155,8 +265,8 @@ export function RiscosCampanhaParticipantesSection({
 
       {participantes.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-6 text-center text-sm text-app-muted">
-          Nenhum participante cadastrado. Use “+ Cadastrar participante” para
-          incluir.
+          Nenhum participante cadastrado. Use “+ Cadastrar participante” ou
+          “Importar Excel” para incluir.
         </p>
       ) : (
         <div className="w-full overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
@@ -249,6 +359,24 @@ export function RiscosCampanhaParticipantesSection({
           setEditando(null);
         }}
         onSave={handleSalvar}
+      />
+
+      <RiscosImportacaoParticipantesModal
+        open={importOpen}
+        fase={importFase}
+        arquivoNome={arquivoNome}
+        linhasEncontradas={linhasEncontradas}
+        validos={validos}
+        comErro={comErro}
+        avaliadas={avaliadas}
+        importados={importados}
+        naoImportados={naoImportados}
+        saving={importSaving}
+        onClose={() => {
+          if (importSaving) return;
+          setImportOpen(false);
+        }}
+        onConfirmar={() => void handleConfirmarImportacao()}
       />
     </div>
   );

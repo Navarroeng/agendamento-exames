@@ -14,6 +14,10 @@ import {
   type RiscosParticipanteStatus,
   isRiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
+import {
+  campanhaPermiteImportacaoParticipantes,
+  type SituacaoImportacaoParticipante,
+} from "@/lib/riscos-participantes-excel";
 import { parseDataNascimentoBr } from "@/lib/date-br";
 import {
   AUDITORIA_ACOES,
@@ -280,6 +284,11 @@ export async function criarParticipanteCampanhaNoServidor(
   const campanha = await buscarCampanha(params.campanhaId);
   if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
 
+  const bloqueio = campanhaPermiteImportacaoParticipantes(
+    String(campanha.status ?? "")
+  );
+  if (bloqueio) throw new Error(bloqueio);
+
   const cpf = normalizeCpfDigits(params.input.cpf);
   await assertCpfLivreNaMesmaCampanha({
     campanhaId: campanha.id,
@@ -460,43 +469,123 @@ export type ImportacaoParticipantesResultado = {
   participantes: RiscosCampanhaParticipanteRecord[];
 };
 
-export async function importarParticipantesCampanhaNoServidor(
-  params: {
-    campanhaId: string;
-    linhas: ImportacaoParticipanteLinha[];
-  },
-  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
-): Promise<ImportacaoParticipantesResultado> {
-  const erros: ImportacaoParticipantesResultado["erros"] = [];
-  const participantes: RiscosCampanhaParticipanteRecord[] = [];
-  let importados = 0;
-  let ignorados = 0;
+export type ValidacaoImportacaoLinhaResultado = {
+  linha: number;
+  nomeCompleto: string;
+  cpf: string;
+  dataNascimento: string;
+  email: string;
+  situacao: SituacaoImportacaoParticipante;
+  motivo: string;
+  pronto: boolean;
+};
 
-  // CPFs já aceitos nesta importação (evita duplicar no mesmo arquivo).
-  const cpfNoArquivo = new Set<string>();
+export type ValidacaoImportacaoResultado = {
+  linhas: ValidacaoImportacaoLinhaResultado[];
+  validos: number;
+  comErro: number;
+  campanhaBloqueada: string | null;
+};
 
-  for (const linha of params.linhas) {
-    const cpf = normalizeCpfDigits(linha.cpf);
-    const validationError = validateRiscosParticipanteInput(linha);
+function mapMotivoToSituacao(
+  motivo: string
+): SituacaoImportacaoParticipante {
+  const m = motivo.toLowerCase();
+  if (m.includes("cancelada") || m.includes("encerrada") || m.includes("não está disponível")) {
+    return "campanha_bloqueada";
+  }
+  if (m.includes("outra campanha")) return "cpf_outra_campanha_ativa";
+  if (m.includes("já existe") || m.includes("nesta pesquisa") || m.includes("nesta campanha")) {
+    return "cpf_ja_na_campanha";
+  }
+  if (m.includes("duplicado no arquivo")) return "cpf_duplicado_arquivo";
+  if (m.includes("nome")) return "nome_obrigatorio";
+  if (m.includes("cpf")) return "cpf_invalido";
+  if (m.includes("nascimento") || m.includes("data")) return "data_invalida";
+  if (m.includes("e-mail") || m.includes("email")) return "email_invalido";
+  return "erro";
+}
+
+/**
+ * Pré-valida a importação (sem gravar), com as mesmas regras do cadastro manual.
+ */
+export async function validarImportacaoParticipantesNoServidor(params: {
+  campanhaId: string;
+  linhas: ImportacaoParticipanteLinha[];
+}): Promise<ValidacaoImportacaoResultado> {
+  const campanha = await buscarCampanha(params.campanhaId);
+  if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
+
+  const campanhaBloqueada = campanhaPermiteImportacaoParticipantes(
+    String(campanha.status ?? "")
+  );
+
+  const linhas: ValidacaoImportacaoLinhaResultado[] = [];
+  const cpfNoArquivo = new Map<string, number>();
+
+  for (const raw of params.linhas) {
+    const linhaNum = raw.linha ?? linhas.length + 2;
+    const nomeCompleto = String(raw.nomeCompleto ?? "").trim();
+    const cpfRaw = String(raw.cpf ?? "").trim();
+    const dataNascimento = String(raw.dataNascimento ?? "").trim();
+    const email = String(raw.email ?? "").trim();
+    const cpf = normalizeCpfDigits(cpfRaw);
+
+    const base = {
+      linha: linhaNum,
+      nomeCompleto,
+      cpf: cpfRaw || cpf,
+      dataNascimento,
+      email,
+    };
+
+    if (campanhaBloqueada) {
+      linhas.push({
+        ...base,
+        situacao: "campanha_bloqueada",
+        motivo: campanhaBloqueada,
+        pronto: false,
+      });
+      continue;
+    }
+
+    if (!nomeCompleto && !cpfRaw && !dataNascimento && !email) {
+      linhas.push({
+        ...base,
+        situacao: "linha_vazia",
+        motivo: "Linha vazia",
+        pronto: false,
+      });
+      continue;
+    }
+
+    const validationError = validateRiscosParticipanteInput({
+      nomeCompleto,
+      cpf: cpfRaw,
+      dataNascimento,
+      email: email || undefined,
+    });
     if (validationError) {
-      ignorados += 1;
-      erros.push({
-        linha: linha.linha,
-        cpf,
+      linhas.push({
+        ...base,
+        situacao: mapMotivoToSituacao(validationError),
         motivo: validationError,
+        pronto: false,
       });
       continue;
     }
 
-    if (cpfNoArquivo.has(cpf)) {
-      ignorados += 1;
-      erros.push({
-        linha: linha.linha,
-        cpf,
-        motivo: "CPF duplicado no arquivo de importação.",
+    const primeira = cpfNoArquivo.get(cpf);
+    if (primeira != null) {
+      linhas.push({
+        ...base,
+        situacao: "cpf_duplicado_arquivo",
+        motivo: `CPF duplicado no arquivo (já na linha ${primeira}).`,
+        pronto: false,
       });
       continue;
     }
+    cpfNoArquivo.set(cpf, linhaNum);
 
     try {
       await assertCpfLivreNaMesmaCampanha({
@@ -504,14 +593,18 @@ export async function importarParticipantesCampanhaNoServidor(
         cpf,
       });
     } catch (err) {
-      ignorados += 1;
-      erros.push({
-        linha: linha.linha,
-        cpf,
+      const motivo =
+        err instanceof Error
+          ? err.message
+          : "CPF já cadastrado nesta campanha.";
+      linhas.push({
+        ...base,
+        situacao: "cpf_ja_na_campanha",
         motivo:
-          err instanceof Error
-            ? err.message
-            : "Já existe um participante com este CPF nesta pesquisa.",
+          motivo.includes("Já existe")
+            ? "CPF já cadastrado nesta campanha."
+            : motivo,
+        pronto: false,
       });
       continue;
     }
@@ -521,43 +614,174 @@ export async function importarParticipantesCampanhaNoServidor(
       ignoreIfSameCampanhaId: params.campanhaId,
     });
     if (conflict) {
-      ignorados += 1;
-      erros.push({
-        linha: linha.linha,
-        cpf,
+      linhas.push({
+        ...base,
+        situacao: "cpf_outra_campanha_ativa",
         motivo: formatMotivoIgnoradoImportacao(conflict),
+        pronto: false,
       });
       continue;
     }
 
-    try {
-      const record = await criarParticipanteCampanhaNoServidor(
-        {
-          campanhaId: params.campanhaId,
-          input: linha,
-          origem: "importacao",
-        },
-        auditOptions
-      );
-      cpfNoArquivo.add(cpf);
-      importados += 1;
-      participantes.push(record);
-    } catch (err) {
+    linhas.push({
+      ...base,
+      situacao: "pronto",
+      motivo: "✓ Pronto para importar",
+      pronto: true,
+    });
+  }
+
+  const validos = linhas.filter((l) => l.pronto).length;
+  return {
+    linhas,
+    validos,
+    comErro: linhas.length - validos,
+    campanhaBloqueada,
+  };
+}
+
+export async function importarParticipantesCampanhaNoServidor(
+  params: {
+    campanhaId: string;
+    linhas: ImportacaoParticipanteLinha[];
+  },
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+): Promise<ImportacaoParticipantesResultado> {
+  const campanha = await buscarCampanha(params.campanhaId);
+  if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
+
+  const bloqueio = campanhaPermiteImportacaoParticipantes(
+    String(campanha.status ?? "")
+  );
+  if (bloqueio) throw new Error(bloqueio);
+
+  const erros: ImportacaoParticipantesResultado["erros"] = [];
+  const participantes: RiscosCampanhaParticipanteRecord[] = [];
+  let importados = 0;
+  let ignorados = 0;
+
+  const validacao = await validarImportacaoParticipantesNoServidor(params);
+  const prontas = validacao.linhas.filter((l) => l.pronto);
+  for (const l of validacao.linhas) {
+    if (l.pronto) continue;
+    ignorados += 1;
+    erros.push({
+      linha: l.linha,
+      cpf: normalizeCpfDigits(l.cpf) || l.cpf,
+      motivo: l.motivo,
+    });
+  }
+
+  if (prontas.length === 0) {
+    return { importados: 0, ignorados, erros, participantes };
+  }
+
+  const admin = createAdminClient();
+  const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
+  const inserts: Record<string, unknown>[] = [];
+
+  for (const linha of prontas) {
+    const raw = params.linhas.find((p) => (p.linha ?? -1) === linha.linha);
+    const dataNascimento = parseDataNascimentoBr(
+      raw?.dataNascimento ?? linha.dataNascimento
+    );
+    if (!dataNascimento) {
       ignorados += 1;
-      if (err instanceof CpfCampanhaAtivaError) {
-        erros.push({
-          linha: linha.linha,
-          cpf,
-          motivo: formatMotivoIgnoradoImportacao(err.conflict),
-        });
-      } else {
-        erros.push({
-          linha: linha.linha,
-          cpf,
-          motivo: err instanceof Error ? err.message : "Falha ao importar.",
-        });
-      }
+      erros.push({
+        linha: linha.linha,
+        cpf: normalizeCpfDigits(linha.cpf),
+        motivo: "Informe a data de nascimento (DD/MM/AAAA).",
+      });
+      continue;
     }
+    const codigo = await gerarCodigoAcessoUnico();
+    inserts.push({
+      campanha_id: campanha.id,
+      orcamento_id: campanha.orcamento_id || null,
+      cliente_id: campanha.cliente_id,
+      nome_completo: (raw?.nomeCompleto ?? linha.nomeCompleto).trim(),
+      cpf: normalizeCpfDigits(raw?.cpf ?? linha.cpf),
+      data_nascimento: dataNascimento,
+      cargo: null,
+      setor: null,
+      email: (raw?.email ?? linha.email)?.trim() || null,
+      status: "pendente",
+      codigo_acesso: codigo,
+      origem: "importacao",
+      criado_por: usuarioNome,
+    });
+  }
+
+  // Insert em lote (preserva validações por linha já feitas acima).
+  const BATCH = 100;
+  for (let i = 0; i < inserts.length; i += BATCH) {
+    const chunk = inserts.slice(i, i + BATCH);
+    const { data, error } = await admin
+      .from("riscos_campanha_participantes")
+      .insert(chunk)
+      .select(PARTICIPANTE_SELECT);
+
+    if (error) {
+      // Fallback: tenta um a um para preservar mensagens por linha.
+      for (const row of chunk) {
+        try {
+          const record = await criarParticipanteCampanhaNoServidor(
+            {
+              campanhaId: params.campanhaId,
+              input: {
+                nomeCompleto: String(row.nome_completo ?? ""),
+                cpf: String(row.cpf ?? ""),
+                dataNascimento: String(row.data_nascimento ?? ""),
+                email: row.email ? String(row.email) : undefined,
+              },
+              origem: "importacao",
+            },
+            auditOptions
+          );
+          importados += 1;
+          participantes.push(record);
+        } catch (err) {
+          ignorados += 1;
+          if (err instanceof CpfCampanhaAtivaError) {
+            erros.push({
+              cpf: String(row.cpf ?? ""),
+              motivo: formatMotivoIgnoradoImportacao(err.conflict),
+            });
+          } else {
+            erros.push({
+              cpf: String(row.cpf ?? ""),
+              motivo:
+                err instanceof Error ? err.message : "Falha ao importar.",
+            });
+          }
+        }
+      }
+      continue;
+    }
+
+    for (const row of data ?? []) {
+      participantes.push(mapParticipante(row as Record<string, unknown>));
+      importados += 1;
+    }
+  }
+
+  if (importados > 0) {
+    const nome = usuarioNome ?? "Sistema";
+    await registrarAuditoria({
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+      modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+      acao: AUDITORIA_ACOES.riscos_participante_criado,
+      registroId: campanha.id,
+      registroNome: campanha.codigo_publico,
+      descricao: `${nome} importou ${importados} participante(s) na pesquisa ${campanha.codigo_publico}.`,
+      dadosDepois: {
+        campanha_id: campanha.id,
+        importados,
+        ignorados,
+      },
+    });
   }
 
   return { importados, ignorados, erros, participantes };

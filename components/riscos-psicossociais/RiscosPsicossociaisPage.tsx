@@ -46,7 +46,8 @@ export function RiscosPsicossociaisPage() {
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
-    handleImportarParticipantesExcel,
+    handlePrepararImportacaoParticipantesExcel,
+    handleConfirmarImportacaoParticipantesExcel,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
   } = useRiscosPsicossociaisPage();
@@ -109,7 +110,12 @@ export function RiscosPsicossociaisPage() {
         onGarantirCodigoAcesso={handleGarantirCodigoAcesso}
         onCriarParticipante={handleCriarParticipante}
         onEditarParticipante={handleEditarParticipante}
-        onImportarParticipantesExcel={handleImportarParticipantesExcel}
+        onPrepararImportacaoParticipantesExcel={
+          handlePrepararImportacaoParticipantesExcel
+        }
+        onConfirmarImportacaoParticipantesExcel={
+          handleConfirmarImportacaoParticipantesExcel
+        }
         onRemoverParticipante={handleRemoverParticipante}
         podeGerenciarParticipante={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}

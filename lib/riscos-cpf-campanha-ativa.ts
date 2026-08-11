@@ -53,7 +53,16 @@ export function formatMensagemCpfEmCampanhaAtiva(
 export function formatMotivoIgnoradoImportacao(
   conflict: CpfCampanhaAtivaConflict
 ): string {
-  return `CPF já pertence à campanha ${conflict.codigoPublico} da empresa ${conflict.empresaNome}.`;
+  const statusLabel =
+    RISCOS_CAMPANHA_STATUS_LABELS[
+      conflict.status as keyof typeof RISCOS_CAMPANHA_STATUS_LABELS
+    ] ?? String(conflict.status);
+  return [
+    "CPF já cadastrado em outra campanha ativa.",
+    `Empresa: ${conflict.empresaNome}.`,
+    `Código: ${conflict.codigoPublico}.`,
+    `Status: ${statusLabel}.`,
+  ].join(" ");
 }
 
 export class CpfCampanhaAtivaError extends Error {

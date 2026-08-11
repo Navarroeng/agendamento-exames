@@ -55,7 +55,23 @@ interface RiscosPainelCardsProps {
     participanteId: string,
     input: RiscosParticipanteInput
   ) => Promise<void>;
-  onImportarParticipantesExcel: (file: File) => Promise<void>;
+  onPrepararImportacaoParticipantesExcel: (
+    file: File
+  ) => Promise<{
+    arquivoNome: string;
+    linhasEncontradas: number;
+    validos: number;
+    comErro: number;
+    avaliadas: import("@/lib/riscos-participantes-excel").LinhaAvaliacaoImportacao[];
+    linhasProntas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[];
+  }>;
+  onConfirmarImportacaoParticipantesExcel: (
+    linhas: import("@/lib/riscos-participantes-excel").LinhaImportacaoParticipante[]
+  ) => Promise<{
+    importados: number;
+    ignorados: number;
+    erros: Array<{ linha?: number; cpf: string; motivo: string }>;
+  }>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
   /** Admin — editar (pendente) e remover participante. */
   podeGerenciarParticipante?: boolean;
@@ -133,7 +149,8 @@ export function RiscosPainelCards({
   onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
-  onImportarParticipantesExcel,
+  onPrepararImportacaoParticipantesExcel,
+  onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
@@ -550,7 +567,8 @@ export function RiscosPainelCards({
             saving={savingParticipante}
             onCriar={onCriarParticipante}
             onEditar={onEditarParticipante}
-            onImportarExcel={onImportarParticipantesExcel}
+            onPrepararImportacaoExcel={onPrepararImportacaoParticipantesExcel}
+            onConfirmarImportacaoExcel={onConfirmarImportacaoParticipantesExcel}
             onRemover={onRemoverParticipante}
             podeGerenciarParticipante={podeGerenciarParticipante}
           />

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   criarParticipanteCampanhaNoServidor,
   importarParticipantesCampanhaNoServidor,
+  validarImportacaoParticipantesNoServidor,
 } from "@/services/riscos-campanha-participantes.server";
 
 export const runtime = "nodejs";
@@ -57,6 +58,7 @@ export async function POST(
       cpf?: string;
       dataNascimento?: string;
       email?: string;
+      dryRun?: boolean;
       importacao?: Array<{
         nomeCompleto?: string;
         cpf?: string;
@@ -73,17 +75,24 @@ export async function POST(
     };
 
     if (Array.isArray(body.importacao)) {
-      const result = await importarParticipantesCampanhaNoServidor(
-        {
+      const linhas = body.importacao.map((l, idx) => ({
+        nomeCompleto: String(l.nomeCompleto ?? ""),
+        cpf: String(l.cpf ?? ""),
+        dataNascimento: String(l.dataNascimento ?? ""),
+        email: l.email != null ? String(l.email) : undefined,
+        linha: l.linha ?? idx + 2,
+      }));
+
+      if (body.dryRun) {
+        const result = await validarImportacaoParticipantesNoServidor({
           campanhaId,
-          linhas: body.importacao.map((l, idx) => ({
-            nomeCompleto: String(l.nomeCompleto ?? ""),
-            cpf: String(l.cpf ?? ""),
-            dataNascimento: String(l.dataNascimento ?? ""),
-            email: l.email != null ? String(l.email) : undefined,
-            linha: l.linha ?? idx + 2,
-          })),
-        },
+          linhas,
+        });
+        return NextResponse.json({ ok: true, dryRun: true, ...result });
+      }
+
+      const result = await importarParticipantesCampanhaNoServidor(
+        { campanhaId, linhas },
         { auditContext }
       );
       return NextResponse.json({ ok: true, ...result });
@@ -117,7 +126,10 @@ export async function POST(
       message.includes("Já existe") ||
       message.includes("Informe") ||
       message.includes("inválid") ||
-      message.includes("não encontrada")
+      message.includes("não encontrada") ||
+      message.includes("cancelada") ||
+      message.includes("encerrada") ||
+      message.includes("não está disponível")
         ? 400
         : 500;
     return NextResponse.json({ error: message }, { status });

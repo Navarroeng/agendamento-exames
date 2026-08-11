@@ -164,29 +164,92 @@ export type ImportacaoParticipantesClientResult = {
   erros: Array<{ linha?: number; cpf: string; motivo: string }>;
 };
 
-export async function importarParticipantesCampanhaExcel(
+export type ValidacaoImportacaoClientResult = {
+  linhas: Array<{
+    linha: number;
+    nomeCompleto: string;
+    cpf: string;
+    dataNascimento: string;
+    email: string;
+    situacao: string;
+    motivo: string;
+    pronto: boolean;
+  }>;
+  validos: number;
+  comErro: number;
+  campanhaBloqueada: string | null;
+};
+
+/** Lê o Excel localmente (sem gravar). */
+export async function parseArquivoImportacaoParticipantes(file: File) {
+  const { parseParticipantesExcelDetalhado } = await import(
+    "@/lib/riscos-participantes-excel"
+  );
+  const buffer = await file.arrayBuffer();
+  return parseParticipantesExcelDetalhado(buffer);
+}
+
+/** Pré-valida no servidor (CPF na campanha / outra campanha ativa). */
+export async function validarImportacaoParticipantesCampanha(params: {
+  campanhaId: string;
+  linhas: Array<{
+    nomeCompleto: string;
+    cpf: string;
+    dataNascimento: string;
+    email?: string;
+    linha?: number;
+  }>;
+}): Promise<ValidacaoImportacaoClientResult> {
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(params.campanhaId)}/participantes`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ importacao: params.linhas, dryRun: true }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    linhas?: ValidacaoImportacaoClientResult["linhas"];
+    validos?: number;
+    comErro?: number;
+    campanhaBloqueada?: string | null;
+  };
+
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Não foi possível validar a planilha.");
+  }
+
+  return {
+    linhas: json.linhas ?? [],
+    validos: json.validos ?? 0,
+    comErro: json.comErro ?? 0,
+    campanhaBloqueada: json.campanhaBloqueada ?? null,
+  };
+}
+
+export async function confirmarImportacaoParticipantesCampanha(
   params: {
     campanhaId: string;
-    file: File;
+    linhas: Array<{
+      nomeCompleto: string;
+      cpf: string;
+      dataNascimento: string;
+      email?: string;
+      linha?: number;
+    }>;
   },
   auditOptions?: AuditOptions
 ): Promise<ImportacaoParticipantesClientResult> {
-  const { parseParticipantesExcel } = await import(
-    "@/lib/riscos-participantes-excel"
-  );
-  const buffer = await params.file.arrayBuffer();
-  const linhas = parseParticipantesExcel(buffer);
-  if (linhas.length === 0) {
-    throw new Error("Nenhuma linha válida encontrada na planilha.");
-  }
-
   const res = await fetch(
     `/api/riscos/campanha/${encodeURIComponent(params.campanhaId)}/participantes`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        importacao: linhas,
+        importacao: params.linhas,
         usuarioNome: auditOptions?.auditContext?.usuarioNome,
         usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
       }),
@@ -210,6 +273,29 @@ export async function importarParticipantesCampanhaExcel(
     ignorados: json.ignorados ?? 0,
     erros: json.erros ?? [],
   };
+}
+
+/** @deprecated Preferir parse + validar + confirmar com prévia. */
+export async function importarParticipantesCampanhaExcel(
+  params: {
+    campanhaId: string;
+    file: File;
+  },
+  auditOptions?: AuditOptions
+): Promise<ImportacaoParticipantesClientResult> {
+  const parsed = await parseArquivoImportacaoParticipantes(params.file);
+  if (!parsed.ok || parsed.linhas.length === 0) {
+    throw new Error(
+      !parsed.ok
+        ? parsed.error
+        : "Nenhuma linha válida encontrada na planilha."
+    );
+  }
+
+  return confirmarImportacaoParticipantesCampanha(
+    { campanhaId: params.campanhaId, linhas: parsed.linhas },
+    auditOptions
+  );
 }
 
 export async function removerParticipanteCampanha(
