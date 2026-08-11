@@ -6,6 +6,7 @@ import { gerarCodigoPublicoCampanha } from "@/lib/riscos-campanha";
 
 export const RISCOS_PARTICIPANTE_STATUS = [
   "pendente",
+  "iniciado",
   "respondido",
   "invalidado",
   "removido",
@@ -19,10 +20,37 @@ export const RISCOS_PARTICIPANTE_STATUS_LABELS: Record<
   string
 > = {
   pendente: "Pendente",
+  iniciado: "Iniciado",
   respondido: "Concluído",
   invalidado: "Invalidado",
   removido: "Removido",
 };
+
+/**
+ * Status operacional de acompanhamento (não altera Responderam/resultados).
+ * - Pendente: 0 respostas e não concluído
+ * - Iniciado: ≥1 resposta e não concluído
+ * - Concluído (respondido): sessão finalizada
+ * Nunca regride de iniciado para pendente.
+ */
+export function calcularStatusParticipanteOperacional(input: {
+  quantidadeRespostas: number;
+  concluido?: boolean;
+  statusAtual?: string | null;
+}): "pendente" | "iniciado" | "respondido" {
+  if (input.concluido || input.statusAtual === "respondido") {
+    return "respondido";
+  }
+  if (input.quantidadeRespostas > 0 || input.statusAtual === "iniciado") {
+    return "iniciado";
+  }
+  return "pendente";
+}
+
+/** Após gravar resposta válida: só avança pendente → iniciado. */
+export function deveAvancarParaIniciado(statusAtual: string): boolean {
+  return statusAtual === "pendente";
+}
 
 export const RISCOS_PARTICIPANTE_ORIGENS = ["manual", "importacao"] as const;
 

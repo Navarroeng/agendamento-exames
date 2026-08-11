@@ -238,7 +238,9 @@ function StatusBadge({ status }: { status: RiscosParticipanteStatus }) {
   const className =
     status === "respondido"
       ? "bg-brand-green-soft text-brand-green"
-      : "bg-[#fef3c7] text-[#b45309]";
+      : status === "iniciado"
+        ? "bg-brand-blue-soft text-brand-blue"
+        : "bg-[#fef3c7] text-[#b45309]";
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${className}`}

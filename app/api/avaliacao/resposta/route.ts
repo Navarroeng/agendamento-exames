@@ -10,6 +10,7 @@ import {
   upsertRespostaSessao,
   validarPayloadResposta,
 } from "@/lib/avaliacao-persistencia";
+import { deveAvancarParaIniciado } from "@/lib/riscos-campanha-participantes";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -17,6 +18,7 @@ export const runtime = "nodejs";
 /**
  * UPSERT de uma resposta do questionário (por pergunta).
  * Isolado por campanha_id + sessão anônima.
+ * Após a 1ª resposta válida: status operacional pendente → iniciado.
  */
 export async function POST(request: Request) {
   try {
@@ -95,6 +97,24 @@ export async function POST(request: Request) {
       valor: validado.valor,
       fontes: validado.fontes,
     });
+
+    // Status operacional: 1ª resposta gravada → Iniciado (nunca regride).
+    const { data: partRow } = await supabase
+      .from("riscos_campanha_participantes")
+      .select("status")
+      .eq("id", portal.participanteId)
+      .eq("campanha_id", portal.campanhaId)
+      .maybeSingle();
+
+    if (partRow && deveAvancarParaIniciado(String(partRow.status ?? ""))) {
+      await supabase
+        .from("riscos_campanha_participantes")
+        .update({ status: "iniciado" })
+        .eq("id", portal.participanteId)
+        .eq("campanha_id", portal.campanhaId)
+        .eq("status", "pendente")
+        .is("concluiu_em", null);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

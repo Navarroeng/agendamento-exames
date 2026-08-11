@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       })
       .eq("id", portal.participanteId)
       .eq("campanha_id", portal.campanhaId)
-      .eq("status", "pendente")
+      .in("status", ["pendente", "iniciado"])
       .is("concluiu_em", null)
       .select("id")
       .maybeSingle();

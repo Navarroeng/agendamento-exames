@@ -62,8 +62,11 @@ export type CampanhaPeriodoStatus =
   | "encerrada"
   | "indisponivel";
 
-/** Status de participante aceitos para iniciar a pesquisa (admin: "Pendente"). */
-export const PARTICIPANTE_STATUS_APTOS_INICIO = ["pendente"] as const;
+/** Status de participante aceitos para iniciar/retomar a pesquisa. */
+export const PARTICIPANTE_STATUS_APTOS_INICIO = [
+  "pendente",
+  "iniciado",
+] as const;
 
 /** Avalia período/status da campanha (sem dados do participante). */
 export function avaliarPeriodoCampanha(

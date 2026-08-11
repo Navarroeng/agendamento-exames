@@ -47,7 +47,11 @@ export function classificarSituacaoParticipante(input: {
   ) {
     return "ja_respondida";
   }
-  if (input.iniciouEm || input.statusSessao === "em_andamento") {
+  if (
+    input.statusParticipante === "iniciado" ||
+    input.iniciouEm ||
+    input.statusSessao === "em_andamento"
+  ) {
     return "em_andamento";
   }
   return "novo";
