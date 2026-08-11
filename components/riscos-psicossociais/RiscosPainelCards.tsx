@@ -16,7 +16,6 @@ import {
   validateAbrirCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "@/lib/riscos-campanha";
-import { COPSOQ_DIMENSOES, COPSOQ_INSTRUMENTO } from "@/lib/copsoq";
 import {
   buildParticipantesResumo,
   type RiscosCampanhaParticipanteRecord,
@@ -429,170 +428,135 @@ export function RiscosPainelCards({
         )}
       </PanelCard>
 
-      {/* Linha 3 — Convites | Questionário */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <PanelCard title="Convites">
-          {campanha ? (
-            <div className="flex h-full flex-col gap-3">
-              {!campanhaStatusSincronizado ? (
-                <PlaceholderNote>
-                  Sincronizando status da campanha com o banco…
-                </PlaceholderNote>
-              ) : exibeLinkConvite ? (
-                <div className="space-y-1.5 text-sm">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                      Link
-                    </p>
-                    <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
-                      {pathAvaliacaoCampanha(campanha.codigo_publico)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                      Código da campanha
-                    </p>
-                    <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
-                      {campanha.codigo_publico}
-                    </p>
-                  </div>
-                  {campanha.status === "encerrada" ? (
-                    <p className="text-[11px] text-[#64748b]">
-                      Pesquisa encerrada. O link permanece apenas como
-                      referência administrativa.
-                    </p>
-                  ) : null}
+      {/* Linha 3 — Convites */}
+      <PanelCard title="Convites">
+        {campanha ? (
+          <div className="flex h-full flex-col gap-3">
+            {!campanhaStatusSincronizado ? (
+              <PlaceholderNote>
+                Sincronizando status da campanha com o banco…
+              </PlaceholderNote>
+            ) : exibeLinkConvite ? (
+              <div className="space-y-1.5 text-sm">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                    Link
+                  </p>
+                  <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
+                    {pathAvaliacaoCampanha(campanha.codigo_publico)}
+                  </p>
                 </div>
-              ) : (
-                <PlaceholderNote>
-                  A pesquisa ainda não foi aberta.
-                </PlaceholderNote>
-              )}
-              <div className="mt-auto flex flex-wrap gap-2">
-                {campanhaStatusSincronizado && exibeLinkConvite ? (
-                  <>
-                    <button
-                      type="button"
-                      className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-                      disabled={!permiteCopiarLink}
-                      title={
-                        permiteCopiarLink
-                          ? "Copiar link da pesquisa"
-                          : "Pesquisa encerrada — cópia desabilitada"
-                      }
-                      onClick={() => void handleCopiarLink()}
-                    >
-                      Copiar link
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                      disabled
-                      title="QR Code será disponibilizado em etapa futura"
-                    >
-                      Gerar QR Code
-                    </button>
-                  </>
-                ) : null}
-                {campanhaStatusSincronizado && acoesConvite.exibirAbrir ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                    disabled={savingCampanha || !podeAbrirPesquisa}
-                    onClick={handleTentarAbrir}
-                    title={
-                      preRequisitoAbrir ??
-                      "Libera o portal para respostas (status Aberta)"
-                    }
-                  >
-                    Abrir pesquisa
-                  </button>
-                ) : null}
-                {campanhaStatusSincronizado && acoesConvite.exibirEncerrar ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                    disabled={savingCampanha}
-                    onClick={() => setConfirmEncerrarOpen(true)}
-                    title="Encerra a pesquisa e bloqueia novos acessos no portal"
-                  >
-                    Encerrar pesquisa
-                  </button>
-                ) : null}
-                {podeCancelarProcesso ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-brand-red/30 px-3 py-2 text-xs font-bold text-brand-red disabled:opacity-40"
-                    disabled={savingCampanha}
-                    onClick={() => {
-                      setMotivoCancelamento("");
-                      setErroCancelar(null);
-                      setConfirmCancelarOpen(true);
-                    }}
-                    title="Cancela o processo preservando o histórico para auditoria"
-                  >
-                    Cancelar processo
-                  </button>
-                ) : null}
-                {exclusaoDefinitivaDisponivel &&
-                campanha &&
-                campanhaStatusSincronizado ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-[#7f1d1d]/40 bg-[#fef2f2] px-3 py-2 text-xs font-bold text-[#7f1d1d] disabled:opacity-40"
-                    disabled={savingCampanha}
-                    onClick={() => {
-                      setConfirmacaoExclusao("");
-                      setErroExcluir(null);
-                      setConfirmExcluirOpen(true);
-                    }}
-                    title="Exclusão definitiva — somente ambiente controlado"
-                  >
-                    Excluir campanha
-                  </button>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                    Código da campanha
+                  </p>
+                  <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
+                    {campanha.codigo_publico}
+                  </p>
+                </div>
+                {campanha.status === "encerrada" ? (
+                  <p className="text-[11px] text-[#64748b]">
+                    Pesquisa encerrada. O link permanece apenas como
+                    referência administrativa.
+                  </p>
                 ) : null}
               </div>
-            </div>
-          ) : (
-            <PlaceholderNote>
-              Crie a pesquisa para gerar o link e o QR Code da campanha.
-            </PlaceholderNote>
-          )}
-        </PanelCard>
-
-        <PanelCard title="Questionário">
-          <div className="flex h-full flex-col gap-3">
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <StatChip
-                label="Perguntas"
-                value={COPSOQ_INSTRUMENTO.totalPerguntasAvaliativas}
-              />
-              <StatChip label="Dimensões" value={COPSOQ_DIMENSOES.length} />
-              <StatChip label="Ordem" value="01 → 40" />
-            </div>
+            ) : (
+              <PlaceholderNote>
+                A pesquisa ainda não foi aberta.
+              </PlaceholderNote>
+            )}
             <div className="mt-auto flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-                onClick={() =>
-                  toast.message("Visualização das perguntas em breve.")
-                }
-              >
-                Visualizar perguntas
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-                onClick={() =>
-                  toast.message("Edição do questionário em breve.")
-                }
-              >
-                Editar questionário
-              </button>
+              {campanhaStatusSincronizado && exibeLinkConvite ? (
+                <>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                    disabled={!permiteCopiarLink}
+                    title={
+                      permiteCopiarLink
+                        ? "Copiar link da pesquisa"
+                        : "Pesquisa encerrada — cópia desabilitada"
+                    }
+                    onClick={() => void handleCopiarLink()}
+                  >
+                    Copiar link
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                    disabled
+                    title="QR Code será disponibilizado em etapa futura"
+                  >
+                    Gerar QR Code
+                  </button>
+                </>
+              ) : null}
+              {campanhaStatusSincronizado && acoesConvite.exibirAbrir ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                  disabled={savingCampanha || !podeAbrirPesquisa}
+                  onClick={handleTentarAbrir}
+                  title={
+                    preRequisitoAbrir ??
+                    "Libera o portal para respostas (status Aberta)"
+                  }
+                >
+                  Abrir pesquisa
+                </button>
+              ) : null}
+              {campanhaStatusSincronizado && acoesConvite.exibirEncerrar ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => setConfirmEncerrarOpen(true)}
+                  title="Encerra a pesquisa e bloqueia novos acessos no portal"
+                >
+                  Encerrar pesquisa
+                </button>
+              ) : null}
+              {podeCancelarProcesso ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-brand-red/30 px-3 py-2 text-xs font-bold text-brand-red disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => {
+                    setMotivoCancelamento("");
+                    setErroCancelar(null);
+                    setConfirmCancelarOpen(true);
+                  }}
+                  title="Cancela o processo preservando o histórico para auditoria"
+                >
+                  Cancelar processo
+                </button>
+              ) : null}
+              {exclusaoDefinitivaDisponivel &&
+              campanha &&
+              campanhaStatusSincronizado ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#7f1d1d]/40 bg-[#fef2f2] px-3 py-2 text-xs font-bold text-[#7f1d1d] disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => {
+                    setConfirmacaoExclusao("");
+                    setErroExcluir(null);
+                    setConfirmExcluirOpen(true);
+                  }}
+                  title="Exclusão definitiva — somente ambiente controlado"
+                >
+                  Excluir campanha
+                </button>
+              ) : null}
             </div>
           </div>
-        </PanelCard>
-      </div>
+        ) : (
+          <PlaceholderNote>
+            Crie a pesquisa para gerar o link e o QR Code da campanha.
+          </PlaceholderNote>
+        )}
+      </PanelCard>
 
       {/* Linha 4 — Resultados | Relatório */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
