@@ -20,7 +20,10 @@ import {
   mapListaPresencaFromTracking,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
-import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
+import {
+  campanhaExibeLinkConvite,
+  type RiscosCampanhaRecord,
+} from "@/lib/riscos-campanha";
 import {
   exigeLaudosSstPorOrigem,
   isOrigemManualCliente,
@@ -28,6 +31,7 @@ import {
   RISCOS_CAMPANHA_ORIGEM,
   type RiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
+import type { RiscosParticipanteStatus } from "@/lib/riscos-campanha-participantes";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /**
@@ -51,23 +55,24 @@ export const DEVELOPMENT_UNLOCK_ALL_TABS = true;
  */
 export const DEVELOPMENT_SKIP_LAUDOS_SST_GATE = true;
 
-/** Etapas manuais na UI (ordem do fluxo). */
+/**
+ * Etapas do fluxo na UI (sem Laudo SST automático).
+ * Progresso é derivado de fatos reais — não de `tracking.etapas_concluidas`.
+ */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
-  { id: "lista_presenca", label: "Lista de presença" },
-  { id: "cadastro_empresa", label: "Cadastro da empresa" },
-  { id: "pesquisa_psicossocial", label: "Pesquisa Psicossocial" },
-  { id: "envio_qr_code", label: "Envio do QR Code" },
-  { id: "preenchimento_finalizado", label: "Preenchimento finalizado" },
-  { id: "laudo_elaborado", label: "Laudo elaborado" },
-  { id: "enviado_cliente", label: "Enviado para o cliente" },
+  { id: "lista_presenca", label: "Lista de Presença" },
+  { id: "cadastro_colaboradores", label: "Cadastro dos Colaboradores" },
+  { id: "link_enviado", label: "Link enviado" },
+  { id: "questionario_finalizado", label: "Questionário finalizado" },
+  { id: "finalizado", label: "Finalizado" },
 ] as const;
 
 export type RiscosPsicossociaisEtapaManualId =
   (typeof RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS)[number]["id"];
 
 /**
- * IDs aceitos em `orcamento_riscos_psicossociais.etapa_atual` (constraint atual).
- * `pesquisa_psicossocial` é etapa de UI; persistência desse id virá em migration futura.
+ * IDs aceitos em `orcamento_riscos_psicossociais.etapa_atual` (constraint do banco).
+ * Mantidos para persistência da lista; o progresso exibido não depende deles.
  */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_PERSISTIDAS = [
   "lista_presenca",
@@ -85,7 +90,7 @@ export type RiscosPsicossociaisEtapaPersistidaId =
 export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
   {
     id: "laudos_sst",
-    label: "Laudos SST",
+    label: "Laudo SST Automático",
     automatica: true as const,
   },
   ...RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.map((e) => ({
@@ -102,7 +107,7 @@ export type RiscosPsicossociaisStatus = "em_andamento" | "concluido";
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS =
   RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.length;
 
-/** Total exibido (1 automática + 7 manuais). */
+/** Total no fluxo automático (1 Laudo SST + 5 etapas). */
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS =
   RISCOS_PSICOSSOCIAIS_ETAPAS.length;
 
@@ -150,10 +155,12 @@ export interface RiscosPsicossociaisProcesso {
   etapaAtual: RiscosPsicossociaisEtapaId;
   /** Progresso total exibido (0–N), conforme origem. */
   etapasConcluidas: number;
-  /** Etapas manuais concluídas (0–7 na UI). */
+  /** Etapas do fluxo (sem Laudo SST) já concluídas. */
   etapasManuaisConcluidas: number;
   totalEtapas: number;
   progressoLabel: string;
+  /** Percentual 0–100 das etapas concluídas. */
+  progressoPercentual: number;
   status: RiscosPsicossociaisStatus;
   /** Se a aba automática Laudos SST está concluída (derivado do módulo Laudos). */
   laudosSstConcluido: boolean;
@@ -162,12 +169,33 @@ export interface RiscosPsicossociaisProcesso {
   listaPresenca: RiscosListaPresencaDados;
   /** Campanha de avaliação vinculada ao processo (se já criada). */
   campanha: RiscosCampanhaRecord | null;
+  /** Participantes ativos (não removidos) — base do progresso. */
+  participantesCadastrados: number;
+  /** Participantes com status operacional Concluído (`respondido`). */
+  participantesRespondidos: number;
+  /** Relatório final efetivamente gerado (não confundir com campanha encerrada). */
+  relatorioGerado: boolean;
   /**
    * Data de entrada em Riscos (= entrada simultânea com Laudos, na conclusão
    * da Implantação). Não muda quando Laudos é concluído depois.
    */
   dataEntrada: string | null;
 }
+
+export type RiscosProgressoParticipanteInput = {
+  status: RiscosParticipanteStatus | string;
+};
+
+export type BuildRiscosProcessoOpts = {
+  origem?: RiscosCampanhaOrigem;
+  /** Status dos participantes ativos (sem removidos). */
+  participantes?: readonly RiscosProgressoParticipanteInput[];
+  /** Fallback quando a lista completa não é recarregada. */
+  participantesCadastrados?: number;
+  participantesRespondidos?: number;
+  /** Relatório final gerado — default false até existir geração real. */
+  relatorioGerado?: boolean;
+};
 
 export interface RiscosPsicossociaisFilters {
   busca: string;
@@ -219,6 +247,148 @@ export function getTotalEtapasRiscosPorOrigem(
   origem: RiscosCampanhaOrigem | string | null | undefined
 ): number {
   return getEtapasRiscosPorOrigem(origem).length;
+}
+
+/** Cadastro concluído quando cadastrados ≥ quantidade prevista. */
+export function isCadastroColaboradoresConcluido(input: {
+  quantidadePrevista: number | null | undefined;
+  participantesCadastrados: number;
+}): boolean {
+  const previstos = Math.max(0, Number(input.quantidadePrevista) || 0);
+  if (previstos < 1) return false;
+  return input.participantesCadastrados >= previstos;
+}
+
+/** Link enviado: pesquisa aberta (ou já encerrada — link foi liberado). */
+export function isLinkEnviadoConcluido(
+  campanhaStatus: string | null | undefined
+): boolean {
+  return campanhaExibeLinkConvite(campanhaStatus);
+}
+
+/**
+ * Questionário finalizado: todos os participantes ativos com status Concluído
+ * (`respondido`). Não basta iniciar.
+ */
+export function isQuestionarioFinalizadoConcluido(input: {
+  participantesCadastrados: number;
+  participantesRespondidos: number;
+}): boolean {
+  if (input.participantesCadastrados < 1) return false;
+  return input.participantesRespondidos >= input.participantesCadastrados;
+}
+
+export function contarParticipantesParaProgresso(
+  participantes: readonly RiscosProgressoParticipanteInput[] | null | undefined
+): { cadastrados: number; respondidos: number } {
+  if (!participantes?.length) {
+    return { cadastrados: 0, respondidos: 0 };
+  }
+  let cadastrados = 0;
+  let respondidos = 0;
+  for (const p of participantes) {
+    const status = String(p.status ?? "");
+    if (status === "removido") continue;
+    cadastrados += 1;
+    if (status === "respondido") respondidos += 1;
+  }
+  return { cadastrados, respondidos };
+}
+
+function resolveContagemParticipantes(opts?: BuildRiscosProcessoOpts): {
+  cadastrados: number;
+  respondidos: number;
+} {
+  if (opts?.participantes) {
+    return contarParticipantesParaProgresso(opts.participantes);
+  }
+  return {
+    cadastrados: Math.max(0, Number(opts?.participantesCadastrados) || 0),
+    respondidos: Math.max(0, Number(opts?.participantesRespondidos) || 0),
+  };
+}
+
+/**
+ * Calcula etapa atual e progresso a partir dos fatos do processo
+ * (sem usar `tracking.etapas_concluidas` / `tracking.etapa_atual`).
+ */
+export function calcularProgressoEtapasRiscos(input: {
+  origem: RiscosCampanhaOrigem | string | null | undefined;
+  laudosSstConcluido: boolean;
+  listaPresencaConcluida: boolean;
+  quantidadePrevista: number | null | undefined;
+  participantesCadastrados: number;
+  participantesRespondidos: number;
+  campanhaStatus: RiscosCampanhaRecord["status"] | string | null | undefined;
+  relatorioGerado: boolean;
+}): {
+  etapaAtual: RiscosPsicossociaisEtapaId;
+  etapasConcluidas: number;
+  etapasManuaisConcluidas: number;
+  totalEtapas: number;
+  progressoLabel: string;
+  progressoPercentual: number;
+  status: RiscosPsicossociaisStatus;
+} {
+  const exigeLaudos = exigeLaudosSstPorOrigem(input.origem);
+  const etapas = getEtapasRiscosPorOrigem(input.origem);
+  const totalEtapas = etapas.length;
+
+  const cadastroOk = isCadastroColaboradoresConcluido({
+    quantidadePrevista: input.quantidadePrevista,
+    participantesCadastrados: input.participantesCadastrados,
+  });
+  const linkOk = isLinkEnviadoConcluido(input.campanhaStatus);
+  const questionarioOk = isQuestionarioFinalizadoConcluido({
+    participantesCadastrados: input.participantesCadastrados,
+    participantesRespondidos: input.participantesRespondidos,
+  });
+  const finalizadoOk = input.relatorioGerado === true;
+
+  const concluidaPorId: Record<RiscosPsicossociaisEtapaId, boolean> = {
+    laudos_sst: !exigeLaudos || input.laudosSstConcluido,
+    lista_presenca: input.listaPresencaConcluida,
+    cadastro_colaboradores: cadastroOk,
+    link_enviado: linkOk,
+    questionario_finalizado: questionarioOk,
+    finalizado: finalizadoOk,
+  };
+
+  let etapasConcluidas = 0;
+  let etapaAtual: RiscosPsicossociaisEtapaId = etapas[0]?.id ?? "lista_presenca";
+
+  for (const etapa of etapas) {
+    if (concluidaPorId[etapa.id]) {
+      etapasConcluidas += 1;
+      continue;
+    }
+    etapaAtual = etapa.id;
+    break;
+  }
+
+  if (etapasConcluidas >= totalEtapas) {
+    etapaAtual = "finalizado";
+    etapasConcluidas = totalEtapas;
+  }
+
+  const etapasManuaisConcluidas = exigeLaudos
+    ? Math.max(0, etapasConcluidas - (concluidaPorId.laudos_sst ? 1 : 0))
+    : etapasConcluidas;
+
+  const progressoPercentual =
+    totalEtapas > 0
+      ? Math.round((etapasConcluidas / totalEtapas) * 100)
+      : 0;
+
+  return {
+    etapaAtual,
+    etapasConcluidas,
+    etapasManuaisConcluidas,
+    totalEtapas,
+    progressoLabel: `${etapasConcluidas} de ${totalEtapas}`,
+    progressoPercentual,
+    status: etapasConcluidas >= totalEtapas ? "concluido" : "em_andamento",
+  };
 }
 
 /**
@@ -302,13 +472,12 @@ export function buildRiscosPsicossociaisProcesso(
   laudos: LaudosSstProcesso,
   tracking: OrcamentoRiscosPsicossociaisRecord | null,
   campanha: RiscosCampanhaRecord | null = null,
-  opts?: { origem?: RiscosCampanhaOrigem }
+  opts?: BuildRiscosProcessoOpts
 ): RiscosPsicossociaisProcesso {
   const origem = normalizeRiscosCampanhaOrigem(
     opts?.origem ?? campanha?.origem ?? RISCOS_CAMPANHA_ORIGEM.orcamento
   );
   const exigeLaudosSst = exigeLaudosSstPorOrigem(origem);
-  const totalEtapas = getTotalEtapasRiscosPorOrigem(origem);
 
   const laudosSstConcluido = exigeLaudosSst
     ? laudos.status === "concluido"
@@ -316,49 +485,19 @@ export function buildRiscosPsicossociaisProcesso(
   const listaPresenca = mapListaPresencaFromTracking(tracking);
   const listaPresencaConcluida = isListaPresencaEtapaConcluida(listaPresenca);
 
-  const storedManuais = Math.min(
-    RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS,
-    Math.max(0, Number(tracking?.etapas_concluidas) || 0)
-  );
+  const { cadastrados, respondidos } = resolveContagemParticipantes(opts);
+  const relatorioGerado = opts?.relatorioGerado === true;
 
-  // Lista incompleta impede progresso manual; concluída garante pelo menos 1.
-  const etapasManuaisConcluidas = listaPresencaConcluida
-    ? Math.max(1, storedManuais)
-    : 0;
-
-  const etapasConcluidas =
-    (exigeLaudosSst && laudosSstConcluido ? 1 : 0) + etapasManuaisConcluidas;
-
-  const manuaisConcluidasTodas =
-    etapasManuaisConcluidas >= RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS;
-  const concluido =
-    (!exigeLaudosSst || laudosSstConcluido) &&
-    listaPresencaConcluida &&
-    (tracking?.status === "concluido" || manuaisConcluidasTodas);
-
-  let etapaAtual: RiscosPsicossociaisEtapaId;
-  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (
-    exigeLaudosSst &&
-    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
-    !laudosSstConcluido
-  ) {
-    etapaAtual = "laudos_sst";
-  } else if (!listaPresencaConcluida) {
-    etapaAtual = "lista_presenca";
-  } else if (concluido) {
-    etapaAtual = "enviado_cliente";
-  } else if (
-    tracking &&
-    isRiscosPsicossociaisEtapaPersistidaId(tracking.etapa_atual) &&
-    tracking.etapa_atual !== "lista_presenca"
-  ) {
-    etapaAtual = tracking.etapa_atual;
-  } else {
-    etapaAtual = "cadastro_empresa";
-  }
-
-  const progressoAtual = concluido ? totalEtapas : etapasConcluidas;
+  const progresso = calcularProgressoEtapasRiscos({
+    origem,
+    laudosSstConcluido,
+    listaPresencaConcluida,
+    quantidadePrevista: campanha?.quantidade_prevista ?? null,
+    participantesCadastrados: cadastrados,
+    participantesRespondidos: respondidos,
+    campanhaStatus: campanha?.status ?? null,
+    relatorioGerado,
+  });
 
   return {
     processoKey: laudos.implantacao.orcamento.id,
@@ -366,19 +505,70 @@ export function buildRiscosPsicossociaisProcesso(
     exigeLaudosSst,
     implantacao: laudos.implantacao,
     laudos,
-    etapaAtual,
-    etapasConcluidas: progressoAtual,
-    etapasManuaisConcluidas: concluido
-      ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS
-      : etapasManuaisConcluidas,
-    totalEtapas,
-    progressoLabel: `${progressoAtual} de ${totalEtapas}`,
-    status: concluido ? "concluido" : "em_andamento",
+    etapaAtual: progresso.etapaAtual,
+    etapasConcluidas: progresso.etapasConcluidas,
+    etapasManuaisConcluidas: progresso.etapasManuaisConcluidas,
+    totalEtapas: progresso.totalEtapas,
+    progressoLabel: progresso.progressoLabel,
+    progressoPercentual: progresso.progressoPercentual,
+    status: progresso.status,
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
     campanha,
+    participantesCadastrados: cadastrados,
+    participantesRespondidos: respondidos,
+    relatorioGerado,
     dataEntrada: tracking?.entrada_em ?? laudos.dataEntrada ?? null,
+  };
+}
+
+/** Recalcula etapa/progresso mantendo o restante do processo. */
+export function withRiscosProgressoAtualizado(
+  processo: RiscosPsicossociaisProcesso,
+  patch?: {
+    campanha?: RiscosCampanhaRecord | null;
+    participantes?: readonly RiscosProgressoParticipanteInput[];
+    relatorioGerado?: boolean;
+  }
+): RiscosPsicossociaisProcesso {
+  const campanha =
+    patch && "campanha" in patch ? patch.campanha ?? null : processo.campanha;
+  const contagem = patch?.participantes
+    ? contarParticipantesParaProgresso(patch.participantes)
+    : {
+        cadastrados: processo.participantesCadastrados,
+        respondidos: processo.participantesRespondidos,
+      };
+  const relatorioGerado =
+    patch?.relatorioGerado !== undefined
+      ? patch.relatorioGerado
+      : processo.relatorioGerado;
+
+  const progresso = calcularProgressoEtapasRiscos({
+    origem: processo.origem,
+    laudosSstConcluido: processo.laudosSstConcluido,
+    listaPresencaConcluida: processo.listaPresencaConcluida,
+    quantidadePrevista: campanha?.quantidade_prevista ?? null,
+    participantesCadastrados: contagem.cadastrados,
+    participantesRespondidos: contagem.respondidos,
+    campanhaStatus: campanha?.status ?? null,
+    relatorioGerado,
+  });
+
+  return {
+    ...processo,
+    campanha,
+    participantesCadastrados: contagem.cadastrados,
+    participantesRespondidos: contagem.respondidos,
+    relatorioGerado,
+    etapaAtual: progresso.etapaAtual,
+    etapasConcluidas: progresso.etapasConcluidas,
+    etapasManuaisConcluidas: progresso.etapasManuaisConcluidas,
+    totalEtapas: progresso.totalEtapas,
+    progressoLabel: progresso.progressoLabel,
+    progressoPercentual: progresso.progressoPercentual,
+    status: progresso.status,
   };
 }
 
@@ -389,6 +579,8 @@ export function buildRiscosPsicossociaisProcesso(
 export function buildRiscosProcessoManualCliente(input: {
   campanha: RiscosCampanhaRecord;
   tracking: OrcamentoRiscosPsicossociaisRecord | null;
+  participantes?: readonly RiscosProgressoParticipanteInput[];
+  relatorioGerado?: boolean;
 }): RiscosPsicossociaisProcesso {
   const { campanha } = input;
   const origem = RISCOS_CAMPANHA_ORIGEM.manual_cliente;
@@ -472,7 +664,11 @@ export function buildRiscosProcessoManualCliente(input: {
     laudosStub,
     input.tracking,
     campanha,
-    { origem }
+    {
+      origem,
+      participantes: input.participantes,
+      relatorioGerado: input.relatorioGerado,
+    }
   );
 
   return {

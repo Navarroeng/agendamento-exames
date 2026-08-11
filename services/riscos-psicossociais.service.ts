@@ -32,16 +32,29 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
     laudosProcessos.map((p) => p.implantacao.orcamento.id)
   );
 
+  const manuais = await listarCampanhasManuaisAtivas();
+  const campanhaIds = [
+    ...Array.from(campanhasMap.values()).map((c) => c.id),
+    ...manuais.map((c) => c.id),
+  ];
+  const participantesPorCampanha =
+    await listarStatusParticipantesPorCampanhas(campanhaIds);
+
   const processosNormais = laudosProcessos.map((laudos) => {
     const orcamentoId = laudos.implantacao.orcamento.id;
+    const campanha = campanhasMap.get(orcamentoId) ?? null;
     return buildRiscosPsicossociaisProcesso(
       laudos,
       riscosMap.get(orcamentoId) ?? null,
-      campanhasMap.get(orcamentoId) ?? null
+      campanha,
+      {
+        participantes: campanha
+          ? participantesPorCampanha.get(campanha.id) ?? []
+          : [],
+      }
     );
   });
 
-  const manuais = await listarCampanhasManuaisAtivas();
   const processosManuais: RiscosPsicossociaisProcesso[] = [];
   for (const campanha of manuais) {
     if (!isOrigemManualCliente(campanha.origem)) continue;
@@ -50,6 +63,7 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
       buildRiscosProcessoManualCliente({
         campanha,
         tracking: fluxo,
+        participantes: participantesPorCampanha.get(campanha.id) ?? [],
       })
     );
   }
@@ -58,6 +72,57 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
     ...processosNormais,
     ...processosManuais,
   ]);
+}
+
+/** Status ativos por campanha (exclui removidos) — base do progresso. */
+async function listarStatusParticipantesPorCampanhas(
+  campanhaIds: string[]
+): Promise<Map<string, Array<{ status: string }>>> {
+  const map = new Map<string, Array<{ status: string }>>();
+  const ids = Array.from(new Set(campanhaIds.filter(Boolean)));
+  if (ids.length === 0) return map;
+
+  const supabase = createClient();
+  let { data, error } = await supabase
+    .from("riscos_campanha_participantes")
+    .select("campanha_id, status, removido_em")
+    .in("campanha_id", ids);
+
+  if (error && /removido_em/i.test(error.message ?? "")) {
+    const fallback = await supabase
+      .from("riscos_campanha_participantes")
+      .select("campanha_id, status")
+      .in("campanha_id", ids)
+      .neq("status", "removido");
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
+
+  if (error) {
+    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+      return map;
+    }
+    console.warn(
+      "riscos participantes (progresso) indisponível:",
+      error.message
+    );
+    return map;
+  }
+
+  for (const row of data ?? []) {
+    const campanhaId = String(
+      (row as { campanha_id?: string }).campanha_id ?? ""
+    );
+    if (!campanhaId) continue;
+    const status = String((row as { status?: string }).status ?? "pendente");
+    const removidoEm = (row as { removido_em?: string | null }).removido_em;
+    if (status === "removido" || removidoEm) continue;
+    const list = map.get(campanhaId) ?? [];
+    list.push({ status });
+    map.set(campanhaId, list);
+  }
+
+  return map;
 }
 
 async function garantirTrackingRiscosPsicossociais(

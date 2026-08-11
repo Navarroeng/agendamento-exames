@@ -40,7 +40,7 @@ function ProgressoRiscos({
   return (
     <div className="min-w-[140px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
-        {processo.progressoLabel} etapas
+        {processo.progressoLabel} etapas · {processo.progressoPercentual}%
       </p>
       <div className="flex items-center gap-0.5">
         {etapas.map((etapa, index) => {
@@ -159,16 +159,19 @@ export function RiscosPsicossociaisTable({
                       )}
                     </td>
                     <td>
-                      {processo.status === "concluido" ? (
+                      {processo.status === "concluido" ||
+                      processo.etapaAtual === "finalizado" ? (
                         <span className="inline-flex rounded-full bg-brand-green-soft px-2.5 py-0.5 text-[10px] font-extrabold text-brand-green">
-                          Concluído
-                        </span>
-                      ) : processo.etapaAtual === "laudos_sst" ? (
-                        <span className="inline-flex rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-[10px] font-extrabold text-[#b45309]">
-                          Aguardando Laudos SST
+                          {RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado}
                         </span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                            processo.etapaAtual === "laudos_sst"
+                              ? "bg-[#fef3c7] text-[#b45309]"
+                              : "bg-[#eef2ff] text-[#4338ca]"
+                          }`}
+                        >
                           {RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
                         </span>
                       )}

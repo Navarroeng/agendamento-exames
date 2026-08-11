@@ -94,13 +94,14 @@ run("TESTE 2/3/5 processo manual sem Laudos SST no total", () => {
   });
   assert.equal(p.origem, "manual_cliente");
   assert.equal(p.exigeLaudosSst, false);
-  assert.equal(p.totalEtapas, 7);
-  assert.equal(getTotalEtapasRiscosPorOrigem(p.origem), 7);
+  assert.equal(p.totalEtapas, 5);
+  assert.equal(getTotalEtapasRiscosPorOrigem(p.origem), 5);
   assert.equal(getEtapasRiscosPorOrigem(p.origem).some((e) => e.id === "laudos_sst"), false);
   assert.equal(p.campanha?.orcamento_id, null);
   assert.equal(p.implantacao.numeroContrato, null);
-  assert.ok(!p.progressoLabel.includes("de 8"));
-  assert.ok(p.progressoLabel.includes("de 7"));
+  assert.equal(p.etapaAtual, "lista_presenca");
+  assert.ok(!p.progressoLabel.includes("de 6"));
+  assert.ok(p.progressoLabel.includes("de 5"));
 });
 
 run("TESTE 4 Laudos não bloqueia fluxo manual", () => {
@@ -109,7 +110,7 @@ run("TESTE 4 Laudos não bloqueia fluxo manual", () => {
     tracking: null,
   });
   assert.equal(isRiscosEtapaLiberadaByFluxo(p, "lista_presenca"), true);
-  assert.equal(isRiscosEtapaLiberadaByFluxo(p, "cadastro_empresa"), false);
+  assert.equal(isRiscosEtapaLiberadaByFluxo(p, "cadastro_colaboradores"), false);
   // Com lista concluída, avança sem Laudos.
   const tracking: OrcamentoRiscosPsicossociaisRecord = {
     orcamento_id: campanhaManual.id,
@@ -129,11 +130,13 @@ run("TESTE 4 Laudos não bloqueia fluxo manual", () => {
     campanha: campanhaManual,
     tracking,
   });
-  assert.equal(isRiscosEtapaLiberadaByFluxo(comLista, "cadastro_empresa"), true);
+  assert.equal(isRiscosEtapaLiberadaByFluxo(comLista, "cadastro_colaboradores"), true);
+  assert.equal(comLista.etapaAtual, "cadastro_colaboradores");
+  assert.equal(comLista.progressoLabel, "1 de 5");
 });
 
-run("TESTE 8 fluxo normal ainda tem 8 etapas e Laudos", () => {
-  assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS.length, 8);
+run("TESTE 8 fluxo normal ainda tem 6 etapas e Laudos", () => {
+  assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS.length, 6);
   assert.equal(exigeLaudosSstPorOrigem("orcamento"), true);
   assert.equal(isOrigemManualCliente("orcamento"), false);
 
@@ -208,7 +211,7 @@ run("TESTE 8 fluxo normal ainda tem 8 etapas e Laudos", () => {
 
   const normal = buildRiscosPsicossociaisProcesso(laudos, null, null);
   assert.equal(normal.exigeLaudosSst, true);
-  assert.equal(normal.totalEtapas, 8);
+  assert.equal(normal.totalEtapas, 6);
   assert.equal(normal.implantacao.numeroContrato, "C-1");
 });
 

@@ -10,6 +10,7 @@ import {
   buildRiscosPsicossociaisProcesso,
   filterRiscosPsicossociaisProcessos,
   filterRiscosPsicossociaisProcessosPorMes,
+  withRiscosProgressoAtualizado,
   type RiscosPsicossociaisFilters,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
@@ -92,11 +93,10 @@ export function useRiscosPsicossociaisPage() {
         // Modal aberto: status da campanha só vem de sync/abrir/encerrar (API),
         // nunca volta a ser o da listagem (pode estar stale/otimista).
         if (prev.campanha?.id) {
-          return {
-            ...updated,
-            campanha: prev.campanha,
-            processoKey: prev.processoKey,
-          };
+          return withRiscosProgressoAtualizado(
+            { ...updated, processoKey: prev.processoKey },
+            { campanha: prev.campanha }
+          );
         }
         return { ...updated, processoKey: prev.processoKey };
       });
@@ -144,7 +144,12 @@ export function useRiscosPsicossociaisPage() {
           prev.laudos,
           tracking,
           prev.campanha,
-          { origem: prev.origem }
+          {
+            origem: prev.origem,
+            participantesCadastrados: prev.participantesCadastrados,
+            participantesRespondidos: prev.participantesRespondidos,
+            relatorioGerado: prev.relatorioGerado,
+          }
         );
         return { ...next, processoKey: prev.processoKey };
       });
@@ -163,7 +168,12 @@ export function useRiscosPsicossociaisPage() {
             p.laudos,
             tracking,
             p.campanha,
-            { origem: p.origem }
+            {
+              origem: p.origem,
+              participantesCadastrados: p.participantesCadastrados,
+              participantesRespondidos: p.participantesRespondidos,
+              relatorioGerado: p.relatorioGerado,
+            }
           );
           return { ...next, processoKey: p.processoKey };
         })
@@ -208,6 +218,18 @@ export function useRiscosPsicossociaisPage() {
     try {
       const rows = await listarParticipantesCampanha(campanhaId);
       setModalParticipantes(rows);
+      setModalProcesso((prev) =>
+        prev && prev.campanha?.id === campanhaId
+          ? withRiscosProgressoAtualizado(prev, { participantes: rows })
+          : prev
+      );
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.campanha?.id === campanhaId
+            ? withRiscosProgressoAtualizado(p, { participantes: rows })
+            : p
+        )
+      );
     } catch (err) {
       console.error(err);
       setModalParticipantes([]);
@@ -216,13 +238,15 @@ export function useRiscosPsicossociaisPage() {
 
   const atualizarCampanhaNoEstado = useCallback(
     (campanha: NonNullable<RiscosPsicossociaisProcesso["campanha"]>) => {
-      setModalProcesso((prev) => (prev ? { ...prev, campanha } : prev));
+      setModalProcesso((prev) =>
+        prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
+      );
       setProcessos((prev) =>
         prev.map((p) =>
           p.campanha?.id === campanha.id ||
           (campanha.orcamento_id != null &&
             p.implantacao.orcamento.id === campanha.orcamento_id)
-            ? { ...p, campanha }
+            ? withRiscosProgressoAtualizado(p, { campanha })
             : p
         )
       );
@@ -265,13 +289,35 @@ export function useRiscosPsicossociaisPage() {
           ]);
           setModalParticipantes(rows);
           if (fresh) {
-            // Substituição completa do objeto campanha (sem merge de status).
             setModalProcesso((prev) =>
-              prev ? { ...prev, campanha: fresh } : prev
+              prev
+                ? withRiscosProgressoAtualizado(prev, {
+                    campanha: fresh,
+                    participantes: rows,
+                  })
+                : prev
             );
             setProcessos((prev) =>
               prev.map((p) =>
-                p.campanha?.id === fresh.id ? { ...p, campanha: fresh } : p
+                p.campanha?.id === fresh.id
+                  ? withRiscosProgressoAtualizado(p, {
+                      campanha: fresh,
+                      participantes: rows,
+                    })
+                  : p
+              )
+            );
+          } else {
+            setModalProcesso((prev) =>
+              prev
+                ? withRiscosProgressoAtualizado(prev, { participantes: rows })
+                : prev
+            );
+            setProcessos((prev) =>
+              prev.map((p) =>
+                p.campanha?.id === campanhaId
+                  ? withRiscosProgressoAtualizado(p, { participantes: rows })
+                  : p
               )
             );
           }
@@ -505,12 +551,12 @@ export function useRiscosPsicossociaisPage() {
         );
 
         setModalProcesso((prev) =>
-          prev ? { ...prev, campanha } : prev
+          prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
         );
         setProcessos((prev) =>
           prev.map((p) =>
             p.implantacao.orcamento.id === orcamento.id
-              ? { ...p, campanha }
+              ? withRiscosProgressoAtualizado(p, { campanha })
               : p
           )
         );
@@ -540,11 +586,13 @@ export function useRiscosPsicossociaisPage() {
         );
       }
       setModalProcesso((prev) =>
-        prev ? { ...prev, campanha } : prev
+        prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
       );
       setProcessos((prev) =>
         prev.map((p) =>
-          p.campanha?.id === campanha.id ? { ...p, campanha } : p
+          p.campanha?.id === campanha.id
+            ? withRiscosProgressoAtualizado(p, { campanha })
+            : p
         )
       );
       setCampanhaStatusSincronizado(true);
@@ -575,11 +623,13 @@ export function useRiscosPsicossociaisPage() {
         );
       }
       setModalProcesso((prev) =>
-        prev ? { ...prev, campanha } : prev
+        prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
       );
       setProcessos((prev) =>
         prev.map((p) =>
-          p.campanha?.id === campanha.id ? { ...p, campanha } : p
+          p.campanha?.id === campanha.id
+            ? withRiscosProgressoAtualizado(p, { campanha })
+            : p
         )
       );
       setCampanhaStatusSincronizado(true);
@@ -611,11 +661,13 @@ export function useRiscosPsicossociaisPage() {
           );
         }
         setModalProcesso((prev) =>
-          prev ? { ...prev, campanha } : prev
+          prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
         );
         setProcessos((prev) =>
           prev.map((p) =>
-            p.campanha?.id === campanha.id ? { ...p, campanha } : p
+            p.campanha?.id === campanha.id
+              ? withRiscosProgressoAtualizado(p, { campanha })
+              : p
           )
         );
         setCampanhaStatusSincronizado(true);
