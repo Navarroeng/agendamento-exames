@@ -248,37 +248,37 @@ export function RiscosPainelCards({
 
   return (
     <div className="space-y-4">
-      {/* Linha 1 — Pré-requisitos */}
-      <PanelCard title="Pré-requisitos">
-        <RiscosPainelPreRequisitos
-          embedded
-          processo={processo}
-          savingLista={savingLista}
-          onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
-          onSalvarRecebimentoLista={onSalvarRecebimentoLista}
-          onRemoverAnexoLista={onRemoverAnexoLista}
-          onVisualizarAnexoLista={onVisualizarAnexoLista}
-        />
-      </PanelCard>
+      {/* Linha 1 — Pré-requisitos | Pesquisa (lado a lado no desktop) */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <PanelCard title="Pré-requisitos" className="min-w-0">
+          <RiscosPainelPreRequisitos
+            embedded
+            processo={processo}
+            savingLista={savingLista}
+            onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
+            onSalvarRecebimentoLista={onSalvarRecebimentoLista}
+            onRemoverAnexoLista={onRemoverAnexoLista}
+            onVisualizarAnexoLista={onVisualizarAnexoLista}
+          />
+        </PanelCard>
 
-      {/* Linha 2 — Pesquisa (largura total: status + link + ações) */}
-      <PanelCard title="Pesquisa">
-        {!campanha && !criarAberto ? (
-          <div className="flex h-full flex-col justify-between gap-3">
-            <PlaceholderNote>
-              Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
-              prevista de colaboradores.
-            </PlaceholderNote>
-            <button
-              type="button"
-              className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              disabled={savingCampanha}
-              onClick={() => setCriarAberto(true)}
-            >
-              Criar pesquisa
-            </button>
-          </div>
-        ) : null}
+        <PanelCard title="Pesquisa" className="min-w-0">
+          {!campanha && !criarAberto ? (
+            <div className="flex h-full flex-col justify-between gap-3">
+              <PlaceholderNote>
+                Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
+                prevista de colaboradores.
+              </PlaceholderNote>
+              <button
+                type="button"
+                className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                disabled={savingCampanha}
+                onClick={() => setCriarAberto(true)}
+              >
+                Criar pesquisa
+              </button>
+            </div>
+          ) : null}
 
         {!campanha && criarAberto ? (
           <div className="space-y-3">
@@ -534,8 +534,9 @@ export function RiscosPainelCards({
           </div>
         ) : null}
       </PanelCard>
+      </div>
 
-      {/* Linha 3 — Participantes (largura total) */}
+      {/* Linha 2 — Participantes (largura total) */}
       <PanelCard title="Participantes">
         {campanha ? (
           <RiscosCampanhaParticipantesSection
@@ -554,7 +555,7 @@ export function RiscosPainelCards({
         )}
       </PanelCard>
 
-      {/* Linha 4 — Resultados | Relatório */}
+      {/* Linha 3 — Resultados | Relatório */}
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <PanelCard title="Resultados">
           <RiscosResultadosPanel
@@ -597,7 +598,7 @@ export function RiscosPainelCards({
         </PanelCard>
       </div>
 
-      {/* Linha 5 — Histórico (largura total) */}
+      {/* Linha 4 — Histórico (largura total) */}
       <PanelCard title="Histórico">
         {!historicoComEventos ? (
           <PlaceholderNote>Nenhum evento registrado.</PlaceholderNote>
