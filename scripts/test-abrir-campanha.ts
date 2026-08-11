@@ -4,6 +4,7 @@ import {
   campanhaExibeLinkConvite,
   campanhaPermiteCopiarLink,
   validateAbrirCampanhaRiscos,
+  validateEncerrarCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "../lib/riscos-campanha";
 import { assertStatusAbertaPersistido } from "../services/riscos-campanha-abrir.server";
@@ -140,6 +141,20 @@ run("confirmação: em_preparacao falha (não permite UI Aberta)", () => {
       } as never),
     /não foi confirmada/i
   );
+});
+
+run("encerrar: só aberta pode encerrar", () => {
+  assert.equal(validateEncerrarCampanhaRiscos({ status: "aberta" }), null);
+  assert.ok(validateEncerrarCampanhaRiscos({ status: "em_preparacao" }));
+  assert.ok(validateEncerrarCampanhaRiscos({ status: "encerrada" }));
+});
+
+run("ações com status null (pré-sync) → nada de Abrir/Encerrar/link", () => {
+  const a = acoesConvitePorStatus(null);
+  assert.equal(a.exibirAbrir, false);
+  assert.equal(a.exibirEncerrar, false);
+  assert.equal(a.exibirLink, false);
+  assert.equal(a.permitirCopiarLink, false);
 });
 
 console.log("\nTodos os testes de abertura de campanha passaram.");

@@ -6,7 +6,6 @@ import {
 import {
   gerarCodigoPublicoCampanha,
   isRiscosCampanhaStatus,
-  validateEncerrarCampanhaRiscos,
   validateRiscosCampanhaCreateInput,
   validateRiscosCampanhaManualCreateInput,
   type RiscosCampanhaCreateInput,
@@ -25,11 +24,9 @@ import {
   CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE,
   clienteTemContratoVigente,
 } from "@/lib/cliente-contrato-vigencia";
-import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
-import { buscarPerfilUsuarioLogado } from "@/services/perfil.service";
 
 const CAMPANHA_SELECT =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, created_at, updated_at";
@@ -291,6 +288,98 @@ export async function buscarCampanhaPorId(
   if (!res.ok || !json.ok || !json.campanha) {
     throw new Error(json.error || "Não foi possível carregar a campanha.");
   }
+  return json.campanha;
+}
+
+/**
+ * Fonte alinhada ao portal: mesma chave codigo_publico do /api/avaliacao/{codigo}/info.
+ */
+export async function buscarCampanhaPorCodigoPublico(
+  codigoPublico: string
+): Promise<RiscosCampanhaRecord | null> {
+  const codigo = codigoPublico.trim().toUpperCase();
+  if (!codigo) return null;
+
+  const [adminRes, infoRes] = await Promise.all([
+    fetch(`/api/riscos/campanha/por-codigo/${encodeURIComponent(codigo)}`, {
+      method: "GET",
+      cache: "no-store",
+    }),
+    fetch(`/api/avaliacao/${encodeURIComponent(codigo)}/info`, {
+      method: "GET",
+      cache: "no-store",
+    }),
+  ]);
+
+  const adminJson = (await adminRes.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+  const infoJson = (await infoRes.json().catch(() => ({}))) as {
+    ok?: boolean;
+    status?: string;
+  };
+
+  if (adminRes.status === 404) return null;
+  if (!adminRes.ok || !adminJson.ok || !adminJson.campanha) {
+    throw new Error(adminJson.error || "Não foi possível carregar a campanha.");
+  }
+
+  const campanha = adminJson.campanha;
+  const statusInfo = String(infoJson.status ?? "").trim();
+
+  // Portal e admin DEVEM enxergar o mesmo status.
+  if (infoJson.ok && statusInfo && statusInfo !== campanha.status) {
+    console.error("[buscarCampanhaPorCodigoPublico] divergência de status", {
+      codigo,
+      statusAdmin: campanha.status,
+      statusInfo,
+    });
+    throw new Error(
+      `Divergência de status para ${codigo}: painel=${campanha.status}, portal=${statusInfo}. Recarregue a página.`
+    );
+  }
+
+  // Substitui completamente — nunca preserva status antigo da listagem.
+  return { ...campanha };
+}
+
+export async function encerrarCampanhaRiscos(
+  campanhaId: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/encerrar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível encerrar a pesquisa.");
+  }
+
+  if (json.campanha.status !== "encerrada") {
+    throw new Error(
+      "O encerramento não foi confirmado no banco. O status da campanha não foi alterado."
+    );
+  }
+
   return json.campanha;
 }
 
@@ -561,37 +650,6 @@ export async function abrirCampanhaRiscos(
   }
 
   return json.campanha;
-}
-
-/**
- * Encerramento manual — estrutura preparada; implementação futura.
- * Não altera dados nesta etapa.
- */
-export async function encerrarCampanhaRiscos(
-  campanhaId: string,
-  _auditOptions?: CampanhaAuditOptions
-): Promise<RiscosCampanhaRecord> {
-  const perfil = await buscarPerfilUsuarioLogado();
-  if (!isPerfilAdmin(perfil?.perfil)) {
-    throw new Error("Somente administradores podem encerrar a pesquisa.");
-  }
-
-  const supabase = createClient();
-  const { data: atual, error } = await supabase
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .eq("id", campanhaId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!atual) throw new Error("Campanha não encontrada.");
-
-  const record = mapCampanhaRow(atual as Record<string, unknown>);
-  const validacao = validateEncerrarCampanhaRiscos(record);
-  if (validacao) throw new Error(validacao);
-
-  throw new Error(
-    "O encerramento manual da pesquisa será disponibilizado em breve."
-  );
 }
 
 export async function garantirCodigoAcessoCampanha(

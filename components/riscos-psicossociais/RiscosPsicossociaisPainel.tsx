@@ -30,6 +30,7 @@ interface RiscosPsicossociaisPainelProps {
     quantidadePrevista: number;
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
+  onEncerrarCampanha: () => Promise<void>;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante: (
@@ -37,6 +38,7 @@ interface RiscosPsicossociaisPainelProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
+  campanhaStatusSincronizado?: boolean;
 }
 
 export function RiscosPsicossociaisPainel({
@@ -51,10 +53,12 @@ export function RiscosPsicossociaisPainel({
   onVisualizarAnexoLista,
   onCriarCampanha,
   onAbrirCampanha,
+  onEncerrarCampanha,
   onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
+  campanhaStatusSincronizado = false,
 }: RiscosPsicossociaisPainelProps) {
   const { orcamento, numeroContrato } = processo.implantacao;
   const campanha = processo.campanha;
@@ -64,10 +68,10 @@ export function RiscosPsicossociaisPainel({
     cnpjDigits.length === 14 ? formatCNPJ(cnpjRaw) : cnpjRaw.trim() || "—";
 
   const statusLabel = useMemo(() => {
-    if (processo.status === "concluido") return "Concluído";
-    if (campanha) return RISCOS_CAMPANHA_STATUS_LABELS[campanha.status];
-    return "Em andamento";
-  }, [processo.status, campanha]);
+    if (!campanha) return "Em andamento";
+    if (!campanhaStatusSincronizado) return "Sincronizando…";
+    return RISCOS_CAMPANHA_STATUS_LABELS[campanha.status];
+  }, [campanha, campanhaStatusSincronizado]);
 
   const progressoPct = Math.round(
     (processo.etapasConcluidas / Math.max(processo.totalEtapas, 1)) * 100
@@ -143,10 +147,12 @@ export function RiscosPsicossociaisPainel({
         onVisualizarAnexoLista={onVisualizarAnexoLista}
         onCriarCampanha={onCriarCampanha}
         onAbrirCampanha={onAbrirCampanha}
+        onEncerrarCampanha={onEncerrarCampanha}
         onGarantirCodigoAcesso={onGarantirCodigoAcesso}
         onCriarParticipante={onCriarParticipante}
         onEditarParticipante={onEditarParticipante}
         onRemoverParticipante={onRemoverParticipante}
+        campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </div>
   );

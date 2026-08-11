@@ -46,6 +46,7 @@ interface RiscosPainelCardsProps {
     quantidadePrevista: number;
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
+  onEncerrarCampanha: () => Promise<void>;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante: (
@@ -53,6 +54,8 @@ interface RiscosPainelCardsProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
+  /** Só exibe ações de Convites após status confirmado no banco. */
+  campanhaStatusSincronizado?: boolean;
 }
 
 function PanelCard({
@@ -118,15 +121,18 @@ export function RiscosPainelCards({
   onVisualizarAnexoLista,
   onCriarCampanha,
   onAbrirCampanha,
+  onEncerrarCampanha,
   onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
+  campanhaStatusSincronizado = false,
 }: RiscosPainelCardsProps) {
   const campanha = processo.campanha;
 
   const [criarAberto, setCriarAberto] = useState(false);
   const [confirmAbrirOpen, setConfirmAbrirOpen] = useState(false);
+  const [confirmEncerrarOpen, setConfirmEncerrarOpen] = useState(false);
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
   const [quantidade, setQuantidade] = useState("");
@@ -195,7 +201,9 @@ export function RiscosPainelCards({
     campanha?.status === "em_preparacao" &&
     !preRequisitoAbrir;
 
-  const acoesConvite = acoesConvitePorStatus(campanha?.status);
+  const acoesConvite = acoesConvitePorStatus(
+    campanhaStatusSincronizado ? campanha?.status : null
+  );
   const exibeLinkConvite = acoesConvite.exibirLink;
   const permiteCopiarLink = acoesConvite.permitirCopiarLink;
 
@@ -362,7 +370,9 @@ export function RiscosPainelCards({
                   </dt>
                   <dd className="mt-0.5">
                     <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
-                      {RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}
+                      {campanhaStatusSincronizado
+                        ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
+                        : "Sincronizando…"}
                     </span>
                   </dd>
                 </div>
@@ -422,7 +432,11 @@ export function RiscosPainelCards({
         <PanelCard title="Convites">
           {campanha ? (
             <div className="flex h-full flex-col gap-3">
-              {exibeLinkConvite ? (
+              {!campanhaStatusSincronizado ? (
+                <PlaceholderNote>
+                  Sincronizando status da campanha com o banco…
+                </PlaceholderNote>
+              ) : exibeLinkConvite ? (
                 <div className="space-y-1.5 text-sm">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
@@ -453,7 +467,7 @@ export function RiscosPainelCards({
                 </PlaceholderNote>
               )}
               <div className="mt-auto flex flex-wrap gap-2">
-                {exibeLinkConvite ? (
+                {campanhaStatusSincronizado && exibeLinkConvite ? (
                   <>
                     <button
                       type="button"
@@ -478,7 +492,7 @@ export function RiscosPainelCards({
                     </button>
                   </>
                 ) : null}
-                {acoesConvite.exibirAbrir ? (
+                {campanhaStatusSincronizado && acoesConvite.exibirAbrir ? (
                   <button
                     type="button"
                     className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -492,12 +506,13 @@ export function RiscosPainelCards({
                     Abrir pesquisa
                   </button>
                 ) : null}
-                {acoesConvite.exibirEncerrar ? (
+                {campanhaStatusSincronizado && acoesConvite.exibirEncerrar ? (
                   <button
                     type="button"
                     className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                    disabled
-                    title="Encerramento manual será disponibilizado em breve"
+                    disabled={savingCampanha}
+                    onClick={() => setConfirmEncerrarOpen(true)}
+                    title="Encerra a pesquisa e bloqueia novos acessos no portal"
                   >
                     Encerrar pesquisa
                   </button>
@@ -679,6 +694,55 @@ export function RiscosPainelCards({
             </span>
           </p>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={confirmEncerrarOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmEncerrarOpen(false);
+        }}
+        title="Encerrar pesquisa"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmEncerrarOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-red px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha || !campanha}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await onEncerrarCampanha();
+                    setConfirmEncerrarOpen(false);
+                  } catch {
+                    // mantém aberto
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Encerrando…" : "Encerrar pesquisa"}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-relaxed text-[#475569]">
+          Tem certeza que deseja encerrar esta pesquisa?
+          <br />
+          <br />
+          Após o encerramento, novos participantes não poderão responder.
+        </p>
       </Modal>
     </div>
   );

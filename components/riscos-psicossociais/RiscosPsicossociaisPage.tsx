@@ -32,10 +32,12 @@ export function RiscosPsicossociaisPage() {
     handleVisualizarAnexoLista,
     handleCriarCampanha,
     handleAbrirCampanha,
+    handleEncerrarCampanha,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,
+    campanhaStatusSincronizado,
   } = useRiscosPsicossociaisPage();
 
   return (
@@ -78,10 +80,12 @@ export function RiscosPsicossociaisPage() {
         onVisualizarAnexoLista={handleVisualizarAnexoLista}
         onCriarCampanha={handleCriarCampanha}
         onAbrirCampanha={handleAbrirCampanha}
+        onEncerrarCampanha={handleEncerrarCampanha}
         onGarantirCodigoAcesso={handleGarantirCodigoAcesso}
         onCriarParticipante={handleCriarParticipante}
         onEditarParticipante={handleEditarParticipante}
         onRemoverParticipante={handleRemoverParticipante}
+        campanhaStatusSincronizado={campanhaStatusSincronizado}
       />
     </AppShell>
   );

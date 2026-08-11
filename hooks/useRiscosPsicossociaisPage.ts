@@ -20,8 +20,9 @@ import {
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   abrirCampanhaRiscos,
-  buscarCampanhaPorId,
+  buscarCampanhaPorCodigoPublico,
   criarCampanhaRiscos,
+  encerrarCampanhaRiscos,
   garantirCodigoAcessoCampanha,
 } from "@/services/riscos-campanha.service";
 import {
@@ -60,6 +61,9 @@ export function useRiscosPsicossociaisPage() {
   );
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
+  /** false até o status da campanha ser relido do banco (não usar listagem stale). */
+  const [campanhaStatusSincronizado, setCampanhaStatusSincronizado] =
+    useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -74,7 +78,17 @@ export function useRiscosPsicossociaisPage() {
           (prev.campanha?.id
             ? data.find((p) => p.campanha?.id === prev.campanha?.id)
             : undefined);
-        return updated ?? prev;
+        if (!updated) return prev;
+        // Modal aberto: status da campanha só vem de sync/abrir/encerrar (API),
+        // nunca volta a ser o da listagem (pode estar stale/otimista).
+        if (prev.campanha?.id) {
+          return {
+            ...updated,
+            campanha: prev.campanha,
+            processoKey: prev.processoKey,
+          };
+        }
+        return { ...updated, processoKey: prev.processoKey };
       });
     } catch (err) {
       console.error(err);
@@ -207,9 +221,15 @@ export function useRiscosPsicossociaisPage() {
   );
 
   const sincronizarCampanhaDoBanco = useCallback(
-    async (campanhaId: string) => {
-      const fresh = await buscarCampanhaPorId(campanhaId);
-      if (fresh) atualizarCampanhaNoEstado(fresh);
+    async (codigoPublico: string, statusListagem?: string) => {
+      const fresh = await buscarCampanhaPorCodigoPublico(codigoPublico);
+      if (!fresh) return null;
+      atualizarCampanhaNoEstado(fresh);
+      if (statusListagem && statusListagem !== fresh.status) {
+        toast.message(
+          `Status sincronizado com o banco: ${fresh.status === "em_preparacao" ? "Em preparação" : fresh.status === "aberta" ? "Aberta" : "Encerrada"} (antes na tela: ${statusListagem}).`
+        );
+      }
       return fresh;
     },
     [atualizarCampanhaNoEstado]
@@ -217,42 +237,54 @@ export function useRiscosPsicossociaisPage() {
 
   const openProcesso = useCallback(
     (processo: RiscosPsicossociaisProcesso) => {
+      setCampanhaStatusSincronizado(!processo.campanha);
       setModalProcesso(processo);
-      if (!processo.campanha?.id) {
+      if (!processo.campanha?.id || !processo.campanha.codigo_publico) {
         setModalParticipantes([]);
+        setCampanhaStatusSincronizado(true);
         return;
       }
+      const codigo = processo.campanha.codigo_publico;
+      const statusListagem = processo.campanha.status;
       const campanhaId = processo.campanha.id;
       void (async () => {
         try {
           const [fresh, rows] = await Promise.all([
-            sincronizarCampanhaDoBanco(campanhaId),
+            sincronizarCampanhaDoBanco(codigo, statusListagem),
             listarParticipantesCampanha(campanhaId),
           ]);
           setModalParticipantes(rows);
-          // Garante badge/botões com o status recém-lido (mesmo se listagem estava stale).
-          if (fresh) atualizarCampanhaNoEstado(fresh);
+          if (fresh) {
+            // Substituição completa do objeto campanha (sem merge de status).
+            setModalProcesso((prev) =>
+              prev ? { ...prev, campanha: fresh } : prev
+            );
+            setProcessos((prev) =>
+              prev.map((p) =>
+                p.campanha?.id === fresh.id ? { ...p, campanha: fresh } : p
+              )
+            );
+          }
+          setCampanhaStatusSincronizado(true);
         } catch (err) {
           console.error(err);
+          setCampanhaStatusSincronizado(false);
           toast.error(
             err instanceof Error
               ? err.message
-              : "Não foi possível sincronizar o status da campanha."
+              : "Não foi possível sincronizar o status da campanha com o banco."
           );
           void carregarParticipantes(campanhaId);
         }
       })();
     },
-    [
-      sincronizarCampanhaDoBanco,
-      atualizarCampanhaNoEstado,
-      carregarParticipantes,
-    ]
+    [sincronizarCampanhaDoBanco, carregarParticipantes]
   );
 
   const closeModal = useCallback(() => {
     setModalProcesso(null);
     setModalParticipantes([]);
+    setCampanhaStatusSincronizado(false);
   }, []);
 
   const handleSalvarSolicitacaoLista = useCallback(
@@ -497,8 +529,15 @@ export function useRiscosPsicossociaisPage() {
           "A abertura não foi confirmada no banco. O status da campanha não foi alterado."
         );
       }
-      atualizarCampanhaNoEstado(campanha);
-      // Re-sincroniza a lista a partir do banco (fonte de verdade).
+      setModalProcesso((prev) =>
+        prev ? { ...prev, campanha } : prev
+      );
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.campanha?.id === campanha.id ? { ...p, campanha } : p
+        )
+      );
+      setCampanhaStatusSincronizado(true);
       await refresh();
       toast.success("Pesquisa aberta para respostas.");
     } catch (err) {
@@ -510,7 +549,42 @@ export function useRiscosPsicossociaisPage() {
     } finally {
       setSavingCampanha(false);
     }
-  }, [modalProcesso, auditContext, atualizarCampanhaNoEstado, refresh]);
+  }, [modalProcesso, auditContext, refresh]);
+
+  const handleEncerrarCampanha = useCallback(async () => {
+    const campanhaId = modalProcesso?.campanha?.id;
+    if (!campanhaId) return;
+    setSavingCampanha(true);
+    try {
+      const campanha = await encerrarCampanhaRiscos(campanhaId, {
+        auditContext,
+      });
+      if (campanha.status !== "encerrada") {
+        throw new Error(
+          "O encerramento não foi confirmado no banco. O status da campanha não foi alterado."
+        );
+      }
+      setModalProcesso((prev) =>
+        prev ? { ...prev, campanha } : prev
+      );
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.campanha?.id === campanha.id ? { ...p, campanha } : p
+        )
+      );
+      setCampanhaStatusSincronizado(true);
+      await refresh();
+      toast.success("Pesquisa encerrada.");
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao encerrar a pesquisa."
+      );
+      throw err;
+    } finally {
+      setSavingCampanha(false);
+    }
+  }, [modalProcesso, auditContext, refresh]);
 
   const handleGarantirCodigoAcesso = useCallback(
     async (regenerar = false) => {
@@ -661,10 +735,12 @@ export function useRiscosPsicossociaisPage() {
     handleVisualizarAnexoLista,
     handleCriarCampanha,
     handleAbrirCampanha,
+    handleEncerrarCampanha,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,
+    campanhaStatusSincronizado,
     refresh,
   };
 }
