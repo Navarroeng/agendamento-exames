@@ -189,6 +189,26 @@ run("TESTE 5 participante concluído → ja_respondida", () => {
   assert.equal(codigoErroPublico("participante_ja_concluiu"), "ja_respondida");
 });
 
+run("TESTE 5b participante removido/invalidado → nao_apto", () => {
+  for (const status of ["removido", "invalidado"] as const) {
+    const r = validarAcessoAvaliacao({
+      codigoPublicoUrl: "5UA22W",
+      dataNascimentoIso: "1990-05-15",
+      campanha: campA,
+      participante: {
+        ...joao,
+        status,
+        concluiu_em: "2026-08-05T12:00:00.000Z",
+        removido_em: status === "removido" ? "2026-08-10T00:00:00.000Z" : null,
+      },
+      hojeIso: hoje,
+    });
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.motivo, "participante_removido");
+    assert.equal(codigoErroPublico("participante_removido"), "nao_apto");
+  }
+});
+
 run("TESTE 6 campanha encerrada → negado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",

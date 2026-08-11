@@ -37,7 +37,6 @@ interface RiscosPsicossociaisModalProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemoverParticipante?: (participanteId: string) => Promise<void>;
-  onInvalidarParticipante?: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosPsicossociaisModal({
@@ -58,7 +57,6 @@ export function RiscosPsicossociaisModal({
   onCriarParticipante,
   onEditarParticipante,
   onRemoverParticipante,
-  onInvalidarParticipante,
 }: RiscosPsicossociaisModalProps) {
   if (!open || !processo) return null;
 
@@ -120,9 +118,6 @@ export function RiscosPsicossociaisModal({
         }}
         onRemoverParticipante={async (id) => {
           await onRemoverParticipante?.(id);
-        }}
-        onInvalidarParticipante={async (id) => {
-          await onInvalidarParticipante?.(id);
         }}
       />
     </Modal>

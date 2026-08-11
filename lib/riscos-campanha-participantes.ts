@@ -8,6 +8,7 @@ export const RISCOS_PARTICIPANTE_STATUS = [
   "pendente",
   "respondido",
   "invalidado",
+  "removido",
 ] as const;
 
 export type RiscosParticipanteStatus =
@@ -20,6 +21,7 @@ export const RISCOS_PARTICIPANTE_STATUS_LABELS: Record<
   pendente: "Pendente",
   respondido: "Concluído",
   invalidado: "Invalidado",
+  removido: "Removido",
 };
 
 export const RISCOS_PARTICIPANTE_ORIGENS = ["manual", "importacao"] as const;
@@ -46,6 +48,7 @@ export type RiscosCampanhaParticipanteRecord = {
   criado_por: string | null;
   created_at: string;
   updated_at?: string;
+  removido_em?: string | null;
 };
 
 export type RiscosParticipanteInput = {
@@ -118,8 +121,9 @@ export function buildParticipantesResumo(
   let invalidados = 0;
   for (const p of participantes) {
     if (p.status === "respondido") respondidos += 1;
-    else if (p.status === "invalidado") invalidados += 1;
-    else pendentes += 1;
+    else if (p.status === "invalidado" || p.status === "removido") {
+      invalidados += 1;
+    } else pendentes += 1;
   }
   return {
     previstos: Math.max(0, previstos),

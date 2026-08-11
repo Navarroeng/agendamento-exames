@@ -19,7 +19,7 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import { buscarCampanhaPorOrcamento } from "@/services/riscos-campanha.service";
 
 const PARTICIPANTE_SELECT =
-  "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at";
+  "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at, removido_em";
 
 type AuditOptions = { auditContext?: AuditoriaUsuarioContext };
 
@@ -53,6 +53,7 @@ function mapParticipante(
     criado_por: row.criado_por ? String(row.criado_por) : null,
     created_at: String(row.created_at ?? ""),
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
+    removido_em: row.removido_em ? String(row.removido_em) : null,
   };
 }
 
@@ -76,11 +77,28 @@ export async function listarParticipantesCampanha(
   campanhaId: string
 ): Promise<RiscosCampanhaParticipanteRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const selectComRemovido = PARTICIPANTE_SELECT;
+  const selectSemRemovido =
+    "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at";
+
+  let { data, error } = await supabase
     .from("riscos_campanha_participantes")
-    .select(PARTICIPANTE_SELECT)
+    .select(selectComRemovido)
     .eq("campanha_id", campanhaId)
+    .is("removido_em", null)
     .order("created_at", { ascending: true });
+
+  if (error && /removido_em/i.test(error.message ?? "")) {
+    const fallback = await supabase
+      .from("riscos_campanha_participantes")
+      .select(selectSemRemovido)
+      .eq("campanha_id", campanhaId)
+      .neq("status", "removido")
+      .neq("status", "invalidado")
+      .order("created_at", { ascending: true });
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
 
   if (error) {
     if (error.code === "42P01" || error.message?.includes("does not exist")) {
@@ -115,10 +133,25 @@ export async function criarParticipanteCampanha(
     .select("id")
     .eq("campanha_id", params.campanhaId)
     .eq("cpf", cpf)
+    .is("removido_em", null)
     .maybeSingle();
-  if (dupErr) throw dupErr;
-  if (duplicado) {
-    throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+  if (dupErr && /removido_em/i.test(dupErr.message ?? "")) {
+    const fb = await supabase
+      .from("riscos_campanha_participantes")
+      .select("id")
+      .eq("campanha_id", params.campanhaId)
+      .eq("cpf", cpf)
+      .not("status", "in", '("removido","invalidado")')
+      .maybeSingle();
+    if (fb.error) throw fb.error;
+    if (fb.data) {
+      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+    }
+  } else {
+    if (dupErr) throw dupErr;
+    if (duplicado) {
+      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+    }
   }
 
   const codigo = await gerarCodigoAcessoUnico(supabase);
@@ -271,49 +304,12 @@ export async function atualizarParticipanteCampanha(
 }
 
 export async function removerParticipanteCampanha(
-  participanteId: string,
-  auditOptions?: AuditOptions
+  _participanteId: string,
+  _auditOptions?: AuditOptions
 ): Promise<void> {
-  const supabase = createClient();
-  const { data: atual, error: findErr } = await supabase
-    .from("riscos_campanha_participantes")
-    .select(PARTICIPANTE_SELECT)
-    .eq("id", participanteId)
-    .maybeSingle();
-  if (findErr) throw findErr;
-  if (!atual) throw new Error("Participante não encontrado.");
-
-  const before = mapParticipante(atual as Record<string, unknown>);
-  if (before.status !== "pendente") {
-    throw new Error(
-      before.status === "respondido"
-        ? "Participante já concluiu a pesquisa. Use “Invalidar participação”."
-        : "Participante invalidado não pode ser removido pela ação comum."
-    );
-  }
-
-  const { error } = await supabase
-    .from("riscos_campanha_participantes")
-    .delete()
-    .eq("id", participanteId);
-  if (error) throw error;
-
-  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_participante_removido,
-    registroId: before.id,
-    registroNome: before.nome_completo,
-    descricao: `${nome} removeu o participante ${before.nome_completo}.`,
-    dadosAntes: {
-      campanha_id: before.campanha_id,
-      cpf: before.cpf,
-      status: before.status,
-    },
-  });
+  throw new Error(
+    "Use a API /api/riscos/participante/[id]/remover (remoção lógica)."
+  );
 }
 
 async function buscarCampanhaPorId(campanhaId: string) {

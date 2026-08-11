@@ -5,7 +5,8 @@ import { removerParticipanteCampanhaSoft } from "@/services/riscos-remocao-parti
 export const runtime = "nodejs";
 
 /**
- * Compatibilidade: invalidar → remoção lógica unificada.
+ * Soft-delete administrativo do participante (com invalidação de sessão se houver).
+ * Não retorna respostas individuais.
  */
 export async function POST(
   request: Request,
@@ -60,14 +61,16 @@ export async function POST(
       ok: true,
       participanteId: result.participanteId,
       campanhaId: result.campanhaId,
+      tinhaSessaoConcluida: result.tinhaSessaoConcluida,
     });
   } catch (err) {
-    console.error("[riscos/participante/invalidar→remover]", err);
+    console.error("[riscos/participante/remover]", err);
     const message =
       err instanceof Error ? err.message : "Não foi possível remover.";
     const status =
       message.includes("já foi removido") ||
-      message.includes("não encontrado")
+      message.includes("não encontrado") ||
+      message.includes("inválido")
         ? 400
         : 500;
     return NextResponse.json({ error: message }, { status });

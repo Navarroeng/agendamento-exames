@@ -1,4 +1,5 @@
 import { datasNascimentoIguais, hojeCivilIso } from "@/lib/date-br";
+import { participanteEstaRemovido } from "@/lib/riscos-remocao-participante";
 
 export type CampanhaAcessoRow = {
   id: string;
@@ -20,6 +21,7 @@ export type ParticipanteAcessoRow = {
   nome_completo: string;
   status: string;
   concluiu_em: string | null;
+  removido_em?: string | null;
 };
 
 export type AvaliacaoValidacaoOk = {
@@ -41,6 +43,7 @@ export type AvaliacaoValidacaoMotivo =
   | "data_nascimento_invalida"
   | "data_nascimento_divergente"
   | "participante_nao_autorizado"
+  | "participante_removido"
   | "participante_ja_concluiu";
 
 export type AvaliacaoValidacaoFail = {
@@ -95,13 +98,14 @@ function campanhaDisponivel(
 /**
  * Validação: campanha da URL + CPF do participante da mesma campanha + data de nascimento.
  * Nunca consulta participante só por CPF: o caller deve buscar por campanha_id + CPF.
+ * Participante removido/invalidado → nao_apto (nunca questionário / nunca "já respondida").
  */
 export function validarAcessoAvaliacao(input: {
   codigoPublicoUrl: string;
   /** YYYY-MM-DD já parseado. */
   dataNascimentoIso: string | null;
   campanha: CampanhaAcessoRow | null;
-  /** Já filtrado por campanha_id + cpf. */
+  /** Já filtrado por campanha_id + cpf (e preferencialmente ativos). */
   participante: ParticipanteAcessoRow | null;
   hojeIso?: string;
 }): AvaliacaoValidacaoResult {
@@ -137,6 +141,15 @@ export function validarAcessoAvaliacao(input: {
   }
 
   if (
+    participanteEstaRemovido({
+      status: input.participante.status,
+      removido_em: input.participante.removido_em,
+    })
+  ) {
+    return { ok: false, motivo: "participante_removido" };
+  }
+
+  if (
     !datasNascimentoIguais(
       input.participante.data_nascimento,
       input.dataNascimentoIso
@@ -147,8 +160,7 @@ export function validarAcessoAvaliacao(input: {
 
   if (
     input.participante.status === "respondido" ||
-    input.participante.status === "invalidado" ||
-    input.participante.concluiu_em
+    Boolean(input.participante.concluiu_em)
   ) {
     return { ok: false, motivo: "participante_ja_concluiu" };
   }
@@ -177,6 +189,7 @@ export function codigoErroPublico(
 ): "ja_respondida" | "campanha_encerrada" | "nao_apto" {
   if (motivo === "participante_ja_concluiu") return "ja_respondida";
   if (motivo === "campanha_encerrada") return "campanha_encerrada";
+  // removido / inválido / não encontrado → mensagem genérica
   return "nao_apto";
 }
 
@@ -190,12 +203,22 @@ export function assertCodigoPublicoSessao(
   );
 }
 
+/** Concluído ativo (ainda na campanha). Removidos NÃO entram aqui. */
 export function participanteJaConcluiu(
-  participante: Pick<ParticipanteAcessoRow, "status" | "concluiu_em">
+  participante: Pick<
+    ParticipanteAcessoRow,
+    "status" | "concluiu_em" | "removido_em"
+  >
 ): boolean {
+  if (
+    participanteEstaRemovido({
+      status: participante.status,
+      removido_em: participante.removido_em,
+    })
+  ) {
+    return false;
+  }
   return (
-    participante.status === "respondido" ||
-    participante.status === "invalidado" ||
-    Boolean(participante.concluiu_em)
+    participante.status === "respondido" || Boolean(participante.concluiu_em)
   );
 }

@@ -36,7 +36,6 @@ export function RiscosPsicossociaisPage() {
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,
-    handleInvalidarParticipante,
   } = useRiscosPsicossociaisPage();
 
   return (
@@ -83,7 +82,6 @@ export function RiscosPsicossociaisPage() {
         onCriarParticipante={handleCriarParticipante}
         onEditarParticipante={handleEditarParticipante}
         onRemoverParticipante={handleRemoverParticipante}
-        onInvalidarParticipante={handleInvalidarParticipante}
       />
     </AppShell>
   );

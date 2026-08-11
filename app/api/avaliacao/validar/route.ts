@@ -36,7 +36,7 @@ const CAMPANHA_SELECT =
   "id, codigo_publico, cliente_id, cnpj, empresa_nome, status, data_inicio, data_encerramento";
 
 const PARTICIPANTE_SELECT =
-  "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em, acessou_em";
+  "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em, acessou_em, removido_em";
 
 export async function POST(request: Request) {
   try {
@@ -104,13 +104,27 @@ export async function POST(request: Request) {
     let participante = null;
     if (campanha?.id) {
       // Isolamento: sempre campanha_id + CPF (nunca CPF sozinho).
-      // CPF no banco é armazenado só com dígitos (normalizeCpfDigits no cadastro).
-      const { data, error } = await supabase
+      // Exclui soft-deleted quando a coluna existir.
+      let { data, error } = await supabase
         .from("riscos_campanha_participantes")
         .select(PARTICIPANTE_SELECT)
         .eq("campanha_id", campanha.id)
         .eq("cpf", cpfDigits)
+        .is("removido_em", null)
         .maybeSingle();
+
+      if (error && /removido_em/i.test(error.message ?? "")) {
+        const fb = await supabase
+          .from("riscos_campanha_participantes")
+          .select(
+            "id, campanha_id, cpf, data_nascimento, nome_completo, status, concluiu_em, acessou_em"
+          )
+          .eq("campanha_id", campanha.id)
+          .eq("cpf", cpfDigits)
+          .maybeSingle();
+        data = fb.data as typeof data;
+        error = fb.error;
+      }
       if (error) throw error;
       participante = data;
     }
@@ -144,6 +158,9 @@ export async function POST(request: Request) {
             status: String(participante.status ?? ""),
             concluiu_em: participante.concluiu_em
               ? String(participante.concluiu_em)
+              : null,
+            removido_em: participante.removido_em
+              ? String(participante.removido_em)
               : null,
           }
         : null,

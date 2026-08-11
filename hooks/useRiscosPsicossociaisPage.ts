@@ -27,7 +27,6 @@ import {
   atualizarParticipanteCampanha,
   criarParticipanteCampanha,
   listarParticipantesCampanha,
-  removerParticipanteCampanha,
 } from "@/services/riscos-campanha-participantes.service";
 import type {
   RiscosCampanhaParticipanteRecord,
@@ -524,31 +523,8 @@ export function useRiscosPsicossociaisPage() {
       if (!campanhaId) return;
       setSavingParticipante(true);
       try {
-        await removerParticipanteCampanha(participanteId, { auditContext });
-        await carregarParticipantes(campanhaId);
-        toast.success("Participante removido.");
-      } catch (err) {
-        console.error(err);
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Erro ao remover participante."
-        );
-      } finally {
-        setSavingParticipante(false);
-      }
-    },
-    [modalProcesso, auditContext, carregarParticipantes]
-  );
-
-  const handleInvalidarParticipante = useCallback(
-    async (participanteId: string) => {
-      const campanhaId = modalProcesso?.campanha?.id;
-      if (!campanhaId) return;
-      setSavingParticipante(true);
-      try {
         const res = await fetch(
-          `/api/riscos/participante/${encodeURIComponent(participanteId)}/invalidar`,
+          `/api/riscos/participante/${encodeURIComponent(participanteId)}/remover`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -560,16 +536,16 @@ export function useRiscosPsicossociaisPage() {
         );
         const json = (await res.json()) as { ok?: boolean; error?: string };
         if (!res.ok || !json.ok) {
-          throw new Error(json.error || "Erro ao invalidar participação.");
+          throw new Error(json.error || "Erro ao remover participante.");
         }
         await carregarParticipantes(campanhaId);
-        toast.success("Participação invalidada. Resultados atualizados.");
+        toast.success("Participante removido.");
       } catch (err) {
         console.error(err);
         toast.error(
           err instanceof Error
             ? err.message
-            : "Erro ao invalidar participação."
+            : "Erro ao remover participante."
         );
       } finally {
         setSavingParticipante(false);
@@ -606,7 +582,6 @@ export function useRiscosPsicossociaisPage() {
     handleCriarParticipante,
     handleEditarParticipante,
     handleRemoverParticipante,
-    handleInvalidarParticipante,
     refresh,
   };
 }

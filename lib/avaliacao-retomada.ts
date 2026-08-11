@@ -36,10 +36,12 @@ export function classificarSituacaoParticipante(input: {
   concluiuEm: string | null | undefined;
   iniciouEm: string | null | undefined;
   statusSessao: "em_andamento" | "concluida" | null;
+  removidoEm?: string | null;
 }): SituacaoParticipantePortal {
+  // Removidos/invalidados não deveriam chegar aqui (API rejeita antes).
+  // Se chegarem, tratar como já respondida só por segurança de UI — a API usa nao_apto.
   if (
     input.statusParticipante === "respondido" ||
-    input.statusParticipante === "invalidado" ||
     Boolean(input.concluiuEm) ||
     input.statusSessao === "concluida"
   ) {

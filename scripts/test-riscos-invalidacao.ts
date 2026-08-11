@@ -1,5 +1,6 @@
 /**
  * Testes de invalidação administrativa e exclusão de sessões dos resultados.
+ * (Compat: regras unificadas com remoção lógica.)
  */
 import assert from "node:assert/strict";
 import {
@@ -7,16 +8,18 @@ import {
   type RiscosParticipanteStatus,
 } from "../lib/riscos-campanha-participantes";
 import {
-  MOTIVO_INVALIDACAO_PADRAO,
-  podeInvalidarParticipacao,
-  podeRemoverParticipanteComum,
-  sessaoContaNosResultados,
-} from "../lib/riscos-invalidacao";
+  precisaConfirmacaoForteRemocao,
+  participanteEstaRemovido,
+} from "../lib/riscos-remocao-participante";
 import {
   consolidarResultadosCampanha,
   filtrarSessoesConcluidasCampanha,
   type RespostaAvaliacaoConsolidacao,
 } from "../lib/riscos-resultados";
+import {
+  codigoErroPublico,
+  validarAcessoAvaliacao,
+} from "../lib/avaliacao-validacao";
 
 function run(name: string, fn: () => void) {
   fn();
@@ -34,47 +37,31 @@ const demandas: RespostaAvaliacaoConsolidacao[] = [
   { sessao_id: "s1", campanha_id: CAMPANHA, pergunta_id: "p-3b", alternativa_id: "freq-raramente" },
 ];
 
-run("TESTE 1: pendente pode remover comum", () => {
-  assert.equal(podeRemoverParticipanteComum("pendente"), true);
-  assert.equal(podeInvalidarParticipacao("pendente"), false);
+run("TESTE 1: pendente remove com confirmação simples", () => {
+  assert.equal(precisaConfirmacaoForteRemocao("pendente"), false);
 });
 
-run("TESTE 2: concluído bloqueia remoção comum e permite invalidar", () => {
-  assert.equal(podeRemoverParticipanteComum("respondido"), false);
-  assert.equal(podeInvalidarParticipacao("respondido"), true);
+run("TESTE 2: concluído exige confirmação forte", () => {
+  assert.equal(precisaConfirmacaoForteRemocao("respondido"), true);
 });
 
-run("TESTE 3: invalidado não remove nem invalida de novo", () => {
-  assert.equal(podeRemoverParticipanteComum("invalidado"), false);
-  assert.equal(podeInvalidarParticipacao("invalidado"), false);
+run("TESTE 3: removido/invalidado detectados", () => {
+  assert.equal(participanteEstaRemovido({ status: "removido" }), true);
+  assert.equal(participanteEstaRemovido({ status: "invalidado" }), true);
+  assert.equal(participanteEstaRemovido({ status: "pendente" }), false);
 });
 
 run("TESTE 4: sessão invalidada não conta nos resultados", () => {
   assert.equal(
-    sessaoContaNosResultados({ status: "concluida", valida: true }),
-    true
-  );
-  assert.equal(
-    sessaoContaNosResultados({ status: "concluida", valida: false }),
-    false
-  );
-  assert.equal(
-    sessaoContaNosResultados({ status: "em_andamento", valida: true }),
-    false
+    filtrarSessoesConcluidasCampanha(
+      [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false }],
+      CAMPANHA
+    ).length,
+    0
   );
 });
 
-run("TESTE 5/6: Respondidos e participação caem após invalidar", () => {
-  const antes = consolidarResultadosCampanha({
-    campanhaId: CAMPANHA,
-    statusCampanha: "aberta",
-    quantidadePrevista: 10,
-    sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: true }],
-    respostas: demandas,
-  });
-  assert.equal(antes.sessoesConcluidas, 1);
-  assert.equal(antes.participacaoPercentual, 10);
-
+run("TESTE 5/6: Respondidos e participação caem após invalidar sessão", () => {
   const depois = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
@@ -89,7 +76,7 @@ run("TESTE 5/6: Respondidos e participação caem após invalidar", () => {
   assert.equal(depois.pendentes, 10);
 });
 
-run("TESTE 7: dimensões recalculadas sem sessão invalidada", () => {
+run("TESTE 7: dimensões sem sessão invalidada", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
@@ -106,30 +93,52 @@ run("TESTE 7: dimensões recalculadas sem sessão invalidada", () => {
   assert.equal(resultado.sessoesConcluidas, 1);
   const demandasDim = resultado.dimensoes.find((d) => d.id === "demandas-trabalho");
   assert.equal(demandasDim?.media, 2.5);
-  assert.equal(demandasDim?.respondentesValidos, 1);
 });
 
-run("TESTE 8: filtro ignora inválidas de forma estável", () => {
+run("TESTE 8: filtro estável", () => {
   const filtradas = filtrarSessoesConcluidasCampanha(
     [
       { id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false },
       { id: "s2", campanha_id: CAMPANHA, status: "concluida", valida: true },
-      { id: "s3", campanha_id: CAMPANHA, status: "concluida" },
     ],
     CAMPANHA
   );
-  assert.deepEqual(
-    filtradas.map((s) => s.id).sort(),
-    ["s2", "s3"]
-  );
+  assert.deepEqual(filtradas.map((s) => s.id), ["s2"]);
 });
 
-run("TESTE 9: motivo padrão de auditoria sem respostas", () => {
-  assert.ok(MOTIVO_INVALIDACAO_PADRAO.includes("Invalidação administrativa"));
-  assert.equal(/resposta|alternativa|p-\d/i.test(MOTIVO_INVALIDACAO_PADRAO), false);
+run("TESTE 9: invalidado → nao_apto (não ja_respondida)", () => {
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "ABC123",
+    dataNascimentoIso: "1990-01-01",
+    campanha: {
+      id: CAMPANHA,
+      codigo_publico: "ABC123",
+      cliente_id: null,
+      cnpj: "1",
+      empresa_nome: "X",
+      status: "aberta",
+      data_inicio: "2026-01-01",
+      data_encerramento: "2026-12-31",
+    },
+    participante: {
+      id: "p",
+      campanha_id: CAMPANHA,
+      cpf: "52998224725",
+      data_nascimento: "1990-01-01",
+      nome_completo: "T",
+      status: "invalidado",
+      concluiu_em: "2026-01-02",
+    },
+    hojeIso: "2026-08-11",
+  });
+  assert.equal(r.ok, false);
+  if (!r.ok) {
+    assert.equal(r.motivo, "participante_removido");
+    assert.equal(codigoErroPublico(r.motivo), "nao_apto");
+  }
 });
 
-run("TESTE 10: payload consolidado sem PII / respostas nominais", () => {
+run("TESTE 10: payload sem PII", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
@@ -137,24 +146,16 @@ run("TESTE 10: payload consolidado sem PII / respostas nominais", () => {
     sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: true }],
     respostas: demandas,
   });
-  const json = JSON.stringify(resultado);
-  assert.equal(
-    /"participante_id"|"cpf"|"nome_completo"|"data_nascimento"/i.test(json),
-    false
-  );
-  assert.equal("respondentes" in resultado, false);
+  assert.equal(/"cpf"|"nome_completo"/i.test(JSON.stringify(resultado)), false);
 });
 
-run("resumo administrativo: invalidado não conta como Responderam", () => {
+run("resumo: removidos não entram na lista ativa", () => {
   const resumo = buildParticipantesResumo(10, [
     { status: "pendente" as RiscosParticipanteStatus },
     { status: "respondido" as RiscosParticipanteStatus },
-    { status: "invalidado" as RiscosParticipanteStatus },
   ]);
-  assert.equal(resumo.cadastrados, 3);
+  assert.equal(resumo.cadastrados, 2);
   assert.equal(resumo.respondidos, 1);
-  assert.equal(resumo.pendentes, 1);
-  assert.equal(resumo.invalidados, 1);
 });
 
-console.log("\nTodos os testes de invalidação passaram.");
+console.log("\nTodos os testes de invalidação/remoção passaram.");

@@ -11,10 +11,7 @@ import {
   type RiscosParticipanteInput,
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
-import {
-  podeInvalidarParticipacao,
-  podeRemoverParticipanteComum,
-} from "@/lib/riscos-invalidacao";
+import { precisaConfirmacaoForteRemocao } from "@/lib/riscos-remocao-participante";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import { RiscosParticipanteFormModal } from "@/components/riscos-psicossociais/RiscosParticipanteFormModal";
 
@@ -28,7 +25,6 @@ interface RiscosCampanhaParticipantesSectionProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
-  onInvalidar: (participanteId: string) => Promise<void>;
 }
 
 export function RiscosCampanhaParticipantesSection({
@@ -38,7 +34,6 @@ export function RiscosCampanhaParticipantesSection({
   onCriar,
   onEditar,
   onRemover,
-  onInvalidar,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,34 +83,14 @@ export function RiscosCampanhaParticipantesSection({
 
   async function handleRemover(p: RiscosCampanhaParticipanteRecord) {
     setMenuOpenId(null);
-    if (!podeRemoverParticipanteComum(p.status)) {
-      toast.error(
-        "Participante que já concluiu não pode ser removido. Use “Invalidar participação”."
-      );
-      return;
-    }
+    const forte = precisaConfirmacaoForteRemocao(p.status);
     const ok = window.confirm(
-      `Remover o participante ${p.nome_completo}? Esta ação não pode ser desfeita.`
+      forte
+        ? `Este participante já concluiu a pesquisa.\n\nAo remover este participante, sua participação deixará de compor os resultados desta campanha e ele não poderá mais acessar esta pesquisa.\n\nDeseja continuar?`
+        : `Remover o participante ${p.nome_completo}?\n\nEle deixará de estar autorizado nesta campanha.`
     );
     if (!ok) return;
     await onRemover(p.id);
-  }
-
-  async function handleInvalidar(p: RiscosCampanhaParticipanteRecord) {
-    setMenuOpenId(null);
-    if (!podeInvalidarParticipacao(p.status)) {
-      toast.error(
-        p.status === "invalidado"
-          ? "Esta participação já está invalidada."
-          : "Somente participantes que concluíram podem ser invalidados."
-      );
-      return;
-    }
-    const ok = window.confirm(
-      `Este participante já concluiu a pesquisa.\n\nInvalidar esta participação fará com que suas respostas deixem de compor os resultados consolidados desta campanha.\n\nO histórico da operação será preservado.\n\nDeseja continuar?`
-    );
-    if (!ok) return;
-    await onInvalidar(p.id);
   }
 
   function placeholderAction(label: string) {
@@ -219,14 +194,12 @@ export function RiscosCampanhaParticipantesSection({
                     <ParticipanteActionsMenu
                       open={menuOpenId === p.id}
                       disabled={saving}
-                      status={p.status}
                       onToggle={() =>
                         setMenuOpenId((id) => (id === p.id ? null : p.id))
                       }
                       onClose={() => setMenuOpenId(null)}
                       onEditar={() => openEdit(p)}
                       onRemover={() => void handleRemover(p)}
-                      onInvalidar={() => void handleInvalidar(p)}
                       onPlaceholder={placeholderAction}
                     />
                   </td>
@@ -257,14 +230,12 @@ function StatusBadge({ status }: { status: RiscosParticipanteStatus }) {
   const className =
     status === "respondido"
       ? "bg-brand-green-soft text-brand-green"
-      : status === "invalidado"
-        ? "bg-[#fee2e2] text-[#b91c1c]"
-        : "bg-[#fef3c7] text-[#b45309]";
+      : "bg-[#fef3c7] text-[#b45309]";
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${className}`}
     >
-      {RISCOS_PARTICIPANTE_STATUS_LABELS[status]}
+      {RISCOS_PARTICIPANTE_STATUS_LABELS[status] ?? status}
     </span>
   );
 }
@@ -299,27 +270,21 @@ function ResumoCard({
 function ParticipanteActionsMenu({
   open,
   disabled,
-  status,
   onToggle,
   onClose,
   onEditar,
   onRemover,
-  onInvalidar,
   onPlaceholder,
 }: {
   open: boolean;
   disabled?: boolean;
-  status: RiscosParticipanteStatus;
   onToggle: () => void;
   onClose: () => void;
   onEditar: () => void;
   onRemover: () => void;
-  onInvalidar: () => void;
   onPlaceholder: (label: string) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const podeRemover = podeRemoverParticipanteComum(status);
-  const podeInvalidar = podeInvalidarParticipacao(status);
 
   useEffect(() => {
     if (!open) return;
@@ -377,21 +342,7 @@ function ParticipanteActionsMenu({
             onClick={() => onPlaceholder("Ver histórico")}
           />
           <div className="my-1 border-t border-[#eef2f7]" />
-          {podeRemover ? (
-            <MenuItem label="Remover" danger onClick={onRemover} />
-          ) : null}
-          {podeInvalidar ? (
-            <MenuItem
-              label="Invalidar participação"
-              danger
-              onClick={onInvalidar}
-            />
-          ) : null}
-          {status === "invalidado" ? (
-            <p className="px-3 py-2 text-[11px] font-semibold text-[#64748b]">
-              Participação já invalidada
-            </p>
-          ) : null}
+          <MenuItem label="Remover participante" danger onClick={onRemover} />
         </div>
       ) : null}
     </div>

@@ -10,6 +10,7 @@ import {
   avaliarPeriodoCampanha,
   participanteJaConcluiu,
 } from "@/lib/avaliacao-validacao";
+import { participanteEstaRemovido } from "@/lib/riscos-remocao-participante";
 
 export type AvaliacaoSessaoRow = {
   id: string;
@@ -119,7 +120,7 @@ export async function carregarContextoPortal(
 
   const { data: participante } = await supabase
     .from("riscos_campanha_participantes")
-    .select("id, status, concluiu_em")
+    .select("id, status, concluiu_em, removido_em")
     .eq("id", input.participanteId)
     .eq("campanha_id", input.campanhaId)
     .maybeSingle();
@@ -147,12 +148,27 @@ export async function carregarContextoPortal(
     return { ok: false, codigo: "nao_apto" };
   }
 
+  const statusPart = String(participante.status ?? "");
+  const removidoEm = participante.removido_em
+    ? String(participante.removido_em)
+    : null;
+
+  if (
+    participanteEstaRemovido({
+      status: statusPart,
+      removido_em: removidoEm,
+    })
+  ) {
+    return { ok: false, codigo: "nao_apto" };
+  }
+
   if (
     participanteJaConcluiu({
-      status: String(participante.status ?? ""),
+      status: statusPart,
       concluiu_em: participante.concluiu_em
         ? String(participante.concluiu_em)
         : null,
+      removido_em: removidoEm,
     })
   ) {
     return { ok: false, codigo: "ja_respondida" };
@@ -169,7 +185,7 @@ export async function carregarContextoPortal(
     },
     participante: {
       id: String(participante.id),
-      status: String(participante.status ?? ""),
+      status: statusPart,
       concluiu_em: participante.concluiu_em
         ? String(participante.concluiu_em)
         : null,
