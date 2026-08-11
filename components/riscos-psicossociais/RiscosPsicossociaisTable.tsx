@@ -3,7 +3,7 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import { Panel } from "@/components/ui/Panel";
-import { IconEye, IconShield } from "@/components/ui/icons/OutlineIcons";
+import { IconShield } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
@@ -15,6 +15,7 @@ import {
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type { YearMonth } from "@/lib/listagem-meses";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
+import { RiscosProcessoRowActionsMenu } from "@/components/riscos-psicossociais/RiscosProcessoRowActionsMenu";
 
 interface RiscosPsicossociaisTableProps {
   processos: RiscosPsicossociaisProcesso[];
@@ -114,7 +115,7 @@ export function RiscosPsicossociaisTable({
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[1080px]">
+          <table className="table-premium w-full min-w-[980px]">
             <thead>
               <tr>
                 <th>Data de entrada</th>
@@ -123,8 +124,7 @@ export function RiscosPsicossociaisTable({
                 <th>Responsável</th>
                 <th>Etapa atual</th>
                 <th>Progresso</th>
-                <th className="w-[88px] text-center">Visualizar</th>
-                <th className="w-[140px] text-center">Ações</th>
+                <th className="w-[72px] text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -134,10 +134,6 @@ export function RiscosPsicossociaisTable({
                 const dataEntrada = processo.dataEntrada
                   ? formatDateIsoToBR(processo.dataEntrada.slice(0, 10))
                   : "—";
-                const podeRemoverEste =
-                  podeRemoverProcesso &&
-                  Boolean(processo.campanha?.id) &&
-                  Boolean(processo.campanha?.codigo_publico);
 
                 return (
                   <tr key={processo.processoKey}>
@@ -181,30 +177,13 @@ export function RiscosPsicossociaisTable({
                       <ProgressoRiscos processo={processo} />
                     </td>
                     <td className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => onVisualizar(processo)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#e2e8f0] bg-white text-[#64748b] transition hover:border-brand-blue/30 hover:bg-brand-blue-soft hover:text-brand-blue"
-                        aria-label={`Visualizar riscos ${orcamento.numero}`}
-                        title="Visualizar"
-                      >
-                        <IconEye size={14} />
-                      </button>
-                    </td>
-                    <td className="text-center">
-                      {podeRemoverEste ? (
-                        <button
-                          type="button"
-                          disabled={savingRemover}
-                          onClick={() => onRemoverProcesso?.(processo)}
-                          className="rounded-lg border border-[#7f1d1d]/30 bg-[#fef2f2] px-2 py-1 text-[10px] font-bold text-[#7f1d1d] transition hover:bg-[#fee2e2] disabled:opacity-40"
-                          title="Remove definitivamente a campanha e todos os dados"
-                        >
-                          Remover processo
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-[#94a3b8]">—</span>
-                      )}
+                      <RiscosProcessoRowActionsMenu
+                        processo={processo}
+                        isAdmin={podeRemoverProcesso}
+                        savingRemover={savingRemover}
+                        onAbrir={onVisualizar}
+                        onRemoverProcesso={onRemoverProcesso}
+                      />
                     </td>
                   </tr>
                 );

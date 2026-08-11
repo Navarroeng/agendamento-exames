@@ -181,6 +181,43 @@ export function campanhaPermiteCopiarLink(
 }
 
 /**
+ * Habilitação do menu ⋮ na listagem principal (coluna Ações).
+ * Não inventa relatório: geração permanece desabilitada até regra real existir.
+ */
+export function acoesMenuListagemProcessoRiscos(input: {
+  campanhaStatus: RiscosCampanhaStatus | string | null | undefined;
+  codigoPublico?: string | null;
+  isAdmin: boolean;
+  hasCampanha: boolean;
+}): {
+  podeAbrir: boolean;
+  podeCopiarLink: boolean;
+  copiarLinkMotivoDesabilitado: string;
+  podeGerarRelatorio: boolean;
+  gerarRelatorioMotivoDesabilitado: string;
+  mostrarRemoverProcesso: boolean;
+} {
+  const codigo = String(input.codigoPublico ?? "").trim();
+  const podeCopiar =
+    Boolean(input.hasCampanha) &&
+    Boolean(codigo) &&
+    campanhaPermiteCopiarLink(input.campanhaStatus);
+
+  return {
+    podeAbrir: true,
+    podeCopiarLink: podeCopiar,
+    copiarLinkMotivoDesabilitado: podeCopiar
+      ? ""
+      : "Disponível após abrir a pesquisa.",
+    podeGerarRelatorio: false,
+    gerarRelatorioMotivoDesabilitado:
+      "Disponível após conclusão/encerramento da pesquisa.",
+    mostrarRemoverProcesso:
+      input.isAdmin && input.hasCampanha && Boolean(codigo),
+  };
+}
+
+/**
  * Ações do card Convites conforme status persistido (fonte de verdade).
  * Separado do state local — use sempre o status lido do banco.
  */
