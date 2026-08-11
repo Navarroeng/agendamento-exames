@@ -1,0 +1,198 @@
+/**
+ * Helpers de apresentação do Relatório Executivo (V2).
+ * Somente UI — não altera cálculos, geração ou persistência.
+ */
+
+import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
+import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
+import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
+
+/** Cores padronizadas (COPSOQ II-Br: 3 faixas oficiais). */
+export const RELATORIO_CORES = {
+  situacao_favoravel: "#16a34a",
+  risco_intermediario: "#ea580c",
+  risco_para_saude: "#dc2626",
+  classificacao_nao_definida: "#64748b",
+  /** Amarelo de atenção visual (destaques de UI; não é faixa oficial extra). */
+  atencao: "#ca8a04",
+} as const;
+
+export const RELATORIO_LEGENDA = [
+  {
+    id: "situacao_favoravel" as const,
+    label: "Situação Favorável",
+    cor: RELATORIO_CORES.situacao_favoravel,
+  },
+  {
+    id: "risco_intermediario" as const,
+    label: "Risco Intermediário",
+    cor: RELATORIO_CORES.risco_intermediario,
+  },
+  {
+    id: "risco_para_saude" as const,
+    label: "Risco para Saúde (Crítico)",
+    cor: RELATORIO_CORES.risco_para_saude,
+  },
+] as const;
+
+export function corPorClassificacaoId(
+  id: CopsoqClassificacaoResultadoId | string | null | undefined
+): string {
+  if (id === "situacao_favoravel") return RELATORIO_CORES.situacao_favoravel;
+  if (id === "risco_intermediario") return RELATORIO_CORES.risco_intermediario;
+  if (id === "risco_para_saude") return RELATORIO_CORES.risco_para_saude;
+  return RELATORIO_CORES.classificacao_nao_definida;
+}
+
+export function bgSuavePorClassificacaoId(
+  id: CopsoqClassificacaoResultadoId | string | null | undefined
+): string {
+  if (id === "situacao_favoravel") return "#ecfdf5";
+  if (id === "risco_intermediario") return "#fff7ed";
+  if (id === "risco_para_saude") return "#fef2f2";
+  return "#f8fafc";
+}
+
+/** Severidade 0 (melhor) → 2 (pior). */
+export function severidadeClassificacao(
+  id: CopsoqClassificacaoResultadoId | string
+): number {
+  if (id === "situacao_favoravel") return 0;
+  if (id === "risco_intermediario") return 1;
+  if (id === "risco_para_saude") return 2;
+  return 3;
+}
+
+/** Score de favorabilidade (maior = melhor), respeitando tipo RISCO/PROTEÇÃO. */
+export function scoreFavorabilidade(
+  d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
+): number {
+  if (d.media == null || Number.isNaN(d.media)) return Number.NEGATIVE_INFINITY;
+  const tipo = String(d.tipo).toUpperCase();
+  if (tipo === "RISCO") return 4 - d.media;
+  return d.media;
+}
+
+export function dimensoesParaCalculo(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): RiscosRelatorioDimensaoSnapshot[] {
+  return dimensoes.filter((d) => d.entraNoCalculo && d.media != null);
+}
+
+export function dimensoesOrdenadasPorMediaDesc(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): RiscosRelatorioDimensaoSnapshot[] {
+  return [...dimensoesParaCalculo(dimensoes)].sort(
+    (a, b) => (b.media ?? 0) - (a.media ?? 0)
+  );
+}
+
+export function rankingMelhores(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
+  limite = 5
+): RiscosRelatorioDimensaoSnapshot[] {
+  return [...dimensoesParaCalculo(dimensoes)]
+    .sort((a, b) => {
+      const sev =
+        severidadeClassificacao(a.classificacaoId) -
+        severidadeClassificacao(b.classificacaoId);
+      if (sev !== 0) return sev;
+      return scoreFavorabilidade(b) - scoreFavorabilidade(a);
+    })
+    .slice(0, limite);
+}
+
+export function rankingAtencao(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
+  limite = 5
+): RiscosRelatorioDimensaoSnapshot[] {
+  return [...dimensoesParaCalculo(dimensoes)]
+    .sort((a, b) => {
+      const sev =
+        severidadeClassificacao(b.classificacaoId) -
+        severidadeClassificacao(a.classificacaoId);
+      if (sev !== 0) return sev;
+      return scoreFavorabilidade(a) - scoreFavorabilidade(b);
+    })
+    .slice(0, limite);
+}
+
+export function nomeCurtoDimensao(nome: string, max = 22): string {
+  const n = nome.trim();
+  if (n.length <= max) return n;
+  return `${n.slice(0, max - 1)}…`;
+}
+
+export function descricaoOficialDimensao(dimensaoId: string): string {
+  const found = COPSOQ_DIMENSOES.find((d) => d.id === dimensaoId);
+  return (
+    found?.descricao ??
+    "Descrição oficial da dimensão disponível no instrumento COPSOQ II-Br."
+  );
+}
+
+export function iniciaisEmpresa(nome: string): string {
+  const parts = nome
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 1 && !/^(de|da|do|das|dos|e|a|o)$/i.test(p));
+  if (parts.length === 0) return "RP";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+export function formatMediaRelatorio(media: number | null | undefined): string {
+  if (media == null || Number.isNaN(media)) return "—";
+  return media.toFixed(2).replace(".", ",");
+}
+
+export type RadarChartDatum = {
+  dimensao: string;
+  nomeCompleto: string;
+  media: number;
+  fullMark: number;
+};
+
+export function montarDadosRadar(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): RadarChartDatum[] {
+  return dimensoesParaCalculo(dimensoes).map((d) => ({
+    dimensao: nomeCurtoDimensao(d.nome, 18),
+    nomeCompleto: d.nome,
+    media: Number(d.media ?? 0),
+    fullMark: 4,
+  }));
+}
+
+export type BarraChartDatum = {
+  id: string;
+  nome: string;
+  media: number;
+  cor: string;
+  classificacaoLabel: string;
+};
+
+export function montarDadosBarras(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): BarraChartDatum[] {
+  return dimensoesOrdenadasPorMediaDesc(dimensoes).map((d) => ({
+    id: d.id,
+    nome: d.nome,
+    media: Number(d.media ?? 0),
+    cor: corPorClassificacaoId(d.classificacaoId),
+    classificacaoLabel: d.classificacaoLabel,
+  }));
+}
+
+export function statusGeralResumo(input: {
+  dimensoesCriticasCount: number;
+  statusGeralMensagem?: string | null;
+}): { label: string; tom: "ok" | "atencao" | "critico" | "neutro" } {
+  if (input.dimensoesCriticasCount >= 3) {
+    return { label: "Atenção prioritária", tom: "critico" };
+  }
+  if (input.dimensoesCriticasCount >= 1) {
+    return { label: "Requer acompanhamento", tom: "atencao" };
+  }
+  return { label: "Estável", tom: "ok" };
+}
