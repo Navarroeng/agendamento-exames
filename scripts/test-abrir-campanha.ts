@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  acoesConvitePorStatus,
   campanhaExibeLinkConvite,
   campanhaPermiteCopiarLink,
   validateAbrirCampanhaRiscos,
@@ -96,6 +97,29 @@ run("convite: aberta exibe e permite copiar", () => {
 run("convite: encerrada exibe mas não copia", () => {
   assert.equal(campanhaExibeLinkConvite("encerrada"), true);
   assert.equal(campanhaPermiteCopiarLink("encerrada"), false);
+});
+
+run("ações: em_preparacao → Abrir sim, Encerrar não", () => {
+  const a = acoesConvitePorStatus("em_preparacao");
+  assert.equal(a.exibirAbrir, true);
+  assert.equal(a.exibirEncerrar, false);
+  assert.equal(a.exibirLink, false);
+});
+
+run("ações: aberta → Abrir não, Encerrar sim, link sim", () => {
+  const a = acoesConvitePorStatus("aberta");
+  assert.equal(a.exibirAbrir, false);
+  assert.equal(a.exibirEncerrar, true);
+  assert.equal(a.exibirLink, true);
+  assert.equal(a.permitirCopiarLink, true);
+});
+
+run("ações: encerrada → sem Abrir/Encerrar, link informativo", () => {
+  const a = acoesConvitePorStatus("encerrada");
+  assert.equal(a.exibirAbrir, false);
+  assert.equal(a.exibirEncerrar, false);
+  assert.equal(a.exibirLink, true);
+  assert.equal(a.permitirCopiarLink, false);
 });
 
 run("confirmação: status aberta passa", () => {

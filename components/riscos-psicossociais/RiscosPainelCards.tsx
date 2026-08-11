@@ -10,8 +10,7 @@ import { RiscosResultadosPanel } from "@/components/riscos-psicossociais/RiscosR
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   RISCOS_CAMPANHA_STATUS_LABELS,
-  campanhaExibeLinkConvite,
-  campanhaPermiteCopiarLink,
+  acoesConvitePorStatus,
   formatPeriodoCampanha,
   pathAvaliacaoCampanha,
   validateAbrirCampanhaRiscos,
@@ -196,12 +195,9 @@ export function RiscosPainelCards({
     campanha?.status === "em_preparacao" &&
     !preRequisitoAbrir;
 
-  const exibeLinkConvite = campanha
-    ? campanhaExibeLinkConvite(campanha.status)
-    : false;
-  const permiteCopiarLink = campanha
-    ? campanhaPermiteCopiarLink(campanha.status)
-    : false;
+  const acoesConvite = acoesConvitePorStatus(campanha?.status);
+  const exibeLinkConvite = acoesConvite.exibirLink;
+  const permiteCopiarLink = acoesConvite.permitirCopiarLink;
 
   async function handleCopiarLink() {
     if (!campanha || !permiteCopiarLink) return;
@@ -482,7 +478,7 @@ export function RiscosPainelCards({
                     </button>
                   </>
                 ) : null}
-                {campanha.status === "em_preparacao" ? (
+                {acoesConvite.exibirAbrir ? (
                   <button
                     type="button"
                     className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -496,7 +492,7 @@ export function RiscosPainelCards({
                     Abrir pesquisa
                   </button>
                 ) : null}
-                {campanha.status === "aberta" ? (
+                {acoesConvite.exibirEncerrar ? (
                   <button
                     type="button"
                     className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"

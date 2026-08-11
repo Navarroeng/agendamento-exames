@@ -271,6 +271,29 @@ export async function buscarCampanhaAtivaPorCliente(
   return mapCampanhaRow(data);
 }
 
+export async function buscarCampanhaPorId(
+  campanhaId: string
+): Promise<RiscosCampanhaRecord | null> {
+  const id = campanhaId.trim();
+  if (!id) return null;
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}`,
+    { method: "GET", cache: "no-store" }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+
+  if (res.status === 404) return null;
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível carregar a campanha.");
+  }
+  return json.campanha;
+}
+
 async function gerarCodigoUnico(
   supabase: ReturnType<typeof createClient>
 ): Promise<string> {

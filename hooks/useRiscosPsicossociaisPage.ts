@@ -20,6 +20,7 @@ import {
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   abrirCampanhaRiscos,
+  buscarCampanhaPorId,
   criarCampanhaRiscos,
   garantirCodigoAcessoCampanha,
 } from "@/services/riscos-campanha.service";
@@ -189,16 +190,64 @@ export function useRiscosPsicossociaisPage() {
     }
   }, []);
 
+  const atualizarCampanhaNoEstado = useCallback(
+    (campanha: NonNullable<RiscosPsicossociaisProcesso["campanha"]>) => {
+      setModalProcesso((prev) => (prev ? { ...prev, campanha } : prev));
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.campanha?.id === campanha.id ||
+          (campanha.orcamento_id != null &&
+            p.implantacao.orcamento.id === campanha.orcamento_id)
+            ? { ...p, campanha }
+            : p
+        )
+      );
+    },
+    []
+  );
+
+  const sincronizarCampanhaDoBanco = useCallback(
+    async (campanhaId: string) => {
+      const fresh = await buscarCampanhaPorId(campanhaId);
+      if (fresh) atualizarCampanhaNoEstado(fresh);
+      return fresh;
+    },
+    [atualizarCampanhaNoEstado]
+  );
+
   const openProcesso = useCallback(
     (processo: RiscosPsicossociaisProcesso) => {
       setModalProcesso(processo);
-      if (processo.campanha?.id) {
-        void carregarParticipantes(processo.campanha.id);
-      } else {
+      if (!processo.campanha?.id) {
         setModalParticipantes([]);
+        return;
       }
+      const campanhaId = processo.campanha.id;
+      void (async () => {
+        try {
+          const [fresh, rows] = await Promise.all([
+            sincronizarCampanhaDoBanco(campanhaId),
+            listarParticipantesCampanha(campanhaId),
+          ]);
+          setModalParticipantes(rows);
+          // Garante badge/botões com o status recém-lido (mesmo se listagem estava stale).
+          if (fresh) atualizarCampanhaNoEstado(fresh);
+        } catch (err) {
+          console.error(err);
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível sincronizar o status da campanha."
+          );
+          void carregarParticipantes(campanhaId);
+        }
+      })();
     },
-    [carregarParticipantes]
+    [
+      sincronizarCampanhaDoBanco,
+      atualizarCampanhaNoEstado,
+      carregarParticipantes,
+    ]
   );
 
   const closeModal = useCallback(() => {
@@ -435,22 +484,6 @@ export function useRiscosPsicossociaisPage() {
       }
     },
     [modalProcesso, auditContext]
-  );
-
-  const atualizarCampanhaNoEstado = useCallback(
-    (campanha: NonNullable<RiscosPsicossociaisProcesso["campanha"]>) => {
-      setModalProcesso((prev) => (prev ? { ...prev, campanha } : prev));
-      setProcessos((prev) =>
-        prev.map((p) =>
-          p.campanha?.id === campanha.id ||
-          (campanha.orcamento_id != null &&
-            p.implantacao.orcamento.id === campanha.orcamento_id)
-            ? { ...p, campanha }
-            : p
-        )
-      );
-    },
-    []
   );
 
   const handleAbrirCampanha = useCallback(async () => {

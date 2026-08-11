@@ -176,6 +176,27 @@ export function campanhaPermiteCopiarLink(
 }
 
 /**
+ * Ações do card Convites conforme status persistido (fonte de verdade).
+ * Separado do state local — use sempre o status lido do banco.
+ */
+export function acoesConvitePorStatus(
+  status: RiscosCampanhaStatus | string | null | undefined
+): {
+  exibirAbrir: boolean;
+  exibirEncerrar: boolean;
+  exibirLink: boolean;
+  permitirCopiarLink: boolean;
+} {
+  const s = String(status ?? "");
+  return {
+    exibirAbrir: s === "em_preparacao",
+    exibirEncerrar: s === "aberta",
+    exibirLink: s === "aberta" || s === "encerrada",
+    permitirCopiarLink: s === "aberta",
+  };
+}
+
+/**
  * Pré-requisitos de negócio para liberar o botão "Abrir pesquisa".
  * Laudos SST só quando o fluxo exige (origem orçamento).
  */
