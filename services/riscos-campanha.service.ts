@@ -9,16 +9,28 @@ import {
   validateAbrirCampanhaRiscos,
   validateEncerrarCampanhaRiscos,
   validateRiscosCampanhaCreateInput,
+  validateRiscosCampanhaManualCreateInput,
   type RiscosCampanhaCreateInput,
+  type RiscosCampanhaManualCreateInput,
   type RiscosCampanhaRecord,
   type RiscosCampanhaStatus,
 } from "@/lib/riscos-campanha";
+import {
+  HISTORICO_CRIACAO_MANUAL,
+  MSG_CAMPANHA_ATIVA_CLIENTE,
+  RISCOS_CAMPANHA_ORIGEM,
+  RISCOS_CAMPANHA_STATUS_ATIVOS,
+  normalizeRiscosCampanhaOrigem,
+} from "@/lib/riscos-campanha-origem";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { buscarPerfilUsuarioLogado } from "@/services/perfil.service";
 
 const CAMPANHA_SELECT =
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, created_at, updated_at";
+
+const CAMPANHA_SELECT_LEGACY =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
 
 type CampanhaAuditOptions = {
@@ -33,7 +45,7 @@ function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
 
   return {
     id: String(row.id),
-    orcamento_id: String(row.orcamento_id),
+    orcamento_id: row.orcamento_id ? String(row.orcamento_id) : null,
     cliente_id: row.cliente_id ? String(row.cliente_id) : null,
     cnpj: String(row.cnpj ?? ""),
     empresa_nome: String(row.empresa_nome ?? ""),
@@ -45,6 +57,11 @@ function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
     codigo_acesso_exibicao: row.codigo_acesso_exibicao
       ? String(row.codigo_acesso_exibicao)
       : null,
+    origem: normalizeRiscosCampanhaOrigem(
+      row.origem != null ? String(row.origem) : undefined
+    ),
+    responsavel: row.responsavel ? String(row.responsavel) : null,
+    observacoes: row.observacoes ? String(row.observacoes) : null,
     criado_por: row.criado_por ? String(row.criado_por) : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
@@ -90,11 +107,30 @@ export async function buscarCampanhaPorOrcamento(
   orcamentoId: string
 ): Promise<RiscosCampanhaRecord | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let data: Record<string, unknown> | null = null;
+  let error: { message?: string; code?: string } | null = null;
+
+  const primary = await supabase
     .from("riscos_campanhas")
     .select(CAMPANHA_SELECT)
     .eq("orcamento_id", orcamentoId)
     .maybeSingle();
+  data = (primary.data as Record<string, unknown> | null) ?? null;
+  error = primary.error;
+
+  if (
+    error &&
+    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703")
+  ) {
+    const fb = await supabase
+      .from("riscos_campanhas")
+      .select(CAMPANHA_SELECT_LEGACY)
+      .eq("orcamento_id", orcamentoId)
+      .maybeSingle();
+    data = (fb.data as Record<string, unknown> | null) ?? null;
+    error = fb.error;
+  }
 
   if (error) {
     if (error.code === "42P01" || error.message?.includes("does not exist")) {
@@ -103,7 +139,7 @@ export async function buscarCampanhaPorOrcamento(
     throw error;
   }
   if (!data) return null;
-  return mapCampanhaRow(data as Record<string, unknown>);
+  return mapCampanhaRow(data);
 }
 
 export async function listarCampanhasPorOrcamentos(
@@ -113,10 +149,28 @@ export async function listarCampanhasPorOrcamentos(
   if (orcamentoIds.length === 0) return map;
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  let data: Array<Record<string, unknown>> | null = null;
+  let error: { message?: string; code?: string } | null = null;
+
+  const primary = await supabase
     .from("riscos_campanhas")
     .select(CAMPANHA_SELECT)
     .in("orcamento_id", orcamentoIds);
+  data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
+  error = primary.error;
+
+  if (
+    error &&
+    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703")
+  ) {
+    const fb = await supabase
+      .from("riscos_campanhas")
+      .select(CAMPANHA_SELECT_LEGACY)
+      .in("orcamento_id", orcamentoIds);
+    data = (fb.data as Array<Record<string, unknown>> | null) ?? null;
+    error = fb.error;
+  }
 
   if (error) {
     if (error.code === "42P01" || error.message?.includes("does not exist")) {
@@ -126,10 +180,91 @@ export async function listarCampanhasPorOrcamentos(
   }
 
   for (const row of data ?? []) {
-    const mapped = mapCampanhaRow(row as Record<string, unknown>);
-    map.set(mapped.orcamento_id, mapped);
+    const mapped = mapCampanhaRow(row);
+    if (mapped.orcamento_id) {
+      map.set(mapped.orcamento_id, mapped);
+    }
   }
   return map;
+}
+
+export async function listarCampanhasManuaisAtivas(): Promise<
+  RiscosCampanhaRecord[]
+> {
+  const supabase = createClient();
+  let { data, error } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
+    .is("orcamento_id", null)
+    .order("created_at", { ascending: false });
+
+  if (
+    error &&
+    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703")
+  ) {
+    return [];
+  }
+
+  if (error) {
+    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return (data ?? []).map((row) =>
+    mapCampanhaRow(row as Record<string, unknown>)
+  );
+}
+
+export async function buscarCampanhaAtivaPorCliente(
+  clienteId: string
+): Promise<RiscosCampanhaRecord | null> {
+  const id = clienteId.trim();
+  if (!id) return null;
+
+  const supabase = createClient();
+  let data: Record<string, unknown> | null = null;
+  let error: { message?: string; code?: string } | null = null;
+
+  const primary = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("cliente_id", id)
+    .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  data = (primary.data as Record<string, unknown> | null) ?? null;
+  error = primary.error;
+
+  if (
+    error &&
+    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703")
+  ) {
+    const fb = await supabase
+      .from("riscos_campanhas")
+      .select(CAMPANHA_SELECT_LEGACY)
+      .eq("cliente_id", id)
+      .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    data = (fb.data as Record<string, unknown> | null) ?? null;
+    error = fb.error;
+  }
+
+  if (error) {
+    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+      return null;
+    }
+    throw error;
+  }
+  if (!data) return null;
+  return mapCampanhaRow(data);
 }
 
 async function gerarCodigoUnico(
@@ -179,6 +314,7 @@ export async function criarCampanhaRiscos(
     codigo_acesso_salt: acesso.salt,
     codigo_acesso_hash: acesso.hash,
     codigo_acesso_exibicao: acesso.exibicao,
+    origem: RISCOS_CAMPANHA_ORIGEM.orcamento,
     criado_por: usuarioNome,
   };
 
@@ -191,6 +327,44 @@ export async function criarCampanhaRiscos(
   if (error) {
     if (error.code === "23505") {
       throw new Error("Já existe uma campanha para este processo.");
+    }
+    // Migration 100 ainda não aplicada: tenta sem colunas novas.
+    if (
+      /origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703"
+    ) {
+      const { origem: _o, ...legacyPayload } = payload;
+      void _o;
+      const fb = await supabase
+        .from("riscos_campanhas")
+        .insert(legacyPayload)
+        .select(CAMPANHA_SELECT_LEGACY)
+        .maybeSingle();
+      if (fb.error) {
+        if (fb.error.code === "23505") {
+          throw new Error("Já existe uma campanha para este processo.");
+        }
+        throw fb.error;
+      }
+      if (!fb.data) throw new Error("Não foi possível criar a campanha.");
+      const recordLegacy = mapCampanhaRow(fb.data as Record<string, unknown>);
+      const nomeLegacy = usuarioNome ?? "Sistema";
+      await registrarAuditoria({
+        usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+        usuarioNome: nomeLegacy,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+        modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+        acao: AUDITORIA_ACOES.riscos_campanha_criada,
+        registroId: recordLegacy.id,
+        registroNome: recordLegacy.empresa_nome,
+        descricao: `${nomeLegacy} criou a campanha ${recordLegacy.codigo_publico} para ${recordLegacy.empresa_nome}.`,
+        dadosDepois: {
+          codigo_publico: recordLegacy.codigo_publico,
+          origem: RISCOS_CAMPANHA_ORIGEM.orcamento,
+          orcamento_id: recordLegacy.orcamento_id,
+        },
+      });
+      return recordLegacy;
     }
     throw error;
   }
@@ -216,6 +390,103 @@ export async function criarCampanhaRiscos(
       quantidade_prevista: record.quantidade_prevista,
       status: record.status,
       orcamento_id: record.orcamento_id,
+      origem: record.origem,
+    },
+  });
+
+  return record;
+}
+
+/**
+ * Inclusão manual pelo cadastro do cliente (clientes antigos / fora do fluxo).
+ * Não cria orçamento nem contrato fictícios.
+ */
+export async function criarCampanhaManualCliente(
+  input: RiscosCampanhaManualCreateInput,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const validationError = validateRiscosCampanhaManualCreateInput(input);
+  if (validationError) throw new Error(validationError);
+
+  const ativa = await buscarCampanhaAtivaPorCliente(input.clienteId);
+  if (ativa) {
+    throw new Error(MSG_CAMPANHA_ATIVA_CLIENTE);
+  }
+
+  const supabase = createClient();
+  const codigo = await gerarCodigoUnico(supabase);
+  const acesso = await gerarCodigoAcessoViaApi();
+  const cnpjDigits = input.cnpj.replace(/\D/g, "");
+  const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
+  const entradaEm = new Date().toISOString();
+
+  const payload = {
+    orcamento_id: null,
+    cliente_id: input.clienteId,
+    cnpj: cnpjDigits,
+    empresa_nome: input.empresaNome.trim(),
+    data_inicio: input.dataInicioIso.slice(0, 10),
+    data_encerramento: input.dataEncerramentoIso.slice(0, 10),
+    quantidade_prevista: Math.trunc(Number(input.quantidadePrevista)),
+    status: "em_preparacao" as const,
+    codigo_publico: codigo,
+    codigo_acesso_salt: acesso.salt,
+    codigo_acesso_hash: acesso.hash,
+    codigo_acesso_exibicao: acesso.exibicao,
+    origem: RISCOS_CAMPANHA_ORIGEM.manual_cliente,
+    responsavel: input.responsavel.trim(),
+    observacoes: input.observacoes?.trim() || null,
+    criado_por: usuarioNome,
+  };
+
+  const { data, error } = await supabase
+    .from("riscos_campanhas")
+    .insert(payload)
+    .select(CAMPANHA_SELECT)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error(MSG_CAMPANHA_ATIVA_CLIENTE);
+    }
+    throw error;
+  }
+  if (!data) {
+    throw new Error("Não foi possível criar a Pesquisa Psicossocial.");
+  }
+
+  const record = mapCampanhaRow(data as Record<string, unknown>);
+
+  const { error: fluxoErr } = await supabase.from("riscos_campanha_fluxo").insert({
+    campanha_id: record.id,
+    etapa_atual: "lista_presenca",
+    etapas_concluidas: 0,
+    status: "em_andamento",
+    entrada_em: entradaEm,
+  });
+  if (fluxoErr) {
+    console.warn("falha ao criar fluxo manual da campanha:", fluxoErr.message);
+  }
+
+  const nome = usuarioNome ?? "Sistema";
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+    acao: AUDITORIA_ACOES.riscos_campanha_criada,
+    registroId: record.id,
+    registroNome: record.empresa_nome,
+    descricao: `${nome}: ${HISTORICO_CRIACAO_MANUAL} (${record.codigo_publico}).`,
+    dadosDepois: {
+      codigo_publico: record.codigo_publico,
+      origem: RISCOS_CAMPANHA_ORIGEM.manual_cliente,
+      cliente_id: record.cliente_id,
+      responsavel: record.responsavel,
+      data_inicio: record.data_inicio,
+      data_encerramento: record.data_encerramento,
+      quantidade_prevista: record.quantidade_prevista,
+      orcamento_id: null,
     },
   });
 

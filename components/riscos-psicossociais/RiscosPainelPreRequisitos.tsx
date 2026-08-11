@@ -55,30 +55,36 @@ export function RiscosPainelPreRequisitos({
 
   const body = (
     <>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div
-          className={`rounded-xl border px-3 py-2.5 ${
-            processo.laudosSstConcluido
-              ? "border-[#bbf7d0] bg-[#f0fdf4]/50"
-              : "border-[#fde68a] bg-[#fffbeb]/50"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-extrabold text-navy">Laudos SST</p>
-            <StatusPill
-              ok={processo.laudosSstConcluido}
-              okLabel="Concluído"
-              pendingLabel="Pendente"
-            />
+      <div
+        className={`grid gap-2 ${
+          processo.exigeLaudosSst ? "sm:grid-cols-2" : "sm:grid-cols-1"
+        }`}
+      >
+        {processo.exigeLaudosSst ? (
+          <div
+            className={`rounded-xl border px-3 py-2.5 ${
+              processo.laudosSstConcluido
+                ? "border-[#bbf7d0] bg-[#f0fdf4]/50"
+                : "border-[#fde68a] bg-[#fffbeb]/50"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-extrabold text-navy">Laudos SST</p>
+              <StatusPill
+                ok={processo.laudosSstConcluido}
+                okLabel="Concluído"
+                pendingLabel="Pendente"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-[#64748b]">
+              {laudosAtualizacao
+                ? `Atualizado em ${formatDateIsoToBR(
+                    laudosAtualizacao.slice(0, 10)
+                  )}`
+                : "Integração automática"}
+            </p>
           </div>
-          <p className="mt-1 text-[11px] text-[#64748b]">
-            {laudosAtualizacao
-              ? `Atualizado em ${formatDateIsoToBR(
-                  laudosAtualizacao.slice(0, 10)
-                )}`
-              : "Integração automática"}
-          </p>
-        </div>
+        ) : null}
 
         <div
           className={`rounded-xl border px-3 py-2.5 ${

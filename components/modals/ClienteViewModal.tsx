@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { ClienteContratoAtualCard } from "@/components/clientes/ClienteContratoAtualCard";
 import { ClienteContratoFormModal } from "@/components/clientes/ClienteContratoFormModal";
 import { ClienteContratosHistoricoTable } from "@/components/clientes/ClienteContratosHistoricoTable";
 import { ClienteEncerrarContratoModal } from "@/components/clientes/ClienteEncerrarContratoModal";
+import { ClienteIncluirRiscosModal } from "@/components/clientes/ClienteIncluirRiscosModal";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
@@ -71,6 +73,7 @@ export function ClienteViewModal({
   onUpdated,
 }: ClienteViewModalProps) {
   const auditContext = useAuditoriaUsuario();
+  const [incluirRiscosOpen, setIncluirRiscosOpen] = useState(false);
 
   const {
     editing: editingCliente,
@@ -226,13 +229,22 @@ export function ClienteViewModal({
                   Dados do cliente
                 </h4>
                 {!editingCliente ? (
-                  <button
-                    type="button"
-                    className="btn !px-4 !py-2 text-xs"
-                    onClick={startEditing}
-                  >
-                    Editar cliente
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn !px-4 !py-2 text-xs"
+                      onClick={startEditing}
+                    >
+                      Editar cliente
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary !px-4 !py-2 text-xs"
+                      onClick={() => setIncluirRiscosOpen(true)}
+                    >
+                      Incluir em Riscos Psicossociais
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -385,6 +397,14 @@ export function ClienteViewModal({
           </div>
         </div>
       </div>
+
+      {cliente ? (
+        <ClienteIncluirRiscosModal
+          open={incluirRiscosOpen}
+          cliente={cliente}
+          onClose={() => setIncluirRiscosOpen(false)}
+        />
+      ) : null}
 
       <ClienteContratoFormModal
         open={formOpen}

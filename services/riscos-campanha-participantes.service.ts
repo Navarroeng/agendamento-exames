@@ -37,7 +37,7 @@ function mapParticipante(
   return {
     id: String(row.id),
     campanha_id: String(row.campanha_id),
-    orcamento_id: String(row.orcamento_id),
+    orcamento_id: row.orcamento_id ? String(row.orcamento_id) : null,
     cliente_id: row.cliente_id ? String(row.cliente_id) : null,
     nome_completo: String(row.nome_completo ?? ""),
     cpf: String(row.cpf ?? ""),
@@ -165,7 +165,7 @@ export async function criarParticipanteCampanha(
     .from("riscos_campanha_participantes")
     .insert({
       campanha_id: campanha.id,
-      orcamento_id: campanha.orcamento_id,
+      orcamento_id: campanha.orcamento_id || null,
       cliente_id: campanha.cliente_id,
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,

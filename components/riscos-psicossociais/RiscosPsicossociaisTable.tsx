@@ -7,11 +7,12 @@ import { IconEye, IconShield } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
+  getEtapasRiscosPorOrigem,
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
-  RISCOS_PSICOSSOCIAIS_ETAPAS,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type { YearMonth } from "@/lib/listagem-meses";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
@@ -30,13 +31,14 @@ function ProgressoRiscos({
 }: {
   processo: RiscosPsicossociaisProcesso;
 }) {
+  const etapas = getEtapasRiscosPorOrigem(processo.origem);
   return (
     <div className="min-w-[140px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
         {processo.progressoLabel} etapas
       </p>
       <div className="flex items-center gap-0.5">
-        {RISCOS_PSICOSSOCIAIS_ETAPAS.map((etapa, index) => {
+        {etapas.map((etapa, index) => {
           const concluida = index < processo.etapasConcluidas;
           const atual =
             !concluida &&
@@ -127,10 +129,15 @@ export function RiscosPsicossociaisTable({
                   : "—";
 
                 return (
-                  <tr key={orcamento.id}>
+                  <tr key={processo.processoKey}>
                     <td className="whitespace-nowrap">{dataEntrada}</td>
                     <td className="max-w-[220px] truncate font-semibold text-navy">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
+                      {isOrigemManualCliente(processo.origem) ? (
+                        <span className="mt-0.5 block text-[10px] font-semibold text-[#64748b]">
+                          Inclusão manual
+                        </span>
+                      ) : null}
                     </td>
                     <td className="whitespace-nowrap text-[12px]">
                       {cnpj
@@ -140,7 +147,9 @@ export function RiscosPsicossociaisTable({
                         : "—"}
                     </td>
                     <td>
-                      {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
+                      {formatResponsavelOrcamentoDisplay(
+                        processo.campanha?.responsavel || orcamento.responsavel
+                      )}
                     </td>
                     <td>
                       {processo.status === "concluido" ? (

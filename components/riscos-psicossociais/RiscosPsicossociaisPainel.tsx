@@ -86,7 +86,12 @@ export function RiscosPsicossociaisPainel({
           </span>
         </h2>
         <p className="mt-1.5 text-[11px] leading-relaxed text-[#64748b] sm:text-xs">
-          {numeroContrato ? (
+          {!processo.exigeLaudosSst ? (
+            <>
+              <span className="font-semibold text-navy">Origem: Inclusão manual</span>
+              {" · "}
+            </>
+          ) : numeroContrato ? (
             <>
               Contrato{" "}
               <span className="font-semibold text-navy">{numeroContrato}</span>

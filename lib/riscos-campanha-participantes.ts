@@ -32,7 +32,7 @@ export type RiscosParticipanteOrigem =
 export type RiscosCampanhaParticipanteRecord = {
   id: string;
   campanha_id: string;
-  orcamento_id: string;
+  orcamento_id: string | null;
   cliente_id: string | null;
   nome_completo: string;
   cpf: string;

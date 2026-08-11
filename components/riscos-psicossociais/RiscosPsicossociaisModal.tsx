@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { RiscosPsicossociaisPainel } from "@/components/riscos-psicossociais/RiscosPsicossociaisPainel";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type {
   RiscosCampanhaParticipanteRecord,
   RiscosParticipanteInput,
@@ -61,15 +62,23 @@ export function RiscosPsicossociaisModal({
   if (!open || !processo) return null;
 
   const { orcamento, numeroContrato } = processo.implantacao;
+  const tituloManual = isOrigemManualCliente(processo.origem);
+  const titulo = tituloManual
+    ? `Riscos Psicossociais · ${formatClienteNomeDisplay(orcamento.cliente_nome)}`
+    : `Riscos Psicossociais · ${orcamento.numero || formatClienteNomeDisplay(orcamento.cliente_nome)}`;
+  const subtitleParts = [
+    formatClienteNomeDisplay(orcamento.cliente_nome),
+    !tituloManual && numeroContrato ? `Contrato ${numeroContrato}` : null,
+    tituloManual ? "Origem: Inclusão manual" : null,
+    processo.progressoLabel,
+  ].filter(Boolean);
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Riscos Psicossociais · ${orcamento.numero}`}
-      subtitle={`${formatClienteNomeDisplay(orcamento.cliente_nome)}${
-        numeroContrato ? ` · Contrato ${numeroContrato}` : ""
-      } · ${processo.progressoLabel}`}
+      title={titulo}
+      subtitle={subtitleParts.join(" · ")}
       size="xxl"
       footer={
         <div className="flex justify-end">

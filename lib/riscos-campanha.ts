@@ -1,5 +1,11 @@
 /** Campanha de avaliação psicossocial (fundação). */
 
+import {
+  RISCOS_CAMPANHA_ORIGEM,
+  normalizeRiscosCampanhaOrigem,
+  type RiscosCampanhaOrigem,
+} from "@/lib/riscos-campanha-origem";
+
 export const RISCOS_CAMPANHA_STATUS = [
   "em_preparacao",
   "aberta",
@@ -17,7 +23,8 @@ export const RISCOS_CAMPANHA_STATUS_LABELS: Record<RiscosCampanhaStatus, string>
 
 export type RiscosCampanhaRecord = {
   id: string;
-  orcamento_id: string;
+  /** Null em inclusão manual (sem orçamento fictício). */
+  orcamento_id: string | null;
   cliente_id: string | null;
   cnpj: string;
   empresa_nome: string;
@@ -28,6 +35,9 @@ export type RiscosCampanhaRecord = {
   codigo_publico: string;
   /** Código compartilhado da campanha (admin). Nunca enviar ao portal público. */
   codigo_acesso_exibicao: string | null;
+  origem: RiscosCampanhaOrigem;
+  responsavel: string | null;
+  observacoes: string | null;
   criado_por: string | null;
   created_at?: string;
   updated_at?: string;
@@ -41,6 +51,18 @@ export type RiscosCampanhaCreateInput = {
   dataInicioIso: string;
   dataEncerramentoIso: string;
   quantidadePrevista: number;
+};
+
+/** Criação a partir do cadastro do cliente (sem orçamento/contrato). */
+export type RiscosCampanhaManualCreateInput = {
+  clienteId: string;
+  cnpj: string;
+  empresaNome: string;
+  responsavel: string;
+  dataInicioIso: string;
+  dataEncerramentoIso: string;
+  quantidadePrevista: number;
+  observacoes?: string | null;
 };
 
 const CODIGO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -60,9 +82,13 @@ export function isRiscosCampanhaStatus(
   return (RISCOS_CAMPANHA_STATUS as readonly string[]).includes(value);
 }
 
-export function validateRiscosCampanhaCreateInput(
-  input: RiscosCampanhaCreateInput
-): string | null {
+function validatePeriodoEQuantidade(input: {
+  dataInicioIso: string;
+  dataEncerramentoIso: string;
+  quantidadePrevista: number;
+  empresaNome: string;
+  cnpj: string;
+}): string | null {
   const inicio = input.dataInicioIso.trim().slice(0, 10);
   const fim = input.dataEncerramentoIso.trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
@@ -84,11 +110,35 @@ export function validateRiscosCampanhaCreateInput(
   if (!input.cnpj.replace(/\D/g, "")) {
     return "CNPJ não identificado no processo.";
   }
+  return null;
+}
+
+export function validateRiscosCampanhaCreateInput(
+  input: RiscosCampanhaCreateInput
+): string | null {
+  const base = validatePeriodoEQuantidade(input);
+  if (base) return base;
   if (!input.orcamentoId) {
     return "Processo de Riscos inválido.";
   }
   return null;
 }
+
+export function validateRiscosCampanhaManualCreateInput(
+  input: RiscosCampanhaManualCreateInput
+): string | null {
+  const base = validatePeriodoEQuantidade(input);
+  if (base) return base;
+  if (!input.clienteId.trim()) {
+    return "Cliente inválido.";
+  }
+  if (!input.responsavel.trim()) {
+    return "Selecione o responsável interno.";
+  }
+  return null;
+}
+
+export { normalizeRiscosCampanhaOrigem, RISCOS_CAMPANHA_ORIGEM };
 
 export function formatPeriodoCampanha(
   dataInicio: string,

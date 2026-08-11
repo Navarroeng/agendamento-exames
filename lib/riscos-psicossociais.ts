@@ -21,6 +21,13 @@ import {
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
+import {
+  exigeLaudosSstPorOrigem,
+  isOrigemManualCliente,
+  normalizeRiscosCampanhaOrigem,
+  RISCOS_CAMPANHA_ORIGEM,
+  type RiscosCampanhaOrigem,
+} from "@/lib/riscos-campanha-origem";
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /**
@@ -131,10 +138,17 @@ export interface OrcamentoRiscosPsicossociaisRecord {
 }
 
 export interface RiscosPsicossociaisProcesso {
+  /**
+   * Chave estável na UI: orçamento.id (fluxo normal) ou campanha.id (manual).
+   */
+  processoKey: string;
+  origem: RiscosCampanhaOrigem;
+  /** Laudos SST só existe no fluxo normal. */
+  exigeLaudosSst: boolean;
   implantacao: ImplantacaoProcesso;
   laudos: LaudosSstProcesso;
   etapaAtual: RiscosPsicossociaisEtapaId;
-  /** Progresso total exibido (0–8), incluindo a etapa automática. */
+  /** Progresso total exibido (0–N), conforme origem. */
   etapasConcluidas: number;
   /** Etapas manuais concluídas (0–7 na UI). */
   etapasManuaisConcluidas: number;
@@ -191,6 +205,22 @@ export function isRiscosEtapaAutomatica(
   return etapaId === "laudos_sst";
 }
 
+/** Etapas exibidas / contadas conforme a origem do processo. */
+export function getEtapasRiscosPorOrigem(
+  origem: RiscosCampanhaOrigem | string | null | undefined
+): readonly (typeof RISCOS_PSICOSSOCIAIS_ETAPAS)[number][] {
+  if (exigeLaudosSstPorOrigem(origem)) {
+    return RISCOS_PSICOSSOCIAIS_ETAPAS;
+  }
+  return RISCOS_PSICOSSOCIAIS_ETAPAS.filter((e) => e.id !== "laudos_sst");
+}
+
+export function getTotalEtapasRiscosPorOrigem(
+  origem: RiscosCampanhaOrigem | string | null | undefined
+): number {
+  return getEtapasRiscosPorOrigem(origem).length;
+}
+
 /**
  * Elegível a Riscos desde a Implantação concluída
  * (mesmo critério de entrada em Laudos SST).
@@ -217,24 +247,30 @@ export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
 export function isRiscosEtapaLiberadaByFluxo(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida"
+    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
   if (etapaId === "laudos_sst") return true;
+  // Fluxo manual: Laudos SST não faz parte — não bloqueia.
+  const exigeLaudos = processo.exigeLaudosSst !== false;
   // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !processo.laudosSstConcluido) {
+  if (
+    exigeLaudos &&
+    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
+    !processo.laudosSstConcluido
+  ) {
     return false;
   }
   if (etapaId === "lista_presenca") return true;
   return processo.listaPresencaConcluida;
 }
 
-/** Etapas manuais só liberam após Laudos SST; Cadastro+ após Lista de Presença. */
+/** Etapas manuais só liberam após Laudos SST (fluxo normal); Cadastro+ após Lista. */
 export function isRiscosEtapaLiberada(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida"
+    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
@@ -245,13 +281,18 @@ export function isRiscosEtapaLiberada(
 export function mensagemBloqueioEtapaRiscos(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida"
+    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): string | null {
   if (isRiscosEtapaLiberada(processo, etapaId)) return null;
+  const exigeLaudos = processo.exigeLaudosSst !== false;
   // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !processo.laudosSstConcluido) {
+  if (
+    exigeLaudos &&
+    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
+    !processo.laudosSstConcluido
+  ) {
     return "Aguardando finalização do processo de Laudos SST.";
   }
   return "Aguardando conclusão da Lista de Presença (recebimento e anexo).";
@@ -260,9 +301,18 @@ export function mensagemBloqueioEtapaRiscos(
 export function buildRiscosPsicossociaisProcesso(
   laudos: LaudosSstProcesso,
   tracking: OrcamentoRiscosPsicossociaisRecord | null,
-  campanha: RiscosCampanhaRecord | null = null
+  campanha: RiscosCampanhaRecord | null = null,
+  opts?: { origem?: RiscosCampanhaOrigem }
 ): RiscosPsicossociaisProcesso {
-  const laudosSstConcluido = laudos.status === "concluido";
+  const origem = normalizeRiscosCampanhaOrigem(
+    opts?.origem ?? campanha?.origem ?? RISCOS_CAMPANHA_ORIGEM.orcamento
+  );
+  const exigeLaudosSst = exigeLaudosSstPorOrigem(origem);
+  const totalEtapas = getTotalEtapasRiscosPorOrigem(origem);
+
+  const laudosSstConcluido = exigeLaudosSst
+    ? laudos.status === "concluido"
+    : true;
   const listaPresenca = mapListaPresencaFromTracking(tracking);
   const listaPresencaConcluida = isListaPresencaEtapaConcluida(listaPresenca);
 
@@ -277,18 +327,22 @@ export function buildRiscosPsicossociaisProcesso(
     : 0;
 
   const etapasConcluidas =
-    (laudosSstConcluido ? 1 : 0) + etapasManuaisConcluidas;
+    (exigeLaudosSst && laudosSstConcluido ? 1 : 0) + etapasManuaisConcluidas;
 
   const manuaisConcluidasTodas =
     etapasManuaisConcluidas >= RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS;
   const concluido =
-    laudosSstConcluido &&
+    (!exigeLaudosSst || laudosSstConcluido) &&
     listaPresencaConcluida &&
     (tracking?.status === "concluido" || manuaisConcluidasTodas);
 
   let etapaAtual: RiscosPsicossociaisEtapaId;
   // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (!DEVELOPMENT_SKIP_LAUDOS_SST_GATE && !laudosSstConcluido) {
+  if (
+    exigeLaudosSst &&
+    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
+    !laudosSstConcluido
+  ) {
     etapaAtual = "laudos_sst";
   } else if (!listaPresencaConcluida) {
     etapaAtual = "lista_presenca";
@@ -304,26 +358,126 @@ export function buildRiscosPsicossociaisProcesso(
     etapaAtual = "cadastro_empresa";
   }
 
+  const progressoAtual = concluido ? totalEtapas : etapasConcluidas;
+
   return {
+    processoKey: laudos.implantacao.orcamento.id,
+    origem,
+    exigeLaudosSst,
     implantacao: laudos.implantacao,
     laudos,
     etapaAtual,
-    etapasConcluidas: concluido
-      ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS
-      : etapasConcluidas,
+    etapasConcluidas: progressoAtual,
     etapasManuaisConcluidas: concluido
       ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS
       : etapasManuaisConcluidas,
-    totalEtapas: RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
-    progressoLabel: `${
-      concluido ? RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS : etapasConcluidas
-    } de ${RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS}`,
+    totalEtapas,
+    progressoLabel: `${progressoAtual} de ${totalEtapas}`,
     status: concluido ? "concluido" : "em_andamento",
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
     campanha,
     dataEntrada: tracking?.entrada_em ?? laudos.dataEntrada ?? null,
+  };
+}
+
+/**
+ * Monta processo de lista a partir de campanha manual (sem orçamento/contrato).
+ * Usa stub mínimo de implantação apenas para reutilizar a UI existente.
+ */
+export function buildRiscosProcessoManualCliente(input: {
+  campanha: RiscosCampanhaRecord;
+  tracking: OrcamentoRiscosPsicossociaisRecord | null;
+}): RiscosPsicossociaisProcesso {
+  const { campanha } = input;
+  const origem = RISCOS_CAMPANHA_ORIGEM.manual_cliente;
+  const agora = campanha.created_at ?? new Date().toISOString();
+  const empresa = campanha.empresa_nome;
+  const cnpj = campanha.cnpj;
+  const responsavel = campanha.responsavel?.trim() || "—";
+
+  const orcamentoStub = {
+    id: `manual:${campanha.id}`,
+    numero: "",
+    data_proposta: agora.slice(0, 10),
+    cliente_id: campanha.cliente_id,
+    cliente_nome: empresa,
+    cliente_cnpj: cnpj,
+    cliente_endereco: null,
+    cliente_setor: null,
+    contato: null,
+    email: null,
+    telefone: null,
+    responsavel,
+    origem_cliente: null,
+    observacoes: campanha.observacoes,
+    motivo_cancelamento: null,
+    observacao_cancelamento: null,
+    cancelado_em: null,
+    cancelado_por: null,
+    desconto_percentual: 0,
+    forma_pagamento: null,
+    validade_proposta: null,
+    subtotal: 0,
+    valor_total: 0,
+    status: "aprovado" as const,
+    assinatura_status: "nao_aplicavel" as const,
+    assinatura_token: null,
+    aceite_em: null,
+    aceite_ip: null,
+    aceite_usuario_nome: null,
+    link_aceite_expira_em: null,
+    created_at: agora,
+    updated_at: agora,
+  };
+
+  const implantacaoStub: ImplantacaoProcesso = {
+    orcamento: orcamentoStub,
+    aprovacao: null,
+    contrato: null,
+    etapaAtual: "concluido",
+    etapasConcluidas: 0,
+    totalEtapas: 0,
+    progressoLabel: "—",
+    agendamentoLiberado: false,
+    agendamentoLabel: "Bloqueado",
+    dataAprovacao: null,
+    numeroContrato: null,
+    ativo: true,
+    quantidadeContratada: campanha.quantidade_prevista,
+    agendamentosRealizados: 0,
+    examesProgramadosFuturos: 0,
+    asosContratuaisEmAberto: 0,
+    agendamentosIniciaisDispensados: false,
+    concluidoComExamesFuturos: false,
+    fluxoImplantacao: "padrao",
+    treinamento: null,
+    etapasOperacionais: [],
+  };
+
+  const laudosStub: LaudosSstProcesso = {
+    implantacao: implantacaoStub,
+    etapaAtual: "envio_cliente",
+    etapasConcluidas: 0,
+    totalEtapas: 0,
+    progressoLabel: "—",
+    status: "concluido",
+    dataEntrada: input.tracking?.entrada_em ?? campanha.created_at ?? null,
+    concluidoEm: null,
+    dataConclusaoImplantacao: null,
+  };
+
+  const processo = buildRiscosPsicossociaisProcesso(
+    laudosStub,
+    input.tracking,
+    campanha,
+    { origem }
+  );
+
+  return {
+    ...processo,
+    processoKey: campanha.id,
   };
 }
 
@@ -336,11 +490,10 @@ export function filterRiscosPsicossociaisProcessos(
 
   return processos.filter((p) => {
     const { orcamento } = p.implantacao;
+    const responsavel =
+      p.campanha?.responsavel?.trim() || orcamento.responsavel || "";
 
-    if (
-      filters.responsavel &&
-      orcamento.responsavel !== filters.responsavel
-    ) {
+    if (filters.responsavel && responsavel !== filters.responsavel) {
       return false;
     }
 
@@ -351,7 +504,8 @@ export function filterRiscosPsicossociaisProcessos(
       p.implantacao.numeroContrato ?? "",
       orcamento.cliente_nome,
       orcamento.cliente_cnpj ?? "",
-      orcamento.responsavel,
+      responsavel,
+      isOrigemManualCliente(p.origem) ? "Inclusão manual" : "",
       p.status === "concluido"
         ? "Concluído"
         : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[p.etapaAtual],
@@ -384,9 +538,14 @@ export function sortRiscosPsicossociaisProcessos(
     const da = a.dataEntrada ?? "";
     const db = b.dataEntrada ?? "";
     if (da !== db) return db.localeCompare(da);
-    return a.implantacao.orcamento.numero.localeCompare(
-      b.implantacao.orcamento.numero,
-      "pt-BR"
-    );
+    const na =
+      a.implantacao.orcamento.cliente_nome ||
+      a.implantacao.orcamento.numero ||
+      a.processoKey;
+    const nb =
+      b.implantacao.orcamento.cliente_nome ||
+      b.implantacao.orcamento.numero ||
+      b.processoKey;
+    return na.localeCompare(nb, "pt-BR");
   });
 }

@@ -1,34 +1,38 @@
 import { createClient } from "@/lib/supabase/client";
 import type { LaudosSstProcesso } from "@/lib/laudos-sst";
 import {
+  buildRiscosProcessoManualCliente,
   buildRiscosPsicossociaisProcesso,
   sortRiscosPsicossociaisProcessos,
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
-import { listarCampanhasPorOrcamentos } from "@/services/riscos-campanha.service";
+import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
+import {
+  listarCampanhasManuaisAtivas,
+  listarCampanhasPorOrcamentos,
+} from "@/services/riscos-campanha.service";
+import { buscarFluxoCampanha } from "@/services/riscos-lista-presenca.service";
 import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
   "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
 
 /**
- * Lista processos de Riscos Psicossociais a partir da Implantação concluída
- * (mesmo conjunto de Laudos SST — entrada simultânea).
- * Não duplica cliente/orçamento/contrato.
+ * Lista processos de Riscos Psicossociais:
+ * - fluxo normal (Implantação concluída / Laudos);
+ * - inclusões manuais pelo cadastro do cliente.
  */
 export async function listarProcessosRiscosPsicossociais(): Promise<
   RiscosPsicossociaisProcesso[]
 > {
   const laudosProcessos = await listarProcessosLaudosSst();
-  if (laudosProcessos.length === 0) return [];
-
   const riscosMap = await garantirTrackingRiscosPsicossociais(laudosProcessos);
   const campanhasMap = await listarCampanhasPorOrcamentos(
     laudosProcessos.map((p) => p.implantacao.orcamento.id)
   );
 
-  const processos = laudosProcessos.map((laudos) => {
+  const processosNormais = laudosProcessos.map((laudos) => {
     const orcamentoId = laudos.implantacao.orcamento.id;
     return buildRiscosPsicossociaisProcesso(
       laudos,
@@ -37,7 +41,23 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
     );
   });
 
-  return sortRiscosPsicossociaisProcessos(processos);
+  const manuais = await listarCampanhasManuaisAtivas();
+  const processosManuais: RiscosPsicossociaisProcesso[] = [];
+  for (const campanha of manuais) {
+    if (!isOrigemManualCliente(campanha.origem)) continue;
+    const fluxo = await buscarFluxoCampanha(campanha.id);
+    processosManuais.push(
+      buildRiscosProcessoManualCliente({
+        campanha,
+        tracking: fluxo,
+      })
+    );
+  }
+
+  return sortRiscosPsicossociaisProcessos([
+    ...processosNormais,
+    ...processosManuais,
+  ]);
 }
 
 async function garantirTrackingRiscosPsicossociais(
@@ -68,7 +88,6 @@ async function garantirTrackingRiscosPsicossociais(
 
   for (const laudos of faltantes) {
     const orcamentoId = laudos.implantacao.orcamento.id;
-    // Entrada simultânea com Laudos (conclusão da Implantação) — não usar concluidoEm.
     const entradaEm = laudos.dataEntrada ?? new Date().toISOString();
     const { data: inserted, error: insertError } = await supabase
       .from("orcamento_riscos_psicossociais")

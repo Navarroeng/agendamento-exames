@@ -625,15 +625,27 @@ function buildHistorico(
     label: string;
     detail?: string;
     done: boolean;
-  }> = [
-    {
+  }> = [];
+
+  if (processo.exigeLaudosSst) {
+    items.push({
       id: "laudos",
       label: "Laudos SST",
       detail: processo.laudosSstConcluido
         ? "Dependência concluída"
         : "Aguardando finalização",
       done: processo.laudosSstConcluido,
-    },
+    });
+  } else {
+    items.push({
+      id: "origem-manual",
+      label: "Inclusão manual pelo cadastro do cliente",
+      detail: "Pesquisa Psicossocial criada manualmente pelo cadastro do cliente.",
+      done: true,
+    });
+  }
+
+  items.push(
     {
       id: "lista",
       label: "Lista de presença concluída",
@@ -677,6 +689,7 @@ function buildHistorico(
     {
       id: "qr",
       label: "QR Code enviado",
+
       detail: "Em breve",
       done: false,
     },
@@ -698,8 +711,8 @@ function buildHistorico(
       label: "Relatório gerado",
       detail: "Em breve",
       done: false,
-    },
-  ];
+    }
+  );
 
   return items;
 }

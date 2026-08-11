@@ -68,9 +68,7 @@ export function useRiscosPsicossociaisPage() {
       setProcessos(data);
       setModalProcesso((prev) => {
         if (!prev) return null;
-        const updated = data.find(
-          (p) => p.implantacao.orcamento.id === prev.implantacao.orcamento.id
-        );
+        const updated = data.find((p) => p.processoKey === prev.processoKey);
         return updated ?? prev;
       });
     } catch (err) {
@@ -101,9 +99,10 @@ export function useRiscosPsicossociaisPage() {
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
     for (const p of processos) {
-      if (p.implantacao.orcamento.responsavel) {
-        set.add(p.implantacao.orcamento.responsavel);
-      }
+      const r =
+        p.campanha?.responsavel?.trim() ||
+        p.implantacao.orcamento.responsavel?.trim();
+      if (r) set.add(r);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [processos]);
@@ -112,27 +111,44 @@ export function useRiscosPsicossociaisPage() {
     (tracking: Parameters<typeof buildRiscosPsicossociaisProcesso>[1]) => {
       setModalProcesso((prev) => {
         if (!prev || !tracking) return prev;
-        return buildRiscosPsicossociaisProcesso(
+        const next = buildRiscosPsicossociaisProcesso(
           prev.laudos,
           tracking,
-          prev.campanha
+          prev.campanha,
+          { origem: prev.origem }
         );
+        return { ...next, processoKey: prev.processoKey };
       });
       setProcessos((prev) =>
         prev.map((p) => {
-          if (
-            !tracking ||
-            p.implantacao.orcamento.id !== tracking.orcamento_id
-          ) {
-            return p;
-          }
-          return buildRiscosPsicossociaisProcesso(
+          if (!tracking) return p;
+          const matchManual =
+            p.exigeLaudosSst === false &&
+            p.campanha?.id &&
+            tracking.orcamento_id === p.campanha.id;
+          const matchOrcamento =
+            p.exigeLaudosSst !== false &&
+            p.implantacao.orcamento.id === tracking.orcamento_id;
+          if (!matchManual && !matchOrcamento) return p;
+          const next = buildRiscosPsicossociaisProcesso(
             p.laudos,
             tracking,
-            p.campanha
+            p.campanha,
+            { origem: p.origem }
           );
+          return { ...next, processoKey: p.processoKey };
         })
       );
+    },
+    []
+  );
+
+  const listaTargetFromProcesso = useCallback(
+    (processo: RiscosPsicossociaisProcesso) => {
+      if (!processo.exigeLaudosSst && processo.campanha?.id) {
+        return { campanhaId: processo.campanha.id };
+      }
+      return { orcamentoId: processo.implantacao.orcamento.id };
     },
     []
   );
@@ -189,12 +205,16 @@ export function useRiscosPsicossociaisPage() {
   const handleSalvarSolicitacaoLista = useCallback(
     async (input: { dataSolicitacaoIso: string; email: string }) => {
       if (!modalProcesso) return;
-      const orcamentoId = modalProcesso.implantacao.orcamento.id;
+      const target = listaTargetFromProcesso(modalProcesso);
+      const registroId =
+        "campanhaId" in target && target.campanhaId
+          ? target.campanhaId
+          : target.orcamentoId!;
       const antes = modalProcesso.listaPresenca;
       setSavingLista(true);
       try {
         const tracking = await salvarSolicitacaoListaPresenca({
-          orcamentoId,
+          ...target,
           dataSolicitacaoIso: input.dataSolicitacaoIso,
           email: input.email,
           usuarioNome: auditContext.usuarioNome,
@@ -206,8 +226,10 @@ export function useRiscosPsicossociaisPage() {
           usuarioEmail: auditContext.usuarioEmail,
           modulo: AUDITORIA_MODULOS.riscos_psicossociais,
           acao: AUDITORIA_ACOES.riscos_lista_solicitada,
-          registroId: orcamentoId,
-          registroNome: modalProcesso.implantacao.orcamento.numero,
+          registroId,
+          registroNome:
+            modalProcesso.implantacao.orcamento.cliente_nome ||
+            modalProcesso.implantacao.orcamento.numero,
           descricao: `Lista de presença solicitada para ${modalProcesso.implantacao.orcamento.cliente_nome} (${input.email}).`,
           dadosAntes: { ...antes },
           dadosDepois: {
@@ -228,19 +250,23 @@ export function useRiscosPsicossociaisPage() {
         setSavingLista(false);
       }
     },
-    [modalProcesso, auditContext, applyTrackingToModal]
+    [modalProcesso, auditContext, applyTrackingToModal, listaTargetFromProcesso]
   );
 
   const handleSalvarRecebimentoLista = useCallback(
     async (file: File) => {
       if (!modalProcesso) return;
-      const orcamentoId = modalProcesso.implantacao.orcamento.id;
+      const target = listaTargetFromProcesso(modalProcesso);
+      const registroId =
+        "campanhaId" in target && target.campanhaId
+          ? target.campanhaId
+          : target.orcamentoId!;
       const antes = modalProcesso.listaPresenca;
       const substituindo = Boolean(antes.lista_anexo_path);
       setSavingLista(true);
       try {
         const tracking = await salvarRecebimentoListaPresenca({
-          orcamentoId,
+          ...target,
           file,
           usuarioNome: auditContext.usuarioNome,
         });
@@ -253,8 +279,10 @@ export function useRiscosPsicossociaisPage() {
           acao: substituindo
             ? AUDITORIA_ACOES.riscos_lista_anexo_substituido
             : AUDITORIA_ACOES.riscos_lista_recebida,
-          registroId: orcamentoId,
-          registroNome: modalProcesso.implantacao.orcamento.numero,
+          registroId,
+          registroNome:
+            modalProcesso.implantacao.orcamento.cliente_nome ||
+            modalProcesso.implantacao.orcamento.numero,
           descricao: substituindo
             ? `Anexo da lista de presença substituído por ${file.name}.`
             : `Lista de presença recebida e anexada (${file.name}).`,
@@ -281,12 +309,16 @@ export function useRiscosPsicossociaisPage() {
         setSavingLista(false);
       }
     },
-    [modalProcesso, auditContext, applyTrackingToModal]
+    [modalProcesso, auditContext, applyTrackingToModal, listaTargetFromProcesso]
   );
 
   const handleRemoverAnexoLista = useCallback(async () => {
     if (!modalProcesso) return;
-    const orcamentoId = modalProcesso.implantacao.orcamento.id;
+    const target = listaTargetFromProcesso(modalProcesso);
+    const registroId =
+      "campanhaId" in target && target.campanhaId
+        ? target.campanhaId
+        : target.orcamentoId!;
     const antes = modalProcesso.listaPresenca;
     if (!antes.lista_anexo_path) return;
 
@@ -298,7 +330,7 @@ export function useRiscosPsicossociaisPage() {
     setSavingLista(true);
     try {
       const tracking = await removerAnexoListaPresenca({
-        orcamentoId,
+        ...target,
         usuarioNome: auditContext.usuarioNome,
       });
       applyTrackingToModal(tracking);
@@ -308,8 +340,10 @@ export function useRiscosPsicossociaisPage() {
         usuarioEmail: auditContext.usuarioEmail,
         modulo: AUDITORIA_MODULOS.riscos_psicossociais,
         acao: AUDITORIA_ACOES.riscos_lista_anexo_removido,
-        registroId: orcamentoId,
-        registroNome: modalProcesso.implantacao.orcamento.numero,
+        registroId,
+        registroNome:
+          modalProcesso.implantacao.orcamento.cliente_nome ||
+          modalProcesso.implantacao.orcamento.numero,
         descricao: `Anexo da lista de presença removido (${antes.lista_anexo_nome ?? "arquivo"}).`,
         dadosAntes: { ...antes },
         dadosDepois: {
@@ -326,7 +360,7 @@ export function useRiscosPsicossociaisPage() {
     } finally {
       setSavingLista(false);
     }
-  }, [modalProcesso, auditContext, applyTrackingToModal]);
+  }, [modalProcesso, auditContext, applyTrackingToModal, listaTargetFromProcesso]);
 
   const handleVisualizarAnexoLista = useCallback(async () => {
     const path = modalProcesso?.listaPresenca.lista_anexo_path;
@@ -350,6 +384,10 @@ export function useRiscosPsicossociaisPage() {
       quantidadePrevista: number;
     }) => {
       if (!modalProcesso) return;
+      if (!modalProcesso.exigeLaudosSst) {
+        toast.error("Esta pesquisa já foi criada pela inclusão manual.");
+        return;
+      }
       const { orcamento } = modalProcesso.implantacao;
       if (modalProcesso.campanha) {
         toast.error("Já existe uma campanha para este processo.");
@@ -401,7 +439,8 @@ export function useRiscosPsicossociaisPage() {
       setProcessos((prev) =>
         prev.map((p) =>
           p.campanha?.id === campanha.id ||
-          p.implantacao.orcamento.id === campanha.orcamento_id
+          (campanha.orcamento_id != null &&
+            p.implantacao.orcamento.id === campanha.orcamento_id)
             ? { ...p, campanha }
             : p
         )
