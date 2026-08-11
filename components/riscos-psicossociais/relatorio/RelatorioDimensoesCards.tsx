@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
+import { analisarDimensao } from "@/lib/riscos-relatorio-conteudo";
 import {
   bgSuavePorClassificacaoId,
   corPorClassificacaoId,
-  descricaoOficialDimensao,
   formatMediaRelatorio,
 } from "@/lib/riscos-relatorio-view";
 
@@ -13,6 +13,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
   const [open, setOpen] = useState(false);
   const cor = corPorClassificacaoId(d.classificacaoId);
   const bg = bgSuavePorClassificacaoId(d.classificacaoId);
+  const analise = analisarDimensao(d);
 
   return (
     <article
@@ -73,7 +74,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
               O que esta dimensão avalia
             </p>
             <p className="mt-1 text-xs leading-relaxed text-navy">
-              {descricaoOficialDimensao(d.id)}
+              {analise.oQueAvalia}
             </p>
           </div>
           <div>
@@ -81,34 +82,26 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
               Resultado encontrado
             </p>
             <p className="mt-1 text-xs leading-relaxed text-navy">
-              Média {formatMediaRelatorio(d.media)} classificada como{" "}
-              <strong>{d.classificacaoLabel}</strong>
-              {d.classificacaoInterpretacao
-                ? ` (${d.classificacaoInterpretacao}).`
-                : "."}{" "}
-              <span className="text-app-muted">
-                Texto narrativo completo será gerado por IA em etapa futura.
-              </span>
+              {analise.resultadoEncontrado}
             </p>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Interpretação
+              Possíveis impactos
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-app-muted">
-              Placeholder — a interpretação executiva contextualizada será
-              elaborada automaticamente com apoio de IA, respeitando o
-              instrumento COPSOQ II-Br.
+            <p className="mt-1 text-xs leading-relaxed text-navy">
+              {analise.possiveisImpactos}
             </p>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
               Recomendações
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-app-muted">
-              Placeholder — recomendações específicas desta dimensão serão
-              geradas na próxima etapa de inteligência artificial.
-            </p>
+            <ul className="mt-1 space-y-1 text-xs leading-relaxed text-navy">
+              {analise.recomendacoes.map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
           </div>
         </div>
       ) : null}
@@ -133,8 +126,8 @@ export function RelatorioDimensoesCards({
           Dimensões COPSOQ
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Cards executivos compactos. Expanda para ver a estrutura preparada
-          para análise por IA.
+          Análise técnica por dimensão — interpretação automática a partir do
+          snapshot persistido (sem recálculo).
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

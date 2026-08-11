@@ -11,6 +11,7 @@ import {
   formatTaxaParticipacao,
   type RiscosRelatorioRecord,
 } from "@/lib/riscos-relatorio";
+import { gerarConteudoExecutivo } from "@/lib/riscos-relatorio-conteudo";
 import { statusGeralResumo } from "@/lib/riscos-relatorio-view";
 
 function CardMetric({
@@ -71,6 +72,7 @@ export function RelatorioResumoExecutivo({
     dimensoesCriticasCount: criticas,
     statusGeralMensagem: resumo?.statusGeralMensagem,
   });
+  const { resumoNarrativo } = gerarConteudoExecutivo(relatorio);
 
   const statusTone =
     status.tom === "critico"
@@ -91,6 +93,14 @@ export function RelatorioResumoExecutivo({
           <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
             Resumo executivo
           </h3>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-3xl border border-[#e8edf5] bg-gradient-to-br from-[#f8fafc] to-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+        <div className="space-y-3 text-sm leading-relaxed text-navy">
+          {resumoNarrativo.map((paragrafo) => (
+            <p key={paragrafo.slice(0, 48)}>{paragrafo}</p>
+          ))}
         </div>
       </div>
 
@@ -143,10 +153,7 @@ export function RelatorioResumoExecutivo({
           </p>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {resumo!.dimensoesCriticas.map((d) => (
-              <li
-                key={d.id}
-                className="text-xs font-semibold text-[#7c2d12]"
-              >
+              <li key={d.id} className="text-xs font-semibold text-[#7c2d12]">
                 • {d.nome}
                 <span className="font-medium text-[#9a3412]/70">
                   {" "}

@@ -9,7 +9,7 @@ import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatori
 import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
 import { RelatorioHeatmap } from "@/components/riscos-psicossociais/relatorio/RelatorioHeatmap";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
-import { RelatorioSecoesIa } from "@/components/riscos-psicossociais/relatorio/RelatorioSecoesIa";
+import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
 
 interface RiscosRelatorioViewerModalProps {
   open: boolean;
@@ -59,7 +59,7 @@ export function RiscosRelatorioViewerModal({
         <RelatorioRanking dimensoes={dimensoes} />
         <RelatorioHeatmap dimensoes={dimensoes} />
         <RelatorioDimensoesCards dimensoes={dimensoes} />
-        <RelatorioSecoesIa json={relatorio.resultado_json} />
+        <RelatorioConclusoesExecutivas relatorio={relatorio} />
       </div>
     </Modal>
   );
