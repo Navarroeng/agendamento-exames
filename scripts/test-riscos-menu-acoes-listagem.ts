@@ -35,18 +35,46 @@ run("aberta: Copiar link habilitado", () => {
   assert.equal(a.mostrarRemoverProcesso, false);
 });
 
-run("encerrada: Copiar desabilitado; Remover admin; Relatório ainda off", () => {
+run("encerrada sem todos concluídos: Relatório off", () => {
   const a = acoesMenuListagemProcessoRiscos({
     campanhaStatus: "encerrada",
     codigoPublico: "ABC123",
     isAdmin: true,
     hasCampanha: true,
+    participantesCadastrados: 3,
+    participantesRespondidos: 1,
   });
   assert.equal(a.podeAbrir, true);
   assert.equal(a.podeCopiarLink, false);
   assert.equal(a.podeGerarRelatorio, false);
-  assert.match(a.gerarRelatorioMotivoDesabilitado, /conclusão|encerramento/i);
+  assert.match(a.gerarRelatorioMotivoDesabilitado, /não concluíram/i);
   assert.equal(a.mostrarRemoverProcesso, true);
+});
+
+run("encerrada com todos concluídos: Relatório on", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "encerrada",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+    participantesCadastrados: 2,
+    participantesRespondidos: 2,
+  });
+  assert.equal(a.podeGerarRelatorio, true);
+});
+
+run("já existe relatório: Gerar off (visualizar no processo)", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "encerrada",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+    participantesCadastrados: 2,
+    participantesRespondidos: 2,
+    relatorioGerado: true,
+  });
+  assert.equal(a.podeGerarRelatorio, false);
+  assert.match(a.gerarRelatorioMotivoDesabilitado, /já gerado/i);
 });
 
 run("não admin não vê Remover processo", () => {

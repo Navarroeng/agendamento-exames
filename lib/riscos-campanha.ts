@@ -174,13 +174,16 @@ export function campanhaPermiteCopiarLink(
 
 /**
  * Habilitação do menu ⋮ na listagem principal (coluna Ações).
- * Não inventa relatório: geração permanece desabilitada até regra real existir.
+ * Gerar relatório: todos os cadastrados concluídos e ainda sem relatório persistido.
  */
 export function acoesMenuListagemProcessoRiscos(input: {
   campanhaStatus: RiscosCampanhaStatus | string | null | undefined;
   codigoPublico?: string | null;
   isAdmin: boolean;
   hasCampanha: boolean;
+  relatorioGerado?: boolean;
+  participantesCadastrados?: number;
+  participantesRespondidos?: number;
 }): {
   podeAbrir: boolean;
   podeCopiarLink: boolean;
@@ -195,15 +198,33 @@ export function acoesMenuListagemProcessoRiscos(input: {
     Boolean(codigo) &&
     campanhaPermiteCopiarLink(input.campanhaStatus);
 
+  const cadastrados = Math.max(0, Number(input.participantesCadastrados) || 0);
+  const respondidos = Math.max(0, Number(input.participantesRespondidos) || 0);
+  const status = String(input.campanhaStatus ?? "");
+  let gerarMotivo = "";
+  let podeGerar = false;
+  if (!input.hasCampanha) {
+    gerarMotivo = "Crie a pesquisa antes de gerar o relatório.";
+  } else if (status === "cancelada") {
+    gerarMotivo = "Não é possível gerar relatório de campanha cancelada.";
+  } else if (input.relatorioGerado) {
+    gerarMotivo = "Relatório já gerado — abra o processo para visualizar.";
+  } else if (cadastrados < 1) {
+    gerarMotivo = "Cadastre e conclua os participantes antes de gerar o relatório.";
+  } else if (respondidos < cadastrados) {
+    gerarMotivo = "Ainda existem participantes que não concluíram a pesquisa.";
+  } else {
+    podeGerar = true;
+  }
+
   return {
     podeAbrir: true,
     podeCopiarLink: podeCopiar,
     copiarLinkMotivoDesabilitado: podeCopiar
       ? ""
       : "Disponível após abrir a pesquisa.",
-    podeGerarRelatorio: false,
-    gerarRelatorioMotivoDesabilitado:
-      "Disponível após conclusão/encerramento da pesquisa.",
+    podeGerarRelatorio: podeGerar,
+    gerarRelatorioMotivoDesabilitado: gerarMotivo,
     mostrarRemoverProcesso:
       input.isAdmin && input.hasCampanha && Boolean(codigo),
   };

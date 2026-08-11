@@ -33,6 +33,9 @@ export function RiscosProcessoRowActionsMenu({
     codigoPublico: campanha?.codigo_publico,
     isAdmin,
     hasCampanha: Boolean(campanha?.id),
+    relatorioGerado: processo.relatorioGerado,
+    participantesCadastrados: processo.participantesCadastrados,
+    participantesRespondidos: processo.participantesRespondidos,
   });
 
   useEffect(() => {
@@ -116,10 +119,21 @@ export function RiscosProcessoRowActionsMenu({
             onClick={() => void handleCopiarLink()}
           />
           <MenuItem
-            label="Gerar relatório"
-            disabled={!acoes.podeGerarRelatorio}
-            title={acoes.gerarRelatorioMotivoDesabilitado}
-            onClick={() => setOpen(false)}
+            label={
+              processo.relatorioGerado
+                ? "Visualizar relatório"
+                : "Gerar relatório"
+            }
+            disabled={!acoes.podeGerarRelatorio && !processo.relatorioGerado}
+            title={
+              processo.relatorioGerado
+                ? "Abrir o processo para visualizar o relatório"
+                : acoes.gerarRelatorioMotivoDesabilitado
+            }
+            onClick={() => {
+              setOpen(false);
+              onAbrir(processo);
+            }}
           />
           {acoes.mostrarRemoverProcesso ? (
             <>

@@ -39,6 +39,8 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
   ];
   const participantesPorCampanha =
     await listarStatusParticipantesPorCampanhas(campanhaIds);
+  const relatoriosMap =
+    await listarRelatoriosExistentesPorCampanhas(campanhaIds);
 
   const processosNormais = laudosProcessos.map((laudos) => {
     const orcamentoId = laudos.implantacao.orcamento.id;
@@ -51,6 +53,9 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
         participantes: campanha
           ? participantesPorCampanha.get(campanha.id) ?? []
           : [],
+        relatorioGerado: campanha
+          ? relatoriosMap.get(campanha.id) === true
+          : false,
       }
     );
   });
@@ -64,6 +69,7 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
         campanha,
         tracking: fluxo,
         participantes: participantesPorCampanha.get(campanha.id) ?? [],
+        relatorioGerado: relatoriosMap.get(campanha.id) === true,
       })
     );
   }
@@ -122,6 +128,35 @@ async function listarStatusParticipantesPorCampanhas(
     map.set(campanhaId, list);
   }
 
+  return map;
+}
+
+/** Existência de relatório final por campanha (listagem). */
+async function listarRelatoriosExistentesPorCampanhas(
+  campanhaIds: string[]
+): Promise<Map<string, boolean>> {
+  const map = new Map<string, boolean>();
+  const ids = Array.from(new Set(campanhaIds.filter(Boolean)));
+  if (ids.length === 0) return map;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("riscos_relatorios")
+    .select("campanha_id")
+    .in("campanha_id", ids);
+
+  if (error) {
+    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+      return map;
+    }
+    console.warn("riscos_relatorios (listagem) indisponível:", error.message);
+    return map;
+  }
+
+  for (const row of data ?? []) {
+    const cid = String((row as { campanha_id?: string }).campanha_id ?? "");
+    if (cid) map.set(cid, true);
+  }
   return map;
 }
 

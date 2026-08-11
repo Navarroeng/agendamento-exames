@@ -1020,6 +1020,25 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes, isAdmin]
   );
 
+  const handleRelatorioAtualizado = useCallback(
+    (relatorioGerado: boolean) => {
+      setModalProcesso((prev) =>
+        prev
+          ? withRiscosProgressoAtualizado(prev, { relatorioGerado })
+          : prev
+      );
+      setProcessos((prev) =>
+        prev.map((p) => {
+          if (!modalProcesso || p.processoKey !== modalProcesso.processoKey) {
+            return p;
+          }
+          return withRiscosProgressoAtualizado(p, { relatorioGerado });
+        })
+      );
+    },
+    [modalProcesso]
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -1061,6 +1080,8 @@ export function useRiscosPsicossociaisPage() {
     handleConfirmarImportacaoParticipantesExcel,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
+    auditContext,
+    handleRelatorioAtualizado,
     refresh,
   };
 }

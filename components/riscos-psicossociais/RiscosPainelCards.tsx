@@ -7,6 +7,8 @@ import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
 import { RiscosPainelPreRequisitos } from "@/components/riscos-psicossociais/RiscosPainelPreRequisitos";
 import { RiscosResultadosPanel } from "@/components/riscos-psicossociais/RiscosResultadosPanel";
+import { RiscosRelatorioPanel } from "@/components/riscos-psicossociais/RiscosRelatorioPanel";
+import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   RISCOS_CAMPANHA_STATUS_LABELS,
@@ -76,6 +78,8 @@ interface RiscosPainelCardsProps {
   podeGerenciarParticipante?: boolean;
   /** Só exibe ações de Convites após status confirmado no banco. */
   campanhaStatusSincronizado?: boolean;
+  auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
+  onRelatorioAtualizado?: (relatorioGerado: boolean) => void;
 }
 
 function PanelCard({
@@ -153,6 +157,8 @@ export function RiscosPainelCards({
   onRemoverParticipante,
   podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
+  auditContext,
+  onRelatorioAtualizado,
 }: RiscosPainelCardsProps) {
   const campanha = processo.campanha;
 
@@ -175,8 +181,6 @@ export function RiscosPainelCards({
   );
 
   const pesquisaCancelada = campanha?.status === "cancelada";
-  /** Relatório ainda não é entidade real; não usar encerrada/cancelada como proxy. */
-  const relatorioExiste = false;
   const podeCancelarProcesso =
     Boolean(campanha) &&
     campanhaStatusSincronizado &&
@@ -562,36 +566,15 @@ export function RiscosPainelCards({
         </PanelCard>
 
         <PanelCard title="Relatório">
-          {!relatorioExiste ? (
-            <PlaceholderNote>
-              Relatório disponível quando houver relatório final persistido.
-            </PlaceholderNote>
-          ) : (
-            <div className="mt-auto flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
-                onClick={() =>
-                  toast.message(
-                    "Visualização do relatório será disponibilizada em breve."
-                  )
-                }
-              >
-                Visualizar relatório
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-                onClick={() =>
-                  toast.message(
-                    "Exportação em PDF será disponibilizada em breve."
-                  )
-                }
-              >
-                Exportar PDF
-              </button>
-            </div>
-          )}
+          <RiscosRelatorioPanel
+            campanha={campanha}
+            participantes={participantes}
+            isAdmin={podeGerenciarParticipante}
+            auditContext={auditContext}
+            onRelatorioChange={(relatorio: RiscosRelatorioRecord | null) => {
+              onRelatorioAtualizado?.(Boolean(relatorio));
+            }}
+          />
         </PanelCard>
       </div>
 
@@ -1035,8 +1018,8 @@ function buildHistorico(
     {
       id: "relatorio",
       label: "Relatório gerado",
-      detail: "Em breve",
-      done: false,
+      detail: processo.relatorioGerado ? "Disponível para visualização" : undefined,
+      done: processo.relatorioGerado === true,
     }
   );
 

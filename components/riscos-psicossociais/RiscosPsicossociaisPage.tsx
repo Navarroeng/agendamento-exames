@@ -50,6 +50,8 @@ export function RiscosPsicossociaisPage() {
     handleConfirmarImportacaoParticipantesExcel,
     handleRemoverParticipante,
     campanhaStatusSincronizado,
+    auditContext,
+    handleRelatorioAtualizado,
   } = useRiscosPsicossociaisPage();
 
   return (
@@ -119,6 +121,8 @@ export function RiscosPsicossociaisPage() {
         onRemoverParticipante={handleRemoverParticipante}
         podeGerenciarParticipante={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
+        auditContext={auditContext}
+        onRelatorioAtualizado={handleRelatorioAtualizado}
       />
     </AppShell>
   );

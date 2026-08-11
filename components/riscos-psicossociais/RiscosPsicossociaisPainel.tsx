@@ -59,6 +59,8 @@ interface RiscosPsicossociaisPainelProps {
   onRemoverParticipante: (participanteId: string) => Promise<void>;
   podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
+  auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
+  onRelatorioAtualizado?: (relatorioGerado: boolean) => void;
 }
 
 export function RiscosPsicossociaisPainel({
@@ -85,6 +87,8 @@ export function RiscosPsicossociaisPainel({
   onRemoverParticipante,
   podeGerenciarParticipante = false,
   campanhaStatusSincronizado = false,
+  auditContext,
+  onRelatorioAtualizado,
 }: RiscosPsicossociaisPainelProps) {
   const { orcamento, numeroContrato } = processo.implantacao;
   const campanha = processo.campanha;
@@ -189,6 +193,8 @@ export function RiscosPsicossociaisPainel({
         onRemoverParticipante={onRemoverParticipante}
         podeGerenciarParticipante={podeGerenciarParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
+        auditContext={auditContext}
+        onRelatorioAtualizado={onRelatorioAtualizado}
       />
     </div>
   );
