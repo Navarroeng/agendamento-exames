@@ -36,6 +36,7 @@ interface RiscosPsicossociaisPainelProps {
   exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
+  onImportarParticipantesExcel: (file: File) => Promise<void>;
   onEditarParticipante: (
     participanteId: string,
     input: RiscosParticipanteInput
@@ -62,6 +63,7 @@ export function RiscosPsicossociaisPainel({
   exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso,
   onCriarParticipante,
+  onImportarParticipantesExcel,
   onEditarParticipante,
   onRemoverParticipante,
   campanhaStatusSincronizado = false,
@@ -159,6 +161,7 @@ export function RiscosPsicossociaisPainel({
         exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}
         onGarantirCodigoAcesso={onGarantirCodigoAcesso}
         onCriarParticipante={onCriarParticipante}
+        onImportarParticipantesExcel={onImportarParticipantesExcel}
         onEditarParticipante={onEditarParticipante}
         onRemoverParticipante={onRemoverParticipante}
         campanhaStatusSincronizado={campanhaStatusSincronizado}

@@ -33,6 +33,7 @@ import {
 import {
   atualizarParticipanteCampanha,
   criarParticipanteCampanha,
+  importarParticipantesCampanhaExcel,
   listarParticipantesCampanha,
 } from "@/services/riscos-campanha-participantes.service";
 import type {
@@ -791,6 +792,39 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, carregarParticipantes]
   );
 
+  const handleImportarParticipantesExcel = useCallback(
+    async (file: File) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) {
+        throw new Error("Crie a pesquisa antes de importar participantes.");
+      }
+      setSavingParticipante(true);
+      try {
+        const result = await importarParticipantesCampanhaExcel(
+          { campanhaId, file },
+          { auditContext }
+        );
+        await carregarParticipantes(campanhaId);
+        const motivos = result.erros
+          .slice(0, 5)
+          .map((e) => `• ${e.motivo}`)
+          .join("\n");
+        toast.success(
+          `Importados: ${result.importados}\nIgnorados: ${result.ignorados}` +
+            (motivos ? `\n\n${motivos}` : "")
+        );
+      } catch (err) {
+        console.error(err);
+        throw err instanceof Error
+          ? err
+          : new Error("Erro ao importar participantes.");
+      } finally {
+        setSavingParticipante(false);
+      }
+    },
+    [modalProcesso, auditContext, carregarParticipantes]
+  );
+
   const handleEditarParticipante = useCallback(
     async (participanteId: string, input: RiscosParticipanteInput) => {
       const campanhaId = modalProcesso?.campanha?.id;
@@ -888,6 +922,7 @@ export function useRiscosPsicossociaisPage() {
     savingRemoverProcesso,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
+    handleImportarParticipantesExcel,
     handleEditarParticipante,
     handleRemoverParticipante,
     campanhaStatusSincronizado,

@@ -25,6 +25,7 @@ interface RiscosCampanhaParticipantesSectionProps {
     input: RiscosParticipanteInput
   ) => Promise<void>;
   onRemover: (participanteId: string) => Promise<void>;
+  onImportarExcel?: (file: File) => Promise<void>;
 }
 
 export function RiscosCampanhaParticipantesSection({
@@ -34,10 +35,12 @@ export function RiscosCampanhaParticipantesSection({
   onCriar,
   onEditar,
   onRemover,
+  onImportarExcel,
 }: RiscosCampanhaParticipantesSectionProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resumo = useMemo(
     () =>
@@ -99,13 +102,43 @@ export function RiscosCampanhaParticipantesSection({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            void (async () => {
+              try {
+                if (onImportarExcel) {
+                  await onImportarExcel(file);
+                } else {
+                  toast.message(
+                    "Importação por Excel será disponibilizada em etapa futura."
+                  );
+                }
+              } catch (err) {
+                toast.error(
+                  err instanceof Error
+                    ? err.message
+                    : "Falha ao importar a planilha."
+                );
+              }
+            })();
+          }}
+        />
         <button
           type="button"
-          className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-          onClick={() =>
-            toast.message(
-              "Importação por Excel será disponibilizada em etapa futura."
-            )
+          className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+          disabled={saving || !onImportarExcel}
+          onClick={() => fileInputRef.current?.click()}
+          title={
+            onImportarExcel
+              ? "Importar planilha (Nome | CPF | Data de nascimento | E-mail)"
+              : "Importação indisponível"
           }
         >
           Importar Excel

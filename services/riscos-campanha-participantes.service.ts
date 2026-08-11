@@ -1,12 +1,7 @@
 import {
-  AUDITORIA_ACOES,
-  AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
-import { normalizeCpfDigits } from "@/lib/cpf";
-import { parseDataNascimentoBr } from "@/lib/date-br";
 import {
-  gerarCodigoAcessoParticipante,
   isRiscosParticipanteStatus,
   validateRiscosParticipanteInput,
   type RiscosCampanhaParticipanteRecord,
@@ -15,7 +10,6 @@ import {
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
 import { createClient } from "@/lib/supabase/client";
-import { registrarAuditoria } from "@/services/auditoria.service";
 import { buscarCampanhaPorOrcamento } from "@/services/riscos-campanha.service";
 
 const PARTICIPANTE_SELECT =
@@ -55,22 +49,6 @@ function mapParticipante(
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
     removido_em: row.removido_em ? String(row.removido_em) : null,
   };
-}
-
-async function gerarCodigoAcessoUnico(
-  supabase: ReturnType<typeof createClient>
-): Promise<string> {
-  for (let i = 0; i < 12; i += 1) {
-    const codigo = gerarCodigoAcessoParticipante(8);
-    const { data, error } = await supabase
-      .from("riscos_campanha_participantes")
-      .select("id")
-      .eq("codigo_acesso", codigo)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return codigo;
-  }
-  throw new Error("Não foi possível gerar o identificador do participante.");
 }
 
 export async function listarParticipantesCampanha(
@@ -122,93 +100,30 @@ export async function criarParticipanteCampanha(
   const validationError = validateRiscosParticipanteInput(params.input);
   if (validationError) throw new Error(validationError);
 
-  const campanha = await buscarCampanhaPorId(params.campanhaId);
-  if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
-
-  const cpf = normalizeCpfDigits(params.input.cpf);
-  const supabase = createClient();
-
-  const { data: duplicado, error: dupErr } = await supabase
-    .from("riscos_campanha_participantes")
-    .select("id")
-    .eq("campanha_id", params.campanhaId)
-    .eq("cpf", cpf)
-    .is("removido_em", null)
-    .maybeSingle();
-  if (dupErr && /removido_em/i.test(dupErr.message ?? "")) {
-    const fb = await supabase
-      .from("riscos_campanha_participantes")
-      .select("id")
-      .eq("campanha_id", params.campanhaId)
-      .eq("cpf", cpf)
-      .not("status", "in", '("removido","invalidado")')
-      .maybeSingle();
-    if (fb.error) throw fb.error;
-    if (fb.data) {
-      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(params.campanhaId)}/participantes`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...params.input,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
     }
-  } else {
-    if (dupErr) throw dupErr;
-    if (duplicado) {
-      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
-    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    participante?: RiscosCampanhaParticipanteRecord;
+  };
+
+  if (!res.ok || !json.ok || !json.participante) {
+    throw new Error(json.error || "Não foi possível cadastrar o participante.");
   }
 
-  const codigo = await gerarCodigoAcessoUnico(supabase);
-  const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
-  const dataNascimento = parseDataNascimentoBr(params.input.dataNascimento);
-  if (!dataNascimento) {
-    throw new Error("Informe a data de nascimento (DD/MM/AAAA).");
-  }
-
-  const { data, error } = await supabase
-    .from("riscos_campanha_participantes")
-    .insert({
-      campanha_id: campanha.id,
-      orcamento_id: campanha.orcamento_id || null,
-      cliente_id: campanha.cliente_id,
-      nome_completo: params.input.nomeCompleto.trim(),
-      cpf,
-      data_nascimento: dataNascimento,
-      cargo: null,
-      setor: null,
-      email: params.input.email?.trim() || null,
-      status: "pendente",
-      codigo_acesso: codigo,
-      origem: "manual",
-      criado_por: usuarioNome,
-    })
-    .select(PARTICIPANTE_SELECT)
-    .maybeSingle();
-
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
-    }
-    throw error;
-  }
-  if (!data) throw new Error("Não foi possível cadastrar o participante.");
-
-  const record = mapParticipante(data as Record<string, unknown>);
-  const nome = usuarioNome ?? "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_participante_criado,
-    registroId: record.id,
-    registroNome: record.nome_completo,
-    descricao: `${nome} cadastrou o participante ${record.nome_completo} na pesquisa ${campanha.codigo_publico}.`,
-    dadosDepois: {
-      campanha_id: record.campanha_id,
-      cpf: record.cpf,
-      status: record.status,
-      codigo_acesso: record.codigo_acesso,
-    },
-  });
-
-  return record;
+  return json.participante;
 }
 
 export async function atualizarParticipanteCampanha(
@@ -221,80 +136,84 @@ export async function atualizarParticipanteCampanha(
   const validationError = validateRiscosParticipanteInput(params.input);
   if (validationError) throw new Error(validationError);
 
-  const supabase = createClient();
-  const { data: atual, error: findErr } = await supabase
-    .from("riscos_campanha_participantes")
-    .select(PARTICIPANTE_SELECT)
-    .eq("id", params.participanteId)
-    .maybeSingle();
-  if (findErr) throw findErr;
-  if (!atual) throw new Error("Participante não encontrado.");
-
-  const before = mapParticipante(atual as Record<string, unknown>);
-  const cpf = normalizeCpfDigits(params.input.cpf);
-  const dataNascimento = parseDataNascimentoBr(params.input.dataNascimento);
-  if (!dataNascimento) {
-    throw new Error("Informe a data de nascimento (DD/MM/AAAA).");
-  }
-
-  if (cpf !== before.cpf) {
-    const { data: duplicado, error: dupErr } = await supabase
-      .from("riscos_campanha_participantes")
-      .select("id")
-      .eq("campanha_id", before.campanha_id)
-      .eq("cpf", cpf)
-      .neq("id", before.id)
-      .maybeSingle();
-    if (dupErr) throw dupErr;
-    if (duplicado) {
-      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+  const res = await fetch(
+    `/api/riscos/participante/${encodeURIComponent(params.participanteId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...params.input,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
     }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    participante?: RiscosCampanhaParticipanteRecord;
+  };
+
+  if (!res.ok || !json.ok || !json.participante) {
+    throw new Error(json.error || "Não foi possível atualizar o participante.");
   }
 
-  const { data, error } = await supabase
-    .from("riscos_campanha_participantes")
-    .update({
-      nome_completo: params.input.nomeCompleto.trim(),
-      cpf,
-      data_nascimento: dataNascimento,
-      email: params.input.email?.trim() || null,
-    })
-    .eq("id", params.participanteId)
-    .select(PARTICIPANTE_SELECT)
-    .maybeSingle();
+  return json.participante;
+}
 
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error("Já existe um participante com este CPF nesta pesquisa.");
+export type ImportacaoParticipantesClientResult = {
+  importados: number;
+  ignorados: number;
+  erros: Array<{ linha?: number; cpf: string; motivo: string }>;
+};
+
+export async function importarParticipantesCampanhaExcel(
+  params: {
+    campanhaId: string;
+    file: File;
+  },
+  auditOptions?: AuditOptions
+): Promise<ImportacaoParticipantesClientResult> {
+  const { parseParticipantesExcel } = await import(
+    "@/lib/riscos-participantes-excel"
+  );
+  const buffer = await params.file.arrayBuffer();
+  const linhas = parseParticipantesExcel(buffer);
+  if (linhas.length === 0) {
+    throw new Error("Nenhuma linha válida encontrada na planilha.");
+  }
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(params.campanhaId)}/participantes`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        importacao: linhas,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
     }
-    throw error;
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    importados?: number;
+    ignorados?: number;
+    erros?: Array<{ linha?: number; cpf: string; motivo: string }>;
+  };
+
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Não foi possível importar a planilha.");
   }
-  if (!data) throw new Error("Não foi possível atualizar o participante.");
 
-  const record = mapParticipante(data as Record<string, unknown>);
-  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_participante_editado,
-    registroId: record.id,
-    registroNome: record.nome_completo,
-    descricao: `${nome} editou o participante ${record.nome_completo}.`,
-    dadosAntes: {
-      nome_completo: before.nome_completo,
-      cpf: before.cpf,
-      email: before.email,
-    },
-    dadosDepois: {
-      nome_completo: record.nome_completo,
-      cpf: record.cpf,
-      email: record.email,
-    },
-  });
-
-  return record;
+  return {
+    importados: json.importados ?? 0,
+    ignorados: json.ignorados ?? 0,
+    erros: json.erros ?? [],
+  };
 }
 
 export async function removerParticipanteCampanha(
@@ -304,19 +223,6 @@ export async function removerParticipanteCampanha(
   throw new Error(
     "Use a API /api/riscos/participante/[id]/remover (remoção lógica)."
   );
-}
-
-async function buscarCampanhaPorId(campanhaId: string) {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("riscos_campanhas")
-    .select(
-      "id, orcamento_id, cliente_id, cnpj, empresa_nome, codigo_publico, quantidade_prevista"
-    )
-    .eq("id", campanhaId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
 }
 
 /** Reexport útil para o fluxo por orçamento. */

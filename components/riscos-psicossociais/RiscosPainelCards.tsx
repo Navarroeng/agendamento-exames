@@ -52,6 +52,7 @@ interface RiscosPainelCardsProps {
   exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
+  onImportarParticipantesExcel: (file: File) => Promise<void>;
   onEditarParticipante: (
     participanteId: string,
     input: RiscosParticipanteInput
@@ -130,6 +131,7 @@ export function RiscosPainelCards({
   exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
+  onImportarParticipantesExcel,
   onEditarParticipante,
   onRemoverParticipante,
   campanhaStatusSincronizado = false,
@@ -433,6 +435,7 @@ export function RiscosPainelCards({
             participantes={participantes}
             saving={savingParticipante}
             onCriar={onCriarParticipante}
+            onImportarExcel={onImportarParticipantesExcel}
             onEditar={onEditarParticipante}
             onRemover={onRemoverParticipante}
           />
