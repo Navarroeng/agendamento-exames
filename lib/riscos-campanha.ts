@@ -159,8 +159,47 @@ export function pathAvaliacaoCampanha(codigo: string): string {
 }
 
 /**
+ * Link/código no card Convites: só após abertura (ou encerrada, como info admin).
+ * O codigo_publico pode existir no banco antes — a UX não deve divulgá-lo.
+ */
+export function campanhaExibeLinkConvite(
+  status: RiscosCampanhaStatus | string | null | undefined
+): boolean {
+  return status === "aberta" || status === "encerrada";
+}
+
+/** Copiar link só enquanto a pesquisa está aberta ao portal. */
+export function campanhaPermiteCopiarLink(
+  status: RiscosCampanhaStatus | string | null | undefined
+): boolean {
+  return status === "aberta";
+}
+
+/**
+ * Pré-requisitos de negócio para liberar o botão "Abrir pesquisa".
+ * Laudos SST só quando o fluxo exige (origem orçamento).
+ */
+export function validatePreRequisitosAbrirCampanha(input: {
+  listaPresencaConcluida: boolean;
+  participantesCadastrados: number;
+  exigeLaudosSst?: boolean;
+  laudosSstConcluido?: boolean;
+}): string | null {
+  if (input.exigeLaudosSst && !input.laudosSstConcluido) {
+    return "Conclua o processo de Laudos SST antes de abrir a pesquisa.";
+  }
+  if (!input.listaPresencaConcluida) {
+    return "Conclua a Lista de Presença antes de abrir a pesquisa.";
+  }
+  if (input.participantesCadastrados < 1) {
+    return "Cadastre ao menos um participante antes de abrir a pesquisa.";
+  }
+  return null;
+}
+
+/**
  * Valida se a campanha pode ser aberta para respostas no Portal.
- * Não altera dados — apenas regras de negócio.
+ * Não altera dados — apenas regras de negócio (status + período).
  */
 export function validateAbrirCampanhaRiscos(
   campanha: Pick<

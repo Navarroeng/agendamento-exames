@@ -10,8 +10,12 @@ import { RiscosResultadosPanel } from "@/components/riscos-psicossociais/RiscosR
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   RISCOS_CAMPANHA_STATUS_LABELS,
+  campanhaExibeLinkConvite,
+  campanhaPermiteCopiarLink,
   formatPeriodoCampanha,
   pathAvaliacaoCampanha,
+  validateAbrirCampanhaRiscos,
+  validatePreRequisitosAbrirCampanha,
 } from "@/lib/riscos-campanha";
 import { COPSOQ_DIMENSOES, COPSOQ_INSTRUMENTO } from "@/lib/copsoq";
 import {
@@ -20,6 +24,9 @@ import {
   type RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
+import {
+  DEVELOPMENT_SKIP_LAUDOS_SST_GATE,
+} from "@/lib/riscos-psicossociais";
 
 interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
@@ -165,8 +172,39 @@ export function RiscosPainelCards({
     setCriarAberto(false);
   }
 
+  const preRequisitoAbrir = useMemo(() => {
+    if (!campanha) return "Crie a pesquisa antes de abrir.";
+    return (
+      validatePreRequisitosAbrirCampanha({
+        listaPresencaConcluida: processo.listaPresencaConcluida,
+        participantesCadastrados: participantes.length,
+        exigeLaudosSst:
+          processo.exigeLaudosSst && !DEVELOPMENT_SKIP_LAUDOS_SST_GATE,
+        laudosSstConcluido: processo.laudosSstConcluido,
+      }) ?? validateAbrirCampanhaRiscos(campanha)
+    );
+  }, [
+    campanha,
+    processo.listaPresencaConcluida,
+    processo.exigeLaudosSst,
+    processo.laudosSstConcluido,
+    participantes.length,
+  ]);
+
+  const podeAbrirPesquisa =
+    Boolean(campanha) &&
+    campanha?.status === "em_preparacao" &&
+    !preRequisitoAbrir;
+
+  const exibeLinkConvite = campanha
+    ? campanhaExibeLinkConvite(campanha.status)
+    : false;
+  const permiteCopiarLink = campanha
+    ? campanhaPermiteCopiarLink(campanha.status)
+    : false;
+
   async function handleCopiarLink() {
-    if (!campanha) return;
+    if (!campanha || !permiteCopiarLink) return;
     const path = pathAvaliacaoCampanha(campanha.codigo_publico);
     const url =
       typeof window !== "undefined"
@@ -178,6 +216,15 @@ export function RiscosPainelCards({
     } catch {
       toast.error("Não foi possível copiar o link.");
     }
+  }
+
+  function handleTentarAbrir() {
+    if (!campanha) return;
+    if (preRequisitoAbrir) {
+      toast.error(preRequisitoAbrir);
+      return;
+    }
+    setConfirmAbrirOpen(true);
   }
 
   return (
@@ -379,59 +426,86 @@ export function RiscosPainelCards({
         <PanelCard title="Convites">
           {campanha ? (
             <div className="flex h-full flex-col gap-3">
-              <div className="space-y-1.5 text-sm">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Link
-                  </p>
-                  <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
-                    {pathAvaliacaoCampanha(campanha.codigo_publico)}
-                  </p>
+              {exibeLinkConvite ? (
+                <div className="space-y-1.5 text-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                      Link
+                    </p>
+                    <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
+                      {pathAvaliacaoCampanha(campanha.codigo_publico)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                      Código da campanha
+                    </p>
+                    <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
+                      {campanha.codigo_publico}
+                    </p>
+                  </div>
+                  {campanha.status === "encerrada" ? (
+                    <p className="text-[11px] text-[#64748b]">
+                      Pesquisa encerrada. O link permanece apenas como
+                      referência administrativa.
+                    </p>
+                  ) : null}
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Código da campanha
-                  </p>
-                  <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
-                    {campanha.codigo_publico}
-                  </p>
-                </div>
-              </div>
+              ) : (
+                <PlaceholderNote>
+                  A pesquisa ainda não foi aberta.
+                </PlaceholderNote>
+              )}
               <div className="mt-auto flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
-                  onClick={() => void handleCopiarLink()}
-                >
-                  Copiar link
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                  disabled
-                  title="QR Code será disponibilizado em etapa futura"
-                >
-                  Gerar QR Code
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                  disabled={
-                    savingCampanha || campanha.status !== "em_preparacao"
-                  }
-                  onClick={() => setConfirmAbrirOpen(true)}
-                  title="Libera o portal para respostas (status Aberta)"
-                >
-                  Abrir pesquisa
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                  disabled
-                  title="Encerramento manual será disponibilizado em breve"
-                >
-                  Encerrar pesquisa
-                </button>
+                {exibeLinkConvite ? (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                      disabled={!permiteCopiarLink}
+                      title={
+                        permiteCopiarLink
+                          ? "Copiar link da pesquisa"
+                          : "Pesquisa encerrada — cópia desabilitada"
+                      }
+                      onClick={() => void handleCopiarLink()}
+                    >
+                      Copiar link
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                      disabled
+                      title="QR Code será disponibilizado em etapa futura"
+                    >
+                      Gerar QR Code
+                    </button>
+                  </>
+                ) : null}
+                {campanha.status === "em_preparacao" ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                    disabled={savingCampanha || !podeAbrirPesquisa}
+                    onClick={handleTentarAbrir}
+                    title={
+                      preRequisitoAbrir ??
+                      "Libera o portal para respostas (status Aberta)"
+                    }
+                  >
+                    Abrir pesquisa
+                  </button>
+                ) : null}
+                {campanha.status === "aberta" ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                    disabled
+                    title="Encerramento manual será disponibilizado em breve"
+                  >
+                    Encerrar pesquisa
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : (
