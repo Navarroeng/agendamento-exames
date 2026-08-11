@@ -265,24 +265,7 @@ export function RiscosPainelCards({
           />
         </PanelCard>
 
-        <PanelCard
-          title="Pesquisa"
-          actions={
-            campanha ? (
-              <button
-                type="button"
-                className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
-                onClick={() =>
-                  toast.message(
-                    "Edição da pesquisa será disponibilizada em breve."
-                  )
-                }
-              >
-                Editar pesquisa
-              </button>
-            ) : null
-          }
-        >
+        <PanelCard title="Pesquisa">
           {!campanha && !criarAberto ? (
             <div className="flex h-full flex-col justify-between gap-3">
               <PlaceholderNote>
