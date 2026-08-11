@@ -234,6 +234,64 @@ export function validateConfirmacaoExclusaoCampanha(
   return null;
 }
 
+/** Motivos pré-definidos para remoção definitiva do processo (admin). */
+export const RISCOS_MOTIVOS_REMOCAO_PROCESSO = [
+  "Processo criado por engano",
+  "Empresa incorreta",
+  "Campanha de teste",
+  "Necessário reiniciar processo",
+  "Outro",
+] as const;
+
+export type RiscosMotivoRemocaoProcesso =
+  (typeof RISCOS_MOTIVOS_REMOCAO_PROCESSO)[number];
+
+/**
+ * Relatório final persistido — ainda não existe entidade.
+ * Nunca usar status "encerrada" como proxy.
+ */
+export function existeRelatorioFinalPersistidoCampanha(_campanhaId: string): boolean {
+  return false;
+}
+
+export function validateRemoverProcessoRiscos(
+  campanha: Pick<RiscosCampanhaRecord, "id" | "status">
+): string | null {
+  if (existeRelatorioFinalPersistidoCampanha(campanha.id)) {
+    return "Não é possível remover o processo: existe relatório final persistido.";
+  }
+  return null;
+}
+
+export function validateMotivoRemocaoProcesso(
+  motivoOpcao: string,
+  motivoOutro?: string
+): string | null {
+  const opcao = motivoOpcao.trim();
+  if (!opcao) return "Informe o motivo da remoção.";
+  if (
+    !(RISCOS_MOTIVOS_REMOCAO_PROCESSO as readonly string[]).includes(opcao)
+  ) {
+    return "Motivo da remoção inválido.";
+  }
+  if (opcao === "Outro") {
+    const outro = (motivoOutro ?? "").trim();
+    if (!outro) return "Descreva o motivo da remoção.";
+    if (outro.length < 5) return "O motivo deve ter ao menos 5 caracteres.";
+    if (outro.length > 2000) return "O motivo é demasiado longo.";
+  }
+  return null;
+}
+
+export function resolverTextoMotivoRemocao(
+  motivoOpcao: string,
+  motivoOutro?: string
+): string {
+  const opcao = motivoOpcao.trim();
+  if (opcao === "Outro") return (motivoOutro ?? "").trim();
+  return opcao;
+}
+
 /**
  * Pré-requisitos de negócio para liberar o botão "Abrir pesquisa".
  * Laudos SST só quando o fluxo exige (origem orçamento).

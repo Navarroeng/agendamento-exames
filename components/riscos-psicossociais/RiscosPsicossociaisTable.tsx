@@ -24,6 +24,10 @@ interface RiscosPsicossociaisTableProps {
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
   onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
+  /** Admin only — remoção definitiva. */
+  podeRemoverProcesso?: boolean;
+  onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
+  savingRemover?: boolean;
 }
 
 function ProgressoRiscos({
@@ -79,6 +83,9 @@ export function RiscosPsicossociaisTable({
   onMesChange,
   onYearChange,
   onVisualizar,
+  podeRemoverProcesso = false,
+  onRemoverProcesso,
+  savingRemover = false,
 }: RiscosPsicossociaisTableProps) {
   return (
     <Panel
@@ -117,7 +124,7 @@ export function RiscosPsicossociaisTable({
                 <th>Etapa atual</th>
                 <th>Progresso</th>
                 <th className="w-[88px] text-center">Visualizar</th>
-                <th className="w-[88px] text-center">Ações</th>
+                <th className="w-[140px] text-center">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -127,6 +134,10 @@ export function RiscosPsicossociaisTable({
                 const dataEntrada = processo.dataEntrada
                   ? formatDateIsoToBR(processo.dataEntrada.slice(0, 10))
                   : "—";
+                const podeRemoverEste =
+                  podeRemoverProcesso &&
+                  Boolean(processo.campanha?.id) &&
+                  Boolean(processo.campanha?.codigo_publico);
 
                 return (
                   <tr key={processo.processoKey}>
@@ -181,7 +192,19 @@ export function RiscosPsicossociaisTable({
                       </button>
                     </td>
                     <td className="text-center">
-                      <span className="text-[11px] text-[#94a3b8]">—</span>
+                      {podeRemoverEste ? (
+                        <button
+                          type="button"
+                          disabled={savingRemover}
+                          onClick={() => onRemoverProcesso?.(processo)}
+                          className="rounded-lg border border-[#7f1d1d]/30 bg-[#fef2f2] px-2 py-1 text-[10px] font-bold text-[#7f1d1d] transition hover:bg-[#fee2e2] disabled:opacity-40"
+                          title="Remove definitivamente a campanha e todos os dados"
+                        >
+                          Remover processo
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-[#94a3b8]">—</span>
+                      )}
                     </td>
                   </tr>
                 );

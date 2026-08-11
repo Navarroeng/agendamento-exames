@@ -466,6 +466,51 @@ export async function excluirCampanhaRiscos(
   };
 }
 
+/** Remoção definitiva do processo (admin, produção). */
+export async function removerProcessoRiscos(
+  campanhaId: string,
+  input: {
+    confirmacaoCodigo: string;
+    motivoOpcao: string;
+    motivoOutro?: string;
+  },
+  auditOptions?: CampanhaAuditOptions
+): Promise<{ codigo_publico: string; empresa_nome: string }> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/remover`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        confirmacaoCodigo: input.confirmacaoCodigo,
+        motivoOpcao: input.motivoOpcao,
+        motivoOutro: input.motivoOutro,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    codigo_publico?: string;
+    empresa_nome?: string;
+  };
+
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Não foi possível remover o processo.");
+  }
+
+  return {
+    codigo_publico: String(json.codigo_publico ?? ""),
+    empresa_nome: String(json.empresa_nome ?? ""),
+  };
+}
+
 /** UI: exclusão definitiva só em dev ou com flag pública espelhando o servidor. */
 export function exclusaoDefinitivaDisponivelNoClient(): boolean {
   if (process.env.NEXT_PUBLIC_RISCOS_PERMITIR_EXCLUSAO_DEFINITIVA === "true") {

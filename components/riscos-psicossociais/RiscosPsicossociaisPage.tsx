@@ -5,6 +5,7 @@ import { IconShield } from "@/components/ui/icons/OutlineIcons";
 import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/RiscosPsicossociaisModal";
 import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
 import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
+import { RiscosRemoverProcessoModal } from "@/components/riscos-psicossociais/RiscosRemoverProcessoModal";
 import { useRiscosPsicossociaisPage } from "@/hooks/useRiscosPsicossociaisPage";
 
 export function RiscosPsicossociaisPage() {
@@ -36,6 +37,12 @@ export function RiscosPsicossociaisPage() {
     handleCancelarProcesso,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel,
+    isAdmin,
+    processoParaRemover,
+    openRemoverProcesso,
+    closeRemoverProcesso,
+    handleRemoverProcesso,
+    savingRemoverProcesso,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
@@ -67,6 +74,17 @@ export function RiscosPsicossociaisPage() {
         onMesChange={handleMesChange}
         onYearChange={handleYearChange}
         onVisualizar={openProcesso}
+        podeRemoverProcesso={isAdmin}
+        onRemoverProcesso={openRemoverProcesso}
+        savingRemover={savingRemoverProcesso}
+      />
+
+      <RiscosRemoverProcessoModal
+        open={Boolean(processoParaRemover)}
+        processo={processoParaRemover}
+        saving={savingRemoverProcesso}
+        onClose={closeRemoverProcesso}
+        onConfirm={handleRemoverProcesso}
       />
 
       <RiscosPsicossociaisModal

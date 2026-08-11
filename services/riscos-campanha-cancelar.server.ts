@@ -5,9 +5,12 @@ import {
 } from "@/lib/auditoria";
 import {
   isRiscosCampanhaStatus,
+  resolverTextoMotivoRemocao,
   validateCancelarProcessoRiscos,
   validateConfirmacaoExclusaoCampanha,
   validateMotivoCancelamento,
+  validateMotivoRemocaoProcesso,
+  validateRemoverProcessoRiscos,
   type RiscosCampanhaRecord,
   type RiscosCampanhaStatus,
 } from "@/lib/riscos-campanha";
@@ -212,37 +215,75 @@ export async function cancelarProcessoRiscosNoServidor(
   return confirmed;
 }
 
-async function coletarPathsListaPresenca(
-  campanha: RiscosCampanhaRecord
-): Promise<string[]> {
+async function contarDadosCampanha(campanhaId: string): Promise<{
+  participantes: number;
+  sessoes: number;
+  respostas: number;
+}> {
   const admin = createAdminClient();
-  const paths = new Set<string>();
+  const [part, sess, resp] = await Promise.all([
+    admin
+      .from("riscos_campanha_participantes")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", campanhaId),
+    admin
+      .from("riscos_avaliacao_sessoes")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", campanhaId),
+    admin
+      .from("riscos_avaliacao_respostas")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", campanhaId),
+  ]);
+  if (part.error) throw part.error;
+  if (sess.error) throw sess.error;
+  if (resp.error) throw resp.error;
+  return {
+    participantes: part.count ?? 0,
+    sessoes: sess.count ?? 0,
+    respostas: resp.count ?? 0,
+  };
+}
 
-  if (campanha.orcamento_id) {
-    const { data: track } = await admin
-      .from("orcamento_riscos_psicossociais")
-      .select("lista_anexo_path")
-      .eq("orcamento_id", campanha.orcamento_id)
-      .maybeSingle();
-    if (track?.lista_anexo_path) paths.add(String(track.lista_anexo_path));
+/**
+ * Apaga a árvore da campanha. CASCADE no banco remove:
+ * participantes, sessões, vínculos, respostas, fluxo.
+ * Portal auditoria (096) fica com campanha_id/participante_id NULL.
+ */
+async function apagarArvoreCampanha(
+  campanha: RiscosCampanhaRecord
+): Promise<void> {
+  const admin = createAdminClient();
 
-    const { data: hist } = await admin
-      .from("orcamento_riscos_lista_presenca_anexos_hist")
-      .select("path")
-      .eq("orcamento_id", campanha.orcamento_id);
-    for (const row of hist ?? []) {
-      if (row.path) paths.add(String(row.path));
-    }
-  }
-
+  // Storage: só limpa anexo do fluxo da campanha (manual).
+  // Anexos ligados ao orçamento permanecem no tracking de Implantação.
+  const paths: string[] = [];
   const { data: fluxo } = await admin
     .from("riscos_campanha_fluxo")
     .select("lista_anexo_path")
     .eq("campanha_id", campanha.id)
     .maybeSingle();
-  if (fluxo?.lista_anexo_path) paths.add(String(fluxo.lista_anexo_path));
+  if (fluxo?.lista_anexo_path) paths.push(String(fluxo.lista_anexo_path));
 
-  return Array.from(paths);
+  if (paths.length > 0) {
+    const { error: storageErr } = await admin.storage
+      .from(RISCOS_LISTA_PRESENCA_BUCKET)
+      .remove(paths);
+    if (storageErr) {
+      console.warn("[apagarArvoreCampanha] storage:", storageErr.message);
+    }
+  }
+
+  const { error: delErr } = await admin
+    .from("riscos_campanhas")
+    .delete()
+    .eq("id", campanha.id);
+  if (delErr) throw delErr;
+
+  const still = await selecionarCampanhaPorId(campanha.id);
+  if (still) {
+    throw new Error("A exclusão não foi confirmada no banco.");
+  }
 }
 
 export async function excluirCampanhaRiscosNoServidor(
@@ -252,7 +293,7 @@ export async function excluirCampanhaRiscosNoServidor(
 ): Promise<{ codigo_publico: string; empresa_nome: string }> {
   if (!exclusaoDefinitivaCampanhaPermitida()) {
     throw new Error(
-      "Exclusão definitiva não está habilitada neste ambiente. Use Cancelar processo em produção."
+      "Exclusão definitiva não está habilitada neste ambiente. Use Remover processo (admin) ou Cancelar processo."
     );
   }
 
@@ -269,7 +310,7 @@ export async function excluirCampanhaRiscosNoServidor(
   if (confErr) throw new Error(confErr);
 
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  const paths = await coletarPathsListaPresenca(before);
+  const contagens = await contarDadosCampanha(id);
 
   await registrarAuditoria({
     usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
@@ -286,41 +327,95 @@ export async function excluirCampanhaRiscosNoServidor(
       status: before.status,
       origem: before.origem,
       cliente_id: before.cliente_id,
+      cnpj: before.cnpj,
+      ...contagens,
     },
     dadosDepois: { excluida: true },
   });
 
-  const admin = createAdminClient();
-
-  if (paths.length > 0) {
-    const { error: storageErr } = await admin.storage
-      .from(RISCOS_LISTA_PRESENCA_BUCKET)
-      .remove(paths);
-    if (storageErr) {
-      console.warn("[excluirCampanha] falha ao limpar storage:", storageErr.message);
-    }
-  }
-
-  if (before.orcamento_id) {
-    await admin
-      .from("orcamento_riscos_lista_presenca_anexos_hist")
-      .delete()
-      .eq("orcamento_id", before.orcamento_id);
-  }
-
-  const { error: delErr } = await admin
-    .from("riscos_campanhas")
-    .delete()
-    .eq("id", id);
-  if (delErr) throw delErr;
-
-  const still = await selecionarCampanhaPorId(id);
-  if (still) {
-    throw new Error("A exclusão não foi confirmada no banco.");
-  }
+  await apagarArvoreCampanha(before);
 
   return {
     codigo_publico: before.codigo_publico,
     empresa_nome: before.empresa_nome,
+  };
+}
+
+/**
+ * Remoção definitiva do processo (produção, somente admin via API).
+ * Sem gate de ambiente — permissão administrativa é obrigatória na rota.
+ */
+export async function removerProcessoRiscosNoServidor(
+  campanhaId: string,
+  input: {
+    confirmacaoCodigo: string;
+    motivoOpcao: string;
+    motivoOutro?: string;
+  },
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+): Promise<{ codigo_publico: string; empresa_nome: string; cliente_id: string | null }> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const before = await selecionarCampanhaPorId(id);
+  if (!before) throw new Error("Campanha não encontrada.");
+
+  const regra = validateRemoverProcessoRiscos(before);
+  if (regra) throw new Error(regra);
+
+  const confErr = validateConfirmacaoExclusaoCampanha(
+    before.codigo_publico,
+    input.confirmacaoCodigo
+  );
+  if (confErr) throw new Error(confErr);
+
+  const motivoErr = validateMotivoRemocaoProcesso(
+    input.motivoOpcao,
+    input.motivoOutro
+  );
+  if (motivoErr) throw new Error(motivoErr);
+  const motivoTexto = resolverTextoMotivoRemocao(
+    input.motivoOpcao,
+    input.motivoOutro
+  );
+
+  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+  const agora = new Date().toISOString();
+  const contagens = await contarDadosCampanha(id);
+
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+    acao: AUDITORIA_ACOES.riscos_processo_removido,
+    registroId: before.id,
+    registroNome: before.empresa_nome,
+    descricao: `${nome} removeu definitivamente o processo ${before.codigo_publico}. Motivo: ${motivoTexto}`,
+    dadosAntes: {
+      campanha_id: before.id,
+      codigo_publico: before.codigo_publico,
+      empresa: before.empresa_nome,
+      cnpj: before.cnpj,
+      status: before.status,
+      origem: before.origem,
+      cliente_id: before.cliente_id,
+      removido_em: agora,
+      removido_por: nome,
+      motivo: motivoTexto,
+      motivo_opcao: input.motivoOpcao.trim(),
+      quantidade_participantes: contagens.participantes,
+      quantidade_sessoes: contagens.sessoes,
+      quantidade_respostas: contagens.respostas,
+    },
+    dadosDepois: { removido: true },
+  });
+
+  await apagarArvoreCampanha(before);
+
+  return {
+    codigo_publico: before.codigo_publico,
+    empresa_nome: before.empresa_nome,
+    cliente_id: before.cliente_id,
   };
 }

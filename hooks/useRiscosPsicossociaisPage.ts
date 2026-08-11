@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
+import { isPerfilAdmin } from "@/lib/permissions";
 import {
   EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS,
   buildRiscosPsicossociaisProcesso,
@@ -27,6 +28,7 @@ import {
   excluirCampanhaRiscos,
   encerrarCampanhaRiscos,
   garantirCodigoAcessoCampanha,
+  removerProcessoRiscos,
 } from "@/services/riscos-campanha.service";
 import {
   atualizarParticipanteCampanha,
@@ -47,11 +49,16 @@ import { listarProcessosRiscosPsicossociais } from "@/services/riscos-psicossoci
 
 export function useRiscosPsicossociaisPage() {
   const auditContext = useAuditoriaUsuario();
+  const { profile } = useAuth();
+  const isAdmin = isPerfilAdmin(profile?.perfil);
   const [processos, setProcessos] = useState<RiscosPsicossociaisProcesso[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
   const [savingCampanha, setSavingCampanha] = useState(false);
   const [savingParticipante, setSavingParticipante] = useState(false);
+  const [savingRemoverProcesso, setSavingRemoverProcesso] = useState(false);
+  const [processoParaRemover, setProcessoParaRemover] =
+    useState<RiscosPsicossociaisProcesso | null>(null);
   const [modalParticipantes, setModalParticipantes] = useState<
     RiscosCampanhaParticipanteRecord[]
   >([]);
@@ -660,6 +667,66 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, refresh]
   );
 
+  const openRemoverProcesso = useCallback(
+    (processo: RiscosPsicossociaisProcesso) => {
+      if (!isAdmin) {
+        toast.error("Somente administradores podem remover o processo.");
+        return;
+      }
+      if (!processo.campanha?.id) {
+        toast.error("Não há campanha para remover neste processo.");
+        return;
+      }
+      setProcessoParaRemover(processo);
+    },
+    [isAdmin]
+  );
+
+  const closeRemoverProcesso = useCallback(() => {
+    if (savingRemoverProcesso) return;
+    setProcessoParaRemover(null);
+  }, [savingRemoverProcesso]);
+
+  const handleRemoverProcesso = useCallback(
+    async (input: {
+      confirmacaoCodigo: string;
+      motivoOpcao: string;
+      motivoOutro?: string;
+    }) => {
+      if (!isAdmin) {
+        toast.error("Somente administradores podem remover o processo.");
+        return;
+      }
+      const campanhaId = processoParaRemover?.campanha?.id;
+      if (!campanhaId) return;
+      setSavingRemoverProcesso(true);
+      try {
+        const result = await removerProcessoRiscos(campanhaId, input, {
+          auditContext,
+        });
+        setProcessoParaRemover(null);
+        if (modalProcesso?.campanha?.id === campanhaId) {
+          setModalProcesso(null);
+          setModalParticipantes([]);
+          setCampanhaStatusSincronizado(false);
+        }
+        await refresh();
+        toast.success(
+          `Processo ${result.codigo_publico} removido. A empresa pode iniciar um novo processo.`
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao remover o processo."
+        );
+        throw err;
+      } finally {
+        setSavingRemoverProcesso(false);
+      }
+    },
+    [isAdmin, processoParaRemover, auditContext, refresh, modalProcesso]
+  );
+
   const handleGarantirCodigoAcesso = useCallback(
     async (regenerar = false) => {
       const campanhaId = modalProcesso?.campanha?.id;
@@ -813,6 +880,12 @@ export function useRiscosPsicossociaisPage() {
     handleCancelarProcesso,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
+    isAdmin,
+    processoParaRemover,
+    openRemoverProcesso,
+    closeRemoverProcesso,
+    handleRemoverProcesso,
+    savingRemoverProcesso,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
