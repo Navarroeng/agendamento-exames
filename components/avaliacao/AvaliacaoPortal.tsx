@@ -704,9 +704,7 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
             </div>
           ) : null}
 
-          {step === "final" ? (
-            <FinalStep onFinish={() => void handleEncerrar()} />
-          ) : null}
+          {step === "final" ? <FinalStep /> : null}
 
           {step === "ja_respondida" ? (
             <StatusMessageStep
@@ -1440,7 +1438,7 @@ function StatusMessageStep({
   );
 }
 
-function FinalStep({ onFinish }: { onFinish: () => void }) {
+function FinalStep() {
   return (
     <div className="space-y-5 text-center">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-brand-green to-[#15803d] text-2xl font-extrabold text-white shadow-[0_12px_28px_rgba(31,157,85,0.35)]">
@@ -1453,29 +1451,17 @@ function FinalStep({ onFinish }: { onFinish: () => void }) {
         <p className="mt-2 text-base font-semibold text-[#334155]">
           Obrigado pela sua participação.
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-[#64748b]">
-          Sua contribuição é muito importante para a melhoria do ambiente de
-          trabalho.
-        </p>
       </div>
 
       <div className="space-y-2 rounded-2xl border border-[#e8edf5] bg-[#f8fafc] px-4 py-4 text-left text-sm text-[#475569]">
         <p>Suas respostas foram registradas com segurança.</p>
         <p>
-          Nenhuma resposta individual será disponibilizada para gestores.
+          Nenhuma resposta individual será disponibilizada aos gestores.
         </p>
         <p>
           Apenas resultados consolidados serão utilizados nas análises.
         </p>
       </div>
-
-      <button
-        type="button"
-        className="btn btn-primary min-h-[52px] w-full justify-center py-3.5 text-[15px]"
-        onClick={onFinish}
-      >
-        Encerrar
-      </button>
     </div>
   );
 }
