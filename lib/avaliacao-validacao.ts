@@ -79,7 +79,7 @@ export function avaliarPeriodoCampanha(
   const fim = String(campanha.data_encerramento ?? "").slice(0, 10);
   const status = String(campanha.status ?? "");
 
-  if (status === "encerrada" || (fim && hoje > fim)) {
+  if (status === "encerrada" || status === "cancelada" || (fim && hoje > fim)) {
     return "encerrada";
   }
   if (status !== "aberta") return "indisponivel";

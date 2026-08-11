@@ -9,6 +9,9 @@ export const MOTIVO_INVALIDACAO_PADRAO =
 export const MOTIVO_INVALIDACAO_ORFA =
   "Sessão órfã: participante removido antes da regra de invalidação administrativa.";
 
+export const MOTIVO_INVALIDACAO_CANCELAMENTO_PROCESSO =
+  "Cancelamento do processo: sessões excluídas da consolidação; dados preservados para auditoria.";
+
 export type SessaoValidadeFields = {
   valida?: boolean | null;
   invalidada_em?: string | null;

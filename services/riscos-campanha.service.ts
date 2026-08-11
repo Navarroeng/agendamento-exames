@@ -29,7 +29,7 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 
 const CAMPANHA_SELECT =
-  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, created_at, updated_at";
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
 
 const CAMPANHA_SELECT_LEGACY =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
@@ -64,6 +64,11 @@ function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
     responsavel: row.responsavel ? String(row.responsavel) : null,
     observacoes: row.observacoes ? String(row.observacoes) : null,
     criado_por: row.criado_por ? String(row.criado_por) : null,
+    cancelada_em: row.cancelada_em ? String(row.cancelada_em) : null,
+    cancelada_por: row.cancelada_por ? String(row.cancelada_por) : null,
+    motivo_cancelamento: row.motivo_cancelamento
+      ? String(row.motivo_cancelamento)
+      : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
   };
@@ -381,6 +386,92 @@ export async function encerrarCampanhaRiscos(
   }
 
   return json.campanha;
+}
+
+export async function cancelarProcessoRiscos(
+  campanhaId: string,
+  motivo: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/cancelar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        motivo,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível cancelar o processo.");
+  }
+
+  if (json.campanha.status !== "cancelada") {
+    throw new Error(
+      "O cancelamento não foi confirmado no banco. O status da campanha não foi alterado."
+    );
+  }
+
+  return json.campanha;
+}
+
+export async function excluirCampanhaRiscos(
+  campanhaId: string,
+  confirmacaoCodigo: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<{ codigo_publico: string; empresa_nome: string }> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/excluir`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        confirmacaoCodigo,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    codigo_publico?: string;
+    empresa_nome?: string;
+  };
+
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Não foi possível excluir a campanha.");
+  }
+
+  return {
+    codigo_publico: String(json.codigo_publico ?? ""),
+    empresa_nome: String(json.empresa_nome ?? ""),
+  };
+}
+
+/** UI: exclusão definitiva só em dev ou com flag pública espelhando o servidor. */
+export function exclusaoDefinitivaDisponivelNoClient(): boolean {
+  if (process.env.NEXT_PUBLIC_RISCOS_PERMITIR_EXCLUSAO_DEFINITIVA === "true") {
+    return true;
+  }
+  return process.env.NODE_ENV !== "production";
 }
 
 async function gerarCodigoUnico(

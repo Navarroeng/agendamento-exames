@@ -33,6 +33,9 @@ export function RiscosPsicossociaisPage() {
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,
+    handleCancelarProcesso,
+    handleExcluirCampanha,
+    exclusaoDefinitivaDisponivel,
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,
@@ -81,6 +84,9 @@ export function RiscosPsicossociaisPage() {
         onCriarCampanha={handleCriarCampanha}
         onAbrirCampanha={handleAbrirCampanha}
         onEncerrarCampanha={handleEncerrarCampanha}
+        onCancelarProcesso={handleCancelarProcesso}
+        onExcluirCampanha={handleExcluirCampanha}
+        exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}
         onGarantirCodigoAcesso={handleGarantirCodigoAcesso}
         onCriarParticipante={handleCriarParticipante}
         onEditarParticipante={handleEditarParticipante}

@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 const CAMPANHA_SELECT =
-  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, created_at, updated_at";
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
 
 const CAMPANHA_SELECT_LEGACY =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
@@ -45,6 +45,11 @@ function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
     responsavel: row.responsavel ? String(row.responsavel) : null,
     observacoes: row.observacoes ? String(row.observacoes) : null,
     criado_por: row.criado_por ? String(row.criado_por) : null,
+    cancelada_em: row.cancelada_em ? String(row.cancelada_em) : null,
+    cancelada_por: row.cancelada_por ? String(row.cancelada_por) : null,
+    motivo_cancelamento: row.motivo_cancelamento
+      ? String(row.motivo_cancelamento)
+      : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
   };
@@ -56,7 +61,7 @@ function isMissingColumnError(error: {
 } | null): boolean {
   if (!error) return false;
   return (
-    /origem|responsavel|observacoes/i.test(error.message ?? "") ||
+    /origem|responsavel|observacoes|cancelada_/i.test(error.message ?? "") ||
     error.code === "42703"
   );
 }

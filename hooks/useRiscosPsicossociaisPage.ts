@@ -21,7 +21,10 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   abrirCampanhaRiscos,
   buscarCampanhaPorCodigoPublico,
+  cancelarProcessoRiscos,
   criarCampanhaRiscos,
+  exclusaoDefinitivaDisponivelNoClient,
+  excluirCampanhaRiscos,
   encerrarCampanhaRiscos,
   garantirCodigoAcessoCampanha,
 } from "@/services/riscos-campanha.service";
@@ -227,7 +230,7 @@ export function useRiscosPsicossociaisPage() {
       atualizarCampanhaNoEstado(fresh);
       if (statusListagem && statusListagem !== fresh.status) {
         toast.message(
-          `Status sincronizado com o banco: ${fresh.status === "em_preparacao" ? "Em preparação" : fresh.status === "aberta" ? "Aberta" : "Encerrada"} (antes na tela: ${statusListagem}).`
+          `Status sincronizado com o banco: ${fresh.status === "em_preparacao" ? "Em preparação" : fresh.status === "aberta" ? "Aberta" : fresh.status === "cancelada" ? "Cancelada" : "Encerrada"} (antes na tela: ${statusListagem}).`
         );
       }
       return fresh;
@@ -586,6 +589,77 @@ export function useRiscosPsicossociaisPage() {
     }
   }, [modalProcesso, auditContext, refresh]);
 
+  const handleCancelarProcesso = useCallback(
+    async (motivo: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      setSavingCampanha(true);
+      try {
+        const campanha = await cancelarProcessoRiscos(campanhaId, motivo, {
+          auditContext,
+        });
+        if (campanha.status !== "cancelada") {
+          throw new Error(
+            "O cancelamento não foi confirmado no banco. O status da campanha não foi alterado."
+          );
+        }
+        setModalProcesso((prev) =>
+          prev ? { ...prev, campanha } : prev
+        );
+        setProcessos((prev) =>
+          prev.map((p) =>
+            p.campanha?.id === campanha.id ? { ...p, campanha } : p
+          )
+        );
+        setCampanhaStatusSincronizado(true);
+        await refresh();
+        toast.success("Processo cancelado. O histórico foi preservado.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao cancelar o processo."
+        );
+        throw err;
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [modalProcesso, auditContext, refresh]
+  );
+
+  const handleExcluirCampanha = useCallback(
+    async (confirmacaoCodigo: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      if (!exclusaoDefinitivaDisponivelNoClient()) {
+        toast.error(
+          "Exclusão definitiva não está disponível neste ambiente."
+        );
+        return;
+      }
+      setSavingCampanha(true);
+      try {
+        await excluirCampanhaRiscos(campanhaId, confirmacaoCodigo, {
+          auditContext,
+        });
+        setModalProcesso(null);
+        setModalParticipantes([]);
+        setCampanhaStatusSincronizado(false);
+        await refresh();
+        toast.success("Campanha excluída definitivamente.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao excluir a campanha."
+        );
+        throw err;
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [modalProcesso, auditContext, refresh]
+  );
+
   const handleGarantirCodigoAcesso = useCallback(
     async (regenerar = false) => {
       const campanhaId = modalProcesso?.campanha?.id;
@@ -736,6 +810,9 @@ export function useRiscosPsicossociaisPage() {
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,
+    handleCancelarProcesso,
+    handleExcluirCampanha,
+    exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
     handleGarantirCodigoAcesso,
     handleCriarParticipante,
     handleEditarParticipante,

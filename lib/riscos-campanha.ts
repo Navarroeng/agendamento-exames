@@ -10,6 +10,7 @@ export const RISCOS_CAMPANHA_STATUS = [
   "em_preparacao",
   "aberta",
   "encerrada",
+  "cancelada",
 ] as const;
 
 export type RiscosCampanhaStatus = (typeof RISCOS_CAMPANHA_STATUS)[number];
@@ -19,6 +20,7 @@ export const RISCOS_CAMPANHA_STATUS_LABELS: Record<RiscosCampanhaStatus, string>
     em_preparacao: "Em preparação",
     aberta: "Aberta",
     encerrada: "Encerrada",
+    cancelada: "Cancelada",
   };
 
 export type RiscosCampanhaRecord = {
@@ -39,6 +41,9 @@ export type RiscosCampanhaRecord = {
   responsavel: string | null;
   observacoes: string | null;
   criado_por: string | null;
+  cancelada_em?: string | null;
+  cancelada_por?: string | null;
+  motivo_cancelamento?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -196,6 +201,39 @@ export function acoesConvitePorStatus(
   };
 }
 
+/** Cancelar processo: qualquer status exceto já cancelada (e sem relatório real — futuro). */
+export function validateCancelarProcessoRiscos(
+  campanha: Pick<RiscosCampanhaRecord, "status">
+): string | null {
+  if (campanha.status === "cancelada") {
+    return "Esta pesquisa já está cancelada.";
+  }
+  return null;
+}
+
+export function validateMotivoCancelamento(motivo: string): string | null {
+  const t = motivo.trim();
+  if (!t) return "Informe o motivo do cancelamento.";
+  if (t.length < 5) return "O motivo deve ter ao menos 5 caracteres.";
+  if (t.length > 2000) return "O motivo é demasiado longo.";
+  return null;
+}
+
+/** Exclusão definitiva: exige confirmação do código público. */
+export function validateConfirmacaoExclusaoCampanha(
+  codigoPublico: string,
+  confirmacaoDigitada: string
+): string | null {
+  const esperado = codigoPublico.trim().toUpperCase();
+  const digitado = confirmacaoDigitada.trim().toUpperCase();
+  if (!esperado) return "Código da campanha inválido.";
+  if (!digitado) return "Digite o código público da campanha para confirmar.";
+  if (digitado !== esperado) {
+    return "O código digitado não confere com o código da campanha.";
+  }
+  return null;
+}
+
 /**
  * Pré-requisitos de negócio para liberar o botão "Abrir pesquisa".
  * Laudos SST só quando o fluxo exige (origem orçamento).
@@ -234,6 +272,9 @@ export function validateAbrirCampanhaRiscos(
   }
   if (campanha.status === "encerrada") {
     return "Não é possível abrir uma pesquisa encerrada.";
+  }
+  if (campanha.status === "cancelada") {
+    return "Não é possível abrir uma pesquisa cancelada.";
   }
   if (campanha.status !== "em_preparacao") {
     return "Somente pesquisas em preparação podem ser abertas.";

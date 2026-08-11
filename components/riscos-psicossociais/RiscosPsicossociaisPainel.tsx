@@ -31,6 +31,9 @@ interface RiscosPsicossociaisPainelProps {
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
   onEncerrarCampanha: () => Promise<void>;
+  onCancelarProcesso: (motivo: string) => Promise<void>;
+  onExcluirCampanha: (confirmacaoCodigo: string) => Promise<void>;
+  exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante: (
@@ -54,6 +57,9 @@ export function RiscosPsicossociaisPainel({
   onCriarCampanha,
   onAbrirCampanha,
   onEncerrarCampanha,
+  onCancelarProcesso,
+  onExcluirCampanha,
+  exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
@@ -148,6 +154,9 @@ export function RiscosPsicossociaisPainel({
         onCriarCampanha={onCriarCampanha}
         onAbrirCampanha={onAbrirCampanha}
         onEncerrarCampanha={onEncerrarCampanha}
+        onCancelarProcesso={onCancelarProcesso}
+        onExcluirCampanha={onExcluirCampanha}
+        exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}
         onGarantirCodigoAcesso={onGarantirCodigoAcesso}
         onCriarParticipante={onCriarParticipante}
         onEditarParticipante={onEditarParticipante}

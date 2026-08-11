@@ -47,6 +47,9 @@ interface RiscosPainelCardsProps {
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
   onEncerrarCampanha: () => Promise<void>;
+  onCancelarProcesso: (motivo: string) => Promise<void>;
+  onExcluirCampanha: (confirmacaoCodigo: string) => Promise<void>;
+  exclusaoDefinitivaDisponivel?: boolean;
   onGarantirCodigoAcesso: (regenerar?: boolean) => Promise<void>;
   onCriarParticipante: (input: RiscosParticipanteInput) => Promise<void>;
   onEditarParticipante: (
@@ -122,6 +125,9 @@ export function RiscosPainelCards({
   onCriarCampanha,
   onAbrirCampanha,
   onEncerrarCampanha,
+  onCancelarProcesso,
+  onExcluirCampanha,
+  exclusaoDefinitivaDisponivel = false,
   onGarantirCodigoAcesso: _onGarantirCodigoAcesso,
   onCriarParticipante,
   onEditarParticipante,
@@ -133,6 +139,12 @@ export function RiscosPainelCards({
   const [criarAberto, setCriarAberto] = useState(false);
   const [confirmAbrirOpen, setConfirmAbrirOpen] = useState(false);
   const [confirmEncerrarOpen, setConfirmEncerrarOpen] = useState(false);
+  const [confirmCancelarOpen, setConfirmCancelarOpen] = useState(false);
+  const [confirmExcluirOpen, setConfirmExcluirOpen] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [erroCancelar, setErroCancelar] = useState<string | null>(null);
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = useState("");
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
   const [quantidade, setQuantidade] = useState("");
@@ -144,9 +156,13 @@ export function RiscosPainelCards({
     [previstos, participantes]
   );
 
-  const pesquisaEncerrada = campanha?.status === "encerrada";
-  /** Relatório ainda não é gerado no produto; UI libera ações após encerrar. */
-  const relatorioExiste = pesquisaEncerrada;
+  const pesquisaCancelada = campanha?.status === "cancelada";
+  /** Relatório ainda não é entidade real; não usar encerrada/cancelada como proxy. */
+  const relatorioExiste = false;
+  const podeCancelarProcesso =
+    Boolean(campanha) &&
+    campanhaStatusSincronizado &&
+    !pesquisaCancelada;
 
   const historico = useMemo(
     () => buildHistorico(processo, participantes),
@@ -517,6 +533,38 @@ export function RiscosPainelCards({
                     Encerrar pesquisa
                   </button>
                 ) : null}
+                {podeCancelarProcesso ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-brand-red/30 px-3 py-2 text-xs font-bold text-brand-red disabled:opacity-40"
+                    disabled={savingCampanha}
+                    onClick={() => {
+                      setMotivoCancelamento("");
+                      setErroCancelar(null);
+                      setConfirmCancelarOpen(true);
+                    }}
+                    title="Cancela o processo preservando o histórico para auditoria"
+                  >
+                    Cancelar processo
+                  </button>
+                ) : null}
+                {exclusaoDefinitivaDisponivel &&
+                campanha &&
+                campanhaStatusSincronizado ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#7f1d1d]/40 bg-[#fef2f2] px-3 py-2 text-xs font-bold text-[#7f1d1d] disabled:opacity-40"
+                    disabled={savingCampanha}
+                    onClick={() => {
+                      setConfirmacaoExclusao("");
+                      setErroExcluir(null);
+                      setConfirmExcluirOpen(true);
+                    }}
+                    title="Exclusão definitiva — somente ambiente controlado"
+                  >
+                    Excluir campanha
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -572,7 +620,7 @@ export function RiscosPainelCards({
         <PanelCard title="Relatório">
           {!relatorioExiste ? (
             <PlaceholderNote>
-              Relatório disponível após o encerramento da pesquisa.
+              Relatório disponível quando houver relatório final persistido.
             </PlaceholderNote>
           ) : (
             <div className="mt-auto flex flex-wrap gap-2">
@@ -744,6 +792,185 @@ export function RiscosPainelCards({
           Após o encerramento, novos participantes não poderão responder.
         </p>
       </Modal>
+
+      <Modal
+        open={confirmCancelarOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmCancelarOpen(false);
+        }}
+        title="Cancelar processo"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmCancelarOpen(false)}
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-red px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha || !campanha || !motivoCancelamento.trim()}
+              onClick={() => {
+                void (async () => {
+                  setErroCancelar(null);
+                  const motivo = motivoCancelamento.trim();
+                  if (!motivo) {
+                    setErroCancelar("Informe o motivo do cancelamento.");
+                    return;
+                  }
+                  if (motivo.length < 5) {
+                    setErroCancelar("O motivo deve ter ao menos 5 caracteres.");
+                    return;
+                  }
+                  try {
+                    await onCancelarProcesso(motivo);
+                    setConfirmCancelarOpen(false);
+                    setMotivoCancelamento("");
+                  } catch (err) {
+                    setErroCancelar(
+                      err instanceof Error
+                        ? err.message
+                        : "Não foi possível cancelar o processo."
+                    );
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Cancelando…" : "Confirmar cancelamento"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm leading-relaxed text-[#475569]">
+          <p>
+            Esta ação irá cancelar o processo de Riscos Psicossociais.
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Os participantes não poderão mais acessar a pesquisa.</li>
+            <li>
+              As respostas existentes deixarão de ser consideradas nos
+              resultados.
+            </li>
+            <li>O histórico será preservado para auditoria.</li>
+          </ul>
+          <Field
+            label={
+              <>
+                Motivo do cancelamento
+                <RequiredMark />
+              </>
+            }
+          >
+            <textarea
+              className="min-h-[96px] w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm text-navy outline-none focus:border-brand-blue"
+              value={motivoCancelamento}
+              onChange={(e) => setMotivoCancelamento(e.target.value)}
+              placeholder="Descreva o motivo do cancelamento"
+              disabled={savingCampanha}
+              maxLength={2000}
+            />
+          </Field>
+          {erroCancelar ? (
+            <p className="text-xs font-semibold text-brand-red">{erroCancelar}</p>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmExcluirOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmExcluirOpen(false);
+        }}
+        title="Excluir campanha"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmExcluirOpen(false)}
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-[#7f1d1d] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={
+                savingCampanha ||
+                !campanha ||
+                confirmacaoExclusao.trim().toUpperCase() !==
+                  (campanha.codigo_publico ?? "").trim().toUpperCase()
+              }
+              onClick={() => {
+                void (async () => {
+                  setErroExcluir(null);
+                  try {
+                    await onExcluirCampanha(confirmacaoExclusao);
+                    setConfirmExcluirOpen(false);
+                    setConfirmacaoExclusao("");
+                  } catch (err) {
+                    setErroExcluir(
+                      err instanceof Error
+                        ? err.message
+                        : "Não foi possível excluir a campanha."
+                    );
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Excluindo…" : "Excluir definitivamente"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm leading-relaxed text-[#475569]">
+          <p className="font-semibold text-[#7f1d1d]">
+            Esta ação apaga definitivamente a campanha e não pode ser desfeita.
+          </p>
+          <p>
+            Disponível apenas em ambiente controlado/desenvolvimento. Em
+            produção use <strong>Cancelar processo</strong>.
+          </p>
+          <Field
+            label={
+              <>
+                Digite o código público{" "}
+                <span className="font-extrabold text-navy">
+                  {campanha?.codigo_publico}
+                </span>{" "}
+                para confirmar
+                <RequiredMark />
+              </>
+            }
+          >
+            <input
+              type="text"
+              className="w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm uppercase tracking-wide text-navy outline-none focus:border-brand-blue"
+              value={confirmacaoExclusao}
+              onChange={(e) => setConfirmacaoExclusao(e.target.value)}
+              placeholder="Código da campanha"
+              disabled={savingCampanha}
+              autoComplete="off"
+            />
+          </Field>
+          {erroExcluir ? (
+            <p className="text-xs font-semibold text-brand-red">{erroExcluir}</p>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -839,6 +1066,27 @@ function buildHistorico(
       id: "encerrada",
       label: "Pesquisa encerrada",
       done: campanha?.status === "encerrada",
+    },
+    {
+      id: "cancelada",
+      label: "Processo cancelado",
+      detail:
+        campanha?.status === "cancelada"
+          ? [
+              campanha.cancelada_em
+                ? `Em ${formatDateIsoToBR(campanha.cancelada_em.slice(0, 10))}`
+                : null,
+              campanha.cancelada_por
+                ? `Por ${campanha.cancelada_por}`
+                : null,
+              campanha.motivo_cancelamento
+                ? `Motivo: ${campanha.motivo_cancelamento}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Cancelada"
+          : undefined,
+      done: campanha?.status === "cancelada",
     },
     {
       id: "relatorio",
