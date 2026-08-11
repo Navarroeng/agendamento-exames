@@ -66,8 +66,6 @@ export type RiscosCampanhaManualCreateInput = {
   responsavel: string;
   dataInicioIso: string;
   dataEncerramentoIso: string;
-  quantidadePrevista: number;
-  observacoes?: string | null;
 };
 
 const CODIGO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -87,10 +85,9 @@ export function isRiscosCampanhaStatus(
   return (RISCOS_CAMPANHA_STATUS as readonly string[]).includes(value);
 }
 
-function validatePeriodoEQuantidade(input: {
+function validatePeriodoCampanhaBase(input: {
   dataInicioIso: string;
   dataEncerramentoIso: string;
-  quantidadePrevista: number;
   empresaNome: string;
   cnpj: string;
 }): string | null {
@@ -105,10 +102,6 @@ function validatePeriodoEQuantidade(input: {
   if (fim < inicio) {
     return "A data de encerramento deve ser igual ou posterior ao início.";
   }
-  const qtd = Number(input.quantidadePrevista);
-  if (!Number.isFinite(qtd) || qtd < 1 || !Number.isInteger(qtd)) {
-    return "Informe a quantidade prevista de colaboradores (número inteiro ≥ 1).";
-  }
   if (!input.empresaNome.trim()) {
     return "Empresa não identificada no processo.";
   }
@@ -121,8 +114,12 @@ function validatePeriodoEQuantidade(input: {
 export function validateRiscosCampanhaCreateInput(
   input: RiscosCampanhaCreateInput
 ): string | null {
-  const base = validatePeriodoEQuantidade(input);
+  const base = validatePeriodoCampanhaBase(input);
   if (base) return base;
+  const qtd = Number(input.quantidadePrevista);
+  if (!Number.isFinite(qtd) || qtd < 1 || !Number.isInteger(qtd)) {
+    return "Informe a quantidade prevista de colaboradores (número inteiro ≥ 1).";
+  }
   if (!input.orcamentoId) {
     return "Processo de Riscos inválido.";
   }
@@ -132,7 +129,7 @@ export function validateRiscosCampanhaCreateInput(
 export function validateRiscosCampanhaManualCreateInput(
   input: RiscosCampanhaManualCreateInput
 ): string | null {
-  const base = validatePeriodoEQuantidade(input);
+  const base = validatePeriodoCampanhaBase(input);
   if (base) return base;
   if (!input.clienteId.trim()) {
     return "Cliente inválido.";

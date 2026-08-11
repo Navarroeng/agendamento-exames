@@ -684,7 +684,8 @@ export async function criarCampanhaManualCliente(
     empresa_nome: input.empresaNome.trim(),
     data_inicio: input.dataInicioIso.slice(0, 10),
     data_encerramento: input.dataEncerramentoIso.slice(0, 10),
-    quantidade_prevista: Math.trunc(Number(input.quantidadePrevista)),
+    // Coluna permanece no banco (check > 0); formulário manual não coleta mais.
+    quantidade_prevista: 1,
     status: "em_preparacao" as const,
     codigo_publico: codigo,
     codigo_acesso_salt: acesso.salt,
@@ -692,7 +693,7 @@ export async function criarCampanhaManualCliente(
     codigo_acesso_exibicao: acesso.exibicao,
     origem: RISCOS_CAMPANHA_ORIGEM.manual_cliente,
     responsavel: input.responsavel.trim(),
-    observacoes: input.observacoes?.trim() || null,
+    observacoes: null,
     criado_por: usuarioNome,
   };
 

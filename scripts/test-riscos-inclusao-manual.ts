@@ -61,7 +61,6 @@ run("TESTE 1 validação criação manual", () => {
       responsavel: "AGATHA",
       dataInicioIso: "2026-08-01",
       dataEncerramentoIso: "2026-08-31",
-      quantidadePrevista: 5,
     }),
     null
   );
@@ -73,8 +72,18 @@ run("TESTE 1 validação criação manual", () => {
       responsavel: "AGATHA",
       dataInicioIso: "2026-08-01",
       dataEncerramentoIso: "2026-08-31",
-      quantidadePrevista: 5,
     })
+  );
+  assert.equal(
+    validateRiscosCampanhaManualCreateInput({
+      clienteId: "cli-1",
+      cnpj: "12345678000199",
+      empresaNome: "Empresa",
+      responsavel: "",
+      dataInicioIso: "2026-08-01",
+      dataEncerramentoIso: "2026-08-31",
+    }),
+    "Selecione o responsável interno."
   );
 });
 

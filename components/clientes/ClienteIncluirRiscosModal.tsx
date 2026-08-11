@@ -36,8 +36,6 @@ export function ClienteIncluirRiscosModal({
   const [responsavelNome, setResponsavelNome] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
-  const [quantidade, setQuantidade] = useState("1");
-  const [observacoes, setObservacoes] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
@@ -46,8 +44,6 @@ export function ClienteIncluirRiscosModal({
     setResponsavelNome(auditContext.usuarioNome?.trim() || "");
     setDataInicio(new Date().toISOString().slice(0, 10));
     setDataEncerramento("");
-    setQuantidade("1");
-    setObservacoes("");
     setLoadingUsers(true);
     void listarUsuariosAtivosParaResponsavel()
       .then((rows) => {
@@ -88,8 +84,6 @@ export function ClienteIncluirRiscosModal({
           responsavel: responsavelNome.trim(),
           dataInicioIso: dataInicio,
           dataEncerramentoIso: dataEncerramento,
-          quantidadePrevista: Number(quantidade),
-          observacoes: observacoes.trim() || null,
         },
         { auditContext }
       );
@@ -186,26 +180,6 @@ export function ClienteIncluirRiscosModal({
             />
           </Field>
         </div>
-        <Field label={<>Quantidade prevista de participantes <RequiredMark /></>}>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            className="field-input"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            disabled={saving}
-          />
-        </Field>
-        <Field label="Observações">
-          <textarea
-            className="field-input min-h-[88px]"
-            value={observacoes}
-            onChange={(e) => setObservacoes(e.target.value)}
-            disabled={saving}
-            placeholder="Opcional"
-          />
-        </Field>
       </div>
     </Modal>
   );
