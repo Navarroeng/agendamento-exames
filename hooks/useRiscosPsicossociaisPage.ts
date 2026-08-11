@@ -14,6 +14,7 @@ import {
   type RiscosPsicossociaisFilters,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import { mesclarCampanhaListagemModal } from "@/lib/riscos-campanha-origem";
 import {
   resolveInitialMesListagem,
   resolveMesParaAno,
@@ -94,9 +95,13 @@ export function useRiscosPsicossociaisPage() {
         // Modal aberto: status da campanha só vem de sync/abrir/encerrar (API),
         // nunca volta a ser o da listagem (pode estar stale/otimista).
         if (prev.campanha?.id) {
+          const campanha = mesclarCampanhaListagemModal(
+            updated.campanha,
+            prev.campanha
+          );
           return withRiscosProgressoAtualizado(
             { ...updated, processoKey: prev.processoKey },
-            { campanha: prev.campanha }
+            { campanha }
           );
         }
         return { ...updated, processoKey: prev.processoKey };
@@ -562,6 +567,7 @@ export function useRiscosPsicossociaisPage() {
           )
         );
         setModalParticipantes([]);
+        await refresh();
         toast.success("Campanha criada com sucesso.");
       } catch (err) {
         console.error(err);
@@ -572,7 +578,7 @@ export function useRiscosPsicossociaisPage() {
         setSavingCampanha(false);
       }
     },
-    [modalProcesso, auditContext]
+    [modalProcesso, auditContext, refresh]
   );
 
   const handleAbrirCampanha = useCallback(async () => {

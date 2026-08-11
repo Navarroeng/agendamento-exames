@@ -53,8 +53,84 @@ export const MSG_CAMPANHA_ATIVA_CLIENTE =
 export const HISTORICO_CRIACAO_MANUAL =
   "Pesquisa Psicossocial criada manualmente pelo cadastro do cliente.";
 
-/** Status considerados "ativos" para bloquear duplicidade de inclusão manual. */
+/** Status considerados "ativos" para bloquear duplicidade (manual/orçamento). */
 export const RISCOS_CAMPANHA_STATUS_ATIVOS = [
   "em_preparacao",
   "aberta",
 ] as const;
+
+/** Status que podem ser a campanha “atual” do progresso (nunca cancelada). */
+export const RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO = [
+  "em_preparacao",
+  "aberta",
+  "encerrada",
+] as const;
+
+export function isCampanhaStatusAtivo(
+  status: string | null | undefined
+): boolean {
+  return (RISCOS_CAMPANHA_STATUS_ATIVOS as readonly string[]).includes(
+    String(status ?? "")
+  );
+}
+
+export function isCampanhaStatusParaProgresso(
+  status: string | null | undefined
+): boolean {
+  return (RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO as readonly string[]).includes(
+    String(status ?? "")
+  );
+}
+
+type CampanhaParaEscolha = {
+  id: string;
+  status: string;
+  created_at?: string | null;
+};
+
+/**
+ * Escolhe a campanha que alimenta etapa/progresso/participantes.
+ * Nunca usa `cancelada`. Prefere aberta > em_preparacao > encerrada,
+ * e em empate a mais recente (`created_at`).
+ */
+export function escolherCampanhaParaProgresso<T extends CampanhaParaEscolha>(
+  candidates: readonly (T | null | undefined)[]
+): T | null {
+  const elegiveis = candidates.filter(
+    (c): c is T => Boolean(c) && isCampanhaStatusParaProgresso(c!.status)
+  );
+  if (elegiveis.length === 0) return null;
+
+  const rank = (status: string) => {
+    if (status === "aberta") return 3;
+    if (status === "em_preparacao") return 2;
+    if (status === "encerrada") return 1;
+    return 0;
+  };
+
+  return [...elegiveis].sort((a, b) => {
+    const rd = rank(b.status) - rank(a.status);
+    if (rd !== 0) return rd;
+    return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+  })[0];
+}
+
+/**
+ * Ao mesclar listagem × modal: não reaplicar campanha cancelada sobre uma ativa.
+ * Se ambas elegíveis e mesmo id, preferir a do modal (status mais fresco da API).
+ */
+export function mesclarCampanhaListagemModal<T extends CampanhaParaEscolha>(
+  listagem: T | null | undefined,
+  modal: T | null | undefined
+): T | null {
+  const escolhida = escolherCampanhaParaProgresso([listagem, modal]);
+  if (
+    escolhida &&
+    modal &&
+    escolhida.id === modal.id &&
+    isCampanhaStatusParaProgresso(modal.status)
+  ) {
+    return modal;
+  }
+  return escolhida;
+}

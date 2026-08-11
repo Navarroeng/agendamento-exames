@@ -18,6 +18,8 @@ import {
   MSG_CAMPANHA_ATIVA_CLIENTE,
   RISCOS_CAMPANHA_ORIGEM,
   RISCOS_CAMPANHA_STATUS_ATIVOS,
+  RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO,
+  escolherCampanhaParaProgresso,
   normalizeRiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
 import {
@@ -113,15 +115,15 @@ export async function buscarCampanhaPorOrcamento(
   orcamentoId: string
 ): Promise<RiscosCampanhaRecord | null> {
   const supabase = createClient();
-  let data: Record<string, unknown> | null = null;
+  let data: Array<Record<string, unknown>> | null = null;
   let error: { message?: string; code?: string } | null = null;
 
   const primary = await supabase
     .from("riscos_campanhas")
     .select(CAMPANHA_SELECT)
     .eq("orcamento_id", orcamentoId)
-    .maybeSingle();
-  data = (primary.data as Record<string, unknown> | null) ?? null;
+    .order("created_at", { ascending: false });
+  data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
   error = primary.error;
 
   if (
@@ -133,8 +135,8 @@ export async function buscarCampanhaPorOrcamento(
       .from("riscos_campanhas")
       .select(CAMPANHA_SELECT_LEGACY)
       .eq("orcamento_id", orcamentoId)
-      .maybeSingle();
-    data = (fb.data as Record<string, unknown> | null) ?? null;
+      .order("created_at", { ascending: false });
+    data = (fb.data as Array<Record<string, unknown>> | null) ?? null;
     error = fb.error;
   }
 
@@ -144,8 +146,56 @@ export async function buscarCampanhaPorOrcamento(
     }
     throw error;
   }
+  if (!data?.length) return null;
+  return escolherCampanhaParaProgresso(data.map(mapCampanhaRow));
+}
+
+/** Bloqueia nova criação: só campanha em_preparacao|aberta. */
+export async function buscarCampanhaAtivaPorOrcamento(
+  orcamentoId: string
+): Promise<RiscosCampanhaRecord | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("orcamento_id", orcamentoId)
+    .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (
+      /origem|responsavel|observacoes/i.test(error.message ?? "") ||
+      error.code === "42703"
+    ) {
+      const fb = await supabase
+        .from("riscos_campanhas")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .eq("orcamento_id", orcamentoId)
+        .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fb.error) {
+        if (
+          fb.error.code === "42P01" ||
+          fb.error.message?.includes("does not exist")
+        ) {
+          return null;
+        }
+        throw fb.error;
+      }
+      if (!fb.data) return null;
+      return mapCampanhaRow(fb.data as Record<string, unknown>);
+    }
+    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+      return null;
+    }
+    throw error;
+  }
   if (!data) return null;
-  return mapCampanhaRow(data);
+  return mapCampanhaRow(data as Record<string, unknown>);
 }
 
 export async function listarCampanhasPorOrcamentos(
@@ -185,11 +235,18 @@ export async function listarCampanhasPorOrcamentos(
     throw error;
   }
 
+  const porOrcamento = new Map<string, RiscosCampanhaRecord[]>();
   for (const row of data ?? []) {
     const mapped = mapCampanhaRow(row);
-    if (mapped.orcamento_id) {
-      map.set(mapped.orcamento_id, mapped);
-    }
+    if (!mapped.orcamento_id) continue;
+    const list = porOrcamento.get(mapped.orcamento_id) ?? [];
+    list.push(mapped);
+    porOrcamento.set(mapped.orcamento_id, list);
+  }
+
+  for (const [orcamentoId, camps] of Array.from(porOrcamento.entries())) {
+    const escolhida = escolherCampanhaParaProgresso(camps);
+    if (escolhida) map.set(orcamentoId, escolhida);
   }
   return map;
 }
@@ -203,6 +260,7 @@ export async function listarCampanhasManuaisAtivas(): Promise<
     .select(CAMPANHA_SELECT)
     .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
     .is("orcamento_id", null)
+    .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
     .order("created_at", { ascending: false });
 
   if (
@@ -542,9 +600,9 @@ export async function criarCampanhaRiscos(
   const validationError = validateRiscosCampanhaCreateInput(input);
   if (validationError) throw new Error(validationError);
 
-  const existente = await buscarCampanhaPorOrcamento(input.orcamentoId);
+  const existente = await buscarCampanhaAtivaPorOrcamento(input.orcamentoId);
   if (existente) {
-    throw new Error("Já existe uma campanha para este processo.");
+    throw new Error("Já existe uma campanha ativa para este processo.");
   }
 
   const supabase = createClient();

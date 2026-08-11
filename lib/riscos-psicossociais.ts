@@ -28,6 +28,7 @@ import {
   exigeLaudosSstPorOrigem,
   isOrigemManualCliente,
   normalizeRiscosCampanhaOrigem,
+  escolherCampanhaParaProgresso,
   RISCOS_CAMPANHA_ORIGEM,
   type RiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
@@ -249,14 +250,13 @@ export function getTotalEtapasRiscosPorOrigem(
   return getEtapasRiscosPorOrigem(origem).length;
 }
 
-/** Cadastro concluído quando cadastrados ≥ quantidade prevista. */
+/** Cadastro concluído quando há pelo menos 1 participante ativo na campanha atual. */
 export function isCadastroColaboradoresConcluido(input: {
-  quantidadePrevista: number | null | undefined;
   participantesCadastrados: number;
+  /** @deprecated Ignorado — regra atual não usa quantidade prevista. */
+  quantidadePrevista?: number | null | undefined;
 }): boolean {
-  const previstos = Math.max(0, Number(input.quantidadePrevista) || 0);
-  if (previstos < 1) return false;
-  return input.participantesCadastrados >= previstos;
+  return Math.max(0, Number(input.participantesCadastrados) || 0) >= 1;
 }
 
 /** Link enviado: pesquisa aberta (ou já encerrada — link foi liberado). */
@@ -335,7 +335,6 @@ export function calcularProgressoEtapasRiscos(input: {
   const totalEtapas = etapas.length;
 
   const cadastroOk = isCadastroColaboradoresConcluido({
-    quantidadePrevista: input.quantidadePrevista,
     participantesCadastrados: input.participantesCadastrados,
   });
   const linkOk = isLinkEnviadoConcluido(input.campanhaStatus);
@@ -478,6 +477,8 @@ export function buildRiscosPsicossociaisProcesso(
     opts?.origem ?? campanha?.origem ?? RISCOS_CAMPANHA_ORIGEM.orcamento
   );
   const exigeLaudosSst = exigeLaudosSstPorOrigem(origem);
+  /** Cancelada nunca entra no progresso — fonte única com a listagem. */
+  const campanhaAtiva = escolherCampanhaParaProgresso([campanha]);
 
   const laudosSstConcluido = exigeLaudosSst
     ? laudos.status === "concluido"
@@ -485,17 +486,21 @@ export function buildRiscosPsicossociaisProcesso(
   const listaPresenca = mapListaPresencaFromTracking(tracking);
   const listaPresencaConcluida = isListaPresencaEtapaConcluida(listaPresenca);
 
-  const { cadastrados, respondidos } = resolveContagemParticipantes(opts);
-  const relatorioGerado = opts?.relatorioGerado === true;
+  const { cadastrados, respondidos } = campanhaAtiva
+    ? resolveContagemParticipantes(opts)
+    : { cadastrados: 0, respondidos: 0 };
+  const relatorioGerado = campanhaAtiva
+    ? opts?.relatorioGerado === true
+    : false;
 
   const progresso = calcularProgressoEtapasRiscos({
     origem,
     laudosSstConcluido,
     listaPresencaConcluida,
-    quantidadePrevista: campanha?.quantidade_prevista ?? null,
+    quantidadePrevista: campanhaAtiva?.quantidade_prevista ?? null,
     participantesCadastrados: cadastrados,
     participantesRespondidos: respondidos,
-    campanhaStatus: campanha?.status ?? null,
+    campanhaStatus: campanhaAtiva?.status ?? null,
     relatorioGerado,
   });
 
@@ -515,7 +520,7 @@ export function buildRiscosPsicossociaisProcesso(
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
-    campanha,
+    campanha: campanhaAtiva,
     participantesCadastrados: cadastrados,
     participantesRespondidos: respondidos,
     relatorioGerado,
@@ -532,8 +537,9 @@ export function withRiscosProgressoAtualizado(
     relatorioGerado?: boolean;
   }
 ): RiscosPsicossociaisProcesso {
-  const campanha =
+  const campanhaRaw =
     patch && "campanha" in patch ? patch.campanha ?? null : processo.campanha;
+  const campanha = escolherCampanhaParaProgresso([campanhaRaw]);
   const contagem = patch?.participantes
     ? contarParticipantesParaProgresso(patch.participantes)
     : {

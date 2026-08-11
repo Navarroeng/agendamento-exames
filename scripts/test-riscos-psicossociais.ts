@@ -157,7 +157,7 @@ const riscosCadastro = buildRiscosPsicossociaisProcesso(
   listaTracking,
   campanhaPrep,
   {
-    participantes: [{ status: "pendente" }, { status: "pendente" }],
+    participantes: [{ status: "pendente" }],
   }
 );
 assert.equal(riscosCadastro.etapaAtual, "link_enviado");
