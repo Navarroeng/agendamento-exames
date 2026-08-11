@@ -170,8 +170,8 @@ export async function criarParticipanteCampanha(
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,
       data_nascimento: dataNascimento,
-      cargo: params.input.cargo?.trim() || null,
-      setor: params.input.setor?.trim() || null,
+      cargo: null,
+      setor: null,
       email: params.input.email?.trim() || null,
       status: "pendente",
       codigo_acesso: codigo,
@@ -257,8 +257,6 @@ export async function atualizarParticipanteCampanha(
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,
       data_nascimento: dataNascimento,
-      cargo: params.input.cargo?.trim() || null,
-      setor: params.input.setor?.trim() || null,
       email: params.input.email?.trim() || null,
     })
     .eq("id", params.participanteId)
@@ -287,15 +285,11 @@ export async function atualizarParticipanteCampanha(
     dadosAntes: {
       nome_completo: before.nome_completo,
       cpf: before.cpf,
-      cargo: before.cargo,
-      setor: before.setor,
       email: before.email,
     },
     dadosDepois: {
       nome_completo: record.nome_completo,
       cpf: record.cpf,
-      cargo: record.cargo,
-      setor: record.setor,
       email: record.email,
     },
   });

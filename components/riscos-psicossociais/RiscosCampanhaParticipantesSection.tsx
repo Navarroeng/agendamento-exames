@@ -54,8 +54,6 @@ export function RiscosCampanhaParticipantesSection({
       nomeCompleto: p.nome_completo,
       cpf: p.cpf,
       dataNascimento: p.data_nascimento ?? "",
-      cargo: p.cargo ?? "",
-      setor: p.setor ?? "",
       email: p.email ?? "",
     } satisfies RiscosParticipanteInput;
   }, [editingId, participantes]);
@@ -143,16 +141,10 @@ export function RiscosCampanhaParticipantesSection({
           <table className="w-full min-w-0 table-fixed text-left text-xs lg:min-w-full">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
-                <th className="w-[28%] px-3 py-2.5">Nome</th>
-                <th className="w-[12%] px-3 py-2.5">CPF</th>
-                <th className="hidden w-[16%] px-3 py-2.5 sm:table-cell">
-                  Cargo
-                </th>
-                <th className="hidden w-[14%] px-3 py-2.5 md:table-cell">
-                  Setor
-                </th>
-                <th className="w-[14%] px-3 py-2.5">Status</th>
-                <th className="hidden w-[12%] px-3 py-2.5 lg:table-cell">
+                <th className="w-[42%] px-3 py-2.5">Nome</th>
+                <th className="w-[18%] px-3 py-2.5">CPF</th>
+                <th className="w-[16%] px-3 py-2.5">Status</th>
+                <th className="hidden w-[14%] px-3 py-2.5 sm:table-cell">
                   Cadastro
                 </th>
                 <th className="w-[72px] px-3 py-2.5 text-center">Ações</th>
@@ -172,20 +164,10 @@ export function RiscosCampanhaParticipantesSection({
                   <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
                     {maskCpfParticipante(p.cpf)}
                   </td>
-                  <td className="hidden px-3 py-2.5 sm:table-cell">
-                    <span className="line-clamp-2 break-words">
-                      {p.cargo?.trim() || "—"}
-                    </span>
-                  </td>
-                  <td className="hidden px-3 py-2.5 md:table-cell">
-                    <span className="line-clamp-2 break-words">
-                      {p.setor?.trim() || "—"}
-                    </span>
-                  </td>
                   <td className="px-3 py-2.5">
                     <StatusBadge status={p.status} />
                   </td>
-                  <td className="hidden px-3 py-2.5 tabular-nums text-[#64748b] lg:table-cell">
+                  <td className="hidden px-3 py-2.5 tabular-nums text-[#64748b] sm:table-cell">
                     {p.created_at
                       ? formatDateBR(p.created_at.slice(0, 10))
                       : "—"}

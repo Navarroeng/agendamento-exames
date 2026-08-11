@@ -14,8 +14,6 @@ const EMPTY_FORM: RiscosParticipanteInput = {
   nomeCompleto: "",
   cpf: "",
   dataNascimento: "",
-  cargo: "",
-  setor: "",
   email: "",
 };
 
@@ -51,8 +49,6 @@ export function RiscosParticipanteFormModal({
         nomeCompleto: initial.nomeCompleto,
         cpf: initial.cpf,
         dataNascimento: nasc,
-        cargo: initial.cargo ?? "",
-        setor: initial.setor ?? "",
         email: initial.email ?? "",
       });
       setCpfMasked(maskCPFInput(initial.cpf));
@@ -77,8 +73,6 @@ export function RiscosParticipanteFormModal({
         nomeCompleto: form.nomeCompleto,
         cpf: form.cpf,
         dataNascimento: nascMasked,
-        cargo: form.cargo,
-        setor: form.setor,
         email: form.email,
       });
     } catch (err) {
@@ -184,26 +178,6 @@ export function RiscosParticipanteFormModal({
                 setNascMasked(masked);
                 setForm((prev) => ({ ...prev, dataNascimento: masked }));
               }}
-            />
-          </Field>
-          <Field label="Cargo">
-            <input
-              className="field-input w-full"
-              value={form.cargo ?? ""}
-              disabled={saving}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, cargo: e.target.value }))
-              }
-            />
-          </Field>
-          <Field label="Setor">
-            <input
-              className="field-input w-full"
-              value={form.setor ?? ""}
-              disabled={saving}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, setor: e.target.value }))
-              }
             />
           </Field>
           <Field label="E-mail (opcional)" className="sm:col-span-2">

@@ -56,14 +56,13 @@ export type RiscosParticipanteInput = {
   cpf: string;
   /** DD/MM/AAAA ou YYYY-MM-DD */
   dataNascimento: string;
-  cargo?: string;
-  setor?: string;
   email?: string;
 };
 
 /**
  * Colunas previstas para importação Excel futura:
- * Nome | CPF | Data de nascimento | Cargo | Setor | E-mail
+ * Nome | CPF | Data de nascimento | E-mail
+ * (Cargo/Setor permanecem opcionais no banco, mas fora do cadastro atual.)
  */
 
 export type RiscosParticipantesResumo = {
