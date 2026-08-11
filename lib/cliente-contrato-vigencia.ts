@@ -12,6 +12,9 @@ export const CONTRATO_VIGENTE_ERROR_MESSAGE =
 export const CONTRATO_ENCERRADO_ERROR_MESSAGE =
   "O contrato desta empresa está encerrado. Não é possível criar novos agendamentos.";
 
+/** Mesma regra de vigência, aplicada a inclusão manual em Riscos Psicossociais. */
+export const CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE =
+  "Cliente sem contrato vigente. Não é possível iniciar a Pesquisa Psicossocial.";
 
 export type ContratoVigenciaResult = {
   vigente: boolean;
@@ -61,6 +64,32 @@ export function contratoEstaVigenteNaData(
   if (!isDateWithinVigencia(dataAgendamento, inicio, fim)) return false;
   if (!contratoLiberaAgendamento(contrato)) return false;
   return true;
+}
+
+/**
+ * Indica se o cliente possui ao menos um contrato vigente na data (padrão: hoje).
+ * Reutiliza `contratoEstaVigenteNaData` — não criar regra paralela.
+ */
+export function clienteTemContratoVigente(
+  contratos: Array<
+    Pick<
+      ClienteContratoRecord,
+      | "id"
+      | "status"
+      | "data_inicio"
+      | "data_fim"
+      | "orcamento_id"
+      | "boleto_pago"
+      | "liberado_para_agendamento"
+    >
+  >,
+  dataReferenciaIso?: string
+): boolean {
+  const data = (dataReferenciaIso ?? new Date().toISOString().slice(0, 10)).slice(
+    0,
+    10
+  );
+  return contratos.some((c) => contratoEstaVigenteNaData(c, data));
 }
 
 export async function verificarContratoVigente(

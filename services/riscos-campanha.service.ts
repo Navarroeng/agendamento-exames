@@ -22,9 +22,14 @@ import {
   RISCOS_CAMPANHA_STATUS_ATIVOS,
   normalizeRiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
+import {
+  CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE,
+  clienteTemContratoVigente,
+} from "@/lib/cliente-contrato-vigencia";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 import { buscarPerfilUsuarioLogado } from "@/services/perfil.service";
 
 const CAMPANHA_SELECT =
@@ -407,6 +412,11 @@ export async function criarCampanhaManualCliente(
 ): Promise<RiscosCampanhaRecord> {
   const validationError = validateRiscosCampanhaManualCreateInput(input);
   if (validationError) throw new Error(validationError);
+
+  const contratos = await listarContratosPorCliente(input.clienteId);
+  if (!clienteTemContratoVigente(contratos)) {
+    throw new Error(CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE);
+  }
 
   const ativa = await buscarCampanhaAtivaPorCliente(input.clienteId);
   if (ativa) {

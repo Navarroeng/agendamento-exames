@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ClienteContratoAtualCard } from "@/components/clientes/ClienteContratoAtualCard";
@@ -29,6 +29,7 @@ import {
 import { SIM_NAO } from "@/lib/constants";
 import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import { clienteTemContratoVigente } from "@/lib/cliente-contrato-vigencia";
 import type { ClienteRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -88,6 +89,7 @@ export function ClienteViewModal({
   } = useClienteEdit(cliente);
 
   const {
+    contratos,
     contratoAtual,
     historico,
     loading,
@@ -107,6 +109,15 @@ export function ClienteViewModal({
     closeForm,
     closeEncerrar,
   } = useClienteContratos(cliente?.id ?? null, cliente?.nome ?? null);
+
+  const podeIncluirRiscos = clienteTemContratoVigente(contratos);
+
+  // Não abrir modal se o contrato deixar de ser vigente.
+  useEffect(() => {
+    if (!podeIncluirRiscos && incluirRiscosOpen) {
+      setIncluirRiscosOpen(false);
+    }
+  }, [podeIncluirRiscos, incluirRiscosOpen]);
 
   if (!cliente) return null;
 
@@ -237,13 +248,15 @@ export function ClienteViewModal({
                     >
                       Editar cliente
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary !px-4 !py-2 text-xs"
-                      onClick={() => setIncluirRiscosOpen(true)}
-                    >
-                      Incluir em Riscos Psicossociais
-                    </button>
+                    {podeIncluirRiscos ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary !px-4 !py-2 text-xs"
+                        onClick={() => setIncluirRiscosOpen(true)}
+                      >
+                        Incluir em Riscos Psicossociais
+                      </button>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">

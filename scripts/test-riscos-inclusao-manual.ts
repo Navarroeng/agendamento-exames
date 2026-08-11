@@ -9,6 +9,10 @@ import {
   RISCOS_CAMPANHA_ORIGEM,
 } from "../lib/riscos-campanha-origem";
 import {
+  CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE,
+  clienteTemContratoVigente,
+} from "../lib/cliente-contrato-vigencia";
+import {
   validateRiscosCampanhaManualCreateInput,
   type RiscosCampanhaRecord,
 } from "../lib/riscos-campanha";
@@ -211,6 +215,28 @@ run("TESTE 10 manual sem contrato undefined", () => {
   assert.equal(p.implantacao.numeroContrato, null);
   assert.equal(p.implantacao.orcamento.numero, "");
   assert.ok(p.implantacao.orcamento.cliente_nome);
+});
+
+run("TESTE 11 contrato vigente é pré-requisito da inclusão manual", () => {
+  const vigente = {
+    id: "c1",
+    status: "ativo" as const,
+    data_inicio: "2026-01-01",
+    data_fim: "2026-12-31",
+    orcamento_id: null as string | null,
+    boleto_pago: false,
+    liberado_para_agendamento: true,
+  };
+  assert.equal(clienteTemContratoVigente([vigente], "2026-08-11"), true);
+  assert.equal(clienteTemContratoVigente([], "2026-08-11"), false);
+  assert.equal(
+    clienteTemContratoVigente(
+      [{ ...vigente, status: "encerrado" }],
+      "2026-08-11"
+    ),
+    false
+  );
+  assert.ok(CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE.includes("contrato vigente"));
 });
 
 console.log("\nTodos os testes de inclusão manual passaram.");
