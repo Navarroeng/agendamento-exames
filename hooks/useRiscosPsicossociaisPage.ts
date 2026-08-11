@@ -68,7 +68,11 @@ export function useRiscosPsicossociaisPage() {
       setProcessos(data);
       setModalProcesso((prev) => {
         if (!prev) return null;
-        const updated = data.find((p) => p.processoKey === prev.processoKey);
+        const updated =
+          data.find((p) => p.processoKey === prev.processoKey) ??
+          (prev.campanha?.id
+            ? data.find((p) => p.campanha?.id === prev.campanha?.id)
+            : undefined);
         return updated ?? prev;
       });
     } catch (err) {
@@ -455,7 +459,14 @@ export function useRiscosPsicossociaisPage() {
     setSavingCampanha(true);
     try {
       const campanha = await abrirCampanhaRiscos(campanhaId, { auditContext });
+      if (campanha.status !== "aberta") {
+        throw new Error(
+          "A abertura não foi confirmada no banco. O status da campanha não foi alterado."
+        );
+      }
       atualizarCampanhaNoEstado(campanha);
+      // Re-sincroniza a lista a partir do banco (fonte de verdade).
+      await refresh();
       toast.success("Pesquisa aberta para respostas.");
     } catch (err) {
       console.error(err);
@@ -466,7 +477,7 @@ export function useRiscosPsicossociaisPage() {
     } finally {
       setSavingCampanha(false);
     }
-  }, [modalProcesso, auditContext, atualizarCampanhaNoEstado]);
+  }, [modalProcesso, auditContext, atualizarCampanhaNoEstado, refresh]);
 
   const handleGarantirCodigoAcesso = useCallback(
     async (regenerar = false) => {

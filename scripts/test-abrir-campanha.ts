@@ -5,6 +5,7 @@ import {
   validateAbrirCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "../lib/riscos-campanha";
+import { assertStatusAbertaPersistido } from "../services/riscos-campanha-abrir.server";
 
 function run(name: string, fn: () => void) {
   fn();
@@ -95,6 +96,26 @@ run("convite: aberta exibe e permite copiar", () => {
 run("convite: encerrada exibe mas não copia", () => {
   assert.equal(campanhaExibeLinkConvite("encerrada"), true);
   assert.equal(campanhaPermiteCopiarLink("encerrada"), false);
+});
+
+run("confirmação: status aberta passa", () => {
+  assert.doesNotThrow(() =>
+    assertStatusAbertaPersistido({
+      status: "aberta",
+      codigo_publico: "QCWMKJ",
+    } as never)
+  );
+});
+
+run("confirmação: em_preparacao falha (não permite UI Aberta)", () => {
+  assert.throws(
+    () =>
+      assertStatusAbertaPersistido({
+        status: "em_preparacao",
+        codigo_publico: "QCWMKJ",
+      } as never),
+    /não foi confirmada/i
+  );
 });
 
 console.log("\nTodos os testes de abertura de campanha passaram.");

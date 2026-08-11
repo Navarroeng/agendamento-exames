@@ -6,7 +6,6 @@ import {
 import {
   gerarCodigoPublicoCampanha,
   isRiscosCampanhaStatus,
-  validateAbrirCampanhaRiscos,
   validateEncerrarCampanhaRiscos,
   validateRiscosCampanhaCreateInput,
   validateRiscosCampanhaManualCreateInput,
@@ -507,66 +506,38 @@ export async function abrirCampanhaRiscos(
   campanhaId: string,
   auditOptions?: CampanhaAuditOptions
 ): Promise<RiscosCampanhaRecord> {
-  const perfil = await buscarPerfilUsuarioLogado();
-  if (!isPerfilAdmin(perfil?.perfil)) {
-    throw new Error("Somente administradores podem abrir a pesquisa.");
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/abrir`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível abrir a pesquisa.");
   }
 
-  const supabase = createClient();
-  const { data: atual, error: errAtual } = await supabase
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .eq("id", campanhaId)
-    .maybeSingle();
-  if (errAtual) throw errAtual;
-  if (!atual) throw new Error("Campanha não encontrada.");
-
-  const before = mapCampanhaRow(atual as Record<string, unknown>);
-  const validacao = validateAbrirCampanhaRiscos(before);
-  if (validacao) throw new Error(validacao);
-
-  const { data, error } = await supabase
-    .from("riscos_campanhas")
-    .update({ status: "aberta" })
-    .eq("id", campanhaId)
-    .eq("status", "em_preparacao")
-    .select(CAMPANHA_SELECT)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) {
+  if (json.campanha.status !== "aberta") {
     throw new Error(
-      "Não foi possível abrir a pesquisa. Verifique se ela ainda está em preparação."
+      "A abertura não foi confirmada no banco. O status da campanha não foi alterado."
     );
   }
 
-  const record = mapCampanhaRow(data as Record<string, unknown>);
-  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_campanha_aberta,
-    registroId: record.id,
-    registroNome: record.empresa_nome,
-    descricao: `${nome} abriu a campanha ${record.codigo_publico} para respostas.`,
-    dadosAntes: {
-      status: before.status,
-      codigo_publico: before.codigo_publico,
-      data_inicio: before.data_inicio,
-      data_encerramento: before.data_encerramento,
-    },
-    dadosDepois: {
-      status: record.status,
-      codigo_publico: record.codigo_publico,
-      data_inicio: record.data_inicio,
-      data_encerramento: record.data_encerramento,
-      updated_at: record.updated_at ?? null,
-    },
-  });
-
-  return record;
+  return json.campanha;
 }
 
 /**
