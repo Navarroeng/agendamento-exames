@@ -1,4 +1,8 @@
 import type { ClienteContratoRecord } from "@/lib/types";
+import {
+  clienteDisponivelParaAgendamento,
+  resolveDisponibilidadeAgendamentoCliente,
+} from "@/lib/cliente-disponibilidade-agendamento";
 
 export type ContratoParaAgendamento = Pick<
   ClienteContratoRecord,
@@ -6,25 +10,28 @@ export type ContratoParaAgendamento = Pick<
   | "boleto_pago"
   | "liberado_para_agendamento"
   | "status"
->;
+> &
+  Partial<
+    Pick<ClienteContratoRecord, "id" | "data_inicio" | "data_fim" | "encerrado_em">
+  >;
 
 export type ClienteParaAgendamento = {
   disponivel_agendamento?: boolean | null;
   agendamento_bloqueio_manual?: boolean | null;
+  agendamento_bloqueio_motivo?: string | null;
 };
 
 /**
- * Regra única de liberação para agendamento (badge / disponibilidade).
- * - encerrado/cancelado → bloqueado;
- * - originado de orçamento → boleto_pago = true;
- * - manual → liberado_para_agendamento.
- *
- * Vigência (data do exame) é validada em contratoEstaVigenteNaData no ato de agendar.
+ * Liberação financeira/status (sem vigência de datas).
+ * Para disponibilidade completa use resolveDisponibilidadeAgendamentoCliente.
  */
 export function contratoLiberaAgendamento(
   contrato: ContratoParaAgendamento
 ): boolean {
   if (contrato.status === "encerrado" || contrato.status === "cancelado") {
+    return false;
+  }
+  if (contrato.status !== "ativo" && contrato.status !== "em_renovacao") {
     return false;
   }
   if (contrato.orcamento_id) {
@@ -34,27 +41,19 @@ export function contratoLiberaAgendamento(
 }
 
 /**
- * Cliente pode agendar se não houver bloqueio manual e
- * (algum contrato libera, ou — sem contratos de orçamento — o flag legado permitir).
+ * Regra central (boolean): delega para resolveDisponibilidadeAgendamentoCliente.
+ * Exige contratos com datas para avaliar vigência.
  */
 export function clientePodeAgendar(
   cliente: ClienteParaAgendamento,
-  contratos: ContratoParaAgendamento[]
+  contratos: ContratoParaAgendamento[],
+  dataReferenciaIso?: string
 ): boolean {
-  if (cliente.agendamento_bloqueio_manual === true) {
-    return false;
-  }
-
-  if (contratos.some((c) => contratoLiberaAgendamento(c))) {
-    return true;
-  }
-
-  const temContratoOrcamento = contratos.some((c) => Boolean(c.orcamento_id));
-  if (temContratoOrcamento) {
-    return false;
-  }
-
-  return cliente.disponivel_agendamento !== false;
+  return clienteDisponivelParaAgendamento({
+    cliente,
+    contratos,
+    dataReferenciaIso,
+  });
 }
 
 export function labelAgendamentoLiberacao(
@@ -62,3 +61,5 @@ export function labelAgendamentoLiberacao(
 ): "Liberado" | "Bloqueado" {
   return liberado ? "Liberado" : "Bloqueado";
 }
+
+export { resolveDisponibilidadeAgendamentoCliente };

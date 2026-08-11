@@ -3,7 +3,7 @@ import {
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
 import { listarClientesParaSelect } from "@/services/cliente.service";
-import { contratoLiberaAgendamento } from "@/lib/cliente-pode-agendar";
+import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
 import type { ClienteContratoRecord } from "@/lib/types";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
@@ -42,14 +42,11 @@ function isDateWithinVigencia(
 export function contratoEstaVigenteNaData(
   contrato: Pick<
     ClienteContratoRecord,
-    | "id"
-    | "status"
-    | "data_inicio"
-    | "data_fim"
-    | "orcamento_id"
-    | "boleto_pago"
-    | "liberado_para_agendamento"
-  >,
+    "status" | "orcamento_id" | "boleto_pago" | "liberado_para_agendamento"
+  > &
+    Partial<
+      Pick<ClienteContratoRecord, "id" | "data_inicio" | "data_fim">
+    >,
   dataAgendamento: string
 ): boolean {
   if (contrato.status === "cancelado" || contrato.status === "encerrado") {
@@ -62,7 +59,12 @@ export function contratoEstaVigenteNaData(
   const fim = contrato.data_fim?.trim() ?? "";
   if (!inicio || !fim) return false;
   if (!isDateWithinVigencia(dataAgendamento, inicio, fim)) return false;
-  if (!contratoLiberaAgendamento(contrato)) return false;
+  // Liberação financeira / manual (mesmo critério de contratoLiberaAgendamento)
+  if (contrato.orcamento_id) {
+    if (contrato.boleto_pago !== true) return false;
+  } else if (contrato.liberado_para_agendamento !== true) {
+    return false;
+  }
   return true;
 }
 
@@ -154,21 +156,30 @@ export async function assertContratoVigentePorNome(
   clienteNome: string,
   dataAgendamento: string
 ): Promise<void> {
-  const result = await verificarContratoVigentePorNome(
-    clienteNome,
-    dataAgendamento
-  );
-  if (result.vigente) return;
+  const nome = clienteNome.trim();
+  if (!nome) return;
 
-  if (result.clienteId) {
-    const contratos = await listarContratosPorCliente(result.clienteId);
-    const encerrado = contratos.find(
-      (c) => c.status === "encerrado" || Boolean(c.encerrado_em)
-    );
-    if (encerrado) {
-      throw new Error(CONTRATO_ENCERRADO_ERROR_MESSAGE);
-    }
+  const clientes = await listarClientesParaSelect();
+  const cliente = clientes.find(
+    (c) => c.nome.trim().toLowerCase() === nome.toLowerCase()
+  );
+  if (!cliente) {
+    throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
   }
 
-  throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
+  const contratos = await listarContratosPorCliente(cliente.id);
+  const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      disponivel_agendamento: cliente.disponivel_agendamento,
+      agendamento_bloqueio_manual: cliente.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: cliente.agendamento_bloqueio_motivo,
+    },
+    contratos,
+    dataReferenciaIso: dataAgendamento,
+  });
+
+  if (disponibilidade.disponivel) return;
+  throw new Error(
+    disponibilidade.motivo ?? CONTRATO_VIGENTE_ERROR_MESSAGE
+  );
 }

@@ -23,13 +23,14 @@ import {
 } from "@/lib/cliente-procuracao";
 import {
   boolToDisponivelAgendamentoForm,
-  formatClienteAgendamentoBadgeLabel,
+  formatDisponibilidadeAgendamentoLabel,
   isClienteDisponivelAgendamento,
 } from "@/lib/cliente-disponivel-agendamento";
 import { SIM_NAO } from "@/lib/constants";
 import { formatCNPJ, maskCNPJInput } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { clienteTemContratoVigente } from "@/lib/cliente-contrato-vigencia";
+import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
 import type { ClienteRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -111,6 +112,14 @@ export function ClienteViewModal({
   } = useClienteContratos(cliente?.id ?? null, cliente?.nome ?? null);
 
   const podeIncluirRiscos = clienteTemContratoVigente(contratos);
+  const disponibilidadeAgendamento = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      disponivel_agendamento: cliente?.disponivel_agendamento,
+      agendamento_bloqueio_manual: cliente?.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: cliente?.agendamento_bloqueio_motivo,
+    },
+    contratos,
+  });
 
   // Não abrir modal se o contrato deixar de ser vigente.
   useEffect(() => {
@@ -342,8 +351,8 @@ export function ClienteViewModal({
                   />
                   <InfoItem
                     label="Disponível para agendamento"
-                    value={formatClienteAgendamentoBadgeLabel(
-                      cliente.disponivel_agendamento
+                    value={formatDisponibilidadeAgendamentoLabel(
+                      disponibilidadeAgendamento
                     )}
                   />
                 </div>

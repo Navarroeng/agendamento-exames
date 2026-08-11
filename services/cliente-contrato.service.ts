@@ -167,7 +167,20 @@ export async function encerrarContrato(
     .single();
 
   if (error) throw error;
-  return data as ClienteContratoRecord;
+  const record = data as ClienteContratoRecord;
+
+  const { error: recomputeError } = await supabase.rpc(
+    "recompute_cliente_disponivel_agendamento",
+    { p_cliente_id: record.cliente_id }
+  );
+  if (recomputeError) {
+    console.warn(
+      "recompute disponibilidade após encerrar contrato:",
+      recomputeError.message
+    );
+  }
+
+  return record;
 }
 
 export async function buscarContratoPorOrcamentoId(

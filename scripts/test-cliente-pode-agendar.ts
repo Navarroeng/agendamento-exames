@@ -1,4 +1,4 @@
-/** Smoke test: regra única clientePodeAgendar / contratoLiberaAgendamento. */
+/** Smoke test: contratoLiberaAgendamento + clientePodeAgendar (regra central). */
 
 import assert from "node:assert/strict";
 import {
@@ -8,32 +8,50 @@ import {
 import { labelAgendamentoContrato } from "../lib/cliente-contrato-mappers";
 
 const orcamentoNaoPago = {
+  id: "c0",
   orcamento_id: "o1",
   boleto_pago: false,
-  liberado_para_agendamento: true, // flag errado não deve liberar
-  status: "assinado" as const,
+  liberado_para_agendamento: true,
+  status: "ativo" as const,
+  data_inicio: "2026-01-01",
+  data_fim: "2026-12-31",
+  encerrado_em: null,
 };
 
 const orcamentoPago = {
+  id: "c1",
   orcamento_id: "o1",
   boleto_pago: true,
   liberado_para_agendamento: true,
   status: "ativo" as const,
+  data_inicio: "2026-01-01",
+  data_fim: "2026-12-31",
+  encerrado_em: null,
 };
 
 const orcamentoPagoEncerrado = {
+  id: "c2",
   orcamento_id: "o1",
   boleto_pago: true,
   liberado_para_agendamento: true,
   status: "encerrado" as const,
+  data_inicio: "2026-01-01",
+  data_fim: "2026-12-31",
+  encerrado_em: "2026-08-01T00:00:00.000Z",
 };
 
 const manualLiberado = {
+  id: "c3",
   orcamento_id: null,
   boleto_pago: false,
   liberado_para_agendamento: true,
   status: "ativo" as const,
+  data_inicio: "2026-01-01",
+  data_fim: "2026-12-31",
+  encerrado_em: null,
 };
+
+const hoje = "2026-08-11";
 
 assert.equal(contratoLiberaAgendamento(orcamentoNaoPago), false);
 assert.equal(contratoLiberaAgendamento(orcamentoPago), true);
@@ -41,36 +59,36 @@ assert.equal(contratoLiberaAgendamento(orcamentoPagoEncerrado), false);
 assert.equal(contratoLiberaAgendamento(manualLiberado), true);
 
 assert.equal(
-  clientePodeAgendar({ disponivel_agendamento: true }, [orcamentoNaoPago]),
+  clientePodeAgendar({ disponivel_agendamento: true }, [orcamentoNaoPago], hoje),
   false
 );
 assert.equal(
-  clientePodeAgendar({ disponivel_agendamento: false }, [orcamentoPago]),
+  clientePodeAgendar({ disponivel_agendamento: false }, [orcamentoPago], hoje),
   true,
-  "sem bloqueio manual, contrato pago ainda libera (legado automático)"
+  "contrato vigente libera mesmo com flag cache desatualizado"
 );
 assert.equal(
   clientePodeAgendar(
     { disponivel_agendamento: false, agendamento_bloqueio_manual: true },
-    [orcamentoPago]
+    [orcamentoPago],
+    hoje
   ),
   false,
-  "bloqueio manual tem prioridade sobre contrato pago"
+  "bloqueio manual tem prioridade"
 );
 assert.equal(
-  clientePodeAgendar({ disponivel_agendamento: true }, [
-    manualLiberado,
-    orcamentoNaoPago,
-  ]),
+  clientePodeAgendar({ disponivel_agendamento: true }, [manualLiberado], hoje),
   true
 );
 assert.equal(
-  clientePodeAgendar({ disponivel_agendamento: true }, []),
-  true
+  clientePodeAgendar({ disponivel_agendamento: true }, [], hoje),
+  false,
+  "sem contrato vigente → bloqueado"
 );
 assert.equal(
-  clientePodeAgendar({ disponivel_agendamento: false }, []),
-  false
+  clientePodeAgendar({ disponivel_agendamento: true }, [orcamentoPagoEncerrado], hoje),
+  false,
+  "encerrado → bloqueado"
 );
 
 assert.equal(labelAgendamentoContrato(orcamentoNaoPago), "Bloqueado");
