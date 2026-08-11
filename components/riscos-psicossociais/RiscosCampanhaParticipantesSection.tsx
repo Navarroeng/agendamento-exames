@@ -95,9 +95,8 @@ export function RiscosCampanhaParticipantesSection({
     !bloqueioImportacao;
 
   const resumo = useMemo(
-    () =>
-      buildParticipantesResumo(campanha.quantidade_prevista, participantes),
-    [campanha.quantidade_prevista, participantes]
+    () => buildParticipantesResumo(participantes),
+    [participantes]
   );
 
   async function handleSalvar(input: RiscosParticipanteInput) {

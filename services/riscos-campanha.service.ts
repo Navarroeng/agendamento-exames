@@ -599,7 +599,8 @@ export async function criarCampanhaRiscos(
     empresa_nome: input.empresaNome.trim(),
     data_inicio: input.dataInicioIso.slice(0, 10),
     data_encerramento: input.dataEncerramentoIso.slice(0, 10),
-    quantidade_prevista: Math.trunc(Number(input.quantidadePrevista)),
+    // Coluna legada (check > 0). Quantidade oficial = participantes cadastrados.
+    quantidade_prevista: 1,
     status: "em_preparacao" as const,
     codigo_publico: codigo,
     codigo_acesso_salt: acesso.salt,

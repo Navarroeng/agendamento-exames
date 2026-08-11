@@ -42,7 +42,6 @@ interface RiscosPainelCardsProps {
   onCriarCampanha: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
-    quantidadePrevista: number;
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
   onEncerrarCampanha: () => Promise<void>;
@@ -168,13 +167,11 @@ export function RiscosPainelCards({
   const [erroExcluir, setErroExcluir] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState("");
   const [dataEncerramento, setDataEncerramento] = useState("");
-  const [quantidade, setQuantidade] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
-  const previstos = campanha?.quantidade_prevista ?? 0;
   const resumo = useMemo(
-    () => buildParticipantesResumo(previstos, participantes),
-    [previstos, participantes]
+    () => buildParticipantesResumo(participantes),
+    [participantes]
   );
 
   const pesquisaCancelada = campanha?.status === "cancelada";
@@ -193,7 +190,6 @@ export function RiscosPainelCards({
 
   async function handleSalvarCampanha() {
     setFormError(null);
-    const qtd = Number(quantidade);
     if (!dataInicio.trim()) {
       setFormError("Informe a data de início.");
       return;
@@ -202,14 +198,9 @@ export function RiscosPainelCards({
       setFormError("Informe a data de encerramento.");
       return;
     }
-    if (!Number.isFinite(qtd) || qtd < 1 || !Number.isInteger(qtd)) {
-      setFormError("Informe a quantidade prevista (inteiro ≥ 1).");
-      return;
-    }
     await onCriarCampanha({
       dataInicioIso: dataInicio,
       dataEncerramentoIso: dataEncerramento,
-      quantidadePrevista: qtd,
     });
     setCriarAberto(false);
   }
@@ -288,8 +279,8 @@ export function RiscosPainelCards({
           {!campanha && !criarAberto ? (
             <div className="flex h-full flex-col justify-between gap-3">
               <PlaceholderNote>
-                Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
-                prevista de colaboradores.
+                Nenhuma pesquisa criada ainda. Cadastre o período de início e
+                encerramento.
               </PlaceholderNote>
               <button
                 type="button"
@@ -333,24 +324,6 @@ export function RiscosPainelCards({
                   value={dataEncerramento}
                   disabled={savingCampanha}
                   onChange={(e) => setDataEncerramento(e.target.value)}
-                />
-              </Field>
-              <Field
-                label={
-                  <>
-                    Qtd. prevista <RequiredMark />
-                  </>
-                }
-                className="sm:col-span-2"
-              >
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  className="field-input w-full"
-                  value={quantidade}
-                  disabled={savingCampanha}
-                  onChange={(e) => setQuantidade(e.target.value)}
                 />
               </Field>
             </div>

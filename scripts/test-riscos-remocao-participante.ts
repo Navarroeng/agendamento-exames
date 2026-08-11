@@ -129,7 +129,7 @@ run("TESTE 5: sessão invalidada fora dos resultados", () => {
   const antes = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: true }],
     respostas: demandas,
   });
@@ -139,7 +139,7 @@ run("TESTE 5: sessão invalidada fora dos resultados", () => {
   const depois = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false }],
     respostas: demandas,
   });
@@ -153,14 +153,16 @@ run("TESTE 6: confirmação forte só para quem concluiu", () => {
 });
 
 run("TESTE 7: contadores após remoção (lista só ativos)", () => {
-  const antes = buildParticipantesResumo(10, [
+  const antes = buildParticipantesResumo([
     { status: "respondido" as RiscosParticipanteStatus },
   ]);
   assert.equal(antes.cadastrados, 1);
+  assert.equal(antes.previstos, 1);
   assert.equal(antes.respondidos, 1);
 
-  const depois = buildParticipantesResumo(10, []);
+  const depois = buildParticipantesResumo([]);
   assert.equal(depois.cadastrados, 0);
+  assert.equal(depois.previstos, 0);
   assert.equal(depois.respondidos, 0);
   assert.equal(depois.pendentes, 0);
 });
@@ -187,7 +189,7 @@ run("TESTE 9: payload consolidado sem PII", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: true }],
     respostas: demandas,
   });

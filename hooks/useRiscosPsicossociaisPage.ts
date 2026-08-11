@@ -536,7 +536,6 @@ export function useRiscosPsicossociaisPage() {
     async (input: {
       dataInicioIso: string;
       dataEncerramentoIso: string;
-      quantidadePrevista: number;
     }) => {
       if (!modalProcesso) return;
       if (!modalProcesso.exigeLaudosSst) {
@@ -559,7 +558,6 @@ export function useRiscosPsicossociaisPage() {
             empresaNome: orcamento.cliente_nome ?? "",
             dataInicioIso: input.dataInicioIso,
             dataEncerramentoIso: input.dataEncerramentoIso,
-            quantidadePrevista: input.quantidadePrevista,
           },
           { auditContext }
         );

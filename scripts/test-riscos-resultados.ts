@@ -38,7 +38,7 @@ run("TESTE 1: nenhuma sessão concluída → sessoesConcluidas = 0", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [
       { id: "s-andamento", campanha_id: CAMPANHA_A, status: "em_andamento" },
     ],
@@ -66,7 +66,7 @@ run("TESTE 2: 1 sessão concluída → Demandas média 2,5", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes,
     respostas: demandasCompletas,
   });
@@ -122,7 +122,7 @@ run("TESTE 4: Campanha A não recebe respostas da Campanha B", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 5,
+    quantidadeCadastrados: 5,
     sessoes: [
       { id: "sA", campanha_id: CAMPANHA_A, status: "concluida" },
       { id: "sB", campanha_id: CAMPANHA_B, status: "concluida" },
@@ -159,7 +159,7 @@ run("TESTE 5: resultado público espelha o engine", () => {
   const publico = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes,
     respostas,
   });
@@ -200,7 +200,7 @@ run("TESTE 6: ofensivos qualitativos sem média/classificação", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 1,
+    quantidadeCadastrados: 1,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA_A, status: "concluida" }],
     respostas: [
       ...demandasCompletas,
@@ -229,7 +229,7 @@ run("TESTE 7: riscoGeral permanece null com mensagem oficial", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA_A, status: "concluida" }],
     respostas: demandasCompletas,
   });
@@ -245,7 +245,7 @@ run("TESTE 8: payload sem campos nominais (nome/CPF/participante)", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA_A,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA_A, status: "concluida" }],
     respostas: demandasCompletas,
   });

@@ -65,7 +65,7 @@ run("TESTE 5/6: Respondidos e participação caem após invalidar sessão", () =
   const depois = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [
       { id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false },
     ],
@@ -80,7 +80,7 @@ run("TESTE 7: dimensões sem sessão invalidada", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [
       { id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false },
       { id: "s2", campanha_id: CAMPANHA, status: "concluida", valida: true },
@@ -142,7 +142,7 @@ run("TESTE 10: payload sem PII", () => {
   const resultado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [{ id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: true }],
     respostas: demandas,
   });
@@ -150,11 +150,12 @@ run("TESTE 10: payload sem PII", () => {
 });
 
 run("resumo: removidos não entram na lista ativa", () => {
-  const resumo = buildParticipantesResumo(10, [
+  const resumo = buildParticipantesResumo([
     { status: "pendente" as RiscosParticipanteStatus },
     { status: "respondido" as RiscosParticipanteStatus },
   ]);
   assert.equal(resumo.cadastrados, 2);
+  assert.equal(resumo.previstos, 2);
   assert.equal(resumo.respondidos, 1);
 });
 

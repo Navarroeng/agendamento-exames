@@ -27,7 +27,6 @@ interface RiscosPsicossociaisPainelProps {
   onCriarCampanha: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
-    quantidadePrevista: number;
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
   onEncerrarCampanha: () => Promise<void>;

@@ -84,13 +84,14 @@ run("label Iniciado", () => {
 });
 
 run("Responderam / cadastrados não mudam com iniciado", () => {
-  const resumo = buildParticipantesResumo(10, [
+  const resumo = buildParticipantesResumo([
     { status: "pendente" as RiscosParticipanteStatus },
     { status: "iniciado" as RiscosParticipanteStatus },
     { status: "iniciado" as RiscosParticipanteStatus },
     { status: "respondido" as RiscosParticipanteStatus },
   ]);
   assert.equal(resumo.cadastrados, 4);
+  assert.equal(resumo.previstos, 4);
   assert.equal(resumo.respondidos, 1);
   // iniciados entram no bucket operacional de não-concluídos (pendentes do resumo)
   assert.equal(resumo.pendentes, 3);

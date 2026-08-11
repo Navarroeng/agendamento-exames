@@ -94,6 +94,7 @@ export type RiscosParticipanteInput = {
  */
 
 export type RiscosParticipantesResumo = {
+  /** Sempre igual a `cadastrados` — quantidade oficial da campanha. */
   previstos: number;
   cadastrados: number;
   pendentes: number;
@@ -139,8 +140,11 @@ export function validateRiscosParticipanteInput(
   return null;
 }
 
+/**
+ * Resumo operacional. A quantidade oficial é o total de cadastrados ativos
+ * (não há mais “qtd. prevista” informada pelo usuário).
+ */
 export function buildParticipantesResumo(
-  previstos: number,
   participantes: Pick<RiscosCampanhaParticipanteRecord, "status">[]
 ): RiscosParticipantesResumo {
   let pendentes = 0;
@@ -152,9 +156,10 @@ export function buildParticipantesResumo(
       invalidados += 1;
     } else pendentes += 1;
   }
+  const cadastrados = participantes.length;
   return {
-    previstos: Math.max(0, previstos),
-    cadastrados: participantes.length,
+    previstos: cadastrados,
+    cadastrados,
     pendentes,
     respondidos,
     invalidados,

@@ -55,7 +55,6 @@ export type RiscosCampanhaCreateInput = {
   empresaNome: string;
   dataInicioIso: string;
   dataEncerramentoIso: string;
-  quantidadePrevista: number;
 };
 
 /** Criação a partir do cadastro do cliente (sem orçamento/contrato). */
@@ -116,10 +115,6 @@ export function validateRiscosCampanhaCreateInput(
 ): string | null {
   const base = validatePeriodoCampanhaBase(input);
   if (base) return base;
-  const qtd = Number(input.quantidadePrevista);
-  if (!Number.isFinite(qtd) || qtd < 1 || !Number.isInteger(qtd)) {
-    return "Informe a quantidade prevista de colaboradores (número inteiro ≥ 1).";
-  }
   if (!input.orcamentoId) {
     return "Processo de Riscos inválido.";
   }

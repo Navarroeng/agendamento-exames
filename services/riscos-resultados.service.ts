@@ -29,13 +29,45 @@ export async function obterResultadosCampanhaRiscos(
 
   const { data: campanha, error: errCampanha } = await supabase
     .from("riscos_campanhas")
-    .select("id, status, quantidade_prevista")
+    .select("id, status")
     .eq("id", id)
     .maybeSingle();
 
   if (errCampanha) throw errCampanha;
   if (!campanha) {
     throw new Error("Campanha não encontrada.");
+  }
+
+  let quantidadeCadastrados = 0;
+  {
+    const primary = await supabase
+      .from("riscos_campanha_participantes")
+      .select("id, status, removido_em")
+      .eq("campanha_id", id);
+
+    let rows: Array<Record<string, unknown>> | null = null;
+    if (primary.error && /removido_em/i.test(primary.error.message ?? "")) {
+      const fb = await supabase
+        .from("riscos_campanha_participantes")
+        .select("id, status")
+        .eq("campanha_id", id)
+        .neq("status", "removido");
+      if (fb.error) throw fb.error;
+      rows = (fb.data ?? []) as Array<Record<string, unknown>>;
+    } else if (primary.error) {
+      throw primary.error;
+    } else {
+      rows = (primary.data ?? []) as Array<Record<string, unknown>>;
+    }
+
+    for (const row of rows ?? []) {
+      const status = String(row.status ?? "");
+      const removidoEm = row.removido_em as string | null | undefined;
+      if (status === "removido" || status === "invalidado" || removidoEm) {
+        continue;
+      }
+      quantidadeCadastrados += 1;
+    }
   }
 
   let sessoesRaw: Array<Record<string, unknown>> | null = null;
@@ -103,7 +135,7 @@ export async function obterResultadosCampanhaRiscos(
   return consolidarResultadosCampanha({
     campanhaId: String(campanha.id),
     statusCampanha: String(campanha.status ?? ""),
-    quantidadePrevista: Number(campanha.quantidade_prevista) || 0,
+    quantidadeCadastrados,
     sessoes,
     respostas,
   });

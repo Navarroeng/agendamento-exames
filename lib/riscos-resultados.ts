@@ -112,19 +112,20 @@ function labelAlternativa(perguntaId: string, alternativaId: string): string {
 export function consolidarResultadosCampanha(input: {
   campanhaId: string;
   statusCampanha: string;
-  quantidadePrevista: number;
+  /** Total de participantes cadastrados ativos (quantidade oficial). */
+  quantidadeCadastrados: number;
   sessoes: SessaoAvaliacaoConsolidacao[];
   respostas: RespostaAvaliacaoConsolidacao[];
 }): RiscosResultadosPublicos {
   const respondentes = montarRespondentesEngine(input);
-  const previstos = Math.max(0, input.quantidadePrevista);
+  const cadastrados = Math.max(0, input.quantidadeCadastrados);
   const engine = interpretarCampanhaCopsoq({
     respondentes,
-    baseParticipacao: previstos > 0 ? previstos : respondentes.length,
+    baseParticipacao: cadastrados > 0 ? cadastrados : respondentes.length,
   });
 
   const sessoesConcluidas = respondentes.length;
-  const pendentes = Math.max(0, previstos - sessoesConcluidas);
+  const pendentes = Math.max(0, cadastrados - sessoesConcluidas);
 
   const ofens = engine.comportamentosOfensivos;
   const perguntasOfensivas = getPerguntasOrdenadas().filter(
@@ -150,7 +151,7 @@ export function consolidarResultadosCampanha(input: {
   return {
     campanhaId: input.campanhaId,
     sessoesConcluidas,
-    previstos,
+    previstos: cadastrados,
     pendentes,
     participacaoPercentual: engine.participacao.percentual,
     statusCampanha: input.statusCampanha,

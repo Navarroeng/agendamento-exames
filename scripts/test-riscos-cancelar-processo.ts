@@ -166,7 +166,7 @@ run("5: resultados deixam de considerar respostas canceladas", () => {
   const consolidado = consolidarResultadosCampanha({
     campanhaId: CAMPANHA,
     statusCampanha: "cancelada",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [
       { id: "s1", campanha_id: CAMPANHA, status: "concluida", valida: false },
     ],

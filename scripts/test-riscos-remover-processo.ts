@@ -80,7 +80,7 @@ run("isolamento: campanha nova não recebe respostas da antiga", () => {
   const consolidadoNova = consolidarResultadosCampanha({
     campanhaId: nova,
     statusCampanha: "aberta",
-    quantidadePrevista: 10,
+    quantidadeCadastrados: 10,
     sessoes: [
       { id: "s-old", campanha_id: antiga, status: "concluida", valida: true },
     ],
