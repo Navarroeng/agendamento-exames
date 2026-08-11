@@ -47,7 +47,6 @@ export function RiscosCampanhaParticipantesSection({
       buildParticipantesResumo(campanha.quantidade_prevista, participantes),
     [campanha.quantidade_prevista, participantes]
   );
-  const faltamCadastrar = Math.max(0, resumo.previstos - resumo.cadastrados);
 
   const editingInitial = useMemo(() => {
     if (!editingId) return null;
@@ -153,13 +152,8 @@ export function RiscosCampanhaParticipantesSection({
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <ResumoCard label="Cadastrados" value={resumo.cadastrados} />
-        <ResumoCard
-          label="Faltam cadastrar"
-          value={faltamCadastrar}
-          emphasize={faltamCadastrar > 0}
-        />
         <ResumoCard label="Responderam" value={resumo.respondidos} />
       </div>
 
@@ -254,23 +248,9 @@ function StatusBadge({ status }: { status: RiscosParticipanteStatus }) {
   );
 }
 
-function ResumoCard({
-  label,
-  value,
-  emphasize = false,
-}: {
-  label: string;
-  value: number;
-  emphasize?: boolean;
-}) {
+function ResumoCard({ label, value }: { label: string; value: number }) {
   return (
-    <div
-      className={`rounded-xl border px-3 py-2.5 ${
-        emphasize
-          ? "border-[#fde68a] bg-[#fffbeb]"
-          : "border-[#e8edf5] bg-[#f8fafc]"
-      }`}
-    >
+    <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-3 py-2.5">
       <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
         {label}
       </p>
