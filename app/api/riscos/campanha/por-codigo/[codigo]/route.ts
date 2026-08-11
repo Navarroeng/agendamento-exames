@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { selecionarCampanhaPorCodigoPublico } from "@/services/riscos-campanha-status.server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /**
  * Fonte de verdade alinhada ao portal: busca por codigo_publico (mesmo critério do /info).
@@ -36,30 +38,36 @@ export async function GET(
       );
     }
 
-    // Espelha o status público do portal para diagnóstico.
-    return NextResponse.json({
-      ok: true,
-      campanha: {
-        id: campanha.id,
-        codigo_publico: campanha.codigo_publico,
-        status: campanha.status,
-        origem: campanha.origem,
-        data_inicio: campanha.data_inicio,
-        data_encerramento: campanha.data_encerramento,
-        empresa_nome: campanha.empresa_nome,
-        quantidade_prevista: campanha.quantidade_prevista,
-        orcamento_id: campanha.orcamento_id,
-        cliente_id: campanha.cliente_id,
-        codigo_acesso_exibicao: campanha.codigo_acesso_exibicao,
-        responsavel: campanha.responsavel,
-        observacoes: campanha.observacoes,
-        criado_por: campanha.criado_por,
-        created_at: campanha.created_at,
-        updated_at: campanha.updated_at,
-        cnpj: campanha.cnpj,
+    return NextResponse.json(
+      {
+        ok: true,
+        campanha: {
+          id: campanha.id,
+          codigo_publico: campanha.codigo_publico,
+          status: campanha.status,
+          origem: campanha.origem,
+          data_inicio: campanha.data_inicio,
+          data_encerramento: campanha.data_encerramento,
+          empresa_nome: campanha.empresa_nome,
+          quantidade_prevista: campanha.quantidade_prevista,
+          orcamento_id: campanha.orcamento_id,
+          cliente_id: campanha.cliente_id,
+          codigo_acesso_exibicao: campanha.codigo_acesso_exibicao,
+          responsavel: campanha.responsavel,
+          observacoes: campanha.observacoes,
+          criado_por: campanha.criado_por,
+          created_at: campanha.created_at,
+          updated_at: campanha.updated_at,
+          cnpj: campanha.cnpj,
+        },
+        fonte: "riscos_campanhas.codigo_publico",
       },
-      fonte: "riscos_campanhas.codigo_publico",
-    });
+      {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+        },
+      }
+    );
   } catch (err) {
     console.error("[riscos/campanha/por-codigo]", err);
     return NextResponse.json(

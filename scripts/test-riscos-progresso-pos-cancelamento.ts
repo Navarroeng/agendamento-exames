@@ -82,6 +82,24 @@ run("mescla listagem×modal não reaplica cancelada", () => {
   );
 });
 
+run("mesma campanha: não mantém aberta stale sobre em_preparacao do banco", () => {
+  const noBanco = campanha({
+    id: "z7",
+    status: "em_preparacao",
+    codigo_publico: "Z7LVSP",
+    updated_at: "2026-08-11T18:00:00.000Z",
+  });
+  const modalStale = campanha({
+    id: "z7",
+    status: "aberta",
+    codigo_publico: "Z7LVSP",
+    updated_at: "2026-08-11T17:00:00.000Z",
+  });
+  const merged = mesclarCampanhaListagemModal(noBanco, modalStale);
+  assert.equal(merged?.status, "em_preparacao");
+  assert.equal(merged?.id, "z7");
+});
+
 run("cadastro conclui com ≥1 participante (não usa previsto)", () => {
   assert.equal(
     isCadastroColaboradoresConcluido({
@@ -158,7 +176,7 @@ run("progresso usa nova campanha; não herda da cancelada", () => {
     participantes: [{ status: "iniciado" }],
   });
   assert.equal(comNova.campanha?.codigo_publico, "T4BFGJ");
-  assert.equal(comNova.etapaAtual, "questionario_finalizado");
+  assert.equal(comNova.etapaAtual, "aguardando_respostas");
   assert.equal(comNova.progressoLabel, "4 de 6");
 });
 

@@ -86,6 +86,7 @@ type CampanhaParaEscolha = {
   id: string;
   status: string;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 /**
@@ -116,21 +117,28 @@ export function escolherCampanhaParaProgresso<T extends CampanhaParaEscolha>(
 }
 
 /**
- * Ao mesclar listagem × modal: não reaplicar campanha cancelada sobre uma ativa.
- * Se ambas elegíveis e mesmo id, preferir a do modal (status mais fresco da API).
+ * Ao mesclar listagem × modal da MESMA campanha:
+ * - não reaplicar cancelada;
+ * - preferir o registro com `updated_at` mais recente (fonte do banco);
+ * - em empate, preferir a listagem (recarga).
+ * Nunca preferir status “mais avançado” só por ranking (ex.: aberta stale
+ * sobre em_preparacao real).
  */
 export function mesclarCampanhaListagemModal<T extends CampanhaParaEscolha>(
   listagem: T | null | undefined,
   modal: T | null | undefined
 ): T | null {
-  const escolhida = escolherCampanhaParaProgresso([listagem, modal]);
-  if (
-    escolhida &&
-    modal &&
-    escolhida.id === modal.id &&
-    isCampanhaStatusParaProgresso(modal.status)
-  ) {
-    return modal;
+  if (listagem && modal && listagem.id === modal.id) {
+    const listOk = isCampanhaStatusParaProgresso(listagem.status);
+    const modalOk = isCampanhaStatusParaProgresso(modal.status);
+    if (!listOk && !modalOk) return null;
+    if (!listOk) return modalOk ? modal : null;
+    if (!modalOk) return listagem;
+
+    const tList = String(listagem.updated_at ?? "");
+    const tModal = String(modal.updated_at ?? "");
+    if (tModal && tList && tModal > tList) return modal;
+    return listagem;
   }
-  return escolhida;
+  return escolherCampanhaParaProgresso([listagem, modal]);
 }

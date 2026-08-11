@@ -64,7 +64,7 @@ export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
   { id: "lista_presenca", label: "Lista de Presença" },
   { id: "cadastro_colaboradores", label: "Cadastro dos Colaboradores" },
   { id: "link_enviado", label: "Link enviado" },
-  { id: "questionario_finalizado", label: "Questionário finalizado" },
+  { id: "aguardando_respostas", label: "Aguardando respostas" },
   { id: "finalizado", label: "Finalizado" },
 ] as const;
 
@@ -267,15 +267,23 @@ export function isLinkEnviadoConcluido(
 }
 
 /**
- * Questionário finalizado: todos os participantes ativos com status Concluído
- * (`respondido`). Não basta iniciar.
+ * Aguardando respostas: concluída somente quando TODOS os participantes
+ * ativos estão Concluído (`respondido`). Pendente ou Iniciado mantém a etapa.
  */
-export function isQuestionarioFinalizadoConcluido(input: {
+export function isAguardandoRespostasConcluido(input: {
   participantesCadastrados: number;
   participantesRespondidos: number;
 }): boolean {
   if (input.participantesCadastrados < 1) return false;
   return input.participantesRespondidos >= input.participantesCadastrados;
+}
+
+/** @deprecated Use `isAguardandoRespostasConcluido`. */
+export function isQuestionarioFinalizadoConcluido(input: {
+  participantesCadastrados: number;
+  participantesRespondidos: number;
+}): boolean {
+  return isAguardandoRespostasConcluido(input);
 }
 
 export function contarParticipantesParaProgresso(
@@ -338,7 +346,7 @@ export function calcularProgressoEtapasRiscos(input: {
     participantesCadastrados: input.participantesCadastrados,
   });
   const linkOk = isLinkEnviadoConcluido(input.campanhaStatus);
-  const questionarioOk = isQuestionarioFinalizadoConcluido({
+  const aguardandoOk = isAguardandoRespostasConcluido({
     participantesCadastrados: input.participantesCadastrados,
     participantesRespondidos: input.participantesRespondidos,
   });
@@ -349,7 +357,7 @@ export function calcularProgressoEtapasRiscos(input: {
     lista_presenca: input.listaPresencaConcluida,
     cadastro_colaboradores: cadastroOk,
     link_enviado: linkOk,
-    questionario_finalizado: questionarioOk,
+    aguardando_respostas: aguardandoOk,
     finalizado: finalizadoOk,
   };
 

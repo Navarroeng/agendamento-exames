@@ -355,7 +355,9 @@ export async function buscarCampanhaPorId(
 }
 
 /**
- * Fonte alinhada ao portal: mesma chave codigo_publico do /api/avaliacao/{codigo}/info.
+ * Fonte alinhada ao portal: mesma chave codigo_publico.
+ * Uma única leitura autenticada (por-codigo) — não compara com /info
+ * (evita falso positivo por cache CDN do GET público).
  */
 export async function buscarCampanhaPorCodigoPublico(
   codigoPublico: string
@@ -363,25 +365,19 @@ export async function buscarCampanhaPorCodigoPublico(
   const codigo = codigoPublico.trim().toUpperCase();
   if (!codigo) return null;
 
-  const [adminRes, infoRes] = await Promise.all([
-    fetch(`/api/riscos/campanha/por-codigo/${encodeURIComponent(codigo)}`, {
+  const adminRes = await fetch(
+    `/api/riscos/campanha/por-codigo/${encodeURIComponent(codigo)}`,
+    {
       method: "GET",
       cache: "no-store",
-    }),
-    fetch(`/api/avaliacao/${encodeURIComponent(codigo)}/info`, {
-      method: "GET",
-      cache: "no-store",
-    }),
-  ]);
+      headers: { "Cache-Control": "no-store" },
+    }
+  );
 
   const adminJson = (await adminRes.json().catch(() => ({}))) as {
     ok?: boolean;
     error?: string;
     campanha?: RiscosCampanhaRecord;
-  };
-  const infoJson = (await infoRes.json().catch(() => ({}))) as {
-    ok?: boolean;
-    status?: string;
   };
 
   if (adminRes.status === 404) return null;
@@ -389,23 +385,8 @@ export async function buscarCampanhaPorCodigoPublico(
     throw new Error(adminJson.error || "Não foi possível carregar a campanha.");
   }
 
-  const campanha = adminJson.campanha;
-  const statusInfo = String(infoJson.status ?? "").trim();
-
-  // Portal e admin DEVEM enxergar o mesmo status.
-  if (infoJson.ok && statusInfo && statusInfo !== campanha.status) {
-    console.error("[buscarCampanhaPorCodigoPublico] divergência de status", {
-      codigo,
-      statusAdmin: campanha.status,
-      statusInfo,
-    });
-    throw new Error(
-      `Divergência de status para ${codigo}: painel=${campanha.status}, portal=${statusInfo}. Recarregue a página.`
-    );
-  }
-
   // Substitui completamente — nunca preserva status antigo da listagem.
-  return { ...campanha };
+  return { ...adminJson.campanha };
 }
 
 export async function encerrarCampanhaRiscos(

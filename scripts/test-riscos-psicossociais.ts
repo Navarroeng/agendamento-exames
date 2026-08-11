@@ -10,6 +10,7 @@ import {
   isProcessoElegivelRiscosPsicossociais,
   isRiscosEtapaLiberada,
   isRiscosEtapaLiberadaByFluxo,
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS,
@@ -24,7 +25,11 @@ assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].automatica, true);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].id, "lista_presenca");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[2].id, "cadastro_colaboradores");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[3].id, "link_enviado");
-assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[4].id, "questionario_finalizado");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[4].id, "aguardando_respostas");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.aguardando_respostas,
+  "Aguardando respostas"
+);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[5].id, "finalizado");
 
 const implantacao = {
@@ -172,8 +177,12 @@ const riscosLink = buildRiscosPsicossociaisProcesso(
     participantes: [{ status: "pendente" }, { status: "iniciado" }],
   }
 );
-assert.equal(riscosLink.etapaAtual, "questionario_finalizado");
+assert.equal(riscosLink.etapaAtual, "aguardando_respostas");
 assert.equal(riscosLink.progressoLabel, "4 de 6");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosLink.etapaAtual],
+  "Aguardando respostas"
+);
 
 const riscosQuestionario = buildRiscosPsicossociaisProcesso(
   laudosConcluido,
