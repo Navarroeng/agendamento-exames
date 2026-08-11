@@ -248,223 +248,208 @@ export function RiscosPainelCards({
 
   return (
     <div className="space-y-4">
-      {/* Linha 1 — Pré-requisitos | Pesquisa */}
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <PanelCard title="Pré-requisitos">
-          <RiscosPainelPreRequisitos
-            embedded
-            processo={processo}
-            savingLista={savingLista}
-            onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
-            onSalvarRecebimentoLista={onSalvarRecebimentoLista}
-            onRemoverAnexoLista={onRemoverAnexoLista}
-            onVisualizarAnexoLista={onVisualizarAnexoLista}
-          />
-        </PanelCard>
-
-        <PanelCard title="Pesquisa">
-          {!campanha && !criarAberto ? (
-            <div className="flex h-full flex-col justify-between gap-3">
-              <PlaceholderNote>
-                Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
-                prevista de colaboradores.
-              </PlaceholderNote>
-              <button
-                type="button"
-                className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-                disabled={savingCampanha}
-                onClick={() => setCriarAberto(true)}
-              >
-                Criar pesquisa
-              </button>
-            </div>
-          ) : null}
-
-          {!campanha && criarAberto ? (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                  label={
-                    <>
-                      Data de início <RequiredMark />
-                    </>
-                  }
-                >
-                  <input
-                    type="date"
-                    className="field-input w-full"
-                    value={dataInicio}
-                    disabled={savingCampanha}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label={
-                    <>
-                      Data de encerramento <RequiredMark />
-                    </>
-                  }
-                >
-                  <input
-                    type="date"
-                    className="field-input w-full"
-                    value={dataEncerramento}
-                    disabled={savingCampanha}
-                    onChange={(e) => setDataEncerramento(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label={
-                    <>
-                      Qtd. prevista <RequiredMark />
-                    </>
-                  }
-                  className="sm:col-span-2"
-                >
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    className="field-input w-full"
-                    value={quantidade}
-                    disabled={savingCampanha}
-                    onChange={(e) => setQuantidade(e.target.value)}
-                  />
-                </Field>
-              </div>
-              {formError ? (
-                <p className="text-xs font-medium text-brand-red">{formError}</p>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
-                  disabled={savingCampanha}
-                  onClick={() => {
-                    setCriarAberto(false);
-                    setFormError(null);
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-                  disabled={savingCampanha}
-                  onClick={() => void handleSalvarCampanha()}
-                >
-                  {savingCampanha ? "Salvando..." : "Salvar pesquisa"}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {campanha ? (
-            <div className="space-y-3">
-              <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Status
-                  </dt>
-                  <dd className="mt-0.5">
-                    <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
-                      {campanhaStatusSincronizado
-                        ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
-                        : "Sincronizando…"}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Período
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {formatPeriodoCampanha(
-                      campanha.data_inicio,
-                      campanha.data_encerramento
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Responsável
-                  </dt>
-                  <dd className="mt-0.5 font-semibold text-navy">
-                    {processo.implantacao.orcamento.responsavel?.trim() || "—"}
-                  </dd>
-                </div>
-              </dl>
-              <div className="grid grid-cols-3 gap-2">
-                <StatChip
-                  label="Participantes cadastrados"
-                  value={resumo.cadastrados}
-                />
-                <StatChip label="Responderam" value={resumo.respondidos} />
-                <StatChip label="Pendentes" value={resumo.pendentes} />
-              </div>
-            </div>
-          ) : null}
-        </PanelCard>
-      </div>
-
-      {/* Linha 2 — Participantes (largura total) */}
-      <PanelCard title="Participantes">
-        {campanha ? (
-          <RiscosCampanhaParticipantesSection
-            campanha={campanha}
-            participantes={participantes}
-            saving={savingParticipante}
-            onCriar={onCriarParticipante}
-            onImportarExcel={onImportarParticipantesExcel}
-            onRemover={onRemoverParticipante}
-            podeRemoverParticipante={podeRemoverParticipante}
-          />
-        ) : (
-          <PlaceholderNote>
-            Crie a pesquisa para gerenciar participantes.
-          </PlaceholderNote>
-        )}
+      {/* Linha 1 — Pré-requisitos */}
+      <PanelCard title="Pré-requisitos">
+        <RiscosPainelPreRequisitos
+          embedded
+          processo={processo}
+          savingLista={savingLista}
+          onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
+          onSalvarRecebimentoLista={onSalvarRecebimentoLista}
+          onRemoverAnexoLista={onRemoverAnexoLista}
+          onVisualizarAnexoLista={onVisualizarAnexoLista}
+        />
       </PanelCard>
 
-      {/* Linha 3 — Convites */}
-      <PanelCard title="Convites">
+      {/* Linha 2 — Pesquisa (largura total: status + link + ações) */}
+      <PanelCard title="Pesquisa">
+        {!campanha && !criarAberto ? (
+          <div className="flex h-full flex-col justify-between gap-3">
+            <PlaceholderNote>
+              Nenhuma pesquisa criada ainda. Cadastre o período e a quantidade
+              prevista de colaboradores.
+            </PlaceholderNote>
+            <button
+              type="button"
+              className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setCriarAberto(true)}
+            >
+              Criar pesquisa
+            </button>
+          </div>
+        ) : null}
+
+        {!campanha && criarAberto ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label={
+                  <>
+                    Data de início <RequiredMark />
+                  </>
+                }
+              >
+                <input
+                  type="date"
+                  className="field-input w-full"
+                  value={dataInicio}
+                  disabled={savingCampanha}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={
+                  <>
+                    Data de encerramento <RequiredMark />
+                  </>
+                }
+              >
+                <input
+                  type="date"
+                  className="field-input w-full"
+                  value={dataEncerramento}
+                  disabled={savingCampanha}
+                  onChange={(e) => setDataEncerramento(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={
+                  <>
+                    Qtd. prevista <RequiredMark />
+                  </>
+                }
+                className="sm:col-span-2"
+              >
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="field-input w-full"
+                  value={quantidade}
+                  disabled={savingCampanha}
+                  onChange={(e) => setQuantidade(e.target.value)}
+                />
+              </Field>
+            </div>
+            {formError ? (
+              <p className="text-xs font-medium text-brand-red">{formError}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-1.5 text-xs font-bold text-navy"
+                disabled={savingCampanha}
+                onClick={() => {
+                  setCriarAberto(false);
+                  setFormError(null);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                disabled={savingCampanha}
+                onClick={() => void handleSalvarCampanha()}
+              >
+                {savingCampanha ? "Salvando..." : "Salvar pesquisa"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {campanha ? (
-          <div className="flex h-full flex-col gap-3">
-            {!campanhaStatusSincronizado ? (
-              <PlaceholderNote>
-                Sincronizando status da campanha com o banco…
-              </PlaceholderNote>
-            ) : exibeLinkConvite ? (
-              <div className="space-y-1.5 text-sm">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Link
-                  </p>
-                  <p className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue">
-                    {pathAvaliacaoCampanha(campanha.codigo_publico)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                    Código da campanha
-                  </p>
-                  <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
-                    {campanha.codigo_publico}
-                  </p>
-                </div>
-                {campanha.status === "encerrada" ? (
-                  <p className="text-[11px] text-[#64748b]">
-                    Pesquisa encerrada. O link permanece apenas como
-                    referência administrativa.
-                  </p>
-                ) : null}
+          <div className="space-y-4">
+            <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Status
+                </dt>
+                <dd className="mt-0.5">
+                  <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
+                    {campanhaStatusSincronizado
+                      ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
+                      : "Sincronizando…"}
+                  </span>
+                </dd>
               </div>
-            ) : (
-              <PlaceholderNote>
-                A pesquisa ainda não foi aberta.
-              </PlaceholderNote>
-            )}
-            <div className="mt-auto flex flex-wrap gap-2">
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Período
+                </dt>
+                <dd className="mt-0.5 font-semibold text-navy">
+                  {formatPeriodoCampanha(
+                    campanha.data_inicio,
+                    campanha.data_encerramento
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                  Responsável
+                </dt>
+                <dd className="mt-0.5 font-semibold text-navy">
+                  {processo.implantacao.orcamento.responsavel?.trim() || "—"}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="grid grid-cols-3 gap-2">
+              <StatChip
+                label="Participantes cadastrados"
+                value={resumo.cadastrados}
+              />
+              <StatChip label="Responderam" value={resumo.respondidos} />
+              <StatChip label="Pendentes" value={resumo.pendentes} />
+            </div>
+
+            <div className="border-t border-[#eef2f7] pt-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Link da pesquisa
+              </p>
+              {!campanhaStatusSincronizado ? (
+                <PlaceholderNote>
+                  Sincronizando status da campanha com o banco…
+                </PlaceholderNote>
+              ) : exibeLinkConvite ? (
+                <div className="space-y-1.5 text-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                      Link
+                    </p>
+                    <a
+                      href={pathAvaliacaoCampanha(campanha.codigo_publico)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-0.5 break-all font-mono text-xs font-semibold text-brand-blue hover:underline"
+                    >
+                      {pathAvaliacaoCampanha(campanha.codigo_publico)}
+                    </a>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                      Código da campanha
+                    </p>
+                    <p className="mt-0.5 font-mono text-sm font-extrabold text-navy">
+                      {campanha.codigo_publico}
+                    </p>
+                  </div>
+                  {campanha.status === "encerrada" ? (
+                    <p className="text-[11px] text-[#64748b]">
+                      Pesquisa encerrada. O link permanece apenas como
+                      referência administrativa.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <PlaceholderNote>
+                  A pesquisa ainda não foi aberta.
+                </PlaceholderNote>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 border-t border-[#eef2f7] pt-3">
               {campanhaStatusSincronizado && exibeLinkConvite ? (
                 <>
                   <button
@@ -530,9 +515,7 @@ export function RiscosPainelCards({
                   Cancelar processo
                 </button>
               ) : null}
-              {exclusaoDefinitivaDisponivel &&
-              campanha &&
-              campanhaStatusSincronizado ? (
+              {exclusaoDefinitivaDisponivel && campanhaStatusSincronizado ? (
                 <button
                   type="button"
                   className="rounded-xl border border-[#7f1d1d]/40 bg-[#fef2f2] px-3 py-2 text-xs font-bold text-[#7f1d1d] disabled:opacity-40"
@@ -549,9 +532,24 @@ export function RiscosPainelCards({
               ) : null}
             </div>
           </div>
+        ) : null}
+      </PanelCard>
+
+      {/* Linha 3 — Participantes (largura total) */}
+      <PanelCard title="Participantes">
+        {campanha ? (
+          <RiscosCampanhaParticipantesSection
+            campanha={campanha}
+            participantes={participantes}
+            saving={savingParticipante}
+            onCriar={onCriarParticipante}
+            onImportarExcel={onImportarParticipantesExcel}
+            onRemover={onRemoverParticipante}
+            podeRemoverParticipante={podeRemoverParticipante}
+          />
         ) : (
           <PlaceholderNote>
-            Crie a pesquisa para gerar o link e o QR Code da campanha.
+            Crie a pesquisa para gerenciar participantes.
           </PlaceholderNote>
         )}
       </PanelCard>
