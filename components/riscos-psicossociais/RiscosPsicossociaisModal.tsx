@@ -14,6 +14,7 @@ interface RiscosPsicossociaisModalProps {
   open: boolean;
   processo: RiscosPsicossociaisProcesso | null;
   savingLista?: boolean;
+  savingLogo?: boolean;
   savingCampanha?: boolean;
   participantes?: RiscosCampanhaParticipanteRecord[];
   savingParticipante?: boolean;
@@ -25,6 +26,8 @@ interface RiscosPsicossociaisModalProps {
   onSalvarRecebimentoLista?: (file: File) => Promise<void>;
   onRemoverAnexoLista?: () => Promise<void>;
   onVisualizarAnexoLista?: () => Promise<void>;
+  onUploadLogoCampanha?: (file: File) => Promise<void>;
+  onRemoverLogoCampanha?: () => Promise<void>;
   onCriarCampanha?: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
@@ -68,6 +71,7 @@ export function RiscosPsicossociaisModal({
   open,
   processo,
   savingLista = false,
+  savingLogo = false,
   savingCampanha = false,
   participantes = [],
   savingParticipante = false,
@@ -76,6 +80,8 @@ export function RiscosPsicossociaisModal({
   onSalvarRecebimentoLista,
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
+  onUploadLogoCampanha,
+  onRemoverLogoCampanha,
   onCriarCampanha,
   onAbrirCampanha,
   onEncerrarCampanha,
@@ -130,6 +136,7 @@ export function RiscosPsicossociaisModal({
         processo={processo}
         participantes={participantes}
         savingLista={savingLista}
+        savingLogo={savingLogo}
         savingCampanha={savingCampanha}
         savingParticipante={savingParticipante}
         onSalvarSolicitacaoLista={async (input) => {
@@ -143,6 +150,12 @@ export function RiscosPsicossociaisModal({
         }}
         onVisualizarAnexoLista={async () => {
           await onVisualizarAnexoLista?.();
+        }}
+        onUploadLogoCampanha={async (file) => {
+          await onUploadLogoCampanha?.(file);
+        }}
+        onRemoverLogoCampanha={async () => {
+          await onRemoverLogoCampanha?.();
         }}
         onCriarCampanha={async (input) => {
           await onCriarCampanha?.(input);

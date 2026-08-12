@@ -4,55 +4,20 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import {
-  isRiscosCampanhaStatus,
+  mapRiscosCampanhaRow,
+  RISCOS_CAMPANHA_SELECT,
+  RISCOS_CAMPANHA_SELECT_LEGACY,
   validateAbrirCampanhaRiscos,
   type RiscosCampanhaRecord,
-  type RiscosCampanhaStatus,
 } from "@/lib/riscos-campanha";
-import { normalizeRiscosCampanhaOrigem } from "@/lib/riscos-campanha-origem";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
-const CAMPANHA_SELECT =
-  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
-
-const CAMPANHA_SELECT_LEGACY =
-  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
+const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
+const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
 
 function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
-  const statusRaw = String(row.status ?? "em_preparacao");
-  const status: RiscosCampanhaStatus = isRiscosCampanhaStatus(statusRaw)
-    ? statusRaw
-    : "em_preparacao";
-
-  return {
-    id: String(row.id),
-    orcamento_id: row.orcamento_id ? String(row.orcamento_id) : null,
-    cliente_id: row.cliente_id ? String(row.cliente_id) : null,
-    cnpj: String(row.cnpj ?? ""),
-    empresa_nome: String(row.empresa_nome ?? ""),
-    data_inicio: String(row.data_inicio ?? "").slice(0, 10),
-    data_encerramento: String(row.data_encerramento ?? "").slice(0, 10),
-    quantidade_prevista: Number(row.quantidade_prevista) || 0,
-    status,
-    codigo_publico: String(row.codigo_publico ?? ""),
-    codigo_acesso_exibicao: row.codigo_acesso_exibicao
-      ? String(row.codigo_acesso_exibicao)
-      : null,
-    origem: normalizeRiscosCampanhaOrigem(
-      row.origem != null ? String(row.origem) : undefined
-    ),
-    responsavel: row.responsavel ? String(row.responsavel) : null,
-    observacoes: row.observacoes ? String(row.observacoes) : null,
-    criado_por: row.criado_por ? String(row.criado_por) : null,
-    cancelada_em: row.cancelada_em ? String(row.cancelada_em) : null,
-    cancelada_por: row.cancelada_por ? String(row.cancelada_por) : null,
-    motivo_cancelamento: row.motivo_cancelamento
-      ? String(row.motivo_cancelamento)
-      : null,
-    created_at: row.created_at ? String(row.created_at) : undefined,
-    updated_at: row.updated_at ? String(row.updated_at) : undefined,
-  };
+  return mapRiscosCampanhaRow(row);
 }
 
 function isMissingColumnError(error: {
@@ -61,8 +26,9 @@ function isMissingColumnError(error: {
 } | null): boolean {
   if (!error) return false;
   return (
-    /origem|responsavel|observacoes|cancelada_/i.test(error.message ?? "") ||
-    error.code === "42703"
+    /origem|responsavel|observacoes|cancelada_|logo_/i.test(
+      error.message ?? ""
+    ) || error.code === "42703"
   );
 }
 

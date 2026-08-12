@@ -49,6 +49,12 @@ const campanhaManual: RiscosCampanhaRecord = {
   responsavel: "AGATHA",
   observacoes: null,
   criado_por: "AGATHA",
+  logo_url: null,
+  logo_storage_path: null,
+  logo_origem: null,
+  logo_nome: null,
+  logo_tipo: null,
+  logo_tamanho: null,
   created_at: "2026-08-11T12:00:00.000Z",
 };
 

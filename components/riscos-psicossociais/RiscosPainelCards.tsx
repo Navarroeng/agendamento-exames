@@ -32,6 +32,7 @@ interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
   participantes: RiscosCampanhaParticipanteRecord[];
   savingLista?: boolean;
+  savingLogo?: boolean;
   savingCampanha?: boolean;
   savingParticipante?: boolean;
   onSalvarSolicitacaoLista: (input: {
@@ -41,6 +42,8 @@ interface RiscosPainelCardsProps {
   onSalvarRecebimentoLista: (file: File) => Promise<void>;
   onRemoverAnexoLista: () => Promise<void>;
   onVisualizarAnexoLista: () => Promise<void>;
+  onUploadLogoCampanha: (file: File) => Promise<void>;
+  onRemoverLogoCampanha: () => Promise<void>;
   onCriarCampanha: (input: {
     dataInicioIso: string;
     dataEncerramentoIso: string;
@@ -137,12 +140,15 @@ export function RiscosPainelCards({
   processo,
   participantes,
   savingLista = false,
+  savingLogo = false,
   savingCampanha = false,
   savingParticipante = false,
   onSalvarSolicitacaoLista,
   onSalvarRecebimentoLista,
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
+  onUploadLogoCampanha,
+  onRemoverLogoCampanha,
   onCriarCampanha,
   onAbrirCampanha,
   onEncerrarCampanha,
@@ -271,11 +277,15 @@ export function RiscosPainelCards({
           <RiscosPainelPreRequisitos
             embedded
             processo={processo}
+            campanha={campanha}
             savingLista={savingLista}
+            savingLogo={savingLogo}
             onSalvarSolicitacaoLista={onSalvarSolicitacaoLista}
             onSalvarRecebimentoLista={onSalvarRecebimentoLista}
             onRemoverAnexoLista={onRemoverAnexoLista}
             onVisualizarAnexoLista={onVisualizarAnexoLista}
+            onUploadLogoCampanha={onUploadLogoCampanha}
+            onRemoverLogoCampanha={onRemoverLogoCampanha}
           />
         </PanelCard>
 

@@ -155,6 +155,12 @@ const campanhaPrep: RiscosCampanhaRecord = {
   responsavel: "BRUNA",
   observacoes: null,
   criado_por: null,
+  logo_url: null,
+  logo_storage_path: null,
+  logo_origem: null,
+  logo_nome: null,
+  logo_tipo: null,
+  logo_tamanho: null,
 };
 
 const riscosCadastro = buildRiscosPsicossociaisProcesso(

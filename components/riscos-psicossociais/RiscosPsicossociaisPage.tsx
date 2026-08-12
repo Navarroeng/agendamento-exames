@@ -19,6 +19,7 @@ export function RiscosPsicossociaisPage() {
     modalProcesso,
     modalParticipantes,
     savingLista,
+    savingLogo,
     savingCampanha,
     savingParticipante,
     handleFilterChange,
@@ -31,6 +32,8 @@ export function RiscosPsicossociaisPage() {
     handleSalvarRecebimentoLista,
     handleRemoverAnexoLista,
     handleVisualizarAnexoLista,
+    handleUploadLogoCampanha,
+    handleRemoverLogoCampanha,
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,
@@ -95,6 +98,7 @@ export function RiscosPsicossociaisPage() {
         open={Boolean(modalProcesso)}
         processo={modalProcesso}
         savingLista={savingLista}
+        savingLogo={savingLogo}
         savingCampanha={savingCampanha}
         participantes={modalParticipantes}
         savingParticipante={savingParticipante}
@@ -103,6 +107,8 @@ export function RiscosPsicossociaisPage() {
         onSalvarRecebimentoLista={handleSalvarRecebimentoLista}
         onRemoverAnexoLista={handleRemoverAnexoLista}
         onVisualizarAnexoLista={handleVisualizarAnexoLista}
+        onUploadLogoCampanha={handleUploadLogoCampanha}
+        onRemoverLogoCampanha={handleRemoverLogoCampanha}
         onCriarCampanha={handleCriarCampanha}
         onAbrirCampanha={handleAbrirCampanha}
         onEncerrarCampanha={handleEncerrarCampanha}

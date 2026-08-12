@@ -56,6 +56,10 @@ import {
   salvarSolicitacaoListaPresenca,
 } from "@/services/riscos-lista-presenca.service";
 import { obterUrlRiscosListaPresencaAnexo } from "@/services/riscos-lista-presenca-storage.service";
+import {
+  removerLogoCampanha,
+  salvarLogoCampanha,
+} from "@/services/riscos-campanha-logo.service";
 import { listarProcessosRiscosPsicossociais } from "@/services/riscos-psicossociais.service";
 
 export function useRiscosPsicossociaisPage() {
@@ -65,6 +69,7 @@ export function useRiscosPsicossociaisPage() {
   const [processos, setProcessos] = useState<RiscosPsicossociaisProcesso[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
+  const [savingLogo, setSavingLogo] = useState(false);
   const [savingCampanha, setSavingCampanha] = useState(false);
   const [savingParticipante, setSavingParticipante] = useState(false);
   const [savingRemoverProcesso, setSavingRemoverProcesso] = useState(false);
@@ -531,6 +536,63 @@ export function useRiscosPsicossociaisPage() {
       toast.error("Não foi possível abrir o anexo.");
     }
   }, [modalProcesso]);
+
+  const handleUploadLogoCampanha = useCallback(
+    async (file: File) => {
+      const campanhaAtual = modalProcesso?.campanha;
+      if (!campanhaAtual) {
+        toast.error("Crie a pesquisa antes de anexar o logo.");
+        return;
+      }
+      setSavingLogo(true);
+      try {
+        const origem = campanhaAtual.logo_storage_path ? "campanha" : "manual";
+        const campanha = await salvarLogoCampanha({
+          campanhaId: campanhaAtual.id,
+          file,
+          origem,
+          auditContext,
+        });
+        atualizarCampanhaNoEstado(campanha);
+        toast.success("Logo da campanha salvo.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar o logo."
+        );
+        throw err;
+      } finally {
+        setSavingLogo(false);
+      }
+    },
+    [modalProcesso, auditContext, atualizarCampanhaNoEstado]
+  );
+
+  const handleRemoverLogoCampanha = useCallback(async () => {
+    const campanhaAtual = modalProcesso?.campanha;
+    if (!campanhaAtual?.logo_storage_path) return;
+    const ok = window.confirm(
+      "Remover o logo desta campanha? O logo oficial da empresa não será alterado."
+    );
+    if (!ok) return;
+
+    setSavingLogo(true);
+    try {
+      const campanha = await removerLogoCampanha({
+        campanhaId: campanhaAtual.id,
+        auditContext,
+      });
+      atualizarCampanhaNoEstado(campanha);
+      toast.success("Logo da campanha removido.");
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao remover o logo."
+      );
+    } finally {
+      setSavingLogo(false);
+    }
+  }, [modalProcesso, auditContext, atualizarCampanhaNoEstado]);
 
   const handleCriarCampanha = useCallback(
     async (input: {
@@ -1049,6 +1111,7 @@ export function useRiscosPsicossociaisPage() {
     modalProcesso,
     modalParticipantes,
     savingLista,
+    savingLogo,
     savingCampanha,
     savingParticipante,
     handleFilterChange,
@@ -1061,6 +1124,8 @@ export function useRiscosPsicossociaisPage() {
     handleSalvarRecebimentoLista,
     handleRemoverAnexoLista,
     handleVisualizarAnexoLista,
+    handleUploadLogoCampanha,
+    handleRemoverLogoCampanha,
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,

@@ -5,6 +5,7 @@ import {
   normalizeRiscosCampanhaOrigem,
   type RiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
+import type { RiscosCampanhaLogoOrigem } from "@/lib/riscos-campanha-logo";
 
 export const RISCOS_CAMPANHA_STATUS = [
   "em_preparacao",
@@ -41,6 +42,15 @@ export type RiscosCampanhaRecord = {
   responsavel: string | null;
   observacoes: string | null;
   criado_por: string | null;
+  /** URL pública opcional (geralmente null; UI usa signed URL). */
+  logo_url: string | null;
+  /** Path no Storage da campanha (isolado do cadastro da empresa). */
+  logo_storage_path: string | null;
+  /** empresa | campanha | manual */
+  logo_origem: RiscosCampanhaLogoOrigem | null;
+  logo_nome: string | null;
+  logo_tipo: string | null;
+  logo_tamanho: number | null;
   cancelada_em?: string | null;
   cancelada_por?: string | null;
   motivo_cancelamento?: string | null;
@@ -66,6 +76,68 @@ export type RiscosCampanhaManualCreateInput = {
   dataInicioIso: string;
   dataEncerramentoIso: string;
 };
+
+export function mapRiscosCampanhaRow(
+  row: Record<string, unknown>
+): RiscosCampanhaRecord {
+  const statusRaw = String(row.status ?? "em_preparacao");
+  const status: RiscosCampanhaStatus = isRiscosCampanhaStatus(statusRaw)
+    ? statusRaw
+    : "em_preparacao";
+
+  const logoOrigemRaw =
+    row.logo_origem != null ? String(row.logo_origem) : null;
+  const logo_origem: RiscosCampanhaLogoOrigem | null =
+    logoOrigemRaw === "empresa" ||
+    logoOrigemRaw === "campanha" ||
+    logoOrigemRaw === "manual"
+      ? logoOrigemRaw
+      : null;
+
+  return {
+    id: String(row.id),
+    orcamento_id: row.orcamento_id ? String(row.orcamento_id) : null,
+    cliente_id: row.cliente_id ? String(row.cliente_id) : null,
+    cnpj: String(row.cnpj ?? ""),
+    empresa_nome: String(row.empresa_nome ?? ""),
+    data_inicio: String(row.data_inicio ?? "").slice(0, 10),
+    data_encerramento: String(row.data_encerramento ?? "").slice(0, 10),
+    quantidade_prevista: Number(row.quantidade_prevista) || 0,
+    status,
+    codigo_publico: String(row.codigo_publico ?? ""),
+    codigo_acesso_exibicao: row.codigo_acesso_exibicao
+      ? String(row.codigo_acesso_exibicao)
+      : null,
+    origem: normalizeRiscosCampanhaOrigem(
+      row.origem != null ? String(row.origem) : undefined
+    ),
+    responsavel: row.responsavel ? String(row.responsavel) : null,
+    observacoes: row.observacoes ? String(row.observacoes) : null,
+    criado_por: row.criado_por ? String(row.criado_por) : null,
+    logo_url: row.logo_url ? String(row.logo_url) : null,
+    logo_storage_path: row.logo_storage_path
+      ? String(row.logo_storage_path)
+      : null,
+    logo_origem,
+    logo_nome: row.logo_nome ? String(row.logo_nome) : null,
+    logo_tipo: row.logo_tipo ? String(row.logo_tipo) : null,
+    logo_tamanho:
+      row.logo_tamanho != null ? Number(row.logo_tamanho) : null,
+    cancelada_em: row.cancelada_em ? String(row.cancelada_em) : null,
+    cancelada_por: row.cancelada_por ? String(row.cancelada_por) : null,
+    motivo_cancelamento: row.motivo_cancelamento
+      ? String(row.motivo_cancelamento)
+      : null,
+    created_at: row.created_at ? String(row.created_at) : undefined,
+    updated_at: row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+export const RISCOS_CAMPANHA_SELECT =
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, logo_url, logo_storage_path, logo_origem, logo_nome, logo_tipo, logo_tamanho, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
+
+export const RISCOS_CAMPANHA_SELECT_LEGACY =
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
 
 const CODIGO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 

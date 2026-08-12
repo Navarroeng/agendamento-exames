@@ -16,6 +16,7 @@ import {
   gerarRelatorioCampanha,
   regenerarRelatorioCampanha,
 } from "@/services/riscos-relatorio.service";
+import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-logo.service";
 import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
 
 interface RiscosRelatorioPanelProps {
@@ -39,6 +40,7 @@ export function RiscosRelatorioPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const onRelatorioChangeRef = useRef(onRelatorioChange);
   onRelatorioChangeRef.current = onRelatorioChange;
 
@@ -87,6 +89,25 @@ export function RiscosRelatorioPanel({
       cancelled = true;
     };
   }, [campanha?.id]);
+
+  useEffect(() => {
+    if (!campanha?.id) {
+      setLogoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const url = await resolverUrlLogoCampanhaOuEmpresa(campanha);
+        if (!cancelled) setLogoUrl(url);
+      } catch {
+        if (!cancelled) setLogoUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campanha]);
 
   async function handleGerar() {
     if (!campanha?.id) return;
@@ -259,6 +280,7 @@ export function RiscosRelatorioPanel({
         open={viewerOpen}
         relatorio={relatorio}
         onClose={() => setViewerOpen(false)}
+        logoUrl={logoUrl}
       />
     </div>
   );

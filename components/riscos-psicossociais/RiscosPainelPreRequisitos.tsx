@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { RiscosListaPresencaTab } from "@/components/riscos-psicossociais/RiscosListaPresencaTab";
+import { RiscosCampanhaLogoCard } from "@/components/riscos-psicossociais/RiscosCampanhaLogoCard";
+import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
 interface RiscosPainelPreRequisitosProps {
   processo: RiscosPsicossociaisProcesso;
+  campanha?: RiscosCampanhaRecord | null;
   savingLista: boolean;
+  savingLogo?: boolean;
   onSalvarSolicitacaoLista: (input: {
     dataSolicitacaoIso: string;
     email: string;
@@ -15,6 +19,8 @@ interface RiscosPainelPreRequisitosProps {
   onSalvarRecebimentoLista: (file: File) => Promise<void>;
   onRemoverAnexoLista: () => Promise<void>;
   onVisualizarAnexoLista: () => Promise<void>;
+  onUploadLogoCampanha?: (file: File) => Promise<void>;
+  onRemoverLogoCampanha?: () => Promise<void>;
   /** Quando true, não renderiza o container externo (usa o PanelCard pai). */
   embedded?: boolean;
 }
@@ -41,11 +47,15 @@ function StatusPill({
 
 export function RiscosPainelPreRequisitos({
   processo,
+  campanha = null,
   savingLista,
+  savingLogo = false,
   onSalvarSolicitacaoLista,
   onSalvarRecebimentoLista,
   onRemoverAnexoLista,
   onVisualizarAnexoLista,
+  onUploadLogoCampanha,
+  onRemoverLogoCampanha,
   embedded = false,
 }: RiscosPainelPreRequisitosProps) {
   const [listaExpandida, setListaExpandida] = useState(false);
@@ -170,6 +180,15 @@ export function RiscosPainelPreRequisitos({
           ) : null}
         </div>
       </div>
+
+      {onUploadLogoCampanha && onRemoverLogoCampanha ? (
+        <RiscosCampanhaLogoCard
+          campanha={campanha ?? processo.campanha ?? null}
+          saving={savingLogo}
+          onUpload={onUploadLogoCampanha}
+          onRemove={onRemoverLogoCampanha}
+        />
+      ) : null}
     </>
   );
 
