@@ -320,9 +320,26 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   body.riscos-relatorio-printing .relatorio-barra-fill,
-  body.riscos-relatorio-printing .relatorio-barra-badge {
+  body.riscos-relatorio-printing .relatorio-barra-badge,
+  body.riscos-relatorio-printing .relatorio-coluna-fill,
+  body.riscos-relatorio-printing .relatorio-coluna-legenda-linha {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  body.riscos-relatorio-printing .relatorio-colunas-bloco {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.riscos-relatorio-printing .relatorio-colunas-area {
+    min-height: 220px;
+  }
+
+  body.riscos-relatorio-printing .relatorio-colunas-legenda {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px 20px !important;
   }
 
   body.riscos-relatorio-printing .relatorio-dimensoes-grid {

@@ -4,9 +4,12 @@
 import assert from "node:assert/strict";
 import type { RiscosRelatorioDimensaoSnapshot } from "../lib/riscos-relatorio";
 import {
+  corCategoriaPorId,
   corPorClassificacaoId,
   dimensoesOrdenadasPorMediaDesc,
+  eixoMaxColunas,
   montarDadosBarras,
+  montarDadosColunasPorTipo,
   montarDadosRadar,
   montarRankingAtencao,
   rankingAtencao,
@@ -182,6 +185,51 @@ run("radar ignora dimensões fora do cálculo", () => {
     radar.every((r) => r.fullMark === 1 && typeof r.media === "number"),
     true
   );
+});
+
+run("colunas: PROTEÇÃO e RISCO separados; ofensivos fora", () => {
+  const prot = montarDadosColunasPorTipo(amostra, "PROTECAO");
+  const risco = montarDadosColunasPorTipo(amostra, "RISCO");
+  assert.ok(prot.every((d) => String(d.tipo).toUpperCase() === "PROTECAO"));
+  assert.ok(risco.every((d) => String(d.tipo).toUpperCase() === "RISCO"));
+  assert.equal(
+    prot.some((d) => d.id === "comportamentos-ofensivos"),
+    false
+  );
+  assert.equal(
+    risco.some((d) => d.id === "comportamentos-ofensivos"),
+    false
+  );
+  // Cores estáveis por id (não classificação)
+  for (const d of [...prot, ...risco]) {
+    assert.equal(d.cor, corCategoriaPorId(d.id));
+  }
+  assert.equal(corCategoriaPorId("lideranca"), "#5B6C8F");
+  assert.equal(corCategoriaPorId("demandas-trabalho"), "#D97757");
+  assert.notEqual(corCategoriaPorId("lideranca"), corPorClassificacaoId("situacao_favoravel"));
+  // Eixo respeita maior maxEscala do grupo sem converter médias
+  const misto = [
+    dim({
+      id: "lideranca",
+      nome: "Liderança",
+      tipo: "PROTECAO",
+      media: 3.1,
+      maxEscalaPadronizada: 4,
+      classificacaoId: "situacao_favoravel",
+    }),
+    dim({
+      id: "interface-trabalho-individuo",
+      nome: "Interface",
+      tipo: "PROTECAO",
+      media: 2.0,
+      maxEscalaPadronizada: 3,
+      classificacaoId: "situacao_favoravel",
+    }),
+  ];
+  const cols = montarDadosColunasPorTipo(misto, "PROTECAO");
+  assert.equal(eixoMaxColunas(cols), 4);
+  assert.equal(cols.find((c) => c.id === "interface-trabalho-individuo")?.media, 2);
+  assert.equal(cols.find((c) => c.id === "interface-trabalho-individuo")?.maxEscala, 3);
 });
 
 run("ranking melhores prioriza situação favorável", () => {

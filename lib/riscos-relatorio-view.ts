@@ -363,6 +363,102 @@ export function montarDadosBarras(
 }
 
 /**
+ * Paleta estável por categoria (coluna + legenda + PDF).
+ * Não representa classificação Favorável/Moderada/Desfavorável.
+ */
+export const RELATORIO_CORES_CATEGORIA: Record<string, string> = {
+  "demandas-trabalho": "#D97757",
+  "influencia-desenvolvimento": "#4A6FA5",
+  "significado-comprometimento": "#7B6B9E",
+  "relacoes-interpessoais": "#3D9B8F",
+  lideranca: "#5B6C8F",
+  "interface-trabalho-individuo": "#C97B84",
+  "conflitos-familia-trabalho": "#C9A227",
+  "valores-local-trabalho": "#5A8F6B",
+  "saude-geral": "#8B7BB8",
+  "burnout-estresse": "#B86B6B",
+  "comportamentos-ofensivos": "#6B8F9E",
+};
+
+const CORES_CATEGORIA_FALLBACK = [
+  "#4A6FA5",
+  "#3D9B8F",
+  "#7B6B9E",
+  "#C97B84",
+  "#C9A227",
+  "#5A8F6B",
+  "#D97757",
+  "#5B6C8F",
+] as const;
+
+export function corCategoriaPorId(categoriaId: string): string {
+  const fixa = RELATORIO_CORES_CATEGORIA[categoriaId];
+  if (fixa) return fixa;
+  let hash = 0;
+  for (let i = 0; i < categoriaId.length; i++) {
+    hash = (hash * 31 + categoriaId.charCodeAt(i)) >>> 0;
+  }
+  return CORES_CATEGORIA_FALLBACK[hash % CORES_CATEGORIA_FALLBACK.length];
+}
+
+export type ColunaChartDatum = {
+  id: string;
+  nome: string;
+  tipo: string;
+  /** Pontuação técnica (escala impressa) — sem normalização. */
+  media: number;
+  maxEscala: number;
+  cor: string;
+  classificacaoId: string;
+  classificacaoLabel: string;
+  ordem: number;
+};
+
+export type TipoColunaGrafico = "PROTECAO" | "RISCO";
+
+function ordemCategoria(id: string): number {
+  return COPSOQ_DIMENSOES.find((d) => d.id === id)?.ordem ?? 999;
+}
+
+function normalizarTipoCategoria(tipo: string): TipoColunaGrafico | null {
+  const t = String(tipo).toUpperCase();
+  if (t === "PROTECAO" || t === "PROTEÇÃO") return "PROTECAO";
+  if (t === "RISCO") return "RISCO";
+  return null;
+}
+
+/**
+ * Dados para gráfico de colunas por tipo (PROTEÇÃO ou RISCO).
+ * Usa apenas categorias do cálculo quantitativo (exclui ofensivos).
+ * Pontuação = média técnica; cor = identidade da categoria.
+ */
+export function montarDadosColunasPorTipo(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
+  tipo: TipoColunaGrafico
+): ColunaChartDatum[] {
+  return dimensoesParaCalculo(dimensoes)
+    .filter((d) => normalizarTipoCategoria(d.tipo) === tipo)
+    .map((d) => ({
+      id: d.id,
+      nome: d.nome,
+      tipo: d.tipo,
+      media: Number(d.media ?? 0),
+      maxEscala: d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4,
+      cor: corCategoriaPorId(d.id),
+      classificacaoId: String(d.classificacaoId),
+      classificacaoLabel: d.classificacaoLabel,
+      ordem: ordemCategoria(d.id),
+    }))
+    .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+/** Maior máximo de escala do grupo — eixo Y sem converter pontuações. */
+export function eixoMaxColunas(itens: readonly ColunaChartDatum[]): number {
+  if (itens.length === 0) return 4;
+  return Math.max(...itens.map((i) => i.maxEscala), 1);
+}
+
+/**
  * Status geral do resumo executivo (somente apresentação).
  * - Favorável: nenhuma Moderada nem Desfavorável
  * - Atenção / Monitoramento: há Situação Moderada, sem Desfavorável
