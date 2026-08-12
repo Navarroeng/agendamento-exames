@@ -325,8 +325,8 @@ export function gerarConteudoExecutivo(
   const melhores = rankingMelhores(dimensoes, 3);
 
   const resumoNarrativo = [
-    `O presente relatório apresenta os resultados da Avaliação de Riscos Psicossociais da organização ${empresa} (campanha ${codigo}), realizada por meio do instrumento COPSOQ II-Br, referência reconhecida para análise de fatores psicossociais no ambiente de trabalho.`,
-    `Foram considerados ${participantes} participante(s) elegível(is), com ${respondentes} respondente(s) válido(s) e taxa de participação de ${taxa}. A análise contempla ${dimensoes.length} categorias, permitindo distinguir fatores de risco e fatores de proteção conforme as orientações oficiais do instrumento.`,
+    `O presente relatório apresenta os resultados da Avaliação de Riscos Psicossociais da organização ${empresa} (campanha ${codigo}), realizada por meio do instrumento COPSOQ II-Br, referência reconhecida para análise de fatores psicossociais no trabalho.`,
+    `Foram considerados ${participantes} participante(s) elegível(is), com ${respondentes} respondente(s) válido(s) e taxa de participação de ${taxa}. A análise contempla ${dimensoes.length} categorias, permitindo distinguir fatores de risco e fatores de proteção conforme as Orientações oficiais do instrumento.`,
     `Este relatório tem como finalidade subsidiar a empresa na identificação de fatores de atenção relacionados aos riscos psicossociais, contribuindo para o desenvolvimento de estratégias preventivas, ações de melhoria organizacional e fortalecimento das práticas voltadas à promoção da saúde e segurança ocupacional.`,
     `Além do atendimento às exigências normativas aplicáveis, a presente avaliação busca apoiar a construção de um ambiente de trabalho mais saudável, equilibrado e produtivo, promovendo melhores condições organizacionais e contribuindo para o bem-estar físico, emocional e psicossocial dos trabalhadores.`,
   ];

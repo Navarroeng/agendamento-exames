@@ -130,7 +130,7 @@ export function RelatorioResumoExecutivo({
             Psicossociais da organização <strong>{empresa}</strong> (campanha{" "}
             <strong>{codigo}</strong>), realizada por meio do instrumento{" "}
             <strong>COPSOQ II-Br</strong>, referência reconhecida para análise
-            de fatores psicossociais no ambiente de trabalho.
+            de fatores psicossociais no trabalho.
           </p>
           <p>
             Foram considerados{" "}
@@ -138,7 +138,7 @@ export function RelatorioResumoExecutivo({
             <strong>{respondentes} respondente(s) válido(s)</strong> e taxa de
             participação de <strong>{taxa}</strong>. A análise contempla{" "}
             <strong>{totalDimensoes} categorias</strong>, permitindo distinguir
-            fatores de risco e fatores de proteção conforme as orientações
+            fatores de risco e fatores de proteção conforme as Orientações
             oficiais do instrumento.
           </p>
           <p>
