@@ -5,20 +5,11 @@ import { toast } from "sonner";
 import { Modal } from "@/components/ui/Modal";
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import {
-  RISCOS_RELATORIO_PRINT_ROOT_ID,
   exportarRelatorioRiscosPdf,
   nomeArquivoPdfRelatorioRiscos,
 } from "@/lib/riscos-relatorio-pdf";
-import { RelatorioCapa } from "@/components/riscos-psicossociais/relatorio/RelatorioCapa";
-import { RelatorioCapaPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCapaPrint";
-import { RelatorioCabecalhoPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoPrint";
-import { RelatorioResumoExecutivo } from "@/components/riscos-psicossociais/relatorio/RelatorioResumoExecutivo";
-import { RelatorioPanoramaCategorias } from "@/components/riscos-psicossociais/relatorio/RelatorioPanoramaCategorias";
-import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
-import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
-import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
-import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
-import { relatorioTemNormalizacao } from "@/lib/riscos-relatorio-view";
+import { RelatorioDocumentoShell } from "@/components/riscos-psicossociais/relatorio/RelatorioDocumentoShell";
+import { RelatorioDocumento } from "@/components/riscos-psicossociais/relatorio/RelatorioDocumento";
 
 interface RiscosRelatorioViewerModalProps {
   open: boolean;
@@ -32,6 +23,10 @@ interface RiscosRelatorioViewerModalProps {
   campanhaStatus?: string | null;
 }
 
+/**
+ * Visualizador do Relatório Executivo.
+ * O documento oficial vive na folha A4 (`RelatorioDocumento`); o PDF imprime o mesmo DOM.
+ */
 export function RiscosRelatorioViewerModal({
   open,
   relatorio,
@@ -44,8 +39,6 @@ export function RiscosRelatorioViewerModal({
 
   if (!open || !relatorio) return null;
 
-  const dimensoes = relatorio.resultado_json?.dimensoes ?? [];
-  const normalizado = relatorioTemNormalizacao(dimensoes);
   const empresa =
     relatorio.empresa_nome ||
     relatorio.resultado_json?.capa?.empresaNome ||
@@ -76,12 +69,12 @@ export function RiscosRelatorioViewerModal({
       open={open}
       onClose={onClose}
       title="Relatório Executivo"
-      subtitle="Avaliação dos Riscos Psicossociais · COPSOQ II-Br"
+      subtitle="Documento A4 · visualização idêntica à exportação PDF"
       size="xxl"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 riscos-relatorio-print-hide">
           <p className="text-[11px] text-app-muted">
-            Documento gerado a partir do snapshot persistido — sem recálculo.
+            Folha A4 única — modal e PDF usam o mesmo documento.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -106,81 +99,14 @@ export function RiscosRelatorioViewerModal({
         </div>
       }
     >
-      <div
-        id={RISCOS_RELATORIO_PRINT_ROOT_ID}
-        className="max-h-[75vh] space-y-10 overflow-y-auto pr-1"
-      >
-        {/* PDF página 1 — capa institucional (oculta no modal) */}
-        <div className="hidden riscos-relatorio-print-force riscos-relatorio-print-capa-pagina">
-          <RelatorioCapaPrint
-            relatorio={relatorio}
-            logoUrl={logoUrl}
-            empresaCnpj={empresaCnpj}
-            campanhaStatus={campanhaStatus}
-          />
-        </div>
-
-        {/* Modal: capa azul atual · PDF página 2+: cabeçalho compacto */}
-        <div className="riscos-relatorio-print-section">
-          <div className="riscos-relatorio-print-hide">
-            <RelatorioCapa
-              relatorio={relatorio}
-              logoUrl={logoUrl}
-              empresaCnpj={empresaCnpj}
-              campanhaStatus={campanhaStatus}
-            />
-          </div>
-          <div className="hidden riscos-relatorio-print-force">
-            <RelatorioCabecalhoPrint relatorio={relatorio} />
-          </div>
-        </div>
-
-        {!normalizado ? (
-          <div className="riscos-relatorio-print-section rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
-            <p className="font-extrabold">
-              Snapshot anterior à metodologia atual de escalas
-            </p>
-            <p className="mt-1 text-xs leading-relaxed">
-              Este relatório foi gerado antes da metodologia de classificação
-              do sistema (escalas impressas 0–3 / 0–4). Médias e classificações
-              exibidas são as do momento da geração. Para aplicar a metodologia
-              atual, um administrador deve usar <strong>Regenerar</strong>.
-            </p>
-          </div>
-        ) : null}
-
-        <div className="riscos-relatorio-print-section">
-          <RelatorioResumoExecutivo relatorio={relatorio} />
-        </div>
-        <div className="riscos-relatorio-print-section">
-          <RelatorioPanoramaCategorias dimensoes={dimensoes} />
-        </div>
-        <div className="riscos-relatorio-print-chart riscos-relatorio-print-section">
-          <RelatorioBarrasChart dimensoes={dimensoes} />
-        </div>
-        <div className="riscos-relatorio-print-section">
-          <RelatorioRanking dimensoes={dimensoes} />
-        </div>
-        <div className="riscos-relatorio-print-section">
-          <RelatorioDimensoesCards dimensoes={dimensoes} />
-        </div>
-        <div className="riscos-relatorio-print-section">
-          <RelatorioConclusoesExecutivas relatorio={relatorio} />
-        </div>
-
-        <div className="riscos-relatorio-print-footer hidden">
-          Navarro Engenharia · Relatório de Riscos Psicossociais
-          {relatorio.codigo_publico
-            ? ` · ${relatorio.codigo_publico}`
-            : ""}{" "}
-          · Gerado em{" "}
-          {relatorio.gerado_em
-            ? new Date(relatorio.gerado_em).toLocaleString("pt-BR")
-            : "—"}
-          <br />
-          Use a numeração de páginas do diálogo de impressão (Salvar como PDF).
-        </div>
-      </div>
+      <RelatorioDocumentoShell>
+        <RelatorioDocumento
+          relatorio={relatorio}
+          logoUrl={logoUrl}
+          empresaCnpj={empresaCnpj}
+          campanhaStatus={campanhaStatus}
+        />
+      </RelatorioDocumentoShell>
     </Modal>
   );
 }

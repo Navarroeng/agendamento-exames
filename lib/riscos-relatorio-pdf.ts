@@ -1,7 +1,7 @@
 /**
  * Exportação PDF do Relatório de Riscos Psicossociais.
- * Abordagem: CSS @media print + window.print() — fiel ao layout web,
- * sem recalcular COPSOQ e sem segunda geração programática do relatório.
+ * Imprime a folha A4 (`#riscos-relatorio-print-root`) — o mesmo DOM do modal.
+ * Sem layout paralelo, sem html2canvas/jsPDF nesta fase.
  */
 
 /** Sanitiza trecho para nome de arquivo (ASCII-ish). */

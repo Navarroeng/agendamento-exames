@@ -20,7 +20,7 @@ function orientacaoLeituraPorTipo(tipo: string): string {
 }
 
 function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const cor = corPorClassificacaoId(d.classificacaoId);
   const bg = bgSuavePorClassificacaoId(d.classificacaoId);
   const analise = analisarDimensao(d);
@@ -109,11 +109,8 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
         </button>
       </div>
 
-      <div
-        className={`space-y-3 border-t border-[#eef2f7] bg-[#fbfcfe] px-4 py-4 riscos-relatorio-print-force ${
-          open ? "" : "hidden"
-        }`}
-      >
+      {open ? (
+        <div className="space-y-3 border-t border-[#eef2f7] bg-[#fbfcfe] px-4 py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
               O que esta categoria avalia
@@ -149,6 +146,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
             </ul>
           </div>
         </div>
+      ) : null}
     </article>
   );
 }

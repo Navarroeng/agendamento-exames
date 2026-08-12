@@ -182,12 +182,30 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 }
 
 /* ------------------------------------------------------------------ */
-/* Relatório Riscos Psicossociais — exportação PDF via impressão       */
+/* Relatório Executivo — folha A4 (fonte da verdade modal + PDF)      */
 /* ------------------------------------------------------------------ */
+.relatorio-a4-folha {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  box-sizing: border-box;
+  padding: 16mm;
+  background: #fff;
+}
+
+.relatorio-a4-capa {
+  min-height: calc(297mm - 32mm);
+  box-sizing: border-box;
+}
+
+.relatorio-a4-rodape {
+  margin-top: 24px;
+}
+
 @media print {
   @page {
     size: A4;
-    margin: 14mm 12mm 18mm 12mm;
+    margin: 0;
   }
 
   body.riscos-relatorio-printing {
@@ -196,6 +214,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
+  /* Oculta tudo e revela só a folha A4 (mesmo DOM do modal). */
   body.riscos-relatorio-printing * {
     visibility: hidden !important;
   }
@@ -205,118 +224,65 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     visibility: visible !important;
   }
 
-  body.riscos-relatorio-printing #riscos-relatorio-print-root {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #fff !important;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-shell {
-    position: static !important;
-    inset: auto !important;
-    display: block !important;
-    padding: 0 !important;
-    height: auto !important;
-    max-height: none !important;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-dialog {
-    position: static !important;
-    max-height: none !important;
-    height: auto !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow: visible !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-body {
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    padding: 0 !important;
-  }
-
   body.riscos-relatorio-printing .riscos-relatorio-print-hide {
     display: none !important;
     visibility: hidden !important;
   }
 
-  body.riscos-relatorio-printing .riscos-relatorio-print-force {
+  /* Chrome do modal / visualizador — fora do PDF */
+  body.riscos-relatorio-printing .riscos-relatorio-print-shell,
+  body.riscos-relatorio-printing .riscos-relatorio-print-dialog,
+  body.riscos-relatorio-printing .riscos-relatorio-print-body,
+  body.riscos-relatorio-printing .relatorio-viewer-stage {
+    position: static !important;
+    inset: auto !important;
     display: block !important;
-    visibility: visible !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
-  /* Capa PDF: página inteira exclusiva; conteúdo inicia na página seguinte */
-  body.riscos-relatorio-printing .riscos-relatorio-print-capa-pagina {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 250mm;
-    height: 250mm;
+  body.riscos-relatorio-printing #riscos-relatorio-print-root.relatorio-a4-folha {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-height: auto !important;
+    height: auto !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 16mm !important;
+    overflow: visible !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Capa = página 1 */
+  body.riscos-relatorio-printing .relatorio-a4-capa {
+    min-height: calc(297mm - 32mm);
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  body.riscos-relatorio-printing .riscos-relatorio-print-capa {
-    flex: 1 1 auto;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 100%;
-    height: 100%;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-cabecalho {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin-bottom: 12px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-section {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-card {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-chart {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body.riscos-relatorio-printing .recharts-responsive-container {
-    width: 100% !important;
-    height: 340px !important;
-    min-height: 340px !important;
-  }
-
-  body.riscos-relatorio-printing .relatorio-barras-lista {
-    break-inside: auto;
-  }
-
+  /* Unidades atômicas — sem forçar paginação artificial de tudo */
+  body.riscos-relatorio-printing .riscos-relatorio-print-section,
+  body.riscos-relatorio-printing .riscos-relatorio-print-card,
+  body.riscos-relatorio-printing .riscos-relatorio-print-chart,
+  body.riscos-relatorio-printing .relatorio-colunas-bloco,
   body.riscos-relatorio-printing .relatorio-barra-row {
     break-inside: avoid;
     page-break-inside: avoid;
-    padding-top: 10px !important;
-    padding-bottom: 10px !important;
   }
 
   body.riscos-relatorio-printing .relatorio-barra-fill,
@@ -327,45 +293,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact;
   }
 
-  body.riscos-relatorio-printing .relatorio-colunas-bloco {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body.riscos-relatorio-printing .relatorio-colunas-area {
-    min-height: 220px;
-  }
-
-  body.riscos-relatorio-printing .relatorio-colunas-legenda {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 10px 20px !important;
-  }
-
-  body.riscos-relatorio-printing .relatorio-dimensoes-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 12px !important;
-  }
-
-  body.riscos-relatorio-printing .relatorio-panorama-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 12px !important;
-  }
-
   body.riscos-relatorio-printing .relatorio-panorama-grid .riscos-relatorio-print-card {
     box-shadow: none !important;
-  }
-
-  body.riscos-relatorio-printing .riscos-relatorio-print-footer {
-    display: block !important;
-    margin-top: 24px;
-    padding-top: 10px;
-    border-top: 1px solid #e2e8f0;
-    font-size: 9px;
-    color: #64748b;
-    text-align: center;
   }
 
   body.riscos-relatorio-printing table {
