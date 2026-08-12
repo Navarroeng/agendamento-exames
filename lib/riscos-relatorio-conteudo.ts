@@ -117,20 +117,12 @@ export function textoResultadoEncontrado(
 ): string {
   const risco = isRisco(d.tipo);
   const sev = labelSeveridade(d.classificacaoId);
-  const temNorm =
-    d.mediaBruta != null && !Number.isNaN(d.mediaBruta);
-
   let base: string;
-  if (temNorm) {
-    const original = formatPontuacaoComMaximo(
-      d.mediaBruta,
-      d.maxEscalaBruta
-    );
-    const padronizada = formatPontuacaoComMaximo(
-      d.media,
-      d.maxEscalaPadronizada ?? 4
-    );
-    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação original ${original} e pontuação da dimensão ${padronizada} (escala final do sistema usada na classificação), resultando em ${d.classificacaoLabel}.`;
+  const max =
+    d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4;
+  const pontuacao = formatPontuacaoComMaximo(d.media, max);
+  if (d.media != null && !Number.isNaN(d.media)) {
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação da dimensão ${pontuacao}, resultando em ${d.classificacaoLabel}.`;
   } else {
     const media = formatMediaRelatorio(d.media);
     base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;

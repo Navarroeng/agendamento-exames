@@ -1,5 +1,5 @@
 /**
- * Auditoria pré-implementação: escalas por dimensão.
+ * Auditoria pré-implementação: escalas por dimensão (impressas).
  */
 import { COPSOQ_DIMENSOES } from "../lib/copsoq/dimensoes";
 import { COPSOQ_PERGUNTAS } from "../lib/copsoq/perguntas";
@@ -18,7 +18,7 @@ for (const d of COPSOQ_DIMENSOES.filter((x) => x.entraNoCalculo)) {
     const min = Math.min(...scores);
     const max = Math.max(...scores);
     const n = alts.length;
-    const dest = n === 5 ? "0–5" : n === 4 ? "0–4" : `? (${n})`;
+    const dest = `0–${max}`;
     destinos.add(dest);
     console.log(
       `  ${p.codigo} | ${p.tipoEscala} | ${n} alts | original ${min}–${max} | dest ${dest} | inv=${p.pontuacaoInvertida}`

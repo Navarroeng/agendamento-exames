@@ -11,6 +11,6 @@ Antes de alterar qualquer coisa relacionada a COPSOQ, Pesquisa Psicossocial, Res
 2. Seguir `FORMULARIO-OFICIAL.md`, `ORIENTACOES-OFICIAIS.md`, `METODOLOGIA-PRODUTO.md` (classificação ativa do produto), `REGRAS-DE-CALCULO.md` e `CHECKLIST-DE-VALIDACAO.md`.
 3. Usar como binários oficiais apenas `docs/copsoq/fonte-oficial/*.pdf`.
 4. **Não** usar memória, conhecimento próprio, versões externas do COPSOQ ou regras presumidas.
-5. Classificação no motor: metodologia do **produto** (`METODOLOGIA-PRODUTO.md` — escalas finais 0–5 e 0–4 com conversão linear). Não misturar com os cortes 2,33/3,66 das Orientações nem com cortes antigos 1,33/2,66.
+5. Classificação no motor: metodologia do **produto** (`METODOLOGIA-PRODUTO.md` — escalas impressas 0–4 e 0–3, cortes 1,60/2,80 e 1,20/2,10). Não misturar com os cortes 2,33/3,66 das Orientações nem com conversões para 0–5.
 6. Se houver divergência ou lacuna oficial no **instrumento** (perguntas/escalas) → parar e informar; não aproximar.
 7. Só voltar aos PDFs “de fora” do repositório quando houver **nova versão oficial** do instrumento (e então atualizar `docs/copsoq/fonte-oficial/` + markdowns).

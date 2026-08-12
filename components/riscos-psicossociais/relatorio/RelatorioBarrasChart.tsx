@@ -74,7 +74,7 @@ export function RelatorioBarrasChart({
             O comprimento da barra indica favorabilidade visual (melhor à
             esquerda/maior). Em dimensões de risco, pontuações técnicas menores
             aparecem com barras maiores. A cor segue a classificação do
-            produto. O tooltip mostra a pontuação técnica real ( /4 ou /5 ).
+            produto. O tooltip mostra a pontuação técnica real ( /3 ou /4 ).
           </p>
         </div>
         <RelatorioLegendaCores />

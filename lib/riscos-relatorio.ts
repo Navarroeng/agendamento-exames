@@ -21,7 +21,7 @@ export type RiscosRelatorioDimensaoSnapshot = {
   tipo: string;
   entraNoCalculo: boolean;
   /**
-   * Média na escala final do produto (0–4 ou 0–5) — classificação e exibição.
+   * Média na escala impressa da dimensão (0–3 ou 0–4) — classificação e exibição.
    */
   media: number | null;
   /**
@@ -150,11 +150,11 @@ export function montarResultadoJsonRelatorio(input: {
       nome: d.nome,
       tipo: d.tipo,
       entraNoCalculo: d.entraNoCalculo,
-      // Média na escala final do produto (0–4 ou 0–5).
+      // Média na escala impressa da dimensão (0–3 ou 0–4).
       media: d.media,
       mediaBruta: d.mediaBruta,
       maxEscalaBruta: amp.max,
-      maxEscalaPadronizada: d.maxEscalaFinal ?? 4,
+      maxEscalaPadronizada: d.maxEscalaFinal ?? amp.max,
       classificacaoId: d.classificacao.id,
       classificacaoLabel: d.classificacao.label,
       classificacaoInterpretacao: d.classificacao.interpretacao,

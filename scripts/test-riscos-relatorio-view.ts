@@ -307,7 +307,7 @@ run("score favorabilidade respeita tipo RISCO vs PROTEÇÃO", () => {
   );
   assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO", maxEscalaPadronizada: 4 }), 4);
   assert.equal(scoreFavorabilidade({ media: 4, tipo: "PROTECAO", maxEscalaPadronizada: 4 }), 4);
-  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO", maxEscalaPadronizada: 5 }), 5);
+  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO", maxEscalaPadronizada: 3 }), 3);
 });
 
 run("status geral respeita três faixas oficiais", () => {

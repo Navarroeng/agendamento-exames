@@ -117,7 +117,7 @@ export function RiscosRelatorioViewerModal({
             </p>
             <p className="mt-1 text-xs leading-relaxed">
               Este relatório foi gerado antes da metodologia de classificação
-              do sistema (escalas finais 0–4 / 0–5). Médias e classificações
+              do sistema (escalas impressas 0–3 / 0–4). Médias e classificações
               exibidas são as do momento da geração. Para aplicar a metodologia
               atual, um administrador deve usar <strong>Regenerar</strong>.
             </p>

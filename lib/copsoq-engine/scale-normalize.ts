@@ -1,7 +1,9 @@
 /**
  * Amplitude efetiva das pontuações impressas (pós-inversão de pergunta).
- * Usada pela conversão linear da metodologia do produto
- * (`escala-produto.ts` → escalas finais 0–4 / 0–5).
+ * Usada para identificar o máximo da escala da dimensão (3 ou 4).
+ *
+ * A classificação do produto NÃO normaliza mais para escala comum —
+ * ver escala-produto.ts / METODOLOGIA-PRODUTO.md.
  *
  * Não altera pontuações impressas do Formulário nem respostas gravadas.
  */
@@ -11,9 +13,9 @@ import type { CopsoqPergunta } from "@/lib/copsoq/types";
 import { perguntasCalculoDaDimensao } from "@/lib/copsoq-engine/dimensions";
 import { maxPontuacaoEscala } from "@/lib/copsoq-engine/score";
 
-/** @deprecated Preferir escalas finais 0–4/0–5 em escala-produto.ts */
+/** @deprecated Classificação não usa mais escala comum. Mantido para helpers legados. */
 export const COPSOQ_ESCALA_COMUM_MIN = 0;
-/** @deprecated Preferir escalas finais 0–4/0–5 em escala-produto.ts */
+/** @deprecated Classificação não usa mais escala comum. Mantido para helpers legados. */
 export const COPSOQ_ESCALA_COMUM_MAX = 4;
 
 export function minPontuacaoEscala(pergunta: CopsoqPergunta): number {

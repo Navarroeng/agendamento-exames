@@ -1,10 +1,11 @@
 /**
- * Escala final da metodologia do produto (não é regra oficial COPSOQ).
+ * Escala impressa da dimensão — metodologia do produto (não é regra oficial COPSOQ).
  *
- * - Perguntas com 5 alternativas (impressas 0–4) → escala final 0–5
- * - Perguntas com 4 alternativas (impressas 0–3) → escala final 0–4
+ * - Perguntas com 5 alternativas (pontuações 0–4) → escala da dimensão 0–4
+ * - Perguntas com 4 alternativas (pontuações 0–3) → escala da dimensão 0–3
  *
- * Conversão linear após pontuação efetiva (já com inversão de pergunta, se houver).
+ * Sem conversão/normalização para classificação: usa a pontuação efetiva
+ * (já com inversão de pergunta, se houver).
  */
 
 import { getCopsoqEscala } from "@/lib/copsoq/escalas";
@@ -12,7 +13,10 @@ import type { CopsoqPergunta } from "@/lib/copsoq/types";
 import { perguntasCalculoDaDimensao } from "@/lib/copsoq-engine/dimensions";
 import { amplitudeEfetivaPergunta } from "@/lib/copsoq-engine/scale-normalize";
 
-export type EscalaFinalProduto = 4 | 5;
+export type EscalaDimensaoProduto = 3 | 4;
+
+/** @deprecated Use EscalaDimensaoProduto (3 | 4). */
+export type EscalaFinalProduto = EscalaDimensaoProduto;
 
 /**
  * Número de alternativas avaliativas da escala da pergunta
@@ -24,68 +28,50 @@ export function numeroAlternativasPergunta(pergunta: CopsoqPergunta): number {
 }
 
 /**
- * Escala final de destino da pergunta (metodologia do produto).
- * 5 alternativas → 0–5; 4 alternativas → 0–4.
+ * Máximo da escala impressa da pergunta (pós-inversão a amplitude é a mesma).
+ * 5 alternativas → 4; 4 alternativas → 3.
  */
+export function maxEscalaImpressaPergunta(
+  pergunta: CopsoqPergunta
+): EscalaDimensaoProduto {
+  const amp = amplitudeEfetivaPergunta(pergunta);
+  if (amp.max === 4) return 4;
+  if (amp.max === 3) return 3;
+  throw new Error(
+    `Pergunta ${pergunta.codigo}: máximo impresso ${amp.max} não mapeado (esperado 3 ou 4).`
+  );
+}
+
+/** @deprecated Alias de maxEscalaImpressaPergunta. */
 export function escalaFinalDestinoPergunta(
   pergunta: CopsoqPergunta
-): EscalaFinalProduto {
-  const n = numeroAlternativasPergunta(pergunta);
-  if (n === 5) return 5;
-  if (n === 4) return 4;
-  throw new Error(
-    `Pergunta ${pergunta.codigo}: escala com ${n} alternativas não mapeada (esperado 4 ou 5).`
-  );
+): EscalaDimensaoProduto {
+  return maxEscalaImpressaPergunta(pergunta);
 }
 
 /**
- * valor_convertido = (valor − minOrig) / (maxOrig − minOrig) × maxDest
- * (minDest = 0).
+ * Escala homogênea da dimensão (máximo impresso).
+ * Se misturar 0–3 e 0–4, lança erro (não harmoniza silenciosamente).
  */
-export function converterParaEscalaFinal(
-  valorOriginal: number,
-  minimoOriginal: number,
-  maximoOriginal: number,
-  maximoDestino: number
-): number {
-  if (!Number.isFinite(valorOriginal)) return valorOriginal;
-  if (maximoOriginal === minimoOriginal) return 0;
-  const t =
-    (valorOriginal - minimoOriginal) / (maximoOriginal - minimoOriginal);
-  return t * maximoDestino;
-}
-
-/** Converte pontuação efetiva (pós-inversão) para a escala final da pergunta. */
-export function converterPontuacaoEfetivaParaEscalaFinal(
-  pergunta: CopsoqPergunta,
-  pontuacaoEfetiva: number
-): number {
-  const amp = amplitudeEfetivaPergunta(pergunta);
-  const maxDest = escalaFinalDestinoPergunta(pergunta);
-  return converterParaEscalaFinal(
-    pontuacaoEfetiva,
-    amp.min,
-    amp.max,
-    maxDest
-  );
-}
-
-/**
- * Escala final homogênea da dimensão.
- * Se misturar 0–4 e 0–5, lança erro (não harmoniza silenciosamente).
- */
-export function escalaFinalDimensao(dimensaoId: string): EscalaFinalProduto {
+export function escalaDimensaoProduto(
+  dimensaoId: string
+): EscalaDimensaoProduto {
   const perguntas = perguntasCalculoDaDimensao(dimensaoId);
   if (perguntas.length === 0) {
     throw new Error(`Dimensão ${dimensaoId}: sem perguntas de cálculo.`);
   }
   const destinos = Array.from(
-    new Set(perguntas.map((p) => escalaFinalDestinoPergunta(p)))
+    new Set(perguntas.map((p) => maxEscalaImpressaPergunta(p)))
   );
   if (destinos.length !== 1) {
     throw new Error(
-      `Dimensão ${dimensaoId}: mistura escalas finais (${destinos.join(", ")}). Harmonização não definida.`
+      `Dimensão ${dimensaoId}: mistura escalas impressas (${destinos.join(", ")}). Harmonização não definida.`
     );
   }
   return destinos[0]!;
+}
+
+/** @deprecated Use escalaDimensaoProduto. */
+export function escalaFinalDimensao(dimensaoId: string): EscalaDimensaoProduto {
+  return escalaDimensaoProduto(dimensaoId);
 }

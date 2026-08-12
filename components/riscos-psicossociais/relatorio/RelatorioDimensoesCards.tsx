@@ -42,24 +42,24 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
         </div>
 
         {comNorm ? (
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Pontuação original
-              </p>
-              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {formatPontuacaoComMaximo(d.mediaBruta, d.maxEscalaBruta)}
-              </p>
-            </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
                 Pontuação da dimensão
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {formatPontuacaoComMaximo(d.media, d.maxEscalaPadronizada ?? 4)}
+                {formatPontuacaoComMaximo(
+                  d.media,
+                  d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
+                )}
               </p>
-              <p className="mt-0.5 text-[10px] font-medium text-app-muted">
-                Escala final · usada na classificação
+            </div>
+            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Respondentes
+              </p>
+              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+                {d.respondentesValidos}
               </p>
             </div>
           </div>
@@ -83,13 +83,6 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
             </div>
           </div>
         )}
-
-        {comNorm ? (
-          <p className="mt-2 text-[11px] text-app-muted">
-            Respondentes válidos:{" "}
-            <span className="font-bold text-navy">{d.respondentesValidos}</span>
-          </p>
-        ) : null}
 
         <button
           type="button"
@@ -164,7 +157,7 @@ export function RelatorioDimensoesCards({
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Análise técnica por dimensão — interpretação automática a partir do
           snapshot persistido (sem recálculo). A classificação usa a pontuação
-          da dimensão na escala final do sistema (0–4 ou 0–5).
+          da dimensão na escala impressa (0–3 ou 0–4).
         </p>
       </div>
       <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

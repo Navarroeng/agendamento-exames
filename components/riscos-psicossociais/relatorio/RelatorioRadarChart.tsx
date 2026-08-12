@@ -38,7 +38,7 @@ export function RelatorioRadarChart({
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Cada eixo usa favorabilidade relativa (0–1), comparável entre
-          dimensões em escala 0–4 e 0–5. O tooltip exibe a pontuação técnica
+          dimensões em escala 0–3 e 0–4. O tooltip exibe a pontuação técnica
           real da dimensão.
         </p>
       </div>

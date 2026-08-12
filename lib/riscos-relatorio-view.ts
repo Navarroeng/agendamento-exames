@@ -70,7 +70,7 @@ export function severidadeClassificacao(
 /**
  * Favorabilidade (maior = melhor) — só para ordenação/ranking/visual.
  * PROTEÇÃO: média; RISCO: maxEscala − média.
- * Usa o máximo da escala final da dimensão (4 ou 5).
+ * Usa o máximo da escala impressa da dimensão (3 ou 4).
  */
 export function scoreFavorabilidade(
   d: Pick<
@@ -267,7 +267,7 @@ export function formatPontuacaoComMaximo(
 export type RadarChartDatum = {
   dimensao: string;
   nomeCompleto: string;
-  /** Favorabilidade relativa 0–1 (comparável entre escalas 0–4 e 0–5). */
+  /** Favorabilidade relativa 0–1 (comparável entre escalas 0–3 e 0–4). */
   media: number;
   fullMark: number;
   /** Pontuação técnica real da dimensão. */

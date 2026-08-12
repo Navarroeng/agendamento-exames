@@ -10,7 +10,7 @@ type DimensaoResultadoUi = {
   nome: string;
   media: number | null;
   mediaBruta?: number | null;
-  maxEscalaFinal?: 4 | 5;
+  maxEscalaFinal?: 3 | 4;
   classificacao: {
     id: CopsoqClassificacaoResultadoId;
     label: string;
@@ -211,9 +211,7 @@ export function RiscosResultadosPanel({
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-navy">{d.nome}</p>
                 <p className="text-[11px] text-[#64748b]">
-                  {d.mediaBruta != null && d.mediaBruta !== d.media
-                    ? `Original ${formatMedia(d.mediaBruta)} · dimensão ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`
-                    : `Pontuação ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`}{" "}
+                  {`Pontuação ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`}{" "}
                   · {d.respondentesValidos} respondente(s) válido(s)
                 </p>
               </div>

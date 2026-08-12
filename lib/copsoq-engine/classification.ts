@@ -1,12 +1,12 @@
 import type { CopsoqDimensao } from "@/lib/copsoq/types";
 import type { CopsoqClassificacaoResultado } from "@/lib/copsoq-engine/types";
 import {
-  escalaFinalDimensao,
-  type EscalaFinalProduto,
+  escalaDimensaoProduto,
+  type EscalaDimensaoProduto,
 } from "@/lib/copsoq-engine/escala-produto";
 
 /**
- * Classificação — metodologia do produto (escalas finais 0–4 e 0–5).
+ * Classificação — metodologia do produto (escalas impressas 0–3 e 0–4).
  * Ver docs/copsoq/METODOLOGIA-PRODUTO.md.
  *
  * IDs internos estáveis:
@@ -40,24 +40,24 @@ export const CLASSIFICACAO_NAO_DEFINIDA: CopsoqClassificacaoResultado = {
   interpretacao: "Regra oficial insuficiente ou média indisponível",
 };
 
-/** Faixas na escala final 0–5 (perguntas com 5 alternativas). */
-export const FAIXA_ESCALA_5 = {
-  /** PROTEÇÃO Favorável: ≥ 3,50; RISCO Desfavorável: ≥ 3,50 */
-  altoMin: 3.5,
-  /** PROTEÇÃO Moderada: ≥ 2,00; RISCO Moderada: ≥ 2,00 */
-  medioMin: 2.0,
-  /** RISCO Favorável: ≤ 1,99; PROTEÇÃO Desfavorável: ≤ 1,99 */
-  baixoMax: 1.99,
-} as const;
-
-/** Faixas na escala final 0–4 (perguntas com 4 alternativas). */
+/** Faixas na escala impressa 0–4 (5 alternativas). Cortes 1,60 / 2,80. */
 export const FAIXA_ESCALA_4 = {
   altoMin: 2.8,
   medioMin: 1.6,
   baixoMax: 1.59,
 } as const;
 
-/** @deprecated Use FAIXA_ESCALA_4 / FAIXA_ESCALA_5. Mantido só para imports legados. */
+/** Faixas na escala impressa 0–3 (4 alternativas). Cortes 1,20 / 2,10. */
+export const FAIXA_ESCALA_3 = {
+  altoMin: 2.1,
+  medioMin: 1.2,
+  baixoMax: 1.19,
+} as const;
+
+/** @deprecated Não há mais escala 0–5 no produto. Alias legado de FAIXA_ESCALA_4. */
+export const FAIXA_ESCALA_5 = FAIXA_ESCALA_4;
+
+/** @deprecated Preferir FAIXA_ESCALA_4 / FAIXA_ESCALA_3. */
 export const COPSOQ_FAIXA_BAIXA_MAX = FAIXA_ESCALA_4.baixoMax;
 export const COPSOQ_FAIXA_MEDIA_MIN = FAIXA_ESCALA_4.medioMin;
 export const COPSOQ_FAIXA_MEDIA_MAX = FAIXA_ESCALA_4.altoMin;
@@ -79,12 +79,12 @@ function classificarNaEscala(
 }
 
 /**
- * Classifica a média da dimensão na escala final do produto (0–4 ou 0–5).
+ * Classifica a média da dimensão na escala impressa (0–3 ou 0–4).
  */
 export function classificarMediaDimensao(
   dimensao: CopsoqDimensao,
   media: number | null,
-  escalaFinal?: EscalaFinalProduto
+  escalaDimensao?: EscalaDimensaoProduto
 ): CopsoqClassificacaoResultado {
   if (!dimensao.entraNoCalculo) {
     return {
@@ -101,9 +101,11 @@ export function classificarMediaDimensao(
   }
 
   const escala =
-    escalaFinal ??
-    (dimensao.id ? escalaFinalDimensao(dimensao.id) : (4 as EscalaFinalProduto));
+    escalaDimensao ??
+    (dimensao.id
+      ? escalaDimensaoProduto(dimensao.id)
+      : (4 as EscalaDimensaoProduto));
 
-  const faixa = escala === 5 ? FAIXA_ESCALA_5 : FAIXA_ESCALA_4;
+  const faixa = escala === 3 ? FAIXA_ESCALA_3 : FAIXA_ESCALA_4;
   return classificarNaEscala(dimensao.tipo, media, faixa);
 }

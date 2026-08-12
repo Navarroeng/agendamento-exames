@@ -34,11 +34,12 @@ export {
 } from "@/lib/copsoq-engine/scale-normalize";
 
 export {
-  converterParaEscalaFinal,
-  converterPontuacaoEfetivaParaEscalaFinal,
+  escalaDimensaoProduto,
   escalaFinalDestinoPergunta,
   escalaFinalDimensao,
+  maxEscalaImpressaPergunta,
   numeroAlternativasPergunta,
+  type EscalaDimensaoProduto,
   type EscalaFinalProduto,
 } from "@/lib/copsoq-engine/escala-produto";
 
@@ -51,6 +52,7 @@ export {
 export {
   classificarMediaDimensao,
   CLASSIFICACAO_NAO_DEFINIDA,
+  FAIXA_ESCALA_3,
   FAIXA_ESCALA_4,
   FAIXA_ESCALA_5,
   COPSOQ_FAIXA_BAIXA_MAX,

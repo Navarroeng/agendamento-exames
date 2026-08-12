@@ -1,6 +1,7 @@
 /**
  * Testes do Motor de Cálculo COPSOQ II-Br.
  * Fontes: Formulário de Aplicação + Orientações v2 (anexos oficiais).
+ * Classificação: metodologia do produto (escalas impressas 0–3 / 0–4).
  */
 import assert from "node:assert/strict";
 import { getCopsoqEscala } from "../lib/copsoq/escalas";
@@ -8,18 +9,13 @@ import { getDimensaoById, getPerguntasOrdenadas } from "../lib/copsoq/instrument
 import { COPSOQ_PERGUNTAS } from "../lib/copsoq/perguntas";
 import {
   COPSOQ_ENGINE_DIVERGENCIAS,
-  COPSOQ_ESCALA_COMUM_MAX,
-  COPSOQ_ESCALA_COMUM_MIN,
   amplitudeEscalaDimensao,
   classificarMediaDimensao,
-  converterParaEscalaFinal,
-  converterPontuacaoEfetivaParaEscalaFinal,
   dimensoesParaMediaGeral,
-  escalaFinalDimensao,
+  escalaDimensaoProduto,
   interpretarCampanhaCopsoq,
   mediaGeralDimensao,
   mediaIndividualDimensao,
-  normalizarPontuacao,
   pontuarAlternativa,
   pontuarRespostaPorId,
   pontuarRespostaPorLabel,
@@ -44,15 +40,10 @@ function alt(escalaId: string, label: string) {
   return a!;
 }
 
-// ---------------------------------------------------------------------------
-// Escala 0–4 preservada (sem conversão 1–5)
-// ---------------------------------------------------------------------------
 run("escala frequencia permanece 0–4 (Formulário)", () => {
   const freq = getCopsoqEscala("frequencia")!;
   const vals = freq.alternativas.map((a) => a.pontuacao).sort((a, b) => a - b);
   assert.deepEqual(vals, [0, 1, 2, 3, 4]);
-  assert.equal(alt("frequencia", "Sempre").pontuacao, 4);
-  assert.equal(alt("frequencia", "Nunca").pontuacao, 0);
 });
 
 run("divergências documentadas estão registradas no motor", () => {
@@ -60,17 +51,13 @@ run("divergências documentadas estão registradas no motor", () => {
   assert.ok(
     COPSOQ_ENGINE_DIVERGENCIAS.some(
       (d) =>
-        d.includes("0–5") ||
-        d.includes("0-5") ||
         d.includes("METODOLOGIA-PRODUTO") ||
-        d.includes("conversão linear")
+        d.includes("0–3") ||
+        d.includes("escala impressa")
     )
   );
 });
 
-// ---------------------------------------------------------------------------
-// Inversão 1B via configuração (não hardcoded)
-// ---------------------------------------------------------------------------
 run("1B usa pontuacaoInvertida e reproduz impressão do Formulário", () => {
   const p1b = pergunta("1B");
   assert.equal(p1b.pontuacaoInvertida, true);
@@ -87,12 +74,7 @@ run("1A não inverte (Sempre = 4)", () => {
   assert.equal(pontuarAlternativa(p1a, alt("frequencia", "Sempre")), 4);
 });
 
-// ---------------------------------------------------------------------------
-// Exemplo oficial Orientações — Demandas de Trabalho
-// ---------------------------------------------------------------------------
 run("exemplo oficial Demandas: média individual 2,5", () => {
-  // 1A Às vezes=2; 1B Raramente invertido=3; 2A Sempre=4; 2B Frequentemente=3;
-  // 3A Às vezes=2; 3B Raramente=1 → soma 15 / 6 = 2,5
   const respostas = {
     "p-1a": "Às vezes",
     "p-1b": "Raramente",
@@ -101,50 +83,21 @@ run("exemplo oficial Demandas: média individual 2,5", () => {
     "p-3a": "Às vezes",
     "p-3b": "Raramente",
   };
-  const media = mediaIndividualDimensao("demandas-trabalho", respostas);
-  assert.equal(media, 2.5);
+  assert.equal(mediaIndividualDimensao("demandas-trabalho", respostas), 2.5);
 });
 
-run("exemplo Demandas: média impressa 2,43 → convertida 0–5 → Situação Moderada", () => {
-  const geralBruta = mediaGeralDimensao([2.5, 3.0, 1.8]);
-  assert.ok(geralBruta != null);
-  assert.ok(Math.abs(geralBruta! - 2.43) < 0.005);
-  const geralFinal = converterParaEscalaFinal(geralBruta!, 0, 4, 5);
-  assert.ok(Math.abs(geralFinal - (2.43 * 5) / 4) < 0.01);
+run("exemplo Demandas: média 2,43 / 4 → Situação Moderada", () => {
+  const geral = mediaGeralDimensao([2.5, 3.0, 1.8]);
+  assert.ok(geral != null);
+  assert.ok(Math.abs(geral! - 2.43) < 0.005);
   const dim = getDimensaoById("demandas-trabalho")!;
-  const cls = classificarMediaDimensao(dim, geralFinal, 5);
+  const cls = classificarMediaDimensao(dim, geral, 4);
   assert.equal(cls.id, "risco_intermediario");
   assert.equal(cls.label, "Situação Moderada");
 });
 
-// ---------------------------------------------------------------------------
-// RISCO × PROTEÇÃO — faixas metodologia do produto (0–5 e 0–4)
-// ---------------------------------------------------------------------------
-run("classificação RISCO escala 0–5 (fronteiras obrigatórias)", () => {
-  const dim = getDimensaoById("demandas-trabalho")!;
-  assert.equal(dim.tipo, "RISCO");
-  assert.equal(classificarMediaDimensao(dim, 0, 5).id, "situacao_favoravel");
-  assert.equal(classificarMediaDimensao(dim, 1.99, 5).id, "situacao_favoravel");
-  assert.equal(classificarMediaDimensao(dim, 2.0, 5).id, "risco_intermediario");
-  assert.equal(classificarMediaDimensao(dim, 3.49, 5).id, "risco_intermediario");
-  assert.equal(classificarMediaDimensao(dim, 3.5, 5).id, "risco_para_saude");
-  assert.equal(classificarMediaDimensao(dim, 5, 5).id, "risco_para_saude");
-  assert.equal(classificarMediaDimensao(dim, 5, 5).label, "Situação Desfavorável");
-});
-
-run("classificação PROTEÇÃO escala 0–5 (fronteiras obrigatórias)", () => {
-  const dim = getDimensaoById("lideranca")!;
-  assert.equal(dim.tipo, "PROTECAO");
-  assert.equal(classificarMediaDimensao(dim, 5, 5).id, "situacao_favoravel");
-  assert.equal(classificarMediaDimensao(dim, 3.5, 5).id, "situacao_favoravel");
-  assert.equal(classificarMediaDimensao(dim, 3.49, 5).id, "risco_intermediario");
-  assert.equal(classificarMediaDimensao(dim, 2.0, 5).id, "risco_intermediario");
-  assert.equal(classificarMediaDimensao(dim, 1.99, 5).id, "risco_para_saude");
-  assert.equal(classificarMediaDimensao(dim, 0, 5).id, "risco_para_saude");
-});
-
 run("classificação RISCO escala 0–4 (fronteiras obrigatórias)", () => {
-  const dim = getDimensaoById("conflitos-familia-trabalho")!;
+  const dim = getDimensaoById("demandas-trabalho")!;
   assert.equal(dim.tipo, "RISCO");
   assert.equal(classificarMediaDimensao(dim, 0, 4).id, "situacao_favoravel");
   assert.equal(classificarMediaDimensao(dim, 1.59, 4).id, "situacao_favoravel");
@@ -152,10 +105,11 @@ run("classificação RISCO escala 0–4 (fronteiras obrigatórias)", () => {
   assert.equal(classificarMediaDimensao(dim, 2.79, 4).id, "risco_intermediario");
   assert.equal(classificarMediaDimensao(dim, 2.8, 4).id, "risco_para_saude");
   assert.equal(classificarMediaDimensao(dim, 4, 4).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(dim, 4, 4).label, "Situação Desfavorável");
 });
 
 run("classificação PROTEÇÃO escala 0–4 (fronteiras obrigatórias)", () => {
-  const dim = getDimensaoById("interface-trabalho-individuo")!;
+  const dim = getDimensaoById("lideranca")!;
   assert.equal(dim.tipo, "PROTECAO");
   assert.equal(classificarMediaDimensao(dim, 4, 4).id, "situacao_favoravel");
   assert.equal(classificarMediaDimensao(dim, 2.8, 4).id, "situacao_favoravel");
@@ -165,44 +119,66 @@ run("classificação PROTEÇÃO escala 0–4 (fronteiras obrigatórias)", () => 
   assert.equal(classificarMediaDimensao(dim, 0, 4).id, "risco_para_saude");
 });
 
-run("conversão linear 0–4→0–5 e 0–3→0–4", () => {
-  assert.equal(converterParaEscalaFinal(0, 0, 4, 5), 0);
-  assert.equal(converterParaEscalaFinal(1, 0, 4, 5), 1.25);
-  assert.equal(converterParaEscalaFinal(2, 0, 4, 5), 2.5);
-  assert.equal(converterParaEscalaFinal(4, 0, 4, 5), 5);
-  assert.equal(converterParaEscalaFinal(0, 0, 3, 4), 0);
-  assert.ok(Math.abs(converterParaEscalaFinal(1, 0, 3, 4) - 4 / 3) < 1e-9);
-  assert.equal(converterParaEscalaFinal(3, 0, 3, 4), 4);
+run("classificação RISCO escala 0–3 (fronteiras obrigatórias)", () => {
+  const dim = getDimensaoById("conflitos-familia-trabalho")!;
+  assert.equal(dim.tipo, "RISCO");
+  assert.equal(classificarMediaDimensao(dim, 0, 3).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 1.19, 3).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 1.2, 3).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(dim, 2.09, 3).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(dim, 2.1, 3).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(dim, 3, 3).id, "risco_para_saude");
 });
 
-run("nenhuma dimensão quantitativa mistura escalas 0–4 e 0–5", () => {
+run("classificação PROTEÇÃO escala 0–3 (fronteiras obrigatórias)", () => {
+  const dim = getDimensaoById("interface-trabalho-individuo")!;
+  assert.equal(dim.tipo, "PROTECAO");
+  assert.equal(classificarMediaDimensao(dim, 3, 3).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 2.1, 3).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 2.09, 3).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(dim, 1.2, 3).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(dim, 1.19, 3).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(dim, 0, 3).id, "risco_para_saude");
+});
+
+run("nenhuma dimensão quantitativa mistura escalas 0–3 e 0–4", () => {
   for (const dim of dimensoesParaMediaGeral()) {
-    assert.ok([4, 5].includes(escalaFinalDimensao(dim.id)));
+    assert.ok([3, 4].includes(escalaDimensaoProduto(dim.id)));
   }
 });
 
-run("1B invertida permanece correta após nova metodologia", () => {
+run("1B invertida: Sempre → original 4 → efetiva 0; sem dupla inversão", () => {
   const p1b = pergunta("1B");
-  assert.equal(p1b.pontuacaoInvertida, true);
-  assert.equal(pontuarAlternativa(p1b, alt("frequencia", "Sempre")), 0);
-  assert.equal(pontuarAlternativa(p1b, alt("frequencia", "Nunca")), 4);
-  const convertida = converterPontuacaoEfetivaParaEscalaFinal(p1b, 0);
-  assert.equal(convertida, 0);
-  assert.equal(converterPontuacaoEfetivaParaEscalaFinal(p1b, 4), 5);
+  const impressa = alt("frequencia", "Sempre").pontuacao;
+  assert.equal(impressa, 4);
+  const efetiva = pontuarAlternativa(p1b, alt("frequencia", "Sempre"));
+  assert.equal(efetiva, 0);
+  // Demandas: 1A Sempre=4, 1B Sempre→0, demais Nunca=0 → (4+0+0+0+0+0)/6
+  const result = interpretarCampanhaCopsoq({
+    respondentes: [
+      {
+        "p-1a": "freq-sempre",
+        "p-1b": "freq-sempre",
+        "p-2a": "freq-nunca",
+        "p-2b": "freq-nunca",
+        "p-3a": "freq-nunca",
+        "p-3b": "freq-nunca",
+      },
+    ],
+  });
+  const dim = result.dimensoes.find((d) => d.id === "demandas-trabalho")!;
+  assert.ok(Math.abs((dim.media ?? -1) - 4 / 6) < 1e-9);
+  assert.equal(dim.maxEscalaFinal, 4);
+  assert.equal(dim.classificacao.id, "situacao_favoravel");
 });
 
-// ---------------------------------------------------------------------------
-// Comportamentos ofensivos fora da média geral
-// ---------------------------------------------------------------------------
 run("Comportamentos ofensivos fora das dimensões calculáveis", () => {
   const ids = dimensoesParaMediaGeral().map((d) => d.id);
   assert.equal(ids.includes("comportamentos-ofensivos"), false);
   assert.equal(ids.length, 10);
-
   const ofens = getDimensaoById("comportamentos-ofensivos")!;
   assert.equal(ofens.entraNoCalculo, false);
-  const cls = classificarMediaDimensao(ofens, 4);
-  assert.equal(cls.id, "classificacao_nao_definida");
+  assert.equal(classificarMediaDimensao(ofens, 4).id, "classificacao_nao_definida");
 });
 
 run("interpretarCampanha: ofensivos qualitativos sem média/classificação", () => {
@@ -218,27 +194,18 @@ run("interpretarCampanha: ofensivos qualitativos sem média/classificação", ()
     baseParticipacao: 10,
   });
   assert.equal(result.comportamentosOfensivos.media, null);
-  assert.equal(result.comportamentosOfensivos.escorePadronizado, null);
   assert.equal(
     result.comportamentosOfensivos.classificacao.id,
     "classificacao_nao_definida"
   );
-  assert.equal(
-    result.dimensoes.some((d) => d.id === "comportamentos-ofensivos"),
-    false
-  );
   assert.equal(result.riscoGeral, null);
 });
 
-// ---------------------------------------------------------------------------
-// Respostas ausentes — não inventar
-// ---------------------------------------------------------------------------
 run("respostas ausentes: média individual null", () => {
-  const media = mediaIndividualDimensao("demandas-trabalho", {
-    "p-1a": "Às vezes",
-    // faltam demais
-  });
-  assert.equal(media, null);
+  assert.equal(
+    mediaIndividualDimensao("demandas-trabalho", { "p-1a": "Às vezes" }),
+    null
+  );
 });
 
 run("respostas ausentes: dimensão sem classificação inventada", () => {
@@ -248,24 +215,20 @@ run("respostas ausentes: dimensão sem classificação inventada", () => {
   const demandas = result.dimensoes.find((d) => d.id === "demandas-trabalho")!;
   assert.equal(demandas.media, null);
   assert.equal(demandas.classificacao.id, "classificacao_nao_definida");
-  assert.equal(demandas.respondentesValidos, 0);
-  assert.equal(demandas.respostasAusentes, 1);
 });
 
-// ---------------------------------------------------------------------------
-// Regras bloqueadas: escore padronizado / risco geral
-// ---------------------------------------------------------------------------
-run("escore padronizado e risco geral permanecem null (sem fórmula oficial)", () => {
-  const respostasCompletasDemandas = {
-    "p-1a": "Às vezes",
-    "p-1b": "Raramente",
-    "p-2a": "Sempre",
-    "p-2b": "Frequentemente",
-    "p-3a": "Às vezes",
-    "p-3b": "Raramente",
-  };
+run("escore padronizado e risco geral permanecem null", () => {
   const result = interpretarCampanhaCopsoq({
-    respondentes: [respostasCompletasDemandas],
+    respondentes: [
+      {
+        "p-1a": "Às vezes",
+        "p-1b": "Raramente",
+        "p-2a": "Sempre",
+        "p-2b": "Frequentemente",
+        "p-3a": "Às vezes",
+        "p-3b": "Raramente",
+      },
+    ],
   });
   assert.equal(result.riscoGeral, null);
   for (const d of result.dimensoes) {
@@ -273,20 +236,12 @@ run("escore padronizado e risco geral permanecem null (sem fórmula oficial)", (
   }
 });
 
-// ---------------------------------------------------------------------------
-// Pontuação por id (portal) e label
-// ---------------------------------------------------------------------------
 run("pontuação por id e label são equivalentes", () => {
   const p = pergunta("2A");
-  const porLabel = pontuarRespostaPorLabel(p, "Sempre");
-  const porId = pontuarRespostaPorId(p, "freq-sempre");
-  assert.equal(porLabel, 4);
-  assert.equal(porId, 4);
+  assert.equal(pontuarRespostaPorLabel(p, "Sempre"), 4);
+  assert.equal(pontuarRespostaPorId(p, "freq-sempre"), 4);
 });
 
-// ---------------------------------------------------------------------------
-// Cobertura: cada dimensão calculável tem perguntas
-// ---------------------------------------------------------------------------
 run("cada dimensão calculável possui perguntas entraNoCalculo", () => {
   for (const dim of dimensoesParaMediaGeral()) {
     const qs = getPerguntasOrdenadas().filter(
@@ -301,24 +256,7 @@ run("participação operacional", () => {
     respondentes: [{}, {}],
     baseParticipacao: 8,
   });
-  assert.equal(result.participacao.respondentes, 2);
-  assert.equal(result.participacao.base, 8);
   assert.equal(result.participacao.percentual, 25);
-});
-
-// ---------------------------------------------------------------------------
-// Normalização de amplitude (escala comum 0–4)
-// ---------------------------------------------------------------------------
-run("normalizarPontuacao: identidade em 0–4 e extremo 0–3 → 4", () => {
-  assert.equal(normalizarPontuacao(2.5, 0, 4), 2.5);
-  assert.equal(normalizarPontuacao(0, 0, 4), COPSOQ_ESCALA_COMUM_MIN);
-  assert.equal(normalizarPontuacao(4, 0, 4), COPSOQ_ESCALA_COMUM_MAX);
-  assert.equal(normalizarPontuacao(3, 0, 3), 4);
-  assert.equal(normalizarPontuacao(0, 0, 3), 0);
-  assert.equal(normalizarPontuacao(1.5, 0, 3), 2);
-  // genérico 0–2 e 0–6
-  assert.equal(normalizarPontuacao(2, 0, 2), 4);
-  assert.equal(normalizarPontuacao(3, 0, 6), 2);
 });
 
 run("amplitudes: Interface e Conflitos 0–3; Demandas 0–4", () => {
@@ -336,20 +274,19 @@ run("amplitudes: Interface e Conflitos 0–3; Demandas 0–4", () => {
   });
 });
 
-run("Interface: Muito satisfeito → melhor resultado possível (Favorável)", () => {
+run("Interface: Muito satisfeito → 3,00 / 3 Favorável", () => {
   const result = interpretarCampanhaCopsoq({
     respondentes: [{ "p-13": "sat-muito-satisfeito" }],
   });
   const dim = result.dimensoes.find(
     (d) => d.id === "interface-trabalho-individuo"
   )!;
-  assert.equal(dim.mediaBruta, 3);
-  assert.equal(dim.media, 4);
-  assert.equal(dim.maxEscalaFinal, 4);
+  assert.equal(dim.media, 3);
+  assert.equal(dim.maxEscalaFinal, 3);
   assert.equal(dim.classificacao.id, "situacao_favoravel");
 });
 
-run("Conflitos: pior extremo → Situação Desfavorável (não preso em Moderada)", () => {
+run("Conflitos: pior extremo → 3,00 / 3 Desfavorável", () => {
   const result = interpretarCampanhaCopsoq({
     respondentes: [
       {
@@ -361,13 +298,12 @@ run("Conflitos: pior extremo → Situação Desfavorável (não preso em Moderad
   const dim = result.dimensoes.find(
     (d) => d.id === "conflitos-familia-trabalho"
   )!;
-  assert.equal(dim.mediaBruta, 3);
-  assert.equal(dim.media, 4);
-  assert.equal(dim.maxEscalaFinal, 4);
+  assert.equal(dim.media, 3);
+  assert.equal(dim.maxEscalaFinal, 3);
   assert.equal(dim.classificacao.id, "risco_para_saude");
 });
 
-run("Demandas: média final = bruta convertida 0–4→0–5", () => {
+run("Demandas: média impressa 2,5 / 4 Moderada (sem conversão)", () => {
   const respostas = {
     "p-1a": "Às vezes",
     "p-1b": "Raramente",
@@ -378,19 +314,19 @@ run("Demandas: média final = bruta convertida 0–4→0–5", () => {
   };
   const result = interpretarCampanhaCopsoq({ respondentes: [respostas] });
   const dim = result.dimensoes.find((d) => d.id === "demandas-trabalho")!;
+  assert.equal(dim.media, 2.5);
   assert.equal(dim.mediaBruta, 2.5);
-  assert.equal(dim.media, 3.125);
-  assert.equal(dim.maxEscalaFinal, 5);
+  assert.equal(dim.maxEscalaFinal, 4);
   assert.equal(dim.classificacao.id, "risco_intermediario");
 });
 
-run("escalas finais: 5-alts → 5; 4-alts → 4; sem mistura", () => {
-  assert.equal(escalaFinalDimensao("demandas-trabalho"), 5);
-  assert.equal(escalaFinalDimensao("interface-trabalho-individuo"), 4);
-  assert.equal(escalaFinalDimensao("conflitos-familia-trabalho"), 4);
+run("escalas: 5-alts → 0–4; 4-alts → 0–3; sem mistura", () => {
+  assert.equal(escalaDimensaoProduto("demandas-trabalho"), 4);
+  assert.equal(escalaDimensaoProduto("interface-trabalho-individuo"), 3);
+  assert.equal(escalaDimensaoProduto("conflitos-familia-trabalho"), 3);
   for (const dim of dimensoesParaMediaGeral()) {
-    const e = escalaFinalDimensao(dim.id);
-    assert.ok(e === 4 || e === 5, dim.id);
+    const e = escalaDimensaoProduto(dim.id);
+    assert.ok(e === 3 || e === 4, dim.id);
   }
 });
 

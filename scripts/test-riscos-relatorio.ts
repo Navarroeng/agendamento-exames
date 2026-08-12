@@ -175,9 +175,9 @@ run("Interface Muito satisfeito: snapshot usa média padronizada na classificaç
     (d) => d.id === "interface-trabalho-individuo"
   )!;
   assert.equal(snap.mediaBruta, 3);
-  assert.equal(snap.media, 4);
+  assert.equal(snap.media, 3);
   assert.equal(snap.maxEscalaBruta, 3);
-  assert.equal(snap.maxEscalaPadronizada, 4);
+  assert.equal(snap.maxEscalaPadronizada, 3);
   assert.equal(snap.classificacaoId, "situacao_favoravel");
   assert.equal(snap.classificacaoLabel, "Situação Favorável");
 });

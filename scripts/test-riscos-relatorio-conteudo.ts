@@ -72,21 +72,20 @@ run("análise de dimensão cobre os 4 blocos técnicos", () => {
   assert.ok(a.recomendacoes.length >= 3);
 });
 
-run("texto com escala final menciona pontuação da dimensão", () => {
+run("texto com pontuação da dimensão na escala impressa", () => {
   const iface = dim({
     id: "interface-trabalho-individuo",
     nome: "Interface trabalho-indivíduo",
     tipo: "PROTECAO",
-    media: 4,
+    media: 3,
     mediaBruta: 3,
     maxEscalaBruta: 3,
-    maxEscalaPadronizada: 4,
+    maxEscalaPadronizada: 3,
     classificacaoId: "situacao_favoravel",
     classificacaoLabel: "Situação Favorável",
   });
   const t = textoResultadoEncontrado(iface);
-  assert.match(t, /pontuação original 3,00 \/ 3/i);
-  assert.match(t, /pontuação da dimensão 4,00 \/ 4/i);
+  assert.match(t, /pontuação da dimensão 3,00 \/ 3/i);
   assert.match(t, /Situação Favorável/);
 });
 

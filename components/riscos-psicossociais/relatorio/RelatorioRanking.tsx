@@ -7,7 +7,6 @@ import {
   formatMediaRelatorio,
   montarRankingAtencao,
   rankingMelhores,
-  scoreFavorabilidade,
 } from "@/lib/riscos-relatorio-view";
 
 function RankingItem({
@@ -30,15 +29,11 @@ function RankingItem({
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-extrabold text-navy">{d.nome}</p>
         <p className="text-[11px] text-app-muted">
-          Padronizada {formatMediaRelatorio(d.media)}
-          {d.mediaBruta != null
-            ? ` · original ${formatMediaRelatorio(d.mediaBruta)}`
+          Pontuação {formatMediaRelatorio(d.media)}
+          {d.maxEscalaPadronizada != null
+            ? ` / ${d.maxEscalaPadronizada}`
             : ""}{" "}
           · {d.classificacaoLabel}
-          <span className="text-[#94a3b8]">
-            {" "}
-            · favorabilidade {formatMediaRelatorio(scoreFavorabilidade(d))}
-          </span>
         </p>
       </div>
       <span
@@ -122,9 +117,9 @@ export function RelatorioRanking({
           Ranking das dimensões
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Ordenação pela favorabilidade relativa à escala da dimensão (0–4 ou
-          0–5), respeitando se a dimensão é RISCO ou PROTEÇÃO. A classificação
-          do motor não é recalculada.
+          Ordenação pela favorabilidade relativa à escala impressa da dimensão
+          (0–3 ou 0–4), respeitando se a dimensão é RISCO ou PROTEÇÃO. A
+          classificação do motor não é recalculada.
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
