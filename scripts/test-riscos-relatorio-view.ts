@@ -8,6 +8,7 @@ import {
   dimensoesOrdenadasPorMediaDesc,
   montarDadosBarras,
   montarDadosRadar,
+  montarRankingAtencao,
   rankingAtencao,
   rankingMelhores,
   scoreFavorabilidade,
@@ -179,11 +180,124 @@ run("ranking melhores prioriza situação favorável", () => {
   const top = rankingMelhores(amostra, 2);
   assert.equal(top[0].classificacaoId, "situacao_favoravel");
   assert.equal(top.every((d) => d.entraNoCalculo), true);
+  // Entre Favoráveis, maior favorabilidade: Liderança 3.9 > Saúde 3.5
+  assert.equal(top[0].id, "b");
 });
 
 run("ranking atenção prioriza risco para saúde", () => {
   const top = rankingAtencao(amostra, 2);
   assert.equal(top[0].classificacaoId, "risco_para_saude");
+  assert.equal(top[0].id, "a");
+  // Segunda: intermediário com menor favorabilidade
+  // Burnout RISCO 2.5 → fav 1.5; Valores PROTEÇÃO 2.5 → fav 2.5 → burnout pior
+  assert.equal(top[1].id, "c");
+});
+
+run("ranking: tudo Favorável não espelha Top melhores como problemas", () => {
+  const todosFav = [
+    dim({
+      id: "demandas",
+      nome: "Demandas",
+      tipo: "RISCO",
+      media: 0,
+      classificacaoId: "situacao_favoravel",
+      classificacaoLabel: "Situação Favorável",
+    }),
+    dim({
+      id: "interface",
+      nome: "Interface",
+      tipo: "PROTECAO",
+      media: 4,
+      classificacaoId: "situacao_favoravel",
+      classificacaoLabel: "Situação Favorável",
+    }),
+    dim({
+      id: "lideranca",
+      nome: "Liderança",
+      tipo: "PROTECAO",
+      media: 3.5,
+      classificacaoId: "situacao_favoravel",
+    }),
+    dim({
+      id: "valores",
+      nome: "Valores",
+      tipo: "PROTECAO",
+      media: 3.2,
+      classificacaoId: "situacao_favoravel",
+    }),
+    dim({
+      id: "burnout",
+      nome: "Burnout",
+      tipo: "RISCO",
+      media: 0.5,
+      classificacaoId: "situacao_favoravel",
+    }),
+  ];
+  const melhores = rankingMelhores(todosFav, 5);
+  const atencao = montarRankingAtencao(todosFav, 5);
+
+  assert.equal(atencao.semRiscosClassificados, true);
+  assert.equal(atencao.itens.length, 0);
+  assert.equal(atencao.prioritarias.length, 0);
+  // Relativas: menor favorabilidade primeiro (Valores 3.2 < Liderança 3.5 < Burnout fav 3.5 < ...)
+  assert.ok(atencao.relativasFavoraveis.length > 0);
+  assert.equal(
+    atencao.relativasFavoraveis.every(
+      (d) => d.classificacaoId === "situacao_favoravel"
+    ),
+    true
+  );
+  // Melhores: Demandas/Interface (fav 4) primeiro — não idêntico ao relativo
+  assert.ok(
+    scoreFavorabilidade(melhores[0]) >=
+      scoreFavorabilidade(atencao.relativasFavoraveis[0])
+  );
+  assert.notDeepEqual(
+    melhores.map((d) => d.id),
+    atencao.relativasFavoraveis.map((d) => d.id)
+  );
+});
+
+run("ranking atenção: uma Intermediária fica em 1º; Favoráveis só depois", () => {
+  const mixed = [
+    dim({
+      id: "fav1",
+      nome: "Fav1",
+      tipo: "PROTECAO",
+      media: 4,
+      classificacaoId: "situacao_favoravel",
+    }),
+    dim({
+      id: "inter",
+      nome: "Inter",
+      tipo: "RISCO",
+      media: 2.5,
+      classificacaoId: "risco_intermediario",
+      classificacaoLabel: "Risco Intermediário",
+    }),
+    dim({
+      id: "fav2",
+      nome: "Fav2",
+      tipo: "RISCO",
+      media: 0,
+      classificacaoId: "situacao_favoravel",
+    }),
+    dim({
+      id: "fav3",
+      nome: "Fav3",
+      tipo: "PROTECAO",
+      media: 3.0,
+      classificacaoId: "situacao_favoravel",
+    }),
+  ];
+  const r = montarRankingAtencao(mixed, 5);
+  assert.equal(r.semRiscosClassificados, false);
+  assert.equal(r.itens[0].id, "inter");
+  assert.equal(r.prioritarias.length, 1);
+  assert.ok(r.itens.length >= 2);
+  assert.ok(
+    r.itens.slice(1).every((d) => d.classificacaoId === "situacao_favoravel")
+  );
 });
 
 run("score favorabilidade respeita tipo RISCO vs PROTEÇÃO", () => {
@@ -195,6 +309,8 @@ run("score favorabilidade respeita tipo RISCO vs PROTEÇÃO", () => {
     scoreFavorabilidade({ media: 3.5, tipo: "PROTECAO" }) >
       scoreFavorabilidade({ media: 2, tipo: "PROTECAO" })
   );
+  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO" }), 4);
+  assert.equal(scoreFavorabilidade({ media: 4, tipo: "PROTECAO" }), 4);
 });
 
 run("status geral por quantidade de críticas", () => {

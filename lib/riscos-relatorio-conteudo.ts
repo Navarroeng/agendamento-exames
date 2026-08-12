@@ -17,7 +17,7 @@ import {
   dimensoesParaCalculo,
   formatMediaRelatorio,
   formatPontuacaoComMaximo,
-  rankingAtencao,
+  montarRankingAtencao,
   rankingMelhores,
   severidadeClassificacao,
 } from "@/lib/riscos-relatorio-view";
@@ -324,7 +324,10 @@ export function gerarConteudoExecutivo(
     (d) => d.classificacaoId === "situacao_favoravel"
   );
   const melhores = rankingMelhores(dimensoes, 3);
-  const atencao = rankingAtencao(dimensoes, 3);
+  const atencaoRank = montarRankingAtencao(dimensoes, 3);
+  const atencao = atencaoRank.semRiscosClassificados
+    ? []
+    : atencaoRank.itens;
 
   const resumoNarrativo = [
     `O presente relatório apresenta os resultados da Avaliação de Riscos Psicossociais da organização ${empresa} (campanha ${codigo}), realizada por meio do instrumento COPSOQ II-Br — referência reconhecida para análise de fatores psicossociais no trabalho.`,
@@ -334,9 +337,11 @@ export function gerarConteudoExecutivo(
       : intermediarias.length > 0
         ? `Não foram identificadas dimensões em Risco para a Saúde; contudo, ${intermediarias.length} dimensão(ões) encontram-se em Risco Intermediário (${listarNomes(intermediarias)}), indicando necessidade de monitoramento e ações de suporte antes de eventual agravamento.`
         : `O panorama geral é favorável: as dimensões quantitativas analisadas situam-se predominantemente em Situação Favorável (${favoraveis.length} dimensão(ões)). Recomenda-se manter as boas práticas e institucionalizar o acompanhamento periódico.`,
-    melhores.length > 0
+    melhores.length > 0 && atencao.length > 0
       ? `Entre os principais fatores positivos destacam-se ${listarNomes(melhores)}. Já as dimensões que merecem maior atenção neste ciclo são ${listarNomes(atencao)}.`
-      : `Os resultados servem como base técnica para ações preventivas, melhoria contínua e tomada de decisão pela alta liderança, SST e RH.`,
+      : melhores.length > 0
+        ? `Entre os principais fatores positivos destacam-se ${listarNomes(melhores)}. Nenhuma dimensão quantitativa encontra-se em Risco Intermediário ou Risco para a Saúde neste ciclo.`
+        : `Os resultados servem como base técnica para ações preventivas, melhoria contínua e tomada de decisão pela alta liderança, SST e RH.`,
   ];
 
   const conclusaoTecnica = [

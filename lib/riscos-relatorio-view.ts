@@ -63,7 +63,10 @@ export function severidadeClassificacao(
   return 3;
 }
 
-/** Score de favorabilidade (maior = melhor), respeitando tipo RISCO/PROTEÇÃO. */
+/**
+ * Favorabilidade (maior = melhor) — só para ordenação/ranking/visual.
+ * PROTEÇÃO: média; RISCO: 4 − média. Não altera classificação do motor.
+ */
 export function scoreFavorabilidade(
   d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
 ): number {
@@ -87,6 +90,28 @@ export function dimensoesOrdenadasPorMediaDesc(
   );
 }
 
+function compararFavorabilidadeDesc(
+  a: RiscosRelatorioDimensaoSnapshot,
+  b: RiscosRelatorioDimensaoSnapshot
+): number {
+  return scoreFavorabilidade(b) - scoreFavorabilidade(a);
+}
+
+function compararAtencao(
+  a: RiscosRelatorioDimensaoSnapshot,
+  b: RiscosRelatorioDimensaoSnapshot
+): number {
+  const sev =
+    severidadeClassificacao(b.classificacaoId) -
+    severidadeClassificacao(a.classificacaoId);
+  if (sev !== 0) return sev;
+  return scoreFavorabilidade(a) - scoreFavorabilidade(b);
+}
+
+/**
+ * Top melhores: classificação mais favorável primeiro, depois maior favorabilidade
+ * (RISCO baixo / PROTEÇÃO alta).
+ */
 export function rankingMelhores(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
   limite = 5
@@ -97,24 +122,81 @@ export function rankingMelhores(
         severidadeClassificacao(a.classificacaoId) -
         severidadeClassificacao(b.classificacaoId);
       if (sev !== 0) return sev;
-      return scoreFavorabilidade(b) - scoreFavorabilidade(a);
+      return compararFavorabilidadeDesc(a, b);
     })
     .slice(0, limite);
 }
 
+export type RankingAtencaoResultado = {
+  /**
+   * Dimensões em Risco para a Saúde ou Intermediário (pior primeiro),
+   * completadas com Favoráveis de menor favorabilidade se faltar vaga.
+   */
+  itens: RiscosRelatorioDimensaoSnapshot[];
+  /** Só intermediário/crítico (sem preenchimento Favorável). */
+  prioritarias: RiscosRelatorioDimensaoSnapshot[];
+  /**
+   * Favoráveis com menor favorabilidade relativa.
+   * Usado quando não há intermediário/crítico (não confundir com “problema”).
+   */
+  relativasFavoraveis: RiscosRelatorioDimensaoSnapshot[];
+  /** True se nenhuma dimensão está em intermediário ou crítico. */
+  semRiscosClassificados: boolean;
+};
+
+/**
+ * Ranking de atenção: prioriza classificação oficial (crítico → intermediário),
+ * depois menor favorabilidade. Não espelha o Top melhores quando tudo é Favorável.
+ */
+export function montarRankingAtencao(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
+  limite = 5
+): RankingAtencaoResultado {
+  const calc = dimensoesParaCalculo(dimensoes);
+
+  const prioritarias = calc
+    .filter((d) => severidadeClassificacao(d.classificacaoId) >= 1)
+    .sort(compararAtencao)
+    .slice(0, limite);
+
+  const relativasFavoraveis = calc
+    .filter((d) => d.classificacaoId === "situacao_favoravel")
+    .sort((a, b) => scoreFavorabilidade(a) - scoreFavorabilidade(b));
+
+  const semRiscosClassificados = prioritarias.length === 0;
+
+  if (semRiscosClassificados) {
+    return {
+      itens: [],
+      prioritarias: [],
+      relativasFavoraveis: relativasFavoraveis.slice(0, limite),
+      semRiscosClassificados: true,
+    };
+  }
+
+  const faltam = Math.max(0, limite - prioritarias.length);
+  const preenchimento = relativasFavoraveis.slice(0, faltam);
+
+  return {
+    itens: [...prioritarias, ...preenchimento],
+    prioritarias,
+    relativasFavoraveis: preenchimento,
+    semRiscosClassificados: false,
+  };
+}
+
+/**
+ * Lista plana do ranking de atenção (compatível com conteúdo narrativo).
+ * Quando tudo é Favorável, retorna as de menor favorabilidade relativa
+ * (o caller deve interpretar o contexto).
+ */
 export function rankingAtencao(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
   limite = 5
 ): RiscosRelatorioDimensaoSnapshot[] {
-  return [...dimensoesParaCalculo(dimensoes)]
-    .sort((a, b) => {
-      const sev =
-        severidadeClassificacao(b.classificacaoId) -
-        severidadeClassificacao(a.classificacaoId);
-      if (sev !== 0) return sev;
-      return scoreFavorabilidade(a) - scoreFavorabilidade(b);
-    })
-    .slice(0, limite);
+  const r = montarRankingAtencao(dimensoes, limite);
+  if (r.semRiscosClassificados) return r.relativasFavoraveis;
+  return r.itens;
 }
 
 export function nomeCurtoDimensao(nome: string, max = 22): string {
@@ -205,15 +287,13 @@ export type BarraChartDatum = {
   classificacaoLabel: string;
 };
 
-/** Comprimento visual da barra (somente UI). Não altera média/classificação. */
+/** Comprimento visual da barra (somente UI). Mesma métrica de favorabilidade. */
 export function valorVisualBarraDimensao(
   d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
 ): number {
-  const media = Number(d.media ?? 0);
-  if (String(d.tipo).toUpperCase() === "RISCO") {
-    return 4 - media;
-  }
-  return media;
+  const score = scoreFavorabilidade(d);
+  if (!Number.isFinite(score) || score === Number.NEGATIVE_INFINITY) return 0;
+  return score;
 }
 
 export function montarDadosBarras(

@@ -5,65 +5,119 @@ import {
   bgSuavePorClassificacaoId,
   corPorClassificacaoId,
   formatMediaRelatorio,
-  rankingAtencao,
+  montarRankingAtencao,
   rankingMelhores,
+  scoreFavorabilidade,
 } from "@/lib/riscos-relatorio-view";
 
-function RankingList({
-  titulo,
-  tom,
+function RankingItem({
+  d,
+  idx,
+}: {
+  d: RiscosRelatorioDimensaoSnapshot;
+  idx: number;
+}) {
+  return (
+    <li
+      className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/90 px-3 py-2.5"
+      style={{
+        backgroundColor: bgSuavePorClassificacaoId(d.classificacaoId),
+      }}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-extrabold text-white">
+        {idx + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-extrabold text-navy">{d.nome}</p>
+        <p className="text-[11px] text-app-muted">
+          Padronizada {formatMediaRelatorio(d.media)}
+          {d.mediaBruta != null
+            ? ` · original ${formatMediaRelatorio(d.mediaBruta)}`
+            : ""}{" "}
+          · {d.classificacaoLabel}
+          <span className="text-[#94a3b8]">
+            {" "}
+            · favorabilidade {formatMediaRelatorio(scoreFavorabilidade(d))}
+          </span>
+        </p>
+      </div>
+      <span
+        className="h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: corPorClassificacaoId(d.classificacaoId) }}
+        aria-hidden
+      />
+    </li>
+  );
+}
+
+function RankingMelhoresCard({
   itens,
 }: {
-  titulo: string;
-  tom: "ok" | "warn";
   itens: RiscosRelatorioDimensaoSnapshot[];
 }) {
-  const shell =
-    tom === "ok"
-      ? "border-[#bbf7d0] from-[#f0fdf4] to-white"
-      : "border-[#fed7aa] from-[#fff7ed] to-white";
-
   return (
-    <div
-      className={`rounded-3xl border bg-gradient-to-b ${shell} p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5`}
-    >
-      <h4 className="text-sm font-extrabold text-navy">{titulo}</h4>
+    <div className="rounded-3xl border border-[#bbf7d0] bg-gradient-to-b from-[#f0fdf4] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
+      <h4 className="text-sm font-extrabold text-navy">Top 5 melhores</h4>
+      <p className="mt-1 text-[11px] text-app-muted">
+        Maior favorabilidade (RISCO: pontuação baixa; PROTEÇÃO: pontuação alta).
+      </p>
       <ol className="mt-3 space-y-2">
         {itens.length === 0 ? (
           <li className="text-xs text-app-muted">Sem dados suficientes.</li>
         ) : (
-          itens.map((d, idx) => (
-            <li
-              key={d.id}
-              className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/90 px-3 py-2.5"
-              style={{
-                backgroundColor: bgSuavePorClassificacaoId(d.classificacaoId),
-              }}
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-extrabold text-white">
-                {idx + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-extrabold text-navy">
-                  {d.nome}
-                </p>
-                <p className="text-[11px] text-app-muted">
-                  Padronizada {formatMediaRelatorio(d.media)}
-                  {d.mediaBruta != null
-                    ? ` · original ${formatMediaRelatorio(d.mediaBruta)}`
-                    : ""}{" "}
-                  · {d.classificacaoLabel}
-                </p>
-              </div>
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: corPorClassificacaoId(d.classificacaoId) }}
-                aria-hidden
-              />
-            </li>
-          ))
+          itens.map((d, idx) => <RankingItem key={d.id} d={d} idx={idx} />)
         )}
       </ol>
+    </div>
+  );
+}
+
+function RankingAtencaoCard({
+  dimensoes,
+}: {
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[];
+}) {
+  const ranking = montarRankingAtencao(dimensoes, 5);
+
+  return (
+    <div className="rounded-3xl border border-[#fed7aa] bg-gradient-to-b from-[#fff7ed] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
+      <h4 className="text-sm font-extrabold text-navy">
+        Top 5 que merecem atenção
+      </h4>
+      <p className="mt-1 text-[11px] text-app-muted">
+        Prioriza classificação oficial (crítico → intermediário); depois menor
+        favorabilidade.
+      </p>
+
+      {ranking.semRiscosClassificados ? (
+        <div className="mt-3 space-y-3">
+          <p className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2.5 text-xs font-semibold leading-relaxed text-[#166534]">
+            Nenhuma dimensão apresenta risco intermediário ou crítico.
+          </p>
+          {ranking.relativasFavoraveis.length > 0 ? (
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Dimensões com menor favorabilidade relativa
+              </p>
+              <p className="mt-0.5 text-[11px] text-app-muted">
+                Continuam classificadas como Situação Favorável — comparação
+                interna apenas.
+              </p>
+              <ol className="mt-2 space-y-2">
+                {ranking.relativasFavoraveis.map((d, idx) => (
+                  <RankingItem key={d.id} d={d} idx={idx} />
+                ))}
+              </ol>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <ol className="mt-3 space-y-2">
+          {ranking.itens.map((d, idx) => (
+            <RankingItem key={d.id} d={d} idx={idx} />
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
@@ -74,7 +128,6 @@ export function RelatorioRanking({
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[];
 }) {
   const melhores = rankingMelhores(dimensoes, 5);
-  const atencao = rankingAtencao(dimensoes, 5);
 
   return (
     <section>
@@ -86,21 +139,14 @@ export function RelatorioRanking({
           Ranking das dimensões
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Ordenação automática pela classificação oficial e pela favorabilidade
-          da média padronizada (escala comum 0–4; RISCO × PROTEÇÃO).
+          Ordenação pela favorabilidade (escala comum 0–4), respeitando se a
+          dimensão é RISCO ou PROTEÇÃO. A classificação oficial do motor não é
+          recalculada.
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <RankingList
-          titulo="Top 5 melhores"
-          tom="ok"
-          itens={melhores}
-        />
-        <RankingList
-          titulo="Top 5 que merecem atenção"
-          tom="warn"
-          itens={atencao}
-        />
+        <RankingMelhoresCard itens={melhores} />
+        <RankingAtencaoCard dimensoes={dimensoes} />
       </div>
     </section>
   );
