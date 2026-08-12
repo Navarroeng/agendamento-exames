@@ -11,12 +11,21 @@ import {
   snapshotTemNormalizacao,
 } from "@/lib/riscos-relatorio-view";
 
+function orientacaoLeituraPorTipo(tipo: string): string {
+  const t = String(tipo).toUpperCase();
+  if (t === "RISCO") {
+    return "Quanto menor a pontuação, melhor a condição avaliada.";
+  }
+  return "Quanto maior a pontuação, melhor a condição avaliada.";
+}
+
 function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
   const [open, setOpen] = useState(false);
   const cor = corPorClassificacaoId(d.classificacaoId);
   const bg = bgSuavePorClassificacaoId(d.classificacaoId);
   const analise = analisarDimensao(d);
   const comNorm = snapshotTemNormalizacao(d);
+  const orientacao = orientacaoLeituraPorTipo(d.tipo);
 
   return (
     <article
@@ -45,7 +54,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Pontuação da dimensão
+                Pontuação
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
                 {formatPontuacaoComMaximo(
@@ -53,10 +62,13 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
                   d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
                 )}
               </p>
+              <p className="mt-1 text-[10px] leading-snug text-[#94a3b8]">
+                {orientacao}
+              </p>
             </div>
             <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Respondentes
+                Respondentes válidos
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
                 {d.respondentesValidos}
@@ -67,15 +79,18 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Média
+                Pontuação
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
                 {formatMediaRelatorio(d.media)}
               </p>
+              <p className="mt-1 text-[10px] leading-snug text-[#94a3b8]">
+                {orientacao}
+              </p>
             </div>
             <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Respondentes
+                Respondentes válidos
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
                 {d.respondentesValidos}
@@ -155,9 +170,10 @@ export function RelatorioDimensoesCards({
           Dimensões COPSOQ
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Análise técnica por dimensão — interpretação automática a partir do
-          snapshot persistido (sem recálculo). A classificação usa a pontuação
-          da dimensão na escala impressa (0–3 ou 0–4).
+          Cada dimensão apresenta a pontuação média obtida pelos participantes,
+          respeitando a escala original do instrumento (0–3 ou 0–4). A
+          classificação considera a metodologia adotada pelo sistema para cada
+          dimensão.
         </p>
       </div>
       <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
