@@ -11,7 +11,6 @@ import {
   formatTaxaParticipacao,
   type RiscosRelatorioRecord,
 } from "@/lib/riscos-relatorio";
-import { gerarConteudoExecutivo } from "@/lib/riscos-relatorio-conteudo";
 import {
   contarFaixasClassificacao,
   statusGeralResumo,
@@ -81,7 +80,19 @@ export function RelatorioResumoExecutivo({
       ? undefined
       : resumo?.dimensoesCriticas?.length,
   });
-  const { resumoNarrativo } = gerarConteudoExecutivo(relatorio);
+
+  const empresa = capa?.empresaNome || relatorio.empresa_nome;
+  const codigo = capa?.codigoPublico || relatorio.codigo_publico || "—";
+  const participantes = capa?.participantes ?? relatorio.participantes ?? 0;
+  const respondentes = capa?.respondentes ?? relatorio.respondentes ?? 0;
+  const taxa = formatTaxaParticipacao(
+    resumo?.participacaoPercentual ??
+      capa?.taxaParticipacao ??
+      relatorio.taxa_participacao
+  );
+  const totalDimensoes =
+    resumo?.quantidadeDimensoes ??
+    (json?.dimensoes ?? []).filter((d) => d.entraNoCalculo).length;
 
   const statusTone =
     status.tom === "critico"
@@ -107,16 +118,43 @@ export function RelatorioResumoExecutivo({
             Visão executiva
           </p>
           <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-            Resumo executivo
+            Objetivo
           </h3>
         </div>
       </div>
 
       <div className="mb-4 rounded-3xl border border-[#e8edf5] bg-gradient-to-br from-[#f8fafc] to-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="space-y-3 text-sm leading-relaxed text-navy">
-          {resumoNarrativo.map((paragrafo) => (
-            <p key={paragrafo.slice(0, 48)}>{paragrafo}</p>
-          ))}
+          <p>
+            O presente relatório apresenta os resultados da Avaliação de Riscos
+            Psicossociais da organização <strong>{empresa}</strong> (campanha{" "}
+            <strong>{codigo}</strong>), realizada por meio do instrumento{" "}
+            <strong>COPSOQ II-Br</strong>, referência reconhecida para análise
+            de fatores psicossociais no ambiente de trabalho.
+          </p>
+          <p>
+            Foram considerados{" "}
+            <strong>{participantes} participante(s) elegível(is)</strong>, com{" "}
+            <strong>{respondentes} respondente(s) válido(s)</strong> e taxa de
+            participação de <strong>{taxa}</strong>. A análise contempla{" "}
+            <strong>{totalDimensoes} categorias</strong>, permitindo distinguir
+            fatores de risco e fatores de proteção conforme as orientações
+            oficiais do instrumento.
+          </p>
+          <p>
+            Este relatório tem como finalidade subsidiar a empresa na
+            identificação de fatores de atenção relacionados aos riscos
+            psicossociais, contribuindo para o desenvolvimento de estratégias
+            preventivas, ações de melhoria organizacional e fortalecimento das
+            práticas voltadas à promoção da saúde e segurança ocupacional.
+          </p>
+          <p>
+            Além do atendimento às exigências normativas aplicáveis, a presente
+            avaliação busca apoiar a construção de um ambiente de trabalho mais
+            saudável, equilibrado e produtivo, promovendo melhores condições
+            organizacionais e contribuindo para o bem-estar físico, emocional e
+            psicossocial dos trabalhadores.
+          </p>
         </div>
       </div>
 

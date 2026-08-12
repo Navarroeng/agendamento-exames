@@ -17,7 +17,6 @@ import {
   dimensoesParaCalculo,
   formatMediaRelatorio,
   formatPontuacaoComMaximo,
-  montarRankingAtencao,
   rankingMelhores,
   severidadeClassificacao,
 } from "@/lib/riscos-relatorio-view";
@@ -324,24 +323,12 @@ export function gerarConteudoExecutivo(
     (d) => d.classificacaoId === "situacao_favoravel"
   );
   const melhores = rankingMelhores(dimensoes, 3);
-  const atencaoRank = montarRankingAtencao(dimensoes, 3);
-  const atencao = atencaoRank.semRiscosClassificados
-    ? []
-    : atencaoRank.itens;
 
   const resumoNarrativo = [
-    `O presente relatório apresenta os resultados da Avaliação de Riscos Psicossociais da organização ${empresa} (campanha ${codigo}), realizada por meio do instrumento COPSOQ II-Br — referência reconhecida para análise de fatores psicossociais no trabalho.`,
-    `Foram considerados ${participantes} participante(s) elegível(is), com ${respondentes} respondente(s) válido(s) e taxa de participação de ${taxa}. A análise contempla ${dimensoes.length} dimensão(ões) quantitativa(s), permitindo distinguir fatores de risco e fatores de proteção conforme as Orientações oficiais do instrumento.`,
-    criticasAltas.length > 0
-      ? `Identificaram-se ${criticasAltas.length} dimensão(ões) em Risco para a Saúde (${listarNomes(criticasAltas)}), além de ${intermediarias.length} em Risco Intermediário. Esses achados orientam priorização de intervenções preventivas e corretivas alinhadas ao gerenciamento de riscos ocupacionais (incluindo requisitos da NR-01, quando aplicável ao contexto da organização).`
-      : intermediarias.length > 0
-        ? `Não foram identificadas dimensões em Risco para a Saúde; contudo, ${intermediarias.length} dimensão(ões) encontram-se em Risco Intermediário (${listarNomes(intermediarias)}), indicando necessidade de monitoramento e ações de suporte antes de eventual agravamento.`
-        : `O panorama geral é favorável: as dimensões quantitativas analisadas situam-se predominantemente em Situação Favorável (${favoraveis.length} dimensão(ões)). Recomenda-se manter as boas práticas e institucionalizar o acompanhamento periódico.`,
-    melhores.length > 0 && atencao.length > 0
-      ? `Entre os principais fatores positivos destacam-se ${listarNomes(melhores)}. Já as dimensões que merecem maior atenção neste ciclo são ${listarNomes(atencao)}.`
-      : melhores.length > 0
-        ? `Entre os principais fatores positivos destacam-se ${listarNomes(melhores)}. Nenhuma dimensão quantitativa encontra-se em Risco Intermediário ou Risco para a Saúde neste ciclo.`
-        : `Os resultados servem como base técnica para ações preventivas, melhoria contínua e tomada de decisão pela alta liderança, SST e RH.`,
+    `O presente relatório apresenta os resultados da Avaliação de Riscos Psicossociais da organização ${empresa} (campanha ${codigo}), realizada por meio do instrumento COPSOQ II-Br, referência reconhecida para análise de fatores psicossociais no ambiente de trabalho.`,
+    `Foram considerados ${participantes} participante(s) elegível(is), com ${respondentes} respondente(s) válido(s) e taxa de participação de ${taxa}. A análise contempla ${dimensoes.length} categorias, permitindo distinguir fatores de risco e fatores de proteção conforme as orientações oficiais do instrumento.`,
+    `Este relatório tem como finalidade subsidiar a empresa na identificação de fatores de atenção relacionados aos riscos psicossociais, contribuindo para o desenvolvimento de estratégias preventivas, ações de melhoria organizacional e fortalecimento das práticas voltadas à promoção da saúde e segurança ocupacional.`,
+    `Além do atendimento às exigências normativas aplicáveis, a presente avaliação busca apoiar a construção de um ambiente de trabalho mais saudável, equilibrado e produtivo, promovendo melhores condições organizacionais e contribuindo para o bem-estar físico, emocional e psicossocial dos trabalhadores.`,
   ];
 
   const conclusaoTecnica = [

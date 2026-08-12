@@ -175,7 +175,8 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
   const out = gerarConteudoExecutivo(relatorio);
   assert.ok(out.resumoNarrativo.some((p) => p.includes("Empresa Alpha")));
   assert.ok(out.resumoNarrativo.some((p) => p.includes("ABC123")));
-  assert.ok(out.resumoNarrativo.some((p) => /Burnout/i.test(p)));
+  assert.ok(out.resumoNarrativo.some((p) => /COPSOQ II-Br/i.test(p)));
+  assert.ok(out.resumoNarrativo.some((p) => /finalidade subsidiar/i.test(p)));
   assert.ok(out.conclusaoTecnica.some((p) => /Risco para a Saúde/i.test(p)));
   assert.ok(
     out.recomendacoesGerais.some((p) =>
@@ -196,7 +197,7 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
     },
   } as RiscosRelatorioRecord;
   const outOk = gerarConteudoExecutivo(favoravelOnly);
-  assert.ok(outOk.resumoNarrativo.some((p) => /favorável/i.test(p)));
+  assert.ok(outOk.resumoNarrativo.some((p) => /categorias/i.test(p)));
   assert.ok(
     outOk.recomendacoesGerais.some((p) => /manter as boas práticas/i.test(p))
   );
