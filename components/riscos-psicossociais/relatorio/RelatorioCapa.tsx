@@ -6,11 +6,7 @@ import {
   formatTaxaParticipacao,
   type RiscosRelatorioRecord,
 } from "@/lib/riscos-relatorio";
-import {
-  formatPeriodoCampanha,
-  RISCOS_CAMPANHA_STATUS_LABELS,
-  type RiscosCampanhaStatus,
-} from "@/lib/riscos-campanha";
+import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
 import { formatCNPJ } from "@/lib/cnpj";
 import { NAVARRO_DADOS_BANCARIOS } from "@/lib/navarro-pagamento";
 import { iniciaisEmpresa } from "@/lib/riscos-relatorio-view";
@@ -21,20 +17,52 @@ const NAVARRO_INSTITUCIONAL = {
   logoSrc: "/logo-navarro.png",
 } as const;
 
-function MetaLinha({ label, value }: { label: string; value: string }) {
+function LogoDestacado({
+  src,
+  alt,
+  fallback,
+  caption,
+}: {
+  src?: string | null;
+  alt: string;
+  fallback: string;
+  caption: string;
+}) {
   return (
-    <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
-      <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
-        {label}
-      </dt>
-      <dd className="text-sm font-semibold leading-snug text-white/95">
-        {value}
-      </dd>
+    <div className="flex min-w-0 flex-col items-start gap-2.5 sm:items-center sm:text-center">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          className="h-20 w-auto max-w-[11rem] rounded-2xl border border-white/20 bg-white object-contain p-3 shadow-[0_16px_40px_rgba(0,0,0,0.28)] sm:h-24 sm:max-w-[13rem] sm:p-3.5"
+        />
+      ) : (
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl font-extrabold tracking-wide text-white shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur sm:h-24 sm:w-24 sm:text-2xl">
+          {fallback}
+        </div>
+      )}
+      <p className="max-w-[13rem] text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+        {caption}
+      </p>
     </div>
   );
 }
 
-function IndicadorCard({
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/40">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold leading-snug text-white/95 sm:text-[15px]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function IndicadorCapa({
   label,
   value,
 }: {
@@ -42,39 +70,13 @@ function IndicadorCard({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/12 bg-white/[0.07] px-3.5 py-3 backdrop-blur-sm">
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/50">
+    <div className="rounded-2xl border border-white/12 bg-white/[0.06] px-4 py-4">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
         {label}
       </p>
-      <p className="mt-1.5 text-lg font-extrabold tabular-nums tracking-tight text-white sm:text-xl">
+      <p className="mt-2 text-2xl font-extrabold tabular-nums tracking-tight text-white">
         {value}
       </p>
-    </div>
-  );
-}
-
-function LogoPlate({
-  src,
-  alt,
-  fallback,
-}: {
-  src?: string | null;
-  alt: string;
-  fallback: string;
-}) {
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={alt}
-        className="h-[4.5rem] w-[4.5rem] rounded-2xl border border-white/25 bg-white object-contain p-2 shadow-[0_12px_28px_rgba(0,0,0,0.22)] sm:h-[5.25rem] sm:w-[5.25rem]"
-      />
-    );
-  }
-  return (
-    <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl border border-white/25 bg-white/10 text-lg font-extrabold tracking-wide text-white backdrop-blur sm:h-[5.25rem] sm:w-[5.25rem] sm:text-xl">
-      {fallback}
     </div>
   );
 }
@@ -83,14 +85,13 @@ export function RelatorioCapa({
   relatorio,
   logoUrl,
   empresaCnpj,
-  campanhaStatus,
 }: {
   relatorio: RiscosRelatorioRecord;
   logoUrl?: string | null;
   /** CNPJ da empresa avaliada (campanha) — só apresentação. */
   empresaCnpj?: string | null;
-  /** Status atual da campanha — só apresentação. */
-  campanhaStatus?: RiscosCampanhaStatus | string | null;
+  /** Mantido por compatibilidade com o modal — não exibido na capa premium. */
+  campanhaStatus?: string | null;
 }) {
   const json = relatorio.resultado_json;
   const capa = json?.capa;
@@ -102,119 +103,140 @@ export function RelatorioCapa({
     capa?.dataEncerramento || ""
   );
   const cnpjCliente = formatCNPJ(empresaCnpj);
-  const statusKey = String(campanhaStatus ?? "") as RiscosCampanhaStatus;
-  const statusLabel =
-    RISCOS_CAMPANHA_STATUS_LABELS[statusKey] ||
-    (campanhaStatus ? String(campanhaStatus) : "—");
+  const codigo = capa?.codigoPublico || relatorio.codigo_publico || "—";
 
   return (
-    <section className="relative overflow-hidden rounded-[1.75rem] border border-[#dbe4f3] bg-gradient-to-br from-[#071833] via-[#0b1f4d] to-[#153a7a] text-white shadow-[0_24px_60px_rgba(7,24,51,0.28)]">
+    <section className="relative overflow-hidden rounded-[1.75rem] border border-[#dbe4f3] bg-gradient-to-br from-[#061428] via-[#0b1f4d] to-[#1a4488] text-white shadow-[0_28px_70px_rgba(7,24,51,0.32)]">
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#c9972b]/80 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#c9972b]/85 to-transparent"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#4f63ff]/15 blur-2xl"
+        className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#4f63ff]/18 blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-28 left-0 h-56 w-56 rounded-full bg-[#c9972b]/10 blur-2xl"
+        className="pointer-events-none absolute -bottom-32 -left-16 h-72 w-72 rounded-full bg-[#c9972b]/12 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.55) 1px, transparent 0)",
+          backgroundSize: "28px 28px",
+        }}
         aria-hidden
       />
 
-      <div className="relative px-6 pb-6 pt-7 sm:px-9 sm:pb-7 sm:pt-8">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-5">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#e8d29e]">
-              Relatório executivo · COPSOQ II-Br
-            </p>
-            <h2 className="mt-2 max-w-3xl text-2xl font-extrabold leading-tight tracking-tight sm:text-[1.85rem]">
-              Avaliação dos Riscos Psicossociais
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/65">
-              Documento corporativo consolidado e anônimo para apoio à gestão de
-              Saúde e Segurança do Trabalho.
-            </p>
-          </div>
+      <div className="relative px-6 pb-7 pt-8 sm:px-10 sm:pb-9 sm:pt-10">
+        {/* Logos */}
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-white/10 pb-7">
+          <LogoDestacado
+            src={logoUrl}
+            alt={`Logo ${empresa}`}
+            fallback={iniciaisEmpresa(empresa)}
+            caption="Empresa avaliada"
+          />
+          <LogoDestacado
+            src={NAVARRO_INSTITUCIONAL.logoSrc}
+            alt="Logo Navarro Engenharia"
+            fallback="NE"
+            caption="Responsável técnico"
+          />
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
-          {/* Empresa avaliada */}
-          <div>
-            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+        {/* Título principal */}
+        <div className="mx-auto mt-9 max-w-3xl text-center sm:mt-11">
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#e8d29e]">
+            Documento Técnico
+          </p>
+          <h2 className="mt-4 text-[1.65rem] font-extrabold leading-[1.12] tracking-tight sm:text-[2.15rem] lg:text-[2.35rem]">
+            Relatório de Avaliação
+            <br />
+            dos Riscos Psicossociais
+          </h2>
+          <p className="mt-4 text-sm font-semibold text-white/70 sm:text-base">
+            Instrumento COPSOQ II-Br
+          </p>
+          <div className="mx-auto mt-6 h-px w-20 bg-gradient-to-r from-transparent via-[#c9972b]/90 to-transparent" />
+        </div>
+
+        {/* Empresa + Responsável */}
+        <div className="mt-9 grid gap-5 lg:mt-11 lg:grid-cols-2 lg:gap-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-5 sm:p-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#e8d29e]/90">
               Empresa avaliada
             </p>
-            <div className="flex items-start gap-4">
-              <LogoPlate
-                src={logoUrl}
-                alt={`Logo ${empresa}`}
-                fallback={iniciaisEmpresa(empresa)}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-lg font-extrabold leading-snug text-white sm:text-xl">
-                  {empresa}
-                </p>
-                <dl className="mt-3 space-y-2.5">
-                  <MetaLinha label="CNPJ" value={cnpjCliente} />
-                  <MetaLinha
-                    label="Campanha"
-                    value={capa?.codigoPublico || relatorio.codigo_publico || "—"}
-                  />
-                  <MetaLinha label="Período" value={periodo || "—"} />
-                </dl>
-              </div>
+            <p className="mt-3 text-lg font-extrabold leading-snug text-white sm:text-xl">
+              {empresa}
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <MetaItem label="Razão Social" value={empresa} />
+              <MetaItem label="CNPJ" value={cnpjCliente} />
+              <MetaItem label="Código da campanha" value={codigo} />
+              <MetaItem label="Período avaliado" value={periodo || "—"} />
             </div>
           </div>
 
-          {/* Responsável técnico */}
-          <div className="lg:border-l lg:border-white/10 lg:pl-10">
-            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-5 sm:p-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#e8d29e]/90">
               Responsável pela avaliação
             </p>
-            <div className="flex items-start gap-4">
-              <LogoPlate
-                src={NAVARRO_INSTITUCIONAL.logoSrc}
-                alt="Logo Navarro Engenharia"
-                fallback="NE"
+            <p className="mt-3 text-lg font-extrabold leading-snug text-white sm:text-[1.15rem]">
+              {NAVARRO_INSTITUCIONAL.nome}
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <MetaItem label="CNPJ" value={NAVARRO_INSTITUCIONAL.cnpj} />
+              <MetaItem
+                label="Responsável pela emissão"
+                value={relatorio.gerado_por?.trim() || "—"}
               />
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-extrabold leading-snug text-white sm:text-lg">
-                  {NAVARRO_INSTITUCIONAL.nome}
-                </p>
-                <dl className="mt-3 space-y-2.5">
-                  <MetaLinha label="CNPJ" value={NAVARRO_INSTITUCIONAL.cnpj} />
-                  <MetaLinha
-                    label="Emissão"
-                    value={relatorio.gerado_por?.trim() || "—"}
-                  />
-                  <MetaLinha label="Data" value={data} />
-                  <MetaLinha label="Hora" value={hora} />
-                </dl>
-              </div>
+              <MetaItem label="Data da emissão" value={data} />
+              <MetaItem label="Hora da emissão" value={hora} />
             </div>
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-          <IndicadorCard
+        {/* Indicadores */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3.5">
+          <IndicadorCapa
             label="Participantes"
             value={capa?.participantes ?? relatorio.participantes ?? 0}
           />
-          <IndicadorCard
+          <IndicadorCapa
             label="Respondentes"
             value={capa?.respondentes ?? relatorio.respondentes ?? 0}
           />
-          <IndicadorCard
+          <IndicadorCapa
             label="Taxa de participação"
             value={formatTaxaParticipacao(
               capa?.taxaParticipacao ?? relatorio.taxa_participacao
             )}
           />
-          <IndicadorCard
+          <IndicadorCapa
             label="Categorias avaliadas"
             value={resumo?.quantidadeDimensoes ?? 0}
           />
-          <IndicadorCard label="Status da campanha" value={statusLabel} />
+        </div>
+
+        {/* Rodapé da capa */}
+        <div className="mt-8 border-t border-white/10 pt-5">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40 sm:justify-between sm:text-left">
+            <span>Documento Técnico</span>
+            <span className="hidden text-white/20 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span>Avaliação de Riscos Psicossociais</span>
+            <span className="hidden text-white/20 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span>Confidencial</span>
+            <span className="hidden text-white/20 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span>Emitido pelo Sistema Navarro SST</span>
+          </div>
         </div>
       </div>
     </section>
