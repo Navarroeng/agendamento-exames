@@ -84,39 +84,22 @@ function RankingAtencaoCard({
       <h4 className="text-sm font-extrabold text-navy">
         Top 5 que merecem atenção
       </h4>
-      <p className="mt-1 text-[11px] text-app-muted">
-        Prioriza classificação oficial (crítico → intermediário); depois menor
-        favorabilidade.
-      </p>
-
       {ranking.semRiscosClassificados ? (
-        <div className="mt-3 space-y-3">
-          <p className="rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2.5 text-xs font-semibold leading-relaxed text-[#166534]">
-            Nenhuma dimensão apresenta risco intermediário ou crítico.
-          </p>
-          {ranking.relativasFavoraveis.length > 0 ? (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Dimensões com menor favorabilidade relativa
-              </p>
-              <p className="mt-0.5 text-[11px] text-app-muted">
-                Continuam classificadas como Situação Favorável — comparação
-                interna apenas.
-              </p>
-              <ol className="mt-2 space-y-2">
-                {ranking.relativasFavoraveis.map((d, idx) => (
-                  <RankingItem key={d.id} d={d} idx={idx} />
-                ))}
-              </ol>
-            </div>
-          ) : null}
-        </div>
+        <p className="mt-3 rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2.5 text-xs font-semibold leading-relaxed text-[#166534]">
+          Nenhuma dimensão apresenta risco intermediário ou crítico.
+        </p>
       ) : (
-        <ol className="mt-3 space-y-2">
-          {ranking.itens.map((d, idx) => (
-            <RankingItem key={d.id} d={d} idx={idx} />
-          ))}
-        </ol>
+        <>
+          <p className="mt-1 text-[11px] text-app-muted">
+            Prioriza classificação oficial (crítico → intermediário); depois
+            menor favorabilidade.
+          </p>
+          <ol className="mt-3 space-y-2">
+            {ranking.itens.map((d, idx) => (
+              <RankingItem key={d.id} d={d} idx={idx} />
+            ))}
+          </ol>
+        </>
       )}
     </div>
   );

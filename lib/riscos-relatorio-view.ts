@@ -131,13 +131,14 @@ export type RankingAtencaoResultado = {
   /**
    * Dimensões em Risco para a Saúde ou Intermediário (pior primeiro),
    * completadas com Favoráveis de menor favorabilidade se faltar vaga.
+   * Vazio quando todas as dimensões são Favoráveis (sem ranking relativo).
    */
   itens: RiscosRelatorioDimensaoSnapshot[];
   /** Só intermediário/crítico (sem preenchimento Favorável). */
   prioritarias: RiscosRelatorioDimensaoSnapshot[];
   /**
-   * Favoráveis com menor favorabilidade relativa.
-   * Usado quando não há intermediário/crítico (não confundir com “problema”).
+   * Favoráveis usadas só para completar o Top quando já há
+   * intermediário/crítico. Vazio se o relatório estiver todo favorável.
    */
   relativasFavoraveis: RiscosRelatorioDimensaoSnapshot[];
   /** True se nenhuma dimensão está em intermediário ou crítico. */
@@ -146,7 +147,8 @@ export type RankingAtencaoResultado = {
 
 /**
  * Ranking de atenção: prioriza classificação oficial (crítico → intermediário),
- * depois menor favorabilidade. Não espelha o Top melhores quando tudo é Favorável.
+ * depois menor favorabilidade. Se tudo for Favorável, não monta ranking
+ * relativo — evita sugerir “problemas” em relatório saudável.
  */
 export function montarRankingAtencao(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
@@ -159,20 +161,20 @@ export function montarRankingAtencao(
     .sort(compararAtencao)
     .slice(0, limite);
 
-  const relativasFavoraveis = calc
-    .filter((d) => d.classificacaoId === "situacao_favoravel")
-    .sort((a, b) => scoreFavorabilidade(a) - scoreFavorabilidade(b));
-
   const semRiscosClassificados = prioritarias.length === 0;
 
   if (semRiscosClassificados) {
     return {
       itens: [],
       prioritarias: [],
-      relativasFavoraveis: relativasFavoraveis.slice(0, limite),
+      relativasFavoraveis: [],
       semRiscosClassificados: true,
     };
   }
+
+  const relativasFavoraveis = calc
+    .filter((d) => d.classificacaoId === "situacao_favoravel")
+    .sort((a, b) => scoreFavorabilidade(a) - scoreFavorabilidade(b));
 
   const faltam = Math.max(0, limite - prioritarias.length);
   const preenchimento = relativasFavoraveis.slice(0, faltam);
@@ -187,15 +189,14 @@ export function montarRankingAtencao(
 
 /**
  * Lista plana do ranking de atenção (compatível com conteúdo narrativo).
- * Quando tudo é Favorável, retorna as de menor favorabilidade relativa
- * (o caller deve interpretar o contexto).
+ * Quando tudo é Favorável, retorna lista vazia.
  */
 export function rankingAtencao(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[],
   limite = 5
 ): RiscosRelatorioDimensaoSnapshot[] {
   const r = montarRankingAtencao(dimensoes, limite);
-  if (r.semRiscosClassificados) return r.relativasFavoraveis;
+  if (r.semRiscosClassificados) return [];
   return r.itens;
 }
 

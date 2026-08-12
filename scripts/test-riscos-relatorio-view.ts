@@ -239,23 +239,12 @@ run("ranking: tudo Favorável não espelha Top melhores como problemas", () => {
   assert.equal(atencao.semRiscosClassificados, true);
   assert.equal(atencao.itens.length, 0);
   assert.equal(atencao.prioritarias.length, 0);
-  // Relativas: menor favorabilidade primeiro (Valores 3.2 < Liderança 3.5 < Burnout fav 3.5 < ...)
-  assert.ok(atencao.relativasFavoraveis.length > 0);
-  assert.equal(
-    atencao.relativasFavoraveis.every(
-      (d) => d.classificacaoId === "situacao_favoravel"
-    ),
-    true
-  );
-  // Melhores: Demandas/Interface (fav 4) primeiro — não idêntico ao relativo
-  assert.ok(
-    scoreFavorabilidade(melhores[0]) >=
-      scoreFavorabilidade(atencao.relativasFavoraveis[0])
-  );
-  assert.notDeepEqual(
-    melhores.map((d) => d.id),
-    atencao.relativasFavoraveis.map((d) => d.id)
-  );
+  // Relatório 100% favorável: sem ranking relativo (evita falsa impressão de risco)
+  assert.equal(atencao.relativasFavoraveis.length, 0);
+  assert.equal(rankingAtencao(todosFav, 5).length, 0);
+  // Top melhores continua listando as de maior favorabilidade
+  assert.ok(melhores.length > 0);
+  assert.ok(scoreFavorabilidade(melhores[0]) >= scoreFavorabilidade(melhores[1]));
 });
 
 run("ranking atenção: uma Intermediária fica em 1º; Favoráveis só depois", () => {
