@@ -177,7 +177,11 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
   assert.ok(out.resumoNarrativo.some((p) => p.includes("ABC123")));
   assert.ok(out.resumoNarrativo.some((p) => /Burnout/i.test(p)));
   assert.ok(out.conclusaoTecnica.some((p) => /Risco para a Saúde/i.test(p)));
-  assert.ok(out.recomendacoesGerais.some((p) => /30 dias|crític/i.test(p)));
+  assert.ok(
+    out.recomendacoesGerais.some((p) =>
+      /30 dias|Risco para a Saúde/i.test(p)
+    )
+  );
   assert.ok(out.planoAcao.length >= 2);
 
   const favoravelOnly = {

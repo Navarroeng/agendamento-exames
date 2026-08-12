@@ -150,7 +150,7 @@ export function textoResultadoEncontrado(
   if (sev === "critico") {
     return risco
       ? `${base} Trata-se de exposição elevada neste fator de risco, com potencial impacto à saúde ocupacional — prioridade de intervenção organizacional.`
-      : `${base} O fator de proteção encontra-se significativamente reduzido, configurando situação crítica do ponto de vista psicossocial.`;
+      : `${base} O fator de proteção encontra-se significativamente reduzido (Risco para a Saúde), exigindo reforço prioritário do ponto de vista psicossocial.`;
   }
   return `${base} A classificação quantitativa não pôde ser definida plenamente para esta dimensão.`;
 }
@@ -178,8 +178,8 @@ export function textoPossiveisImpactos(
   }
   if (sev === "critico") {
     return risco
-      ? `Em “${d.nome}”, o resultado crítico eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, exigindo resposta organizacional estruturada.`
-      : `Em “${d.nome}”, a fragilidade deste fator de proteção pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores.`;
+      ? `Em “${d.nome}”, o resultado em Risco para a Saúde eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, exigindo resposta organizacional estruturada.`
+      : `Em “${d.nome}”, a fragilidade deste fator de proteção (Risco para a Saúde) pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores.`;
   }
   return `Os impactos específicos de “${d.nome}” dependem de aprofundamento qualitativo complementar à análise quantitativa.`;
 }
@@ -350,7 +350,7 @@ export function gerarConteudoExecutivo(
     criticasAltas.length > 0
       ? `O panorama geral indica necessidade de intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva a probabilidade de impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
       : intermediarias.length > 0
-        ? `O panorama geral é de atenção moderada: não há dimensões em faixa crítica máxima, porém o conjunto intermediário (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
+        ? `O panorama geral é de atenção/monitoramento: não há dimensões em Risco para a Saúde, porém o conjunto em Risco Intermediário (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
         : `O panorama geral é estável e favorável. A organização demonstra, neste ciclo, predominância de condições psicossociais positivas, o que não dispensa a manutenção de rotinas de vigilância e reavaliação periódica.`,
     melhores.length > 0
       ? `Como fatores positivos a preservar, destacam-se ${listarNomes(melhores)}. A consolidação desses resultados deve ser tratada como ativo de gestão, e não apenas como ausência de problema.`
@@ -360,7 +360,7 @@ export function gerarConteudoExecutivo(
   const recomendacoesGerais: string[] = [];
   if (criticasAltas.length > 0) {
     recomendacoesGerais.push(
-      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as dimensões críticas: ${listarNomes(criticasAltas)}.`
+      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as dimensões em Risco para a Saúde: ${listarNomes(criticasAltas)}.`
     );
     recomendacoesGerais.push(
       "Revisar processos, jornadas e mecanismos de suporte nas áreas mais expostas, com indicadores de acompanhamento mensal."
@@ -446,8 +446,8 @@ export function montarPlanoAcao(
       acao: acaoPrincipal,
       objetivo:
         sev === "critico"
-          ? `Reduzir exposição crítica em “${d.nome}” e mitigar impactos à saúde ocupacional.`
-          : `Estabilizar “${d.nome}” e evitar progressão para faixa de risco para a saúde.`,
+          ? `Reduzir a exposição em Risco para a Saúde em “${d.nome}” e mitigar impactos à saúde ocupacional.`
+          : `Estabilizar “${d.nome}” (Risco Intermediário) e evitar progressão para Risco para a Saúde.`,
       responsavelSugerido:
         sev === "critico"
           ? "Diretoria / SST / RH"

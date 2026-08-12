@@ -317,15 +317,80 @@ export function montarDadosBarras(
     .sort((a, b) => b.valorVisual - a.valorVisual);
 }
 
+/**
+ * Status geral do resumo executivo (somente apresentação).
+ * - Favorável: nenhuma intermediária nem em Risco para a Saúde
+ * - Atenção / Monitoramento: há Risco Intermediário, sem Risco para a Saúde
+ * - Atenção Prioritária: há ao menos uma em Risco para a Saúde
+ */
 export function statusGeralResumo(input: {
-  dimensoesCriticasCount: number;
+  /** @deprecated Preferir contagens separadas. Mantido para compatibilidade. */
+  dimensoesCriticasCount?: number;
+  riscoIntermediarioCount?: number;
+  riscoParaSaudeCount?: number;
   statusGeralMensagem?: string | null;
-}): { label: string; tom: "ok" | "atencao" | "critico" | "neutro" } {
-  if (input.dimensoesCriticasCount >= 3) {
-    return { label: "Atenção prioritária", tom: "critico" };
+}): {
+  label: string;
+  tom: "ok" | "atencao" | "critico" | "neutro";
+  mensagem: string;
+} {
+  const nSaude = input.riscoParaSaudeCount ?? 0;
+  // Compat: se só veio o agregado antigo (intermediário + saúde juntos),
+  // trata como "atenção/monitoramento" — nunca como crítico automático.
+  const nInter =
+    input.riscoIntermediarioCount ??
+    (input.riscoParaSaudeCount == null
+      ? input.dimensoesCriticasCount ?? 0
+      : 0);
+
+  if (nSaude > 0) {
+    return {
+      label: "Atenção prioritária",
+      tom: "critico",
+      mensagem:
+        input.statusGeralMensagem?.trim() ||
+        "Há dimensão(ões) em Risco para a Saúde — intervenção prioritária.",
+    };
   }
-  if (input.dimensoesCriticasCount >= 1) {
-    return { label: "Requer acompanhamento", tom: "atencao" };
+  if (nInter > 0) {
+    return {
+      label: "Atenção / Monitoramento",
+      tom: "atencao",
+      mensagem:
+        input.statusGeralMensagem?.trim() ||
+        "Há dimensão(ões) em Risco Intermediário — monitorar e reforçar suporte.",
+    };
   }
-  return { label: "Estável", tom: "ok" };
+  return {
+    label: "Situação Favorável",
+    tom: "ok",
+    mensagem:
+      input.statusGeralMensagem?.trim() ||
+      "Nenhuma dimensão em Risco Intermediário ou Risco para a Saúde.",
+  };
+}
+
+/** Contagens oficiais por faixa a partir do snapshot (UI). */
+export function contarFaixasClassificacao(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): {
+  favoravel: number;
+  intermediario: number;
+  riscoParaSaude: number;
+  emAtencao: number;
+} {
+  let favoravel = 0;
+  let intermediario = 0;
+  let riscoParaSaude = 0;
+  for (const d of dimensoesParaCalculo(dimensoes)) {
+    if (d.classificacaoId === "situacao_favoravel") favoravel += 1;
+    else if (d.classificacaoId === "risco_intermediario") intermediario += 1;
+    else if (d.classificacaoId === "risco_para_saude") riscoParaSaude += 1;
+  }
+  return {
+    favoravel,
+    intermediario,
+    riscoParaSaude,
+    emAtencao: intermediario + riscoParaSaude,
+  };
 }

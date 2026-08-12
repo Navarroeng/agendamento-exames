@@ -12,6 +12,7 @@ import {
   rankingAtencao,
   rankingMelhores,
   scoreFavorabilidade,
+  contarFaixasClassificacao,
   statusGeralResumo,
   valorVisualBarraDimensao,
 } from "../lib/riscos-relatorio-view";
@@ -302,10 +303,76 @@ run("score favorabilidade respeita tipo RISCO vs PROTEÇÃO", () => {
   assert.equal(scoreFavorabilidade({ media: 4, tipo: "PROTECAO" }), 4);
 });
 
-run("status geral por quantidade de críticas", () => {
+run("status geral respeita três faixas oficiais", () => {
   assert.equal(statusGeralResumo({ dimensoesCriticasCount: 0 }).tom, "ok");
-  assert.equal(statusGeralResumo({ dimensoesCriticasCount: 1 }).tom, "atencao");
-  assert.equal(statusGeralResumo({ dimensoesCriticasCount: 3 }).tom, "critico");
+  assert.equal(statusGeralResumo({ dimensoesCriticasCount: 0 }).label, "Situação Favorável");
+  // Agregado legado (intermediário+saúde) → atenção, nunca crítico automático
+  assert.equal(statusGeralResumo({ dimensoesCriticasCount: 3 }).tom, "atencao");
+  assert.equal(
+    statusGeralResumo({ dimensoesCriticasCount: 3 }).label,
+    "Atenção / Monitoramento"
+  );
+  assert.equal(
+    statusGeralResumo({
+      riscoIntermediarioCount: 2,
+      riscoParaSaudeCount: 0,
+    }).tom,
+    "atencao"
+  );
+  assert.equal(
+    statusGeralResumo({
+      riscoIntermediarioCount: 2,
+      riscoParaSaudeCount: 0,
+    }).label,
+    "Atenção / Monitoramento"
+  );
+  assert.equal(
+    statusGeralResumo({
+      riscoIntermediarioCount: 1,
+      riscoParaSaudeCount: 1,
+    }).tom,
+    "critico"
+  );
+  assert.equal(
+    statusGeralResumo({
+      riscoIntermediarioCount: 0,
+      riscoParaSaudeCount: 1,
+    }).label,
+    "Atenção prioritária"
+  );
+});
+
+run("contarFaixasClassificacao separa intermediário e saúde", () => {
+  const faixas = contarFaixasClassificacao([
+    dim({
+      id: "a",
+      nome: "A",
+      tipo: "RISCO",
+      media: 1,
+      classificacaoId: "situacao_favoravel",
+      classificacaoLabel: "Situação Favorável",
+    }),
+    dim({
+      id: "b",
+      nome: "B",
+      tipo: "RISCO",
+      media: 2,
+      classificacaoId: "risco_intermediario",
+      classificacaoLabel: "Risco Intermediário",
+    }),
+    dim({
+      id: "c",
+      nome: "C",
+      tipo: "RISCO",
+      media: 3,
+      classificacaoId: "risco_para_saude",
+      classificacaoLabel: "Risco para a Saúde",
+    }),
+  ]);
+  assert.equal(faixas.favoravel, 1);
+  assert.equal(faixas.intermediario, 1);
+  assert.equal(faixas.riscoParaSaude, 1);
+  assert.equal(faixas.emAtencao, 2);
 });
 
 console.log("\nTodos os testes de view do relatório passaram.");

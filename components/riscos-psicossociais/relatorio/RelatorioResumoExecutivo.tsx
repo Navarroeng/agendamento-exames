@@ -12,7 +12,10 @@ import {
   type RiscosRelatorioRecord,
 } from "@/lib/riscos-relatorio";
 import { gerarConteudoExecutivo } from "@/lib/riscos-relatorio-conteudo";
-import { statusGeralResumo } from "@/lib/riscos-relatorio-view";
+import {
+  contarFaixasClassificacao,
+  statusGeralResumo,
+} from "@/lib/riscos-relatorio-view";
 
 function CardMetric({
   label,
@@ -67,10 +70,16 @@ export function RelatorioResumoExecutivo({
   const json = relatorio.resultado_json;
   const resumo = json?.resumoExecutivo;
   const capa = json?.capa;
-  const criticas = resumo?.dimensoesCriticas?.length ?? 0;
+  const faixas = contarFaixasClassificacao(json?.dimensoes ?? []);
+  const emAtencao =
+    faixas.emAtencao || (resumo?.dimensoesCriticas?.length ?? 0);
   const status = statusGeralResumo({
-    dimensoesCriticasCount: criticas,
-    statusGeralMensagem: resumo?.statusGeralMensagem,
+    riscoIntermediarioCount: faixas.intermediario,
+    riscoParaSaudeCount: faixas.riscoParaSaude,
+    // Snapshot antigo sem dimensoes: agregado só como atenção/monitoramento.
+    dimensoesCriticasCount: json?.dimensoes?.length
+      ? undefined
+      : resumo?.dimensoesCriticas?.length,
   });
   const { resumoNarrativo } = gerarConteudoExecutivo(relatorio);
 
@@ -82,6 +91,13 @@ export function RelatorioResumoExecutivo({
         : status.tom === "ok"
           ? "ok"
           : "neutral";
+
+  const atencaoTone =
+    faixas.riscoParaSaude > 0
+      ? "danger"
+      : emAtencao > 0
+        ? "warn"
+        : "ok";
 
   return (
     <section>
@@ -127,35 +143,61 @@ export function RelatorioResumoExecutivo({
           icon={<IconChecklist size={18} />}
         />
         <CardMetric
-          label="Dimensões críticas"
-          value={criticas}
+          label="Dimensões em atenção"
+          value={emAtencao}
           hint={
-            criticas > 0
-              ? "Intermediário ou risco para saúde"
-              : "Nenhuma dimensão crítica"
+            emAtencao > 0
+              ? "Intermediário ou Risco para a Saúde"
+              : "Nenhuma dimensão em atenção"
           }
           icon={<IconShield size={18} />}
-          tone={criticas > 0 ? "warn" : "ok"}
+          tone={atencaoTone}
         />
         <CardMetric
           label="Status geral"
           value={status.label}
-          hint={resumo?.statusGeralMensagem || undefined}
+          hint={status.mensagem}
           icon={<IconShield size={18} />}
           tone={statusTone}
         />
       </div>
 
       {(resumo?.dimensoesCriticas?.length ?? 0) > 0 ? (
-        <div className="mt-4 rounded-2xl border border-[#fde68a] bg-[#fefce8] px-4 py-3">
-          <p className="text-xs font-extrabold text-[#a16207]">
-            Dimensões que merecem atenção
+        <div
+          className={`mt-4 rounded-2xl border px-4 py-3 ${
+            faixas.riscoParaSaude > 0
+              ? "border-[#fecaca] bg-[#fef2f2]"
+              : "border-[#fde68a] bg-[#fefce8]"
+          }`}
+        >
+          <p
+            className={`text-xs font-extrabold ${
+              faixas.riscoParaSaude > 0 ? "text-[#b91c1c]" : "text-[#a16207]"
+            }`}
+          >
+            Dimensões em atenção
+          </p>
+          <p
+            className={`mt-0.5 text-[11px] ${
+              faixas.riscoParaSaude > 0
+                ? "text-[#b91c1c]/80"
+                : "text-[#a16207]/80"
+            }`}
+          >
+            Intermediário ou Risco para a Saúde
           </p>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {resumo!.dimensoesCriticas.map((d) => (
-              <li key={d.id} className="text-xs font-semibold text-[#854d0e]">
+              <li
+                key={d.id}
+                className={`text-xs font-semibold ${
+                  faixas.riscoParaSaude > 0
+                    ? "text-[#7f1d1d]"
+                    : "text-[#854d0e]"
+                }`}
+              >
                 • {d.nome}
-                <span className="font-medium text-[#a16207]/70">
+                <span className="font-medium opacity-70">
                   {" "}
                   — {d.classificacaoLabel}
                 </span>
