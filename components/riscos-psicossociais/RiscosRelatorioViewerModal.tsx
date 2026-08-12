@@ -15,7 +15,6 @@ import { RelatorioResumoExecutivo } from "@/components/riscos-psicossociais/rela
 import { RelatorioRadarChart } from "@/components/riscos-psicossociais/relatorio/RelatorioRadarChart";
 import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
 import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
-import { RelatorioHeatmap } from "@/components/riscos-psicossociais/relatorio/RelatorioHeatmap";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
 import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
 import { relatorioTemNormalizacao } from "@/lib/riscos-relatorio-view";
@@ -153,9 +152,6 @@ export function RiscosRelatorioViewerModal({
         </div>
         <div className="riscos-relatorio-print-section">
           <RelatorioRanking dimensoes={dimensoes} />
-        </div>
-        <div className="riscos-relatorio-print-section">
-          <RelatorioHeatmap dimensoes={dimensoes} />
         </div>
         <div className="riscos-relatorio-print-section">
           <RelatorioDimensoesCards dimensoes={dimensoes} />

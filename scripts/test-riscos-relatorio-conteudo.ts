@@ -9,7 +9,6 @@ import type {
 import {
   analisarDimensao,
   gerarConteudoExecutivo,
-  montarPlanoAcao,
   recomendacoesDimensao,
   textoPossiveisImpactos,
   textoResultadoEncontrado,
@@ -109,15 +108,6 @@ run("recomendações críticas são mais específicas/exigentes", () => {
   assert.ok(cri.some((r) => /imediata|priorizar|plano de ação/i.test(r)));
 });
 
-run("plano de ação prioriza críticos e define prazos", () => {
-  const plano = montarPlanoAcao([favoravel, intermediario, critico]);
-  assert.equal(plano[0].prioridade, "Alta");
-  assert.equal(plano[0].dimensaoId, "burnout-estresse");
-  assert.equal(plano[0].prazoSugerido, "30 dias");
-  assert.ok(plano.some((p) => p.prioridade === "Média"));
-  assert.ok(plano.every((p) => p.status === "Pendente"));
-});
-
 run("conteúdo executivo é específico aos resultados da campanha", () => {
   const relatorio = {
     id: "r1",
@@ -182,7 +172,6 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
       /30 dias|Situação Desfavorável/i.test(p)
     )
   );
-  assert.ok(out.planoAcao.length >= 2);
 
   const favoravelOnly = {
     ...relatorio,

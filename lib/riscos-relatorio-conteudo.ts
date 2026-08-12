@@ -28,22 +28,10 @@ export type AnaliseDimensaoConteudo = {
   recomendacoes: string[];
 };
 
-export type ItemPlanoAcao = {
-  prioridade: "Alta" | "Média" | "Baixa";
-  acao: string;
-  objetivo: string;
-  responsavelSugerido: string;
-  prazoSugerido: string;
-  status: "Pendente";
-  dimensaoId: string;
-  dimensaoNome: string;
-};
-
 export type ConteudoExecutivoRelatorio = {
   resumoNarrativo: string[];
   conclusaoTecnica: string[];
   recomendacoesGerais: string[];
-  planoAcao: ItemPlanoAcao[];
 };
 
 /** Textos técnicos por dimensão (baseados nas descrições oficiais COPSOQ). */
@@ -369,7 +357,7 @@ export function gerarConteudoExecutivo(
     );
   }
   recomendacoesGerais.push(
-    "Compartilhar este relatório com a direção e os responsáveis por SST/RH, convertendo achados em ações com prazo e responsável definidos (ver Plano de Ação)."
+    "Compartilhar este relatório com a direção e os responsáveis por SST/RH, convertendo achados em ações com prazo e responsável definidos."
   );
   if (criticas.length > 3) {
     recomendacoesGerais.push(
@@ -377,70 +365,9 @@ export function gerarConteudoExecutivo(
     );
   }
 
-  const planoAcao = montarPlanoAcao(dimensoes);
-
   return {
     resumoNarrativo,
     conclusaoTecnica,
     recomendacoesGerais,
-    planoAcao,
   };
-}
-
-export function montarPlanoAcao(
-  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
-): ItemPlanoAcao[] {
-  const ordenadas = [...dimensoesParaCalculo(dimensoes)].sort(
-    (a, b) =>
-      severidadeClassificacao(b.classificacaoId) -
-        severidadeClassificacao(a.classificacaoId) ||
-      a.nome.localeCompare(b.nome, "pt-BR")
-  );
-
-  const itens: ItemPlanoAcao[] = [];
-  for (const d of ordenadas) {
-    const sev = labelSeveridade(d.classificacaoId);
-    if (sev === "favoravel") {
-      // no máximo 2 ações de manutenção
-      if (itens.filter((i) => i.prioridade === "Baixa").length >= 2) continue;
-      itens.push({
-        prioridade: "Baixa",
-        acao: `Manter boas práticas em “${d.nome}” e documentar evidências.`,
-        objetivo: "Preservar fator de proteção / baixa exposição ao risco.",
-        responsavelSugerido: "Liderança da área + RH",
-        prazoSugerido: "90 dias (revisão)",
-        status: "Pendente",
-        dimensaoId: d.id,
-        dimensaoNome: d.nome,
-      });
-      continue;
-    }
-
-    const recs = recomendacoesDimensao(d);
-    const acaoPrincipal =
-      recs.find((r) => !r.toLowerCase().startsWith("monitorar")) ?? recs[0];
-
-    itens.push({
-      prioridade: sev === "critico" ? "Alta" : "Média",
-      acao: acaoPrincipal,
-      objetivo:
-        sev === "critico"
-          ? `Reduzir a exposição em Situação Desfavorável em “${d.nome}” e mitigar impactos à saúde ocupacional.`
-          : `Estabilizar “${d.nome}” (Situação Moderada) e evitar progressão para Situação Desfavorável.`,
-      responsavelSugerido:
-        sev === "critico"
-          ? "Diretoria / SST / RH"
-          : "SST / RH / Liderança imediata",
-      prazoSugerido: sev === "critico" ? "30 dias" : "60 dias",
-      status: "Pendente",
-      dimensaoId: d.id,
-      dimensaoNome: d.nome,
-    });
-  }
-
-  // Limitar a um plano executivo legível
-  const altas = itens.filter((i) => i.prioridade === "Alta");
-  const medias = itens.filter((i) => i.prioridade === "Média");
-  const baixas = itens.filter((i) => i.prioridade === "Baixa");
-  return [...altas, ...medias.slice(0, 5), ...baixas.slice(0, 2)].slice(0, 10);
 }
