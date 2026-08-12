@@ -209,9 +209,37 @@ export function RiscosRelatorioPanel({
         <button
           type="button"
           className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-          onClick={() =>
-            toast.message("Exportação em PDF será disponibilizada em breve.")
-          }
+          onClick={() => {
+            setViewerOpen(true);
+            window.setTimeout(() => {
+              void (async () => {
+                try {
+                  const empresa =
+                    relatorio.empresa_nome ||
+                    relatorio.resultado_json?.capa?.empresaNome ||
+                    "Empresa";
+                  const { exportarRelatorioRiscosPdf, nomeArquivoPdfRelatorioRiscos } =
+                    await import("@/lib/riscos-relatorio-pdf");
+                  toast.message("Abrindo impressão…", {
+                    description: `Use “Salvar como PDF”. Nome sugerido: ${nomeArquivoPdfRelatorioRiscos(
+                      empresa,
+                      relatorio.gerado_em
+                    )}`,
+                  });
+                  await exportarRelatorioRiscosPdf({
+                    empresaNome: empresa,
+                    geradoEm: relatorio.gerado_em,
+                  });
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : "Falha ao exportar o PDF."
+                  );
+                }
+              })();
+            }, 400);
+          }}
         >
           Exportar PDF
         </button>

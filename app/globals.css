@@ -180,3 +180,122 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 .avaliacao-step-enter {
   animation: avaliacao-step-enter 280ms ease-out;
 }
+
+/* ------------------------------------------------------------------ */
+/* Relatório Riscos Psicossociais — exportação PDF via impressão       */
+/* ------------------------------------------------------------------ */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm 18mm 12mm;
+  }
+
+  body.riscos-relatorio-printing {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing * {
+    visibility: hidden !important;
+  }
+
+  body.riscos-relatorio-printing #riscos-relatorio-print-root,
+  body.riscos-relatorio-printing #riscos-relatorio-print-root * {
+    visibility: visible !important;
+  }
+
+  body.riscos-relatorio-printing #riscos-relatorio-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-shell {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-dialog {
+    position: static !important;
+    max-height: none !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-body {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-hide {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-force {
+    display: block !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-chart {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.riscos-relatorio-printing .recharts-responsive-container {
+    width: 100% !important;
+    height: 340px !important;
+    min-height: 340px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  body.riscos-relatorio-printing .riscos-relatorio-print-footer {
+    display: block !important;
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 9px;
+    color: #64748b;
+    text-align: center;
+  }
+
+  body.riscos-relatorio-printing table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+

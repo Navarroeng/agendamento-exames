@@ -75,24 +75,24 @@ export function Modal({
   const widthClass = resolveWidthClass(size, wide, extraWide);
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 riscos-relatorio-print-shell">
       <button
         type="button"
-        className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-black/45 backdrop-blur-[1px] riscos-relatorio-print-hide"
         onClick={() => {
           if (closeOnOverlayClick) onClose();
         }}
         aria-label="Fechar"
       />
       <div
-        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-app-line bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] ${widthClass}`}
+        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-app-line bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] riscos-relatorio-print-dialog ${widthClass}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-5 py-4 sm:px-6 sm:py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-5 py-4 sm:px-6 sm:py-5 riscos-relatorio-print-hide">
           <div className="min-w-0">
             <h3
               id="modal-title"
@@ -113,11 +113,11 @@ export function Modal({
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 riscos-relatorio-print-body">
           {children}
         </div>
         {footer ? (
-          <div className="pointer-events-auto shrink-0 border-t border-app-line bg-white px-4 py-3 sm:px-6 sm:py-4">
+          <div className="pointer-events-auto shrink-0 border-t border-app-line bg-white px-4 py-3 sm:px-6 sm:py-4 riscos-relatorio-print-hide">
             {footer}
           </div>
         ) : null}

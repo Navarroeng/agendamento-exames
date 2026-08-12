@@ -20,7 +20,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
 
   return (
     <article
-      className="rounded-2xl border border-[#e8edf5] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
+      className="riscos-relatorio-print-card rounded-2xl border border-[#e8edf5] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
       style={{ borderTopColor: cor, borderTopWidth: 3 }}
     >
       <div className="p-4">
@@ -93,7 +93,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
 
         <button
           type="button"
-          className="mt-3 w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-navy transition hover:border-brand-blue hover:bg-brand-blue-soft hover:text-brand-blue"
+          className="mt-3 w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-navy transition hover:border-brand-blue hover:bg-brand-blue-soft hover:text-brand-blue riscos-relatorio-print-hide"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
         >
@@ -101,8 +101,11 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
         </button>
       </div>
 
-      {open ? (
-        <div className="space-y-3 border-t border-[#eef2f7] bg-[#fbfcfe] px-4 py-4">
+      <div
+        className={`space-y-3 border-t border-[#eef2f7] bg-[#fbfcfe] px-4 py-4 riscos-relatorio-print-force ${
+          open ? "" : "hidden"
+        }`}
+      >
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
               O que esta dimensão avalia
@@ -138,7 +141,6 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
             </ul>
           </div>
         </div>
-      ) : null}
     </article>
   );
 }
@@ -165,7 +167,7 @@ export function RelatorioDimensoesCards({
           padronizada (escala comum 0–4).
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {list.map((d) => (
           <DimensaoCard key={d.id} d={d} />
         ))}
