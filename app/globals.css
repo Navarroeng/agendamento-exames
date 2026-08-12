@@ -254,6 +254,14 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   body.riscos-relatorio-printing .riscos-relatorio-print-force {
     display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Cabeçalho PDF: layout compacto A4 (sem o hero do modal) */
+  body.riscos-relatorio-printing .riscos-relatorio-print-capa {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
   }
 
   body.riscos-relatorio-printing .riscos-relatorio-print-section {

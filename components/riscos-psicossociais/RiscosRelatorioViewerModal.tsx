@@ -10,6 +10,7 @@ import {
   nomeArquivoPdfRelatorioRiscos,
 } from "@/lib/riscos-relatorio-pdf";
 import { RelatorioCapa } from "@/components/riscos-psicossociais/relatorio/RelatorioCapa";
+import { RelatorioCapaPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCapaPrint";
 import { RelatorioResumoExecutivo } from "@/components/riscos-psicossociais/relatorio/RelatorioResumoExecutivo";
 import { RelatorioRadarChart } from "@/components/riscos-psicossociais/relatorio/RelatorioRadarChart";
 import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
@@ -124,12 +125,22 @@ export function RiscosRelatorioViewerModal({
         ) : null}
 
         <div className="riscos-relatorio-print-section">
-          <RelatorioCapa
-            relatorio={relatorio}
-            logoUrl={logoUrl}
-            empresaCnpj={empresaCnpj}
-            campanhaStatus={campanhaStatus}
-          />
+          <div className="riscos-relatorio-print-hide">
+            <RelatorioCapa
+              relatorio={relatorio}
+              logoUrl={logoUrl}
+              empresaCnpj={empresaCnpj}
+              campanhaStatus={campanhaStatus}
+            />
+          </div>
+          <div className="hidden riscos-relatorio-print-force riscos-relatorio-print-capa">
+            <RelatorioCapaPrint
+              relatorio={relatorio}
+              logoUrl={logoUrl}
+              empresaCnpj={empresaCnpj}
+              campanhaStatus={campanhaStatus}
+            />
+          </div>
         </div>
         <div className="riscos-relatorio-print-section">
           <RelatorioResumoExecutivo relatorio={relatorio} />
