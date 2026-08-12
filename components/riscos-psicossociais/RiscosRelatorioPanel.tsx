@@ -281,6 +281,8 @@ export function RiscosRelatorioPanel({
         relatorio={relatorio}
         onClose={() => setViewerOpen(false)}
         logoUrl={logoUrl}
+        empresaCnpj={campanha.cnpj}
+        campanhaStatus={campanha.status}
       />
     </div>
   );

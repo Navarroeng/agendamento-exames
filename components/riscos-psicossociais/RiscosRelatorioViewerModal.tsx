@@ -25,6 +25,10 @@ interface RiscosRelatorioViewerModalProps {
   onClose: () => void;
   /** Logo da empresa quando disponível (apenas visual). */
   logoUrl?: string | null;
+  /** CNPJ da empresa avaliada (campanha) — só capa. */
+  empresaCnpj?: string | null;
+  /** Status da campanha — só capa. */
+  campanhaStatus?: string | null;
 }
 
 export function RiscosRelatorioViewerModal({
@@ -32,6 +36,8 @@ export function RiscosRelatorioViewerModal({
   relatorio,
   onClose,
   logoUrl,
+  empresaCnpj,
+  campanhaStatus,
 }: RiscosRelatorioViewerModalProps) {
   const [exporting, setExporting] = useState(false);
 
@@ -118,7 +124,12 @@ export function RiscosRelatorioViewerModal({
         ) : null}
 
         <div className="riscos-relatorio-print-section">
-          <RelatorioCapa relatorio={relatorio} logoUrl={logoUrl} />
+          <RelatorioCapa
+            relatorio={relatorio}
+            logoUrl={logoUrl}
+            empresaCnpj={empresaCnpj}
+            campanhaStatus={campanhaStatus}
+          />
         </div>
         <div className="riscos-relatorio-print-section">
           <RelatorioResumoExecutivo relatorio={relatorio} />
