@@ -53,13 +53,13 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
             </div>
             <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
               <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Pontuação padronizada
+                Pontuação da dimensão
               </p>
               <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
                 {formatPontuacaoComMaximo(d.media, d.maxEscalaPadronizada ?? 4)}
               </p>
               <p className="mt-0.5 text-[10px] font-medium text-app-muted">
-                Usada na classificação
+                Escala final · usada na classificação
               </p>
             </div>
           </div>
@@ -164,7 +164,7 @@ export function RelatorioDimensoesCards({
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Análise técnica por dimensão — interpretação automática a partir do
           snapshot persistido (sem recálculo). A classificação usa a pontuação
-          padronizada (escala comum 0–4).
+          da dimensão na escala final do sistema (0–4 ou 0–5).
         </p>
       </div>
       <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -26,13 +26,16 @@ function TooltipBarras({
   if (!row) return null;
   const isRisco = String(row.tipo).toUpperCase() === "RISCO";
   const mediaTxt = row.media.toFixed(2).replace(".", ",");
+  const maxTxt = String(row.maxEscala);
 
   return (
     <div className="max-w-xs rounded-xl border border-[#e8edf5] bg-white px-3 py-2.5 text-xs shadow-md">
       <p className="font-extrabold text-navy">{row.nome}</p>
       <p className="mt-1 text-app-muted">
-        Pontuação padronizada:{" "}
-        <span className="font-bold text-navy">{mediaTxt} / 4</span>
+        Pontuação da dimensão:{" "}
+        <span className="font-bold text-navy">
+          {mediaTxt} / {maxTxt}
+        </span>
       </p>
       <p className="mt-0.5 font-bold text-navy">{row.classificacaoLabel}</p>
       {isRisco ? (
@@ -70,8 +73,8 @@ export function RelatorioBarrasChart({
           <p className="mt-1 text-xs text-app-muted sm:text-sm">
             O comprimento da barra indica favorabilidade visual (melhor à
             esquerda/maior). Em dimensões de risco, pontuações técnicas menores
-            aparecem com barras maiores. A cor segue a classificação oficial
-            COPSOQ.
+            aparecem com barras maiores. A cor segue a classificação do
+            produto. O tooltip mostra a pontuação técnica real ( /4 ou /5 ).
           </p>
         </div>
         <RelatorioLegendaCores />
@@ -88,7 +91,10 @@ export function RelatorioBarrasChart({
               <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" horizontal={false} />
               <XAxis
                 type="number"
-                domain={[0, 4]}
+                domain={[0, 1]}
+                tickFormatter={(v) =>
+                  typeof v === "number" ? v.toFixed(1) : String(v)
+                }
                 tick={{ fill: "#94a3b8", fontSize: 11 }}
               />
               <YAxis

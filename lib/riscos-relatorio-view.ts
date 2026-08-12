@@ -69,14 +69,19 @@ export function severidadeClassificacao(
 
 /**
  * Favorabilidade (maior = melhor) — só para ordenação/ranking/visual.
- * PROTEÇÃO: média; RISCO: 4 − média. Não altera classificação do motor.
+ * PROTEÇÃO: média; RISCO: maxEscala − média.
+ * Usa o máximo da escala final da dimensão (4 ou 5).
  */
 export function scoreFavorabilidade(
-  d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
+  d: Pick<
+    RiscosRelatorioDimensaoSnapshot,
+    "media" | "tipo" | "maxEscalaPadronizada"
+  >
 ): number {
   if (d.media == null || Number.isNaN(d.media)) return Number.NEGATIVE_INFINITY;
+  const max = d.maxEscalaPadronizada ?? 4;
   const tipo = String(d.tipo).toUpperCase();
-  if (tipo === "RISCO") return 4 - d.media;
+  if (tipo === "RISCO") return max - d.media;
   return d.media;
 }
 
@@ -262,43 +267,62 @@ export function formatPontuacaoComMaximo(
 export type RadarChartDatum = {
   dimensao: string;
   nomeCompleto: string;
+  /** Favorabilidade relativa 0–1 (comparável entre escalas 0–4 e 0–5). */
   media: number;
   fullMark: number;
+  /** Pontuação técnica real da dimensão. */
+  pontuacaoTecnica: number;
+  maxEscala: number;
 };
 
 export function montarDadosRadar(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
 ): RadarChartDatum[] {
-  return dimensoesParaCalculo(dimensoes).map((d) => ({
-    dimensao: nomeCurtoDimensao(d.nome, 18),
-    nomeCompleto: d.nome,
-    media: Number(d.media ?? 0),
-    fullMark: 4,
-  }));
+  return dimensoesParaCalculo(dimensoes).map((d) => {
+    const max = d.maxEscalaPadronizada ?? 4;
+    const score = scoreFavorabilidade(d);
+    const relativa =
+      !Number.isFinite(score) || score === Number.NEGATIVE_INFINITY
+        ? 0
+        : score / max;
+    return {
+      dimensao: nomeCurtoDimensao(d.nome, 18),
+      nomeCompleto: d.nome,
+      media: relativa,
+      fullMark: 1,
+      pontuacaoTecnica: Number(d.media ?? 0),
+      maxEscala: max,
+    };
+  });
 }
 
 export type BarraChartDatum = {
   id: string;
   nome: string;
   tipo: string;
-  /** Pontuação padronizada técnica (0–4) — nunca inventar a partir do visual. */
+  /** Pontuação técnica na escala final da dimensão. */
   media: number;
+  maxEscala: number;
   /**
-   * Comprimento visual da barra (0–4).
-   * PROTEÇÃO: igual à media; RISCO: 4 − media (maior barra = melhor resultado).
+   * Comprimento visual (0–1): favorabilidade relativa.
+   * PROTEÇÃO: media/max; RISCO: (max−media)/max.
    */
   valorVisual: number;
   cor: string;
   classificacaoLabel: string;
 };
 
-/** Comprimento visual da barra (somente UI). Mesma métrica de favorabilidade. */
+/** Comprimento visual da barra (0–1). Favorabilidade relativa à escala da dimensão. */
 export function valorVisualBarraDimensao(
-  d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
+  d: Pick<
+    RiscosRelatorioDimensaoSnapshot,
+    "media" | "tipo" | "maxEscalaPadronizada"
+  >
 ): number {
+  const max = d.maxEscalaPadronizada ?? 4;
   const score = scoreFavorabilidade(d);
   if (!Number.isFinite(score) || score === Number.NEGATIVE_INFINITY) return 0;
-  return score;
+  return max > 0 ? score / max : 0;
 }
 
 export function montarDadosBarras(
@@ -310,6 +334,7 @@ export function montarDadosBarras(
       nome: d.nome,
       tipo: d.tipo,
       media: Number(d.media ?? 0),
+      maxEscala: d.maxEscalaPadronizada ?? 4,
       valorVisual: valorVisualBarraDimensao(d),
       cor: corPorClassificacaoId(d.classificacaoId),
       classificacaoLabel: d.classificacaoLabel,

@@ -4,7 +4,6 @@
  */
 
 import {
-  COPSOQ_ESCALA_COMUM_MAX,
   amplitudeEscalaDimensao,
   type CopsoqClassificacaoResultadoId,
 } from "@/lib/copsoq-engine";
@@ -22,18 +21,16 @@ export type RiscosRelatorioDimensaoSnapshot = {
   tipo: string;
   entraNoCalculo: boolean;
   /**
-   * Média na escala comum do motor (0–4).
-   * É o valor usado para classificação, radar, ranking e heatmap.
+   * Média na escala final do produto (0–4 ou 0–5) — classificação e exibição.
    */
   media: number | null;
   /**
-   * Média bruta nas pontuações impressas do Formulário (antes da normalização).
-   * Ausente em snapshots gerados antes da normalização de amplitude.
+   * Média bruta nas pontuações impressas (após inversão, antes da conversão).
    */
   mediaBruta?: number | null;
-  /** Máximo possível da escala impressa desta dimensão (ex.: 3 ou 4). */
+  /** Máximo da escala impressa desta dimensão (ex.: 3 ou 4). */
   maxEscalaBruta?: number | null;
-  /** Máximo da escala comum de classificação (sempre 4 nos snapshots novos). */
+  /** Máximo da escala final do produto (4 ou 5). */
   maxEscalaPadronizada?: number | null;
   classificacaoId: CopsoqClassificacaoResultadoId;
   classificacaoLabel: string;
@@ -153,11 +150,11 @@ export function montarResultadoJsonRelatorio(input: {
       nome: d.nome,
       tipo: d.tipo,
       entraNoCalculo: d.entraNoCalculo,
-      // Sempre a média já normalizada (escala comum) — mesma usada em classificarMediaDimensao.
+      // Média na escala final do produto (0–4 ou 0–5).
       media: d.media,
       mediaBruta: d.mediaBruta,
       maxEscalaBruta: amp.max,
-      maxEscalaPadronizada: COPSOQ_ESCALA_COMUM_MAX,
+      maxEscalaPadronizada: d.maxEscalaFinal ?? 4,
       classificacaoId: d.classificacao.id,
       classificacaoLabel: d.classificacao.label,
       classificacaoInterpretacao: d.classificacao.interpretacao,

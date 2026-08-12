@@ -130,7 +130,7 @@ export function textoResultadoEncontrado(
       d.media,
       d.maxEscalaPadronizada ?? 4
     );
-    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação original ${original} e pontuação padronizada ${padronizada} (escala comum usada na classificação), resultando em ${d.classificacaoLabel}.`;
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação original ${original} e pontuação da dimensão ${padronizada} (escala final do sistema usada na classificação), resultando em ${d.classificacaoLabel}.`;
   } else {
     const media = formatMediaRelatorio(d.media);
     base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;

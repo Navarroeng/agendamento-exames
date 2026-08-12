@@ -138,13 +138,19 @@ run("barras: RISCO inverte comprimento visual; PROTEÇÃO preserva média técni
     classificacaoId: "risco_para_saude",
   });
 
-  assert.equal(valorVisualBarraDimensao(perfeitoRisco), 4);
-  assert.equal(valorVisualBarraDimensao(burnout), 4);
-  assert.equal(valorVisualBarraDimensao(conflitos), 4);
-  assert.equal(valorVisualBarraDimensao(perfeitoProt), 4);
+  assert.equal(valorVisualBarraDimensao(perfeitoRisco), 1);
+  assert.equal(valorVisualBarraDimensao(burnout), 1);
+  assert.equal(valorVisualBarraDimensao(conflitos), 1);
+  assert.equal(valorVisualBarraDimensao(perfeitoProt), 1);
   assert.equal(valorVisualBarraDimensao(criticoRisco), 0);
-  assert.equal(valorVisualBarraDimensao({ media: 1, tipo: "RISCO" }), 3);
-  assert.equal(valorVisualBarraDimensao({ media: 3, tipo: "RISCO" }), 1);
+  assert.equal(
+    valorVisualBarraDimensao({ media: 1, tipo: "RISCO", maxEscalaPadronizada: 4 }),
+    0.75
+  );
+  assert.equal(
+    valorVisualBarraDimensao({ media: 3, tipo: "RISCO", maxEscalaPadronizada: 4 }),
+    0.25
+  );
 
   const barras = montarDadosBarras([
     perfeitoRisco,
@@ -155,12 +161,12 @@ run("barras: RISCO inverte comprimento visual; PROTEÇÃO preserva média técni
   ]);
   const byId = Object.fromEntries(barras.map((b) => [b.id, b]));
   assert.equal(byId["demandas-trabalho"].media, 0);
-  assert.equal(byId["demandas-trabalho"].valorVisual, 4);
+  assert.equal(byId["demandas-trabalho"].valorVisual, 1);
   assert.equal(byId["demandas-trabalho"].cor, "#16a34a");
-  assert.equal(byId["burnout-estresse"].valorVisual, 4);
-  assert.equal(byId["conflitos-familia-trabalho"].valorVisual, 4);
+  assert.equal(byId["burnout-estresse"].valorVisual, 1);
+  assert.equal(byId["conflitos-familia-trabalho"].valorVisual, 1);
   assert.equal(byId["interface-trabalho-individuo"].media, 4);
-  assert.equal(byId["interface-trabalho-individuo"].valorVisual, 4);
+  assert.equal(byId["interface-trabalho-individuo"].valorVisual, 1);
   assert.equal(byId["critico"].media, 4);
   assert.equal(byId["critico"].valorVisual, 0);
   assert.equal(byId["critico"].cor, "#dc2626");
@@ -172,7 +178,7 @@ run("radar ignora dimensões fora do cálculo", () => {
   const radar = montarDadosRadar(amostra);
   assert.equal(radar.length, 5);
   assert.equal(
-    radar.every((r) => r.fullMark === 4 && typeof r.media === "number"),
+    radar.every((r) => r.fullMark === 1 && typeof r.media === "number"),
     true
   );
 });
@@ -299,8 +305,9 @@ run("score favorabilidade respeita tipo RISCO vs PROTEÇÃO", () => {
     scoreFavorabilidade({ media: 3.5, tipo: "PROTECAO" }) >
       scoreFavorabilidade({ media: 2, tipo: "PROTECAO" })
   );
-  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO" }), 4);
-  assert.equal(scoreFavorabilidade({ media: 4, tipo: "PROTECAO" }), 4);
+  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO", maxEscalaPadronizada: 4 }), 4);
+  assert.equal(scoreFavorabilidade({ media: 4, tipo: "PROTECAO", maxEscalaPadronizada: 4 }), 4);
+  assert.equal(scoreFavorabilidade({ media: 0, tipo: "RISCO", maxEscalaPadronizada: 5 }), 5);
 });
 
 run("status geral respeita três faixas oficiais", () => {

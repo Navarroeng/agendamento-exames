@@ -34,10 +34,10 @@ Fonte da verdade: arquivos em `docs/copsoq/` (derivados dos PDFs em `fonte-ofici
 - [ ] dimensões
 - [ ] classificação RISCO × PROTEÇÃO
 - [ ] médias (individual e geral)
-- [ ] normalização de amplitude → escala comum 0–4 antes dos cortes (dimensões 0–4 idênticas)
-- [ ] limites / faixas do **produto** (1,33 e 2,66) — ver `METODOLOGIA-PRODUTO.md`
-- [ ] exemplos de fronteira (1,33 / 1,34 / 2,66 / 2,67) para RISCO e PROTEÇÃO
-- [ ] exemplo de média Demandas 2,43 → Situação Moderada (produto)
+- [ ] conversão linear por pergunta → escala final 0–5 (5 alts) ou 0–4 (4 alts)
+- [ ] limites / faixas do **produto** por escala — ver `METODOLOGIA-PRODUTO.md`
+- [ ] exemplos de fronteira 0–5 e 0–4 para RISCO e PROTEÇÃO
+- [ ] exemplo Demandas: impressa 2,5 → final 3,125 / 5 → Situação Moderada
 - [ ] questões de comportamento ofensivo (qualitativo; não entram no cálculo final)
 
 ### Motor e qualidade

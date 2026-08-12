@@ -10,6 +10,7 @@ type DimensaoResultadoUi = {
   nome: string;
   media: number | null;
   mediaBruta?: number | null;
+  maxEscalaFinal?: 4 | 5;
   classificacao: {
     id: CopsoqClassificacaoResultadoId;
     label: string;
@@ -59,6 +60,15 @@ function badgeClass(id: CopsoqClassificacaoResultadoId): string {
 function formatMedia(media: number | null): string {
   if (media == null || Number.isNaN(media)) return "—";
   return media.toFixed(2).replace(".", ",");
+}
+
+function formatPontuacaoDimensao(
+  media: number | null,
+  max: number | undefined
+): string {
+  const m = formatMedia(media);
+  if (m === "—") return m;
+  return `${m} / ${max ?? 4}`;
 }
 
 function StatChip({
@@ -202,8 +212,8 @@ export function RiscosResultadosPanel({
                 <p className="text-sm font-semibold text-navy">{d.nome}</p>
                 <p className="text-[11px] text-[#64748b]">
                   {d.mediaBruta != null && d.mediaBruta !== d.media
-                    ? `Original ${formatMedia(d.mediaBruta)} · padronizada ${formatMedia(d.media)}`
-                    : `Padronizada ${formatMedia(d.media)}`}{" "}
+                    ? `Original ${formatMedia(d.mediaBruta)} · dimensão ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`
+                    : `Pontuação ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`}{" "}
                   · {d.respondentesValidos} respondente(s) válido(s)
                 </p>
               </div>

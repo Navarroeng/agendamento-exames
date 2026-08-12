@@ -113,13 +113,13 @@ export function RiscosRelatorioViewerModal({
         {!normalizado ? (
           <div className="riscos-relatorio-print-section rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
             <p className="font-extrabold">
-              Snapshot anterior à normalização de escalas
+              Snapshot anterior à metodologia atual de escalas
             </p>
             <p className="mt-1 text-xs leading-relaxed">
-              Este relatório foi gerado antes da equivalência de amplitudes
-              (escala comum 0–4). Médias e classificações exibidas são as do
-              momento da geração. Para aplicar a metodologia atual, um
-              administrador deve usar <strong>Regenerar</strong>.
+              Este relatório foi gerado antes da metodologia de classificação
+              do sistema (escalas finais 0–4 / 0–5). Médias e classificações
+              exibidas são as do momento da geração. Para aplicar a metodologia
+              atual, um administrador deve usar <strong>Regenerar</strong>.
             </p>
           </div>
         ) : null}

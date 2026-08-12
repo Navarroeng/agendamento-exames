@@ -74,7 +74,9 @@ run("TESTE 2: 1 sessão concluída → Demandas média 2,5", () => {
   assert.equal(temResultadosConcluidos(resultado), true);
   const demandas = resultado.dimensoes.find((d) => d.id === "demandas-trabalho");
   assert.ok(demandas);
-  assert.equal(demandas!.media, 2.5);
+  assert.equal(demandas!.media, 3.125);
+  assert.equal(demandas!.mediaBruta, 2.5);
+  assert.equal(demandas!.maxEscalaFinal, 5);
   assert.equal(demandas!.classificacao.id, "risco_intermediario");
   assert.equal(demandas!.respondentesValidos, 1);
   assert.equal(resultado.participacaoPercentual, 10); // 1/10
@@ -145,7 +147,9 @@ run("TESTE 4: Campanha A não recebe respostas da Campanha B", () => {
   });
   assert.equal(resultado.sessoesConcluidas, 1);
   const demandas = resultado.dimensoes.find((d) => d.id === "demandas-trabalho");
-  assert.equal(demandas!.media, 2.5);
+  assert.equal(demandas!.mediaBruta, 2.5);
+  assert.equal(demandas!.media, 3.125);
+  assert.equal(demandas!.maxEscalaFinal, 5);
 });
 
 // ---------------------------------------------------------------------------

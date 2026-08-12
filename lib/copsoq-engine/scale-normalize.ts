@@ -1,15 +1,9 @@
 /**
- * Normalização de amplitude de dimensão antes da classificação.
- *
- * Escala comum: 0–4 (amplitude impressa predominante no Formulário COPSOQ II-Br).
- * Justificativa técnica:
- * - Os cortes 2,33 / 3,66 já são aplicados no motor sobre essa métrica.
- * - Dimensões homogêneas 0–4 sofrem transformação identidade → mesmos resultados.
- * - 0–5 ou 0–100 exigiria remapeamento dos cortes ou mudaria as médias exibidas
- *   das dimensões 0–4 (maior impacto em radar/ranking/relatório).
+ * Amplitude efetiva das pontuações impressas (pós-inversão de pergunta).
+ * Usada pela conversão linear da metodologia do produto
+ * (`escala-produto.ts` → escalas finais 0–4 / 0–5).
  *
  * Não altera pontuações impressas do Formulário nem respostas gravadas.
- * Apenas torna equivalentes amplitudes distintas (ex.: 0–3 vs 0–4) antes das faixas.
  */
 
 import { getCopsoqEscala } from "@/lib/copsoq/escalas";
@@ -17,8 +11,9 @@ import type { CopsoqPergunta } from "@/lib/copsoq/types";
 import { perguntasCalculoDaDimensao } from "@/lib/copsoq-engine/dimensions";
 import { maxPontuacaoEscala } from "@/lib/copsoq-engine/score";
 
-/** Escala comum interna do motor (pré-classificação). */
+/** @deprecated Preferir escalas finais 0–4/0–5 em escala-produto.ts */
 export const COPSOQ_ESCALA_COMUM_MIN = 0;
+/** @deprecated Preferir escalas finais 0–4/0–5 em escala-produto.ts */
 export const COPSOQ_ESCALA_COMUM_MAX = 4;
 
 export function minPontuacaoEscala(pergunta: CopsoqPergunta): number {

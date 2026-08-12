@@ -1,24 +1,18 @@
 import type { CopsoqDimensao } from "@/lib/copsoq/types";
 import type { CopsoqClassificacaoResultado } from "@/lib/copsoq-engine/types";
+import {
+  escalaFinalDimensao,
+  type EscalaFinalProduto,
+} from "@/lib/copsoq-engine/escala-produto";
 
 /**
- * Classificação do produto (Riscos Psicossociais) — escala comum 0–4.
+ * Classificação — metodologia do produto (escalas finais 0–4 e 0–5).
+ * Ver docs/copsoq/METODOLOGIA-PRODUTO.md.
  *
- * Cortes oficiais do instrumento COPSOQ II-Br (Orientações: 2,33 / 3,66) foram
- * substituídos, por decisão de produto, pelos cortes 1,33 / 2,66 e pela
- * nomenclatura Situação Favorável / Moderada / Desfavorável.
- *
- * Ver docs/copsoq/METODOLOGIA-PRODUTO.md e REGRAS-DE-CALCULO.md.
- *
- * PROTEÇÃO (maior = melhor):
- *   > 2,66 Favorável | 1,34–2,66 Moderada | 0–1,33 Desfavorável
- *
- * RISCO (maior = pior):
- *   0–1,33 Favorável | 1,34–2,66 Moderada | > 2,66 Desfavorável
- *
- * IDs internos estáveis (compatibilidade de snapshot / filtros):
+ * IDs internos estáveis:
  *   situacao_favoravel | risco_intermediario (= Moderada) | risco_para_saude (= Desfavorável)
  */
+
 const CLASSIFICACOES = {
   situacao_favoravel: {
     id: "situacao_favoravel" as const,
@@ -46,18 +40,51 @@ export const CLASSIFICACAO_NAO_DEFINIDA: CopsoqClassificacaoResultado = {
   interpretacao: "Regra oficial insuficiente ou média indisponível",
 };
 
-/** Limites da metodologia do produto (escala comum 0–4). */
-export const COPSOQ_FAIXA_BAIXA_MAX = 1.33;
-export const COPSOQ_FAIXA_MEDIA_MIN = 1.34;
-export const COPSOQ_FAIXA_MEDIA_MAX = 2.66;
+/** Faixas na escala final 0–5 (perguntas com 5 alternativas). */
+export const FAIXA_ESCALA_5 = {
+  /** PROTEÇÃO Favorável: ≥ 3,50; RISCO Desfavorável: ≥ 3,50 */
+  altoMin: 3.5,
+  /** PROTEÇÃO Moderada: ≥ 2,00; RISCO Moderada: ≥ 2,00 */
+  medioMin: 2.0,
+  /** RISCO Favorável: ≤ 1,99; PROTEÇÃO Desfavorável: ≤ 1,99 */
+  baixoMax: 1.99,
+} as const;
+
+/** Faixas na escala final 0–4 (perguntas com 4 alternativas). */
+export const FAIXA_ESCALA_4 = {
+  altoMin: 2.8,
+  medioMin: 1.6,
+  baixoMax: 1.59,
+} as const;
+
+/** @deprecated Use FAIXA_ESCALA_4 / FAIXA_ESCALA_5. Mantido só para imports legados. */
+export const COPSOQ_FAIXA_BAIXA_MAX = FAIXA_ESCALA_4.baixoMax;
+export const COPSOQ_FAIXA_MEDIA_MIN = FAIXA_ESCALA_4.medioMin;
+export const COPSOQ_FAIXA_MEDIA_MAX = FAIXA_ESCALA_4.altoMin;
+
+function classificarNaEscala(
+  tipo: CopsoqDimensao["tipo"],
+  media: number,
+  faixa: { altoMin: number; medioMin: number; baixoMax: number }
+): CopsoqClassificacaoResultado {
+  if (tipo === "RISCO") {
+    if (media <= faixa.baixoMax) return CLASSIFICACOES.situacao_favoravel;
+    if (media < faixa.altoMin) return CLASSIFICACOES.risco_intermediario;
+    return CLASSIFICACOES.risco_para_saude;
+  }
+  // PROTEÇÃO
+  if (media >= faixa.altoMin) return CLASSIFICACOES.situacao_favoravel;
+  if (media >= faixa.medioMin) return CLASSIFICACOES.risco_intermediario;
+  return CLASSIFICACOES.risco_para_saude;
+}
 
 /**
- * Classifica a média da dimensão (já normalizada 0–4) conforme tipo RISCO/PROTEÇÃO.
- * Se a dimensão não entra no cálculo quantitativo, não classifica.
+ * Classifica a média da dimensão na escala final do produto (0–4 ou 0–5).
  */
 export function classificarMediaDimensao(
   dimensao: CopsoqDimensao,
-  media: number | null
+  media: number | null,
+  escalaFinal?: EscalaFinalProduto
 ): CopsoqClassificacaoResultado {
   if (!dimensao.entraNoCalculo) {
     return {
@@ -73,14 +100,10 @@ export function classificarMediaDimensao(
     };
   }
 
-  if (dimensao.tipo === "RISCO") {
-    if (media <= COPSOQ_FAIXA_BAIXA_MAX) return CLASSIFICACOES.situacao_favoravel;
-    if (media <= COPSOQ_FAIXA_MEDIA_MAX) return CLASSIFICACOES.risco_intermediario;
-    return CLASSIFICACOES.risco_para_saude;
-  }
+  const escala =
+    escalaFinal ??
+    (dimensao.id ? escalaFinalDimensao(dimensao.id) : (4 as EscalaFinalProduto));
 
-  // PROTEÇÃO — faixas invertidas (maior pontuação = melhor)
-  if (media > COPSOQ_FAIXA_MEDIA_MAX) return CLASSIFICACOES.situacao_favoravel;
-  if (media >= COPSOQ_FAIXA_MEDIA_MIN) return CLASSIFICACOES.risco_intermediario;
-  return CLASSIFICACOES.risco_para_saude;
+  const faixa = escala === 5 ? FAIXA_ESCALA_5 : FAIXA_ESCALA_4;
+  return classificarNaEscala(dimensao.tipo, media, faixa);
 }

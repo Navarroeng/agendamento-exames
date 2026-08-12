@@ -37,9 +37,9 @@ export function RelatorioRadarChart({
           Panorama das dimensões
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Cada eixo usa a pontuação padronizada da dimensão (escala comum 0–4),
-          a mesma da classificação. Valores maiores em risco indicam maior
-          exposição; em proteção, maior recurso.
+          Cada eixo usa favorabilidade relativa (0–1), comparável entre
+          dimensões em escala 0–4 e 0–5. O tooltip exibe a pontuação técnica
+          real da dimensão.
         </p>
       </div>
 
@@ -54,12 +54,12 @@ export function RelatorioRadarChart({
               />
               <PolarRadiusAxis
                 angle={30}
-                domain={[0, 4]}
+                domain={[0, 1]}
                 tick={{ fill: "#94a3b8", fontSize: 10 }}
                 axisLine={false}
               />
               <Radar
-                name="Padronizada"
+                name="Favorabilidade"
                 dataKey="media"
                 stroke="#4f63ff"
                 fill="#4f63ff"
@@ -67,12 +67,22 @@ export function RelatorioRadarChart({
                 strokeWidth={2}
               />
               <Tooltip
-                formatter={(value) => [
-                  typeof value === "number"
-                    ? value.toFixed(2).replace(".", ",")
-                    : String(value ?? "—"),
-                  "Padronizada",
-                ]}
+                formatter={(_value, _name, item) => {
+                  const row = item?.payload as
+                    | {
+                        pontuacaoTecnica?: number;
+                        maxEscala?: number;
+                      }
+                    | undefined;
+                  const tec = row?.pontuacaoTecnica;
+                  const max = row?.maxEscala ?? 4;
+                  return [
+                    tec == null
+                      ? "—"
+                      : `${tec.toFixed(2).replace(".", ",")} / ${max}`,
+                    "Pontuação",
+                  ];
+                }}
                 labelFormatter={(_, payload) => {
                   const row = payload?.[0]?.payload as
                     | { nomeCompleto?: string }

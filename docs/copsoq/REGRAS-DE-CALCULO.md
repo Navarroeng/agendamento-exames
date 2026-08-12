@@ -30,8 +30,9 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
 | `lib/copsoq-engine/score.ts` | Pontuação efetiva (inclui inversão configurável) |
 | `lib/copsoq-engine/normalization.ts` | Normalização de chave de alternativa |
 | `lib/copsoq-engine/dimensions.ts` | Média individual e média geral por dimensão |
-| `lib/copsoq-engine/scale-normalize.ts` | Normalização de amplitude → escala comum 0–4 |
-| `lib/copsoq-engine/classification.ts` | Faixas do produto 1,33 / 2,66 (RISCO e PROTEÇÃO) |
+| `lib/copsoq-engine/scale-normalize.ts` | Amplitude efetiva das pontuações impressas (pós-inversão) |
+| `lib/copsoq-engine/escala-produto.ts` | Conversão linear → escalas finais 0–4 / 0–5 |
+| `lib/copsoq-engine/classification.ts` | Faixas do produto por escala (RISCO e PROTEÇÃO) |
 | `lib/copsoq-engine/statistics.ts` | Cobertura e participação operacional |
 | `lib/copsoq-engine/interpreter.ts` | Orquestra campanha → resultado |
 
@@ -54,11 +55,11 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
    - Selecionar perguntas da dimensão que entram no cálculo.
    - Pontuar cada resposta (`pontuarAlternativa` / por id).
    - Se `pontuacaoInvertida` (ex.: 1B): pontuação efetiva = `maxEscala − pontuação impressa da alternativa na escala base`.
-   - **Média individual** = soma das pontuações ÷ número de perguntas da dimensão (só se o conjunto estiver completo para aquele respondente, conforme regras de cobertura do código).
-   - **Média geral bruta** = média das médias individuais válidas (escala impressa do Formulário).
-   - **Normalização de amplitude** (`normalizarPontuacao`): mapeia a média bruta para a **escala comum 0–4** do motor, usando min/max possíveis da dimensão (derivados automaticamente das escalas das perguntas). Dimensões já 0–4 sofrem identidade.
-   - **Classificar** a média **já normalizada** conforme tipo RISCO ou PROTEÇÃO (cortes do produto **1,33 / 2,66** — ver `METODOLOGIA-PRODUTO.md`).
-   - Saída: `media` = normalizada (consumida por radar/ranking/relatório); `mediaBruta` = média impressa (auditoria).
+   - **Converter** cada pontuação efetiva para a escala final da pergunta (0–5 se 5 alternativas; 0–4 se 4 alternativas) — `escala-produto.ts`.
+   - **Média individual final** = soma das pontuações convertidas ÷ número de perguntas da dimensão (só se o conjunto estiver completo).
+   - **Média geral** = média das médias individuais finais; `mediaBruta` = média nas pontuações impressas (auditoria).
+   - **Classificar** a média final conforme tipo RISCO ou PROTEÇÃO e faixas da escala da dimensão (`METODOLOGIA-PRODUTO.md`).
+   - Saída: `media` = escala final; `maxEscalaFinal` = 4 ou 5; `mediaBruta` = impressa.
 3. Dimensão **Comportamentos ofensivos**:
    - Não entra no cálculo quantitativo (`entraNoCalculo: false`).
    - Saída apenas qualitativa (frequências), sem média/classificação quantitativa.
@@ -87,26 +88,26 @@ Entrada tipica da campanha: `interpretarCampanhaCopsoq({ respondentes, baseParti
 
 | Regra | Referência |
 |-------|------------|
-| Cortes **1,33 / 2,66** e rótulos Situação Favorável / Moderada / Desfavorável | `METODOLOGIA-PRODUTO.md` |
+| Escalas finais **0–5** (5 alternativas) e **0–4** (4 alternativas), com conversão linear a partir das pontuações impressas | `METODOLOGIA-PRODUTO.md` |
+| Rótulos: Situação Favorável / Moderada / Desfavorável | `METODOLOGIA-PRODUTO.md` |
 | PROTEÇÃO: faixas invertidas em relação a RISCO | `METODOLOGIA-PRODUTO.md` |
-| Exemplo Demandas (Orientações): média 2,43 → no produto classifica-se como **Situação Moderada** (faixa 1,34–2,66) | Produto + exemplo de média das Orientações |
+| Exemplo Demandas: média impressa 2,5 → convertida 3,125 / 5 → Situação Moderada | Produto |
 
-Os cortes oficiais 2,33 / 3,66 e os rótulos “Risco Intermediário” / “Risco para a Saúde” permanecem documentados em `ORIENTACOES-OFICIAIS.md` como referência do instrumento, **não** como regra ativa do motor.
+Os cortes oficiais 2,33 / 3,66 e os rótulos “Risco Intermediário” / “Risco para a Saúde” permanecem documentados em `ORIENTACOES-OFICIAIS.md` como referência do instrumento, **não** como regra ativa do motor. Cortes antigos do produto (1,33 / 2,66) também foram **substituídos**.
 
 ---
 
-## Normalização de amplitude (motor — equivalência matemática)
+## Escalas finais do produto (motor)
 
 **Não altera o instrumento.** Perguntas, alternativas e pontuações impressas permanecem as do Formulário.
 
 | Decisão | Justificativa técnica |
 |---------|----------------------|
-| Escala comum **0–4** | Amplitude predominante no Formulário; classificação do produto opera nessa métrica. |
-| Não usar 0–5 | Exigiria remapeamento dos cortes e mudaria médias exibidas das dimensões 0–4. |
-| Não usar 0–100 | Mesmo problema de impacto + divergência da escala dos cortes. |
-| Fórmula | `mediaComum = (mediaBruta − min) / (max − min) × 4` (min/max da dimensão, genéricos). |
-| Dimensões 0–4 | Identidade: `media === mediaBruta` → mesmos resultados de antes da normalização. |
-| Dimensões 0–3 (ex.: Interface, Conflitos) | Extremos passam a alcançar Favorável / Desfavorável quando a resposta é o extremo impresso. |
+| 5 alternativas impressas **0–4** → escala final **0–5** | Conversão linear por pergunta após inversão |
+| 4 alternativas impressas **0–3** → escala final **0–4** | Conversão linear por pergunta após inversão |
+| Fórmula | `(valor − min) / (max − min) × maxDest` |
+| Média da dimensão | Média aritmética das perguntas **já convertidas** ÷ nº de perguntas válidas |
+| Dimensão com escalas mistas | **Proibido** — o motor lança erro (nenhuma mistura no instrumento atual) |
 
 Snapshots antigos de relatório **não** são recalculados até “Regenerar Relatório”.
 
@@ -116,11 +117,11 @@ Snapshots antigos de relatório **não** são recalculados até “Regenerar Rel
 
 | Tema | Status no motor |
 |------|-----------------|
-| Conversão item a item 0–4 ↔ 1–5 / “Intervalo (0 a 5)” (Orientações) | **Não convertida** nas alternativas. Pontuações do Formulário são preservadas; só a média da dimensão é reescalada para 0–4 antes dos cortes. |
+| Conversão “Intervalo (0 a 5)” das Orientações | O **produto** converte 0–4→0–5 e 0–3→0–4 por metodologia própria (`METODOLOGIA-PRODUTO.md`), **não** como regra oficial do instrumento |
 | Risco geral agregado entre dimensões | **null** (`riscoGeral`) |
 | Escore padronizado | **null** (`escorePadronizado`) |
 | Fórmula oficial única de “pontuação geral” além das médias por dimensão | Não definida; ofensivos explicitamente fora |
-| Renormalização das alternativas para escala 0–5 | Proibida (instrumento intacto). A normalização 0–4 do motor é só equivalência de amplitude pré-classificação. |
+| Alterar pontuações impressas do Formulário | Proibida |
 
 Documentadas também em `COPSOQ_ENGINE_DIVERGENCIAS` (`lib/copsoq-engine/types.ts`).
 
@@ -138,11 +139,12 @@ Documentadas também em `COPSOQ_ENGINE_DIVERGENCIAS` (`lib/copsoq-engine/types.t
 ## Pontos que jamais devem ser implementados por aproximação
 
 1. Inventar “risco geral” ou ranking único entre dimensões.
-2. Converter alternativas 0–4 → 1–5 (ou o inverso) sem texto oficial; não confundir com a normalização de amplitude 0–4 do motor.
+2. Converter alternativas impressas do Formulário sem base oficial; a conversão linear 0–4→0–5 / 0–3→0–4 é **metodologia do produto**, não regra do instrumento.
 3. Incluir Comportamentos ofensivos na média/classificação quantitativa.
 4. Alterar textos, alternativas ou pontuações do Formulário para “combinar” com trechos 1–5 das Orientações.
 5. Criar interstícios de dimensão que não existem no Formulário (ver `lib/copsoq/intersticiais.ts`).
 6. Expor respostas individuais nominais em dashboards/resultados.
+7. Harmonizar silenciosamente dimensões que misturem escalas finais 0–4 e 0–5.
 
 ---
 

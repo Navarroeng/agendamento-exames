@@ -72,7 +72,7 @@ run("análise de dimensão cobre os 4 blocos técnicos", () => {
   assert.ok(a.recomendacoes.length >= 3);
 });
 
-run("texto com normalização menciona pontuação padronizada", () => {
+run("texto com escala final menciona pontuação da dimensão", () => {
   const iface = dim({
     id: "interface-trabalho-individuo",
     nome: "Interface trabalho-indivíduo",
@@ -86,7 +86,7 @@ run("texto com normalização menciona pontuação padronizada", () => {
   });
   const t = textoResultadoEncontrado(iface);
   assert.match(t, /pontuação original 3,00 \/ 3/i);
-  assert.match(t, /pontuação padronizada 4,00 \/ 4/i);
+  assert.match(t, /pontuação da dimensão 4,00 \/ 4/i);
   assert.match(t, /Situação Favorável/);
 });
 

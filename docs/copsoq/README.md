@@ -56,13 +56,14 @@ deve **consultar primeiro** os arquivos desta pasta (`docs/copsoq/`), nesta orde
 |---------|----------|
 | [FORMULARIO-OFICIAL.md](./FORMULARIO-OFICIAL.md) | Instrumento completo (40 itens, escalas, textos intermediários) |
 | [ORIENTACOES-OFICIAIS.md](./ORIENTACOES-OFICIAIS.md) | Dimensões, cálculo, faixas oficiais do instrumento e observações |
-| [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md) | **Metodologia de classificação adotada pelo produto** (cortes 1,33 / 2,66) |
+| [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md) | **Metodologia de classificação adotada pelo produto** (escalas finais 0–4 / 0–5) |
 | [REGRAS-DE-CALCULO.md](./REGRAS-DE-CALCULO.md) | Documentação técnica do motor do projeto |
 | [CHECKLIST-DE-VALIDACAO.md](./CHECKLIST-DE-VALIDACAO.md) | Checklist obrigatório antes de qualquer mudança |
 | [fonte-oficial/](./fonte-oficial/) | PDFs e textos oficiais incorporados ao repositório |
 
 ## Nota sobre classificação
 
-As Orientações oficiais descrevem faixas 2,33 / 3,66 (Risco Intermediário / Risco para a Saúde).  
-O **produto** adota a metodologia documentada em [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md).  
-Não misturar as duas nomenclaturas/cortes na implementação.
+As Orientações oficiais descrevem faixas 2,33 / 3,66.  
+O **produto** adota a metodologia em [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md):
+escalas finais **0–5** (5 alternativas) e **0–4** (4 alternativas), com conversão linear a partir das pontuações impressas do Formulário.  
+Não misturar cortes/nomenclaturas do instrumento com a metodologia do sistema.
