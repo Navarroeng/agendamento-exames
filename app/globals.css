@@ -189,23 +189,50 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   max-width: 100%;
   min-height: 297mm;
   box-sizing: border-box;
-  padding: 16mm;
+  padding: 0;
   background: #fff;
 }
 
+/* Capa ocupa a área útil da 1ª página no viewer */
 .relatorio-a4-capa {
-  min-height: calc(297mm - 32mm);
   box-sizing: border-box;
+  min-height: 297mm;
 }
 
-.relatorio-a4-rodape {
-  margin-top: 24px;
+.relatorio-capa-folha {
+  min-height: 297mm;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.relatorio-a4-conteudo {
+  box-sizing: border-box;
+  padding: 14mm 16mm 18mm;
+}
+
+/* Rodapé interno — só no print (páginas 2+) */
+.relatorio-print-footer-interno {
+  display: none;
 }
 
 @media print {
   @page {
     size: A4;
+    margin: 14mm 16mm 18mm 16mm;
+    @bottom-center {
+      content: "Navarro Engenharia de Segurança e Medicina Ocupacional · Relatório de Avaliação dos Riscos Psicossociais · Página " counter(page);
+      font-size: 7.5pt;
+      color: #64748b;
+    }
+  }
+
+  /* Capa: página inteira sem margem / sem rodapé @page */
+  @page :first {
     margin: 0;
+    @bottom-center {
+      content: none;
+    }
   }
 
   body.riscos-relatorio-printing {
@@ -214,7 +241,6 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
-  /* Oculta tudo e revela só a folha A4 (mesmo DOM do modal). */
   body.riscos-relatorio-printing * {
     visibility: hidden !important;
   }
@@ -229,7 +255,6 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     visibility: hidden !important;
   }
 
-  /* Chrome do modal / visualizador — fora do PDF */
   body.riscos-relatorio-printing .riscos-relatorio-print-shell,
   body.riscos-relatorio-printing .riscos-relatorio-print-dialog,
   body.riscos-relatorio-printing .riscos-relatorio-print-body,
@@ -259,26 +284,45 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     min-height: auto !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 16mm !important;
+    padding: 0 !important;
     overflow: visible !important;
     background: #fff !important;
     box-shadow: none !important;
     border-radius: 0 !important;
   }
 
-  /* Capa = página 1 */
+  /* Página 1 — capa completa, fundo sólido estável */
   body.riscos-relatorio-printing .relatorio-a4-capa {
-    min-height: calc(297mm - 32mm);
+    height: 297mm;
+    max-height: 297mm;
+    min-height: 297mm;
+    overflow: hidden;
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  /* Unidades atômicas — sem forçar paginação artificial de tudo */
-  body.riscos-relatorio-printing .riscos-relatorio-print-section,
+  body.riscos-relatorio-printing .relatorio-capa-folha {
+    height: 297mm !important;
+    max-height: 297mm !important;
+    min-height: 297mm !important;
+    overflow: hidden !important;
+    background-color: #0b1f4d !important;
+    background-image: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-a4-conteudo {
+    padding: 0 !important; /* margens vêm do @page */
+  }
+
+  /*
+   * Quebras: só unidades atômicas (card / gráfico / linha).
+   * NÃO evitar quebra em seções inteiras — isso gerava páginas vazias.
+   */
   body.riscos-relatorio-printing .riscos-relatorio-print-card,
-  body.riscos-relatorio-printing .riscos-relatorio-print-chart,
   body.riscos-relatorio-printing .relatorio-colunas-bloco,
   body.riscos-relatorio-printing .relatorio-barra-row {
     break-inside: avoid;
@@ -289,12 +333,82 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-barra-badge,
   body.riscos-relatorio-printing .relatorio-coluna-fill,
   body.riscos-relatorio-printing .relatorio-coluna-legenda-linha {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  body.riscos-relatorio-printing .relatorio-panorama-grid .riscos-relatorio-print-card {
-    box-shadow: none !important;
+  body.riscos-relatorio-printing .relatorio-panorama-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /*
+   * Rodapé nas páginas internas (fallback Chromium).
+   * position:fixed repete em todas as páginas — máscara sólida na capa
+   * cobre o rodapé na página 1. Engines com @page margin boxes usam o
+   * @bottom-center acima (capa sem conteúdo).
+   */
+  body.riscos-relatorio-printing .relatorio-print-footer-interno {
+    display: block !important;
+    visibility: visible !important;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 5mm;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  body.riscos-relatorio-printing .relatorio-print-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border-top: 1px solid #e2e8f0;
+    margin: 0 16mm;
+    padding-top: 2.5mm;
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+    background: #fff;
+  }
+
+  body.riscos-relatorio-printing .relatorio-print-footer-sep {
+    color: #cbd5e1;
+  }
+
+  body.riscos-relatorio-printing .relatorio-print-page-num::after {
+    content: "Página " counter(page);
+  }
+
+  /* Cobre o rodapé fixo na página 1 (fundo sólido = estável no PDF) */
+  body.riscos-relatorio-printing .relatorio-capa-print-mask {
+    display: block !important;
+    visibility: visible !important;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 18mm;
+    background-color: #0b1f4d !important;
+    background-image: none !important;
+    z-index: 100;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-analise {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
   }
 
   body.riscos-relatorio-printing table {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 import { analisarDimensao } from "@/lib/riscos-relatorio-conteudo";
 import {
@@ -11,142 +10,111 @@ import {
   snapshotTemNormalizacao,
 } from "@/lib/riscos-relatorio-view";
 
-function orientacaoLeituraPorTipo(tipo: string): string {
-  const t = String(tipo).toUpperCase();
-  if (t === "RISCO") {
-    return "Quanto menor a pontuação, melhor a condição avaliada.";
-  }
-  return "Quanto maior a pontuação, melhor a condição avaliada.";
+function truncateText(texto: string, max: number): string {
+  const t = texto.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
 function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
-  const [open, setOpen] = useState(true);
   const cor = corPorClassificacaoId(d.classificacaoId);
   const bg = bgSuavePorClassificacaoId(d.classificacaoId);
   const analise = analisarDimensao(d);
   const comNorm = snapshotTemNormalizacao(d);
-  const orientacao = orientacaoLeituraPorTipo(d.tipo);
+  const pontuacao = comNorm
+    ? formatPontuacaoComMaximo(
+        d.media,
+        d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
+      )
+    : formatMediaRelatorio(d.media);
+  const tipoLabel =
+    String(d.tipo).toUpperCase() === "RISCO" ? "RISCO" : "PROTEÇÃO";
 
   return (
     <article
-      className="riscos-relatorio-print-card rounded-2xl border border-[#e8edf5] bg-white shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.07)]"
-      style={{ borderTopColor: cor, borderTopWidth: 3 }}
+      className="riscos-relatorio-print-card overflow-hidden rounded-xl border border-[#e8edf5] bg-white"
+      style={{
+        borderTopColor: cor,
+        borderTopWidth: 3,
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}
     >
-      <div className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-extrabold text-navy sm:text-[15px]">
-              {d.nome}
-            </h4>
-            <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-app-muted">
-              {d.tipo}
-            </p>
-          </div>
-          <span
-            className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold text-white"
-            style={{ backgroundColor: cor }}
-          >
-            {d.classificacaoLabel}
-          </span>
+      {/* Cabeçalho */}
+      <div className="flex flex-wrap items-start justify-between gap-2 px-3.5 py-2.5">
+        <div className="min-w-0 flex-1">
+          <h4 className="text-[13px] font-extrabold leading-snug text-navy">
+            {d.nome}
+          </h4>
+          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            {tipoLabel}
+          </p>
         </div>
-
-        {comNorm ? (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
-              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Pontuação
-              </p>
-              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {formatPontuacaoComMaximo(
-                  d.media,
-                  d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
-                )}
-              </p>
-              <p className="mt-1 text-[10px] leading-snug text-[#94a3b8]">
-                {orientacao}
-              </p>
-            </div>
-            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Respondentes válidos
-              </p>
-              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {d.respondentesValidos}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
-              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Pontuação
-              </p>
-              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {formatMediaRelatorio(d.media)}
-              </p>
-              <p className="mt-1 text-[10px] leading-snug text-[#94a3b8]">
-                {orientacao}
-              </p>
-            </div>
-            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                Respondentes válidos
-              </p>
-              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-                {d.respondentesValidos}
-              </p>
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="mt-3 w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-navy transition hover:border-brand-blue hover:bg-brand-blue-soft hover:text-brand-blue riscos-relatorio-print-hide"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
+        <span
+          className="inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[9px] font-extrabold text-white"
+          style={{ backgroundColor: cor }}
         >
-          {open ? "Ocultar análise" : "Ver análise"}
-        </button>
+          {d.classificacaoLabel}
+        </span>
       </div>
 
-      {open ? (
-        <div className="space-y-3 border-t border-[#eef2f7] bg-[#fbfcfe] px-4 py-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              O que esta categoria avalia
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-navy">
-              {analise.oQueAvalia}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Resultado encontrado
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-navy">
-              {analise.resultadoEncontrado}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Possíveis impactos
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-navy">
-              {analise.possiveisImpactos}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Recomendações
-            </p>
-            <ul className="mt-1 space-y-1 text-xs leading-relaxed text-navy">
-              {analise.recomendacoes.map((r) => (
-                <li key={r}>• {r}</li>
-              ))}
-            </ul>
-          </div>
+      {/* Métricas */}
+      <div className="grid grid-cols-2 gap-2 border-t border-[#eef2f7] px-3.5 py-2">
+        <div className="rounded-lg px-2.5 py-1.5" style={{ backgroundColor: bg }}>
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            Pontuação
+          </p>
+          <p className="text-sm font-extrabold tabular-nums text-navy">
+            {pontuacao}
+          </p>
         </div>
-      ) : null}
+        <div className="rounded-lg bg-[#f8fafc] px-2.5 py-1.5">
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            Respondentes
+          </p>
+          <p className="text-sm font-extrabold tabular-nums text-navy">
+            {d.respondentesValidos}
+          </p>
+        </div>
+      </div>
+
+      {/* Análise em grid 2×2 — layout horizontal compacto */}
+      <div className="relatorio-dimensoes-analise grid grid-cols-2 border-t border-[#eef2f7]">
+        <div className="border-b border-r border-[#eef2f7] px-3 py-2">
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            O que avalia
+          </p>
+          <p className="mt-0.5 text-[10px] leading-snug text-navy">
+            {truncateText(analise.oQueAvalia, 160)}
+          </p>
+        </div>
+        <div className="border-b border-[#eef2f7] px-3 py-2">
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            Resultado encontrado
+          </p>
+          <p className="mt-0.5 text-[10px] leading-snug text-navy">
+            {truncateText(analise.resultadoEncontrado, 180)}
+          </p>
+        </div>
+        <div className="border-r border-[#eef2f7] px-3 py-2">
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            Possíveis impactos
+          </p>
+          <p className="mt-0.5 text-[10px] leading-snug text-navy">
+            {truncateText(analise.possiveisImpactos, 160)}
+          </p>
+        </div>
+        <div className="px-3 py-2">
+          <p className="text-[8px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            Recomendações
+          </p>
+          <ul className="mt-0.5 space-y-0.5 text-[10px] leading-snug text-navy">
+            {analise.recomendacoes.slice(0, 3).map((r) => (
+              <li key={r}>• {truncateText(r, 100)}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </article>
   );
 }
@@ -160,21 +128,19 @@ export function RelatorioDimensoesCards({
 
   return (
     <section>
-      <div className="mb-4">
+      <div className="mb-3">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
           Detalhamento
         </p>
-        <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
+        <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
           Categorias COPSOQ
         </h3>
-        <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Cada categoria apresenta a pontuação média obtida pelos participantes,
-          respeitando a escala original do instrumento (0–3 ou 0–4). A
-          classificação considera a metodologia adotada pelo sistema para cada
-          categoria.
+        <p className="mt-0.5 text-xs text-app-muted">
+          Análise técnica por categoria — pontuação na escala impressa e
+          classificação do sistema.
         </p>
       </div>
-      <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="relatorio-dimensoes-grid grid grid-cols-1 gap-3">
         {list.map((d) => (
           <DimensaoCard key={d.id} d={d} />
         ))}

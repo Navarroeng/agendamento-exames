@@ -8,6 +8,7 @@ import {
   rankingGeralPorFavorabilidade,
   valorVisualBarraDimensao,
 } from "@/lib/riscos-relatorio-view";
+import { RelatorioLegendaCores } from "@/components/riscos-psicossociais/relatorio/RelatorioLegendaCores";
 
 function labelTipo(tipo: string): string {
   return String(tipo).toUpperCase() === "RISCO" ? "RISCO" : "PROTEÇÃO";
@@ -141,20 +142,23 @@ export function RelatorioRanking({
 
   return (
     <section>
-      <div className="mb-4">
+      <div className="mb-3">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
           Priorização
         </p>
-        <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
+        <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
           Ranking Geral das Categorias
         </h3>
-        <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
+        <p className="mt-0.5 max-w-2xl text-xs text-app-muted">
           Ordenação automática considerando a favorabilidade da categoria,
           respeitando se a categoria é de RISCO ou PROTEÇÃO.
         </p>
+        <div className="mt-2">
+          <RelatorioLegendaCores />
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-[#e8edf5] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="overflow-hidden rounded-xl border border-[#e8edf5] bg-white">
         <ol className="relatorio-barras-lista">
           {ranking.map((d, idx) => (
             <RankingLinha key={d.id} d={d} posicao={idx + 1} />

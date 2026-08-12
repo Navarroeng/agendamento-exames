@@ -39,21 +39,23 @@ function CardMetric({
 
   return (
     <div
-      className={`rounded-2xl border px-4 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ${tones[tone]}`}
+      className={`rounded-xl border px-3 py-2.5 ${tones[tone]}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
             {label}
           </p>
-          <p className="mt-2 text-2xl font-extrabold tabular-nums text-navy sm:text-[1.65rem]">
+          <p className="mt-1 text-lg font-extrabold tabular-nums text-navy">
             {value}
           </p>
           {hint ? (
-            <p className="mt-1.5 text-xs leading-snug text-app-muted">{hint}</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-app-muted line-clamp-2">
+              {hint}
+            </p>
           ) : null}
         </div>
-        <div className="rounded-xl bg-white/80 p-2 text-navy shadow-sm ring-1 ring-[#e8edf5]">
+        <div className="rounded-lg bg-white/80 p-1.5 text-navy ring-1 ring-[#e8edf5]">
           {icon}
         </div>
       </div>
@@ -112,19 +114,17 @@ export function RelatorioResumoExecutivo({
 
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
-            Visão executiva
-          </p>
-          <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-            Objetivo
-          </h3>
-        </div>
+      <div className="mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
+          Visão executiva
+        </p>
+        <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
+          Objetivo
+        </h3>
       </div>
 
-      <div className="mb-4 rounded-3xl border border-[#e8edf5] bg-gradient-to-br from-[#f8fafc] to-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="space-y-3 text-sm leading-relaxed text-navy">
+      <div className="mb-3 rounded-xl border border-[#e8edf5] bg-[#f8fafc] p-3.5">
+        <div className="space-y-2 text-[12px] leading-relaxed text-navy">
           <p>
             O presente relatório apresenta os resultados da Avaliação de Riscos
             Psicossociais da organização <strong>{empresa}</strong> (campanha{" "}
@@ -158,27 +158,27 @@ export function RelatorioResumoExecutivo({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <CardMetric
           label="Participação"
           value={formatTaxaParticipacao(
             resumo?.participacaoPercentual ?? capa?.taxaParticipacao
           )}
           hint={`${capa?.respondentes ?? 0} de ${capa?.participantes ?? 0} concluíram`}
-          icon={<IconChart size={18} />}
+          icon={<IconChart size={16} />}
           tone="info"
         />
         <CardMetric
           label="Respondentes"
           value={capa?.respondentes ?? relatorio.respondentes ?? 0}
           hint="Sessões concluídas válidas"
-          icon={<IconUsers size={18} />}
+          icon={<IconUsers size={16} />}
         />
         <CardMetric
           label="Categorias avaliadas"
           value={resumo?.quantidadeDimensoes ?? 0}
           hint="Categorias COPSOQ no cálculo"
-          icon={<IconChecklist size={18} />}
+          icon={<IconChecklist size={16} />}
         />
         <CardMetric
           label="Categorias em atenção"
@@ -188,14 +188,14 @@ export function RelatorioResumoExecutivo({
               ? "Moderada ou Desfavorável"
               : "Nenhuma categoria em atenção"
           }
-          icon={<IconShield size={18} />}
+          icon={<IconShield size={16} />}
           tone={atencaoTone}
         />
         <CardMetric
           label="Status geral"
           value={status.label}
           hint={status.mensagem}
-          icon={<IconShield size={18} />}
+          icon={<IconShield size={16} />}
           tone={statusTone}
         />
       </div>

@@ -34,23 +34,21 @@ function GraficoColunasGrupo({
 
   return (
     <section className="relatorio-colunas-bloco riscos-relatorio-print-card">
-      <div className="mb-5">
+      <div className="mb-3">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
           Comparativo
         </p>
-        <h3 className="mt-1 text-base font-extrabold uppercase tracking-wide text-navy sm:text-lg">
+        <h3 className="mt-1 text-base font-extrabold uppercase tracking-wide text-navy">
           {titulo}
         </h3>
-        <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
-          {subtitulo}
-        </p>
+        <p className="mt-0.5 max-w-2xl text-xs text-app-muted">{subtitulo}</p>
       </div>
 
-      <div className="rounded-3xl border border-[#e8edf5] bg-white px-3 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] sm:px-6 sm:py-6">
+      <div className="rounded-xl border border-[#e8edf5] bg-white px-3 py-4 sm:px-5 sm:py-5">
         {/* Área do gráfico */}
         <div className="relatorio-colunas-area flex gap-2 sm:gap-3">
           {/* Eixo Y */}
-          <div className="relative flex h-52 w-7 shrink-0 flex-col justify-between sm:h-60 sm:w-8">
+          <div className="relative flex h-48 w-7 shrink-0 flex-col justify-between sm:h-52 sm:w-8">
             {[...ticks].reverse().map((t) => (
               <span
                 key={t}
@@ -75,7 +73,7 @@ function GraficoColunasGrupo({
               ))}
             </div>
 
-            <div className="relative flex h-52 items-end justify-around gap-1 px-1 sm:h-60 sm:gap-2 sm:px-2">
+            <div className="relative flex h-48 items-end justify-around gap-1 px-1 sm:h-52 sm:gap-2 sm:px-2">
               {itens.map((item) => (
                 <ColunaVertical
                   key={item.id}
@@ -87,21 +85,21 @@ function GraficoColunasGrupo({
           </div>
         </div>
 
-        {/* Legenda */}
-        <ul className="relatorio-colunas-legenda mt-6 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-[#eef2f7] pt-5 sm:grid-cols-2">
+        {/* Legenda — permanece no mesmo bloco (break-inside: avoid) */}
+        <ul className="relatorio-colunas-legenda mt-4 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t border-[#eef2f7] pt-3 sm:grid-cols-2">
           {itens.map((item) => (
             <li key={item.id} className="min-w-0">
-              <p className="text-[13px] font-extrabold leading-snug text-navy">
+              <p className="text-[12px] font-extrabold leading-snug text-navy">
                 {item.nome}
               </p>
               <div
-                className="relatorio-coluna-legenda-linha mt-1.5 h-1 w-full max-w-[11rem] rounded-full"
+                className="relatorio-coluna-legenda-linha mt-1 h-1 w-full max-w-[10rem] rounded-full"
                 style={{ backgroundColor: item.cor }}
                 aria-hidden
               />
-              <p className="mt-1.5 text-sm font-extrabold tabular-nums text-navy">
+              <p className="mt-1 text-[13px] font-extrabold tabular-nums text-navy">
                 {formatPontuacaoComMaximo(item.media, item.maxEscala)}
-                <span className="ml-1.5 text-[11px] font-semibold text-[#64748b]">
+                <span className="ml-1.5 text-[10px] font-semibold text-[#64748b]">
                   · {item.classificacaoLabel}
                 </span>
               </p>
@@ -159,16 +157,16 @@ export function RelatorioBarrasChart({
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <GraficoColunasGrupo
         titulo="Gráfico de pontuações para categorias positivas"
-        subtitulo="Somente categorias de PROTEÇÃO. A altura da coluna reflete a pontuação técnica na escala impressa (0–3 ou 0–4), sem conversão. Cores identificam a categoria; a classificação aparece na legenda."
+        subtitulo="Somente categorias de PROTEÇÃO. Altura da coluna = pontuação técnica na escala impressa. Cores identificam a categoria."
         tipo="PROTECAO"
         dimensoes={dimensoes}
       />
       <GraficoColunasGrupo
         titulo="Gráfico de pontuações para categorias negativas"
-        subtitulo="Somente categorias de RISCO. A altura da coluna reflete a pontuação técnica na escala impressa (0–3 ou 0–4), sem conversão. Cores identificam a categoria; a classificação aparece na legenda."
+        subtitulo="Somente categorias de RISCO. Altura da coluna = pontuação técnica na escala impressa. Cores identificam a categoria."
         tipo="RISCO"
         dimensoes={dimensoes}
       />

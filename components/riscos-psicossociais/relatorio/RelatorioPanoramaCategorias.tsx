@@ -43,7 +43,7 @@ function iconeCategoria(id: string): LucideIcon {
   return ICONE_POR_CATEGORIA[id] ?? LayoutGrid;
 }
 
-function descricaoCurta(id: string, max = 96): string {
+function descricaoCurta(id: string, max = 72): string {
   const texto = descricaoOficialDimensao(id).trim();
   if (texto.length <= max) return texto;
   return `${texto.slice(0, max - 1).trimEnd()}…`;
@@ -65,41 +65,46 @@ function CategoriaPanoramaCard({
 
   return (
     <article
-      className="riscos-relatorio-print-card flex h-full flex-col rounded-2xl border bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
-      style={{ borderColor: `${cor}55`, borderTopWidth: 3, borderTopColor: cor }}
+      className="riscos-relatorio-print-card flex h-full flex-col rounded-xl border bg-white p-3"
+      style={{
+        borderColor: `${cor}55`,
+        borderTopWidth: 3,
+        borderTopColor: cor,
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
           style={{ backgroundColor: bg, color: cor }}
           aria-hidden
         >
-          <Icon size={22} strokeWidth={1.85} />
+          <Icon size={18} strokeWidth={1.85} />
         </span>
         <div className="min-w-0 flex-1">
-          <h4 className="text-[13px] font-extrabold leading-snug text-navy sm:text-sm">
+          <h4 className="text-[12px] font-extrabold leading-snug text-navy">
             {d.nome}
           </h4>
-          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
             {String(d.tipo).toUpperCase() === "RISCO" ? "RISCO" : "PROTEÇÃO"}
           </p>
         </div>
       </div>
 
-      <p className="mt-4 text-2xl font-extrabold tabular-nums tracking-tight text-navy">
-        {pontuacao}
-      </p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <p className="text-lg font-extrabold tabular-nums tracking-tight text-navy">
+          {pontuacao}
+        </p>
+        <span
+          className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-extrabold leading-tight text-white"
+          style={{ backgroundColor: cor }}
+        >
+          {d.classificacaoLabel}
+        </span>
+      </div>
 
-      <span
-        className="mt-3 inline-flex w-fit max-w-full rounded-full px-2.5 py-1 text-[10px] font-extrabold leading-tight text-white"
-        style={{ backgroundColor: cor }}
-      >
-        {d.classificacaoLabel}
-      </span>
-
-      <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]">
-        {descricao}
-      </p>
+      <p className="mt-2 text-[10px] leading-snug text-[#64748b]">{descricao}</p>
     </article>
   );
 }
@@ -113,7 +118,7 @@ export function RelatorioPanoramaCategorias({
 
   if (itens.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-10 text-center text-sm text-app-muted">
+      <div className="rounded-2xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-8 text-center text-sm text-app-muted">
         Sem categorias quantitativas suficientes para o panorama.
       </div>
     );
@@ -121,23 +126,23 @@ export function RelatorioPanoramaCategorias({
 
   return (
     <section>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
             Resultado geral
           </p>
-          <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
+          <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
             Panorama das Categorias
           </h3>
-          <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
-            Visão executiva de todas as categorias avaliadas, com pontuação e
-            classificação na metodologia do sistema.
+          <p className="mt-0.5 max-w-2xl text-xs text-app-muted">
+            Visão executiva das categorias avaliadas, com pontuação e
+            classificação.
           </p>
         </div>
         <RelatorioLegendaCores />
       </div>
 
-      <div className="relatorio-panorama-grid grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="relatorio-panorama-grid grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {itens.map((d) => (
           <CategoriaPanoramaCard key={d.id} d={d} />
         ))}
