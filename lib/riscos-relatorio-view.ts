@@ -193,21 +193,43 @@ export function montarDadosRadar(
 export type BarraChartDatum = {
   id: string;
   nome: string;
+  tipo: string;
+  /** Pontuação padronizada técnica (0–4) — nunca inventar a partir do visual. */
   media: number;
+  /**
+   * Comprimento visual da barra (0–4).
+   * PROTEÇÃO: igual à media; RISCO: 4 − media (maior barra = melhor resultado).
+   */
+  valorVisual: number;
   cor: string;
   classificacaoLabel: string;
 };
 
+/** Comprimento visual da barra (somente UI). Não altera média/classificação. */
+export function valorVisualBarraDimensao(
+  d: Pick<RiscosRelatorioDimensaoSnapshot, "media" | "tipo">
+): number {
+  const media = Number(d.media ?? 0);
+  if (String(d.tipo).toUpperCase() === "RISCO") {
+    return 4 - media;
+  }
+  return media;
+}
+
 export function montarDadosBarras(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
 ): BarraChartDatum[] {
-  return dimensoesOrdenadasPorMediaDesc(dimensoes).map((d) => ({
-    id: d.id,
-    nome: d.nome,
-    media: Number(d.media ?? 0),
-    cor: corPorClassificacaoId(d.classificacaoId),
-    classificacaoLabel: d.classificacaoLabel,
-  }));
+  return [...dimensoesParaCalculo(dimensoes)]
+    .map((d) => ({
+      id: d.id,
+      nome: d.nome,
+      tipo: d.tipo,
+      media: Number(d.media ?? 0),
+      valorVisual: valorVisualBarraDimensao(d),
+      cor: corPorClassificacaoId(d.classificacaoId),
+      classificacaoLabel: d.classificacaoLabel,
+    }))
+    .sort((a, b) => b.valorVisual - a.valorVisual);
 }
 
 export function statusGeralResumo(input: {

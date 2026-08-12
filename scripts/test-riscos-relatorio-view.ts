@@ -12,6 +12,7 @@ import {
   rankingMelhores,
   scoreFavorabilidade,
   statusGeralResumo,
+  valorVisualBarraDimensao,
 } from "../lib/riscos-relatorio-view";
 
 function run(name: string, fn: () => void) {
@@ -94,9 +95,75 @@ run("barras ordenadas da maior média para a menor", () => {
   assert.equal(ordered[0].id, "b");
   assert.equal(ordered[0].media, 3.9);
   assert.equal(ordered[ordered.length - 1].media, 2.5);
-  const barras = montarDadosBarras(amostra);
-  assert.equal(barras[0].media >= barras[1].media, true);
-  assert.equal(barras.every((b) => b.cor.startsWith("#")), true);
+});
+
+run("barras: RISCO inverte comprimento visual; PROTEÇÃO preserva média técnica", () => {
+  const perfeitoRisco = dim({
+    id: "demandas-trabalho",
+    nome: "Demandas de Trabalho",
+    tipo: "RISCO",
+    media: 0,
+    classificacaoId: "situacao_favoravel",
+    classificacaoLabel: "Situação Favorável",
+  });
+  const perfeitoProt = dim({
+    id: "interface-trabalho-individuo",
+    nome: "Interface trabalho-indivíduo",
+    tipo: "PROTECAO",
+    media: 4,
+    classificacaoId: "situacao_favoravel",
+    classificacaoLabel: "Situação Favorável",
+  });
+  const burnout = dim({
+    id: "burnout-estresse",
+    nome: "Burnout e Estresse",
+    tipo: "RISCO",
+    media: 0,
+    classificacaoId: "situacao_favoravel",
+  });
+  const conflitos = dim({
+    id: "conflitos-familia-trabalho",
+    nome: "Conflitos família-trabalho",
+    tipo: "RISCO",
+    media: 0,
+    classificacaoId: "situacao_favoravel",
+  });
+  const criticoRisco = dim({
+    id: "critico",
+    nome: "Risco alto",
+    tipo: "RISCO",
+    media: 4,
+    classificacaoId: "risco_para_saude",
+  });
+
+  assert.equal(valorVisualBarraDimensao(perfeitoRisco), 4);
+  assert.equal(valorVisualBarraDimensao(burnout), 4);
+  assert.equal(valorVisualBarraDimensao(conflitos), 4);
+  assert.equal(valorVisualBarraDimensao(perfeitoProt), 4);
+  assert.equal(valorVisualBarraDimensao(criticoRisco), 0);
+  assert.equal(valorVisualBarraDimensao({ media: 1, tipo: "RISCO" }), 3);
+  assert.equal(valorVisualBarraDimensao({ media: 3, tipo: "RISCO" }), 1);
+
+  const barras = montarDadosBarras([
+    perfeitoRisco,
+    perfeitoProt,
+    burnout,
+    conflitos,
+    criticoRisco,
+  ]);
+  const byId = Object.fromEntries(barras.map((b) => [b.id, b]));
+  assert.equal(byId["demandas-trabalho"].media, 0);
+  assert.equal(byId["demandas-trabalho"].valorVisual, 4);
+  assert.equal(byId["demandas-trabalho"].cor, "#16a34a");
+  assert.equal(byId["burnout-estresse"].valorVisual, 4);
+  assert.equal(byId["conflitos-familia-trabalho"].valorVisual, 4);
+  assert.equal(byId["interface-trabalho-individuo"].media, 4);
+  assert.equal(byId["interface-trabalho-individuo"].valorVisual, 4);
+  assert.equal(byId["critico"].media, 4);
+  assert.equal(byId["critico"].valorVisual, 0);
+  assert.equal(byId["critico"].cor, "#dc2626");
+  // Ordenação visual: maior favorabilidade primeiro
+  assert.equal(barras[0].valorVisual >= barras[barras.length - 1].valorVisual, true);
 });
 
 run("radar ignora dimensões fora do cálculo", () => {

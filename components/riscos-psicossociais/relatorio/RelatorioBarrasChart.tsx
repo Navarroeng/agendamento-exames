@@ -14,6 +14,37 @@ import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 import { montarDadosBarras } from "@/lib/riscos-relatorio-view";
 import { RelatorioLegendaCores } from "@/components/riscos-psicossociais/relatorio/RelatorioLegendaCores";
 
+function TooltipBarras({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: ReturnType<typeof montarDadosBarras>[number] }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const isRisco = String(row.tipo).toUpperCase() === "RISCO";
+  const mediaTxt = row.media.toFixed(2).replace(".", ",");
+
+  return (
+    <div className="max-w-xs rounded-xl border border-[#e8edf5] bg-white px-3 py-2.5 text-xs shadow-md">
+      <p className="font-extrabold text-navy">{row.nome}</p>
+      <p className="mt-1 text-app-muted">
+        Pontuação padronizada:{" "}
+        <span className="font-bold text-navy">{mediaTxt} / 4</span>
+      </p>
+      <p className="mt-0.5 font-bold text-navy">{row.classificacaoLabel}</p>
+      {isRisco ? (
+        <p className="mt-1.5 text-[11px] leading-snug text-app-muted">
+          Para esta dimensão, pontuações menores representam melhores
+          resultados.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function RelatorioBarrasChart({
   dimensoes,
 }: {
@@ -34,11 +65,13 @@ export function RelatorioBarrasChart({
             Comparativo
           </p>
           <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-            Pontuações padronizadas por dimensão
+            Resultado das dimensões
           </h3>
           <p className="mt-1 text-xs text-app-muted sm:text-sm">
-            Ordenação da maior pontuação padronizada (0–4) para a menor. A cor
-            reflete a classificação oficial COPSOQ.
+            O comprimento da barra indica favorabilidade visual (melhor à
+            esquerda/maior). Em dimensões de risco, pontuações técnicas menores
+            aparecem com barras maiores. A cor segue a classificação oficial
+            COPSOQ.
           </p>
         </div>
         <RelatorioLegendaCores />
@@ -64,25 +97,8 @@ export function RelatorioBarrasChart({
                 width={150}
                 tick={{ fill: "#334155", fontSize: 11, fontWeight: 600 }}
               />
-              <Tooltip
-                formatter={(value, _name, item) => {
-                  const label =
-                    (item?.payload as { classificacaoLabel?: string })
-                      ?.classificacaoLabel ?? "";
-                  return [
-                    typeof value === "number"
-                      ? `${value.toFixed(2).replace(".", ",")} · ${label}`
-                      : String(value ?? "—"),
-                    "Padronizada",
-                  ];
-                }}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "1px solid #e8edf5",
-                  fontSize: 12,
-                }}
-              />
-              <Bar dataKey="media" radius={[0, 8, 8, 0]} barSize={18}>
+              <Tooltip content={<TooltipBarras />} />
+              <Bar dataKey="valorVisual" radius={[0, 8, 8, 0]} barSize={18}>
                 {data.map((entry) => (
                   <Cell key={entry.id} fill={entry.cor} />
                 ))}
