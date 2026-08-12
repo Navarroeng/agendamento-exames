@@ -11,6 +11,7 @@ import {
 } from "@/lib/riscos-relatorio-pdf";
 import { RelatorioCapa } from "@/components/riscos-psicossociais/relatorio/RelatorioCapa";
 import { RelatorioCapaPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCapaPrint";
+import { RelatorioCabecalhoPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoPrint";
 import { RelatorioResumoExecutivo } from "@/components/riscos-psicossociais/relatorio/RelatorioResumoExecutivo";
 import { RelatorioRadarChart } from "@/components/riscos-psicossociais/relatorio/RelatorioRadarChart";
 import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
@@ -109,6 +110,31 @@ export function RiscosRelatorioViewerModal({
         id={RISCOS_RELATORIO_PRINT_ROOT_ID}
         className="max-h-[75vh] space-y-10 overflow-y-auto pr-1"
       >
+        {/* PDF página 1 — capa institucional (oculta no modal) */}
+        <div className="hidden riscos-relatorio-print-force riscos-relatorio-print-capa-pagina">
+          <RelatorioCapaPrint
+            relatorio={relatorio}
+            logoUrl={logoUrl}
+            empresaCnpj={empresaCnpj}
+            campanhaStatus={campanhaStatus}
+          />
+        </div>
+
+        {/* Modal: capa azul atual · PDF página 2+: cabeçalho compacto */}
+        <div className="riscos-relatorio-print-section">
+          <div className="riscos-relatorio-print-hide">
+            <RelatorioCapa
+              relatorio={relatorio}
+              logoUrl={logoUrl}
+              empresaCnpj={empresaCnpj}
+              campanhaStatus={campanhaStatus}
+            />
+          </div>
+          <div className="hidden riscos-relatorio-print-force">
+            <RelatorioCabecalhoPrint relatorio={relatorio} />
+          </div>
+        </div>
+
         {!normalizado ? (
           <div className="riscos-relatorio-print-section rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
             <p className="font-extrabold">
@@ -123,24 +149,6 @@ export function RiscosRelatorioViewerModal({
           </div>
         ) : null}
 
-        <div className="riscos-relatorio-print-section">
-          <div className="riscos-relatorio-print-hide">
-            <RelatorioCapa
-              relatorio={relatorio}
-              logoUrl={logoUrl}
-              empresaCnpj={empresaCnpj}
-              campanhaStatus={campanhaStatus}
-            />
-          </div>
-          <div className="hidden riscos-relatorio-print-force riscos-relatorio-print-capa">
-            <RelatorioCapaPrint
-              relatorio={relatorio}
-              logoUrl={logoUrl}
-              empresaCnpj={empresaCnpj}
-              campanhaStatus={campanhaStatus}
-            />
-          </div>
-        </div>
         <div className="riscos-relatorio-print-section">
           <RelatorioResumoExecutivo relatorio={relatorio} />
         </div>
