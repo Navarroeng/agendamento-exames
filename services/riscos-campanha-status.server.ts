@@ -4,9 +4,11 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import {
+  isRiscosCampanhaSelectSchemaError,
   mapRiscosCampanhaRow,
   RISCOS_CAMPANHA_SELECT,
   RISCOS_CAMPANHA_SELECT_LEGACY,
+  RISCOS_CAMPANHA_SELECT_SEM_LOGO,
   validateEncerrarCampanhaRiscos,
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
@@ -14,48 +16,52 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
+const CAMPANHA_SELECT_SEM_LOGO = RISCOS_CAMPANHA_SELECT_SEM_LOGO;
 const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
 
 function mapCampanhaRow(row: Record<string, unknown>): RiscosCampanhaRecord {
   return mapRiscosCampanhaRow(row);
 }
 
-function isMissingColumnError(error: {
-  message?: string;
-  code?: string;
-} | null): boolean {
-  if (!error) return false;
-  return (
-    /origem|responsavel|observacoes|cancelada_|logo_/i.test(
-      error.message ?? ""
-    ) || error.code === "42703"
-  );
+async function selectCampanhaRow(
+  build: (select: string) => Promise<{
+    data: Record<string, unknown> | null;
+    error: { message?: string; code?: string } | null;
+  }>
+): Promise<RiscosCampanhaRecord | null> {
+  const primary = await build(CAMPANHA_SELECT);
+  if (isRiscosCampanhaSelectSchemaError(primary.error)) {
+    const semLogo = await build(CAMPANHA_SELECT_SEM_LOGO);
+    if (isRiscosCampanhaSelectSchemaError(semLogo.error)) {
+      const legacy = await build(CAMPANHA_SELECT_LEGACY);
+      if (legacy.error) throw legacy.error;
+      if (!legacy.data) return null;
+      return mapCampanhaRow(legacy.data);
+    }
+    if (semLogo.error) throw semLogo.error;
+    if (!semLogo.data) return null;
+    return mapCampanhaRow(semLogo.data);
+  }
+  if (primary.error) throw primary.error;
+  if (!primary.data) return null;
+  return mapCampanhaRow(primary.data);
 }
 
 async function selecionarCampanhaPorId(
   campanhaId: string
 ): Promise<RiscosCampanhaRecord | null> {
   const admin = createAdminClient();
-  const primary = await admin
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .eq("id", campanhaId)
-    .maybeSingle();
-
-  if (isMissingColumnError(primary.error)) {
-    const fb = await admin
+  return selectCampanhaRow(async (select) => {
+    const res = await admin
       .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(select)
       .eq("id", campanhaId)
       .maybeSingle();
-    if (fb.error) throw fb.error;
-    if (!fb.data) return null;
-    return mapCampanhaRow(fb.data as Record<string, unknown>);
-  }
-
-  if (primary.error) throw primary.error;
-  if (!primary.data) return null;
-  return mapCampanhaRow(primary.data as Record<string, unknown>);
+    return {
+      data: (res.data as Record<string, unknown> | null) ?? null,
+      error: res.error,
+    };
+  });
 }
 
 export async function selecionarCampanhaPorCodigoPublico(
@@ -65,26 +71,17 @@ export async function selecionarCampanhaPorCodigoPublico(
   if (!codigo) return null;
 
   const admin = createAdminClient();
-  const primary = await admin
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .eq("codigo_publico", codigo)
-    .maybeSingle();
-
-  if (isMissingColumnError(primary.error)) {
-    const fb = await admin
+  return selectCampanhaRow(async (select) => {
+    const res = await admin
       .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(select)
       .eq("codigo_publico", codigo)
       .maybeSingle();
-    if (fb.error) throw fb.error;
-    if (!fb.data) return null;
-    return mapCampanhaRow(fb.data as Record<string, unknown>);
-  }
-
-  if (primary.error) throw primary.error;
-  if (!primary.data) return null;
-  return mapCampanhaRow(primary.data as Record<string, unknown>);
+    return {
+      data: (res.data as Record<string, unknown> | null) ?? null,
+      error: res.error,
+    };
+  });
 }
 
 export async function encerrarCampanhaRiscosNoServidor(
@@ -115,15 +112,25 @@ export async function encerrarCampanhaRiscosNoServidor(
 
   let updateError = updatePrimary.error;
 
-  if (isMissingColumnError(updateError)) {
+  if (isRiscosCampanhaSelectSchemaError(updateError)) {
     const fb = await admin
       .from("riscos_campanhas")
       .update({ status: "encerrada" })
       .eq("id", id)
       .eq("status", "aberta")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(CAMPANHA_SELECT_SEM_LOGO)
       .maybeSingle();
     updateError = fb.error;
+    if (isRiscosCampanhaSelectSchemaError(updateError)) {
+      const fbLegacy = await admin
+        .from("riscos_campanhas")
+        .update({ status: "encerrada" })
+        .eq("id", id)
+        .eq("status", "aberta")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .maybeSingle();
+      updateError = fbLegacy.error;
+    }
   }
 
   if (updateError) throw updateError;

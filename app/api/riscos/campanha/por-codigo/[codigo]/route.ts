@@ -38,28 +38,12 @@ export async function GET(
       );
     }
 
+    // Retorna o record completo (inclui logo_*). Não filtrar campos —
+    // openProcesso sincroniza por este endpoint e sobrescreve o state.
     return NextResponse.json(
       {
         ok: true,
-        campanha: {
-          id: campanha.id,
-          codigo_publico: campanha.codigo_publico,
-          status: campanha.status,
-          origem: campanha.origem,
-          data_inicio: campanha.data_inicio,
-          data_encerramento: campanha.data_encerramento,
-          empresa_nome: campanha.empresa_nome,
-          quantidade_prevista: campanha.quantidade_prevista,
-          orcamento_id: campanha.orcamento_id,
-          cliente_id: campanha.cliente_id,
-          codigo_acesso_exibicao: campanha.codigo_acesso_exibicao,
-          responsavel: campanha.responsavel,
-          observacoes: campanha.observacoes,
-          criado_por: campanha.criado_por,
-          created_at: campanha.created_at,
-          updated_at: campanha.updated_at,
-          cnpj: campanha.cnpj,
-        },
+        campanha,
         fonte: "riscos_campanhas.codigo_publico",
       },
       {
