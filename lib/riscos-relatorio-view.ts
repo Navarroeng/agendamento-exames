@@ -146,6 +146,32 @@ export function formatMediaRelatorio(media: number | null | undefined): string {
   return media.toFixed(2).replace(".", ",");
 }
 
+/** Snapshot gerado após a normalização de amplitude (possui mediaBruta). */
+export function snapshotTemNormalizacao(
+  d: Pick<RiscosRelatorioDimensaoSnapshot, "mediaBruta">
+): boolean {
+  return d.mediaBruta != null && !Number.isNaN(d.mediaBruta);
+}
+
+export function relatorioTemNormalizacao(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): boolean {
+  const calc = dimensoes.filter((d) => d.entraNoCalculo && d.media != null);
+  if (calc.length === 0) return false;
+  return calc.every((d) => snapshotTemNormalizacao(d));
+}
+
+/** Ex.: "3,00 / 3" */
+export function formatPontuacaoComMaximo(
+  valor: number | null | undefined,
+  maximo: number | null | undefined
+): string {
+  const v = formatMediaRelatorio(valor);
+  if (v === "—") return "—";
+  if (maximo == null || Number.isNaN(maximo)) return v;
+  return `${v} / ${maximo}`;
+}
+
 export type RadarChartDatum = {
   dimensao: string;
   nomeCompleto: string;

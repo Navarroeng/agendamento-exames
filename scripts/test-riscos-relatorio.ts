@@ -10,6 +10,7 @@ import {
   montarResultadoJsonRelatorio,
   validatePodeGerarRelatorioFinal,
 } from "../lib/riscos-relatorio";
+import { consolidarResultadosCampanha } from "../lib/riscos-resultados";
 import type { RiscosResultadosPublicos } from "../lib/riscos-resultados";
 
 function run(name: string, fn: () => void) {
@@ -96,6 +97,7 @@ run("montarResultadoJsonRelatorio: snapshot com placeholders", () => {
         tipo: "risco",
         entraNoCalculo: true,
         media: 72.5,
+        mediaBruta: 72.5,
         respondentesValidos: 8,
         classificacao: {
           id: "risco_para_saude",
@@ -109,6 +111,7 @@ run("montarResultadoJsonRelatorio: snapshot com placeholders", () => {
         tipo: "recurso",
         entraNoCalculo: true,
         media: 40,
+        mediaBruta: 40,
         respondentesValidos: 8,
         classificacao: {
           id: "situacao_favoravel",
@@ -131,15 +134,52 @@ run("montarResultadoJsonRelatorio: snapshot com placeholders", () => {
     consolidado,
   });
 
-  assert.equal(json.versao, 1);
+  assert.equal(json.versao, 2);
   assert.equal(json.capa.participantes, 10);
   assert.equal(json.capa.respondentes, 8);
   assert.equal(json.capa.taxaParticipacao, 80);
   assert.equal(json.resumoExecutivo.quantidadeDimensoes, 2);
   assert.equal(json.resumoExecutivo.dimensoesCriticas.length, 1);
   assert.equal(json.dimensoes[0].cor, "#dc2626");
+  assert.equal(json.dimensoes[0].mediaBruta, 72.5);
+  assert.equal(json.dimensoes[0].maxEscalaPadronizada, 4);
   assert.equal(json.conclusao, null);
   assert.equal(json.recomendacoes, null);
+});
+
+run("Interface Muito satisfeito: snapshot usa média padronizada na classificação", () => {
+  const consolidado = consolidarResultadosCampanha({
+    campanhaId: "c-iface",
+    statusCampanha: "encerrada",
+    quantidadeCadastrados: 1,
+    sessoes: [
+      { id: "s1", campanha_id: "c-iface", status: "concluida", valida: true },
+    ],
+    respostas: [
+      {
+        sessao_id: "s1",
+        campanha_id: "c-iface",
+        pergunta_id: "p-13",
+        alternativa_id: "sat-muito-satisfeito",
+      },
+    ],
+  });
+  const json = montarResultadoJsonRelatorio({
+    empresaNome: "Diag",
+    codigoPublico: "IFACE",
+    dataInicio: "2026-01-01",
+    dataEncerramento: "2026-12-31",
+    consolidado,
+  });
+  const snap = json.dimensoes.find(
+    (d) => d.id === "interface-trabalho-individuo"
+  )!;
+  assert.equal(snap.mediaBruta, 3);
+  assert.equal(snap.media, 4);
+  assert.equal(snap.maxEscalaBruta, 3);
+  assert.equal(snap.maxEscalaPadronizada, 4);
+  assert.equal(snap.classificacaoId, "situacao_favoravel");
+  assert.equal(snap.classificacaoLabel, "Situação Favorável");
 });
 
 console.log("\nTodos os testes do relatório passaram.");

@@ -16,6 +16,7 @@ import {
 import {
   dimensoesParaCalculo,
   formatMediaRelatorio,
+  formatPontuacaoComMaximo,
   rankingAtencao,
   rankingMelhores,
   severidadeClassificacao,
@@ -104,13 +105,37 @@ export function textoOQueAvalia(
 export function textoResultadoEncontrado(
   d: Pick<
     RiscosRelatorioDimensaoSnapshot,
-    "nome" | "tipo" | "media" | "classificacaoId" | "classificacaoLabel" | "respondentesValidos"
+    | "nome"
+    | "tipo"
+    | "media"
+    | "mediaBruta"
+    | "maxEscalaBruta"
+    | "maxEscalaPadronizada"
+    | "classificacaoId"
+    | "classificacaoLabel"
+    | "respondentesValidos"
   >
 ): string {
-  const media = formatMediaRelatorio(d.media);
   const risco = isRisco(d.tipo);
   const sev = labelSeveridade(d.classificacaoId);
-  const base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;
+  const temNorm =
+    d.mediaBruta != null && !Number.isNaN(d.mediaBruta);
+
+  let base: string;
+  if (temNorm) {
+    const original = formatPontuacaoComMaximo(
+      d.mediaBruta,
+      d.maxEscalaBruta
+    );
+    const padronizada = formatPontuacaoComMaximo(
+      d.media,
+      d.maxEscalaPadronizada ?? 4
+    );
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação original ${original} e pontuação padronizada ${padronizada} (escala comum usada na classificação), resultando em ${d.classificacaoLabel}.`;
+  } else {
+    const media = formatMediaRelatorio(d.media);
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;
+  }
 
   if (sev === "favoravel") {
     return risco

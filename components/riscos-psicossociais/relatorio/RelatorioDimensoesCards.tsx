@@ -7,6 +7,8 @@ import {
   bgSuavePorClassificacaoId,
   corPorClassificacaoId,
   formatMediaRelatorio,
+  formatPontuacaoComMaximo,
+  snapshotTemNormalizacao,
 } from "@/lib/riscos-relatorio-view";
 
 function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
@@ -14,6 +16,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
   const cor = corPorClassificacaoId(d.classificacaoId);
   const bg = bgSuavePorClassificacaoId(d.classificacaoId);
   const analise = analisarDimensao(d);
+  const comNorm = snapshotTemNormalizacao(d);
 
   return (
     <article
@@ -38,24 +41,55 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
-            <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Média
-            </p>
-            <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-              {formatMediaRelatorio(d.media)}
-            </p>
+        {comNorm ? (
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Pontuação original
+              </p>
+              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+                {formatPontuacaoComMaximo(d.mediaBruta, d.maxEscalaBruta)}
+              </p>
+            </div>
+            <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Pontuação padronizada
+              </p>
+              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+                {formatPontuacaoComMaximo(d.media, d.maxEscalaPadronizada ?? 4)}
+              </p>
+              <p className="mt-0.5 text-[10px] font-medium text-app-muted">
+                Usada na classificação
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              Respondentes
-            </p>
-            <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
-              {d.respondentesValidos}
-            </p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl px-3 py-2" style={{ backgroundColor: bg }}>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Média
+              </p>
+              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+                {formatMediaRelatorio(d.media)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-[#f8fafc] px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Respondentes
+              </p>
+              <p className="mt-0.5 text-base font-extrabold tabular-nums text-navy">
+                {d.respondentesValidos}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {comNorm ? (
+          <p className="mt-2 text-[11px] text-app-muted">
+            Respondentes válidos:{" "}
+            <span className="font-bold text-navy">{d.respondentesValidos}</span>
+          </p>
+        ) : null}
 
         <button
           type="button"
@@ -127,7 +161,8 @@ export function RelatorioDimensoesCards({
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Análise técnica por dimensão — interpretação automática a partir do
-          snapshot persistido (sem recálculo).
+          snapshot persistido (sem recálculo). A classificação usa a pontuação
+          padronizada (escala comum 0–4).
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -48,7 +48,11 @@ function RankingList({
                   {d.nome}
                 </p>
                 <p className="text-[11px] text-app-muted">
-                  Média {formatMediaRelatorio(d.media)} · {d.classificacaoLabel}
+                  Padronizada {formatMediaRelatorio(d.media)}
+                  {d.mediaBruta != null
+                    ? ` · original ${formatMediaRelatorio(d.mediaBruta)}`
+                    : ""}{" "}
+                  · {d.classificacaoLabel}
                 </p>
               </div>
               <span
@@ -83,7 +87,7 @@ export function RelatorioRanking({
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Ordenação automática pela classificação oficial e pela favorabilidade
-          da média (RISCO × PROTEÇÃO).
+          da média padronizada (escala comum 0–4; RISCO × PROTEÇÃO).
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

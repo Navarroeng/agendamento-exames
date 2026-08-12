@@ -63,8 +63,11 @@ export function RelatorioHeatmap({
                   >
                     {d.classificacaoLabel}
                   </span>
-                  <span className="w-16 text-right text-xs font-bold tabular-nums text-app-muted">
+                  <span className="w-20 text-right text-xs font-bold tabular-nums text-app-muted">
                     {formatMediaRelatorio(d.media)}
+                    <span className="block text-[9px] font-medium normal-case tracking-normal text-[#94a3b8]">
+                      padronizada
+                    </span>
                   </span>
                 </li>
               );

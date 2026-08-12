@@ -9,6 +9,7 @@ type DimensaoResultadoUi = {
   id: string;
   nome: string;
   media: number | null;
+  mediaBruta?: number | null;
   classificacao: {
     id: CopsoqClassificacaoResultadoId;
     label: string;
@@ -200,8 +201,10 @@ export function RiscosResultadosPanel({
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-navy">{d.nome}</p>
                 <p className="text-[11px] text-[#64748b]">
-                  Média {formatMedia(d.media)} · {d.respondentesValidos}{" "}
-                  respondente(s) válido(s)
+                  {d.mediaBruta != null && d.mediaBruta !== d.media
+                    ? `Original ${formatMedia(d.mediaBruta)} · padronizada ${formatMedia(d.media)}`
+                    : `Padronizada ${formatMedia(d.media)}`}{" "}
+                  · {d.respondentesValidos} respondente(s) válido(s)
                 </p>
               </div>
               <span

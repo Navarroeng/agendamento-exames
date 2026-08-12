@@ -3,10 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { obterResultadosCampanhaRiscos } from "@/services/riscos-resultados.service";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Resultados consolidados da campanha (anônimos).
  * Autenticado no painel; dados via service role (sem PII / sem respostas nominais).
+ * Sempre recalcula via motor atual (não lê snapshot de relatório).
  */
 export async function GET(
   _request: Request,

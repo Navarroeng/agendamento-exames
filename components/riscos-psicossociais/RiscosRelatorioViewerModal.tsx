@@ -10,6 +10,7 @@ import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/Re
 import { RelatorioHeatmap } from "@/components/riscos-psicossociais/relatorio/RelatorioHeatmap";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
 import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
+import { relatorioTemNormalizacao } from "@/lib/riscos-relatorio-view";
 
 interface RiscosRelatorioViewerModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function RiscosRelatorioViewerModal({
   if (!open || !relatorio) return null;
 
   const dimensoes = relatorio.resultado_json?.dimensoes ?? [];
+  const normalizado = relatorioTemNormalizacao(dimensoes);
 
   return (
     <Modal
@@ -52,6 +54,17 @@ export function RiscosRelatorioViewerModal({
       }
     >
       <div className="max-h-[75vh] space-y-10 overflow-y-auto pr-1">
+        {!normalizado ? (
+          <div className="rounded-2xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+            <p className="font-extrabold">Snapshot anterior à normalização de escalas</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              Este relatório foi gerado antes da equivalência de amplitudes
+              (escala comum 0–4). Médias e classificações exibidas são as do
+              momento da geração. Para aplicar a metodologia atual, um
+              administrador deve usar <strong>Regenerar</strong>.
+            </p>
+          </div>
+        ) : null}
         <RelatorioCapa relatorio={relatorio} logoUrl={logoUrl} />
         <RelatorioResumoExecutivo relatorio={relatorio} />
         <RelatorioRadarChart dimensoes={dimensoes} />

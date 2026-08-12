@@ -37,9 +37,9 @@ export function RelatorioRadarChart({
           Panorama das dimensões
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Cada eixo representa uma dimensão COPSOQ (escala 0–4). Médias maiores
-          em dimensões de risco indicam maior exposição; em proteção, maior
-          recurso.
+          Cada eixo usa a pontuação padronizada da dimensão (escala comum 0–4),
+          a mesma da classificação. Valores maiores em risco indicam maior
+          exposição; em proteção, maior recurso.
         </p>
       </div>
 
@@ -59,7 +59,7 @@ export function RelatorioRadarChart({
                 axisLine={false}
               />
               <Radar
-                name="Média"
+                name="Padronizada"
                 dataKey="media"
                 stroke="#4f63ff"
                 fill="#4f63ff"
@@ -71,7 +71,7 @@ export function RelatorioRadarChart({
                   typeof value === "number"
                     ? value.toFixed(2).replace(".", ",")
                     : String(value ?? "—"),
-                  "Média",
+                  "Padronizada",
                 ]}
                 labelFormatter={(_, payload) => {
                   const row = payload?.[0]?.payload as

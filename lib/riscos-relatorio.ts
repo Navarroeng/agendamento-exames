@@ -3,23 +3,38 @@
  * Cálculos COPSOQ: reutiliza consolidarResultadosCampanha / motor oficial.
  */
 
-import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
+import {
+  COPSOQ_ESCALA_COMUM_MAX,
+  amplitudeEscalaDimensao,
+  type CopsoqClassificacaoResultadoId,
+} from "@/lib/copsoq-engine";
 import type { RiscosResultadosPublicos } from "@/lib/riscos-resultados";
 
 export const RISCOS_RELATORIO_STATUS = ["gerado", "substituido"] as const;
 export type RiscosRelatorioStatus = (typeof RISCOS_RELATORIO_STATUS)[number];
 
-export const RISCOS_RELATORIO_JSON_VERSAO = 1 as const;
+/** v2: snapshot inclui mediaBruta + máximos de escala para transparência da classificação. */
+export const RISCOS_RELATORIO_JSON_VERSAO = 2 as const;
 
 export type RiscosRelatorioDimensaoSnapshot = {
   id: string;
   nome: string;
   tipo: string;
   entraNoCalculo: boolean;
-  /** Média na escala comum do motor (0–4), usada em classificação e gráficos. */
+  /**
+   * Média na escala comum do motor (0–4).
+   * É o valor usado para classificação, radar, ranking e heatmap.
+   */
   media: number | null;
-  /** Média bruta (Formulário); opcional em snapshots antigos. */
+  /**
+   * Média bruta nas pontuações impressas do Formulário (antes da normalização).
+   * Ausente em snapshots gerados antes da normalização de amplitude.
+   */
   mediaBruta?: number | null;
+  /** Máximo possível da escala impressa desta dimensão (ex.: 3 ou 4). */
+  maxEscalaBruta?: number | null;
+  /** Máximo da escala comum de classificação (sempre 4 nos snapshots novos). */
+  maxEscalaPadronizada?: number | null;
   classificacaoId: CopsoqClassificacaoResultadoId;
   classificacaoLabel: string;
   classificacaoInterpretacao: string;
@@ -131,20 +146,26 @@ export function montarResultadoJsonRelatorio(input: {
   consolidado: RiscosResultadosPublicos;
 }): RiscosRelatorioResultadoJson {
   const c = input.consolidado;
-  const dimensoes: RiscosRelatorioDimensaoSnapshot[] = c.dimensoes.map((d) => ({
-    id: d.id,
-    nome: d.nome,
-    tipo: d.tipo,
-    entraNoCalculo: d.entraNoCalculo,
-    media: d.media,
-    mediaBruta: d.mediaBruta,
-    classificacaoId: d.classificacao.id,
-    classificacaoLabel: d.classificacao.label,
-    classificacaoInterpretacao: d.classificacao.interpretacao,
-    cor: corClassificacaoRelatorio(d.classificacao.id),
-    respondentesValidos: d.respondentesValidos,
-    descricao: d.classificacao.interpretacao,
-  }));
+  const dimensoes: RiscosRelatorioDimensaoSnapshot[] = c.dimensoes.map((d) => {
+    const amp = amplitudeEscalaDimensao(d.id);
+    return {
+      id: d.id,
+      nome: d.nome,
+      tipo: d.tipo,
+      entraNoCalculo: d.entraNoCalculo,
+      // Sempre a média já normalizada (escala comum) — mesma usada em classificarMediaDimensao.
+      media: d.media,
+      mediaBruta: d.mediaBruta,
+      maxEscalaBruta: amp.max,
+      maxEscalaPadronizada: COPSOQ_ESCALA_COMUM_MAX,
+      classificacaoId: d.classificacao.id,
+      classificacaoLabel: d.classificacao.label,
+      classificacaoInterpretacao: d.classificacao.interpretacao,
+      cor: corClassificacaoRelatorio(d.classificacao.id),
+      respondentesValidos: d.respondentesValidos,
+      descricao: d.classificacao.interpretacao,
+    };
+  });
 
   const criticas = dimensoes
     .filter(

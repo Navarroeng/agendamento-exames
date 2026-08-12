@@ -72,6 +72,24 @@ run("análise de dimensão cobre os 4 blocos técnicos", () => {
   assert.ok(a.recomendacoes.length >= 3);
 });
 
+run("texto com normalização menciona pontuação padronizada", () => {
+  const iface = dim({
+    id: "interface-trabalho-individuo",
+    nome: "Interface trabalho-indivíduo",
+    tipo: "PROTECAO",
+    media: 4,
+    mediaBruta: 3,
+    maxEscalaBruta: 3,
+    maxEscalaPadronizada: 4,
+    classificacaoId: "situacao_favoravel",
+    classificacaoLabel: "Situação Favorável",
+  });
+  const t = textoResultadoEncontrado(iface);
+  assert.match(t, /pontuação original 3,00 \/ 3/i);
+  assert.match(t, /pontuação padronizada 4,00 \/ 4/i);
+  assert.match(t, /Situação Favorável/);
+});
+
 run("resultado favorável vs crítico diverge na narrativa", () => {
   const f = textoResultadoEncontrado(favoravel);
   const c = textoResultadoEncontrado(critico);
@@ -118,7 +136,7 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
     status: "gerado",
     pdf_url: null,
     resultado_json: {
-      versao: 1,
+      versao: 2,
       capa: {
         empresaNome: "Empresa Alpha",
         codigoPublico: "ABC123",

@@ -34,11 +34,11 @@ export function RelatorioBarrasChart({
             Comparativo
           </p>
           <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-            Médias por dimensão
+            Pontuações padronizadas por dimensão
           </h3>
           <p className="mt-1 text-xs text-app-muted sm:text-sm">
-            Ordenação da maior média para a menor. A cor reflete a classificação
-            oficial COPSOQ.
+            Ordenação da maior pontuação padronizada (0–4) para a menor. A cor
+            reflete a classificação oficial COPSOQ.
           </p>
         </div>
         <RelatorioLegendaCores />
@@ -73,7 +73,7 @@ export function RelatorioBarrasChart({
                     typeof value === "number"
                       ? `${value.toFixed(2).replace(".", ",")} · ${label}`
                       : String(value ?? "—"),
-                    "Média",
+                    "Padronizada",
                   ];
                 }}
                 contentStyle={{
