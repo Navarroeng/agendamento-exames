@@ -4,99 +4,127 @@ import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 import {
   bgSuavePorClassificacaoId,
   corPorClassificacaoId,
-  formatMediaRelatorio,
-  montarRankingAtencao,
-  rankingMelhores,
+  formatPontuacaoComMaximo,
+  rankingGeralPorFavorabilidade,
+  valorVisualBarraDimensao,
 } from "@/lib/riscos-relatorio-view";
 
-function RankingItem({
+function labelTipo(tipo: string): string {
+  return String(tipo).toUpperCase() === "RISCO" ? "RISCO" : "PROTEÇÃO";
+}
+
+function posicaoMedalhaClass(posicao: number): string {
+  if (posicao === 1) {
+    return "bg-[#ca8a04] text-white shadow-[0_0_0_2px_rgba(202,138,4,0.25)]";
+  }
+  if (posicao === 2) {
+    return "bg-[#94a3b8] text-white shadow-[0_0_0_2px_rgba(148,163,184,0.25)]";
+  }
+  if (posicao === 3) {
+    return "bg-[#b45309] text-white shadow-[0_0_0_2px_rgba(180,83,9,0.2)]";
+  }
+  return "bg-navy text-white";
+}
+
+function RankingLinha({
   d,
-  idx,
+  posicao,
 }: {
   d: RiscosRelatorioDimensaoSnapshot;
-  idx: number;
+  posicao: number;
 }) {
+  const cor = corPorClassificacaoId(d.classificacaoId);
+  const bg = bgSuavePorClassificacaoId(d.classificacaoId);
+  const pontuacao = formatPontuacaoComMaximo(
+    d.media,
+    d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
+  );
+  const pct = Math.max(
+    0,
+    Math.min(100, valorVisualBarraDimensao(d) * 100)
+  );
+
   return (
     <li
-      className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/90 px-3 py-2.5"
-      style={{
-        backgroundColor: bgSuavePorClassificacaoId(d.classificacaoId),
-      }}
+      className="relatorio-barra-row border-b border-[#eef2f7] px-3 py-3 last:border-b-0 sm:px-4 sm:py-3.5"
+      style={{ backgroundColor: posicao <= 3 ? bg : undefined }}
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-extrabold text-white">
-        {idx + 1}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-extrabold text-navy">{d.nome}</p>
-        <p className="text-[11px] text-app-muted">
-          Pontuação {formatMediaRelatorio(d.media)}
-          {d.maxEscalaPadronizada != null
-            ? ` / ${d.maxEscalaPadronizada}`
-            : ""}{" "}
-          · {d.classificacaoLabel}
-        </p>
-      </div>
-      <span
-        className="h-2.5 w-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: corPorClassificacaoId(d.classificacaoId) }}
-        aria-hidden
-      />
-    </li>
-  );
-}
-
-function RankingMelhoresCard({
-  itens,
-}: {
-  itens: RiscosRelatorioDimensaoSnapshot[];
-}) {
-  return (
-    <div className="rounded-3xl border border-[#bbf7d0] bg-gradient-to-b from-[#f0fdf4] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
-      <h4 className="text-sm font-extrabold text-navy">Top 5 melhores</h4>
-      <p className="mt-1 text-[11px] text-app-muted">
-        Maior favorabilidade (RISCO: pontuação baixa; PROTEÇÃO: pontuação alta).
-      </p>
-      <ol className="mt-3 space-y-2">
-        {itens.length === 0 ? (
-          <li className="text-xs text-app-muted">Sem dados suficientes.</li>
-        ) : (
-          itens.map((d, idx) => <RankingItem key={d.id} d={d} idx={idx} />)
-        )}
-      </ol>
-    </div>
-  );
-}
-
-function RankingAtencaoCard({
-  dimensoes,
-}: {
-  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[];
-}) {
-  const ranking = montarRankingAtencao(dimensoes, 5);
-
-  return (
-    <div className="rounded-3xl border border-[#fde68a] bg-gradient-to-b from-[#fefce8] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
-      <h4 className="text-sm font-extrabold text-navy">
-        Top 5 que merecem atenção
-      </h4>
-      {ranking.semRiscosClassificados ? (
-        <p className="mt-3 rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2.5 text-xs font-semibold leading-relaxed text-[#166534]">
-          Nenhuma dimensão apresenta Situação Moderada ou Situação Desfavorável.
-        </p>
-      ) : (
-        <>
-          <p className="mt-1 text-[11px] text-app-muted">
-            Prioriza classificação do produto (Situação Desfavorável → Situação
-            Moderada); depois menor favorabilidade.
+      {/* Mobile */}
+      <div className="flex flex-col gap-2.5 sm:hidden">
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
+          >
+            {posicao}º
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-extrabold leading-snug text-navy">
+              {d.nome}
+            </p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+              {labelTipo(d.tipo)}
+            </p>
+          </div>
+        </div>
+        <div
+          className="h-3.5 w-full overflow-hidden rounded-full bg-[#eef2f7]"
+          role="img"
+          aria-label={`Favorabilidade visual ${pct.toFixed(0)}%`}
+        >
+          <div
+            className="relatorio-barra-fill h-full rounded-full"
+            style={{ width: `${pct}%`, backgroundColor: cor }}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-extrabold tabular-nums text-navy">
+            {pontuacao}
           </p>
-          <ol className="mt-3 space-y-2">
-            {ranking.itens.map((d, idx) => (
-              <RankingItem key={d.id} d={d} idx={idx} />
-            ))}
-          </ol>
-        </>
-      )}
-    </div>
+          <span
+            className="relatorio-barra-badge inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold text-white"
+            style={{ backgroundColor: cor }}
+          >
+            {d.classificacaoLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Desktop */}
+      <div className="hidden items-center gap-3 sm:flex lg:gap-4">
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
+        >
+          {posicao}º
+        </span>
+        <div className="w-[11rem] shrink-0 lg:w-52">
+          <p className="text-[13px] font-extrabold leading-snug text-navy">
+            {d.nome}
+          </p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            {labelTipo(d.tipo)}
+          </p>
+        </div>
+        <div
+          className="h-3.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#eef2f7]"
+          role="img"
+          aria-label={`Favorabilidade visual ${pct.toFixed(0)}%`}
+        >
+          <div
+            className="relatorio-barra-fill h-full rounded-full"
+            style={{ width: `${pct}%`, backgroundColor: cor }}
+          />
+        </div>
+        <p className="w-[4.75rem] shrink-0 text-right text-sm font-extrabold tabular-nums text-navy">
+          {pontuacao}
+        </p>
+        <span
+          className="relatorio-barra-badge inline-flex w-[9.5rem] shrink-0 justify-center rounded-full px-2.5 py-1 text-center text-[10px] font-extrabold leading-tight text-white lg:w-40"
+          style={{ backgroundColor: cor }}
+        >
+          {d.classificacaoLabel}
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -105,7 +133,11 @@ export function RelatorioRanking({
 }: {
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[];
 }) {
-  const melhores = rankingMelhores(dimensoes, 5);
+  const ranking = rankingGeralPorFavorabilidade(dimensoes);
+
+  if (ranking.length === 0) {
+    return null;
+  }
 
   return (
     <section>
@@ -114,17 +146,20 @@ export function RelatorioRanking({
           Priorização
         </p>
         <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-          Ranking das dimensões
+          Ranking Geral das Dimensões
         </h3>
-        <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Ordenação pela favorabilidade relativa à escala impressa da dimensão
-          (0–3 ou 0–4), respeitando se a dimensão é RISCO ou PROTEÇÃO. A
-          classificação do motor não é recalculada.
+        <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
+          Ordenação automática considerando a favorabilidade da dimensão,
+          respeitando se a categoria é de RISCO ou PROTEÇÃO.
         </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RankingMelhoresCard itens={melhores} />
-        <RankingAtencaoCard dimensoes={dimensoes} />
+
+      <div className="overflow-hidden rounded-3xl border border-[#e8edf5] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+        <ol className="relatorio-barras-lista">
+          {ranking.map((d, idx) => (
+            <RankingLinha key={d.id} d={d} posicao={idx + 1} />
+          ))}
+        </ol>
       </div>
     </section>
   );

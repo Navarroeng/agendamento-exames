@@ -136,6 +136,20 @@ export function rankingMelhores(
     .slice(0, limite);
 }
 
+/**
+ * Ranking geral: todas as dimensões calculáveis, da mais favorável à menos
+ * favorável (scoreFavorabilidade: PROTEÇÃO = média; RISCO = max − média).
+ */
+export function rankingGeralPorFavorabilidade(
+  dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
+): RiscosRelatorioDimensaoSnapshot[] {
+  return [...dimensoesParaCalculo(dimensoes)].sort((a, b) => {
+    const fav = compararFavorabilidadeDesc(a, b);
+    if (fav !== 0) return fav;
+    return a.nome.localeCompare(b.nome, "pt-BR");
+  });
+}
+
 export type RankingAtencaoResultado = {
   /**
    * Dimensões em Situação Desfavorável ou Moderada (pior primeiro),

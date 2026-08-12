@@ -10,6 +10,7 @@ import {
   montarDadosRadar,
   montarRankingAtencao,
   rankingAtencao,
+  rankingGeralPorFavorabilidade,
   rankingMelhores,
   scoreFavorabilidade,
   contarFaixasClassificacao,
@@ -189,6 +190,17 @@ run("ranking melhores prioriza situação favorável", () => {
   assert.equal(top.every((d) => d.entraNoCalculo), true);
   // Entre Favoráveis, maior favorabilidade: Liderança 3.9 > Saúde 3.5
   assert.equal(top[0].id, "b");
+});
+
+run("ranking geral ordena por favorabilidade RISCO×PROTEÇÃO", () => {
+  const geral = rankingGeralPorFavorabilidade(amostra);
+  assert.ok(geral.length >= 5);
+  for (let i = 1; i < geral.length; i++) {
+    assert.ok(
+      scoreFavorabilidade(geral[i - 1]) >= scoreFavorabilidade(geral[i]),
+      `ordem quebrada em ${geral[i - 1].id} → ${geral[i].id}`
+    );
+  }
 });
 
 run("ranking atenção prioriza risco para saúde", () => {
