@@ -24,6 +24,16 @@ export {
 } from "@/lib/copsoq-engine/normalization";
 
 export {
+  COPSOQ_ESCALA_COMUM_MIN,
+  COPSOQ_ESCALA_COMUM_MAX,
+  amplitudeEscalaDimensao,
+  amplitudeEfetivaPergunta,
+  minPontuacaoEscala,
+  normalizarMediaDimensao,
+  normalizarPontuacao,
+} from "@/lib/copsoq-engine/scale-normalize";
+
+export {
   mediaIndividualDimensao,
   mediaGeralDimensao,
   perguntasCalculoDaDimensao,

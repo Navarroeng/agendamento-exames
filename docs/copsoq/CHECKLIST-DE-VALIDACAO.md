@@ -34,6 +34,7 @@ Fonte da verdade: arquivos em `docs/copsoq/` (derivados dos PDFs em `fonte-ofici
 - [ ] dimensões
 - [ ] classificação RISCO × PROTEÇÃO
 - [ ] médias (individual e geral)
+- [ ] normalização de amplitude → escala comum 0–4 antes dos cortes (dimensões 0–4 idênticas)
 - [ ] limites / faixas (2,33 e 3,66)
 - [ ] exemplos oficiais (Demandas: 2,5 individual; 2,43 geral → Risco Intermediário)
 - [ ] questões de comportamento ofensivo (qualitativo; não entram no cálculo final)

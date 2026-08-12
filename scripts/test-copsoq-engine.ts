@@ -8,14 +8,18 @@ import { getDimensaoById, getPerguntasOrdenadas } from "../lib/copsoq/instrument
 import { COPSOQ_PERGUNTAS } from "../lib/copsoq/perguntas";
 import {
   COPSOQ_ENGINE_DIVERGENCIAS,
+  COPSOQ_ESCALA_COMUM_MAX,
+  COPSOQ_ESCALA_COMUM_MIN,
   COPSOQ_FAIXA_BAIXA_MAX,
   COPSOQ_FAIXA_MEDIA_MAX,
   COPSOQ_FAIXA_MEDIA_MIN,
+  amplitudeEscalaDimensao,
   classificarMediaDimensao,
   dimensoesParaMediaGeral,
   interpretarCampanhaCopsoq,
   mediaGeralDimensao,
   mediaIndividualDimensao,
+  normalizarPontuacao,
   pontuarAlternativa,
   pontuarRespostaPorId,
   pontuarRespostaPorLabel,
@@ -54,7 +58,13 @@ run("escala frequencia permanece 0–4 (Formulário)", () => {
 run("divergências documentadas estão registradas no motor", () => {
   assert.ok(COPSOQ_ENGINE_DIVERGENCIAS.length >= 3);
   assert.ok(
-    COPSOQ_ENGINE_DIVERGENCIAS.some((d) => d.includes("0–4") || d.includes("0-4") || d.includes("NÃO converte"))
+    COPSOQ_ENGINE_DIVERGENCIAS.some(
+      (d) =>
+        d.includes("normalizada") ||
+        d.includes("escala comum") ||
+        d.includes("0–4") ||
+        d.includes("0-4")
+    )
   );
 });
 
@@ -260,6 +270,98 @@ run("participação operacional", () => {
   assert.equal(result.participacao.respondentes, 2);
   assert.equal(result.participacao.base, 8);
   assert.equal(result.participacao.percentual, 25);
+});
+
+// ---------------------------------------------------------------------------
+// Normalização de amplitude (escala comum 0–4)
+// ---------------------------------------------------------------------------
+run("normalizarPontuacao: identidade em 0–4 e extremo 0–3 → 4", () => {
+  assert.equal(normalizarPontuacao(2.5, 0, 4), 2.5);
+  assert.equal(normalizarPontuacao(0, 0, 4), COPSOQ_ESCALA_COMUM_MIN);
+  assert.equal(normalizarPontuacao(4, 0, 4), COPSOQ_ESCALA_COMUM_MAX);
+  assert.equal(normalizarPontuacao(3, 0, 3), 4);
+  assert.equal(normalizarPontuacao(0, 0, 3), 0);
+  assert.equal(normalizarPontuacao(1.5, 0, 3), 2);
+  // genérico 0–2 e 0–6
+  assert.equal(normalizarPontuacao(2, 0, 2), 4);
+  assert.equal(normalizarPontuacao(3, 0, 6), 2);
+});
+
+run("amplitudes: Interface e Conflitos 0–3; Demandas 0–4", () => {
+  assert.deepEqual(amplitudeEscalaDimensao("interface-trabalho-individuo"), {
+    min: 0,
+    max: 3,
+  });
+  assert.deepEqual(amplitudeEscalaDimensao("conflitos-familia-trabalho"), {
+    min: 0,
+    max: 3,
+  });
+  assert.deepEqual(amplitudeEscalaDimensao("demandas-trabalho"), {
+    min: 0,
+    max: 4,
+  });
+});
+
+run("Interface: Muito satisfeito → melhor resultado possível (Favorável)", () => {
+  const result = interpretarCampanhaCopsoq({
+    respondentes: [{ "p-13": "sat-muito-satisfeito" }],
+  });
+  const dim = result.dimensoes.find(
+    (d) => d.id === "interface-trabalho-individuo"
+  )!;
+  assert.equal(dim.mediaBruta, 3);
+  assert.equal(dim.media, 4);
+  assert.equal(dim.classificacao.id, "situacao_favoravel");
+});
+
+run("Conflitos: pior extremo → Risco para a Saúde (não preso em Intermediário)", () => {
+  const result = interpretarCampanhaCopsoq({
+    respondentes: [
+      {
+        "p-14a": "imp-certeza",
+        "p-14b": "imp-certeza",
+      },
+    ],
+  });
+  const dim = result.dimensoes.find(
+    (d) => d.id === "conflitos-familia-trabalho"
+  )!;
+  assert.equal(dim.mediaBruta, 3);
+  assert.equal(dim.media, 4);
+  assert.equal(dim.classificacao.id, "risco_para_saude");
+});
+
+run("Demandas homogênea 0–4: média e classificação idênticas à bruta", () => {
+  const respostas = {
+    "p-1a": "Às vezes",
+    "p-1b": "Raramente",
+    "p-2a": "Sempre",
+    "p-2b": "Frequentemente",
+    "p-3a": "Às vezes",
+    "p-3b": "Raramente",
+  };
+  const result = interpretarCampanhaCopsoq({ respondentes: [respostas] });
+  const dim = result.dimensoes.find((d) => d.id === "demandas-trabalho")!;
+  assert.equal(dim.mediaBruta, 2.5);
+  assert.equal(dim.media, 2.5);
+  assert.equal(dim.classificacao.id, "risco_intermediario");
+});
+
+run("todas as dimensões calculáveis: media == mediaBruta quando amplitude 0–4", () => {
+  // preenchimento mínimo só para dimensões 0–4 com um respondente vazio → medias null
+  // Verifica identidade da função de normalização por amplitude detectada
+  for (const dim of dimensoesParaMediaGeral()) {
+    const amp = amplitudeEscalaDimensao(dim.id);
+    if (amp.min === 0 && amp.max === 4) {
+      for (const v of [0, 1.2, 2.33, 2.5, 3.66, 4]) {
+        assert.equal(
+          normalizarPontuacao(v, amp.min, amp.max),
+          v,
+          `${dim.id} deveria ser identidade em ${v}`
+        );
+      }
+    }
+  }
 });
 
 console.log("test-copsoq-engine: OK");

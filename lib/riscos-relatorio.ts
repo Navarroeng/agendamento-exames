@@ -16,7 +16,10 @@ export type RiscosRelatorioDimensaoSnapshot = {
   nome: string;
   tipo: string;
   entraNoCalculo: boolean;
+  /** Média na escala comum do motor (0–4), usada em classificação e gráficos. */
   media: number | null;
+  /** Média bruta (Formulário); opcional em snapshots antigos. */
+  mediaBruta?: number | null;
   classificacaoId: CopsoqClassificacaoResultadoId;
   classificacaoLabel: string;
   classificacaoInterpretacao: string;
@@ -134,6 +137,7 @@ export function montarResultadoJsonRelatorio(input: {
     tipo: d.tipo,
     entraNoCalculo: d.entraNoCalculo,
     media: d.media,
+    mediaBruta: d.mediaBruta,
     classificacaoId: d.classificacao.id,
     classificacaoLabel: d.classificacao.label,
     classificacaoInterpretacao: d.classificacao.interpretacao,

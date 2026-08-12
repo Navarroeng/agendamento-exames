@@ -1,7 +1,11 @@
 import { getCopsoqInstrumento } from "@/lib/copsoq/instrument";
-import { classificarMediaDimensao } from "@/lib/copsoq-engine/classification";
+import {
+  CLASSIFICACAO_NAO_DEFINIDA,
+  classificarMediaDimensao,
+} from "@/lib/copsoq-engine/classification";
 import { mediaGeralDimensao } from "@/lib/copsoq-engine/dimensions";
 import { normalizarChaveAlternativa } from "@/lib/copsoq-engine/normalization";
+import { normalizarMediaDimensao } from "@/lib/copsoq-engine/scale-normalize";
 import {
   calcularParticipacaoOperacional,
   contarCoberturaDimensao,
@@ -14,7 +18,6 @@ import {
   type CopsoqEngineInput,
   type CopsoqEngineResult,
 } from "@/lib/copsoq-engine/types";
-import { CLASSIFICACAO_NAO_DEFINIDA } from "@/lib/copsoq-engine/classification";
 
 function analisarComportamentosOfensivos(
   respondentes: CopsoqEngineInput["respondentes"]
@@ -72,7 +75,10 @@ export function interpretarCampanhaCopsoq(
     if (!dim.entraNoCalculo) continue;
 
     const cobertura = contarCoberturaDimensao(dim.id, respondentes);
-    const media = mediaGeralDimensao(cobertura.mediasValidas);
+    // 1) média bruta (pontuações impressas do Formulário)
+    const mediaBruta = mediaGeralDimensao(cobertura.mediasValidas);
+    // 2–3) normalizar amplitude → escala comum 0–4; 4) classificar
+    const media = normalizarMediaDimensao(dim.id, mediaBruta);
 
     dimensoes.push({
       id: dim.id,
@@ -80,6 +86,7 @@ export function interpretarCampanhaCopsoq(
       tipo: dim.tipo,
       entraNoCalculo: true,
       media,
+      mediaBruta,
       escorePadronizado: null,
       classificacao: classificarMediaDimensao(dim, media),
       respondentesValidos: cobertura.respondentesValidos,

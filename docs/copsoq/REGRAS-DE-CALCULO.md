@@ -30,6 +30,7 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
 | `lib/copsoq-engine/score.ts` | Pontuação efetiva (inclui inversão configurável) |
 | `lib/copsoq-engine/normalization.ts` | Normalização de chave de alternativa |
 | `lib/copsoq-engine/dimensions.ts` | Média individual e média geral por dimensão |
+| `lib/copsoq-engine/scale-normalize.ts` | Normalização de amplitude → escala comum 0–4 |
 | `lib/copsoq-engine/classification.ts` | Faixas 2,33 / 3,66 RISCO e PROTEÇÃO |
 | `lib/copsoq-engine/statistics.ts` | Cobertura e participação operacional |
 | `lib/copsoq-engine/interpreter.ts` | Orquestra campanha → resultado |
@@ -54,8 +55,10 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
    - Pontuar cada resposta (`pontuarAlternativa` / por id).
    - Se `pontuacaoInvertida` (ex.: 1B): pontuação efetiva = `maxEscala − pontuação impressa da alternativa na escala base`.
    - **Média individual** = soma das pontuações ÷ número de perguntas da dimensão (só se o conjunto estiver completo para aquele respondente, conforme regras de cobertura do código).
-   - **Média geral** = média das médias individuais válidas.
-   - **Classificar** a média geral conforme tipo RISCO ou PROTEÇÃO.
+   - **Média geral bruta** = média das médias individuais válidas (escala impressa do Formulário).
+   - **Normalização de amplitude** (`normalizarPontuacao`): mapeia a média bruta para a **escala comum 0–4** do motor, usando min/max possíveis da dimensão (derivados automaticamente das escalas das perguntas). Dimensões já 0–4 sofrem identidade.
+   - **Classificar** a média **já normalizada** conforme tipo RISCO ou PROTEÇÃO (cortes 2,33 / 3,66).
+   - Saída: `media` = normalizada (consumida por radar/ranking/relatório); `mediaBruta` = média impressa (auditoria).
 3. Dimensão **Comportamentos ofensivos**:
    - Não entra no cálculo quantitativo (`entraNoCalculo: false`).
    - Saída apenas qualitativa (frequências), sem média/classificação quantitativa.
@@ -85,15 +88,32 @@ Entrada tipica da campanha: `interpretarCampanhaCopsoq({ respondentes, baseParti
 
 ---
 
+## Normalização de amplitude (motor — equivalência matemática)
+
+**Não altera o instrumento.** Perguntas, alternativas e pontuações impressas permanecem as do Formulário.
+
+| Decisão | Justificativa técnica |
+|---------|----------------------|
+| Escala comum **0–4** | Amplitude predominante no Formulário; cortes oficiais 2,33/3,66 já estão nessa métrica no motor. |
+| Não usar 0–5 | Exigiria remapeamento dos cortes e mudaria médias exibidas das dimensões 0–4. |
+| Não usar 0–100 | Mesmo problema de impacto + divergência da escala dos cortes. |
+| Fórmula | `mediaComum = (mediaBruta − min) / (max − min) × 4` (min/max da dimensão, genéricos). |
+| Dimensões 0–4 | Identidade: `media === mediaBruta` → mesmos resultados de antes. |
+| Dimensões 0–3 (ex.: Interface, Conflitos) | Extremos passam a alcançar Favorável / Risco para a Saúde quando a resposta é o extremo impresso. |
+
+Snapshots antigos de relatório **não** são recalculados até “Regenerar Relatório”.
+
+---
+
 ## Regras indefinidas nos PDFs oficiais (não implementar por aproximação)
 
 | Tema | Status no motor |
 |------|-----------------|
-| Conversão 0–4 (Formulário) ↔ 1–5 / “Intervalo (0 a 5)” (Orientações) | **Não convertida**. Usam-se pontuações do Formulário + cortes 2,33/3,66. |
+| Conversão item a item 0–4 ↔ 1–5 / “Intervalo (0 a 5)” (Orientações) | **Não convertida** nas alternativas. Pontuações do Formulário são preservadas; só a média da dimensão é reescalada para 0–4 antes dos cortes. |
 | Risco geral agregado entre dimensões | **null** (`riscoGeral`) |
 | Escore padronizado | **null** (`escorePadronizado`) |
 | Fórmula oficial única de “pontuação geral” além das médias por dimensão | Não definida; ofensivos explicitamente fora |
-| Renormalização para escala 0–5 | Proibida sem nova documentação oficial |
+| Renormalização das alternativas para escala 0–5 | Proibida (instrumento intacto). A normalização 0–4 do motor é só equivalência de amplitude pré-classificação. |
 
 Documentadas também em `COPSOQ_ENGINE_DIVERGENCIAS` (`lib/copsoq-engine/types.ts`).
 
@@ -111,7 +131,7 @@ Documentadas também em `COPSOQ_ENGINE_DIVERGENCIAS` (`lib/copsoq-engine/types.t
 ## Pontos que jamais devem ser implementados por aproximação
 
 1. Inventar “risco geral” ou ranking único entre dimensões.
-2. Converter escala 0–4 → 1–5 (ou o inverso) sem texto oficial que defina a conversão.
+2. Converter alternativas 0–4 → 1–5 (ou o inverso) sem texto oficial; não confundir com a normalização de amplitude 0–4 do motor.
 3. Incluir Comportamentos ofensivos na média/classificação quantitativa.
 4. Alterar textos, alternativas ou pontuações do Formulário para “combinar” com trechos 1–5 das Orientações.
 5. Criar interstícios de dimensão que não existem no Formulário (ver `lib/copsoq/intersticiais.ts`).

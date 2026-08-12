@@ -5,11 +5,12 @@
  * - COPSOQ II - Formulário de Aplicação
  * - COPSOQ II - Orientações v2
  *
- * Divergência documentada (NÃO corrigida artificialmente):
+ * Divergência documentada:
  * - Formulário usa pontuações 0–4 (e 0–3 em algumas escalas).
  * - Orientações citam em um trecho “respostas de 1 a 5” e faixas “Intervalo (0 a 5)”.
- * - Cortes oficiais de classificação (2,33 / 3,66) são aplicados sobre as médias
- *   calculadas com as pontuações do Formulário (0–4 / 0–3), sem conversão 0–4→1–5.
+ * - Alternativas NÃO são convertidas 0–4→1–5.
+ * - Médias brutas do Formulário são normalizadas para escala comum 0–4 (amplitude
+ *   predominante) antes dos cortes 2,33/3,66 — equivalência de amplitudes distintas.
  */
 
 import type {
@@ -37,8 +38,16 @@ export type CopsoqDimensaoCalculoResultado = {
   nome: string;
   tipo: CopsoqDimensaoTipo;
   entraNoCalculo: boolean;
-  /** Média geral da dimensão na campanha (média das médias individuais). */
+  /**
+   * Média usada para classificação e exibição: já na escala comum do motor (0–4).
+   * Para dimensões com amplitude 0–4, coincide com a média bruta.
+   */
   media: number | null;
+  /**
+   * Média aritmética nas pontuações impressas do Formulário (antes da
+   * normalização de amplitude). Null se média indisponível.
+   */
+  mediaBruta: number | null;
   /**
    * Não definido nos documentos oficiais anexados.
    * Sempre null até haver fórmula oficial.
@@ -94,8 +103,9 @@ export type CopsoqEngineInput = {
 
 /** Documentação embutida das divergências Formulário × Orientações. */
 export const COPSOQ_ENGINE_DIVERGENCIAS = [
-  "Formulário: pontuações impressas 0–4 (freq./intens./saúde/exposição) e 0–3 (satisfação/impacto). Orientações citam em trecho '1 a 5' e 'Intervalo (0 a 5)'. Motor NÃO converte 0–4→1–5.",
-  "Cortes de classificação oficiais (≤2,33 / 2,34–3,66 / >3,66) aplicados sobre médias na escala do Formulário.",
+  "Formulário: pontuações impressas 0–4 (freq./intens./saúde/exposição) e 0–3 (satisfação/impacto). Orientações citam em trecho '1 a 5' e 'Intervalo (0 a 5)'.",
+  "Motor: média bruta do Formulário é normalizada para escala comum 0–4 (amplitude predominante) antes dos cortes 2,33/3,66 — equivalência de amplitudes distintas, sem alterar o instrumento.",
+  "Cortes de classificação oficiais (≤2,33 / 2,34–3,66 / >3,66) aplicados sobre a média já normalizada para 0–4.",
   "Risco geral agregado entre dimensões: não definido oficialmente — retorna null.",
   "Escore padronizado: não definido oficialmente — retorna null.",
   "Comportamentos ofensivos: opcionais, fora do cálculo quantitativo; só saída qualitativa.",
