@@ -87,7 +87,7 @@ const amostra: RiscosRelatorioDimensaoSnapshot[] = [
 
 run("cores padronizadas por classificação oficial", () => {
   assert.equal(corPorClassificacaoId("situacao_favoravel"), "#16a34a");
-  assert.equal(corPorClassificacaoId("risco_intermediario"), "#ea580c");
+  assert.equal(corPorClassificacaoId("risco_intermediario"), "#ca8a04");
   assert.equal(corPorClassificacaoId("risco_para_saude"), "#dc2626");
 });
 

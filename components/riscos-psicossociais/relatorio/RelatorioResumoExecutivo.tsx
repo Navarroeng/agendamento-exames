@@ -30,7 +30,7 @@ function CardMetric({
   const tones = {
     neutral: "border-[#e8edf5] bg-white",
     ok: "border-[#bbf7d0] bg-[#f0fdf4]",
-    warn: "border-[#fed7aa] bg-[#fff7ed]",
+    warn: "border-[#fde68a] bg-[#fefce8]",
     danger: "border-[#fecaca] bg-[#fef2f2]",
     info: "border-[#c7d2fe] bg-[#eef1ff]",
   } as const;
@@ -147,15 +147,15 @@ export function RelatorioResumoExecutivo({
       </div>
 
       {(resumo?.dimensoesCriticas?.length ?? 0) > 0 ? (
-        <div className="mt-4 rounded-2xl border border-[#fed7aa] bg-[#fff7ed] px-4 py-3">
-          <p className="text-xs font-extrabold text-[#9a3412]">
+        <div className="mt-4 rounded-2xl border border-[#fde68a] bg-[#fefce8] px-4 py-3">
+          <p className="text-xs font-extrabold text-[#a16207]">
             Dimensões que merecem atenção
           </p>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {resumo!.dimensoesCriticas.map((d) => (
-              <li key={d.id} className="text-xs font-semibold text-[#7c2d12]">
+              <li key={d.id} className="text-xs font-semibold text-[#854d0e]">
                 • {d.nome}
-                <span className="font-medium text-[#9a3412]/70">
+                <span className="font-medium text-[#a16207]/70">
                   {" "}
                   — {d.classificacaoLabel}
                 </span>

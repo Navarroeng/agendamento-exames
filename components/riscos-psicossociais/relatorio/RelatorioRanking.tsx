@@ -80,7 +80,7 @@ function RankingAtencaoCard({
   const ranking = montarRankingAtencao(dimensoes, 5);
 
   return (
-    <div className="rounded-3xl border border-[#fed7aa] bg-gradient-to-b from-[#fff7ed] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
+    <div className="rounded-3xl border border-[#fde68a] bg-gradient-to-b from-[#fefce8] to-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
       <h4 className="text-sm font-extrabold text-navy">
         Top 5 que merecem atenção
       </h4>

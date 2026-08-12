@@ -8,7 +8,7 @@ import {
 
 function prioridadeClass(p: ItemPlanoAcao["prioridade"]): string {
   if (p === "Alta") return "bg-[#fee2e2] text-[#b91c1c]";
-  if (p === "Média") return "bg-[#ffedd5] text-[#c2410c]";
+  if (p === "Média") return "bg-[#fef9c3] text-[#a16207]";
   return "bg-[#dcfce7] text-[#15803d]";
 }
 

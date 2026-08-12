@@ -48,7 +48,7 @@ function badgeClass(id: CopsoqClassificacaoResultadoId): string {
     return "bg-brand-green-soft text-brand-green";
   }
   if (id === "risco_intermediario") {
-    return "bg-[#fef3c7] text-[#b45309]";
+    return "bg-[#fef9c3] text-[#a16207]";
   }
   if (id === "risco_para_saude") {
     return "bg-[#fee2e2] text-[#b91c1c]";

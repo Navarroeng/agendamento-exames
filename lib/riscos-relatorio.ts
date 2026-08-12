@@ -87,12 +87,12 @@ export type RiscosRelatorioRecord = {
   updated_at?: string;
 };
 
-/** Cor visual por classificação (UI do relatório). */
+/** Cor visual por classificação (UI do relatório). Verde / amarelo / vermelho. */
 export function corClassificacaoRelatorio(
   id: CopsoqClassificacaoResultadoId | string
 ): string {
   if (id === "situacao_favoravel") return "#16a34a";
-  if (id === "risco_intermediario") return "#d97706";
+  if (id === "risco_intermediario") return "#ca8a04";
   if (id === "risco_para_saude") return "#dc2626";
   return "#64748b";
 }

@@ -7,13 +7,16 @@ import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
 import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 
-/** Cores padronizadas (COPSOQ II-Br: 3 faixas oficiais). */
+/** Cores padronizadas das 3 faixas oficiais (apresentação). */
 export const RELATORIO_CORES = {
+  /** Situação Favorável */
   situacao_favoravel: "#16a34a",
-  risco_intermediario: "#ea580c",
+  /** Faixa intermediária oficial — amarelo (não laranja). */
+  risco_intermediario: "#ca8a04",
+  /** Risco para a Saúde / faixa crítica */
   risco_para_saude: "#dc2626",
   classificacao_nao_definida: "#64748b",
-  /** Amarelo de atenção visual (destaques de UI; não é faixa oficial extra). */
+  /** Destaques de UI (cards de atenção); alinhado ao amarelo da faixa média. */
   atencao: "#ca8a04",
 } as const;
 
@@ -30,7 +33,7 @@ export const RELATORIO_LEGENDA = [
   },
   {
     id: "risco_para_saude" as const,
-    label: "Risco para Saúde (Crítico)",
+    label: "Risco para a Saúde",
     cor: RELATORIO_CORES.risco_para_saude,
   },
 ] as const;
@@ -48,7 +51,8 @@ export function bgSuavePorClassificacaoId(
   id: CopsoqClassificacaoResultadoId | string | null | undefined
 ): string {
   if (id === "situacao_favoravel") return "#ecfdf5";
-  if (id === "risco_intermediario") return "#fff7ed";
+  /** Amarelo suave — sem tom laranja. */
+  if (id === "risco_intermediario") return "#fefce8";
   if (id === "risco_para_saude") return "#fef2f2";
   return "#f8fafc";
 }
