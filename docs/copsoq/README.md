@@ -55,7 +55,14 @@ deve **consultar primeiro** os arquivos desta pasta (`docs/copsoq/`), nesta orde
 | Arquivo | Conteúdo |
 |---------|----------|
 | [FORMULARIO-OFICIAL.md](./FORMULARIO-OFICIAL.md) | Instrumento completo (40 itens, escalas, textos intermediários) |
-| [ORIENTACOES-OFICIAIS.md](./ORIENTACOES-OFICIAIS.md) | Dimensões, cálculo, faixas, exemplos e observações |
+| [ORIENTACOES-OFICIAIS.md](./ORIENTACOES-OFICIAIS.md) | Dimensões, cálculo, faixas oficiais do instrumento e observações |
+| [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md) | **Metodologia de classificação adotada pelo produto** (cortes 1,33 / 2,66) |
 | [REGRAS-DE-CALCULO.md](./REGRAS-DE-CALCULO.md) | Documentação técnica do motor do projeto |
 | [CHECKLIST-DE-VALIDACAO.md](./CHECKLIST-DE-VALIDACAO.md) | Checklist obrigatório antes de qualquer mudança |
 | [fonte-oficial/](./fonte-oficial/) | PDFs e textos oficiais incorporados ao repositório |
+
+## Nota sobre classificação
+
+As Orientações oficiais descrevem faixas 2,33 / 3,66 (Risco Intermediário / Risco para a Saúde).  
+O **produto** adota a metodologia documentada em [METODOLOGIA-PRODUTO.md](./METODOLOGIA-PRODUTO.md).  
+Não misturar as duas nomenclaturas/cortes na implementação.

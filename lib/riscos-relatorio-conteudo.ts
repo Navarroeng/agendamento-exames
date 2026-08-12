@@ -143,13 +143,13 @@ export function textoResultadoEncontrado(
   }
   if (sev === "intermediario") {
     return risco
-      ? `${base} A exposição encontra-se em patamar intermediário e pode sinalizar início de sobrecarga — recomenda-se monitoramento e ações de suporte.`
-      : `${base} O fator de proteção aparece enfraquecido em nível intermediário, indicando necessidade de reforço preventivo antes de agravamento.`;
+      ? `${base} A exposição encontra-se em Situação Moderada e pode sinalizar início de sobrecarga — recomenda-se monitoramento e ações de suporte.`
+      : `${base} O fator de proteção aparece enfraquecido em Situação Moderada, indicando necessidade de reforço preventivo antes de agravamento.`;
   }
   if (sev === "critico") {
     return risco
       ? `${base} Trata-se de exposição elevada neste fator de risco, com potencial impacto à saúde ocupacional — prioridade de intervenção organizacional.`
-      : `${base} O fator de proteção encontra-se significativamente reduzido (Risco para a Saúde), exigindo reforço prioritário do ponto de vista psicossocial.`;
+      : `${base} O fator de proteção encontra-se significativamente reduzido (Situação Desfavorável), exigindo reforço prioritário do ponto de vista psicossocial.`;
   }
   return `${base} A classificação quantitativa não pôde ser definida plenamente para esta dimensão.`;
 }
@@ -171,14 +171,14 @@ export function textoPossiveisImpactos(
   }
   if (sev === "intermediario") {
     return (
-      `Em “${d.nome}”, o resultado intermediário pode elevar fadiga, tensão interpessoal e redução gradual de desempenho, afetando clima e saúde ocupacional se não houver acompanhamento. ` +
-      `É uma janela oportuna para prevenção, evitando evolução para cenário crítico.`
+      `Em “${d.nome}”, o resultado em Situação Moderada pode elevar fadiga, tensão interpessoal e redução gradual de desempenho, afetando clima e saúde ocupacional se não houver acompanhamento. ` +
+      `É uma janela oportuna para prevenção, evitando evolução para Situação Desfavorável.`
     );
   }
   if (sev === "critico") {
     return risco
-      ? `Em “${d.nome}”, o resultado em Risco para a Saúde eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, exigindo resposta organizacional estruturada.`
-      : `Em “${d.nome}”, a fragilidade deste fator de proteção (Risco para a Saúde) pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores.`;
+      ? `Em “${d.nome}”, o resultado em Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, exigindo resposta organizacional estruturada.`
+      : `Em “${d.nome}”, a fragilidade deste fator de proteção (Situação Desfavorável) pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores.`;
   }
   return `Os impactos específicos de “${d.nome}” dependem de aprofundamento qualitativo complementar à análise quantitativa.`;
 }
@@ -333,11 +333,11 @@ export function gerarConteudoExecutivo(
 
   const conclusaoTecnica = [
     `Do ponto de vista técnico, a campanha reuniu ${respondentes} resposta(s) válida(s) em um universo de ${participantes} participante(s) (${taxa} de participação), conferindo base empírica para leitura executiva dos riscos psicossociais em ${empresa}.`,
-    `Das ${dimensoes.length} dimensões no cálculo quantitativo, ${favoraveis.length} apresentaram Situação Favorável, ${intermediarias.length} Risco Intermediário e ${criticasAltas.length} Risco para a Saúde.`,
+    `Das ${dimensoes.length} dimensões no cálculo quantitativo, ${favoraveis.length} apresentaram Situação Favorável, ${intermediarias.length} Situação Moderada e ${criticasAltas.length} Situação Desfavorável.`,
     criticasAltas.length > 0
       ? `O panorama geral indica necessidade de intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva a probabilidade de impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
       : intermediarias.length > 0
-        ? `O panorama geral é de atenção/monitoramento: não há dimensões em Risco para a Saúde, porém o conjunto em Risco Intermediário (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
+        ? `O panorama geral é de atenção/monitoramento: não há dimensões em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
         : `O panorama geral é estável e favorável. A organização demonstra, neste ciclo, predominância de condições psicossociais positivas, o que não dispensa a manutenção de rotinas de vigilância e reavaliação periódica.`,
     melhores.length > 0
       ? `Como fatores positivos a preservar, destacam-se ${listarNomes(melhores)}. A consolidação desses resultados deve ser tratada como ativo de gestão, e não apenas como ausência de problema.`
@@ -347,7 +347,7 @@ export function gerarConteudoExecutivo(
   const recomendacoesGerais: string[] = [];
   if (criticasAltas.length > 0) {
     recomendacoesGerais.push(
-      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as dimensões em Risco para a Saúde: ${listarNomes(criticasAltas)}.`
+      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as dimensões em Situação Desfavorável: ${listarNomes(criticasAltas)}.`
     );
     recomendacoesGerais.push(
       "Revisar processos, jornadas e mecanismos de suporte nas áreas mais expostas, com indicadores de acompanhamento mensal."
@@ -357,7 +357,7 @@ export function gerarConteudoExecutivo(
     );
   } else if (intermediarias.length > 0) {
     recomendacoesGerais.push(
-      `Monitorar trimestralmente as dimensões em Risco Intermediário (${listarNomes(intermediarias)}) e executar ações de suporte preventivo.`
+      `Monitorar trimestralmente as dimensões em Situação Moderada (${listarNomes(intermediarias)}) e executar ações de suporte preventivo.`
     );
     recomendacoesGerais.push(
       "Fortalecer comunicação interna, desenvolvimento de lideranças e clareza de papéis como alavancas transversais de proteção."
@@ -433,8 +433,8 @@ export function montarPlanoAcao(
       acao: acaoPrincipal,
       objetivo:
         sev === "critico"
-          ? `Reduzir a exposição em Risco para a Saúde em “${d.nome}” e mitigar impactos à saúde ocupacional.`
-          : `Estabilizar “${d.nome}” (Risco Intermediário) e evitar progressão para Risco para a Saúde.`,
+          ? `Reduzir a exposição em Situação Desfavorável em “${d.nome}” e mitigar impactos à saúde ocupacional.`
+          : `Estabilizar “${d.nome}” (Situação Moderada) e evitar progressão para Situação Desfavorável.`,
       responsavelSugerido:
         sev === "critico"
           ? "Diretoria / SST / RH"

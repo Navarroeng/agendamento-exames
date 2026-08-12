@@ -185,7 +185,7 @@ export function RelatorioResumoExecutivo({
           value={emAtencao}
           hint={
             emAtencao > 0
-              ? "Intermediário ou Risco para a Saúde"
+              ? "Moderada ou Desfavorável"
               : "Nenhuma dimensão em atenção"
           }
           icon={<IconShield size={18} />}
@@ -222,7 +222,7 @@ export function RelatorioResumoExecutivo({
                 : "text-[#a16207]/80"
             }`}
           >
-            Intermediário ou Risco para a Saúde
+            Moderada ou Desfavorável
           </p>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {resumo!.dimensoesCriticas.map((d) => (

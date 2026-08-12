@@ -8,8 +8,9 @@ alwaysApply: true
 Antes de alterar qualquer coisa relacionada a COPSOQ, Pesquisa Psicossocial, Resultados, Dashboard, Relatórios, PDF, Estatísticas, Motor de cálculo, Questionário, Dimensões ou Classificações:
 
 1. Consultar **primeiro** a pasta `docs/copsoq/` (começar por `docs/copsoq/README.md`).
-2. Seguir `FORMULARIO-OFICIAL.md`, `ORIENTACOES-OFICIAIS.md`, `REGRAS-DE-CALCULO.md` e `CHECKLIST-DE-VALIDACAO.md`.
+2. Seguir `FORMULARIO-OFICIAL.md`, `ORIENTACOES-OFICIAIS.md`, `METODOLOGIA-PRODUTO.md` (classificação ativa do produto), `REGRAS-DE-CALCULO.md` e `CHECKLIST-DE-VALIDACAO.md`.
 3. Usar como binários oficiais apenas `docs/copsoq/fonte-oficial/*.pdf`.
 4. **Não** usar memória, conhecimento próprio, versões externas do COPSOQ ou regras presumidas.
-5. Se houver divergência ou lacuna oficial → parar e informar; não aproximar.
-6. Só voltar aos PDFs “de fora” do repositório quando houver **nova versão oficial** do instrumento (e então atualizar `docs/copsoq/fonte-oficial/` + markdowns).
+5. Classificação no motor: cortes e rótulos do **produto** (`METODOLOGIA-PRODUTO.md` — 1,33/2,66). Não misturar com os cortes 2,33/3,66 das Orientações.
+6. Se houver divergência ou lacuna oficial no **instrumento** (perguntas/escalas) → parar e informar; não aproximar.
+7. Só voltar aos PDFs “de fora” do repositório quando houver **nova versão oficial** do instrumento (e então atualizar `docs/copsoq/fonte-oficial/` + markdowns).

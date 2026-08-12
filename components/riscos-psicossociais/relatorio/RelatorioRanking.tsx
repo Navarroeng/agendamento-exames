@@ -86,13 +86,13 @@ function RankingAtencaoCard({
       </h4>
       {ranking.semRiscosClassificados ? (
         <p className="mt-3 rounded-2xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2.5 text-xs font-semibold leading-relaxed text-[#166534]">
-          Nenhuma dimensão apresenta Risco Intermediário ou Risco para a Saúde.
+          Nenhuma dimensão apresenta Situação Moderada ou Situação Desfavorável.
         </p>
       ) : (
         <>
           <p className="mt-1 text-[11px] text-app-muted">
-            Prioriza classificação oficial (Risco para a Saúde → Risco
-            Intermediário); depois menor favorabilidade.
+            Prioriza classificação do produto (Situação Desfavorável → Situação
+            Moderada); depois menor favorabilidade.
           </p>
           <ol className="mt-3 space-y-2">
             {ranking.itens.map((d, idx) => (

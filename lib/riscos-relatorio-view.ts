@@ -7,13 +7,13 @@ import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
 import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 
-/** Cores padronizadas das 3 faixas oficiais (apresentação). */
+/** Cores padronizadas das 3 faixas do produto (apresentação). */
 export const RELATORIO_CORES = {
   /** Situação Favorável */
   situacao_favoravel: "#16a34a",
-  /** Faixa intermediária oficial — amarelo (não laranja). */
+  /** Situação Moderada (id interno risco_intermediario) */
   risco_intermediario: "#ca8a04",
-  /** Risco para a Saúde / faixa crítica */
+  /** Situação Desfavorável (id interno risco_para_saude) */
   risco_para_saude: "#dc2626",
   classificacao_nao_definida: "#64748b",
   /** Destaques de UI (cards de atenção); alinhado ao amarelo da faixa média. */
@@ -28,12 +28,12 @@ export const RELATORIO_LEGENDA = [
   },
   {
     id: "risco_intermediario" as const,
-    label: "Risco Intermediário",
+    label: "Situação Moderada",
     cor: RELATORIO_CORES.risco_intermediario,
   },
   {
     id: "risco_para_saude" as const,
-    label: "Risco para a Saúde",
+    label: "Situação Desfavorável",
     cor: RELATORIO_CORES.risco_para_saude,
   },
 ] as const;
@@ -133,24 +133,24 @@ export function rankingMelhores(
 
 export type RankingAtencaoResultado = {
   /**
-   * Dimensões em Risco para a Saúde ou Intermediário (pior primeiro),
+   * Dimensões em Situação Desfavorável ou Moderada (pior primeiro),
    * completadas com Favoráveis de menor favorabilidade se faltar vaga.
    * Vazio quando todas as dimensões são Favoráveis (sem ranking relativo).
    */
   itens: RiscosRelatorioDimensaoSnapshot[];
-  /** Só intermediário/crítico (sem preenchimento Favorável). */
+  /** Só Moderada/Desfavorável (sem preenchimento Favorável). */
   prioritarias: RiscosRelatorioDimensaoSnapshot[];
   /**
    * Favoráveis usadas só para completar o Top quando já há
-   * intermediário/crítico. Vazio se o relatório estiver todo favorável.
+   * Moderada/Desfavorável. Vazio se o relatório estiver todo favorável.
    */
   relativasFavoraveis: RiscosRelatorioDimensaoSnapshot[];
-  /** True se nenhuma dimensão está em intermediário ou crítico. */
+  /** True se nenhuma dimensão está em Moderada ou Desfavorável. */
   semRiscosClassificados: boolean;
 };
 
 /**
- * Ranking de atenção: prioriza classificação oficial (crítico → intermediário),
+ * Ranking de atenção: prioriza classificação do produto (Desfavorável → Moderada),
  * depois menor favorabilidade. Se tudo for Favorável, não monta ranking
  * relativo — evita sugerir “problemas” em relatório saudável.
  */
@@ -319,9 +319,9 @@ export function montarDadosBarras(
 
 /**
  * Status geral do resumo executivo (somente apresentação).
- * - Favorável: nenhuma intermediária nem em Risco para a Saúde
- * - Atenção / Monitoramento: há Risco Intermediário, sem Risco para a Saúde
- * - Atenção Prioritária: há ao menos uma em Risco para a Saúde
+ * - Favorável: nenhuma Moderada nem Desfavorável
+ * - Atenção / Monitoramento: há Situação Moderada, sem Desfavorável
+ * - Atenção Prioritária: há ao menos uma Situação Desfavorável
  */
 export function statusGeralResumo(input: {
   /** @deprecated Preferir contagens separadas. Mantido para compatibilidade. */
@@ -335,7 +335,7 @@ export function statusGeralResumo(input: {
   mensagem: string;
 } {
   const nSaude = input.riscoParaSaudeCount ?? 0;
-  // Compat: se só veio o agregado antigo (intermediário + saúde juntos),
+  // Compat: se só veio o agregado antigo (Moderada + Desfavorável juntos),
   // trata como "atenção/monitoramento" — nunca como crítico automático.
   const nInter =
     input.riscoIntermediarioCount ??
@@ -349,7 +349,7 @@ export function statusGeralResumo(input: {
       tom: "critico",
       mensagem:
         input.statusGeralMensagem?.trim() ||
-        "Há dimensão(ões) em Risco para a Saúde — intervenção prioritária.",
+        "Há dimensão(ões) em Situação Desfavorável — intervenção prioritária.",
     };
   }
   if (nInter > 0) {
@@ -358,7 +358,7 @@ export function statusGeralResumo(input: {
       tom: "atencao",
       mensagem:
         input.statusGeralMensagem?.trim() ||
-        "Há dimensão(ões) em Risco Intermediário — monitorar e reforçar suporte.",
+        "Há dimensão(ões) em Situação Moderada — monitorar e reforçar suporte.",
     };
   }
   return {
@@ -366,7 +366,7 @@ export function statusGeralResumo(input: {
     tom: "ok",
     mensagem:
       input.statusGeralMensagem?.trim() ||
-      "Nenhuma dimensão em Risco Intermediário ou Risco para a Saúde.",
+      "Nenhuma dimensão em Situação Moderada ou Situação Desfavorável.",
   };
 }
 

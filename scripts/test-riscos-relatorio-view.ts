@@ -263,7 +263,7 @@ run("ranking atenção: uma Intermediária fica em 1º; Favoráveis só depois",
       tipo: "RISCO",
       media: 2.5,
       classificacaoId: "risco_intermediario",
-      classificacaoLabel: "Risco Intermediário",
+      classificacaoLabel: "Situação Moderada",
     }),
     dim({
       id: "fav2",
@@ -358,7 +358,7 @@ run("contarFaixasClassificacao separa intermediário e saúde", () => {
       tipo: "RISCO",
       media: 2,
       classificacaoId: "risco_intermediario",
-      classificacaoLabel: "Risco Intermediário",
+      classificacaoLabel: "Situação Moderada",
     }),
     dim({
       id: "c",
@@ -366,7 +366,7 @@ run("contarFaixasClassificacao separa intermediário e saúde", () => {
       tipo: "RISCO",
       media: 3,
       classificacaoId: "risco_para_saude",
-      classificacaoLabel: "Risco para a Saúde",
+      classificacaoLabel: "Situação Desfavorável",
     }),
   ]);
   assert.equal(faixas.favoravel, 1);

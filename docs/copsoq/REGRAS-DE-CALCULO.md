@@ -31,7 +31,7 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
 | `lib/copsoq-engine/normalization.ts` | Normalização de chave de alternativa |
 | `lib/copsoq-engine/dimensions.ts` | Média individual e média geral por dimensão |
 | `lib/copsoq-engine/scale-normalize.ts` | Normalização de amplitude → escala comum 0–4 |
-| `lib/copsoq-engine/classification.ts` | Faixas 2,33 / 3,66 RISCO e PROTEÇÃO |
+| `lib/copsoq-engine/classification.ts` | Faixas do produto 1,33 / 2,66 (RISCO e PROTEÇÃO) |
 | `lib/copsoq-engine/statistics.ts` | Cobertura e participação operacional |
 | `lib/copsoq-engine/interpreter.ts` | Orquestra campanha → resultado |
 
@@ -57,7 +57,7 @@ lib/riscos-resultados.ts / services/riscos-resultados.service.ts
    - **Média individual** = soma das pontuações ÷ número de perguntas da dimensão (só se o conjunto estiver completo para aquele respondente, conforme regras de cobertura do código).
    - **Média geral bruta** = média das médias individuais válidas (escala impressa do Formulário).
    - **Normalização de amplitude** (`normalizarPontuacao`): mapeia a média bruta para a **escala comum 0–4** do motor, usando min/max possíveis da dimensão (derivados automaticamente das escalas das perguntas). Dimensões já 0–4 sofrem identidade.
-   - **Classificar** a média **já normalizada** conforme tipo RISCO ou PROTEÇÃO (cortes 2,33 / 3,66).
+   - **Classificar** a média **já normalizada** conforme tipo RISCO ou PROTEÇÃO (cortes do produto **1,33 / 2,66** — ver `METODOLOGIA-PRODUTO.md`).
    - Saída: `media` = normalizada (consumida por radar/ranking/relatório); `mediaBruta` = média impressa (auditoria).
 3. Dimensão **Comportamentos ofensivos**:
    - Não entra no cálculo quantitativo (`entraNoCalculo: false`).
@@ -80,11 +80,18 @@ Entrada tipica da campanha: `interpretarCampanhaCopsoq({ respondentes, baseParti
 | Comportamentos ofensivos fora do cálculo final; análise qualitativa | Orientações |
 | Média individual = soma ÷ nº de perguntas da dimensão | Orientações |
 | Média geral = média das médias individuais | Orientações |
-| Exemplo Demandas: média individual 2,5; geral 2,43 → Risco Intermediário | Orientações |
-| Cortes 2,33 e 3,66; faixas favorável / intermediário / risco para a saúde | Orientações |
-| PROTEÇÃO: faixas invertidas em relação a RISCO | Orientações |
 | Análise separada por fator (não um único índice) | Orientações |
 | Anonimato / voluntariedade | Formulário + Orientações |
+
+### Classificação — metodologia do produto (substitui cortes das Orientações no motor)
+
+| Regra | Referência |
+|-------|------------|
+| Cortes **1,33 / 2,66** e rótulos Situação Favorável / Moderada / Desfavorável | `METODOLOGIA-PRODUTO.md` |
+| PROTEÇÃO: faixas invertidas em relação a RISCO | `METODOLOGIA-PRODUTO.md` |
+| Exemplo Demandas (Orientações): média 2,43 → no produto classifica-se como **Situação Moderada** (faixa 1,34–2,66) | Produto + exemplo de média das Orientações |
+
+Os cortes oficiais 2,33 / 3,66 e os rótulos “Risco Intermediário” / “Risco para a Saúde” permanecem documentados em `ORIENTACOES-OFICIAIS.md` como referência do instrumento, **não** como regra ativa do motor.
 
 ---
 
@@ -94,12 +101,12 @@ Entrada tipica da campanha: `interpretarCampanhaCopsoq({ respondentes, baseParti
 
 | Decisão | Justificativa técnica |
 |---------|----------------------|
-| Escala comum **0–4** | Amplitude predominante no Formulário; cortes oficiais 2,33/3,66 já estão nessa métrica no motor. |
+| Escala comum **0–4** | Amplitude predominante no Formulário; classificação do produto opera nessa métrica. |
 | Não usar 0–5 | Exigiria remapeamento dos cortes e mudaria médias exibidas das dimensões 0–4. |
 | Não usar 0–100 | Mesmo problema de impacto + divergência da escala dos cortes. |
 | Fórmula | `mediaComum = (mediaBruta − min) / (max − min) × 4` (min/max da dimensão, genéricos). |
-| Dimensões 0–4 | Identidade: `media === mediaBruta` → mesmos resultados de antes. |
-| Dimensões 0–3 (ex.: Interface, Conflitos) | Extremos passam a alcançar Favorável / Risco para a Saúde quando a resposta é o extremo impresso. |
+| Dimensões 0–4 | Identidade: `media === mediaBruta` → mesmos resultados de antes da normalização. |
+| Dimensões 0–3 (ex.: Interface, Conflitos) | Extremos passam a alcançar Favorável / Desfavorável quando a resposta é o extremo impresso. |
 
 Snapshots antigos de relatório **não** são recalculados até “Regenerar Relatório”.
 

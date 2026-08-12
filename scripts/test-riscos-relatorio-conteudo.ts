@@ -52,7 +52,7 @@ const intermediario = dim({
   tipo: "RISCO",
   media: 2.5,
   classificacaoId: "risco_intermediario",
-  classificacaoLabel: "Risco Intermediário",
+  classificacaoLabel: "Situação Moderada",
 });
 
 const critico = dim({
@@ -61,13 +61,13 @@ const critico = dim({
   tipo: "RISCO",
   media: 3.9,
   classificacaoId: "risco_para_saude",
-  classificacaoLabel: "Risco para Saúde",
+  classificacaoLabel: "Situação Desfavorável",
 });
 
 run("análise de dimensão cobre os 4 blocos técnicos", () => {
   const a = analisarDimensao(critico);
   assert.ok(a.oQueAvalia.includes("esgotamento"));
-  assert.ok(a.resultadoEncontrado.includes("Risco para Saúde"));
+  assert.ok(a.resultadoEncontrado.includes("Situação Desfavorável"));
   assert.ok(a.possiveisImpactos.length > 40);
   assert.ok(a.recomendacoes.length >= 3);
 });
@@ -100,7 +100,7 @@ run("resultado favorável vs crítico diverge na narrativa", () => {
 
 run("impactos intermediários mencionam prevenção", () => {
   const t = textoPossiveisImpactos(intermediario);
-  assert.match(t, /intermediário|prevenção|janela/i);
+  assert.match(t, /Moderada|prevenção|janela/i);
 });
 
 run("recomendações críticas são mais específicas/exigentes", () => {
@@ -177,10 +177,10 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
   assert.ok(out.resumoNarrativo.some((p) => p.includes("ABC123")));
   assert.ok(out.resumoNarrativo.some((p) => /COPSOQ II-Br/i.test(p)));
   assert.ok(out.resumoNarrativo.some((p) => /finalidade subsidiar/i.test(p)));
-  assert.ok(out.conclusaoTecnica.some((p) => /Risco para a Saúde/i.test(p)));
+  assert.ok(out.conclusaoTecnica.some((p) => /Situação Desfavorável/i.test(p)));
   assert.ok(
     out.recomendacoesGerais.some((p) =>
-      /30 dias|Risco para a Saúde/i.test(p)
+      /30 dias|Situação Desfavorável/i.test(p)
     )
   );
   assert.ok(out.planoAcao.length >= 2);

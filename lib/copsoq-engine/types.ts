@@ -10,7 +10,7 @@
  * - Orientações citam em um trecho “respostas de 1 a 5” e faixas “Intervalo (0 a 5)”.
  * - Alternativas NÃO são convertidas 0–4→1–5.
  * - Médias brutas do Formulário são normalizadas para escala comum 0–4 (amplitude
- *   predominante) antes dos cortes 2,33/3,66 — equivalência de amplitudes distintas.
+ *   predominante) antes dos cortes de classificação do produto (1,33 / 2,66).
  */
 
 import type {
@@ -104,8 +104,8 @@ export type CopsoqEngineInput = {
 /** Documentação embutida das divergências Formulário × Orientações. */
 export const COPSOQ_ENGINE_DIVERGENCIAS = [
   "Formulário: pontuações impressas 0–4 (freq./intens./saúde/exposição) e 0–3 (satisfação/impacto). Orientações citam em trecho '1 a 5' e 'Intervalo (0 a 5)'.",
-  "Motor: média bruta do Formulário é normalizada para escala comum 0–4 (amplitude predominante) antes dos cortes 2,33/3,66 — equivalência de amplitudes distintas, sem alterar o instrumento.",
-  "Cortes de classificação oficiais (≤2,33 / 2,34–3,66 / >3,66) aplicados sobre a média já normalizada para 0–4.",
+  "Motor: média bruta do Formulário é normalizada para escala comum 0–4 (amplitude predominante) antes da classificação — equivalência de amplitudes distintas, sem alterar o instrumento.",
+  "Classificação do produto (não os cortes 2,33/3,66 das Orientações): ≤1,33 / 1,34–2,66 / >2,66 com nomenclatura Situação Favorável / Moderada / Desfavorável — ver METODOLOGIA-PRODUTO.md.",
   "Risco geral agregado entre dimensões: não definido oficialmente — retorna null.",
   "Escore padronizado: não definido oficialmente — retorna null.",
   "Comportamentos ofensivos: opcionais, fora do cálculo quantitativo; só saída qualitativa.",

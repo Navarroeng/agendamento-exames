@@ -105,22 +105,24 @@ run("exemplo oficial Demandas: média individual 2,5", () => {
   assert.equal(media, 2.5);
 });
 
-run("exemplo oficial Demandas: média geral 2,43 e Risco Intermediário", () => {
+run("exemplo Demandas: média geral 2,43 → Situação Moderada (produto)", () => {
   const geral = mediaGeralDimensao([2.5, 3.0, 1.8]);
   assert.ok(geral != null);
   assert.ok(Math.abs(geral! - 2.43) < 0.005);
   const dim = getDimensaoById("demandas-trabalho")!;
   const cls = classificarMediaDimensao(dim, geral);
   assert.equal(cls.id, "risco_intermediario");
+  assert.equal(cls.label, "Situação Moderada");
 });
 
 // ---------------------------------------------------------------------------
-// RISCO × PROTEÇÃO + limites de faixa
+// RISCO × PROTEÇÃO + limites de faixa (metodologia do produto 1,33 / 2,66)
 // ---------------------------------------------------------------------------
-run("classificação RISCO nos limites oficiais", () => {
+run("classificação RISCO nos limites do produto", () => {
   const dim = getDimensaoById("demandas-trabalho")!;
   assert.equal(dim.tipo, "RISCO");
   assert.equal(classificarMediaDimensao(dim, 0).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 1.0).id, "situacao_favoravel");
   assert.equal(
     classificarMediaDimensao(dim, COPSOQ_FAIXA_BAIXA_MAX).id,
     "situacao_favoravel"
@@ -129,23 +131,29 @@ run("classificação RISCO nos limites oficiais", () => {
     classificarMediaDimensao(dim, COPSOQ_FAIXA_MEDIA_MIN).id,
     "risco_intermediario"
   );
+  assert.equal(classificarMediaDimensao(dim, 2.0).id, "risco_intermediario");
   assert.equal(
     classificarMediaDimensao(dim, COPSOQ_FAIXA_MEDIA_MAX).id,
     "risco_intermediario"
   );
-  assert.equal(classificarMediaDimensao(dim, 3.67).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(dim, 2.67).id, "risco_para_saude");
   assert.equal(classificarMediaDimensao(dim, 4).id, "risco_para_saude");
+  assert.equal(
+    classificarMediaDimensao(dim, 4).label,
+    "Situação Desfavorável"
+  );
 });
 
-run("classificação PROTEÇÃO nos limites oficiais (faixas invertidas)", () => {
+run("classificação PROTEÇÃO nos limites do produto (faixas invertidas)", () => {
   const dim = getDimensaoById("lideranca")!;
   assert.equal(dim.tipo, "PROTECAO");
   assert.equal(classificarMediaDimensao(dim, 4).id, "situacao_favoravel");
-  assert.equal(classificarMediaDimensao(dim, 3.67).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(dim, 3.0).id, "situacao_favoravel");
   assert.equal(
     classificarMediaDimensao(dim, COPSOQ_FAIXA_MEDIA_MAX).id,
     "risco_intermediario"
   );
+  assert.equal(classificarMediaDimensao(dim, 2.0).id, "risco_intermediario");
   assert.equal(
     classificarMediaDimensao(dim, COPSOQ_FAIXA_MEDIA_MIN).id,
     "risco_intermediario"
@@ -155,6 +163,23 @@ run("classificação PROTEÇÃO nos limites oficiais (faixas invertidas)", () =>
     "risco_para_saude"
   );
   assert.equal(classificarMediaDimensao(dim, 0).id, "risco_para_saude");
+  assert.equal(
+    classificarMediaDimensao(dim, 0).label,
+    "Situação Desfavorável"
+  );
+});
+
+run("fronteiras obrigatórias 1,33 / 1,34 / 2,66 / 2,67 (RISCO e PROTEÇÃO)", () => {
+  const risco = getDimensaoById("demandas-trabalho")!;
+  const prot = getDimensaoById("lideranca")!;
+  assert.equal(classificarMediaDimensao(risco, 1.33).id, "situacao_favoravel");
+  assert.equal(classificarMediaDimensao(risco, 1.34).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(risco, 2.66).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(risco, 2.67).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(prot, 1.33).id, "risco_para_saude");
+  assert.equal(classificarMediaDimensao(prot, 1.34).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(prot, 2.66).id, "risco_intermediario");
+  assert.equal(classificarMediaDimensao(prot, 2.67).id, "situacao_favoravel");
 });
 
 // ---------------------------------------------------------------------------
@@ -314,7 +339,7 @@ run("Interface: Muito satisfeito → melhor resultado possível (Favorável)", (
   assert.equal(dim.classificacao.id, "situacao_favoravel");
 });
 
-run("Conflitos: pior extremo → Risco para a Saúde (não preso em Intermediário)", () => {
+run("Conflitos: pior extremo → Situação Desfavorável (não preso em Moderada)", () => {
   const result = interpretarCampanhaCopsoq({
     respondentes: [
       {

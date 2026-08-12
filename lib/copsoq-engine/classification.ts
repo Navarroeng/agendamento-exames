@@ -1,34 +1,42 @@
 import type { CopsoqDimensao } from "@/lib/copsoq/types";
-import type {
-  CopsoqClassificacaoResultado,
-} from "@/lib/copsoq-engine/types";
+import type { CopsoqClassificacaoResultado } from "@/lib/copsoq-engine/types";
 
 /**
- * Classificações oficiais — Orientações COPSOQ II-Br.
- * Cortes explícitos: 2,33 e 3,66.
+ * Classificação do produto (Riscos Psicossociais) — escala comum 0–4.
  *
- * RISCO: 0–2,33 Favorável | 2,34–3,66 Intermediário | >3,66 Risco para Saúde
- * PROTEÇÃO: >3,66 Favorável | 2,34–3,66 Intermediário | 0–2,33 Risco para Saúde
+ * Cortes oficiais do instrumento COPSOQ II-Br (Orientações: 2,33 / 3,66) foram
+ * substituídos, por decisão de produto, pelos cortes 1,33 / 2,66 e pela
+ * nomenclatura Situação Favorável / Moderada / Desfavorável.
  *
- * Divergência documentada: tabelas citam “Intervalo (0 a 5)” enquanto o
- * Formulário pontua 0–4. Aplicamos os cortes numéricos oficiais sem
- * renormalizar a escala.
+ * Ver docs/copsoq/METODOLOGIA-PRODUTO.md e REGRAS-DE-CALCULO.md.
+ *
+ * PROTEÇÃO (maior = melhor):
+ *   > 2,66 Favorável | 1,34–2,66 Moderada | 0–1,33 Desfavorável
+ *
+ * RISCO (maior = pior):
+ *   0–1,33 Favorável | 1,34–2,66 Moderada | > 2,66 Desfavorável
+ *
+ * IDs internos estáveis (compatibilidade de snapshot / filtros):
+ *   situacao_favoravel | risco_intermediario (= Moderada) | risco_para_saude (= Desfavorável)
  */
 const CLASSIFICACOES = {
   situacao_favoravel: {
     id: "situacao_favoravel" as const,
     label: "Situação Favorável",
-    interpretacao: "Baixo/Nenhum risco",
+    interpretacao:
+      "Baixa ou inexistente exposição a fatores de risco.",
   },
   risco_intermediario: {
     id: "risco_intermediario" as const,
-    label: "Risco Intermediário",
-    interpretacao: "Médio risco",
+    label: "Situação Moderada",
+    interpretacao:
+      "Exposição a fator(es) de risco com necessidade de monitoramento.",
   },
   risco_para_saude: {
     id: "risco_para_saude" as const,
-    label: "Risco para Saúde",
-    interpretacao: "Alto risco",
+    label: "Situação Desfavorável",
+    interpretacao:
+      "Exposição significativa a fator(es) de risco, requerendo intervenção.",
   },
 };
 
@@ -38,13 +46,13 @@ export const CLASSIFICACAO_NAO_DEFINIDA: CopsoqClassificacaoResultado = {
   interpretacao: "Regra oficial insuficiente ou média indisponível",
 };
 
-/** Limites oficiais documentados nas Orientações. */
-export const COPSOQ_FAIXA_BAIXA_MAX = 2.33;
-export const COPSOQ_FAIXA_MEDIA_MIN = 2.34;
-export const COPSOQ_FAIXA_MEDIA_MAX = 3.66;
+/** Limites da metodologia do produto (escala comum 0–4). */
+export const COPSOQ_FAIXA_BAIXA_MAX = 1.33;
+export const COPSOQ_FAIXA_MEDIA_MIN = 1.34;
+export const COPSOQ_FAIXA_MEDIA_MAX = 2.66;
 
 /**
- * Classifica a média da dimensão conforme tipo RISCO/PROTEÇÃO.
+ * Classifica a média da dimensão (já normalizada 0–4) conforme tipo RISCO/PROTEÇÃO.
  * Se a dimensão não entra no cálculo quantitativo, não classifica.
  */
 export function classificarMediaDimensao(
@@ -71,7 +79,7 @@ export function classificarMediaDimensao(
     return CLASSIFICACOES.risco_para_saude;
   }
 
-  // PROTEÇÃO — faixas invertidas (Orientações)
+  // PROTEÇÃO — faixas invertidas (maior pontuação = melhor)
   if (media > COPSOQ_FAIXA_MEDIA_MAX) return CLASSIFICACOES.situacao_favoravel;
   if (media >= COPSOQ_FAIXA_MEDIA_MIN) return CLASSIFICACOES.risco_intermediario;
   return CLASSIFICACOES.risco_para_saude;
