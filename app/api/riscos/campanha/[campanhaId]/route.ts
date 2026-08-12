@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   mapRiscosCampanhaRow,
+  isRiscosCampanhaSelectSchemaError,
   RISCOS_CAMPANHA_SELECT,
   RISCOS_CAMPANHA_SELECT_LEGACY,
+  RISCOS_CAMPANHA_SELECT_SEM_LOGO,
 } from "@/lib/riscos-campanha";
 
 export const runtime = "nodejs";
@@ -41,18 +43,23 @@ export async function GET(
     let row = primary.data as Record<string, unknown> | null;
     let error = primary.error;
 
-    if (
-      error &&
-      (/origem|responsavel|observacoes|logo_/i.test(error.message ?? "") ||
-        error.code === "42703")
-    ) {
+    if (isRiscosCampanhaSelectSchemaError(error)) {
       const fb = await admin
         .from("riscos_campanhas")
-        .select(RISCOS_CAMPANHA_SELECT_LEGACY)
+        .select(RISCOS_CAMPANHA_SELECT_SEM_LOGO)
         .eq("id", campanhaId)
         .maybeSingle();
       row = fb.data as Record<string, unknown> | null;
       error = fb.error;
+      if (isRiscosCampanhaSelectSchemaError(error)) {
+        const fbLegacy = await admin
+          .from("riscos_campanhas")
+          .select(RISCOS_CAMPANHA_SELECT_LEGACY)
+          .eq("id", campanhaId)
+          .maybeSingle();
+        row = fbLegacy.data as Record<string, unknown> | null;
+        error = fbLegacy.error;
+      }
     }
 
     if (error) throw error;

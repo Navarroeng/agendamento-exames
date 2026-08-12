@@ -5,10 +5,12 @@ import {
 } from "@/lib/auditoria";
 import {
   gerarCodigoPublicoCampanha,
+  isRiscosCampanhaSelectSchemaError,
   isRiscosCampanhaStatus,
   mapRiscosCampanhaRow,
   RISCOS_CAMPANHA_SELECT,
   RISCOS_CAMPANHA_SELECT_LEGACY,
+  RISCOS_CAMPANHA_SELECT_SEM_LOGO,
   validateRiscosCampanhaCreateInput,
   validateRiscosCampanhaManualCreateInput,
   type RiscosCampanhaCreateInput,
@@ -34,6 +36,7 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
+const CAMPANHA_SELECT_SEM_LOGO = RISCOS_CAMPANHA_SELECT_SEM_LOGO;
 const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
 
 type CampanhaAuditOptions = {
@@ -94,18 +97,23 @@ export async function buscarCampanhaPorOrcamento(
   data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
   error = primary.error;
 
-  if (
-    error &&
-    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703")
-  ) {
+  if (isRiscosCampanhaSelectSchemaError(error)) {
     const fb = await supabase
       .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(CAMPANHA_SELECT_SEM_LOGO)
       .eq("orcamento_id", orcamentoId)
       .order("created_at", { ascending: false });
     data = (fb.data as Array<Record<string, unknown>> | null) ?? null;
     error = fb.error;
+    if (isRiscosCampanhaSelectSchemaError(error)) {
+      const fbLegacy = await supabase
+        .from("riscos_campanhas")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .eq("orcamento_id", orcamentoId)
+        .order("created_at", { ascending: false });
+      data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
+      error = fbLegacy.error;
+    }
   }
 
   if (error) {
@@ -133,18 +141,36 @@ export async function buscarCampanhaAtivaPorOrcamento(
     .maybeSingle();
 
   if (error) {
-    if (
-      /origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703"
-    ) {
+    if (isRiscosCampanhaSelectSchemaError(error)) {
       const fb = await supabase
         .from("riscos_campanhas")
-        .select(CAMPANHA_SELECT_LEGACY)
+        .select(CAMPANHA_SELECT_SEM_LOGO)
         .eq("orcamento_id", orcamentoId)
         .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (isRiscosCampanhaSelectSchemaError(fb.error)) {
+        const fbLegacy = await supabase
+          .from("riscos_campanhas")
+          .select(CAMPANHA_SELECT_LEGACY)
+          .eq("orcamento_id", orcamentoId)
+          .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fbLegacy.error) {
+          if (
+            fbLegacy.error.code === "42P01" ||
+            fbLegacy.error.message?.includes("does not exist")
+          ) {
+            return null;
+          }
+          throw fbLegacy.error;
+        }
+        if (!fbLegacy.data) return null;
+        return mapCampanhaRow(fbLegacy.data as Record<string, unknown>);
+      }
       if (fb.error) {
         if (
           fb.error.code === "42P01" ||
@@ -183,17 +209,21 @@ export async function listarCampanhasPorOrcamentos(
   data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
   error = primary.error;
 
-  if (
-    error &&
-    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703")
-  ) {
+  if (isRiscosCampanhaSelectSchemaError(error)) {
     const fb = await supabase
       .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(CAMPANHA_SELECT_SEM_LOGO)
       .in("orcamento_id", orcamentoIds);
     data = (fb.data as Array<Record<string, unknown>> | null) ?? null;
     error = fb.error;
+    if (isRiscosCampanhaSelectSchemaError(error)) {
+      const fbLegacy = await supabase
+        .from("riscos_campanhas")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .in("orcamento_id", orcamentoIds);
+      data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
+      error = fbLegacy.error;
+    }
   }
 
   if (error) {
@@ -223,20 +253,50 @@ export async function listarCampanhasManuaisAtivas(): Promise<
   RiscosCampanhaRecord[]
 > {
   const supabase = createClient();
-  let { data, error } = await supabase
+  let data: Array<Record<string, unknown>> | null = null;
+  let error: { message?: string; code?: string } | null = null;
+
+  const primary = await supabase
     .from("riscos_campanhas")
     .select(CAMPANHA_SELECT)
     .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
     .is("orcamento_id", null)
     .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
     .order("created_at", { ascending: false });
+  data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
+  error = primary.error;
 
-  if (
-    error &&
-    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703")
-  ) {
-    return [];
+  // Migration 107 (logo_*) pode ainda não estar aplicada: nunca engolir a listagem.
+  if (isRiscosCampanhaSelectSchemaError(error)) {
+    const fbLogo = await supabase
+      .from("riscos_campanhas")
+      .select(CAMPANHA_SELECT_SEM_LOGO)
+      .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
+      .is("orcamento_id", null)
+      .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
+      .order("created_at", { ascending: false });
+    data = (fbLogo.data as Array<Record<string, unknown>> | null) ?? null;
+    error = fbLogo.error;
+
+    if (isRiscosCampanhaSelectSchemaError(error)) {
+      const fbLegacy = await supabase
+        .from("riscos_campanhas")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .is("orcamento_id", null)
+        .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
+        .order("created_at", { ascending: false });
+      data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
+      error = fbLegacy.error;
+      if (!error && data) {
+        // LEGACY sem coluna origem: filtra no cliente quando possível.
+        data = data.filter((row) => {
+          const origem = row.origem;
+          return (
+            origem == null || origem === RISCOS_CAMPANHA_ORIGEM.manual_cliente
+          );
+        });
+      }
+    }
   }
 
   if (error) {
@@ -246,9 +306,7 @@ export async function listarCampanhasManuaisAtivas(): Promise<
     throw error;
   }
 
-  return (data ?? []).map((row) =>
-    mapCampanhaRow(row as Record<string, unknown>)
-  );
+  return (data ?? []).map((row) => mapCampanhaRow(row));
 }
 
 export async function buscarCampanhaAtivaPorCliente(
@@ -272,14 +330,10 @@ export async function buscarCampanhaAtivaPorCliente(
   data = (primary.data as Record<string, unknown> | null) ?? null;
   error = primary.error;
 
-  if (
-    error &&
-    (/origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703")
-  ) {
+  if (isRiscosCampanhaSelectSchemaError(error)) {
     const fb = await supabase
       .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_LEGACY)
+      .select(CAMPANHA_SELECT_SEM_LOGO)
       .eq("cliente_id", id)
       .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
       .order("created_at", { ascending: false })
@@ -287,6 +341,18 @@ export async function buscarCampanhaAtivaPorCliente(
       .maybeSingle();
     data = (fb.data as Record<string, unknown> | null) ?? null;
     error = fb.error;
+    if (isRiscosCampanhaSelectSchemaError(error)) {
+      const fbLegacy = await supabase
+        .from("riscos_campanhas")
+        .select(CAMPANHA_SELECT_LEGACY)
+        .eq("cliente_id", id)
+        .in("status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      data = (fbLegacy.data as Record<string, unknown> | null) ?? null;
+      error = fbLegacy.error;
+    }
   }
 
   if (error) {

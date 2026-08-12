@@ -136,8 +136,25 @@ export function mapRiscosCampanhaRow(
 export const RISCOS_CAMPANHA_SELECT =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, logo_url, logo_storage_path, logo_origem, logo_nome, logo_tipo, logo_tamanho, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
 
+/** Schema com origem/cancelamento, sem colunas de logo (pré-migration 107). */
+export const RISCOS_CAMPANHA_SELECT_SEM_LOGO =
+  "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, origem, responsavel, observacoes, criado_por, cancelada_em, cancelada_por, motivo_cancelamento, created_at, updated_at";
+
 export const RISCOS_CAMPANHA_SELECT_LEGACY =
   "id, orcamento_id, cliente_id, cnpj, empresa_nome, data_inicio, data_encerramento, quantidade_prevista, status, codigo_publico, codigo_acesso_exibicao, criado_por, created_at, updated_at";
+
+/** Erro de coluna ausente no SELECT de riscos_campanhas (migrations pendentes). */
+export function isRiscosCampanhaSelectSchemaError(
+  error: { message?: string; code?: string } | null | undefined
+): boolean {
+  if (!error) return false;
+  const msg = error.message ?? "";
+  return (
+    /origem|responsavel|observacoes|logo_|cancelada_/i.test(msg) ||
+    error.code === "42703" ||
+    error.code === "PGRST204"
+  );
+}
 
 const CODIGO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
