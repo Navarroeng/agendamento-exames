@@ -331,6 +331,16 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     gap: 12px !important;
   }
 
+  body.riscos-relatorio-printing .relatorio-panorama-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-panorama-grid .riscos-relatorio-print-card {
+    box-shadow: none !important;
+  }
+
   body.riscos-relatorio-printing .riscos-relatorio-print-footer {
     display: block !important;
     margin-top: 24px;

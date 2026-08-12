@@ -13,7 +13,7 @@ import { RelatorioCapa } from "@/components/riscos-psicossociais/relatorio/Relat
 import { RelatorioCapaPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCapaPrint";
 import { RelatorioCabecalhoPrint } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoPrint";
 import { RelatorioResumoExecutivo } from "@/components/riscos-psicossociais/relatorio/RelatorioResumoExecutivo";
-import { RelatorioRadarChart } from "@/components/riscos-psicossociais/relatorio/RelatorioRadarChart";
+import { RelatorioPanoramaCategorias } from "@/components/riscos-psicossociais/relatorio/RelatorioPanoramaCategorias";
 import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
 import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
@@ -152,8 +152,8 @@ export function RiscosRelatorioViewerModal({
         <div className="riscos-relatorio-print-section">
           <RelatorioResumoExecutivo relatorio={relatorio} />
         </div>
-        <div className="riscos-relatorio-print-chart riscos-relatorio-print-section">
-          <RelatorioRadarChart dimensoes={dimensoes} />
+        <div className="riscos-relatorio-print-section">
+          <RelatorioPanoramaCategorias dimensoes={dimensoes} />
         </div>
         <div className="riscos-relatorio-print-chart riscos-relatorio-print-section">
           <RelatorioBarrasChart dimensoes={dimensoes} />
