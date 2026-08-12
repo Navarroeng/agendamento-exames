@@ -285,6 +285,23 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     min-height: 340px !important;
   }
 
+  body.riscos-relatorio-printing .relatorio-barras-lista {
+    break-inside: auto;
+  }
+
+  body.riscos-relatorio-printing .relatorio-barra-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-barra-fill,
+  body.riscos-relatorio-printing .relatorio-barra-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   body.riscos-relatorio-printing .relatorio-dimensoes-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;

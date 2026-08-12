@@ -300,7 +300,7 @@ export type BarraChartDatum = {
   id: string;
   nome: string;
   tipo: string;
-  /** Pontuação técnica na escala final da dimensão. */
+  /** Pontuação técnica na escala impressa da dimensão. */
   media: number;
   maxEscala: number;
   /**
@@ -309,7 +309,10 @@ export type BarraChartDatum = {
    */
   valorVisual: number;
   cor: string;
+  classificacaoId: string;
   classificacaoLabel: string;
+  respondentesValidos: number;
+  descricao: string;
 };
 
 /** Comprimento visual da barra (0–1). Favorabilidade relativa à escala da dimensão. */
@@ -337,7 +340,10 @@ export function montarDadosBarras(
       maxEscala: d.maxEscalaPadronizada ?? 4,
       valorVisual: valorVisualBarraDimensao(d),
       cor: corPorClassificacaoId(d.classificacaoId),
+      classificacaoId: String(d.classificacaoId),
       classificacaoLabel: d.classificacaoLabel,
+      respondentesValidos: d.respondentesValidos,
+      descricao: d.descricao ?? d.classificacaoInterpretacao ?? "",
     }))
     .sort((a, b) => b.valorVisual - a.valorVisual);
 }
