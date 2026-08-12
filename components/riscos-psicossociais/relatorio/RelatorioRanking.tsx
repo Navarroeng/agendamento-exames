@@ -146,10 +146,10 @@ export function RelatorioRanking({
           Priorização
         </p>
         <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-          Ranking Geral das Dimensões
+          Ranking Geral das Categorias
         </h3>
         <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
-          Ordenação automática considerando a favorabilidade da dimensão,
+          Ordenação automática considerando a favorabilidade da categoria,
           respeitando se a categoria é de RISCO ou PROTEÇÃO.
         </p>
       </div>

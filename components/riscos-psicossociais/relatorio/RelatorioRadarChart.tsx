@@ -22,7 +22,7 @@ export function RelatorioRadarChart({
   if (data.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] px-4 py-10 text-center text-sm text-app-muted">
-        Sem dimensões quantitativas suficientes para o gráfico radar.
+        Sem categorias quantitativas suficientes para o gráfico radar.
       </div>
     );
   }
@@ -34,12 +34,12 @@ export function RelatorioRadarChart({
           Resultado geral
         </p>
         <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-          Panorama das dimensões
+          Panorama das Categorias
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
           Cada eixo usa favorabilidade relativa (0–1), comparável entre
-          dimensões em escala 0–3 e 0–4. O tooltip exibe a pontuação técnica
-          real da dimensão.
+          categorias em escala 0–3 e 0–4. O tooltip exibe a pontuação técnica
+          real da categoria.
         </p>
       </div>
 

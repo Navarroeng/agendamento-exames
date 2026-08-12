@@ -1143,7 +1143,7 @@ function OrientacoesStep({
           Cerca de 8 a 12 minutos.
         </OrientacaoItem>
         <OrientacaoItem titulo="Quantidade de perguntas">
-          {totalPerguntas} perguntas (COPSOQ), organizadas por dimensões com
+          {totalPerguntas} perguntas (COPSOQ), organizadas por categorias com
           telas de transição entre blocos.
         </OrientacaoItem>
         <OrientacaoItem titulo="Confidencialidade">

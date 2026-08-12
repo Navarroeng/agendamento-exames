@@ -8,7 +8,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "RISCO",
     ordem: 1,
     descricao:
-      "Dimensão de risco associada a sobrecarga, ritmo e exigências emocionais do trabalho.",
+      "Categoria de risco associada a sobrecarga, ritmo e exigências emocionais do trabalho.",
     textoIntroducao:
       "As próximas perguntas são sobre as Demandas do seu trabalho.",
     entraNoCalculo: true,
@@ -19,7 +19,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 2,
     descricao:
-      "Dimensão de proteção relacionada à influência nas decisões e ao aprendizado no trabalho.",
+      "Categoria de proteção relacionada à influência nas decisões e ao aprendizado no trabalho.",
     textoIntroducao:
       "As próximas perguntas são sobre influência nas decisões e possibilidade de desenvolvimento no trabalho.",
     entraNoCalculo: true,
@@ -30,7 +30,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 3,
     descricao:
-      "Dimensão de proteção relacionada ao significado do trabalho e ao comprometimento com o local de trabalho.",
+      "Categoria de proteção relacionada ao significado do trabalho e ao comprometimento com o local de trabalho.",
     textoIntroducao:
       "As próximas perguntas são sobre o significado do seu trabalho e o comprometimento com o local de trabalho.",
     entraNoCalculo: true,
@@ -41,7 +41,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 4,
     descricao:
-      "Dimensão de proteção relacionada à informação, reconhecimento, justiça e clareza de papéis.",
+      "Categoria de proteção relacionada à informação, reconhecimento, justiça e clareza de papéis.",
     textoIntroducao:
       "As próximas perguntas são sobre informação, reconhecimento, tratamento justo e clareza de objetivos no trabalho.",
     entraNoCalculo: true,
@@ -52,7 +52,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 5,
     descricao:
-      "Dimensão de proteção relacionada à qualidade da liderança imediata.",
+      "Categoria de proteção relacionada à qualidade da liderança imediata.",
     textoIntroducao:
       "As próximas perguntas são sobre a Liderança — a relação com seu superior imediato.",
     entraNoCalculo: true,
@@ -63,7 +63,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 6,
     descricao:
-      "Dimensão de proteção relacionada à satisfação geral com o trabalho.",
+      "Categoria de proteção relacionada à satisfação geral com o trabalho.",
     textoIntroducao:
       "A próxima pergunta é sobre a sua satisfação com o trabalho como um todo.",
     entraNoCalculo: true,
@@ -74,7 +74,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "RISCO",
     ordem: 7,
     descricao:
-      "Dimensão de risco sobre o efeito do trabalho na vida particular e familiar.",
+      "Categoria de risco sobre o efeito do trabalho na vida particular e familiar.",
     textoIntroducao:
       "As próximas duas perguntas são sobre a forma como o seu trabalho afeta a sua vida particular e familiar.",
     entraNoCalculo: true,
@@ -85,7 +85,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "PROTECAO",
     ordem: 8,
     descricao:
-      "Dimensão de proteção relacionada à confiança e justiça na organização.",
+      "Categoria de proteção relacionada à confiança e justiça na organização.",
     textoIntroducao:
       "As próximas quatro perguntas não são sobre o seu próprio trabalho, mas sobre a empresa em que você trabalha.",
     entraNoCalculo: true,
@@ -95,7 +95,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     nome: "Saúde Geral",
     tipo: "PROTECAO",
     ordem: 9,
-    descricao: "Dimensão de proteção sobre a percepção geral de saúde.",
+    descricao: "Categoria de proteção sobre a percepção geral de saúde.",
     textoIntroducao:
       "As próximas cinco perguntas são sobre a sua própria saúde e bem-estar. Por favor, tente não distinguir entre sintomas que são causados pelo trabalho e sintomas que se devem a outras causas. Descreva como você está no geral. As perguntas são sobre a sua saúde e bem-estar nas últimas quatro semanas:",
     entraNoCalculo: true,
@@ -106,7 +106,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "RISCO",
     ordem: 10,
     descricao:
-      "Dimensão de risco sobre esgotamento físico/emocional, estresse e irritação.",
+      "Categoria de risco sobre esgotamento físico/emocional, estresse e irritação.",
     textoIntroducao:
       "As próximas perguntas são sobre esgotamento, estresse e irritação nas últimas quatro semanas.",
     entraNoCalculo: true,
@@ -117,7 +117,7 @@ export const COPSOQ_DIMENSOES: readonly CopsoqDimensao[] = [
     tipo: "RISCO",
     ordem: 11,
     descricao:
-      "Dimensão de risco com análise separada. Obrigatória para resposta e não entra na média geral.",
+      "Categoria de risco com análise separada. Obrigatória para resposta e não entra na média geral.",
     textoIntroducao:
       "As próximas perguntas são sobre exposição a comportamentos ofensivos no local de trabalho nos últimos 12 meses.",
     entraNoCalculo: false,

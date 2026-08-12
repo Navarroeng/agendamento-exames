@@ -200,7 +200,7 @@ export function RiscosResultadosPanel({
 
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          Dimensões
+          Categorias
         </p>
         <ul className="divide-y divide-[#eef2f7] overflow-hidden rounded-xl border border-[#e8edf5]">
           {data.dimensoes.map((d) => (
@@ -234,8 +234,8 @@ export function RiscosResultadosPanel({
         <p className="text-[11px] text-[#64748b]">
           Análise qualitativa consolidada · sem média ou classificação de risco.
           {data.comportamentosOfensivos.respondentesComAlgumaResposta > 0
-            ? ` · ${data.comportamentosOfensivos.respondentesComAlgumaResposta} sessão(ões) com alguma resposta nesta dimensão.`
-            : " · Nenhuma resposta registrada nesta dimensão."}
+            ? ` · ${data.comportamentosOfensivos.respondentesComAlgumaResposta} sessão(ões) com alguma resposta nesta categoria.`
+            : " · Nenhuma resposta registrada nesta categoria."}
         </p>
         <div className="space-y-2">
           {data.comportamentosOfensivos.itens.map((item) => (

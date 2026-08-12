@@ -211,7 +211,7 @@ export function RelatorioCapa({
             )}
           />
           <IndicadorCard
-            label="Dimensões avaliadas"
+            label="Categorias avaliadas"
             value={resumo?.quantidadeDimensoes ?? 0}
           />
           <IndicadorCard label="Status da campanha" value={statusLabel} />

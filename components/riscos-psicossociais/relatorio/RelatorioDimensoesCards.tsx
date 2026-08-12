@@ -116,7 +116,7 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
       >
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-              O que esta dimensão avalia
+              O que esta categoria avalia
             </p>
             <p className="mt-1 text-xs leading-relaxed text-navy">
               {analise.oQueAvalia}
@@ -167,13 +167,13 @@ export function RelatorioDimensoesCards({
           Detalhamento
         </p>
         <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-          Dimensões COPSOQ
+          Categorias COPSOQ
         </h3>
         <p className="mt-1 text-xs text-app-muted sm:text-sm">
-          Cada dimensão apresenta a pontuação média obtida pelos participantes,
+          Cada categoria apresenta a pontuação média obtida pelos participantes,
           respeitando a escala original do instrumento (0–3 ou 0–4). A
           classificação considera a metodologia adotada pelo sistema para cada
-          dimensão.
+          categoria.
         </p>
       </div>
       <div className="relatorio-dimensoes-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

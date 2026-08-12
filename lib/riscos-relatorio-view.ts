@@ -233,7 +233,7 @@ export function descricaoOficialDimensao(dimensaoId: string): string {
   const found = COPSOQ_DIMENSOES.find((d) => d.id === dimensaoId);
   return (
     found?.descricao ??
-    "Descrição oficial da dimensão disponível no instrumento COPSOQ II-Br."
+    "Descrição oficial da categoria disponível no instrumento COPSOQ II-Br."
   );
 }
 
@@ -394,7 +394,7 @@ export function statusGeralResumo(input: {
       tom: "critico",
       mensagem:
         input.statusGeralMensagem?.trim() ||
-        "Há dimensão(ões) em Situação Desfavorável — intervenção prioritária.",
+        "Há categoria(s) em Situação Desfavorável — intervenção prioritária.",
     };
   }
   if (nInter > 0) {
@@ -403,7 +403,7 @@ export function statusGeralResumo(input: {
       tom: "atencao",
       mensagem:
         input.statusGeralMensagem?.trim() ||
-        "Há dimensão(ões) em Situação Moderada — monitorar e reforçar suporte.",
+        "Há categoria(s) em Situação Moderada — monitorar e reforçar suporte.",
     };
   }
   return {
@@ -411,7 +411,7 @@ export function statusGeralResumo(input: {
     tom: "ok",
     mensagem:
       input.statusGeralMensagem?.trim() ||
-      "Nenhuma dimensão em Situação Moderada ou Situação Desfavorável.",
+      "Nenhuma categoria em Situação Moderada ou Situação Desfavorável.",
   };
 }
 

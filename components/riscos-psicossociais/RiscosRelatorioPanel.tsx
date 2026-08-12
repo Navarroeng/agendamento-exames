@@ -138,7 +138,7 @@ export function RiscosRelatorioPanel({
   async function handleRegenerar() {
     if (!campanha?.id || !isAdmin) return;
     const ok = window.confirm(
-      "Regenerar recalcula todas as dimensões com o motor COPSOQ atual (incluindo normalização de escalas) e substitui o snapshot salvo. Relatórios antigos sem essa regeneração continuam com os valores anteriores. Continuar?"
+      "Regenerar recalcula todas as categorias com o motor COPSOQ atual (incluindo normalização de escalas) e substitui o snapshot salvo. Relatórios antigos sem essa regeneração continuam com os valores anteriores. Continuar?"
     );
     if (!ok) return;
     setSaving(true);

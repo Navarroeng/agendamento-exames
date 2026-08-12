@@ -37,27 +37,27 @@ export type ConteudoExecutivoRelatorio = {
 /** Textos técnicos por dimensão (baseados nas descrições oficiais COPSOQ). */
 const O_QUE_AVALIA: Record<string, string> = {
   "demandas-trabalho":
-    "Esta dimensão avalia o nível de exigência quantitativa, cognitiva e emocional imposto ao trabalhador na execução das atividades — ritmo, volume de trabalho e carga emocional associada.",
+    "Esta categoria avalia o nível de exigência quantitativa, cognitiva e emocional imposto ao trabalhador na execução das atividades — ritmo, volume de trabalho e carga emocional associada.",
   "influencia-desenvolvimento":
-    "Esta dimensão avalia o grau de autonomia do trabalhador nas decisões do próprio trabalho e as oportunidades reais de aprendizado e desenvolvimento profissional.",
+    "Esta categoria avalia o grau de autonomia do trabalhador nas decisões do próprio trabalho e as oportunidades reais de aprendizado e desenvolvimento profissional.",
   "significado-comprometimento":
-    "Esta dimensão avalia o sentido atribuído ao trabalho e o vínculo afetivo-profissional com a organização, elementos associados à motivação e à permanência.",
+    "Esta categoria avalia o sentido atribuído ao trabalho e o vínculo afetivo-profissional com a organização, elementos associados à motivação e à permanência.",
   "relacoes-interpessoais":
-    "Esta dimensão avalia a qualidade das relações no trabalho: informação, reconhecimento, tratamento justo e clareza de papéis e objetivos.",
+    "Esta categoria avalia a qualidade das relações no trabalho: informação, reconhecimento, tratamento justo e clareza de papéis e objetivos.",
   "lideranca":
-    "Esta dimensão avalia a qualidade da liderança imediata — apoio, planejamento, reconhecimento e condução das equipes no dia a dia.",
+    "Esta categoria avalia a qualidade da liderança imediata — apoio, planejamento, reconhecimento e condução das equipes no dia a dia.",
   "interface-trabalho-individuo":
-    "Esta dimensão avalia a satisfação geral do trabalhador com o trabalho como um todo, refletindo o equilíbrio percebido entre exigências e recompensas.",
+    "Esta categoria avalia a satisfação geral do trabalhador com o trabalho como um todo, refletindo o equilíbrio percebido entre exigências e recompensas.",
   "conflitos-familia-trabalho":
-    "Esta dimensão avalia o quanto as demandas do trabalho interferem na vida particular e familiar, indicando risco de conflito entre esferas profissional e pessoal.",
+    "Esta categoria avalia o quanto as demandas do trabalho interferem na vida particular e familiar, indicando risco de conflito entre esferas profissional e pessoal.",
   "valores-local-trabalho":
-    "Esta dimensão avalia a percepção de confiança, justiça e coerência dos valores organizacionais no ambiente de trabalho.",
+    "Esta categoria avalia a percepção de confiança, justiça e coerência dos valores organizacionais no ambiente de trabalho.",
   "saude-geral":
-    "Esta dimensão avalia a percepção geral de saúde e bem-estar do trabalhador nas últimas semanas, independentemente da causa atribuída aos sintomas.",
+    "Esta categoria avalia a percepção geral de saúde e bem-estar do trabalhador nas últimas semanas, independentemente da causa atribuída aos sintomas.",
   "burnout-estresse":
-    "Esta dimensão avalia sinais de esgotamento físico e emocional, estresse e irritação — indicadores clássicos de desgaste psicossocial ocupacional.",
+    "Esta categoria avalia sinais de esgotamento físico e emocional, estresse e irritação — indicadores clássicos de desgaste psicossocial ocupacional.",
   "comportamentos-ofensivos":
-    "Esta dimensão avalia a exposição a comportamentos ofensivos no ambiente de trabalho. No COPSOQ II-Br, é analisada de forma qualitativa e não entra na média quantitativa geral.",
+    "Esta categoria avalia a exposição a comportamentos ofensivos no ambiente de trabalho. No COPSOQ II-Br, é analisada de forma qualitativa e não entra na média quantitativa geral.",
 };
 
 function metaDimensao(id: string) {
@@ -84,9 +84,9 @@ export function textoOQueAvalia(
   if (oficial) return oficial;
   const meta = metaDimensao(d.id);
   if (meta?.descricao) {
-    return `Esta dimensão (${isRisco(d.tipo) ? "fator de risco" : "fator de proteção"}) avalia: ${meta.descricao}`;
+    return `Esta categoria (${isRisco(d.tipo) ? "fator de risco" : "fator de proteção"}) avalia: ${meta.descricao}`;
   }
-  return `Esta dimensão avalia aspectos psicossociais relacionados a “${d.nome}”, conforme o instrumento COPSOQ II-Br.`;
+  return `Esta categoria avalia aspectos psicossociais relacionados a “${d.nome}”, conforme o instrumento COPSOQ II-Br.`;
 }
 
 export function textoResultadoEncontrado(
@@ -110,10 +110,10 @@ export function textoResultadoEncontrado(
     d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4;
   const pontuacao = formatPontuacaoComMaximo(d.media, max);
   if (d.media != null && !Number.isNaN(d.media)) {
-    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou pontuação da dimensão ${pontuacao}, resultando em ${d.classificacaoLabel}.`;
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a categoria “${d.nome}” apresentou pontuação da categoria ${pontuacao}, resultando em ${d.classificacaoLabel}.`;
   } else {
     const media = formatMediaRelatorio(d.media);
-    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a dimensão “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;
+    base = `Com base em ${d.respondentesValidos} respondente(s) válido(s), a categoria “${d.nome}” apresentou média ${media}, classificada como ${d.classificacaoLabel}.`;
   }
 
   if (sev === "favoravel") {
@@ -131,7 +131,7 @@ export function textoResultadoEncontrado(
       ? `${base} Trata-se de exposição elevada neste fator de risco, com potencial impacto à saúde ocupacional — prioridade de intervenção organizacional.`
       : `${base} O fator de proteção encontra-se significativamente reduzido (Situação Desfavorável), exigindo reforço prioritário do ponto de vista psicossocial.`;
   }
-  return `${base} A classificação quantitativa não pôde ser definida plenamente para esta dimensão.`;
+  return `${base} A classificação quantitativa não pôde ser definida plenamente para esta categoria.`;
 }
 
 export function textoPossiveisImpactos(
@@ -175,14 +175,14 @@ export function recomendacoesDimensao(
 
   if (sev === "favoravel") {
     return [
-      "Manter e documentar as boas práticas já identificadas nesta dimensão.",
+      "Manter e documentar as boas práticas já identificadas nesta categoria.",
       "Comunicar os resultados positivos às lideranças para reforço cultural.",
       ...especificas.slice(0, 2),
     ];
   }
   if (sev === "intermediario") {
     return [
-      "Monitorar indicadores desta dimensão e promover ações de suporte preventivo.",
+      "Monitorar indicadores desta categoria e promover ações de suporte preventivo.",
       "Incluir o tema em reuniões de SST/RH e acompanhar evolução em novo ciclo.",
       ...especificas,
     ];
@@ -266,7 +266,7 @@ export function analisarDimensao(
 }
 
 function listarNomes(dims: RiscosRelatorioDimensaoSnapshot[]): string {
-  if (dims.length === 0) return "nenhuma dimensão em destaque";
+  if (dims.length === 0) return "nenhuma categoria em destaque";
   if (dims.length === 1) return `“${dims[0].nome}”`;
   if (dims.length === 2) return `“${dims[0].nome}” e “${dims[1].nome}”`;
   const inicio = dims
@@ -313,11 +313,11 @@ export function gerarConteudoExecutivo(
 
   const conclusaoTecnica = [
     `Do ponto de vista técnico, a campanha reuniu ${respondentes} resposta(s) válida(s) em um universo de ${participantes} participante(s) (${taxa} de participação), conferindo base empírica para leitura executiva dos riscos psicossociais em ${empresa}.`,
-    `Das ${dimensoes.length} dimensões no cálculo quantitativo, ${favoraveis.length} apresentaram Situação Favorável, ${intermediarias.length} Situação Moderada e ${criticasAltas.length} Situação Desfavorável.`,
+    `Das ${dimensoes.length} categorias no cálculo quantitativo, ${favoraveis.length} apresentaram Situação Favorável, ${intermediarias.length} Situação Moderada e ${criticasAltas.length} Situação Desfavorável.`,
     criticasAltas.length > 0
       ? `O panorama geral indica necessidade de intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva a probabilidade de impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
       : intermediarias.length > 0
-        ? `O panorama geral é de atenção/monitoramento: não há dimensões em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
+        ? `O panorama geral é de atenção/monitoramento: não há categorias em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
         : `O panorama geral é estável e favorável. A organização demonstra, neste ciclo, predominância de condições psicossociais positivas, o que não dispensa a manutenção de rotinas de vigilância e reavaliação periódica.`,
     melhores.length > 0
       ? `Como fatores positivos a preservar, destacam-se ${listarNomes(melhores)}. A consolidação desses resultados deve ser tratada como ativo de gestão, e não apenas como ausência de problema.`
@@ -327,7 +327,7 @@ export function gerarConteudoExecutivo(
   const recomendacoesGerais: string[] = [];
   if (criticasAltas.length > 0) {
     recomendacoesGerais.push(
-      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as dimensões em Situação Desfavorável: ${listarNomes(criticasAltas)}.`
+      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as categorias em Situação Desfavorável: ${listarNomes(criticasAltas)}.`
     );
     recomendacoesGerais.push(
       "Revisar processos, jornadas e mecanismos de suporte nas áreas mais expostas, com indicadores de acompanhamento mensal."
@@ -337,7 +337,7 @@ export function gerarConteudoExecutivo(
     );
   } else if (intermediarias.length > 0) {
     recomendacoesGerais.push(
-      `Monitorar trimestralmente as dimensões em Situação Moderada (${listarNomes(intermediarias)}) e executar ações de suporte preventivo.`
+      `Monitorar trimestralmente as categorias em Situação Moderada (${listarNomes(intermediarias)}) e executar ações de suporte preventivo.`
     );
     recomendacoesGerais.push(
       "Fortalecer comunicação interna, desenvolvimento de lideranças e clareza de papéis como alavancas transversais de proteção."
@@ -361,7 +361,7 @@ export function gerarConteudoExecutivo(
   );
   if (criticas.length > 3) {
     recomendacoesGerais.push(
-      "Diante do volume de dimensões que requerem atenção, priorizar as de maior severidade e impacto operacional, evitando dispersão de esforços."
+      "Diante do volume de categorias que requerem atenção, priorizar as de maior severidade e impacto operacional, evitando dispersão de esforços."
     );
   }
 

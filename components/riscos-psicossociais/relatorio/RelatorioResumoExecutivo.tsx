@@ -175,18 +175,18 @@ export function RelatorioResumoExecutivo({
           icon={<IconUsers size={18} />}
         />
         <CardMetric
-          label="Dimensões avaliadas"
+          label="Categorias avaliadas"
           value={resumo?.quantidadeDimensoes ?? 0}
-          hint="Dimensões COPSOQ no cálculo"
+          hint="Categorias COPSOQ no cálculo"
           icon={<IconChecklist size={18} />}
         />
         <CardMetric
-          label="Dimensões em atenção"
+          label="Categorias em atenção"
           value={emAtencao}
           hint={
             emAtencao > 0
               ? "Moderada ou Desfavorável"
-              : "Nenhuma dimensão em atenção"
+              : "Nenhuma categoria em atenção"
           }
           icon={<IconShield size={18} />}
           tone={atencaoTone}
@@ -213,7 +213,7 @@ export function RelatorioResumoExecutivo({
               faixas.riscoParaSaude > 0 ? "text-[#b91c1c]" : "text-[#a16207]"
             }`}
           >
-            Dimensões em atenção
+            Categorias em atenção
           </p>
           <p
             className={`mt-0.5 text-[11px] ${

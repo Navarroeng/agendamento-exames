@@ -137,10 +137,10 @@ export function RelatorioBarrasChart({
             Comparativo
           </p>
           <h3 className="mt-1 text-lg font-extrabold text-navy sm:text-xl">
-            Resultado das dimensões
+            Resultado das Categorias
           </h3>
           <p className="mt-1 max-w-2xl text-xs text-app-muted sm:text-sm">
-            O comprimento da barra indica favorabilidade visual. Em dimensões de
+            O comprimento da barra indica favorabilidade visual. Em categorias de
             risco, pontuações técnicas menores geram barras maiores. Pontuação e
             classificação ficam sempre visíveis (incluindo no PDF).
           </p>

@@ -84,7 +84,7 @@ run("texto com pontuação da dimensão na escala impressa", () => {
     classificacaoLabel: "Situação Favorável",
   });
   const t = textoResultadoEncontrado(iface);
-  assert.match(t, /pontuação da dimensão 3,00 \/ 3/i);
+  assert.match(t, /pontuação da categoria 3,00 \/ 3/i);
   assert.match(t, /Situação Favorável/);
 });
 
