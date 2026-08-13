@@ -524,19 +524,30 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   body.riscos-relatorio-printing .relatorio-sintese-cards {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 3mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-sintese-card {
+    width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-sintese-tecnica {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   body.riscos-relatorio-printing .relatorio-assinatura-tecnica {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-top: 8mm !important;
+    margin-top: 14mm !important;
   }
 
   body.riscos-relatorio-printing .relatorio-assinatura-imagem-wrap {
-    width: 60mm !important;
+    width: 55mm !important;
   }
 
   body.riscos-relatorio-printing .relatorio-secao-graficos {
