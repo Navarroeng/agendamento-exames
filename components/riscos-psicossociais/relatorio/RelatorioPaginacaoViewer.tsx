@@ -2,6 +2,12 @@
 
 import { useLayoutEffect, useState } from "react";
 import { RISCOS_RELATORIO_PRINT_ROOT_ID } from "@/lib/riscos-relatorio-pdf";
+import {
+  RELATORIO_RODAPE_CONFIDENCIAL,
+  RELATORIO_RODAPE_NAVARRO,
+  RELATORIO_RODAPE_TITULO,
+  RELATORIO_RODAPE_VERSAO,
+} from "@/lib/riscos-relatorio-rodape";
 
 /**
  * Rodapés com número de folha no viewer (modal).
@@ -87,11 +93,13 @@ export function RelatorioPaginacaoViewer() {
           className="relatorio-viewer-pagina-rodape"
           style={{ top: f.top }}
         >
-          <span>
-            Navarro Engenharia de Segurança e Medicina Ocupacional
-          </span>
+          <span>{RELATORIO_RODAPE_NAVARRO}</span>
           <span className="relatorio-print-footer-sep">·</span>
-          <span>Relatório de Avaliação dos Riscos Psicossociais</span>
+          <span>{RELATORIO_RODAPE_TITULO}</span>
+          <span className="relatorio-print-footer-sep">·</span>
+          <span>{RELATORIO_RODAPE_VERSAO}</span>
+          <span className="relatorio-print-footer-sep">·</span>
+          <span>{RELATORIO_RODAPE_CONFIDENCIAL}</span>
           <span className="relatorio-print-footer-sep">·</span>
           <span>Página {f.pagina}</span>
         </div>

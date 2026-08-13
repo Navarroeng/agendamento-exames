@@ -211,6 +211,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   break-after: page;
   /* Named page: capa full-bleed (sem margem @page) */
   page: relatorio-capa;
+  /* Capa = 0 (sem rodapé); a folha seguinte incrementa para Página 1. */
+  counter-reset: page 0;
 }
 
 /* Área útil das páginas internas — laterais 16mm no wrapper (modal = PDF).
@@ -509,15 +511,39 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 }
 
 @media print {
+  /*
+   * Rodapé do PDF: margin boxes de @page (Chromium não incrementa
+   * counter(page) no DOM). Default + :first cobrem o caso em que named
+   * pages são ignoradas. NÃO usar visibility:hidden no * — isso omite
+   * as margin boxes no “Salvar como PDF”.
+   */
   @page {
     size: A4;
-    margin: 0;
+    margin: 6mm 0 18mm 0;
+    @bottom-center {
+      content: "Navarro Engenharia de Segurança e Medicina Ocupacional  ·  Relatório de Avaliação dos Riscos Psicossociais  ·  Versão 1.0  ·  Confidencial  ·  Página " counter(page);
+      font-family: ui-sans-serif, system-ui, sans-serif, "Segoe UI", Arial, sans-serif;
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 2.5mm;
+    }
   }
 
-  /* Capa: full-bleed. Internas: só topo/rodapé no @page (laterais no wrapper). */
+  @page :first {
+    size: A4;
+    margin: 0;
+    counter-reset: page 0;
+    @bottom-center {
+      content: none;
+    }
+  }
+
   @page relatorio-capa {
     size: A4;
     margin: 0;
+    counter-reset: page 0;
     @bottom-center {
       content: none;
     }
@@ -525,22 +551,15 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   @page relatorio-interno {
     size: A4;
-    /* Topo/rodapé no @page (repetem em cada folha). Laterais no wrapper 16mm. */
     margin: 6mm 0 18mm 0;
-    /*
-     * Chromium só avalia counter(page) em margin boxes de @page.
-     * counter-reset: page 1 em .relatorio-a4-conteudo → Visão Executiva = 1.
-     */
     @bottom-center {
-      content: "Navarro Engenharia de Segurança e Medicina Ocupacional  ·  Relatório de Avaliação dos Riscos Psicossociais  ·  Página " counter(page);
+      content: "Navarro Engenharia de Segurança e Medicina Ocupacional  ·  Relatório de Avaliação dos Riscos Psicossociais  ·  Versão 1.0  ·  Confidencial  ·  Página " counter(page);
       font-family: ui-sans-serif, system-ui, sans-serif, "Segoe UI", Arial, sans-serif;
       font-size: 7.5pt;
       font-weight: 600;
       color: #64748b;
       border-top: 1px solid #e2e8f0;
       padding-top: 2.5mm;
-      padding-left: 16mm;
-      padding-right: 16mm;
     }
   }
 
@@ -550,13 +569,9 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
-  body.riscos-relatorio-printing * {
-    visibility: hidden !important;
-  }
-
-  body.riscos-relatorio-printing #riscos-relatorio-print-root,
-  body.riscos-relatorio-printing #riscos-relatorio-print-root * {
-    visibility: visible !important;
+  /* Esconde o app atrás do modal sem ocultar as margin boxes do @page. */
+  body.riscos-relatorio-printing > *:not(.riscos-relatorio-print-shell) {
+    display: none !important;
   }
 
   body.riscos-relatorio-printing .riscos-relatorio-print-hide {

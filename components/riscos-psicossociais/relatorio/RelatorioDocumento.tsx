@@ -113,6 +113,10 @@ export function RelatorioDocumento({
           <span className="relatorio-print-footer-sep">·</span>
           <span>Relatório de Avaliação dos Riscos Psicossociais</span>
           <span className="relatorio-print-footer-sep">·</span>
+          <span>Versão 1.0</span>
+          <span className="relatorio-print-footer-sep">·</span>
+          <span>Confidencial</span>
+          <span className="relatorio-print-footer-sep">·</span>
           <span className="relatorio-print-page-num" />
         </div>
       </div>
