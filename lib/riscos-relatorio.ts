@@ -223,3 +223,34 @@ export function formatDataHoraRelatorio(iso: string | null | undefined): {
   });
   return { data, hora };
 }
+
+const MESES_EXTENSO_PT = [
+  "JANEIRO",
+  "FEVEREIRO",
+  "MARÇO",
+  "ABRIL",
+  "MAIO",
+  "JUNHO",
+  "JULHO",
+  "AGOSTO",
+  "SETEMBRO",
+  "OUTUBRO",
+  "NOVEMBRO",
+  "DEZEMBRO",
+] as const;
+
+/**
+ * Data de emissão do relatório por extenso (calendário local do `gerado_em`).
+ * Ex.: "SÃO PAULO, 12 DE AGOSTO DE 2026"
+ */
+export function formatLocalEmissaoSaoPauloExtenso(
+  iso: string | null | undefined
+): string {
+  if (!iso) return "SÃO PAULO, —";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "SÃO PAULO, —";
+  const dia = d.getDate();
+  const mes = MESES_EXTENSO_PT[d.getMonth()] ?? "—";
+  const ano = d.getFullYear();
+  return `SÃO PAULO, ${dia} DE ${mes} DE ${ano}`;
+}

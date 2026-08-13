@@ -1,10 +1,12 @@
 "use client";
 
-import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
+import {
+  formatLocalEmissaoSaoPauloExtenso,
+  type RiscosRelatorioRecord,
+} from "@/lib/riscos-relatorio";
 import { gerarConteudoExecutivo } from "@/lib/riscos-relatorio-conteudo";
 
 const ASSINATURA_SRC = "/assinaturas/pedro-henrique-navarro.png";
-const DATA_ENCERRAMENTO = "SÃO PAULO, 20 de Julho de 2026";
 
 /**
  * Última página: Síntese Técnica + assinatura técnica (mesmo DOM modal/PDF).
@@ -17,6 +19,9 @@ export function RelatorioConclusoesExecutivas({
 }) {
   const { conclusaoTecnica, recomendacoesGerais } =
     gerarConteudoExecutivo(relatorio);
+  const dataEmissaoExtenso = formatLocalEmissaoSaoPauloExtenso(
+    relatorio.gerado_em
+  );
 
   return (
     <section className="relatorio-sintese-tecnica">
@@ -60,10 +65,10 @@ export function RelatorioConclusoesExecutivas({
         </div>
       </div>
 
-      {/* Bloco único — não quebrar entre páginas; respiro maior após o conteúdo técnico */}
+      {/* Bloco único — data = gerado_em persistido; não usa “hoje” do navegador */}
       <div className="relatorio-assinatura-tecnica mt-[14mm] flex flex-col items-center text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-navy">
-          {DATA_ENCERRAMENTO}
+          {dataEmissaoExtenso}
         </p>
 
         <div className="relatorio-assinatura-imagem-wrap mt-3">
