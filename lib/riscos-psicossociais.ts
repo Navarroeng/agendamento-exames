@@ -13,6 +13,7 @@ import {
   type LaudosSstProcesso,
   type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
+import { EMPTY_LAUDOS_WORKFLOW } from "@/lib/laudos-sst-etapas";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import {
@@ -672,6 +673,8 @@ export function buildRiscosProcessoManualCliente(input: {
     dataEntrada: input.tracking?.entrada_em ?? campanha.created_at ?? null,
     concluidoEm: null,
     dataConclusaoImplantacao: null,
+    workflow: { ...EMPTY_LAUDOS_WORKFLOW },
+    tracking: null,
   };
 
   const processo = buildRiscosPsicossociaisProcesso(

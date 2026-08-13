@@ -98,6 +98,20 @@ export function useLaudosSstPage() {
     setModalTab("epis");
   }, []);
 
+  const handleModalSaved = useCallback(
+    (atualizado: LaudosSstProcesso) => {
+      setModalProcesso(atualizado);
+      setProcessos((prev) =>
+        prev.map((p) =>
+          p.implantacao.orcamento.id === atualizado.implantacao.orcamento.id
+            ? atualizado
+            : p
+        )
+      );
+    },
+    []
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -114,6 +128,7 @@ export function useLaudosSstPage() {
     handleYearChange,
     openProcesso,
     closeModal,
+    handleModalSaved,
     refresh,
   };
 }

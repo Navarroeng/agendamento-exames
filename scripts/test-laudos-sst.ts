@@ -147,6 +147,62 @@ assert.equal(concluido.etapasConcluidas, 6);
 assert.equal(concluido.progressoLabel, "6 de 6");
 assert.equal(concluido.etapaAtual, "envio_cliente");
 
+const workflowProgresso = buildLaudosSstProcesso(
+  baseProcesso({ etapaAtual: "concluido" }),
+  {
+    orcamento_id: "o1",
+    etapa_atual: "cronograma_acoes",
+    etapas_concluidas: 2,
+    epi_disponibiliza: true,
+    cadastro_realizado: false,
+  }
+);
+assert.equal(workflowProgresso.etapasConcluidas, 1);
+assert.equal(workflowProgresso.etapaAtual, "processo_inicial");
+assert.equal(workflowProgresso.progressoLabel, "1 de 6");
+
+const dataCivil = buildLaudosSstProcesso(
+  baseProcesso({ etapaAtual: "concluido" }),
+  {
+    orcamento_id: "o1",
+    etapa_atual: "processo_inicial",
+    etapas_concluidas: 1,
+    epi_disponibiliza: false,
+    cadastro_realizado: true,
+    cadastro_data: "2026-08-13T03:00:00.000Z",
+  }
+);
+assert.equal(dataCivil.workflow.cadastroData, "2026-08-13");
+assert.equal(dataCivil.etapasConcluidas, 2);
+
+const seisDeSeis = buildLaudosSstProcesso(
+  baseProcesso({ etapaAtual: "concluido" }),
+  {
+    orcamento_id: "o1",
+    etapa_atual: "envio_cliente",
+    etapas_concluidas: 4,
+    epi_disponibiliza: false,
+    cadastro_realizado: true,
+    cadastro_data: "2026-08-13",
+    cronograma_elaborado: true,
+    cronograma_data: "2026-08-13",
+    pgr_realizado: true,
+    pgr_data: "2026-08-13",
+    pcmso_realizado: true,
+    pcmso_data: "2026-08-13",
+    ltcat_realizado: true,
+    ltcat_data: "2026-08-13",
+    enviado_pedro: true,
+    aprovacao_pedro: true,
+    enviado_cliente: true,
+    enviado_cliente_email: "cliente@empresa.com",
+    enviado_cliente_data: "2026-08-13",
+  }
+);
+assert.equal(seisDeSeis.status, "concluido");
+assert.equal(seisDeSeis.etapasConcluidas, 6);
+assert.equal(seisDeSeis.progressoLabel, "6 de 6");
+
 const filtrados = filterLaudosSstProcessos([built], {
   busca: "acme",
   responsavel: "",

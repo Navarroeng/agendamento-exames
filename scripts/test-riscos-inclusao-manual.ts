@@ -26,6 +26,7 @@ import {
   type OrcamentoRiscosPsicossociaisRecord,
 } from "../lib/riscos-psicossociais";
 import type { LaudosSstProcesso } from "../lib/laudos-sst";
+import { EMPTY_LAUDOS_WORKFLOW } from "../lib/laudos-sst-etapas";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
 
 function run(name: string, fn: () => void) {
@@ -213,6 +214,8 @@ run("TESTE 8 fluxo normal ainda tem 6 etapas e Laudos", () => {
     dataEntrada: "2026-01-01",
     concluidoEm: null,
     dataConclusaoImplantacao: null,
+    workflow: { ...EMPTY_LAUDOS_WORKFLOW },
+    tracking: null,
   };
 
   const normal = buildRiscosPsicossociaisProcesso(laudos, null, null);

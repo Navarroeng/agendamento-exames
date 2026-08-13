@@ -24,6 +24,7 @@ export function LaudosSstPage() {
     handleYearChange,
     openProcesso,
     closeModal,
+    handleModalSaved,
   } = useLaudosSstPage();
 
   return (
@@ -58,6 +59,7 @@ export function LaudosSstPage() {
         tab={modalTab}
         onTabChange={setModalTab}
         onClose={closeModal}
+        onSaved={handleModalSaved}
       />
     </AppShell>
   );

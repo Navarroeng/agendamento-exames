@@ -2,6 +2,12 @@ import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
+import {
+  contarEtapasConsecutivasConcluidas,
+  EMPTY_LAUDOS_WORKFLOW,
+  resolverEtapaAtualLaudos,
+  type LaudosSstWorkflow,
+} from "@/lib/laudos-sst-etapas";
 
 /** Etapas exclusivas do módulo Laudos SST (ordem fixa). */
 export const LAUDOS_SST_ETAPAS = [
@@ -34,6 +40,27 @@ export interface OrcamentoLaudosSstRecord {
   concluido_em?: string | null;
   created_at?: string;
   updated_at?: string;
+  epi_disponibiliza?: boolean | null;
+  cadastro_realizado?: boolean | null;
+  cadastro_data?: string | null;
+  cronograma_elaborado?: boolean | null;
+  cronograma_data?: string | null;
+  cronograma_epi_respostas?: Record<string, boolean | null> | null;
+  pgr_realizado?: boolean | null;
+  pgr_data?: string | null;
+  pcmso_realizado?: boolean | null;
+  pcmso_data?: string | null;
+  ltcat_realizado?: boolean | null;
+  ltcat_data?: string | null;
+  enviado_pedro?: boolean | null;
+  enviado_pedro_em?: string | null;
+  aprovacao_pedro?: boolean | null;
+  aprovacao_pedro_em?: string | null;
+  aprovacao_pedro_por?: string | null;
+  aprovacao_pedro_por_nome?: string | null;
+  enviado_cliente?: boolean | null;
+  enviado_cliente_email?: string | null;
+  enviado_cliente_data?: string | null;
 }
 
 export interface LaudosSstProcesso {
@@ -49,6 +76,8 @@ export interface LaudosSstProcesso {
   concluidoEm: string | null;
   /** Reservado: data de conclusão da implantação. */
   dataConclusaoImplantacao: string | null;
+  workflow: LaudosSstWorkflow;
+  tracking: OrcamentoLaudosSstRecord | null;
 }
 
 export interface LaudosSstFilters {
@@ -101,23 +130,82 @@ export function isProcessoElegivelLaudosSst(
   );
 }
 
+function dateOnly(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const day = value.split("T")[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+export function mapLaudosWorkflowFromRecord(
+  tracking: OrcamentoLaudosSstRecord | null
+): LaudosSstWorkflow {
+  if (!tracking) return { ...EMPTY_LAUDOS_WORKFLOW };
+  return {
+    epiDisponibiliza: tracking.epi_disponibiliza ?? null,
+    cadastroRealizado: tracking.cadastro_realizado ?? null,
+    cadastroData: dateOnly(tracking.cadastro_data),
+    cronogramaElaborado: tracking.cronograma_elaborado ?? null,
+    cronogramaData: dateOnly(tracking.cronograma_data),
+    cronogramaEpiRespostas:
+      tracking.cronograma_epi_respostas &&
+      typeof tracking.cronograma_epi_respostas === "object"
+        ? { ...tracking.cronograma_epi_respostas }
+        : {},
+    pgrRealizado: tracking.pgr_realizado ?? null,
+    pgrData: dateOnly(tracking.pgr_data),
+    pcmsoRealizado: tracking.pcmso_realizado ?? null,
+    pcmsoData: dateOnly(tracking.pcmso_data),
+    ltcatRealizado: tracking.ltcat_realizado ?? null,
+    ltcatData: dateOnly(tracking.ltcat_data),
+    enviadoPedro: tracking.enviado_pedro ?? null,
+    enviadoPedroEm: tracking.enviado_pedro_em ?? null,
+    aprovacaoPedro: tracking.aprovacao_pedro ?? null,
+    aprovacaoPedroEm: tracking.aprovacao_pedro_em ?? null,
+    aprovacaoPedroPorNome: tracking.aprovacao_pedro_por_nome ?? null,
+    enviadoCliente: tracking.enviado_cliente ?? null,
+    enviadoClienteEmail: tracking.enviado_cliente_email ?? null,
+    enviadoClienteData: dateOnly(tracking.enviado_cliente_data),
+  };
+}
+
+function workflowTemResposta(w: LaudosSstWorkflow): boolean {
+  return (
+    w.epiDisponibiliza !== null ||
+    w.cadastroRealizado !== null ||
+    w.cronogramaElaborado !== null ||
+    w.pgrRealizado !== null ||
+    w.pcmsoRealizado !== null ||
+    w.ltcatRealizado !== null ||
+    w.enviadoPedro !== null ||
+    w.aprovacaoPedro !== null ||
+    w.enviadoCliente !== null
+  );
+}
+
 export function buildLaudosSstProcesso(
   implantacao: ImplantacaoProcesso,
   tracking: OrcamentoLaudosSstRecord | null
 ): LaudosSstProcesso {
-  const etapaAtual =
-    tracking && isLaudosSstEtapaId(tracking.etapa_atual)
-      ? tracking.etapa_atual
-      : "epis";
-  const etapasConcluidas = Math.min(
+  const workflow = mapLaudosWorkflowFromRecord(tracking);
+  const ordem = LAUDOS_SST_ETAPAS.map((e) => e.id);
+  const computed = contarEtapasConsecutivasConcluidas(workflow, ordem);
+  const persisted = Math.min(
     LAUDOS_SST_TOTAL_ETAPAS,
     Math.max(0, Number(tracking?.etapas_concluidas) || 0)
   );
-  const concluido = isLaudosSstConcluido(
-    tracking
-      ? { status: tracking.status, etapas_concluidas: etapasConcluidas }
-      : null
-  );
+  const etapasConcluidas = workflowTemResposta(workflow) ? computed : persisted;
+  const etapaAtual = workflowTemResposta(workflow)
+    ? resolverEtapaAtualLaudos(workflow, ordem)
+    : tracking && isLaudosSstEtapaId(tracking.etapa_atual)
+      ? tracking.etapa_atual
+      : "epis";
+  const concluido = workflowTemResposta(workflow)
+    ? computed >= LAUDOS_SST_TOTAL_ETAPAS
+    : isLaudosSstConcluido(
+        tracking
+          ? { status: tracking.status, etapas_concluidas: persisted }
+          : null
+      );
 
   return {
     implantacao,
@@ -129,6 +217,8 @@ export function buildLaudosSstProcesso(
     dataEntrada: tracking?.entrada_em ?? tracking?.created_at ?? null,
     concluidoEm: concluido ? tracking?.concluido_em ?? null : null,
     dataConclusaoImplantacao: null,
+    workflow,
+    tracking,
   };
 }
 
