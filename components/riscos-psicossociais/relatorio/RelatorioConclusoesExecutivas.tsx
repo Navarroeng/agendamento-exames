@@ -65,8 +65,8 @@ export function RelatorioConclusoesExecutivas({
         </div>
       </div>
 
-      {/* Bloco único — data = gerado_em persistido; não usa “hoje” do navegador */}
-      <div className="relatorio-assinatura-tecnica mt-[14mm] flex flex-col items-center text-center">
+      {/* Empurrado ao rodapé da última folha (flex); data = gerado_em persistido */}
+      <div className="relatorio-assinatura-tecnica flex flex-col items-center text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-navy">
           {dataEmissaoExtenso}
         </p>

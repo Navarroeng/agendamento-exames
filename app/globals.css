@@ -191,6 +191,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   padding: 0;
   margin: 0;
   background: #fff;
+  position: relative;
 }
 
 /*
@@ -331,6 +332,73 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 .relatorio-assinatura-tecnica {
   break-inside: avoid;
   page-break-inside: avoid;
+  margin-top: auto;
+  padding-top: 12mm;
+  padding-bottom: 10mm;
+}
+
+.relatorio-secao-visao-executiva,
+.relatorio-secao-panorama,
+.relatorio-secao-graficos,
+.relatorio-secao-ranking,
+.relatorio-secao-detalhamento {
+  padding-bottom: 12mm;
+}
+
+.relatorio-secao-conclusoes {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(297mm - 28mm);
+  padding-bottom: 14mm;
+}
+
+.relatorio-sintese-tecnica {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Rodapé DOM legado — numeração real: @page no PDF, overlay no viewer */
+.relatorio-print-footer-interno {
+  display: none;
+}
+
+.relatorio-documento {
+  position: relative;
+}
+
+.relatorio-viewer-paginacao {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.relatorio-viewer-pagina-rodape {
+  position: absolute;
+  left: 16mm;
+  right: 16mm;
+  transform: translateY(-100%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-top: 1px solid #e2e8f0;
+  padding: 2.5mm 0 2mm;
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: #64748b;
+  text-align: center;
+  background: #fff;
+}
+
+.relatorio-print-footer-sep {
+  color: #cbd5e1;
 }
 
 .relatorio-assinatura-imagem-wrap {
@@ -357,12 +425,30 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   @page relatorio-capa {
     size: A4;
     margin: 0;
+    @bottom-center {
+      content: none;
+    }
   }
 
   @page relatorio-interno {
     size: A4;
-    /* Topo 6mm: o respiro extra até os logos está no padding do cabeçalho. */
-    margin: 6mm 0 18mm 0;
+    /* Laterais 16mm no @page: o rodapé (margin box) alinha à área útil.
+     * Topo 6mm: respiro extra dos logos está no padding do cabeçalho. */
+    margin: 6mm 16mm 18mm 16mm;
+    /*
+     * Chromium só avalia counter(page) em margin boxes de @page.
+     * No DOM (::after / position:fixed) o contador permanece 0 — origem do bug.
+     * Capa = folha 1 (sem este rodapé, full-bleed). Internas continuam 2, 3, …
+     */
+    @bottom-center {
+      content: "Navarro Engenharia de Segurança e Medicina Ocupacional  ·  Relatório de Avaliação dos Riscos Psicossociais  ·  Página " counter(page);
+      font-family: ui-sans-serif, system-ui, sans-serif, "Segoe UI", Arial, sans-serif;
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 2.5mm;
+    }
   }
 
   body.riscos-relatorio-printing {
@@ -453,12 +539,11 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Margens laterais no wrapper .relatorio-a4-conteudo (16mm — valor aprovado).
-   * Topo/rodapé de continuidade: @page relatorio-interno.
-   * Não zerar o padding horizontal — isso encostava o conteúdo nas bordas.
+   * Laterais passam a vir do @page relatorio-interno (16mm).
+   * Zerar o wrapper evita margem dupla; o @page aplica em cada folha.
    */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 0 16mm !important;
+    padding: 0 !important;
     background: #fff !important;
   }
 
@@ -524,6 +609,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     margin-top: 0 !important;
   }
 
+  body.riscos-relatorio-printing .relatorio-secao-visao-executiva,
+  body.riscos-relatorio-printing .relatorio-secao-panorama,
   body.riscos-relatorio-printing .relatorio-secao-graficos,
   body.riscos-relatorio-printing .relatorio-secao-ranking,
   body.riscos-relatorio-printing .relatorio-secao-detalhamento,
@@ -544,14 +631,26 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   body.riscos-relatorio-printing .relatorio-sintese-tecnica {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  body.riscos-relatorio-printing .relatorio-secao-conclusoes {
+    min-height: calc(297mm - 6mm - 18mm) !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   body.riscos-relatorio-printing .relatorio-assinatura-tecnica {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-top: 14mm !important;
+    margin-top: auto !important;
+    padding-top: 16mm !important;
+    padding-bottom: 24mm !important;
   }
 
   body.riscos-relatorio-printing .relatorio-assinatura-imagem-wrap {
@@ -603,44 +702,12 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Rodapé só nas páginas internas.
-   * Chromium repete position:fixed em toda página — na capa (p.1) a máscara
-   * azul full-bleed cobre o rodapé. Sem @page margin boxes (evita "Página 0").
+   * Rodapé no print: margin box de @page (counter(page) real).
+   * O bloco DOM é ocultado para não duplicar nem mostrar "Página 0".
    */
   body.riscos-relatorio-printing .relatorio-print-footer-interno {
-    display: block !important;
-    visibility: visible !important;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-    pointer-events: none;
-  }
-
-  body.riscos-relatorio-printing .relatorio-print-footer-inner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    border-top: 1px solid #e2e8f0;
-    margin: 0 16mm;
-    padding: 2.5mm 0 4mm;
-    font-size: 7.5pt;
-    font-weight: 600;
-    color: #64748b;
-    text-align: center;
-    /* transparente: evita faixa branca sobre a capa azul na p.1 */
-    background: transparent;
-  }
-
-  body.riscos-relatorio-printing .relatorio-print-footer-sep {
-    color: #cbd5e1;
-  }
-
-  body.riscos-relatorio-printing .relatorio-print-page-num::after {
-    content: "Página " counter(page);
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* Capa: cobre o rodapé fixo na página 1 — mesma cor sólida da capa */

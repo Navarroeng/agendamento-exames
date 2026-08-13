@@ -9,6 +9,7 @@ import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/Re
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
 import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
 import { RelatorioCabecalhoInterno } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoInterno";
+import { RelatorioPaginacaoViewer } from "@/components/riscos-psicossociais/relatorio/RelatorioPaginacaoViewer";
 import { relatorioTemNormalizacao } from "@/lib/riscos-relatorio-view";
 
 /**
@@ -103,7 +104,7 @@ export function RelatorioDocumento({
         </section>
       </div>
 
-      {/* Rodapé fixo nas páginas internas (print) — capa sem número */}
+      {/* Rodapé DOM legado — oculto; PDF usa @page; viewer usa RelatorioPaginacaoViewer */}
       <div className="relatorio-print-footer-interno" aria-hidden>
         <div className="relatorio-print-footer-inner">
           <span>
@@ -115,6 +116,8 @@ export function RelatorioDocumento({
           <span className="relatorio-print-page-num" />
         </div>
       </div>
+
+      <RelatorioPaginacaoViewer />
     </div>
   );
 }

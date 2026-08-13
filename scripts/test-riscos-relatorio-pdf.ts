@@ -7,6 +7,7 @@ import {
   nomeArquivoPdfRelatorioRiscos,
   sanitizarNomeArquivoEmpresa,
 } from "../lib/riscos-relatorio-pdf";
+import { formatLocalEmissaoSaoPauloExtenso } from "../lib/riscos-relatorio";
 
 function run(name: string, fn: () => void) {
   fn();
@@ -40,6 +41,13 @@ run("aceita gerado_em ISO", () => {
     "2026-08-12T12:00:00.000Z"
   );
   assert.match(nome, /^Relatorio_Riscos_Psicossociais_Empresa_X_\d{2}-\d{2}-\d{4}\.pdf$/);
+});
+
+run("data de emissão usa gerado_em persistido, não a data de abertura", () => {
+  assert.equal(
+    formatLocalEmissaoSaoPauloExtenso("2026-08-13T15:00:00.000-03:00"),
+    "SÃO PAULO, 13 DE AGOSTO DE 2026"
+  );
 });
 
 console.log("\nTodos os testes de PDF do relatório passaram.");

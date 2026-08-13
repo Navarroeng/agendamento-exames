@@ -266,6 +266,8 @@ export function RelatorioCapa({
             Versão 1.0
             <span className="mx-1.5 text-[#5a7199]">•</span>
             Confidencial
+            <span className="mx-1.5 text-[#5a7199]">•</span>
+            Página 1
           </p>
         </footer>
       </div>
