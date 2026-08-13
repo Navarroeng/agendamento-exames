@@ -321,9 +321,23 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   background: #c9972b;
 }
 
-/* Rodapé institucional — só no print, a partir da página 2 */
-.relatorio-print-footer-interno {
-  display: none;
+.relatorio-assinatura-tecnica {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.relatorio-assinatura-imagem-wrap {
+  width: 62mm;
+  max-width: 70%;
+}
+
+.relatorio-assinatura-imagem {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 @media print {
@@ -507,6 +521,22 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-secao-detalhamento,
   body.riscos-relatorio-printing .relatorio-secao-conclusoes {
     padding-bottom: 2mm;
+  }
+
+  body.riscos-relatorio-printing .relatorio-sintese-cards {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 3mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-assinatura-tecnica {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-top: 8mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-assinatura-imagem-wrap {
+    width: 60mm !important;
   }
 
   body.riscos-relatorio-printing .relatorio-secao-graficos {

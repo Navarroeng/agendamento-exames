@@ -418,15 +418,15 @@ export function gerarConteudoExecutivo(
 
   const conclusaoTecnica = [
     `Do ponto de vista técnico, a campanha reuniu ${respondentes} resposta(s) válida(s) em um universo de ${participantes} participante(s) (${taxa} de participação), conferindo base empírica para leitura executiva dos riscos psicossociais em ${empresa}.`,
-    `Das ${dimensoes.length} categorias no cálculo quantitativo, ${favoraveis.length} apresentaram Situação Favorável, ${intermediarias.length} Situação Moderada e ${criticasAltas.length} Situação Desfavorável.`,
+    `Das ${dimensoes.length} categorias no cálculo, ${favoraveis.length} em Situação Favorável, ${intermediarias.length} em Situação Moderada e ${criticasAltas.length} em Situação Desfavorável.`,
     criticasAltas.length > 0
-      ? `O panorama geral indica necessidade de intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva a probabilidade de impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
+      ? `O panorama indica intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
       : intermediarias.length > 0
-        ? `O panorama geral é de atenção/monitoramento: não há categorias em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento de indicadores.`
-        : `O panorama geral é estável e favorável. A organização demonstra, neste ciclo, predominância de condições psicossociais positivas, o que não dispensa a manutenção de rotinas de vigilância e reavaliação periódica.`,
+        ? `O panorama é de atenção/monitoramento: não há categorias em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento.`
+        : `O panorama é estável e favorável, com predominância de condições psicossociais positivas — o que não dispensa vigilância e reavaliação periódica.`,
     melhores.length > 0
-      ? `Como fatores positivos a preservar, destacam-se ${listarNomes(melhores)}. A consolidação desses resultados deve ser tratada como ativo de gestão, e não apenas como ausência de problema.`
-      : `Recomenda-se registrar formalmente as evidências deste ciclo para comparação longitudinal em avaliações futuras.`,
+      ? `Como fatores positivos a preservar, destacam-se ${listarNomes(melhores)}, a serem tratados como ativo de gestão.`
+      : `Recomenda-se registrar formalmente as evidências deste ciclo para comparação longitudinal.`,
   ];
 
   const recomendacoesGerais: string[] = [];
