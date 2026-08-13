@@ -251,7 +251,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   min-height: 297mm;
   margin: 0;
   padding: 0;
-  background-color: #0b1f4d;
+  background-color: #ffffff;
   background-image: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -542,7 +542,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     max-height: 297mm !important;
     min-height: 297mm !important;
     overflow: hidden !important;
-    background-color: #0b1f4d !important;
+    background-color: #ffffff !important;
     background-image: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -736,20 +736,10 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     visibility: hidden !important;
   }
 
-  /* Capa: cobre o rodapé fixo na página 1 — mesma cor sólida da capa */
+  /* Rodapé interno do print está oculto — máscara da capa não é mais necessária. */
   body.riscos-relatorio-printing .relatorio-capa-print-mask {
-    display: block !important;
-    visibility: visible !important;
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 14mm;
-    background-color: #0b1f4d !important;
-    background-image: none !important;
-    z-index: 100;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    display: none !important;
+    visibility: hidden !important;
   }
 
   body.riscos-relatorio-printing .relatorio-dimensoes-analise {
