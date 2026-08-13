@@ -341,6 +341,12 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     page-break-inside: avoid;
   }
 
+  /* Página 3 — Resultado Geral / Panorama começa no topo */
+  body.riscos-relatorio-printing .relatorio-secao-panorama {
+    break-before: page;
+    page-break-before: always;
+  }
+
   body.riscos-relatorio-printing .relatorio-barra-fill,
   body.riscos-relatorio-printing .relatorio-barra-badge,
   body.riscos-relatorio-printing .relatorio-coluna-fill,

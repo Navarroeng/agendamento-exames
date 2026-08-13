@@ -40,10 +40,10 @@ export function RelatorioDocumento({
         />
       </section>
 
-      {/* Conteúdo contínuo — quebras naturais, sem forçar página por seção */}
-      <div className="relatorio-a4-conteudo space-y-5">
+      {/* Páginas internas — Visão Executiva (p.2) e demais seções */}
+      <div className="relatorio-a4-conteudo">
         {!normalizado ? (
-          <div className="riscos-relatorio-print-card rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-sm text-[#92400e]">
+          <div className="riscos-relatorio-print-card mb-5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-sm text-[#92400e]">
             <p className="font-extrabold text-xs">
               Snapshot anterior à metodologia atual de escalas
             </p>
@@ -55,27 +55,29 @@ export function RelatorioDocumento({
           </div>
         ) : null}
 
-        <section>
+        {/* Página 2 — somente Visão Executiva */}
+        <section className="relatorio-secao-visao-executiva">
           <RelatorioResumoExecutivo relatorio={relatorio} />
         </section>
 
-        <section>
+        {/* Página 3+ — Panorama inicia no topo (quebra obrigatória no print) */}
+        <section className="relatorio-secao-panorama mt-8 print:mt-0">
           <RelatorioPanoramaCategorias dimensoes={dimensoes} />
         </section>
 
-        <section>
+        <section className="mt-5">
           <RelatorioBarrasChart dimensoes={dimensoes} />
         </section>
 
-        <section>
+        <section className="mt-5">
           <RelatorioRanking dimensoes={dimensoes} />
         </section>
 
-        <section>
+        <section className="mt-5">
           <RelatorioDimensoesCards dimensoes={dimensoes} />
         </section>
 
-        <section>
+        <section className="mt-5">
           <RelatorioConclusoesExecutivas relatorio={relatorio} />
         </section>
       </div>

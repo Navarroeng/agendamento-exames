@@ -38,24 +38,22 @@ function CardMetric({
   } as const;
 
   return (
-    <div
-      className={`rounded-xl border px-3 py-2.5 ${tones[tone]}`}
-    >
-      <div className="flex items-start justify-between gap-2">
+    <div className={`rounded-xl border px-4 py-3.5 ${tones[tone]}`}>
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
             {label}
           </p>
-          <p className="mt-1 text-lg font-extrabold tabular-nums text-navy">
+          <p className="mt-1.5 text-xl font-extrabold tabular-nums leading-none text-navy">
             {value}
           </p>
           {hint ? (
-            <p className="mt-0.5 text-[10px] leading-snug text-app-muted line-clamp-2">
+            <p className="mt-1.5 text-[11px] leading-snug text-app-muted">
               {hint}
             </p>
           ) : null}
         </div>
-        <div className="rounded-lg bg-white/80 p-1.5 text-navy ring-1 ring-[#e8edf5]">
+        <div className="rounded-lg bg-white/80 p-2 text-navy ring-1 ring-[#e8edf5]">
           {icon}
         </div>
       </div>
@@ -113,18 +111,16 @@ export function RelatorioResumoExecutivo({
         : "ok";
 
   return (
-    <section>
-      <div className="mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
+    <section className="relatorio-visao-executiva">
+      <div className="mb-5">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#94a3b8]">
           Visão executiva
         </p>
-        <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
-          Objetivo
-        </h3>
+        <h3 className="mt-3 text-lg font-extrabold text-navy">Objetivo</h3>
       </div>
 
-      <div className="mb-3 rounded-xl border border-[#e8edf5] bg-[#f8fafc] p-3.5">
-        <div className="space-y-2 text-[12px] leading-relaxed text-navy">
+      <div className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-5 py-5">
+        <div className="space-y-3.5 text-[13px] leading-relaxed text-navy">
           <p>
             O presente relatório apresenta os resultados da Avaliação de Riscos
             Psicossociais da organização <strong>{empresa}</strong> (campanha{" "}
@@ -158,28 +154,31 @@ export function RelatorioResumoExecutivo({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-3 gap-3">
         <CardMetric
           label="Participação"
           value={formatTaxaParticipacao(
             resumo?.participacaoPercentual ?? capa?.taxaParticipacao
           )}
           hint={`${capa?.respondentes ?? 0} de ${capa?.participantes ?? 0} concluíram`}
-          icon={<IconChart size={16} />}
+          icon={<IconChart size={18} />}
           tone="info"
         />
         <CardMetric
           label="Respondentes"
           value={capa?.respondentes ?? relatorio.respondentes ?? 0}
           hint="Sessões concluídas válidas"
-          icon={<IconUsers size={16} />}
+          icon={<IconUsers size={18} />}
         />
         <CardMetric
           label="Categorias avaliadas"
           value={resumo?.quantidadeDimensoes ?? 0}
           hint="Categorias COPSOQ no cálculo"
-          icon={<IconChecklist size={16} />}
+          icon={<IconChecklist size={18} />}
         />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <CardMetric
           label="Categorias em atenção"
           value={emAtencao}
@@ -188,35 +187,35 @@ export function RelatorioResumoExecutivo({
               ? "Moderada ou Desfavorável"
               : "Nenhuma categoria em atenção"
           }
-          icon={<IconShield size={16} />}
+          icon={<IconShield size={18} />}
           tone={atencaoTone}
         />
         <CardMetric
           label="Status geral"
           value={status.label}
           hint={status.mensagem}
-          icon={<IconShield size={16} />}
+          icon={<IconShield size={18} />}
           tone={statusTone}
         />
       </div>
 
       {(resumo?.dimensoesCriticas?.length ?? 0) > 0 ? (
         <div
-          className={`mt-4 rounded-2xl border px-4 py-3 ${
+          className={`riscos-relatorio-print-card mt-6 rounded-xl border px-5 py-4 ${
             faixas.riscoParaSaude > 0
               ? "border-[#fecaca] bg-[#fef2f2]"
               : "border-[#fde68a] bg-[#fefce8]"
           }`}
         >
           <p
-            className={`text-xs font-extrabold ${
+            className={`text-sm font-extrabold ${
               faixas.riscoParaSaude > 0 ? "text-[#b91c1c]" : "text-[#a16207]"
             }`}
           >
             Categorias em atenção
           </p>
           <p
-            className={`mt-0.5 text-[11px] ${
+            className={`mt-1 text-xs ${
               faixas.riscoParaSaude > 0
                 ? "text-[#b91c1c]/80"
                 : "text-[#a16207]/80"
@@ -224,11 +223,11 @@ export function RelatorioResumoExecutivo({
           >
             Moderada ou Desfavorável
           </p>
-          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
             {resumo!.dimensoesCriticas.map((d) => (
               <li
                 key={d.id}
-                className={`text-xs font-semibold ${
+                className={`text-[13px] font-semibold leading-snug ${
                   faixas.riscoParaSaude > 0
                     ? "text-[#7f1d1d]"
                     : "text-[#854d0e]"
