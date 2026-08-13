@@ -150,7 +150,7 @@ export function RelatorioCapa({
 
         <div className="min-h-[0.85rem] flex-1" aria-hidden />
 
-        {/* 4. Empresa avaliada — protagonista central */}
+        {/* 4. Empresa avaliada — identificação institucional */}
         <div className="shrink-0 text-center">
           <p
             className="text-[9px] font-bold uppercase text-[#e8d29e]"
@@ -159,17 +159,17 @@ export function RelatorioCapa({
             Empresa avaliada
           </p>
 
-          <div className="mt-3 flex justify-center">
+          <div className="mt-4 flex justify-center">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoUrl}
                 alt={`Logo ${empresa}`}
-                className="h-[5.5rem] w-auto max-w-[12rem] rounded-xl border border-white/25 bg-white object-contain p-2.5"
+                className="h-[6.5rem] w-auto max-w-[14rem] rounded-xl border border-white/25 bg-white object-contain p-3"
               />
             ) : (
               <div
-                className="flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-xl border border-white/25 text-xl font-extrabold tracking-wide text-white"
+                className="flex h-[6.5rem] w-[6.5rem] items-center justify-center rounded-xl border border-white/25 text-2xl font-extrabold tracking-wide text-white"
                 style={{
                   backgroundColor: CAPA_PANEL,
                   WebkitPrintColorAdjust: "exact",
@@ -181,41 +181,47 @@ export function RelatorioCapa({
             )}
           </div>
 
-          <p className="mx-auto mt-3 max-w-lg text-[1.05rem] font-extrabold leading-snug text-white">
+          <p className="mx-auto mt-4 max-w-xl text-[1.2rem] font-extrabold leading-snug tracking-tight text-white">
             {empresa}
           </p>
 
-          <div className="mx-auto mt-3.5 grid max-w-md grid-cols-2 gap-x-8 gap-y-2.5 text-left">
-            <div>
+          <div
+            className="mx-auto mt-3 h-[2px] w-10"
+            style={{ backgroundColor: CAPA_GOLD }}
+            aria-hidden
+          />
+
+          <div className="mx-auto mt-3.5 grid max-w-xl grid-cols-3 gap-x-4">
+            <div className="min-w-0 text-center">
               <p
-                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
-                style={{ letterSpacing: "0.14em" }}
+                className="text-[9px] font-bold uppercase text-white/65"
+                style={{ letterSpacing: "0.16em" }}
               >
                 CNPJ
               </p>
-              <p className="mt-0.5 text-[12px] font-semibold text-white">
+              <p className="mt-1.5 text-[13px] font-semibold leading-snug text-white">
                 {cnpjCliente}
               </p>
             </div>
-            <div>
+            <div className="min-w-0 text-center">
               <p
-                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
-                style={{ letterSpacing: "0.14em" }}
+                className="text-[9px] font-bold uppercase text-white/65"
+                style={{ letterSpacing: "0.16em" }}
               >
                 Campanha
               </p>
-              <p className="mt-0.5 text-[12px] font-semibold text-white">
+              <p className="mt-1.5 text-[13px] font-semibold leading-snug text-white">
                 {codigo}
               </p>
             </div>
-            <div className="col-span-2 text-center">
+            <div className="min-w-0 text-center">
               <p
-                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
-                style={{ letterSpacing: "0.14em" }}
+                className="text-[9px] font-bold uppercase text-white/65"
+                style={{ letterSpacing: "0.16em" }}
               >
                 Período avaliado
               </p>
-              <p className="mt-0.5 text-[12px] font-semibold text-white">
+              <p className="mt-1.5 text-[13px] font-semibold leading-snug text-white">
                 {periodo || "—"}
               </p>
             </div>
