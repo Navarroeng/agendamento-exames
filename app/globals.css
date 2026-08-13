@@ -212,7 +212,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   page: relatorio-capa;
 }
 
-/* Margens screen no conteúdo; print usa @page relatorio-interno (repete em cada folha). */
+/* Área útil das páginas internas — padding lateral único (modal = PDF). */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
   padding: 12mm 16mm 22mm;
@@ -332,7 +332,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     margin: 0;
   }
 
-  /* Capa: full-bleed. Internas: margem segura em TODA folha (incl. continuidade). */
+  /* Capa: full-bleed. Internas: só topo/rodapé no @page (laterais no wrapper). */
   @page relatorio-capa {
     size: A4;
     margin: 0;
@@ -340,7 +340,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   @page relatorio-interno {
     size: A4;
-    margin: 10mm 16mm 18mm 16mm;
+    margin: 10mm 0 18mm 0;
   }
 
   body.riscos-relatorio-printing {
@@ -431,11 +431,12 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Margens laterais/superior/inferior vêm de @page relatorio-interno
-   * (repetem em cada folha). Padding do container NÃO se repete.
+   * Margens laterais no wrapper .relatorio-a4-conteudo (16mm — valor aprovado).
+   * Topo/rodapé de continuidade: @page relatorio-interno.
+   * Não zerar o padding horizontal — isso encostava o conteúdo nas bordas.
    */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 0 !important;
+    padding: 0 16mm !important;
     background: #fff !important;
   }
 
