@@ -237,6 +237,46 @@ export function descricaoOficialDimensao(dimensaoId: string): string {
   );
 }
 
+/**
+ * Descrição completa e curta para o Panorama (PDF) — sem reticências.
+ * Remove prefácios redundantes; preserva o sentido integral.
+ */
+const DESCRICAO_PANORAMA: Readonly<Record<string, string>> = {
+  "demandas-trabalho":
+    "Sobrecarga, ritmo e exigências emocionais do trabalho.",
+  "influencia-desenvolvimento":
+    "Influência nas decisões, aprendizado e desenvolvimento profissional.",
+  "significado-comprometimento":
+    "Significado do trabalho e comprometimento com o local de trabalho.",
+  "relacoes-interpessoais":
+    "Informação, reconhecimento, justiça e clareza de papéis.",
+  lideranca: "Qualidade da liderança imediata.",
+  "interface-trabalho-individuo": "Satisfação geral com o trabalho.",
+  "conflitos-familia-trabalho":
+    "Efeito do trabalho na vida particular e familiar.",
+  "valores-local-trabalho": "Confiança e justiça na organização.",
+  "saude-geral": "Percepção geral de saúde.",
+  "burnout-estresse":
+    "Esgotamento físico e emocional, estresse e irritação.",
+  "comportamentos-ofensivos":
+    "Exposição a comportamentos ofensivos no local de trabalho.",
+};
+
+export function descricaoPanoramaDimensao(dimensaoId: string): string {
+  const curada = DESCRICAO_PANORAMA[dimensaoId];
+  if (curada) return curada;
+
+  const oficial = descricaoOficialDimensao(dimensaoId).trim();
+  const semPrefacio = oficial
+    .replace(
+      /^Categoria de (risco|proteção)\s+(associada a|relacionada à|relacionada ao|relacionada a|sobre)\s+/i,
+      ""
+    )
+    .trim();
+  if (!semPrefacio) return oficial;
+  return semPrefacio.charAt(0).toUpperCase() + semPrefacio.slice(1);
+}
+
 export function iniciaisEmpresa(nome: string): string {
   const parts = nome
     .trim()

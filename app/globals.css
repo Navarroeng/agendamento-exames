@@ -226,7 +226,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 /* Margens das páginas internas ficam no conteúdo (não no @page). */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
-  padding: 14mm 16mm 20mm;
+  padding: 16mm 16mm 22mm;
   background: #fff;
 }
 
@@ -330,7 +330,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   /* Margens internas no conteúdo (página 2+), não no @page */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 14mm 16mm 22mm !important;
+    padding: 16mm 16mm 24mm !important;
     background: #fff !important;
   }
 
@@ -341,10 +341,15 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     page-break-inside: avoid;
   }
 
-  /* Página 3 — Resultado Geral / Panorama começa no topo */
+  /*
+   * Seções após quebra de página: padding-top recria a margem superior
+   * (padding do container pai não se repete no topo de cada folha).
+   */
   body.riscos-relatorio-printing .relatorio-secao-panorama {
     break-before: page;
     page-break-before: always;
+    padding-top: 16mm;
+    margin-top: 0 !important;
   }
 
   body.riscos-relatorio-printing .relatorio-barra-fill,

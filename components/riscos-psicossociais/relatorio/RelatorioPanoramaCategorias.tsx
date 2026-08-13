@@ -19,7 +19,7 @@ import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 import {
   bgSuavePorClassificacaoId,
   corPorClassificacaoId,
-  descricaoOficialDimensao,
+  descricaoPanoramaDimensao,
   dimensoesParaCalculo,
   formatPontuacaoComMaximo,
 } from "@/lib/riscos-relatorio-view";
@@ -43,12 +43,6 @@ function iconeCategoria(id: string): LucideIcon {
   return ICONE_POR_CATEGORIA[id] ?? LayoutGrid;
 }
 
-function descricaoCurta(id: string, max = 72): string {
-  const texto = descricaoOficialDimensao(id).trim();
-  if (texto.length <= max) return texto;
-  return `${texto.slice(0, max - 1).trimEnd()}…`;
-}
-
 function CategoriaPanoramaCard({
   d,
 }: {
@@ -61,7 +55,7 @@ function CategoriaPanoramaCard({
     d.media,
     d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4
   );
-  const descricao = descricaoCurta(d.id);
+  const descricao = descricaoPanoramaDimensao(d.id);
 
   return (
     <article
@@ -104,7 +98,9 @@ function CategoriaPanoramaCard({
         </span>
       </div>
 
-      <p className="mt-2 text-[10px] leading-snug text-[#64748b]">{descricao}</p>
+      <p className="mt-2 flex-1 text-[11px] leading-snug text-[#64748b]">
+        {descricao}
+      </p>
     </article>
   );
 }
@@ -142,7 +138,7 @@ export function RelatorioPanoramaCategorias({
         <RelatorioLegendaCores />
       </div>
 
-      <div className="relatorio-panorama-grid grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="relatorio-panorama-grid grid grid-cols-1 items-stretch gap-2.5 sm:grid-cols-2">
         {itens.map((d) => (
           <CategoriaPanoramaCard key={d.id} d={d} />
         ))}
