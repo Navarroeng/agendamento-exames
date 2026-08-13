@@ -70,7 +70,8 @@ export function RelatorioDocumento({
           <RelatorioBarrasChart dimensoes={dimensoes} />
         </section>
 
-        <section className="mt-5">
+        {/* Página própria — Ranking Geral */}
+        <section className="relatorio-secao-ranking mt-8 print:mt-0">
           <RelatorioRanking dimensoes={dimensoes} />
         </section>
 

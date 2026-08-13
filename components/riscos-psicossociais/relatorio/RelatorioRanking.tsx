@@ -47,28 +47,28 @@ function RankingLinha({
 
   return (
     <li
-      className="relatorio-barra-row border-b border-[#eef2f7] px-3 py-3 last:border-b-0 sm:px-4 sm:py-3.5"
+      className="relatorio-barra-row border-b border-[#eef2f7] px-2.5 py-1.5 last:border-b-0 sm:px-3 sm:py-2"
       style={{ backgroundColor: posicao <= 3 ? bg : undefined }}
     >
       {/* Mobile */}
-      <div className="flex flex-col gap-2.5 sm:hidden">
-        <div className="flex items-start gap-2.5">
+      <div className="ranking-linha-mobile flex flex-col gap-1.5 sm:hidden">
+        <div className="flex items-start gap-2">
           <span
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
           >
             {posicao}º
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-extrabold leading-snug text-navy">
+            <p className="text-[12px] font-extrabold leading-snug text-navy">
               {d.nome}
             </p>
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
               {labelTipo(d.tipo)}
             </p>
           </div>
         </div>
         <div
-          className="h-3.5 w-full overflow-hidden rounded-full bg-[#eef2f7]"
+          className="h-2.5 w-full overflow-hidden rounded-full bg-[#eef2f7]"
           role="img"
           aria-label={`Favorabilidade visual ${pct.toFixed(0)}%`}
         >
@@ -77,12 +77,12 @@ function RankingLinha({
             style={{ width: `${pct}%`, backgroundColor: cor }}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-extrabold tabular-nums text-navy">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="text-[13px] font-extrabold tabular-nums text-navy">
             {pontuacao}
           </p>
           <span
-            className="relatorio-barra-badge inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold text-white"
+            className="relatorio-barra-badge inline-flex rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white"
             style={{ backgroundColor: cor }}
           >
             {d.classificacaoLabel}
@@ -90,23 +90,23 @@ function RankingLinha({
         </div>
       </div>
 
-      {/* Desktop */}
-      <div className="hidden items-center gap-3 sm:flex lg:gap-4">
+      {/* Desktop / A4 */}
+      <div className="ranking-linha-desktop hidden items-center gap-2.5 sm:flex">
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${posicaoMedalhaClass(posicao)}`}
         >
           {posicao}º
         </span>
-        <div className="w-[11rem] shrink-0 lg:w-52">
-          <p className="text-[13px] font-extrabold leading-snug text-navy">
+        <div className="w-[10.5rem] shrink-0 lg:w-48">
+          <p className="text-[12px] font-extrabold leading-snug text-navy">
             {d.nome}
           </p>
-          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
             {labelTipo(d.tipo)}
           </p>
         </div>
         <div
-          className="h-3.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#eef2f7]"
+          className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#eef2f7]"
           role="img"
           aria-label={`Favorabilidade visual ${pct.toFixed(0)}%`}
         >
@@ -115,11 +115,11 @@ function RankingLinha({
             style={{ width: `${pct}%`, backgroundColor: cor }}
           />
         </div>
-        <p className="w-[4.75rem] shrink-0 text-right text-sm font-extrabold tabular-nums text-navy">
+        <p className="w-[4.5rem] shrink-0 text-right text-[13px] font-extrabold tabular-nums text-navy">
           {pontuacao}
         </p>
         <span
-          className="relatorio-barra-badge inline-flex w-[9.5rem] shrink-0 justify-center rounded-full px-2.5 py-1 text-center text-[10px] font-extrabold leading-tight text-white lg:w-40"
+          className="relatorio-barra-badge inline-flex w-[8.75rem] shrink-0 justify-center rounded-full px-2 py-0.5 text-center text-[9px] font-extrabold leading-tight text-white lg:w-36"
           style={{ backgroundColor: cor }}
         >
           {d.classificacaoLabel}
@@ -141,24 +141,24 @@ export function RelatorioRanking({
   }
 
   return (
-    <section>
-      <div className="mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
+    <section className="relatorio-ranking">
+      <header className="mb-4">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a3b8]">
           Priorização
         </p>
-        <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
+        <h3 className="mt-2 text-base font-extrabold text-navy sm:text-lg">
           Ranking Geral das Categorias
         </h3>
-        <p className="mt-0.5 max-w-2xl text-xs text-app-muted">
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-app-muted">
           Ordenação automática considerando a favorabilidade da categoria,
           respeitando se a categoria é de RISCO ou PROTEÇÃO.
         </p>
-        <div className="mt-2">
+        <div className="mt-3.5">
           <RelatorioLegendaCores />
         </div>
-      </div>
+      </header>
 
-      <div className="overflow-hidden rounded-xl border border-[#e8edf5] bg-white">
+      <div className="relatorio-ranking-lista overflow-hidden rounded-xl border border-[#e8edf5] bg-white">
         <ol className="relatorio-barras-lista">
           {ranking.map((d, idx) => (
             <RankingLinha key={d.id} d={d} posicao={idx + 1} />

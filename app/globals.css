@@ -368,6 +368,29 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     page-break-inside: avoid;
   }
 
+  /* Página do Ranking — nunca continua na página dos gráficos */
+  body.riscos-relatorio-printing .relatorio-secao-ranking {
+    break-before: page;
+    page-break-before: always;
+    padding-top: 16mm;
+    padding-bottom: 4mm;
+    margin-top: 0 !important;
+  }
+
+  body.riscos-relatorio-printing .ranking-linha-mobile {
+    display: none !important;
+  }
+
+  body.riscos-relatorio-printing .ranking-linha-desktop {
+    display: flex !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-ranking-lista,
+  body.riscos-relatorio-printing .relatorio-barra-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   body.riscos-relatorio-printing .relatorio-barra-fill,
   body.riscos-relatorio-printing .relatorio-barra-badge,
   body.riscos-relatorio-printing .relatorio-coluna-fill,
