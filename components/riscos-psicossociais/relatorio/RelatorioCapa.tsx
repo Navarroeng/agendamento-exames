@@ -15,6 +15,7 @@ const NAVARRO_INSTITUCIONAL = {
   nome: "Navarro Engenharia de Segurança e Medicina Ocupacional",
   cnpj: NAVARRO_DADOS_BANCARIOS.pixCnpj,
   logoSrc: "/logo-navarro.png",
+  responsavel: "Pedro Navarro - CREA 5069206790/SP",
 } as const;
 
 /** Fundo sólido no elemento raiz da capa — estável no PDF (sem gradient/blur). */
@@ -71,7 +72,6 @@ export function RelatorioCapa({
   );
   const cnpjCliente = formatCNPJ(empresaCnpj);
   const codigo = capa?.codigoPublico || relatorio.codigo_publico || "—";
-  const responsavel = relatorio.gerado_por?.trim() || "—";
   const iniciais = iniciaisEmpresa(empresa);
 
   return (
@@ -98,15 +98,15 @@ export function RelatorioCapa({
               className="h-[4.25rem] w-auto max-w-[11rem] rounded-lg border border-white/20 bg-white object-contain p-2"
             />
           </div>
-          <div className="min-w-0 max-w-[58%] text-right">
+          <div className="min-w-0 max-w-[62%] text-right">
             <p className="text-[11px] font-semibold leading-snug text-white">
               {NAVARRO_INSTITUCIONAL.nome}
             </p>
             <p className="mt-1.5 text-[10px] leading-relaxed text-[#b8c5dc]">
               CNPJ: {NAVARRO_INSTITUCIONAL.cnpj}
             </p>
-            <p className="text-[10px] leading-relaxed text-[#b8c5dc]">
-              Responsável: {responsavel}
+            <p className="whitespace-nowrap text-[9px] leading-relaxed text-[#b8c5dc]">
+              Responsável: {NAVARRO_INSTITUCIONAL.responsavel}
             </p>
             <p className="text-[10px] leading-relaxed text-[#b8c5dc]">
               Emissão: {data} às {hora}
