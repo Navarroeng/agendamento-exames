@@ -33,8 +33,8 @@ export function RelatorioConclusoesExecutivas({
           Conclusão e recomendações
         </h3>
         <p className="mt-1 text-[11px] leading-snug text-app-muted">
-          Textos gerados automaticamente a partir do snapshot persistido desta
-          campanha — específicos para os resultados encontrados.
+          Análises elaboradas a partir dos resultados consolidados desta
+          campanha, considerando especificamente os resultados encontrados.
         </p>
       </header>
 
