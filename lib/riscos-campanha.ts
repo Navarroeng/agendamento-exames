@@ -239,9 +239,43 @@ export function formatPeriodoCampanha(
   return `${fmt(dataInicio)} a ${fmt(dataEncerramento)}`;
 }
 
-/** Path conceitual futuro do questionário público. */
+/** Path conceitual do questionário público. */
 export function pathAvaliacaoCampanha(codigo: string): string {
   return `/avaliacao/${codigo.trim().toUpperCase()}`;
+}
+
+/**
+ * URL pública completa da pesquisa (mesma fonte para Copiar link e QR Code).
+ * Em browser usa `window.location.origin` quando `origin` não é informado.
+ */
+export function urlPublicaPesquisaCampanha(
+  codigo: string,
+  origin?: string
+): string {
+  const path = pathAvaliacaoCampanha(codigo);
+  const base = (
+    origin ??
+    (typeof window !== "undefined" ? window.location.origin : "")
+  ).replace(/\/$/, "");
+  return base ? `${base}${path}` : path;
+}
+
+/** Nome de arquivo seguro para download do QR (empresa + código). */
+export function nomeArquivoQrCodePesquisa(
+  empresaNome: string,
+  codigoPublico: string
+): string {
+  const empresa = empresaNome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toUpperCase()
+    .slice(0, 48);
+  const codigo = codigoPublico.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const parteEmpresa = empresa || "EMPRESA";
+  const parteCodigo = codigo || "CAMPANHA";
+  return `QR-Code-${parteEmpresa}-${parteCodigo}.png`;
 }
 
 /**

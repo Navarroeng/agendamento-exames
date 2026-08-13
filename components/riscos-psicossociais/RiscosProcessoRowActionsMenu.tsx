@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   acoesMenuListagemProcessoRiscos,
-  pathAvaliacaoCampanha,
+  urlPublicaPesquisaCampanha,
 } from "@/lib/riscos-campanha";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
@@ -65,11 +65,7 @@ export function RiscosProcessoRowActionsMenu({
 
   async function handleCopiarLink() {
     if (!acoes.podeCopiarLink || !campanha?.codigo_publico) return;
-    const path = pathAvaliacaoCampanha(campanha.codigo_publico);
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}${path}`
-        : path;
+    const url = urlPublicaPesquisaCampanha(campanha.codigo_publico);
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Link copiado com sucesso.");

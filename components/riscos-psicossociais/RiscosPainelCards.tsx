@@ -8,6 +8,7 @@ import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicosso
 import { RiscosPainelPreRequisitos } from "@/components/riscos-psicossociais/RiscosPainelPreRequisitos";
 import { RiscosResultadosPanel } from "@/components/riscos-psicossociais/RiscosResultadosPanel";
 import { RiscosRelatorioPanel } from "@/components/riscos-psicossociais/RiscosRelatorioPanel";
+import { RiscosQrCodeModal } from "@/components/riscos-psicossociais/RiscosQrCodeModal";
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
@@ -15,6 +16,7 @@ import {
   acoesConvitePorStatus,
   formatPeriodoCampanha,
   pathAvaliacaoCampanha,
+  urlPublicaPesquisaCampanha,
   validateAbrirCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "@/lib/riscos-campanha";
@@ -27,7 +29,7 @@ import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 import {
   DEVELOPMENT_SKIP_LAUDOS_SST_GATE,
 } from "@/lib/riscos-psicossociais";
-
+import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-logo.service";
 interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
   participantes: RiscosCampanhaParticipanteRecord[];
@@ -173,6 +175,8 @@ export function RiscosPainelCards({
   const [confirmEncerrarOpen, setConfirmEncerrarOpen] = useState(false);
   const [confirmCancelarOpen, setConfirmCancelarOpen] = useState(false);
   const [confirmExcluirOpen, setConfirmExcluirOpen] = useState(false);
+  const [qrCodeOpen, setQrCodeOpen] = useState(false);
+  const [qrLogoUrl, setQrLogoUrl] = useState<string | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [erroCancelar, setErroCancelar] = useState<string | null>(null);
   const [confirmacaoExclusao, setConfirmacaoExclusao] = useState("");
@@ -247,16 +251,24 @@ export function RiscosPainelCards({
 
   async function handleCopiarLink() {
     if (!campanha || !permiteCopiarLink) return;
-    const path = pathAvaliacaoCampanha(campanha.codigo_publico);
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}${path}`
-        : path;
+    const url = urlPublicaPesquisaCampanha(campanha.codigo_publico);
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Link copiado.");
+      toast.success("Link da pesquisa copiado.");
     } catch {
       toast.error("Não foi possível copiar o link.");
+    }
+  }
+
+  async function handleAbrirQrCode() {
+    if (!campanha?.codigo_publico?.trim()) return;
+    setQrLogoUrl(null);
+    setQrCodeOpen(true);
+    try {
+      const url = await resolverUrlLogoCampanhaOuEmpresa(campanha);
+      setQrLogoUrl(url);
+    } catch {
+      setQrLogoUrl(null);
     }
   }
 
@@ -477,8 +489,9 @@ export function RiscosPainelCards({
                   <button
                     type="button"
                     className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
-                    disabled
-                    title="QR Code será disponibilizado em etapa futura"
+                    disabled={!campanha.codigo_publico?.trim()}
+                    title="Gerar QR Code do link público da pesquisa"
+                    onClick={() => void handleAbrirQrCode()}
                   >
                     Gerar QR Code
                   </button>
@@ -908,6 +921,17 @@ export function RiscosPainelCards({
           ) : null}
         </div>
       </Modal>
+
+      <RiscosQrCodeModal
+        open={qrCodeOpen && Boolean(campanha?.codigo_publico)}
+        onClose={() => {
+          setQrCodeOpen(false);
+          setQrLogoUrl(null);
+        }}
+        empresaNome={campanha?.empresa_nome || processo.implantacao.orcamento.cliente_nome || "Empresa"}
+        codigoPublico={campanha?.codigo_publico || ""}
+        logoUrl={qrLogoUrl}
+      />
     </div>
   );
 }
