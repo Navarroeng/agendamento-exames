@@ -5,6 +5,7 @@ import {
   EMPTY_LAUDOS_SST_FILTERS,
   filterLaudosSstProcessos,
   filterLaudosSstProcessosPorMes,
+  sortLaudosSstProcessos,
   type LaudosSstEtapaId,
   type LaudosSstFilters,
   type LaudosSstProcesso,
@@ -56,7 +57,7 @@ export function useLaudosSstPage() {
 
   const filtrados = useMemo(() => {
     const porMes = filterLaudosSstProcessosPorMes(processos, mesSelecionado);
-    return filterLaudosSstProcessos(porMes, filters);
+    return sortLaudosSstProcessos(filterLaudosSstProcessos(porMes, filters));
   }, [processos, filters, mesSelecionado]);
 
   const responsaveis = useMemo(() => {

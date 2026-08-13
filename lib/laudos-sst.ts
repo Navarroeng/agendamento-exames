@@ -276,9 +276,16 @@ export function sortLaudosSstProcessos(
   processos: LaudosSstProcesso[]
 ): LaudosSstProcesso[] {
   return [...processos].sort((a, b) => {
-    const da = a.dataEntrada ?? "";
-    const db = b.dataEntrada ?? "";
-    if (da !== db) return db.localeCompare(da);
+    if (a.etapasConcluidas !== b.etapasConcluidas) {
+      return a.etapasConcluidas - b.etapasConcluidas;
+    }
+    const da = (a.dataEntrada ?? "").slice(0, 10);
+    const db = (b.dataEntrada ?? "").slice(0, 10);
+    if (da !== db) {
+      if (!da) return 1;
+      if (!db) return -1;
+      return da.localeCompare(db);
+    }
     return a.implantacao.orcamento.numero.localeCompare(
       b.implantacao.orcamento.numero,
       "pt-BR"

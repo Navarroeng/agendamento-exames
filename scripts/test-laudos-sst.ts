@@ -7,6 +7,7 @@ import {
   isProcessoElegivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
+  sortLaudosSstProcessos,
 } from "../lib/laudos-sst";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
 
@@ -208,5 +209,36 @@ const filtrados = filterLaudosSstProcessos([built], {
   responsavel: "",
 });
 assert.equal(filtrados.length, 1);
+
+function processoOrdenacao(
+  numero: string,
+  etapas: number,
+  entrada: string
+): ReturnType<typeof buildLaudosSstProcesso> {
+  const base = baseProcesso({ etapaAtual: "concluido" });
+  base.orcamento = { ...base.orcamento, id: numero, numero };
+  return buildLaudosSstProcesso(base, {
+    orcamento_id: numero,
+    etapa_atual: etapas >= 6 ? "envio_cliente" : "epis",
+    etapas_concluidas: etapas,
+    status: etapas >= 6 ? "concluido" : "em_andamento",
+    entrada_em: `${entrada}T12:00:00.000Z`,
+  });
+}
+
+const ordenados = sortLaudosSstProcessos([
+  processoOrdenacao("Empresa C", 2, "2026-08-05"),
+  processoOrdenacao("Empresa B", 0, "2026-08-12"),
+  processoOrdenacao("Empresa D", 1, "2026-08-10"),
+  processoOrdenacao("Empresa A", 0, "2026-08-06"),
+  processoOrdenacao("Empresa E", 6, "2026-08-01"),
+]);
+assert.deepEqual(
+  ordenados.map((p) => p.implantacao.orcamento.numero),
+  ["Empresa A", "Empresa B", "Empresa D", "Empresa C", "Empresa E"]
+);
+assert.equal(ordenados[0].etapasConcluidas, 0);
+assert.equal(ordenados[1].etapasConcluidas, 0);
+assert.equal(ordenados[4].etapasConcluidas, 6);
 
 console.log("test-laudos-sst: OK");
