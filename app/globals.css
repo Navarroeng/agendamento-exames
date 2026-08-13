@@ -208,6 +208,38 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   overflow: hidden;
   page-break-after: always;
   break-after: page;
+  /* Named page: capa full-bleed (sem margem @page) */
+  page: relatorio-capa;
+}
+
+/* Margens screen no conteúdo; print usa @page relatorio-interno (repete em cada folha). */
+.relatorio-a4-conteudo {
+  box-sizing: border-box;
+  padding: 12mm 16mm 22mm;
+  background: #fff;
+  page: relatorio-interno;
+}
+
+/* Tabela COPSOQ — thead repetível no print; layout estável no modal */
+.relatorio-dimensoes-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.relatorio-dimensoes-print-table > thead > tr > td,
+.relatorio-dimensoes-print-table > tbody > tr > td {
+  padding: 0;
+  vertical-align: top;
+  border: none;
+}
+
+.relatorio-dimensoes-card-row > td {
+  padding-bottom: 10px;
+}
+
+.relatorio-dimensoes-card-row:last-child > td {
+  padding-bottom: 0;
 }
 
 .relatorio-capa-folha {
@@ -221,13 +253,6 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   background-image: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-}
-
-/* Margens das páginas internas ficam no conteúdo (não no @page). */
-.relatorio-a4-conteudo {
-  box-sizing: border-box;
-  padding: 12mm 16mm 22mm;
-  background: #fff;
 }
 
 /* Cabeçalho institucional — páginas internas (não na capa) */
@@ -305,6 +330,17 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   @page {
     size: A4;
     margin: 0;
+  }
+
+  /* Capa: full-bleed. Internas: margem segura em TODA folha (incl. continuidade). */
+  @page relatorio-capa {
+    size: A4;
+    margin: 0;
+  }
+
+  @page relatorio-interno {
+    size: A4;
+    margin: 10mm 16mm 18mm 16mm;
   }
 
   body.riscos-relatorio-printing {
@@ -394,17 +430,15 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
-  /* Margens internas no conteúdo (página 2+), não no @page */
+  /*
+   * Margens laterais/superior/inferior vêm de @page relatorio-interno
+   * (repetem em cada folha). Padding do container NÃO se repete.
+   */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 12mm 16mm 24mm !important;
+    padding: 0 !important;
     background: #fff !important;
   }
 
-  /*
-   * Cabeçalho interno fica NO FLUXO de cada seção de folha.
-   * NÃO usar position:fixed — no Chromium o fixed se repete na capa
-   * e cobre o cabeçalho original da Navarro.
-   */
   body.riscos-relatorio-printing .relatorio-cabecalho-interno {
     position: static !important;
     margin: 0 0 5mm !important;
@@ -412,6 +446,37 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     background: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /*
+   * Thead do detalhamento: repete o cabeçalho em cada folha de cards.
+   * (Solução estrutural — não depende do nome da categoria.)
+   */
+  body.riscos-relatorio-printing .relatorio-dimensoes-print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-print-thead-cabecalho {
+    display: table-header-group !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-card-row,
+  body.riscos-relatorio-printing .relatorio-dimensoes-card-row > td,
+  body.riscos-relatorio-printing .relatorio-dimensoes-card-row .riscos-relatorio-print-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-card-row > td {
+    padding-bottom: 3mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-dimensoes-titulo-row {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   body.riscos-relatorio-printing .riscos-relatorio-print-card,
@@ -422,22 +487,25 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Seções após quebra: margem superior útil + cabeçalho no fluxo.
+   * Seções após quebra forçada.
+   * Síntese Técnica: página exclusiva (após o último card COPSOQ).
    */
   body.riscos-relatorio-printing .relatorio-secao-panorama,
   body.riscos-relatorio-printing .relatorio-secao-graficos,
   body.riscos-relatorio-printing .relatorio-secao-ranking,
-  body.riscos-relatorio-printing .relatorio-secao-detalhamento {
+  body.riscos-relatorio-printing .relatorio-secao-detalhamento,
+  body.riscos-relatorio-printing .relatorio-secao-conclusoes {
     break-before: page;
     page-break-before: always;
-    padding-top: 4mm;
+    padding-top: 0;
     margin-top: 0 !important;
   }
 
   body.riscos-relatorio-printing .relatorio-secao-graficos,
   body.riscos-relatorio-printing .relatorio-secao-ranking,
-  body.riscos-relatorio-printing .relatorio-secao-detalhamento {
-    padding-bottom: 4mm;
+  body.riscos-relatorio-printing .relatorio-secao-detalhamento,
+  body.riscos-relatorio-printing .relatorio-secao-conclusoes {
+    padding-bottom: 2mm;
   }
 
   body.riscos-relatorio-printing .relatorio-secao-graficos {
@@ -546,7 +614,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     grid-template-columns: 1fr 1fr !important;
   }
 
-  body.riscos-relatorio-printing table {
+  /* Tabelas de dados — não a tabela de paginação dos cards COPSOQ */
+  body.riscos-relatorio-printing table:not(.relatorio-dimensoes-print-table) {
     break-inside: avoid;
     page-break-inside: avoid;
   }

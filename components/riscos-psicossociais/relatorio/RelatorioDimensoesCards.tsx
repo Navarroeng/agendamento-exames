@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { RiscosRelatorioDimensaoSnapshot } from "@/lib/riscos-relatorio";
 import { analisarDimensaoRelatorio } from "@/lib/riscos-relatorio-conteudo";
 import {
@@ -110,32 +111,53 @@ function DimensaoCard({ d }: { d: RiscosRelatorioDimensaoSnapshot }) {
   );
 }
 
+/**
+ * Cards COPSOQ em tabela com thead repetível no print.
+ * Qualquer card que inicie folha herda automaticamente o cabeçalho + respiro.
+ */
 export function RelatorioDimensoesCards({
   dimensoes,
+  cabecalho,
 }: {
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[];
+  cabecalho: ReactNode;
 }) {
   const list = dimensoes.filter((d) => d.entraNoCalculo);
 
   return (
     <section className="relatorio-detalhamento-copsoq">
-      <header className="mb-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a3b8]">
-          Detalhamento
-        </p>
-        <h3 className="mt-2 text-base font-extrabold text-navy sm:text-lg">
-          Categorias COPSOQ
-        </h3>
-        <p className="mt-1.5 text-xs leading-relaxed text-app-muted">
-          Análise técnica por categoria — pontuação na escala impressa e
-          classificação do sistema.
-        </p>
-      </header>
-      <div className="relatorio-dimensoes-grid grid grid-cols-1 gap-3">
-        {list.map((d) => (
-          <DimensaoCard key={d.id} d={d} />
-        ))}
-      </div>
+      <table className="relatorio-dimensoes-print-table">
+        <thead className="relatorio-print-thead-cabecalho">
+          <tr>
+            <td>{cabecalho}</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="relatorio-dimensoes-titulo-row">
+            <td>
+              <header className="mb-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a3b8]">
+                  Detalhamento
+                </p>
+                <h3 className="mt-2 text-base font-extrabold text-navy sm:text-lg">
+                  Categorias COPSOQ
+                </h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-app-muted">
+                  Análise técnica por categoria — pontuação na escala impressa e
+                  classificação do sistema.
+                </p>
+              </header>
+            </td>
+          </tr>
+          {list.map((d) => (
+            <tr key={d.id} className="relatorio-dimensoes-card-row">
+              <td>
+                <DimensaoCard d={d} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }

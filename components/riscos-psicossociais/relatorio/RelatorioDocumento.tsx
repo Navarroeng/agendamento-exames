@@ -88,12 +88,17 @@ export function RelatorioDocumento({
           <RelatorioRanking dimensoes={dimensoes} />
         </section>
 
+        {/*
+          Detalhamento: cabeçalho no thead (repete em cada folha no print).
+          Assim qualquer card que inicie página herda área segura superior.
+        */}
         <section className="relatorio-secao-detalhamento mt-8 print:mt-0">
-          {cabecalho}
-          <RelatorioDimensoesCards dimensoes={dimensoes} />
+          <RelatorioDimensoesCards dimensoes={dimensoes} cabecalho={cabecalho} />
         </section>
 
+        {/* Última seção — página exclusiva */}
         <section className="relatorio-secao-conclusoes mt-8 print:mt-0">
+          {cabecalho}
           <RelatorioConclusoesExecutivas relatorio={relatorio} />
         </section>
       </div>
