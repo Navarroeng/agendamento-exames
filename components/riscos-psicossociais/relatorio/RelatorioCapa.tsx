@@ -17,53 +17,11 @@ const NAVARRO_INSTITUCIONAL = {
   logoSrc: "/logo-navarro.png",
 } as const;
 
-/** Fundo sólido — estável em PDF (gradientes/blur caem no visualizador Chromium). */
+/** Fundo sólido no elemento raiz da capa — estável no PDF (sem gradient/blur). */
 const CAPA_BG = "#0b1f4d";
-
-function LogoDestacado({
-  src,
-  alt,
-  fallback,
-  caption,
-}: {
-  src?: string | null;
-  alt: string;
-  fallback: string;
-  caption: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={alt}
-          className="h-14 w-auto max-w-[9rem] rounded-xl border border-white/25 bg-white object-contain p-2"
-        />
-      ) : (
-        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/25 bg-[#132a5c] text-base font-extrabold tracking-wide text-white">
-          {fallback}
-        </div>
-      )}
-      <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#c5d0e6]">
-        {caption}
-      </p>
-    </div>
-  );
-}
-
-function MetaItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9eb0d0]">
-        {label}
-      </p>
-      <p className="mt-0.5 text-[12px] font-semibold leading-snug text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
+const CAPA_PANEL = "#132a5c";
+const CAPA_GOLD = "#c9972b";
+const CAPA_LINE = "#2a4578";
 
 function IndicadorCapa({
   label,
@@ -74,17 +32,18 @@ function IndicadorCapa({
 }) {
   return (
     <div
-      className="rounded-xl border border-[#2a4578] px-3 py-2"
+      className="flex min-h-[3.25rem] flex-col items-center justify-center rounded-lg border px-2 py-2 text-center"
       style={{
-        backgroundColor: "#132a5c",
+        borderColor: CAPA_LINE,
+        backgroundColor: CAPA_PANEL,
         WebkitPrintColorAdjust: "exact",
         printColorAdjust: "exact",
       }}
     >
-      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9eb0d0]">
+      <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#9eb0d0]">
         {label}
       </p>
-      <p className="mt-0.5 text-base font-extrabold tabular-nums tracking-tight text-white">
+      <p className="mt-1 text-[1.05rem] font-extrabold tabular-nums leading-none tracking-tight text-white">
         {value}
       </p>
     </div>
@@ -112,6 +71,8 @@ export function RelatorioCapa({
   );
   const cnpjCliente = formatCNPJ(empresaCnpj);
   const codigo = capa?.codigoPublico || relatorio.codigo_publico || "—";
+  const responsavel = relatorio.gerado_por?.trim() || "—";
+  const iniciais = iniciaisEmpresa(empresa);
 
   return (
     <section
@@ -122,93 +83,149 @@ export function RelatorioCapa({
         printColorAdjust: "exact",
       }}
     >
-      <div className="flex flex-1 flex-col px-5 py-4 sm:px-7 sm:py-5">
-        {/* Logos */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2a4578] pb-3">
-          <LogoDestacado
-            src={logoUrl}
-            alt={`Logo ${empresa}`}
-            fallback={iniciaisEmpresa(empresa)}
-            caption="Empresa avaliada"
-          />
-          <LogoDestacado
-            src={NAVARRO_INSTITUCIONAL.logoSrc}
-            alt="Logo Navarro Engenharia"
-            fallback="NE"
-            caption="Responsável técnico"
+      {/*
+        Distribuição vertical equilibrada na folha A4 (297mm).
+        Spacers flex-1 espalham o conteúdo — sem scale(), sem overflow.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col px-6 py-5 sm:px-8 sm:py-6">
+        {/* 1. Cabeçalho — somente Navarro */}
+        <header className="flex shrink-0 items-start justify-between gap-4">
+          <div className="shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={NAVARRO_INSTITUCIONAL.logoSrc}
+              alt="Logo Navarro Engenharia"
+              className="h-[4.25rem] w-auto max-w-[11rem] rounded-lg border border-white/20 bg-white object-contain p-2"
+            />
+          </div>
+          <div className="min-w-0 max-w-[58%] text-right">
+            <p className="text-[11px] font-semibold leading-snug text-white">
+              {NAVARRO_INSTITUCIONAL.nome}
+            </p>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-[#b8c5dc]">
+              CNPJ: {NAVARRO_INSTITUCIONAL.cnpj}
+            </p>
+            <p className="text-[10px] leading-relaxed text-[#b8c5dc]">
+              Responsável: {responsavel}
+            </p>
+            <p className="text-[10px] leading-relaxed text-[#b8c5dc]">
+              Emissão: {data} às {hora}
+            </p>
+          </div>
+        </header>
+
+        {/* 2. Linha divisória com detalhe dourado */}
+        <div className="mt-4 shrink-0" aria-hidden>
+          <div className="h-px w-full" style={{ backgroundColor: CAPA_LINE }} />
+          <div
+            className="mx-auto -mt-px h-[2px] w-16"
+            style={{ backgroundColor: CAPA_GOLD }}
           />
         </div>
 
-        {/* Título */}
-        <div className="mx-auto mt-4 max-w-2xl text-center">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#e8d29e]">
+        <div className="min-h-[0.75rem] flex-1" aria-hidden />
+
+        {/* 3. Bloco principal do documento */}
+        <div className="shrink-0 text-center">
+          <p
+            className="text-[11px] font-bold uppercase text-[#e8d29e]"
+            style={{ letterSpacing: "0.28em" }}
+          >
             Documento Técnico
           </p>
-          <h2 className="mt-1.5 text-[1.35rem] font-extrabold leading-[1.15] tracking-tight sm:text-[1.6rem]">
+          <h2 className="mt-5 text-[1.65rem] font-extrabold leading-[1.12] tracking-tight text-white sm:text-[1.85rem]">
             Relatório de Avaliação
             <br />
             dos Riscos Psicossociais
           </h2>
-          <p className="mt-1.5 text-sm font-semibold text-[#c5d0e6]">
+          <p className="mt-3 text-[13px] font-medium text-[#c5d0e6]">
             Instrumento COPSOQ II-Br
           </p>
           <div
-            className="mx-auto mt-3 h-0.5 w-14"
-            style={{ backgroundColor: "#c9972b" }}
+            className="mx-auto mt-4 h-[2px] w-12"
+            style={{ backgroundColor: CAPA_GOLD }}
             aria-hidden
           />
         </div>
 
-        {/* Empresa + Responsável — compacto horizontal */}
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-          <div
-            className="rounded-xl border border-[#2a4578] p-3"
-            style={{
-              backgroundColor: "#132a5c",
-              WebkitPrintColorAdjust: "exact",
-              printColorAdjust: "exact",
-            }}
+        <div className="min-h-[0.85rem] flex-1" aria-hidden />
+
+        {/* 4. Empresa avaliada — protagonista central */}
+        <div className="shrink-0 text-center">
+          <p
+            className="text-[9px] font-bold uppercase text-[#e8d29e]"
+            style={{ letterSpacing: "0.2em" }}
           >
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#e8d29e]">
-              Empresa avaliada
-            </p>
-            <p className="mt-1 text-[14px] font-extrabold leading-snug text-white">
-              {empresa}
-            </p>
-            <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2">
-              <MetaItem label="CNPJ" value={cnpjCliente} />
-              <MetaItem label="Campanha" value={codigo} />
-              <MetaItem label="Período" value={periodo || "—"} />
-            </div>
+            Empresa avaliada
+          </p>
+
+          <div className="mt-3 flex justify-center">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={`Logo ${empresa}`}
+                className="h-[5.5rem] w-auto max-w-[12rem] rounded-xl border border-white/25 bg-white object-contain p-2.5"
+              />
+            ) : (
+              <div
+                className="flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-xl border border-white/25 text-xl font-extrabold tracking-wide text-white"
+                style={{
+                  backgroundColor: CAPA_PANEL,
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact",
+                }}
+              >
+                {iniciais}
+              </div>
+            )}
           </div>
 
-          <div
-            className="rounded-xl border border-[#2a4578] p-3"
-            style={{
-              backgroundColor: "#132a5c",
-              WebkitPrintColorAdjust: "exact",
-              printColorAdjust: "exact",
-            }}
-          >
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#e8d29e]">
-              Responsável pela avaliação
-            </p>
-            <p className="mt-1 text-[12px] font-extrabold leading-snug text-white">
-              {NAVARRO_INSTITUCIONAL.nome}
-            </p>
-            <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2">
-              <MetaItem label="CNPJ" value={NAVARRO_INSTITUCIONAL.cnpj} />
-              <MetaItem
-                label="Responsável"
-                value={relatorio.gerado_por?.trim() || "—"}
-              />
-              <MetaItem label="Emissão" value={`${data} · ${hora}`} />
+          <p className="mx-auto mt-3 max-w-lg text-[1.05rem] font-extrabold leading-snug text-white">
+            {empresa}
+          </p>
+
+          <div className="mx-auto mt-3.5 grid max-w-md grid-cols-2 gap-x-8 gap-y-2.5 text-left">
+            <div>
+              <p
+                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
+                style={{ letterSpacing: "0.14em" }}
+              >
+                CNPJ
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold text-white">
+                {cnpjCliente}
+              </p>
+            </div>
+            <div>
+              <p
+                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
+                style={{ letterSpacing: "0.14em" }}
+              >
+                Campanha
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold text-white">
+                {codigo}
+              </p>
+            </div>
+            <div className="col-span-2 text-center">
+              <p
+                className="text-[8px] font-bold uppercase text-[#9eb0d0]"
+                style={{ letterSpacing: "0.14em" }}
+              >
+                Período avaliado
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold text-white">
+                {periodo || "—"}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Indicadores */}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="min-h-[0.75rem] flex-1" aria-hidden />
+
+        {/* 5. Indicadores — uma linha, mesma altura/largura */}
+        <div className="grid shrink-0 grid-cols-4 gap-2">
           <IndicadorCapa
             label="Participantes"
             value={capa?.participantes ?? relatorio.participantes ?? 0}
@@ -218,29 +235,34 @@ export function RelatorioCapa({
             value={capa?.respondentes ?? relatorio.respondentes ?? 0}
           />
           <IndicadorCapa
-            label="Taxa de participação"
+            label="Participação"
             value={formatTaxaParticipacao(
               capa?.taxaParticipacao ?? relatorio.taxa_participacao
             )}
           />
           <IndicadorCapa
-            label="Categorias avaliadas"
+            label="Categorias"
             value={resumo?.quantidadeDimensoes ?? 0}
           />
         </div>
 
-        {/* Rodapé da capa — obrigatoriamente na página 1 */}
-        <div className="mt-auto border-t border-[#2a4578] pt-2.5 pb-1">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#9eb0d0]">
-            <span>Documento Técnico</span>
-            <span>Avaliação de Riscos Psicossociais</span>
-            <span>Confidencial</span>
-            <span>Emitido pelo Sistema Navarro SST</span>
-          </div>
-        </div>
+        <div className="min-h-[0.5rem] flex-1" aria-hidden />
+
+        {/* 6. Rodapé institucional — dentro da página 1 */}
+        <footer className="shrink-0 border-t pt-3" style={{ borderColor: CAPA_LINE }}>
+          <p className="text-center text-[8.5px] font-medium leading-relaxed tracking-wide text-[#9eb0d0]">
+            {NAVARRO_INSTITUCIONAL.nome}
+            <span className="mx-1.5 text-[#5a7199]">•</span>
+            Relatório de Avaliação dos Riscos Psicossociais
+            <span className="mx-1.5 text-[#5a7199]">•</span>
+            Versão 1.0
+            <span className="mx-1.5 text-[#5a7199]">•</span>
+            Confidencial
+          </p>
+        </footer>
       </div>
 
-      {/* Máscara print: cobre rodapé fixo na página 1 */}
+      {/* Máscara print: cobre rodapé fixo das páginas internas na página 1 */}
       <div className="relatorio-capa-print-mask hidden" aria-hidden />
     </section>
   );
