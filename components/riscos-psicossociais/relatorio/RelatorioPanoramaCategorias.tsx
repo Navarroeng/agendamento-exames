@@ -122,21 +122,21 @@ export function RelatorioPanoramaCategorias({
 
   return (
     <section>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
-            Resultado geral
-          </p>
-          <h3 className="mt-1 text-base font-extrabold text-navy sm:text-lg">
-            Panorama das Categorias
-          </h3>
-          <p className="mt-0.5 max-w-2xl text-xs text-app-muted">
-            Visão executiva das categorias avaliadas, com pontuação e
-            classificação.
-          </p>
+      <header className="mb-5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#94a3b8]">
+          Resultado geral
+        </p>
+        <h3 className="mt-2 text-base font-extrabold text-navy sm:text-lg">
+          Panorama das Categorias
+        </h3>
+        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-app-muted">
+          Visão executiva das categorias avaliadas, com pontuação e
+          classificação.
+        </p>
+        <div className="mt-3.5">
+          <RelatorioLegendaCores />
         </div>
-        <RelatorioLegendaCores />
-      </div>
+      </header>
 
       <div className="relatorio-panorama-grid grid grid-cols-1 items-stretch gap-2.5 sm:grid-cols-2">
         {itens.map((d) => (
