@@ -337,6 +337,16 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   padding-bottom: 10mm;
 }
 
+.relatorio-visao-metric-hint,
+.relatorio-visao-status-value,
+.relatorio-visao-status-hint {
+  white-space: nowrap;
+}
+
+.relatorio-visao-status-hint {
+  letter-spacing: -0.025em;
+}
+
 .relatorio-secao-visao-executiva,
 .relatorio-secao-panorama,
 .relatorio-secao-graficos,
@@ -687,6 +697,22 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-coluna-legenda-linha {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-visao-metric-hint,
+  body.riscos-relatorio-printing .relatorio-visao-status-value,
+  body.riscos-relatorio-printing .relatorio-visao-status-hint {
+    white-space: nowrap !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-visao-status-value {
+    font-size: 11pt !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-visao-status-hint {
+    font-size: 7.5pt !important;
+    letter-spacing: -0.03em !important;
   }
 
   body.riscos-relatorio-printing .relatorio-panorama-grid {

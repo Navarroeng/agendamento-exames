@@ -30,12 +30,16 @@ function CardMetric({
   hint,
   icon,
   tone = "neutral",
+  valueClassName,
+  hintClassName,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   icon: ReactNode;
   tone?: "neutral" | "ok" | "warn" | "danger" | "info";
+  valueClassName?: string;
+  hintClassName?: string;
 }) {
   const tones = {
     neutral: "border-[#e8edf5] bg-white",
@@ -46,25 +50,37 @@ function CardMetric({
   } as const;
 
   return (
-    <div className={`rounded-xl border px-4 py-3.5 ${tones[tone]}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+    <div
+      className={`relatorio-visao-metric flex h-full flex-col rounded-xl border px-3.5 py-2.5 ${tones[tone]}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-[#94a3b8]">
             {label}
           </p>
-          <p className="mt-1.5 text-xl font-extrabold tabular-nums leading-none text-navy">
+          <p
+            className={
+              valueClassName ??
+              "mt-1 text-[17px] font-extrabold tabular-nums leading-none text-navy"
+            }
+          >
             {value}
           </p>
-          {hint ? (
-            <p className="mt-1.5 text-[11px] leading-snug text-app-muted">
-              {hint}
-            </p>
-          ) : null}
         </div>
-        <div className="rounded-lg bg-white/80 p-2 text-navy ring-1 ring-[#e8edf5]">
+        <div className="shrink-0 rounded-md bg-white/80 p-1.5 text-navy ring-1 ring-[#e8edf5]">
           {icon}
         </div>
       </div>
+      {hint ? (
+        <p
+          className={
+            hintClassName ??
+            "relatorio-visao-metric-hint mt-1 whitespace-nowrap text-[10px] leading-none text-app-muted"
+          }
+        >
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -212,20 +228,20 @@ export function RelatorioResumoExecutivo({
             resumo?.participacaoPercentual ?? capa?.taxaParticipacao
           )}
           hint={`${capa?.respondentes ?? 0} de ${capa?.participantes ?? 0} concluíram`}
-          icon={<IconChart size={18} />}
+          icon={<IconChart size={16} />}
           tone="info"
         />
         <CardMetric
           label="Respondentes"
           value={capa?.respondentes ?? relatorio.respondentes ?? 0}
           hint="Sessões concluídas válidas"
-          icon={<IconUsers size={18} />}
+          icon={<IconUsers size={16} />}
         />
         <CardMetric
           label="Categorias avaliadas"
           value={resumo?.quantidadeDimensoes ?? 0}
           hint="Categorias COPSOQ no cálculo"
-          icon={<IconChecklist size={18} />}
+          icon={<IconChecklist size={16} />}
         />
       </div>
 
@@ -238,15 +254,17 @@ export function RelatorioResumoExecutivo({
               ? "Moderada ou Desfavorável"
               : "Nenhuma categoria em atenção"
           }
-          icon={<IconShield size={18} />}
+          icon={<IconShield size={16} />}
           tone={atencaoTone}
         />
         <CardMetric
           label="Status geral"
           value={status.label}
           hint={status.mensagem}
-          icon={<IconShield size={18} />}
+          icon={<IconShield size={16} />}
           tone={statusTone}
+          valueClassName="relatorio-visao-status-value mt-1 whitespace-nowrap text-[15px] font-extrabold leading-none tracking-tight text-navy"
+          hintClassName="relatorio-visao-status-hint mt-1 whitespace-nowrap text-[9px] leading-none tracking-tight text-app-muted"
         />
       </div>
 
