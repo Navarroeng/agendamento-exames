@@ -323,6 +323,23 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   color: #0b1f4d;
 }
 
+/* Indicadores: o flex restante fica ENTRE dados e cards; a base fixa sobe o bloco. */
+.relatorio-capa-indicadores-respiro {
+  flex: 1 1 auto;
+  min-height: 16mm;
+}
+
+.relatorio-capa-indicadores {
+  flex: 0 0 auto;
+}
+
+.relatorio-capa-indicadores-base {
+  flex: 0 0 140px;
+  height: 140px;
+  min-height: 140px;
+  max-height: 140px;
+}
+
 /* Cabeçalho institucional — páginas internas (não na capa).
  * Redistribuição vertical (altura total ≈ a anterior):
  * 6mm acima dos logos + logos ~28% maiores + menos espaço após a linha. */
@@ -645,6 +662,23 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   body.riscos-relatorio-printing .relatorio-capa-empresa-dados {
     margin: 0 auto !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-indicadores-respiro {
+    flex: 1 1 auto !important;
+    min-height: 16mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-indicadores {
+    flex: 0 0 auto !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-indicadores-base {
+    flex: 0 0 140px !important;
+    height: 140px !important;
+    min-height: 140px !important;
+    max-height: 140px !important;
+    margin: 0 !important;
   }
 
   /*

@@ -179,11 +179,11 @@ export function RelatorioCapa({
               <img
                 src={logoUrl}
                 alt={`Logo ${empresa}`}
-                className="h-[7.5rem] w-auto max-w-[16rem] rounded-xl border border-[#e8edf5] bg-[#f8fafc] object-contain p-3 shadow-[0_1px_10px_rgba(15,23,42,0.05)]"
+                className="h-[8.85rem] w-auto max-w-[18.88rem] rounded-xl border border-[#e8edf5] bg-[#f8fafc] object-contain p-3 shadow-[0_1px_10px_rgba(15,23,42,0.05)]"
               />
             ) : (
               <div
-                className="flex h-[7.5rem] w-[7.5rem] items-center justify-center rounded-xl border text-2xl font-extrabold tracking-wide"
+                className="flex h-[8.85rem] w-[8.85rem] items-center justify-center rounded-xl border text-2xl font-extrabold tracking-wide"
                 style={{
                   borderColor: CAPA_NAVY_BORDER,
                   backgroundColor: CAPA_NAVY_SOFT,
@@ -217,10 +217,10 @@ export function RelatorioCapa({
           </div>
         </div>
 
-        {/* Branco restante — empurra os indicadores para a base, sem comprimir os gaps acima */}
-        <div className="min-h-[12mm] flex-1" aria-hidden />
+        {/* Respiro entre dados e indicadores — não prende os cards no rodapé */}
+        <div className="relatorio-capa-indicadores-respiro" aria-hidden />
 
-        <div className="grid shrink-0 grid-cols-4 gap-2">
+        <div className="relatorio-capa-indicadores grid shrink-0 grid-cols-4 gap-2">
           <IndicadorCapa
             label="Participantes"
             value={capa?.participantes ?? relatorio.participantes ?? 0}
@@ -241,8 +241,8 @@ export function RelatorioCapa({
           />
         </div>
 
-        {/* Respiro inferior da capa — indicadores permanecem na base */}
-        <div className="min-h-[8mm] shrink-0" aria-hidden />
+        {/* Espaço inferior explícito — sobe os cards ~110px em relação à base */}
+        <div className="relatorio-capa-indicadores-base" aria-hidden />
       </div>
 
       <div className="relatorio-capa-print-mask hidden" aria-hidden />
