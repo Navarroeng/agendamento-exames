@@ -79,7 +79,6 @@ export async function POST(
         nomeCompleto: String(l.nomeCompleto ?? ""),
         cpf: String(l.cpf ?? ""),
         dataNascimento: String(l.dataNascimento ?? ""),
-        email: l.email != null ? String(l.email) : undefined,
         linha: l.linha ?? idx + 2,
       }));
 
@@ -105,7 +104,6 @@ export async function POST(
           nomeCompleto: String(body.nomeCompleto ?? ""),
           cpf: String(body.cpf ?? ""),
           dataNascimento: String(body.dataNascimento ?? ""),
-          email: body.email != null ? String(body.email) : undefined,
         },
       },
       { auditContext }

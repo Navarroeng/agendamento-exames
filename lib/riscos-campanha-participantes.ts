@@ -88,9 +88,9 @@ export type RiscosParticipanteInput = {
 };
 
 /**
- * Colunas previstas para importação Excel futura:
- * Nome | CPF | Data de nascimento | E-mail
- * (Cargo/Setor permanecem opcionais no banco, mas fora do cadastro atual.)
+ * Colunas de importação Excel:
+ * Nome completo | CPF | Data de nascimento
+ * (E-mail permanece no banco, mas fora do cadastro/importação atuais.)
  */
 
 export type RiscosParticipantesResumo = {
@@ -132,10 +132,6 @@ export function validateRiscosParticipanteInput(
   }
   if (!parseDataNascimentoBr(input.dataNascimento)) {
     return "Informe a data de nascimento (DD/MM/AAAA).";
-  }
-  const email = input.email?.trim() ?? "";
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return "Informe um e-mail válido ou deixe em branco.";
   }
   return null;
 }

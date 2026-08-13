@@ -132,7 +132,6 @@ export function RiscosImportacaoParticipantesModal({
                   <th className="px-3 py-2">Nome</th>
                   <th className="px-3 py-2">CPF</th>
                   <th className="px-3 py-2">Data de nascimento</th>
-                  <th className="px-3 py-2">E-mail</th>
                   <th className="px-3 py-2">Situação</th>
                 </tr>
               </thead>
@@ -149,7 +148,6 @@ export function RiscosImportacaoParticipantesModal({
                     <td className="px-3 py-2 tabular-nums">
                       {a.dataNascimento || "—"}
                     </td>
-                    <td className="px-3 py-2">{a.email || "—"}</td>
                     <td
                       className={`px-3 py-2 font-semibold ${
                         a.pronto ? "text-brand-green" : "text-brand-red"

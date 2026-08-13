@@ -219,7 +219,7 @@ export function RiscosCampanhaParticipantesSection({
             bloqueioImportacao
               ? bloqueioImportacao
               : podeImportar
-                ? "Importar planilha (NOME COMPLETO | CPF | DATA DE NASCIMENTO | E-MAIL)"
+                ? "Importar planilha (NOME COMPLETO | CPF | DATA DE NASCIMENTO)"
                 : "Importação indisponível"
           }
         >
@@ -348,7 +348,6 @@ export function RiscosCampanhaParticipantesSection({
                 nomeCompleto: editando.nome_completo,
                 cpf: editando.cpf,
                 dataNascimento: editando.data_nascimento ?? "",
-                email: editando.email ?? "",
               }
             : null
         }

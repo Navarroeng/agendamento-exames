@@ -1,6 +1,6 @@
 /**
  * Importação Excel de participantes (Riscos Psicossociais).
- * Colunas oficiais: NOME COMPLETO | CPF | DATA DE NASCIMENTO | E-MAIL
+ * Colunas oficiais: NOME COMPLETO | CPF | DATA DE NASCIMENTO
  * Biblioteca: SheetJS (xlsx).
  */
 
@@ -16,7 +16,6 @@ export const RISCOS_IMPORT_HEADERS = [
   "NOME COMPLETO",
   "CPF",
   "DATA DE NASCIMENTO",
-  "E-MAIL",
 ] as const;
 
 export const RISCOS_IMPORT_MODELO_FILENAME =
@@ -93,7 +92,6 @@ function mapHeaderKey(header: string): keyof RiscosParticipanteInput | null {
   ) {
     return "dataNascimento";
   }
-  if (h === "email" || h === "e-mail" || h === "mail") return "email";
   return null;
 }
 
@@ -146,8 +144,6 @@ export function situacaoImportacaoLabel(
       return "CPF inválido";
     case "data_invalida":
       return "Data inválida";
-    case "email_invalido":
-      return "E-mail inválido";
     case "cpf_duplicado_arquivo":
       return "CPF duplicado no arquivo";
     case "cpf_ja_na_campanha":
@@ -168,7 +164,6 @@ function mapValidationToSituacao(
   if (m.includes("nome")) return "nome_obrigatorio";
   if (m.includes("cpf")) return "cpf_invalido";
   if (m.includes("nascimento") || m.includes("data")) return "data_invalida";
-  if (m.includes("e-mail") || m.includes("email")) return "email_invalido";
   return "erro";
 }
 
@@ -212,7 +207,6 @@ export function avaliarLinhasImportacaoParticipantes(input: {
     const nomeCompleto = linha.nomeCompleto.trim();
     const cpfRaw = String(linha.cpf ?? "").trim();
     const dataNascimento = String(linha.dataNascimento ?? "").trim();
-    const email = String(linha.email ?? "").trim();
     const cpfDigits = normalizeCpfDigits(cpfRaw);
 
     const base: LinhaAvaliacaoImportacao = {
@@ -221,7 +215,7 @@ export function avaliarLinhasImportacaoParticipantes(input: {
       cpf: cpfRaw,
       cpfDigits,
       dataNascimento,
-      email,
+      email: "",
       situacao: "pronto",
       motivo: "✓ Pronto para importar",
       pronto: false,
@@ -236,7 +230,7 @@ export function avaliarLinhasImportacaoParticipantes(input: {
       continue;
     }
 
-    if (!nomeCompleto && !cpfRaw && !dataNascimento && !email) {
+    if (!nomeCompleto && !cpfRaw && !dataNascimento) {
       avaliadas.push({
         ...base,
         situacao: "linha_vazia",
@@ -249,7 +243,6 @@ export function avaliarLinhasImportacaoParticipantes(input: {
       nomeCompleto,
       cpf: cpfRaw,
       dataNascimento,
-      email: email || undefined,
     });
     if (validationError) {
       const situacao = mapValidationToSituacao(validationError);
@@ -307,7 +300,6 @@ export function avaliarLinhasImportacaoParticipantes(input: {
       nomeCompleto,
       cpf: cpfDigits,
       dataNascimento,
-      email: email || undefined,
     };
     avaliadas.push({
       ...base,
@@ -377,8 +369,6 @@ export function parseParticipantesExcelDetalhado(
   if (!mappedFields.has("nomeCompleto")) missing.push("NOME COMPLETO");
   if (!mappedFields.has("cpf")) missing.push("CPF");
   if (!mappedFields.has("dataNascimento")) missing.push("DATA DE NASCIMENTO");
-  // E-MAIL é opcional como coluna, mas esperamos o cabeçalho oficial.
-  if (!mappedFields.has("email")) missing.push("E-MAIL");
 
   if (missing.length > 0) {
     return {
@@ -396,24 +386,21 @@ export function parseParticipantesExcelDetalhado(
     let nomeCompleto = "";
     let cpf = "";
     let dataNascimento = "";
-    let email = "";
 
     for (const [col, field] of Array.from(headerMap.entries())) {
       const raw = row[col];
       if (field === "nomeCompleto") nomeCompleto = cellStr(raw);
       if (field === "cpf") cpf = cellStr(raw, false);
       if (field === "dataNascimento") dataNascimento = cellStr(raw, true);
-      if (field === "email") email = cellStr(raw);
     }
 
-    if (!nomeCompleto && !cpf && !dataNascimento && !email) return;
+    if (!nomeCompleto && !cpf && !dataNascimento) return;
 
     out.push({
       linha: idx + 2,
       nomeCompleto,
       cpf,
       dataNascimento,
-      email: email || undefined,
     });
   });
 
@@ -441,16 +428,10 @@ export function gerarModeloImportacaoParticipantesExcel(): ArrayBuffer {
       "Maria da Silva (EXEMPLO — substitua esta linha)",
       "000.000.000-00",
       "15/03/1990",
-      "maria@email.com",
     ],
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet["!cols"] = [
-    { wch: 42 },
-    { wch: 18 },
-    { wch: 20 },
-    { wch: 28 },
-  ];
+  sheet["!cols"] = [{ wch: 42 }, { wch: 18 }, { wch: 20 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet, "Participantes");
   const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });

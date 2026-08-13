@@ -319,7 +319,7 @@ export async function criarParticipanteCampanhaNoServidor(
       data_nascimento: dataNascimento,
       cargo: null,
       setor: null,
-      email: params.input.email?.trim() || null,
+      email: null,
       status: "pendente",
       codigo_acesso: codigo,
       origem: params.origem ?? "manual",
@@ -412,7 +412,6 @@ export async function atualizarParticipanteCampanhaNoServidor(
       nome_completo: params.input.nomeCompleto.trim(),
       cpf,
       data_nascimento: dataNascimento,
-      email: params.input.email?.trim() || null,
     })
     .eq("id", params.participanteId)
     .select(PARTICIPANTE_SELECT)
@@ -502,7 +501,6 @@ function mapMotivoToSituacao(
   if (m.includes("nome")) return "nome_obrigatorio";
   if (m.includes("cpf")) return "cpf_invalido";
   if (m.includes("nascimento") || m.includes("data")) return "data_invalida";
-  if (m.includes("e-mail") || m.includes("email")) return "email_invalido";
   return "erro";
 }
 
@@ -528,7 +526,6 @@ export async function validarImportacaoParticipantesNoServidor(params: {
     const nomeCompleto = String(raw.nomeCompleto ?? "").trim();
     const cpfRaw = String(raw.cpf ?? "").trim();
     const dataNascimento = String(raw.dataNascimento ?? "").trim();
-    const email = String(raw.email ?? "").trim();
     const cpf = normalizeCpfDigits(cpfRaw);
 
     const base = {
@@ -536,7 +533,7 @@ export async function validarImportacaoParticipantesNoServidor(params: {
       nomeCompleto,
       cpf: cpfRaw || cpf,
       dataNascimento,
-      email,
+      email: "",
     };
 
     if (campanhaBloqueada) {
@@ -549,7 +546,7 @@ export async function validarImportacaoParticipantesNoServidor(params: {
       continue;
     }
 
-    if (!nomeCompleto && !cpfRaw && !dataNascimento && !email) {
+    if (!nomeCompleto && !cpfRaw && !dataNascimento) {
       linhas.push({
         ...base,
         situacao: "linha_vazia",
@@ -563,7 +560,6 @@ export async function validarImportacaoParticipantesNoServidor(params: {
       nomeCompleto,
       cpf: cpfRaw,
       dataNascimento,
-      email: email || undefined,
     });
     if (validationError) {
       linhas.push({
@@ -704,7 +700,7 @@ export async function importarParticipantesCampanhaNoServidor(
       data_nascimento: dataNascimento,
       cargo: null,
       setor: null,
-      email: (raw?.email ?? linha.email)?.trim() || null,
+      email: null,
       status: "pendente",
       codigo_acesso: codigo,
       origem: "importacao",

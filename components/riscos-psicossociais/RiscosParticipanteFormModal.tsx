@@ -14,7 +14,6 @@ const EMPTY_FORM: RiscosParticipanteInput = {
   nomeCompleto: "",
   cpf: "",
   dataNascimento: "",
-  email: "",
 };
 
 interface RiscosParticipanteFormModalProps {
@@ -49,7 +48,6 @@ export function RiscosParticipanteFormModal({
         nomeCompleto: initial.nomeCompleto,
         cpf: initial.cpf,
         dataNascimento: nasc,
-        email: initial.email ?? "",
       });
       setCpfMasked(maskCPFInput(initial.cpf));
       setNascMasked(nasc);
@@ -73,7 +71,6 @@ export function RiscosParticipanteFormModal({
         nomeCompleto: form.nomeCompleto,
         cpf: form.cpf,
         dataNascimento: nascMasked,
-        email: form.email,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
@@ -178,17 +175,6 @@ export function RiscosParticipanteFormModal({
                 setNascMasked(masked);
                 setForm((prev) => ({ ...prev, dataNascimento: masked }));
               }}
-            />
-          </Field>
-          <Field label="E-mail (opcional)" className="sm:col-span-2">
-            <input
-              type="email"
-              className="field-input w-full"
-              value={form.email ?? ""}
-              disabled={saving}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, email: e.target.value }))
-              }
             />
           </Field>
         </div>

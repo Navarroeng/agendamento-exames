@@ -62,7 +62,6 @@ export async function PATCH(
           nomeCompleto: String(body.nomeCompleto ?? ""),
           cpf: String(body.cpf ?? ""),
           dataNascimento: String(body.dataNascimento ?? ""),
-          email: body.email != null ? String(body.email) : undefined,
         },
       },
       {

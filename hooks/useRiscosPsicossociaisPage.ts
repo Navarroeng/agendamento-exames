@@ -1043,7 +1043,7 @@ export function useRiscosPsicossociaisPage() {
         cpf: l.cpf,
         cpfDigits: normalizeCpfDigits(l.cpf),
         dataNascimento: l.dataNascimento,
-        email: l.email,
+        email: "",
         situacao: l.situacao as SituacaoImportacaoParticipante,
         motivo: l.motivo,
         pronto: l.pronto,
@@ -1052,7 +1052,6 @@ export function useRiscosPsicossociaisPage() {
               nomeCompleto: l.nomeCompleto,
               cpf: normalizeCpfDigits(l.cpf),
               dataNascimento: l.dataNascimento,
-              email: l.email || undefined,
             }
           : undefined,
       }));
