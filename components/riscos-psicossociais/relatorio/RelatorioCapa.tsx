@@ -270,7 +270,8 @@ export function RelatorioCapa({
         </footer>
       </div>
 
-      {/* Máscara print: cobre rodapé fixo das páginas internas na página 1 */}
+      {/* Máscaras print: cobrem cabeçalho/rodapé fixos na página 1 */}
+      <div className="relatorio-capa-print-mask-topo hidden" aria-hidden />
       <div className="relatorio-capa-print-mask hidden" aria-hidden />
     </section>
   );

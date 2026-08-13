@@ -8,6 +8,7 @@ import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatori
 import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
 import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
+import { RelatorioCabecalhoInterno } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoInterno";
 import { relatorioTemNormalizacao } from "@/lib/riscos-relatorio-view";
 
 /**
@@ -27,6 +28,10 @@ export function RelatorioDocumento({
 }) {
   const dimensoes = relatorio.resultado_json?.dimensoes ?? [];
   const normalizado = relatorioTemNormalizacao(dimensoes);
+  const empresaNome =
+    relatorio.resultado_json?.capa?.empresaNome ||
+    relatorio.empresa_nome ||
+    "Empresa";
 
   return (
     <div className="relatorio-documento">
@@ -42,6 +47,11 @@ export function RelatorioDocumento({
 
       {/* Páginas internas — Visão Executiva (p.2) e demais seções */}
       <div className="relatorio-a4-conteudo">
+        <RelatorioCabecalhoInterno
+          logoUrl={logoUrl}
+          empresaNome={empresaNome}
+        />
+
         {!normalizado ? (
           <div className="riscos-relatorio-print-card mb-5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5 text-sm text-[#92400e]">
             <p className="font-extrabold text-xs">

@@ -226,8 +226,74 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 /* Margens das páginas internas ficam no conteúdo (não no @page). */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
-  padding: 16mm 16mm 22mm;
+  padding: 12mm 16mm 22mm;
   background: #fff;
+}
+
+/* Cabeçalho institucional — páginas internas (não na capa) */
+.relatorio-cabecalho-interno {
+  box-sizing: border-box;
+  margin: 0 0 5mm;
+  padding: 0 0 3mm;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.relatorio-cabecalho-interno-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 10mm;
+}
+
+.relatorio-cabecalho-logo {
+  height: 9mm;
+  width: auto;
+  max-width: 42mm;
+  object-fit: contain;
+  object-position: left center;
+  display: block;
+}
+
+.relatorio-cabecalho-logo-cliente {
+  object-position: right center;
+  margin-left: auto;
+}
+
+.relatorio-cabecalho-logo-fallback {
+  height: 9mm;
+  min-width: 9mm;
+  padding: 0 2.5mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 8pt;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0b1f4d;
+  margin-left: auto;
+}
+
+.relatorio-cabecalho-interno-linha {
+  margin-top: 2.5mm;
+  height: 1px;
+  width: 100%;
+  background: #e2e8f0;
+  position: relative;
+}
+
+.relatorio-cabecalho-interno-linha-ouro {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14mm;
+  height: 1.5px;
+  background: #c9972b;
 }
 
 /* Rodapé institucional — só no print, a partir da página 2 */
@@ -330,8 +396,24 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   /* Margens internas no conteúdo (página 2+), não no @page */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 16mm 16mm 24mm !important;
+    /* topo = área do cabeçalho fixo (~16mm) + respiro */
+    padding: 18mm 16mm 24mm !important;
     background: #fff !important;
+  }
+
+  /* Cabeçalho fixo — repete em todas as folhas; capa mascara o topo */
+  body.riscos-relatorio-printing .relatorio-cabecalho-interno {
+    position: fixed;
+    top: 8mm;
+    left: 16mm;
+    right: 16mm;
+    width: auto;
+    margin: 0 !important;
+    padding: 0 0 2.5mm !important;
+    z-index: 40;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body.riscos-relatorio-printing .riscos-relatorio-print-card,
@@ -342,13 +424,13 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Seções após quebra de página: padding-top recria a margem superior
+   * Seções após quebra: padding-top limpa o cabeçalho fixo
    * (padding do container pai não se repete no topo de cada folha).
    */
   body.riscos-relatorio-printing .relatorio-secao-panorama {
     break-before: page;
     page-break-before: always;
-    padding-top: 16mm;
+    padding-top: 18mm;
     margin-top: 0 !important;
   }
 
@@ -358,7 +440,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     page-break-before: always;
     break-inside: avoid;
     page-break-inside: avoid;
-    padding-top: 16mm;
+    padding-top: 18mm;
     padding-bottom: 4mm;
     margin-top: 0 !important;
   }
@@ -372,7 +454,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-secao-ranking {
     break-before: page;
     page-break-before: always;
-    padding-top: 16mm;
+    padding-top: 18mm;
     padding-bottom: 4mm;
     margin-top: 0 !important;
   }
@@ -461,6 +543,22 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     right: 0;
     bottom: 0;
     height: 14mm;
+    background-color: #0b1f4d !important;
+    background-image: none !important;
+    z-index: 100;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Capa: cobre o cabeçalho fixo na página 1 */
+  body.riscos-relatorio-printing .relatorio-capa-print-mask-topo {
+    display: block !important;
+    visibility: visible !important;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 22mm;
     background-color: #0b1f4d !important;
     background-image: none !important;
     z-index: 100;
