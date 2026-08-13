@@ -212,10 +212,11 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   page: relatorio-capa;
 }
 
-/* Área útil das páginas internas — padding lateral único (modal = PDF). */
+/* Área útil das páginas internas — padding lateral único (modal = PDF).
+ * Topo menor: o respiro acima dos logos vive no cabeçalho interno. */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
-  padding: 12mm 16mm 22mm;
+  padding: 6mm 16mm 22mm;
   background: #fff;
   page: relatorio-interno;
 }
@@ -255,11 +256,13 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   print-color-adjust: exact;
 }
 
-/* Cabeçalho institucional — páginas internas (não na capa) */
+/* Cabeçalho institucional — páginas internas (não na capa).
+ * Redistribuição vertical (altura total ≈ a anterior):
+ * 6mm acima dos logos + logos ~28% maiores + menos espaço após a linha. */
 .relatorio-cabecalho-interno {
   box-sizing: border-box;
-  margin: 0 0 5mm;
-  padding: 0 0 3mm;
+  margin: 0 0 3mm;
+  padding: 6mm 0 3mm;
   background: #fff;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -270,16 +273,18 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 10mm;
+  min-height: 12mm;
 }
 
 .relatorio-cabecalho-logo {
-  height: 9mm;
+  height: 11.5mm;
   width: auto;
-  max-width: 42mm;
+  max-width: 54mm;
+  max-height: 11.5mm;
   object-fit: contain;
   object-position: left center;
   display: block;
+  flex-shrink: 0;
 }
 
 .relatorio-cabecalho-logo-cliente {
@@ -288,8 +293,9 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 }
 
 .relatorio-cabecalho-logo-fallback {
-  height: 9mm;
-  min-width: 9mm;
+  height: 11.5mm;
+  min-width: 11.5mm;
+  max-height: 11.5mm;
   padding: 0 2.5mm;
   display: flex;
   align-items: center;
@@ -297,15 +303,16 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   border-radius: 4px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  font-size: 8pt;
+  font-size: 9pt;
   font-weight: 800;
   letter-spacing: 0.04em;
   color: #0b1f4d;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .relatorio-cabecalho-interno-linha {
-  margin-top: 2.5mm;
+  margin-top: 2mm;
   height: 1px;
   width: 100%;
   background: #e2e8f0;
@@ -354,7 +361,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   @page relatorio-interno {
     size: A4;
-    margin: 10mm 0 18mm 0;
+    /* Topo 6mm: o respiro extra até os logos está no padding do cabeçalho. */
+    margin: 6mm 0 18mm 0;
   }
 
   body.riscos-relatorio-printing {
@@ -456,8 +464,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   body.riscos-relatorio-printing .relatorio-cabecalho-interno {
     position: static !important;
-    margin: 0 0 5mm !important;
-    padding: 0 0 3mm !important;
+    margin: 0 0 3mm !important;
+    padding: 6mm 0 3mm !important;
     background: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
