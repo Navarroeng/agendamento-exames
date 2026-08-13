@@ -213,13 +213,15 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   page: relatorio-capa;
 }
 
-/* Área útil das páginas internas — padding lateral único (modal = PDF).
- * Topo menor: o respiro acima dos logos vive no cabeçalho interno. */
+/* Área útil das páginas internas — laterais 16mm no wrapper (modal = PDF).
+ * Topo menor: o respiro acima dos logos vive no cabeçalho interno.
+ * counter-reset: capa não conta; a primeira folha interna é Página 1. */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
   padding: 6mm 16mm 22mm;
   background: #fff;
   page: relatorio-interno;
+  counter-reset: page 1;
 }
 
 /* Tabela COPSOQ — thead repetível no print; layout estável no modal */
@@ -442,13 +444,11 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 
   @page relatorio-interno {
     size: A4;
-    /* Laterais 16mm no @page: o rodapé (margin box) alinha à área útil.
-     * Topo 6mm: respiro extra dos logos está no padding do cabeçalho. */
-    margin: 6mm 16mm 18mm 16mm;
+    /* Topo/rodapé no @page (repetem em cada folha). Laterais no wrapper 16mm. */
+    margin: 6mm 0 18mm 0;
     /*
      * Chromium só avalia counter(page) em margin boxes de @page.
-     * No DOM (::after / position:fixed) o contador permanece 0 — origem do bug.
-     * Capa = folha 1 (sem este rodapé, full-bleed). Internas continuam 2, 3, …
+     * counter-reset: page 1 em .relatorio-a4-conteudo → Visão Executiva = 1.
      */
     @bottom-center {
       content: "Navarro Engenharia de Segurança e Medicina Ocupacional  ·  Relatório de Avaliação dos Riscos Psicossociais  ·  Página " counter(page);
@@ -458,6 +458,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
       color: #64748b;
       border-top: 1px solid #e2e8f0;
       padding-top: 2.5mm;
+      padding-left: 16mm;
+      padding-right: 16mm;
     }
   }
 
@@ -549,11 +551,12 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Laterais passam a vir do @page relatorio-interno (16mm).
-   * Zerar o wrapper evita margem dupla; o @page aplica em cada folha.
+   * Laterais 16mm no wrapper (não no @page) — Chromium aplica o padding
+   * do bloco em todas as folhas do fluxo, inclusive continuidade COPSOQ.
+   * Topo/rodapé continuam no @page (6mm / 18mm).
    */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 0 !important;
+    padding: 0 16mm !important;
     background: #fff !important;
   }
 

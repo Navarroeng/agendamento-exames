@@ -165,7 +165,7 @@ export function RelatorioCapa({
       </div>
 
       {/* Área branca — identificação do cliente + indicadores */}
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-5 pt-7">
+      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8 pt-5">
         <div className="shrink-0 text-center">
           <p
             className="text-[9px] font-bold uppercase"
@@ -174,17 +174,17 @@ export function RelatorioCapa({
             Empresa avaliada
           </p>
 
-          <div className="mt-4 flex justify-center">
+          <div className="mt-3.5 flex justify-center">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoUrl}
                 alt={`Logo ${empresa}`}
-                className="h-[6.25rem] w-auto max-w-[14rem] rounded-xl border border-[#e8edf5] bg-[#f8fafc] object-contain p-3 shadow-[0_1px_10px_rgba(15,23,42,0.05)]"
+                className="h-[7.5rem] w-auto max-w-[16rem] rounded-xl border border-[#e8edf5] bg-[#f8fafc] object-contain p-3 shadow-[0_1px_10px_rgba(15,23,42,0.05)]"
               />
             ) : (
               <div
-                className="flex h-[6.25rem] w-[6.25rem] items-center justify-center rounded-xl border text-2xl font-extrabold tracking-wide"
+                className="flex h-[7.5rem] w-[7.5rem] items-center justify-center rounded-xl border text-2xl font-extrabold tracking-wide"
                 style={{
                   borderColor: CAPA_NAVY_BORDER,
                   backgroundColor: CAPA_NAVY_SOFT,
@@ -257,7 +257,8 @@ export function RelatorioCapa({
           </div>
         </div>
 
-        <div className="min-h-[0.75rem] flex-1" aria-hidden />
+        {/* Respiro proporcional — não consome o resto da folha */}
+        <div className="min-h-[10mm] flex-[0.4]" aria-hidden />
 
         <div className="grid shrink-0 grid-cols-4 gap-2">
           <IndicadorCapa
@@ -280,33 +281,8 @@ export function RelatorioCapa({
           />
         </div>
 
-        <footer
-          className="mt-5 shrink-0 border-t pt-3"
-          style={{ borderColor: "#e2e8f0" }}
-        >
-          <p
-            className="text-center text-[8.5px] font-medium leading-relaxed tracking-wide"
-            style={{ color: "#64748b" }}
-          >
-            {NAVARRO_INSTITUCIONAL.nome}
-            <span className="mx-1.5" style={{ color: "#cbd5e1" }}>
-              •
-            </span>
-            Relatório de Avaliação dos Riscos Psicossociais
-            <span className="mx-1.5" style={{ color: "#cbd5e1" }}>
-              •
-            </span>
-            Versão 1.0
-            <span className="mx-1.5" style={{ color: "#cbd5e1" }}>
-              •
-            </span>
-            Confidencial
-            <span className="mx-1.5" style={{ color: "#cbd5e1" }}>
-              •
-            </span>
-            Página 1
-          </p>
-        </footer>
+        {/* Branco restante abaixo dos indicadores — capa sem rodapé */}
+        <div className="min-h-[8mm] flex-1" aria-hidden />
       </div>
 
       <div className="relatorio-capa-print-mask hidden" aria-hidden />

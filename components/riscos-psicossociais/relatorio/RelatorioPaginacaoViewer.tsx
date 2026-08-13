@@ -8,7 +8,7 @@ import { RISCOS_RELATORIO_PRINT_ROOT_ID } from "@/lib/riscos-relatorio-pdf";
  * No PDF o número vem de @page { counter(page) } — Chromium não incrementa
  * counter(page) em elementos do DOM (origem do "Página 0").
  *
- * A capa é a folha 1 (rodapé próprio, navy). Daqui em diante: 2, 3, …
+ * A capa não entra na numeração. Visão Executiva = Página 1.
  * Detalhamento COPSOQ pode ocupar várias folhas — fatiado pela altura A4.
  */
 const SECOES: { sel: string; fluxo?: boolean }[] = [
@@ -44,7 +44,7 @@ export function RelatorioPaginacaoViewer() {
       if (!pageH) return;
 
       const next: Folha[] = [];
-      let pagina = 2;
+      let pagina = 1;
 
       for (const { sel, fluxo } of SECOES) {
         const el = root.querySelector(sel);
