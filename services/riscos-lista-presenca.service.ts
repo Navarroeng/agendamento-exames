@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   isListaPresencaEtapaConcluida,
   isSolicitacaoListaConcluida,
-  isValidEmailListaPresenca,
   mapListaPresencaFromTracking,
   type RiscosListaPresencaAnexoMeta,
   type RiscosListaPresencaDados,
@@ -194,16 +193,11 @@ export async function salvarSolicitacaoListaPresenca(params: {
   orcamentoId?: string;
   campanhaId?: string;
   dataSolicitacaoIso: string;
-  email: string;
   usuarioNome: string;
 }): Promise<OrcamentoRiscosPsicossociaisRecord> {
   const target = normalizeTarget(params);
-  const email = params.email.trim();
   if (!params.dataSolicitacaoIso.trim()) {
     throw new Error("Informe a data da solicitação.");
-  }
-  if (!isValidEmailListaPresenca(email)) {
-    throw new Error("Informe um e-mail válido do cliente.");
   }
 
   const atual = await buscarTrackingPorTarget(target);
@@ -216,11 +210,10 @@ export async function salvarSolicitacaoListaPresenca(params: {
     ...mapListaPresencaFromTracking(atual),
     lista_solicitada: true,
     lista_solicitada_em: params.dataSolicitacaoIso.slice(0, 10),
-    lista_solicitada_email: email,
   };
 
   if (!isSolicitacaoListaConcluida(listaPreview)) {
-    throw new Error("Preencha data e e-mail para salvar a solicitação.");
+    throw new Error("Informe a data da solicitação.");
   }
 
   const progresso = syncProgressoAposLista(listaPreview, atual);
@@ -228,7 +221,6 @@ export async function salvarSolicitacaoListaPresenca(params: {
   const patch = {
     lista_solicitada: true,
     lista_solicitada_em: params.dataSolicitacaoIso.slice(0, 10),
-    lista_solicitada_email: email,
     lista_solicitada_por: params.usuarioNome,
     lista_solicitada_registrado_em: now,
     ...progresso,

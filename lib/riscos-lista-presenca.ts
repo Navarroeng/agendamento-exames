@@ -54,15 +54,10 @@ export function isValidEmailListaPresenca(email: string): boolean {
 }
 
 export function isSolicitacaoListaConcluida(
-  dados: Pick<
-    RiscosListaPresencaDados,
-    "lista_solicitada" | "lista_solicitada_em" | "lista_solicitada_email"
-  >
+  dados: Pick<RiscosListaPresencaDados, "lista_solicitada" | "lista_solicitada_em">
 ): boolean {
   return (
-    dados.lista_solicitada === true &&
-    Boolean(dados.lista_solicitada_em?.trim()) &&
-    Boolean(dados.lista_solicitada_email?.trim())
+    dados.lista_solicitada === true && Boolean(dados.lista_solicitada_em?.trim())
   );
 }
 

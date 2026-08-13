@@ -14,7 +14,6 @@ interface RiscosPainelPreRequisitosProps {
   savingLogo?: boolean;
   onSalvarSolicitacaoLista: (input: {
     dataSolicitacaoIso: string;
-    email: string;
   }) => Promise<void>;
   onSalvarRecebimentoLista: (file: File) => Promise<void>;
   onRemoverAnexoLista: () => Promise<void>;
@@ -123,12 +122,6 @@ export function RiscosPainelPreRequisitos({
                 {lista.lista_solicitada_em
                   ? formatDateIsoToBR(lista.lista_solicitada_em.slice(0, 10))
                   : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[#94a3b8]">E-mail utilizado</dt>
-              <dd className="mt-0.5 break-all font-semibold text-navy">
-                {lista.lista_solicitada_email?.trim() || "—"}
               </dd>
             </div>
             <div>

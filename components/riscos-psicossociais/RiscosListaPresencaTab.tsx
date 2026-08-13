@@ -6,7 +6,6 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   isRecebimentoListaConcluido,
   isSolicitacaoListaConcluida,
-  isValidEmailListaPresenca,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
@@ -16,7 +15,6 @@ interface RiscosListaPresencaTabProps {
   saving: boolean;
   onSalvarSolicitacao: (input: {
     dataSolicitacaoIso: string;
-    email: string;
   }) => Promise<void>;
   onSalvarRecebimento: (file: File) => Promise<void>;
   onRemoverAnexo: () => Promise<void>;
@@ -75,7 +73,6 @@ export function RiscosListaPresencaTab({
   const [dataSolicitacao, setDataSolicitacao] = useState(
     dados.lista_solicitada_em?.slice(0, 10) ?? ""
   );
-  const [email, setEmail] = useState(dados.lista_solicitada_email ?? "");
 
   const [recebidaSim, setRecebidaSim] = useState(dados.lista_recebida);
   const [file, setFile] = useState<File | null>(null);
@@ -83,7 +80,6 @@ export function RiscosListaPresencaTab({
   useEffect(() => {
     setSolicitadaSim(dados.lista_solicitada);
     setDataSolicitacao(dados.lista_solicitada_em?.slice(0, 10) ?? "");
-    setEmail(dados.lista_solicitada_email ?? "");
     setRecebidaSim(dados.lista_recebida);
     setFile(null);
   }, [dados]);
@@ -106,13 +102,8 @@ export function RiscosListaPresencaTab({
       toast.error("Informe a data da solicitação.");
       return;
     }
-    if (!isValidEmailListaPresenca(email)) {
-      toast.error("Informe um e-mail válido do cliente.");
-      return;
-    }
     await onSalvarSolicitacao({
       dataSolicitacaoIso: dataSolicitacao,
-      email,
     });
   };
 
@@ -142,10 +133,6 @@ export function RiscosListaPresencaTab({
               {dados.lista_solicitada_em
                 ? formatDateIsoToBR(dados.lista_solicitada_em.slice(0, 10))
                 : "—"}
-            </p>
-            <p>
-              E-mail:{" "}
-              <span className="font-medium">{dados.lista_solicitada_email}</span>
             </p>
             {dados.lista_solicitada_por ? (
               <p className="text-[11px] text-[#64748b]">
@@ -187,8 +174,8 @@ export function RiscosListaPresencaTab({
             </div>
 
             {solicitadaSim ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
+              <div className="space-y-3">
+                <div className="max-w-xs">
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
                     Data da solicitação
                   </label>
@@ -200,31 +187,16 @@ export function RiscosListaPresencaTab({
                     onChange={(e) => setDataSolicitacao(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
-                    E-mail do cliente
-                  </label>
-                  <input
-                    type="email"
-                    className="field-input"
-                    placeholder="cliente@empresa.com.br"
-                    value={email}
-                    disabled={saving}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={saving}
-                    onClick={() => {
-                      void handleSalvarSolicitacao();
-                    }}
-                  >
-                    {saving ? "Salvando..." : "Salvar solicitação"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={saving}
+                  onClick={() => {
+                    void handleSalvarSolicitacao();
+                  }}
+                >
+                  {saving ? "Salvando..." : "Salvar solicitação"}
+                </button>
               </div>
             ) : (
               <p className="text-sm text-app-muted">

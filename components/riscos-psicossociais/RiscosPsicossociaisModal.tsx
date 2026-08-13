@@ -21,7 +21,6 @@ interface RiscosPsicossociaisModalProps {
   onClose: () => void;
   onSalvarSolicitacaoLista?: (input: {
     dataSolicitacaoIso: string;
-    email: string;
   }) => Promise<void>;
   onSalvarRecebimentoLista?: (file: File) => Promise<void>;
   onRemoverAnexoLista?: () => Promise<void>;

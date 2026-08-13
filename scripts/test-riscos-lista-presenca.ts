@@ -54,6 +54,40 @@ const soSolicitacao = buildRiscosPsicossociaisProcesso(laudosConcluido, {
 
 assert.equal(isSolicitacaoListaConcluida(soSolicitacao.listaPresenca), true);
 assert.equal(soSolicitacao.listaPresencaConcluida, false);
+
+const solicitacaoNovaSemEmail = buildRiscosPsicossociaisProcesso(
+  laudosConcluido,
+  {
+    orcamento_id: "o1",
+    etapa_atual: "lista_presenca",
+    etapas_concluidas: 0,
+    entrada_em: "2026-08-12T15:00:00Z",
+    lista_solicitada: true,
+    lista_solicitada_em: "2026-08-13",
+    lista_solicitada_email: null,
+    lista_recebida: false,
+  }
+);
+assert.equal(
+  isSolicitacaoListaConcluida(solicitacaoNovaSemEmail.listaPresenca),
+  true
+);
+assert.equal(solicitacaoNovaSemEmail.listaPresencaConcluida, false);
+
+const solicitacaoSemData = buildRiscosPsicossociaisProcesso(laudosConcluido, {
+  orcamento_id: "o1",
+  etapa_atual: "lista_presenca",
+  etapas_concluidas: 0,
+  entrada_em: "2026-08-12T15:00:00Z",
+  lista_solicitada: true,
+  lista_solicitada_em: null,
+  lista_solicitada_email: "legado@empresa.com.br",
+  lista_recebida: false,
+});
+assert.equal(
+  isSolicitacaoListaConcluida(solicitacaoSemData.listaPresenca),
+  false
+);
 assert.equal(soSolicitacao.etapasConcluidas, 1); // só Laudo SST automático
 assert.equal(soSolicitacao.etapaAtual, "lista_presenca");
 assert.equal(isRiscosEtapaLiberadaByFluxo(soSolicitacao, "lista_presenca"), true);
@@ -82,6 +116,25 @@ const completa = buildRiscosPsicossociaisProcesso(laudosConcluido, {
 
 assert.equal(isListaPresencaEtapaConcluida(completa.listaPresenca), true);
 assert.equal(completa.listaPresencaConcluida, true);
+
+const completaNova = buildRiscosPsicossociaisProcesso(laudosConcluido, {
+  orcamento_id: "o1",
+  etapa_atual: "lista_presenca",
+  etapas_concluidas: 0,
+  entrada_em: "2026-08-12T15:00:00Z",
+  lista_solicitada: true,
+  lista_solicitada_em: "2026-08-13",
+  lista_solicitada_email: null,
+  lista_recebida: true,
+  lista_anexo_path: "o1/lista.pdf",
+  lista_anexo_nome: "lista.pdf",
+});
+assert.equal(isListaPresencaEtapaConcluida(completaNova.listaPresenca), true);
+assert.equal(completaNova.listaPresencaConcluida, true);
+assert.equal(
+  isRiscosEtapaLiberadaByFluxo(completaNova, "cadastro_colaboradores"),
+  true
+);
 assert.equal(completa.etapasConcluidas, 2);
 assert.equal(completa.progressoLabel, `2 de ${RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS}`);
 assert.equal(completa.etapaAtual, "cadastro_colaboradores");

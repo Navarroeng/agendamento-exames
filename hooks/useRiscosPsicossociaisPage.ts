@@ -434,7 +434,7 @@ export function useRiscosPsicossociaisPage() {
   }, []);
 
   const handleSalvarSolicitacaoLista = useCallback(
-    async (input: { dataSolicitacaoIso: string; email: string }) => {
+    async (input: { dataSolicitacaoIso: string }) => {
       if (!modalProcesso) return;
       const target = listaTargetFromProcesso(modalProcesso);
       const registroId =
@@ -447,7 +447,6 @@ export function useRiscosPsicossociaisPage() {
         const tracking = await salvarSolicitacaoListaPresenca({
           ...target,
           dataSolicitacaoIso: input.dataSolicitacaoIso,
-          email: input.email,
           usuarioNome: auditContext.usuarioNome,
         });
         applyTrackingToModal(tracking);
@@ -461,12 +460,11 @@ export function useRiscosPsicossociaisPage() {
           registroNome:
             modalProcesso.implantacao.orcamento.cliente_nome ||
             modalProcesso.implantacao.orcamento.numero,
-          descricao: `Lista de presença solicitada para ${modalProcesso.implantacao.orcamento.cliente_nome} (${input.email}).`,
+          descricao: `Lista de presença solicitada para ${modalProcesso.implantacao.orcamento.cliente_nome}.`,
           dadosAntes: { ...antes },
           dadosDepois: {
             lista_solicitada: true,
             lista_solicitada_em: input.dataSolicitacaoIso,
-            lista_solicitada_email: input.email,
           },
         });
         toast.success("Solicitação da lista salva.");
