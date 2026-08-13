@@ -70,7 +70,7 @@ export function RiscosRelatorioViewerModal({
       onClose={onClose}
       title="Relatório Executivo"
       subtitle="Documento A4 · visualização idêntica à exportação PDF"
-      size="xxl"
+      size="viewport"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 riscos-relatorio-print-hide">
           <p className="text-[11px] text-app-muted">

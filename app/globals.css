@@ -186,32 +186,51 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 /* ------------------------------------------------------------------ */
 .relatorio-a4-folha {
   width: 210mm;
-  max-width: 100%;
   min-height: 297mm;
   box-sizing: border-box;
   padding: 0;
+  margin: 0;
   background: #fff;
 }
 
-/* Capa ocupa a área útil da 1ª página no viewer */
+/*
+ * Página 1 = exatamente uma folha A4.
+ * Fundo azul no elemento raiz da capa (sem margem @page → sem faixa branca).
+ */
 .relatorio-a4-capa {
   box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
   min-height: 297mm;
+  max-height: 297mm;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
 }
 
 .relatorio-capa-folha {
-  min-height: 297mm;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 297mm;
+  margin: 0;
+  padding: 0;
+  background-color: #0b1f4d;
+  background-image: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
+/* Margens das páginas internas ficam no conteúdo (não no @page). */
 .relatorio-a4-conteudo {
   box-sizing: border-box;
-  padding: 14mm 16mm 18mm;
+  padding: 14mm 16mm 20mm;
+  background: #fff;
 }
 
-/* Rodapé interno — só no print (páginas 2+) */
+/* Rodapé institucional — só no print, a partir da página 2 */
 .relatorio-print-footer-interno {
   display: none;
 }
@@ -219,20 +238,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 @media print {
   @page {
     size: A4;
-    margin: 14mm 16mm 18mm 16mm;
-    @bottom-center {
-      content: "Navarro Engenharia de Segurança e Medicina Ocupacional · Relatório de Avaliação dos Riscos Psicossociais · Página " counter(page);
-      font-size: 7.5pt;
-      color: #64748b;
-    }
-  }
-
-  /* Capa: página inteira sem margem / sem rodapé @page */
-  @page :first {
     margin: 0;
-    @bottom-center {
-      content: none;
-    }
   }
 
   body.riscos-relatorio-printing {
@@ -273,6 +279,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    transform: none !important;
+    zoom: normal !important;
   }
 
   body.riscos-relatorio-printing #riscos-relatorio-print-root.relatorio-a4-folha {
@@ -289,21 +297,27 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     background: #fff !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    transform: none !important;
+    zoom: normal !important;
   }
 
-  /* Página 1 — capa completa, fundo sólido estável */
+  /* Página 1 — capa full-bleed 210×297 mm */
   body.riscos-relatorio-printing .relatorio-a4-capa {
-    height: 297mm;
-    max-height: 297mm;
-    min-height: 297mm;
-    overflow: hidden;
-    page-break-after: always;
-    break-after: page;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    min-height: 297mm !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   body.riscos-relatorio-printing .relatorio-capa-folha {
+    width: 100% !important;
     height: 297mm !important;
     max-height: 297mm !important;
     min-height: 297mm !important;
@@ -314,14 +328,12 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
+  /* Margens internas no conteúdo (página 2+), não no @page */
   body.riscos-relatorio-printing .relatorio-a4-conteudo {
-    padding: 0 !important; /* margens vêm do @page */
+    padding: 14mm 16mm 22mm !important;
+    background: #fff !important;
   }
 
-  /*
-   * Quebras: só unidades atômicas (card / gráfico / linha).
-   * NÃO evitar quebra em seções inteiras — isso gerava páginas vazias.
-   */
   body.riscos-relatorio-printing .riscos-relatorio-print-card,
   body.riscos-relatorio-printing .relatorio-colunas-bloco,
   body.riscos-relatorio-printing .relatorio-barra-row {
@@ -350,10 +362,9 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   /*
-   * Rodapé nas páginas internas (fallback Chromium).
-   * position:fixed repete em todas as páginas — máscara sólida na capa
-   * cobre o rodapé na página 1. Engines com @page margin boxes usam o
-   * @bottom-center acima (capa sem conteúdo).
+   * Rodapé só nas páginas internas.
+   * Chromium repete position:fixed em toda página — na capa (p.1) a máscara
+   * azul full-bleed cobre o rodapé. Sem @page margin boxes (evita "Página 0").
    */
   body.riscos-relatorio-printing .relatorio-print-footer-interno {
     display: block !important;
@@ -361,7 +372,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 5mm;
+    bottom: 0;
     z-index: 1;
     pointer-events: none;
   }
@@ -374,12 +385,13 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     gap: 0.35rem;
     border-top: 1px solid #e2e8f0;
     margin: 0 16mm;
-    padding-top: 2.5mm;
+    padding: 2.5mm 0 4mm;
     font-size: 7.5pt;
     font-weight: 600;
     color: #64748b;
     text-align: center;
-    background: #fff;
+    /* transparente: evita faixa branca sobre a capa azul na p.1 */
+    background: transparent;
   }
 
   body.riscos-relatorio-printing .relatorio-print-footer-sep {
@@ -390,7 +402,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     content: "Página " counter(page);
   }
 
-  /* Cobre o rodapé fixo na página 1 (fundo sólido = estável no PDF) */
+  /* Capa: cobre o rodapé fixo na página 1 — mesma cor sólida da capa */
   body.riscos-relatorio-printing .relatorio-capa-print-mask {
     display: block !important;
     visibility: visible !important;
@@ -398,7 +410,7 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 18mm;
+    height: 14mm;
     background-color: #0b1f4d !important;
     background-image: none !important;
     z-index: 100;

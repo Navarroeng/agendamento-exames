@@ -3,7 +3,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type ModalSize = "default" | "wide" | "extraWide" | "xl" | "xxl";
+type ModalSize =
+  | "default"
+  | "wide"
+  | "extraWide"
+  | "xl"
+  | "xxl"
+  /** Viewer A4 — ~95vw × 95vh; o documento interno define o tamanho real. */
+  | "viewport";
 
 interface ModalProps {
   open: boolean;
@@ -25,6 +32,7 @@ function resolveWidthClass(
   wide: boolean,
   extraWide: boolean
 ): string {
+  if (size === "viewport") return "w-[95vw] max-w-[95vw]";
   if (size === "xxl") return "max-w-[1480px]";
   if (size === "xl") return "max-w-[1320px]";
   if (size === "extraWide" || extraWide) return "max-w-5xl";
@@ -73,9 +81,14 @@ export function Modal({
   if (!open || !mounted) return null;
 
   const widthClass = resolveWidthClass(size, wide, extraWide);
+  const isViewport = size === "viewport";
+  const heightClass = isViewport ? "h-[95vh] max-h-[95vh]" : "max-h-[90vh]";
+  const bodyPadClass = isViewport ? "p-0" : "p-4 sm:p-6";
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 riscos-relatorio-print-shell">
+    <div
+      className={`fixed inset-0 z-[60] flex items-center justify-center riscos-relatorio-print-shell ${isViewport ? "p-2 sm:p-3" : "p-3 sm:p-4"}`}
+    >
       <button
         type="button"
         className="absolute inset-0 bg-black/45 backdrop-blur-[1px] riscos-relatorio-print-hide"
@@ -85,7 +98,7 @@ export function Modal({
         aria-label="Fechar"
       />
       <div
-        className={`relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-app-line bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] riscos-relatorio-print-dialog ${widthClass}`}
+        className={`relative z-10 flex w-full flex-col overflow-hidden rounded-2xl border border-app-line bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] riscos-relatorio-print-dialog ${heightClass} ${widthClass}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -113,7 +126,9 @@ export function Modal({
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 riscos-relatorio-print-body">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden riscos-relatorio-print-body ${bodyPadClass}`}
+        >
           {children}
         </div>
         {footer ? (
