@@ -459,6 +459,15 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     margin-top: 0 !important;
   }
 
+  /* Página do Detalhamento COPSOQ — nunca continua na página do Ranking */
+  body.riscos-relatorio-printing .relatorio-secao-detalhamento {
+    break-before: page;
+    page-break-before: always;
+    padding-top: 18mm;
+    padding-bottom: 4mm;
+    margin-top: 0 !important;
+  }
+
   body.riscos-relatorio-printing .ranking-linha-mobile {
     display: none !important;
   }

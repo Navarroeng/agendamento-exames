@@ -85,7 +85,8 @@ export function RelatorioDocumento({
           <RelatorioRanking dimensoes={dimensoes} />
         </section>
 
-        <section className="mt-5">
+        {/* Página própria — Detalhamento Categorias COPSOQ */}
+        <section className="relatorio-secao-detalhamento mt-8 print:mt-0">
           <RelatorioDimensoesCards dimensoes={dimensoes} />
         </section>
 

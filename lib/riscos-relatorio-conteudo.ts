@@ -265,6 +265,111 @@ export function analisarDimensao(
   };
 }
 
+/** Versões compactas e completas para cards do relatório A4 — sem reticências. */
+const O_QUE_AVALIA_RELATORIO: Record<string, string> = {
+  "demandas-trabalho":
+    "Avalia as exigências quantitativas, cognitivas e emocionais do trabalho, incluindo ritmo, volume e carga emocional.",
+  "influencia-desenvolvimento":
+    "Avalia a autonomia nas decisões do próprio trabalho e as oportunidades reais de aprendizado e desenvolvimento profissional.",
+  "significado-comprometimento":
+    "Avalia o sentido atribuído ao trabalho e o vínculo com a organização, associados à motivação e à permanência.",
+  "relacoes-interpessoais":
+    "Avalia informação, reconhecimento, tratamento justo e clareza de papéis e objetivos no trabalho.",
+  lideranca:
+    "Avalia a qualidade da liderança imediata — apoio, planejamento, reconhecimento e condução das equipes.",
+  "interface-trabalho-individuo":
+    "Avalia a satisfação geral com o trabalho, refletindo o equilíbrio percebido entre exigências e recompensas.",
+  "conflitos-familia-trabalho":
+    "Avalia o quanto as demandas do trabalho interferem na vida particular e familiar.",
+  "valores-local-trabalho":
+    "Avalia a percepção de confiança, justiça e coerência dos valores organizacionais.",
+  "saude-geral":
+    "Avalia a percepção geral de saúde e bem-estar do trabalhador nas últimas semanas.",
+  "burnout-estresse":
+    "Avalia sinais de esgotamento físico e emocional, estresse e irritação no contexto ocupacional.",
+  "comportamentos-ofensivos":
+    "Avalia a exposição a comportamentos ofensivos no trabalho; no COPSOQ II-Br, é analisada de forma qualitativa.",
+};
+
+function textoOQueAvaliaRelatorio(
+  d: Pick<RiscosRelatorioDimensaoSnapshot, "id" | "nome" | "tipo">
+): string {
+  return O_QUE_AVALIA_RELATORIO[d.id] ?? textoOQueAvalia(d);
+}
+
+function textoResultadoEncontradoRelatorio(
+  d: Pick<
+    RiscosRelatorioDimensaoSnapshot,
+    | "nome"
+    | "tipo"
+    | "media"
+    | "maxEscalaBruta"
+    | "maxEscalaPadronizada"
+    | "classificacaoId"
+    | "classificacaoLabel"
+    | "respondentesValidos"
+  >
+): string {
+  const risco = isRisco(d.tipo);
+  const sev = labelSeveridade(d.classificacaoId);
+  const max = d.maxEscalaPadronizada ?? d.maxEscalaBruta ?? 4;
+  const pontuacao = formatPontuacaoComMaximo(d.media, max);
+  const base = `Com ${d.respondentesValidos} respondentes válidos, a categoria obteve ${pontuacao}, classificada como ${d.classificacaoLabel}`;
+
+  if (sev === "favoravel") {
+    return risco
+      ? `${base}, indicando baixos níveis de exposição neste fator de risco.`
+      : `${base}, indicando presença consistente deste fator de proteção.`;
+  }
+  if (sev === "intermediario") {
+    return `${base}, indicando necessidade de acompanhamento preventivo.`;
+  }
+  if (sev === "critico") {
+    return risco
+      ? `${base}, com prioridade de intervenção organizacional.`
+      : `${base}, exigindo reforço prioritário do fator de proteção.`;
+  }
+  return `${base}.`;
+}
+
+function textoPossiveisImpactosRelatorio(
+  d: Pick<
+    RiscosRelatorioDimensaoSnapshot,
+    "nome" | "tipo" | "classificacaoId"
+  >
+): string {
+  const sev = labelSeveridade(d.classificacaoId);
+  const risco = isRisco(d.tipo);
+
+  if (sev === "favoravel") {
+    return "O resultado favorável tende a sustentar bem-estar, clima organizacional e menor probabilidade de adoecimento relacionado ao trabalho.";
+  }
+  if (sev === "intermediario") {
+    return "A Situação Moderada pode contribuir para fadiga, tensão interpessoal, queda de desempenho e impactos no clima e na saúde ocupacional.";
+  }
+  if (sev === "critico") {
+    return risco
+      ? "A Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, conflitos e deterioração do clima, exigindo resposta organizacional estruturada."
+      : "A fragilidade deste fator de proteção pode reduzir suporte percebido, motivação e confiança institucional, com reflexos no clima e na saúde dos trabalhadores.";
+  }
+  return `Os impactos de “${d.nome}” dependem de aprofundamento qualitativo complementar.`;
+}
+
+/**
+ * Análise compacta para cards A4 do detalhamento COPSOQ.
+ * Textos completos (sem reticências); sentido técnico preservado.
+ */
+export function analisarDimensaoRelatorio(
+  d: RiscosRelatorioDimensaoSnapshot
+): AnaliseDimensaoConteudo {
+  return {
+    oQueAvalia: textoOQueAvaliaRelatorio(d),
+    resultadoEncontrado: textoResultadoEncontradoRelatorio(d),
+    possiveisImpactos: textoPossiveisImpactosRelatorio(d),
+    recomendacoes: recomendacoesDimensao(d).slice(0, 2),
+  };
+}
+
 function listarNomes(dims: RiscosRelatorioDimensaoSnapshot[]): string {
   if (dims.length === 0) return "nenhuma categoria em destaque";
   if (dims.length === 1) return `“${dims[0].nome}”`;
