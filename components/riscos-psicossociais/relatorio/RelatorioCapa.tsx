@@ -192,7 +192,7 @@ export function RelatorioCapa({
             aria-hidden
           />
 
-          <div className="mx-auto mt-3.5 grid max-w-xl grid-cols-3 gap-x-4">
+          <div className="mx-auto mt-6 grid max-w-xl grid-cols-3 gap-x-4">
             <div className="min-w-0 text-center">
               <p
                 className="text-[9px] font-bold uppercase text-white/65"
