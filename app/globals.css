@@ -352,6 +352,22 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     margin-top: 0 !important;
   }
 
+  /* Página dos dois gráficos — juntos, com margem superior e inferior útil */
+  body.riscos-relatorio-printing .relatorio-secao-graficos {
+    break-before: page;
+    page-break-before: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding-top: 16mm;
+    padding-bottom: 4mm;
+    margin-top: 0 !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-graficos-comparativos {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   body.riscos-relatorio-printing .relatorio-barra-fill,
   body.riscos-relatorio-printing .relatorio-barra-badge,
   body.riscos-relatorio-printing .relatorio-coluna-fill,

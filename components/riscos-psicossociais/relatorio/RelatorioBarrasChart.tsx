@@ -31,28 +31,33 @@ function GraficoColunasGrupo({
 
   const eixoMax = eixoMaxColunas(itens);
   const ticks = ticksEixo(eixoMax);
+  /** Negativo (poucas barras) mais baixo; positivo mantém área útil maior. */
+  const compacto = tipo === "RISCO" || itens.length <= 4;
+  const areaH = compacto ? "h-28" : "h-40";
 
   return (
     <section className="relatorio-colunas-bloco riscos-relatorio-print-card">
-      <div className="mb-3">
+      <div className="mb-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#94a3b8]">
           Comparativo
         </p>
-        <h3 className="mt-1 text-base font-extrabold uppercase tracking-wide text-navy">
+        <h3 className="mt-1 text-[13px] font-extrabold uppercase tracking-wide text-navy sm:text-sm">
           {titulo}
         </h3>
-        <p className="mt-0.5 max-w-2xl text-xs text-app-muted">{subtitulo}</p>
+        <p className="mt-0.5 max-w-2xl text-[11px] leading-snug text-app-muted">
+          {subtitulo}
+        </p>
       </div>
 
-      <div className="rounded-xl border border-[#e8edf5] bg-white px-3 py-4 sm:px-5 sm:py-5">
-        {/* Área do gráfico */}
-        <div className="relatorio-colunas-area flex gap-2 sm:gap-3">
-          {/* Eixo Y */}
-          <div className="relative flex h-48 w-7 shrink-0 flex-col justify-between sm:h-52 sm:w-8">
+      <div className="rounded-xl border border-[#e8edf5] bg-white px-2.5 py-2.5 sm:px-3.5 sm:py-3">
+        <div className="relatorio-colunas-area flex gap-1.5 sm:gap-2">
+          <div
+            className={`relative flex w-6 shrink-0 flex-col justify-between sm:w-7 ${areaH}`}
+          >
             {[...ticks].reverse().map((t) => (
               <span
                 key={t}
-                className="text-right text-[10px] font-semibold tabular-nums text-[#94a3b8]"
+                className="text-right text-[9px] font-semibold tabular-nums text-[#94a3b8]"
               >
                 {t}
               </span>
@@ -60,7 +65,6 @@ function GraficoColunasGrupo({
           </div>
 
           <div className="relative min-w-0 flex-1">
-            {/* Linhas de grade */}
             <div
               className="pointer-events-none absolute inset-0 flex flex-col justify-between border-b border-l border-[#e2e8f0]"
               aria-hidden
@@ -73,7 +77,9 @@ function GraficoColunasGrupo({
               ))}
             </div>
 
-            <div className="relative flex h-48 items-end justify-around gap-1 px-1 sm:h-52 sm:gap-2 sm:px-2">
+            <div
+              className={`relative flex items-end justify-around gap-1 px-0.5 sm:gap-1.5 sm:px-1 ${areaH}`}
+            >
               {itens.map((item) => (
                 <ColunaVertical
                   key={item.id}
@@ -85,19 +91,22 @@ function GraficoColunasGrupo({
           </div>
         </div>
 
-        {/* Legenda — permanece no mesmo bloco (break-inside: avoid) */}
-        <ul className="relatorio-colunas-legenda mt-4 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t border-[#eef2f7] pt-3 sm:grid-cols-2">
+        <ul
+          className={`relatorio-colunas-legenda mt-2.5 grid grid-cols-1 gap-x-5 border-t border-[#eef2f7] pt-2 sm:grid-cols-2 ${
+            compacto ? "gap-y-1.5" : "gap-y-2"
+          }`}
+        >
           {itens.map((item) => (
             <li key={item.id} className="min-w-0">
-              <p className="text-[12px] font-extrabold leading-snug text-navy">
+              <p className="text-[11px] font-extrabold leading-snug text-navy">
                 {item.nome}
               </p>
               <div
-                className="relatorio-coluna-legenda-linha mt-1 h-1 w-full max-w-[10rem] rounded-full"
+                className="relatorio-coluna-legenda-linha mt-0.5 h-1 w-full max-w-[9rem] rounded-full"
                 style={{ backgroundColor: item.cor }}
                 aria-hidden
               />
-              <p className="mt-1 text-[13px] font-extrabold tabular-nums text-navy">
+              <p className="mt-0.5 text-[12px] font-extrabold tabular-nums text-navy">
                 {formatPontuacaoComMaximo(item.media, item.maxEscala)}
                 <span className="ml-1.5 text-[10px] font-semibold text-[#64748b]">
                   · {item.classificacaoLabel}
@@ -126,12 +135,12 @@ function ColunaVertical({
 
   return (
     <div className="relatorio-coluna-item flex h-full min-w-0 flex-1 flex-col items-center justify-end">
-      <p className="mb-1.5 max-w-full truncate px-0.5 text-center text-[10px] font-extrabold tabular-nums leading-none text-navy sm:text-[11px]">
+      <p className="mb-1 max-w-full px-0.5 text-center text-[10px] font-extrabold tabular-nums leading-none text-navy">
         {pontuacao}
       </p>
       <div className="flex w-full flex-1 items-end justify-center">
         <div
-          className="relatorio-coluna-fill w-[72%] max-w-[3.25rem] min-h-[4px] rounded-t-lg sm:w-[68%] sm:max-w-[3.75rem]"
+          className="relatorio-coluna-fill w-[72%] max-w-[3rem] min-h-[4px] rounded-t-md sm:w-[68%] sm:max-w-[3.25rem]"
           style={{
             height: `${alturaPct}%`,
             backgroundColor: item.cor,
@@ -157,7 +166,7 @@ export function RelatorioBarrasChart({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="relatorio-graficos-comparativos flex flex-col gap-[10mm]">
       <GraficoColunasGrupo
         titulo="Gráfico de pontuações para categorias positivas"
         subtitulo="Somente categorias de PROTEÇÃO. Altura da coluna = pontuação técnica na escala impressa. Cores identificam a categoria."

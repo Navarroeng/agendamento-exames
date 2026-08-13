@@ -65,7 +65,8 @@ export function RelatorioDocumento({
           <RelatorioPanoramaCategorias dimensoes={dimensoes} />
         </section>
 
-        <section className="mt-5">
+        {/* Página própria — dois gráficos comparativos juntos */}
+        <section className="relatorio-secao-graficos mt-8 print:mt-0">
           <RelatorioBarrasChart dimensoes={dimensoes} />
         </section>
 
