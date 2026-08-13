@@ -124,6 +124,7 @@ export function RiscosQrCodeModal({
         url: urlPublicaPesquisaCampanha(codigo),
         empresaNome,
         codigoPublico: codigo,
+        logoUrl,
       });
       const base = nomeArquivoQrCodePesquisa(empresaNome, codigo).replace(
         /\.png$/i,

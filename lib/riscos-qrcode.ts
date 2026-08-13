@@ -2,6 +2,8 @@ import QRCode from "qrcode";
 
 const QR_DARK = "#0b1f4d";
 const QR_LIGHT = "#ffffff";
+const MUTED = "#64748b";
+const ACCENT = "#2563eb";
 
 /** QR limpo (só módulos) — alta resolução para impressão. */
 export async function gerarQrCodeDataUrl(
@@ -20,71 +22,179 @@ export async function gerarQrCodeDataUrl(
 }
 
 /**
- * Arte branca com identificação (empresa + QR + código).
- * O QR permanece limpo; textos ficam fora da área de leitura.
+ * Arte completa para compartilhamento (WhatsApp / mural / e-mail).
+ * QR limpo no centro; textos e logo fora da área de leitura.
  */
 export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
   url: string;
   empresaNome: string;
   codigoPublico: string;
+  logoUrl?: string | null;
 }): Promise<string> {
-  const qrSize = 1000;
-  const padX = 80;
-  const padTop = 120;
-  const padBottom = 160;
-  const gap = 48;
-  const canvasW = qrSize + padX * 2;
-  const canvasH = padTop + qrSize + gap + padBottom;
+  const canvasW = 1200;
+  const padX = 72;
+  const qrSize = 860;
+  const contentW = canvasW - padX * 2;
+
+  const nome = (input.empresaNome.trim() || "Empresa").toUpperCase();
+  const codigo = input.codigoPublico.trim().toUpperCase();
 
   const qrDataUrl = await gerarQrCodeDataUrl(input.url, qrSize);
+  const qrImg = await loadImage(qrDataUrl);
+
+  let logoImg: HTMLImageElement | null = null;
+  if (input.logoUrl?.trim()) {
+    try {
+      logoImg = await loadImage(input.logoUrl.trim(), true);
+    } catch {
+      logoImg = null;
+    }
+  }
+
+  // Layout vertical (altura calculada após medir textos)
+  const measureCanvas = document.createElement("canvas");
+  const mctx = measureCanvas.getContext("2d");
+  if (!mctx) throw new Error("Canvas indisponível.");
+
+  const titleLines = ["QUESTIONÁRIO DE", "RISCOS PSICOSSOCIAIS"];
+  const subtitle = "Avaliação do ambiente de trabalho";
+  const cta = "ESCANEIE O QR CODE PARA PARTICIPAR";
+  const footer = "Sua participação é importante.";
+
+  mctx.font = "800 52px system-ui, Segoe UI, Arial, sans-serif";
+  const nomeLines = wrapTextLines(mctx, nome, contentW, 44);
+
+  const logoBox = logoImg ? 96 : 0;
+  const yTitle = 72;
+  const titleLineH = 58;
+  const ySubtitle = yTitle + titleLines.length * titleLineH + 18;
+  const yRule = ySubtitle + 44;
+  const yLogo = yRule + 36;
+  const yNome = logoImg ? yLogo + logoBox + 28 : yLogo + 8;
+  const nomeLineH = 44;
+  const yCta = yNome + nomeLines.length * nomeLineH + 40;
+  const yQr = yCta + 52;
+  const yCodigoLabel = yQr + qrSize + 40;
+  const yCodigo = yCodigoLabel + 36;
+  const yFooter = yCodigo + 56;
+  const canvasH = yFooter + 64;
+
   const canvas = document.createElement("canvas");
   canvas.width = canvasW;
   canvas.height = canvasH;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas indisponível.");
 
+  // Fundo branco + faixa superior sutil
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvasW, canvasH);
-
   ctx.fillStyle = QR_DARK;
-  ctx.font = "700 42px system-ui, Segoe UI, Arial, sans-serif";
+  ctx.fillRect(0, 0, canvasW, 12);
+
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const nome = input.empresaNome.trim() || "Empresa";
-  wrapText(ctx, nome.toUpperCase(), canvasW / 2, padTop / 2, canvasW - padX * 2, 48);
+  ctx.textBaseline = "top";
 
-  const img = await loadImage(qrDataUrl);
-  ctx.drawImage(img, padX, padTop, qrSize, qrSize);
+  // Título
+  ctx.fillStyle = QR_DARK;
+  ctx.font = "800 52px system-ui, Segoe UI, Arial, sans-serif";
+  titleLines.forEach((line, i) => {
+    ctx.fillText(line, canvasW / 2, yTitle + i * titleLineH);
+  });
 
-  const yMeta = padTop + qrSize + gap + 36;
-  ctx.fillStyle = "#64748b";
+  // Subtítulo
+  ctx.fillStyle = MUTED;
   ctx.font = "600 28px system-ui, Segoe UI, Arial, sans-serif";
-  ctx.fillText("Campanha", canvasW / 2, yMeta);
+  ctx.fillText(subtitle, canvasW / 2, ySubtitle);
+
+  // Linha decorativa
+  const ruleW = 160;
+  ctx.fillStyle = ACCENT;
+  ctx.fillRect((canvasW - ruleW) / 2, yRule, ruleW, 4);
+
+  // Logo
+  if (logoImg) {
+    const maxLogo = logoBox;
+    const scale = Math.min(
+      maxLogo / logoImg.naturalWidth,
+      maxLogo / logoImg.naturalHeight,
+      1
+    );
+    const lw = Math.max(1, Math.round(logoImg.naturalWidth * scale));
+    const lh = Math.max(1, Math.round(logoImg.naturalHeight * scale));
+    const lx = Math.round((canvasW - lw) / 2);
+    const ly = Math.round(yLogo + (maxLogo - lh) / 2);
+
+    // Moldura branca discreta
+    const pad = 10;
+    roundRect(ctx, lx - pad, ly - pad, lw + pad * 2, lh + pad * 2, 12);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.drawImage(logoImg, lx, ly, lw, lh);
+  }
+
+  // Nome da empresa
+  ctx.fillStyle = QR_DARK;
+  ctx.font = "800 40px system-ui, Segoe UI, Arial, sans-serif";
+  nomeLines.forEach((line, i) => {
+    ctx.fillText(line, canvasW / 2, yNome + i * nomeLineH);
+  });
+
+  // CTA
+  ctx.fillStyle = ACCENT;
+  ctx.font = "700 26px system-ui, Segoe UI, Arial, sans-serif";
+  ctx.fillText(cta, canvasW / 2, yCta);
+
+  // QR (principal)
+  const qrX = Math.round((canvasW - qrSize) / 2);
+  roundRect(ctx, qrX - 16, yQr - 16, qrSize + 32, qrSize + 32, 24);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = "#e8edf5";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.drawImage(qrImg, qrX, yQr, qrSize, qrSize);
+
+  // Código da campanha
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 24px system-ui, Segoe UI, Arial, sans-serif";
+  ctx.fillText("Código da campanha", canvasW / 2, yCodigoLabel);
 
   ctx.fillStyle = QR_DARK;
-  ctx.font = "800 44px ui-monospace, Consolas, monospace";
-  ctx.fillText(input.codigoPublico.trim().toUpperCase(), canvasW / 2, yMeta + 52);
+  ctx.font = "800 40px ui-monospace, Consolas, monospace";
+  ctx.fillText(codigo || "—", canvasW / 2, yCodigo);
+
+  // Mensagem neutra
+  ctx.fillStyle = MUTED;
+  ctx.font = "600 24px system-ui, Segoe UI, Arial, sans-serif";
+  ctx.fillText(footer, canvasW / 2, yFooter);
 
   return canvas.toDataURL("image/png");
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(
+  src: string,
+  crossOrigin = false
+): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    if (crossOrigin) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Falha ao carregar QR."));
+    img.onerror = () => reject(new Error("Falha ao carregar imagem."));
     img.src = src;
   });
 }
 
-function wrapText(
+function wrapTextLines(
   ctx: CanvasRenderingContext2D,
   text: string,
-  x: number,
-  y: number,
   maxWidth: number,
-  lineHeight: number
-) {
+  _lineHeight: number
+): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -98,10 +208,25 @@ function wrapText(
     }
   }
   if (line) lines.push(line);
-  const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((l, i) => {
-    ctx.fillText(l, x, startY + i * lineHeight);
-  });
+  return lines.length > 0 ? lines : [text];
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
 }
 
 export function baixarDataUrlPng(dataUrl: string, filename: string) {
