@@ -166,15 +166,14 @@ export function RelatorioCapa({
 
       {/* Área branca — identificação do cliente + indicadores */}
       <div className="flex min-h-0 flex-1 flex-col px-8 pb-8 pt-5">
-        <div className="shrink-0 text-center">
-          <p
-            className="text-[9px] font-bold uppercase"
-            style={{ letterSpacing: "0.22em", color: "#8a6a1e" }}
-          >
-            Empresa avaliada
-          </p>
+        {/*
+         * Grupo inteiro desce 80px (padding-top no container).
+         * Vãos internos em px fixos — o flex:1 abaixo segura os indicadores na base.
+         */}
+        <div className="relatorio-capa-empresa">
+          <p className="relatorio-capa-empresa-rotulo">Empresa avaliada</p>
 
-          <div className="mt-3.5 flex justify-center">
+          <div className="relatorio-capa-empresa-logo">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -198,67 +197,28 @@ export function RelatorioCapa({
             )}
           </div>
 
-          <p
-            className="mx-auto mt-4 max-w-xl text-[1.2rem] font-extrabold leading-snug tracking-tight"
-            style={{ color: CAPA_NAVY }}
-          >
-            {empresa}
-          </p>
+          <p className="relatorio-capa-empresa-nome">{empresa}</p>
 
-          <div
-            className="mx-auto mt-3 h-[2px] w-10"
-            style={{ backgroundColor: CAPA_GOLD }}
-            aria-hidden
-          />
+          <div className="relatorio-capa-empresa-traco" aria-hidden />
 
-          <div className="mx-auto mt-5 grid max-w-xl grid-cols-3 gap-x-4">
+          <div className="relatorio-capa-empresa-dados mx-auto grid grid-cols-3 gap-x-4">
             <div className="min-w-0 text-center">
-              <p
-                className="text-[9px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "#7a8799" }}
-              >
-                CNPJ
-              </p>
-              <p
-                className="mt-1.5 text-[13px] font-semibold leading-snug"
-                style={{ color: CAPA_NAVY }}
-              >
-                {cnpjCliente}
-              </p>
+              <p className="relatorio-capa-empresa-dado-label">CNPJ</p>
+              <p className="relatorio-capa-empresa-dado-valor">{cnpjCliente}</p>
             </div>
             <div className="min-w-0 text-center">
-              <p
-                className="text-[9px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "#7a8799" }}
-              >
-                Campanha
-              </p>
-              <p
-                className="mt-1.5 text-[13px] font-semibold leading-snug"
-                style={{ color: CAPA_NAVY }}
-              >
-                {codigo}
-              </p>
+              <p className="relatorio-capa-empresa-dado-label">Campanha</p>
+              <p className="relatorio-capa-empresa-dado-valor">{codigo}</p>
             </div>
             <div className="min-w-0 text-center">
-              <p
-                className="text-[9px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "#7a8799" }}
-              >
-                Período avaliado
-              </p>
-              <p
-                className="mt-1.5 text-[13px] font-semibold leading-snug"
-                style={{ color: CAPA_NAVY }}
-              >
-                {periodo || "—"}
-              </p>
+              <p className="relatorio-capa-empresa-dado-label">Período avaliado</p>
+              <p className="relatorio-capa-empresa-dado-valor">{periodo || "—"}</p>
             </div>
           </div>
         </div>
 
-        {/* Respiro proporcional — não consome o resto da folha */}
-        <div className="min-h-[10mm] flex-[0.4]" aria-hidden />
+        {/* Branco restante — empurra os indicadores para a base, sem comprimir os gaps acima */}
+        <div className="min-h-[12mm] flex-1" aria-hidden />
 
         <div className="grid shrink-0 grid-cols-4 gap-2">
           <IndicadorCapa
@@ -281,8 +241,8 @@ export function RelatorioCapa({
           />
         </div>
 
-        {/* Branco restante abaixo dos indicadores — capa sem rodapé */}
-        <div className="min-h-[8mm] flex-1" aria-hidden />
+        {/* Respiro inferior da capa — indicadores permanecem na base */}
+        <div className="min-h-[8mm] shrink-0" aria-hidden />
       </div>
 
       <div className="relatorio-capa-print-mask hidden" aria-hidden />

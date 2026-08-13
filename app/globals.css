@@ -259,6 +259,70 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   print-color-adjust: exact;
 }
 
+/* Bloco EMPRESA AVALIADA — grupo inteiro desce 80px; vãos internos em px fixos. */
+.relatorio-capa-empresa {
+  flex: 0 0 auto;
+  align-self: stretch;
+  text-align: center;
+  padding-top: 80px;
+  margin: 0;
+}
+
+.relatorio-capa-empresa-rotulo {
+  margin: 0 0 32px !important;
+  font-size: 15px !important;
+  font-weight: 600;
+  letter-spacing: 3px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #8a6a1e;
+}
+
+.relatorio-capa-empresa-logo {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 30px !important;
+}
+
+.relatorio-capa-empresa-nome {
+  margin: 0 auto 22px !important;
+  max-width: 36rem;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: #0b1f4d;
+}
+
+.relatorio-capa-empresa-traco {
+  margin: 0 auto 28px !important;
+  width: 32px;
+  height: 2px;
+  background-color: #c9972b;
+}
+
+.relatorio-capa-empresa-dados {
+  margin: 0 auto !important;
+  max-width: 36rem;
+}
+
+.relatorio-capa-empresa-dado-label {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #7a8799;
+}
+
+.relatorio-capa-empresa-dado-valor {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0b1f4d;
+}
+
 /* Cabeçalho institucional — páginas internas (não na capa).
  * Redistribuição vertical (altura total ≈ a anterior):
  * 6mm acima dos logos + logos ~28% maiores + menos espaço após a linha. */
@@ -548,6 +612,39 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     background-image: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa {
+    flex: 0 0 auto !important;
+    padding-top: 80px !important;
+    margin: 0 !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa-rotulo {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    letter-spacing: 3px !important;
+    margin: 0 0 32px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa-logo {
+    margin: 0 0 30px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa-nome {
+    margin: 0 auto 22px !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa-traco {
+    margin: 0 auto 28px !important;
+    width: 32px !important;
+    height: 2px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-empresa-dados {
+    margin: 0 auto !important;
   }
 
   /*
