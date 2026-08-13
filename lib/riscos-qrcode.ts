@@ -33,8 +33,18 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
 }): Promise<string> {
   const canvasW = 1200;
   const padX = 72;
-  const qrSize = 860;
   const contentW = canvasW - padX * 2;
+
+  const qrSize = Math.round(860 * 0.85);
+  const qrCardPad = 28;
+  const logoBox = Math.round(96 * 1.7);
+  const nomeFontPx = 44;
+  const nomeLineH = 50;
+  const gapLogoNome = 16;
+  const gapNomeCta = 32;
+  const ctaLineH = 32;
+  const gapCtaQr = 18;
+  const gapQrCodigo = 22;
 
   const nome = (input.empresaNome.trim() || "Empresa").toUpperCase();
   const codigo = input.codigoPublico.trim().toUpperCase();
@@ -51,7 +61,6 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
     }
   }
 
-  // Layout vertical (altura calculada após medir textos)
   const measureCanvas = document.createElement("canvas");
   const mctx = measureCanvas.getContext("2d");
   if (!mctx) throw new Error("Canvas indisponível.");
@@ -61,20 +70,19 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
   const cta = "ESCANEIE O QR CODE PARA PARTICIPAR";
   const footer = "Sua participação é importante.";
 
-  mctx.font = "800 52px system-ui, Segoe UI, Arial, sans-serif";
-  const nomeLines = wrapTextLines(mctx, nome, contentW, 44);
+  mctx.font = `800 ${nomeFontPx}px system-ui, Segoe UI, Arial, sans-serif`;
+  const nomeLines = wrapTextLines(mctx, nome, contentW, nomeLineH);
 
-  const logoBox = logoImg ? 96 : 0;
   const yTitle = 72;
   const titleLineH = 58;
   const ySubtitle = yTitle + titleLines.length * titleLineH + 18;
   const yRule = ySubtitle + 44;
-  const yLogo = yRule + 36;
-  const yNome = logoImg ? yLogo + logoBox + 28 : yLogo + 8;
-  const nomeLineH = 44;
-  const yCta = yNome + nomeLines.length * nomeLineH + 40;
-  const yQr = yCta + 52;
-  const yCodigoLabel = yQr + qrSize + 40;
+  const yLogo = yRule + 40;
+  const yNome = logoImg ? yLogo + logoBox + gapLogoNome : yLogo + 8;
+  const yCta = yNome + nomeLines.length * nomeLineH + gapNomeCta;
+  const yQrCard = yCta + ctaLineH + gapCtaQr;
+  const yQr = yQrCard + qrCardPad;
+  const yCodigoLabel = yQr + qrSize + qrCardPad + gapQrCodigo;
   const yCodigo = yCodigoLabel + 36;
   const yFooter = yCodigo + 56;
   const canvasH = yFooter + 64;
@@ -85,7 +93,6 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas indisponível.");
 
-  // Fundo branco + faixa superior sutil
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvasW, canvasH);
   ctx.fillStyle = QR_DARK;
@@ -94,70 +101,67 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
-  // Título
   ctx.fillStyle = QR_DARK;
   ctx.font = "800 52px system-ui, Segoe UI, Arial, sans-serif";
   titleLines.forEach((line, i) => {
     ctx.fillText(line, canvasW / 2, yTitle + i * titleLineH);
   });
 
-  // Subtítulo
   ctx.fillStyle = MUTED;
   ctx.font = "600 28px system-ui, Segoe UI, Arial, sans-serif";
   ctx.fillText(subtitle, canvasW / 2, ySubtitle);
 
-  // Linha decorativa
   const ruleW = 160;
   ctx.fillStyle = ACCENT;
   ctx.fillRect((canvasW - ruleW) / 2, yRule, ruleW, 4);
 
-  // Logo
   if (logoImg) {
     const maxLogo = logoBox;
     const scale = Math.min(
-      maxLogo / logoImg.naturalWidth,
-      maxLogo / logoImg.naturalHeight,
-      1
+      maxLogo / Math.max(1, logoImg.naturalWidth),
+      maxLogo / Math.max(1, logoImg.naturalHeight)
     );
     const lw = Math.max(1, Math.round(logoImg.naturalWidth * scale));
     const lh = Math.max(1, Math.round(logoImg.naturalHeight * scale));
     const lx = Math.round((canvasW - lw) / 2);
     const ly = Math.round(yLogo + (maxLogo - lh) / 2);
 
-    // Moldura branca discreta
-    const pad = 10;
+    const pad = 8;
     roundRect(ctx, lx - pad, ly - pad, lw + pad * 2, lh + pad * 2, 12);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(logoImg, lx, ly, lw, lh);
   }
 
-  // Nome da empresa
   ctx.fillStyle = QR_DARK;
-  ctx.font = "800 40px system-ui, Segoe UI, Arial, sans-serif";
+  ctx.font = `800 ${nomeFontPx}px system-ui, Segoe UI, Arial, sans-serif`;
   nomeLines.forEach((line, i) => {
     ctx.fillText(line, canvasW / 2, yNome + i * nomeLineH);
   });
 
-  // CTA
   ctx.fillStyle = ACCENT;
   ctx.font = "700 26px system-ui, Segoe UI, Arial, sans-serif";
   ctx.fillText(cta, canvasW / 2, yCta);
 
-  // QR (principal)
   const qrX = Math.round((canvasW - qrSize) / 2);
-  roundRect(ctx, qrX - 16, yQr - 16, qrSize + 32, qrSize + 32, 24);
+  const cardX = qrX - qrCardPad;
+  const cardY = yQr - qrCardPad;
+  const cardSize = qrSize + qrCardPad * 2;
+  roundRect(ctx, cardX, cardY, cardSize, cardSize, 24);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.strokeStyle = "#e8edf5";
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(qrImg, qrX, yQr, qrSize, qrSize);
+  ctx.imageSmoothingEnabled = true;
 
-  // Código da campanha
   ctx.fillStyle = MUTED;
   ctx.font = "600 24px system-ui, Segoe UI, Arial, sans-serif";
   ctx.fillText("Código da campanha", canvasW / 2, yCodigoLabel);
@@ -166,7 +170,6 @@ export async function gerarQrCodeArteIdentificacaoDataUrl(input: {
   ctx.font = "800 40px ui-monospace, Consolas, monospace";
   ctx.fillText(codigo || "—", canvasW / 2, yCodigo);
 
-  // Mensagem neutra
   ctx.fillStyle = MUTED;
   ctx.font = "600 24px system-ui, Segoe UI, Arial, sans-serif";
   ctx.fillText(footer, canvasW / 2, yFooter);
