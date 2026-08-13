@@ -148,7 +148,8 @@ export function RelatorioCapa({
           />
         </div>
 
-        <div className="min-h-[0.85rem] flex-1" aria-hidden />
+        {/* Empurra menos — sobe o bloco Empresa Avaliada como unidade */}
+        <div className="min-h-[0.35rem] flex-[0.45]" aria-hidden />
 
         {/* 4. Empresa avaliada — identificação institucional */}
         <div className="shrink-0 text-center">
@@ -228,7 +229,8 @@ export function RelatorioCapa({
           </div>
         </div>
 
-        <div className="min-h-[0.75rem] flex-1" aria-hidden />
+        {/* Mais respiro abaixo — equilibra o bloco na região central */}
+        <div className="min-h-[0.85rem] flex-[1.4]" aria-hidden />
 
         {/* 5. Indicadores — uma linha, mesma altura/largura */}
         <div className="grid shrink-0 grid-cols-4 gap-2">
