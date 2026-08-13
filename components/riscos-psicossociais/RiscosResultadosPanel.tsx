@@ -44,33 +44,6 @@ type ResultadosPayload = {
   error?: string;
 };
 
-function badgeClass(id: CopsoqClassificacaoResultadoId): string {
-  if (id === "situacao_favoravel") {
-    return "bg-brand-green-soft text-brand-green";
-  }
-  if (id === "risco_intermediario") {
-    return "bg-[#fef9c3] text-[#a16207]";
-  }
-  if (id === "risco_para_saude") {
-    return "bg-[#fee2e2] text-[#b91c1c]";
-  }
-  return "bg-[#f1f5f9] text-[#64748b]";
-}
-
-function formatMedia(media: number | null): string {
-  if (media == null || Number.isNaN(media)) return "—";
-  return media.toFixed(2).replace(".", ",");
-}
-
-function formatPontuacaoDimensao(
-  media: number | null,
-  max: number | undefined
-): string {
-  const m = formatMedia(media);
-  if (m === "—") return m;
-  return `${m} / ${max ?? 4}`;
-}
-
 function StatChip({
   label,
   value,
@@ -88,6 +61,51 @@ function StatChip({
       </p>
     </div>
   );
+}
+
+function ResumoSituacaoCard({
+  label,
+  value,
+  dotClass,
+  softClass,
+}: {
+  label: string;
+  value: number;
+  dotClass: string;
+  softClass: string;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-[#e8edf5] px-2.5 py-2.5 ${softClass}`}
+    >
+      <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide text-[#64748b]">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-extrabold tabular-nums leading-none text-navy">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function contarResumoGeral(dimensoes: DimensaoResultadoUi[]) {
+  let favoraveis = 0;
+  let moderadas = 0;
+  let desfavoraveis = 0;
+
+  for (const d of dimensoes) {
+    if (d.classificacao.id === "situacao_favoravel") favoraveis += 1;
+    else if (d.classificacao.id === "risco_intermediario") moderadas += 1;
+    else if (d.classificacao.id === "risco_para_saude") desfavoraveis += 1;
+  }
+
+  return {
+    favoraveis,
+    moderadas,
+    desfavoraveis,
+    total: favoraveis + moderadas + desfavoraveis,
+  };
 }
 
 interface RiscosResultadosPanelProps {
@@ -175,6 +193,8 @@ export function RiscosResultadosPanel({
     );
   }
 
+  const resumo = contarResumoGeral(data.dimensoes);
+
   const statusLabel =
     RISCOS_CAMPANHA_STATUS_LABELS[
       data.statusCampanha as keyof typeof RISCOS_CAMPANHA_STATUS_LABELS
@@ -200,31 +220,32 @@ export function RiscosResultadosPanel({
 
       <div className="space-y-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          Categorias
+          Resumo Geral
         </p>
-        <ul className="divide-y divide-[#eef2f7] overflow-hidden rounded-xl border border-[#e8edf5]">
-          {data.dimensoes.map((d) => (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2.5"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-navy">{d.nome}</p>
-                <p className="text-[11px] text-[#64748b]">
-                  {`Pontuação ${formatPontuacaoDimensao(d.media, d.maxEscalaFinal)}`}{" "}
-                  · {d.respondentesValidos} respondente(s) válido(s)
-                </p>
-              </div>
-              <span
-                className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${badgeClass(
-                  d.classificacao.id
-                )}`}
-              >
-                {d.classificacao.label}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="grid grid-cols-3 gap-2">
+          <ResumoSituacaoCard
+            label="Favoráveis"
+            value={resumo.favoraveis}
+            dotClass="bg-brand-green"
+            softClass="bg-[#f0fdf4]"
+          />
+          <ResumoSituacaoCard
+            label="Moderadas"
+            value={resumo.moderadas}
+            dotClass="bg-[#ca8a04]"
+            softClass="bg-[#fffbeb]"
+          />
+          <ResumoSituacaoCard
+            label="Desfavoráveis"
+            value={resumo.desfavoraveis}
+            dotClass="bg-[#dc2626]"
+            softClass="bg-[#fef2f2]"
+          />
+        </div>
+        <p className="text-[11px] text-[#64748b]">
+          {resumo.total}{" "}
+          {resumo.total === 1 ? "categoria avaliada" : "categorias avaliadas"}
+        </p>
       </div>
 
       <div className="space-y-2">
