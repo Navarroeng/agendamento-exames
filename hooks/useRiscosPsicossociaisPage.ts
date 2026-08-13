@@ -59,7 +59,10 @@ import { obterUrlRiscosListaPresencaAnexo } from "@/services/riscos-lista-presen
 import {
   removerLogoCampanha,
   salvarLogoCampanha,
+  resolverUrlLogoCampanhaOuEmpresa,
 } from "@/services/riscos-campanha-logo.service";
+import { buscarRelatorioCampanha } from "@/services/riscos-relatorio.service";
+import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { listarProcessosRiscosPsicossociais } from "@/services/riscos-psicossociais.service";
 
 export function useRiscosPsicossociaisPage() {
@@ -90,6 +93,17 @@ export function useRiscosPsicossociaisPage() {
   /** false até o status da campanha ser relido do banco (não usar listagem stale). */
   const [campanhaStatusSincronizado, setCampanhaStatusSincronizado] =
     useState(false);
+  const [relatorioViewerOpen, setRelatorioViewerOpen] = useState(false);
+  const [relatorioViewer, setRelatorioViewer] =
+    useState<RiscosRelatorioRecord | null>(null);
+  const [relatorioViewerLogoUrl, setRelatorioViewerLogoUrl] = useState<
+    string | null
+  >(null);
+  const [relatorioViewerCnpj, setRelatorioViewerCnpj] = useState<string | null>(
+    null
+  );
+  const [relatorioViewerCampanhaStatus, setRelatorioViewerCampanhaStatus] =
+    useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -360,6 +374,63 @@ export function useRiscosPsicossociaisPage() {
     setModalProcesso(null);
     setModalParticipantes([]);
     setCampanhaStatusSincronizado(false);
+  }, []);
+
+  /** Abre o Relatório Executivo sem passar pelo modal de detalhes. */
+  const openVisualizarRelatorio = useCallback(
+    async (processo: RiscosPsicossociaisProcesso) => {
+      const campanha = processo.campanha;
+      if (!campanha?.id) {
+        toast.error("Campanha não encontrada para este processo.");
+        return;
+      }
+      if (!processo.relatorioGerado) {
+        openProcesso(processo);
+        return;
+      }
+
+      const toastId = toast.loading("Carregando relatório…");
+      try {
+        const [relatorio, logoUrl] = await Promise.all([
+          buscarRelatorioCampanha(campanha.id),
+          resolverUrlLogoCampanhaOuEmpresa(campanha),
+        ]);
+        if (!relatorio) {
+          toast.error(
+            "Relatório não encontrado. Abra o processo para gerar novamente.",
+            { id: toastId }
+          );
+          return;
+        }
+        setRelatorioViewer(relatorio);
+        setRelatorioViewerLogoUrl(logoUrl);
+        setRelatorioViewerCnpj(
+          campanha.cnpj ||
+            processo.implantacao.orcamento.cliente_cnpj ||
+            null
+        );
+        setRelatorioViewerCampanhaStatus(campanha.status);
+        setRelatorioViewerOpen(true);
+        toast.dismiss(toastId);
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível abrir o relatório.",
+          { id: toastId }
+        );
+      }
+    },
+    [openProcesso]
+  );
+
+  const closeVisualizarRelatorio = useCallback(() => {
+    setRelatorioViewerOpen(false);
+    setRelatorioViewer(null);
+    setRelatorioViewerLogoUrl(null);
+    setRelatorioViewerCnpj(null);
+    setRelatorioViewerCampanhaStatus(null);
   }, []);
 
   const handleSalvarSolicitacaoLista = useCallback(
@@ -1119,6 +1190,13 @@ export function useRiscosPsicossociaisPage() {
     handleMesChange,
     handleYearChange,
     openProcesso,
+    openVisualizarRelatorio,
+    closeVisualizarRelatorio,
+    relatorioViewerOpen,
+    relatorioViewer,
+    relatorioViewerLogoUrl,
+    relatorioViewerCnpj,
+    relatorioViewerCampanhaStatus,
     closeModal,
     handleSalvarSolicitacaoLista,
     handleSalvarRecebimentoLista,

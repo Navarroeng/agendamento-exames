@@ -13,6 +13,7 @@ type RiscosProcessoRowActionsMenuProps = {
   isAdmin: boolean;
   savingRemover?: boolean;
   onAbrir: (processo: RiscosPsicossociaisProcesso) => void;
+  onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
   onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
 };
 
@@ -21,6 +22,7 @@ export function RiscosProcessoRowActionsMenu({
   isAdmin,
   savingRemover = false,
   onAbrir,
+  onVisualizarRelatorio,
   onRemoverProcesso,
 }: RiscosProcessoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -127,12 +129,16 @@ export function RiscosProcessoRowActionsMenu({
             disabled={!acoes.podeGerarRelatorio && !processo.relatorioGerado}
             title={
               processo.relatorioGerado
-                ? "Abrir o processo para visualizar o relatório"
+                ? "Abrir o Relatório Executivo"
                 : acoes.gerarRelatorioMotivoDesabilitado
             }
             onClick={() => {
               setOpen(false);
-              onAbrir(processo);
+              if (processo.relatorioGerado) {
+                onVisualizarRelatorio(processo);
+              } else {
+                onAbrir(processo);
+              }
             }}
           />
           {acoes.mostrarRemoverProcesso ? (

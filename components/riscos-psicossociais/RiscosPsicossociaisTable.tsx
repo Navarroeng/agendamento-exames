@@ -25,6 +25,7 @@ interface RiscosPsicossociaisTableProps {
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
   onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
+  onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
   /** Admin only — remoção definitiva. */
   podeRemoverProcesso?: boolean;
   onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
@@ -84,6 +85,7 @@ export function RiscosPsicossociaisTable({
   onMesChange,
   onYearChange,
   onVisualizar,
+  onVisualizarRelatorio,
   podeRemoverProcesso = false,
   onRemoverProcesso,
   savingRemover = false,
@@ -185,6 +187,7 @@ export function RiscosPsicossociaisTable({
                         isAdmin={podeRemoverProcesso}
                         savingRemover={savingRemover}
                         onAbrir={onVisualizar}
+                        onVisualizarRelatorio={onVisualizarRelatorio}
                         onRemoverProcesso={onRemoverProcesso}
                       />
                     </td>

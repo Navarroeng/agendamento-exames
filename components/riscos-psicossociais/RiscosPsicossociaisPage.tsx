@@ -6,6 +6,7 @@ import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/Risc
 import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
 import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
 import { RiscosRemoverProcessoModal } from "@/components/riscos-psicossociais/RiscosRemoverProcessoModal";
+import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
 import { useRiscosPsicossociaisPage } from "@/hooks/useRiscosPsicossociaisPage";
 
 export function RiscosPsicossociaisPage() {
@@ -27,6 +28,13 @@ export function RiscosPsicossociaisPage() {
     handleMesChange,
     handleYearChange,
     openProcesso,
+    openVisualizarRelatorio,
+    closeVisualizarRelatorio,
+    relatorioViewerOpen,
+    relatorioViewer,
+    relatorioViewerLogoUrl,
+    relatorioViewerCnpj,
+    relatorioViewerCampanhaStatus,
     closeModal,
     handleSalvarSolicitacaoLista,
     handleSalvarRecebimentoLista,
@@ -81,6 +89,7 @@ export function RiscosPsicossociaisPage() {
         onMesChange={handleMesChange}
         onYearChange={handleYearChange}
         onVisualizar={openProcesso}
+        onVisualizarRelatorio={(p) => void openVisualizarRelatorio(p)}
         podeRemoverProcesso={isAdmin}
         onRemoverProcesso={openRemoverProcesso}
         savingRemover={savingRemoverProcesso}
@@ -92,6 +101,15 @@ export function RiscosPsicossociaisPage() {
         saving={savingRemoverProcesso}
         onClose={closeRemoverProcesso}
         onConfirm={handleRemoverProcesso}
+      />
+
+      <RiscosRelatorioViewerModal
+        open={relatorioViewerOpen}
+        relatorio={relatorioViewer}
+        onClose={closeVisualizarRelatorio}
+        logoUrl={relatorioViewerLogoUrl}
+        empresaCnpj={relatorioViewerCnpj}
+        campanhaStatus={relatorioViewerCampanhaStatus}
       />
 
       <RiscosPsicossociaisModal
