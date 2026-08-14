@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { RiscosListaPresencaTab } from "@/components/riscos-psicossociais/RiscosListaPresencaTab";
 import { RiscosCampanhaLogoCard } from "@/components/riscos-psicossociais/RiscosCampanhaLogoCard";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
+import { downloadModeloImportacaoParticipantesExcel } from "@/lib/riscos-participantes-excel";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
 interface RiscosPainelPreRequisitosProps {
@@ -140,7 +142,7 @@ export function RiscosPainelPreRequisitos({
             </div>
           </dl>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             {lista.lista_anexo_path ? (
               <button
                 type="button"
@@ -156,6 +158,20 @@ export function RiscosPainelPreRequisitos({
               onClick={() => setListaExpandida((v) => !v)}
             >
               {listaExpandida ? "Ocultar gestão" : "Gerenciar lista"}
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[#cbd5e1] bg-white px-3 py-1.5 text-[11px] font-bold text-navy"
+              title="Baixar modelo_importacao_participantes_riscos.xlsx"
+              onClick={() => {
+                try {
+                  downloadModeloImportacaoParticipantesExcel();
+                } catch {
+                  toast.error("Não foi possível baixar o modelo.");
+                }
+              }}
+            >
+              Baixar modelo
             </button>
           </div>
 

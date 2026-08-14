@@ -15,8 +15,10 @@ import {
 } from "../lib/riscos-lista-presenca-importacao";
 import {
   avaliarLinhasImportacaoParticipantes,
+  downloadModeloImportacaoParticipantesExcel,
   parseParticipantesExcelDetalhado,
   RISCOS_IMPORT_HEADERS,
+  RISCOS_IMPORT_MODELO_FILENAME,
 } from "../lib/riscos-participantes-excel";
 import * as XLSX from "xlsx";
 import { isValidCPF } from "../lib/cpf";
@@ -135,20 +137,71 @@ const tab = readFileSync(
   join(root, "components/riscos-psicossociais/RiscosListaPresencaTab.tsx"),
   "utf8"
 );
+const painel = readFileSync(
+  join(root, "components/riscos-psicossociais/RiscosPainelPreRequisitos.tsx"),
+  "utf8"
+);
 const participantes = readFileSync(
   join(root, "components/riscos-psicossociais/RiscosCampanhaParticipantesSection.tsx"),
   "utf8"
 );
 const hook = readFileSync(join(root, "hooks/useRiscosPsicossociaisPage.ts"), "utf8");
 
-assert.match(tab, /downloadModeloImportacaoParticipantesExcel/);
-assert.match(tab, /Baixar modelo/);
+assert.match(painel, /downloadModeloImportacaoParticipantesExcel/);
+assert.match(painel, /Baixar modelo/);
+assert.match(painel, /Gerenciar lista/);
+const gestaoExpandida = painel.indexOf("{listaExpandida ? (");
+assert.ok(gestaoExpandida > 0);
+assert.match(painel.slice(0, gestaoExpandida), /Baixar modelo/);
+assert.doesNotMatch(painel.slice(gestaoExpandida), /Baixar modelo/);
+assert.doesNotMatch(tab, /Baixar modelo/);
+assert.doesNotMatch(tab, /downloadModeloImportacaoParticipantesExcel/);
+assert.doesNotMatch(tab, /Modelo da lista/);
+assert.doesNotMatch(tab, /baixar o modelo/i);
 assert.match(tab, /Ao salvar, os participantes serão importados automaticamente/);
+assert.match(
+  tab,
+  /A importação automática dos participantes a partir do Excel/
+);
 assert.match(participantes, /Importar Excel/);
 assert.match(participantes, /downloadModeloImportacaoParticipantesExcel/);
 assert.match(hook, /handlePrepararImportacaoParticipantesExcel\(file\)/);
 assert.match(hook, /confirmarImportacaoParticipantesCampanha/);
 assert.match(hook, /isArquivoExcelListaPresenca/);
 assert.doesNotMatch(hook, /from\("esocial"/);
+
+const previousCreateElement = globalThis.document?.createElement;
+const previousCreateObjectURL = globalThis.URL?.createObjectURL;
+const previousRevokeObjectURL = globalThis.URL?.revokeObjectURL;
+const fakeAnchor = {
+  href: "",
+  download: "",
+  clickCount: 0,
+  click() {
+    this.clickCount += 1;
+  },
+};
+(globalThis as { document?: { createElement: (tag: string) => unknown } }).document = {
+  createElement: (tag: string) => {
+    assert.equal(tag, "a");
+    return fakeAnchor;
+  },
+};
+(globalThis.URL as { createObjectURL: (blob: Blob) => string }).createObjectURL = () =>
+  "blob:modelo-lista";
+(globalThis.URL as { revokeObjectURL: (url: string) => void }).revokeObjectURL = () =>
+  undefined;
+downloadModeloImportacaoParticipantesExcel();
+assert.equal(fakeAnchor.download, RISCOS_IMPORT_MODELO_FILENAME);
+assert.equal(fakeAnchor.clickCount, 1);
+if (previousCreateElement && globalThis.document) {
+  globalThis.document.createElement = previousCreateElement;
+}
+if (previousCreateObjectURL) {
+  globalThis.URL.createObjectURL = previousCreateObjectURL;
+}
+if (previousRevokeObjectURL) {
+  globalThis.URL.revokeObjectURL = previousRevokeObjectURL;
+}
 
 console.log("test-riscos-lista-presenca-importacao: OK");
