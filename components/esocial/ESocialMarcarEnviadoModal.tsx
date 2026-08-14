@@ -93,17 +93,6 @@ export function ESocialMarcarEnviadoModal({
             onChange={(e) => onChangeData(maskDateBR(e.target.value))}
           />
         </Field>
-        <Field label="Número da matrícula">
-          <input
-            className="field-input"
-            type="text"
-            autoComplete="off"
-            placeholder="Digite a matrícula"
-            value={numeroMatricula}
-            disabled={confirmDisabled}
-            onChange={(e) => onChangeMatricula(e.target.value)}
-          />
-        </Field>
         <Field label="Nº Recibo">
           <input
             className={`field-input font-mono text-sm tracking-tight ${
@@ -138,6 +127,17 @@ export function ESocialMarcarEnviadoModal({
               </p>
             </div>
           )}
+        </Field>
+        <Field label="Número da matrícula">
+          <input
+            className="field-input"
+            type="text"
+            autoComplete="off"
+            placeholder="Digite a matrícula"
+            value={numeroMatricula}
+            disabled={confirmDisabled}
+            onChange={(e) => onChangeMatricula(e.target.value)}
+          />
         </Field>
       </div>
     </Modal>

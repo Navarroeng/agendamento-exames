@@ -79,10 +79,14 @@ assert.doesNotMatch(pendenteFn, /numero_matricula/);
 assert.match(actions, /onVisualizar\(agendamento\.id\)/);
 assert.match(actions, /onMarcarEnviado\(agendamento\.id\)/);
 
-const matriculaIdx = modal.indexOf('label="Número da matrícula"');
+const dataIdx = modal.indexOf('label="Data envio e-Social"');
 const reciboIdx = modal.indexOf('label="Nº Recibo"');
+const matriculaIdx = modal.indexOf('label="Número da matrícula"');
+assert.ok(dataIdx > 0, "modal tem Data envio e-Social");
+assert.ok(reciboIdx > 0, "modal tem Nº Recibo");
 assert.ok(matriculaIdx > 0, "modal tem Número da matrícula");
-assert.ok(reciboIdx > matriculaIdx, "matrícula aparece antes do Nº Recibo");
+assert.ok(dataIdx < reciboIdx, "data aparece antes do Nº Recibo");
+assert.ok(reciboIdx < matriculaIdx, "Nº Recibo aparece antes da matrícula");
 
 assert.match(page, /numeroMatricula=\{matriculaInput\}/);
 assert.match(view, /agendamento\.numero_matricula/);
