@@ -30,6 +30,28 @@ export const LAUDOS_SST_ETAPA_LABELS: Record<LaudosSstEtapaId, string> =
     LAUDOS_SST_ETAPAS.map((e) => [e.id, e.label])
   ) as Record<LaudosSstEtapaId, string>;
 
+/** Base visual do badge da coluna Etapa atual (tamanho, fonte e padding). */
+export const LAUDOS_SST_ETAPA_BADGE_BASE =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold";
+
+/**
+ * Cor do badge pela etapa/status real — não pela posição da linha.
+ * Somente "Processo inicial" usa lilás; as demais etapas em andamento
+ * mantêm o indigo atual; Concluído permanece verde.
+ */
+export function laudosSstEtapaAtualBadgeClass(
+  etapaAtual: LaudosSstEtapaId,
+  status: LaudosSstStatus
+): string {
+  if (status === "concluido") {
+    return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-brand-green-soft text-brand-green`;
+  }
+  if (etapaAtual === "processo_inicial") {
+    return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-[#F3E8FF] text-[#7E22CE]`;
+  }
+  return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
+}
+
 export interface OrcamentoLaudosSstRecord {
   orcamento_id: string;
   etapa_atual: LaudosSstEtapaId;

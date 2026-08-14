@@ -10,6 +10,7 @@ import {
   LAUDOS_SST_ETAPA_LABELS,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_MES_VAZIO_MSG,
+  laudosSstEtapaAtualBadgeClass,
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
 import type { YearMonth } from "@/lib/listagem-meses";
@@ -128,15 +129,16 @@ export function LaudosSstTable({
                       {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
                     </td>
                     <td>
-                      {processo.status === "concluido" ? (
-                        <span className="inline-flex rounded-full bg-brand-green-soft px-2.5 py-0.5 text-[10px] font-extrabold text-brand-green">
-                          Concluído
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[10px] font-extrabold text-[#4338ca]">
-                          {LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual]}
-                        </span>
-                      )}
+                      <span
+                        className={laudosSstEtapaAtualBadgeClass(
+                          processo.etapaAtual,
+                          processo.status
+                        )}
+                      >
+                        {processo.status === "concluido"
+                          ? "Concluído"
+                          : LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual]}
+                      </span>
                     </td>
                     <td>
                       <ProgressoLaudos processo={processo} />

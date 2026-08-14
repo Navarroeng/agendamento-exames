@@ -7,6 +7,7 @@ import {
   isProcessoElegivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
+  laudosSstEtapaAtualBadgeClass,
   sortLaudosSstProcessos,
 } from "../lib/laudos-sst";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
@@ -240,5 +241,36 @@ assert.deepEqual(
 assert.equal(ordenados[0].etapasConcluidas, 0);
 assert.equal(ordenados[1].etapasConcluidas, 0);
 assert.equal(ordenados[4].etapasConcluidas, 6);
+
+const indigo =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
+const lilas =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#F3E8FF] text-[#7E22CE]";
+const verde =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
+
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("processo_inicial", "em_andamento"),
+  lilas
+);
+assert.equal(laudosSstEtapaAtualBadgeClass("epis", "em_andamento"), indigo);
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("cronograma_acoes", "em_andamento"),
+  indigo
+);
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("pgr_pcmso_ltcat", "em_andamento"),
+  indigo
+);
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("autorizacao_pedro", "em_andamento"),
+  indigo
+);
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("envio_cliente", "em_andamento"),
+  indigo
+);
+assert.equal(laudosSstEtapaAtualBadgeClass("processo_inicial", "concluido"), verde);
+assert.equal(laudosSstEtapaAtualBadgeClass("epis", "concluido"), verde);
 
 console.log("test-laudos-sst: OK");
