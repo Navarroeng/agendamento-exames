@@ -1,6 +1,8 @@
 /** Smoke: elegibilidade e progresso base do módulo Laudos SST. */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildLaudosSstProcesso,
   filterLaudosSstProcessos,
@@ -244,14 +246,14 @@ assert.equal(ordenados[4].etapasConcluidas, 6);
 
 const indigo =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
-const lilas =
-  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#F3E8FF] text-[#7E22CE]";
+const azulProcessoInicial =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#E8EEFF] text-[#3F51D7]";
 const verde =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
 
 assert.equal(
   laudosSstEtapaAtualBadgeClass("processo_inicial", "em_andamento"),
-  lilas
+  azulProcessoInicial
 );
 assert.equal(laudosSstEtapaAtualBadgeClass("epis", "em_andamento"), indigo);
 assert.equal(
@@ -272,5 +274,8 @@ assert.equal(
 );
 assert.equal(laudosSstEtapaAtualBadgeClass("processo_inicial", "concluido"), verde);
 assert.equal(laudosSstEtapaAtualBadgeClass("epis", "concluido"), verde);
+
+const fonteBadge = readFileSync(join(process.cwd(), "lib/laudos-sst.ts"), "utf8");
+assert.doesNotMatch(fonteBadge, /#F3E8FF|#7E22CE|#E9D5FF|lilás/i);
 
 console.log("test-laudos-sst: OK");
