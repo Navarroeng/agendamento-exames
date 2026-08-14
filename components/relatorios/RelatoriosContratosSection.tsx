@@ -105,6 +105,7 @@ export function RelatoriosContratosSection({
         title="Evolução de receita contratual"
         data={chartReceita}
         type="line"
+        valueFormat="currency"
       />
 
       <div>

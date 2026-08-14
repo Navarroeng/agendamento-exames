@@ -22,6 +22,18 @@ export function formatCurrency(value: number): string {
   return `R$ ${formatMoney(value)}`;
 }
 
+const BRL_CURRENCY = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Exibição monetária pt-BR via Intl (inclui negativos no padrão da locale). */
+export function formatCurrencyIntl(value: number): string {
+  return BRL_CURRENCY.format(value);
+}
+
 /** Alias explícito para exibição em pt-BR (R$ 2.000,00). */
 export const formatCurrencyBRL = formatCurrency;
 

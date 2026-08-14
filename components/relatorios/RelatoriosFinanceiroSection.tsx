@@ -74,6 +74,7 @@ export function RelatoriosFinanceiroSection({
           title="Evolução mensal — faturamento, custos e lucro"
           data={chartFaturamento}
           type="multi"
+          valueFormat="currency"
         />
         <RelatoriosChartCard
           title="Exames mais realizados"
