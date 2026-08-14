@@ -22,7 +22,11 @@ import type {
   RelatoriosFilters,
   RelatoriosKpis,
 } from "./types";
-import { filterAgendamentosRelatorios } from "./filters";
+import { buildResumoClinicasMes } from "@/lib/fatura-mes-resumo";
+import {
+  filterAgendamentosRelatorios,
+  filterAgendamentosRelatoriosExtra,
+} from "./filters";
 
 function daysBetween(fromIso: string, toIso: string): number {
   const from = new Date(`${fromIso.split("T")[0]}T12:00:00`);
@@ -45,12 +49,63 @@ function sumExamesAgendamento(item: AgendamentoWithExames) {
   return { valorCliente, custoClinica, lucro: valorCliente - custoClinica };
 }
 
+function filterAgendamentosPorStatusContrato(
+  agendamentos: AgendamentoWithExames[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  statusContrato: RelatoriosFilters["statusContrato"]
+): AgendamentoWithExames[] {
+  if (!statusContrato) return agendamentos;
+  const clienteIds = new Set(
+    contratos
+      .filter((c) => c.status === statusContrato)
+      .map((c) => c.cliente_id)
+  );
+  const nomes = new Set(
+    clientes
+      .filter((c) => clienteIds.has(c.id))
+      .map((c) => c.nome.trim().toLowerCase())
+  );
+  return agendamentos.filter((a) =>
+    nomes.has(a.cliente_nome.trim().toLowerCase())
+  );
+}
+
+/**
+ * Mesmo indicador "Previsto no mês" da página Custos Clínicas
+ * (`buildResumoClinicasMes` → `valorPrevisto`).
+ * Filtros extras de Relatórios (empresa/clínica/responsável/status contrato)
+ * recortam essa mesma base — não recalculam o custo.
+ */
+export function custosClinicasPrevistoNoMes(
+  agendamentosCustos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  filters: RelatoriosFilters
+): number {
+  const extra = filterAgendamentosRelatoriosExtra(agendamentosCustos, filters);
+  const base = filterAgendamentosPorStatusContrato(
+    extra,
+    contratos,
+    clientes,
+    filters.statusContrato
+  );
+  const resumo = buildResumoClinicasMes(
+    base,
+    faturas,
+    filters.mesReferencia.trim()
+  );
+  return resumo?.resumo.valorPrevisto ?? 0;
+}
+
 export function buildKpis(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
   contratos: ClienteContratoRecord[],
   clientes: ClienteRecord[],
-  filters: RelatoriosFilters
+  filters: RelatoriosFilters,
+  agendamentosCustosClinicas: AgendamentoWithExames[] = agendamentos
 ): RelatoriosKpis {
   const filtered = filterAgendamentosRelatorios(agendamentos, filters);
   const range = filters.mesReferencia.trim()
@@ -68,15 +123,17 @@ export function buildKpis(
   });
 
   const faturasCliente = faturasMes.filter((f) => f.tipo === "cliente");
-  const faturasClinica = faturasMes.filter((f) => f.tipo === "clinica");
 
   const totalFaturado = faturasCliente.reduce(
     (s, f) => s + Number(f.valor_total ?? 0),
     0
   );
-  const custosClinicas = faturasClinica.reduce(
-    (s, f) => s + Number(f.valor_total ?? 0),
-    0
+  const custosClinicas = custosClinicasPrevistoNoMes(
+    agendamentosCustosClinicas,
+    faturas,
+    contratos,
+    clientes,
+    filters
   );
 
   const hoje = todayIso();

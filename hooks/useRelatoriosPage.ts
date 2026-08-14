@@ -91,7 +91,8 @@ export function useRelatoriosPage() {
             data.faturas,
             data.contratos,
             data.clientes,
-            filters
+            filters,
+            data.agendamentosCustosClinicas
           )
         : null,
     [data, filters]

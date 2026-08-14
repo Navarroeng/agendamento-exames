@@ -10,6 +10,19 @@ function matchesText(value: string, query: string): boolean {
   return textMatchesSearch(value, query);
 }
 
+/** Empresa, clínica e responsável — sem filtrar mês (o mês segue a regra de Custos Clínicas). */
+export function filterAgendamentosRelatoriosExtra(
+  agendamentos: AgendamentoWithExames[],
+  filters: Pick<RelatoriosFilters, "empresa" | "clinica" | "responsavel">
+): AgendamentoWithExames[] {
+  return agendamentos.filter((item) => {
+    if (!matchesText(item.cliente_nome, filters.empresa)) return false;
+    if (!matchesText(item.clinica_nome, filters.clinica)) return false;
+    if (!matchesText(item.responsavel, filters.responsavel)) return false;
+    return true;
+  });
+}
+
 export function filterAgendamentosRelatorios(
   agendamentos: AgendamentoWithExames[],
   filters: RelatoriosFilters
@@ -18,17 +31,16 @@ export function filterAgendamentosRelatorios(
     ? parseMonthYearBRToIsoRange(filters.mesReferencia)
     : null;
 
-  return agendamentos.filter((item) => {
-    if (item.status === "cancelado") return false;
+  return filterAgendamentosRelatoriosExtra(agendamentos, filters).filter(
+    (item) => {
+      if (item.status === "cancelado") return false;
 
-    const data = item.data_agendamento.split("T")[0];
-    if (range && (data < range.inicio || data > range.fim)) return false;
-    if (!matchesText(item.cliente_nome, filters.empresa)) return false;
-    if (!matchesText(item.clinica_nome, filters.clinica)) return false;
-    if (!matchesText(item.responsavel, filters.responsavel)) return false;
+      const data = item.data_agendamento.split("T")[0];
+      if (range && (data < range.inicio || data > range.fim)) return false;
 
-    return true;
-  });
+      return true;
+    }
+  );
 }
 
 export function extractRelatoriosFilterOptions(
