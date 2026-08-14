@@ -141,6 +141,41 @@ export function faturamentoPrevistoNoMes(
   return resumo?.resumo.valorPrevisto ?? 0;
 }
 
+/** Previsto, custos e lucro da mesma fonte dos cards de Relatórios. */
+export function financeiroPrevistoNoMes(
+  agendamentosFatura: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  filters: RelatoriosFilters
+): { previsto: number; custos: number; lucro: number } {
+  const previsto = faturamentoPrevistoNoMes(
+    agendamentosFatura,
+    faturas,
+    contratos,
+    clientes,
+    filters
+  );
+  const custos = custosClinicasPrevistoNoMes(
+    agendamentosFatura,
+    faturas,
+    contratos,
+    clientes,
+    filters
+  );
+  return { previsto, custos, lucro: previsto - custos };
+}
+
+function mesIsoFromAgendamento(data: string): string | null {
+  const match = data.split("T")[0].match(/^(\d{4})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}` : null;
+}
+
+function mesIsoToBR(mesIso: string): string {
+  const [year, month] = mesIso.split("-");
+  return year && month ? `${month}/${year}` : "";
+}
+
 export function buildKpis(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
@@ -151,20 +186,14 @@ export function buildKpis(
 ): RelatoriosKpis {
   const filtered = filterAgendamentosRelatorios(agendamentos, filters);
 
-  const totalFaturado = faturamentoPrevistoNoMes(
-    agendamentosCustosClinicas,
-    faturas,
-    contratos,
-    clientes,
-    filters
-  );
-  const custosClinicas = custosClinicasPrevistoNoMes(
-    agendamentosCustosClinicas,
-    faturas,
-    contratos,
-    clientes,
-    filters
-  );
+  const { previsto: totalFaturado, custos: custosClinicas, lucro: lucroBruto } =
+    financeiroPrevistoNoMes(
+      agendamentosCustosClinicas,
+      faturas,
+      contratos,
+      clientes,
+      filters
+    );
 
   const hoje = todayIso();
   const contratosAtivos = contratos.filter((c) => c.status === "ativo");
@@ -188,7 +217,7 @@ export function buildKpis(
     totalAsosMes: filtered.length,
     totalFaturado,
     custosClinicas,
-    lucroBruto: totalFaturado - custosClinicas,
+    lucroBruto,
     pendenciasEsocial: filtered.filter((a) => {
       const status = getESocialVisualStatus(a);
       return status === "pendente" || status === "urgente";
@@ -401,32 +430,47 @@ export function buildContratosVencendo(
     .sort((a, b) => a.diasRestantes - b.diasRestantes);
 }
 
+/**
+ * Evolução mensal = mesmos indicadores dos cards (Previsto / Custos / Lucro)
+ * para cada competência, sem somar `faturas.valor_total`.
+ */
 export function buildFaturamentoMensalChart(
-  faturas: FaturaRecord[]
+  agendamentosFatura: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  filters: RelatoriosFilters
 ): ChartPoint[] {
-  const map = new Map<string, { faturado: number; custo: number }>();
+  const base = agendamentosBaseFaturaRelatorios(
+    agendamentosFatura,
+    contratos,
+    clientes,
+    filters
+  );
+  const months = new Set<string>();
+  base.forEach((item) => {
+    const mes = mesIsoFromAgendamento(item.data_agendamento);
+    if (mes) months.add(mes);
+  });
 
-  faturas
-    .filter((f) => f.status !== "cancelada")
-    .forEach((f) => {
-      const mes = f.mes_referencia ?? f.periodo_inicio?.slice(0, 7);
-      if (!mes) return;
-      const current = map.get(mes) ?? { faturado: 0, custo: 0 };
-      const valor = Number(f.valor_total ?? 0);
-      if (f.tipo === "cliente") current.faturado += valor;
-      else current.custo += valor;
-      map.set(mes, current);
-    });
-
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
+  return Array.from(months)
+    .sort((a, b) => a.localeCompare(b))
     .slice(-12)
-    .map(([label, v]) => ({
-      label,
-      value: v.faturado,
-      value2: v.custo,
-      value3: v.faturado - v.custo,
-    }));
+    .map((mesIso) => {
+      const { previsto, custos, lucro } = financeiroPrevistoNoMes(
+        agendamentosFatura,
+        faturas,
+        contratos,
+        clientes,
+        { ...filters, mesReferencia: mesIsoToBR(mesIso) }
+      );
+      return {
+        label: mesIso,
+        value: previsto,
+        value2: custos,
+        value3: lucro,
+      };
+    });
 }
 
 export function buildExamesMaisRealizadosChart(

@@ -121,7 +121,7 @@ export function RelatoriosChartCard({
             <YAxis tick={{ fontSize: 10 }} tickFormatter={yTick} width={valueFormat === "currency" ? 88 : 40} />
             {tooltip}
             <Legend />
-            <Bar dataKey="value" name="Faturado" fill={NAVY} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="value" name="Previsto" fill={NAVY} radius={[4, 4, 0, 0]} />
             <Bar dataKey="value2" name="Custos" fill={BLUE} radius={[4, 4, 0, 0]} />
             <Bar dataKey="value3" name="Lucro" fill={GOLD} radius={[4, 4, 0, 0]} />
           </BarChart>

@@ -52,6 +52,8 @@ assert.match(
   /Evolução de receita contratual[\s\S]*valueFormat="currency"/
 );
 assert.match(chartCard, /formatRelatoriosChartTick/);
+assert.match(chartCard, /name="Previsto"/);
+assert.doesNotMatch(chartCard, /name="Faturado"/);
 
 console.log("test-relatorios-chart-format: OK");
 console.log("  Faturado:", faturado);

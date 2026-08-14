@@ -116,8 +116,17 @@ export function useRelatoriosPage() {
   );
 
   const chartFaturamento = useMemo(
-    () => (data ? buildFaturamentoMensalChart(data.faturas) : []),
-    [data]
+    () =>
+      data
+        ? buildFaturamentoMensalChart(
+            data.agendamentosCustosClinicas,
+            data.faturas,
+            data.contratos,
+            data.clientes,
+            filters
+          )
+        : [],
+    [data, filters]
   );
 
   const chartExames = useMemo(

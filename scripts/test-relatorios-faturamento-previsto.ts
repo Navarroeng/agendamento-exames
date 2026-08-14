@@ -203,6 +203,11 @@ const financeiro = readFileSync(
 assert.match(aggregations, /buildResumoClientesMes/);
 assert.match(aggregations, /faturamentoPrevistoNoMes/);
 assert.doesNotMatch(aggregations, /faturasCliente\.reduce/);
+assert.match(aggregations, /financeiroPrevistoNoMes/);
+assert.doesNotMatch(
+  aggregations,
+  /if \(f\.tipo === "cliente"\) current\.faturado \+= valor/
+);
 assert.match(summary, /Previsto no mês/);
 assert.doesNotMatch(summary, /Total faturado/);
 assert.match(financeiro, /Previsto no mês/);
