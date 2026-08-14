@@ -1,5 +1,4 @@
 import { addMonthsToIsoDate } from "@/lib/cliente-contrato-dates";
-import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
 import { getESocialVisualStatus } from "@/lib/esocial-filters";
 import { formatDateBR } from "@/lib/format";
 import type {
@@ -18,7 +17,7 @@ import type {
   RelatoriosFilters,
   RelatoriosKpis,
 } from "./types";
-import { buildResumoClinicasMes } from "@/lib/fatura-mes-resumo";
+import { buildResumoClientesMes, buildResumoClinicasMes } from "@/lib/fatura-mes-resumo";
 import {
   filterAgendamentosRelatorios,
   filterAgendamentosRelatoriosExtra,
@@ -67,11 +66,32 @@ function filterAgendamentosPorStatusContrato(
   );
 }
 
+function agendamentosBaseFaturaRelatorios(
+  agendamentosFatura: AgendamentoWithExames[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  filters: RelatoriosFilters
+): AgendamentoWithExames[] {
+  const extra = filterAgendamentosRelatoriosExtra(agendamentosFatura, filters);
+  return filterAgendamentosPorStatusContrato(
+    extra,
+    contratos,
+    clientes,
+    filters.statusContrato
+  );
+}
+
+function clientesCatalogRelatorios(clientes: ClienteRecord[]) {
+  return clientes.map((c) => ({
+    id: c.id,
+    nome: c.nome,
+    cnpj: c.cnpj ?? "",
+  }));
+}
+
 /**
  * Mesmo indicador "Previsto no mês" da página Custos Clínicas
  * (`buildResumoClinicasMes` → `valorPrevisto`).
- * Filtros extras de Relatórios (empresa/clínica/responsável/status contrato)
- * recortam essa mesma base — não recalculam o custo.
  */
 export function custosClinicasPrevistoNoMes(
   agendamentosCustos: AgendamentoWithExames[],
@@ -80,17 +100,43 @@ export function custosClinicasPrevistoNoMes(
   clientes: ClienteRecord[],
   filters: RelatoriosFilters
 ): number {
-  const extra = filterAgendamentosRelatoriosExtra(agendamentosCustos, filters);
-  const base = filterAgendamentosPorStatusContrato(
-    extra,
+  const base = agendamentosBaseFaturaRelatorios(
+    agendamentosCustos,
     contratos,
     clientes,
-    filters.statusContrato
+    filters
   );
   const resumo = buildResumoClinicasMes(
     base,
     faturas,
     filters.mesReferencia.trim()
+  );
+  return resumo?.resumo.valorPrevisto ?? 0;
+}
+
+/**
+ * Mesmo indicador "Previsto no mês" da página Faturas Clientes
+ * (`buildResumoClientesMes` → `valorPrevisto`).
+ */
+export function faturamentoPrevistoNoMes(
+  agendamentosFatura: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  contratos: ClienteContratoRecord[],
+  clientes: ClienteRecord[],
+  filters: RelatoriosFilters
+): number {
+  const base = agendamentosBaseFaturaRelatorios(
+    agendamentosFatura,
+    contratos,
+    clientes,
+    filters
+  );
+  const resumo = buildResumoClientesMes(
+    base,
+    faturas,
+    filters.mesReferencia.trim(),
+    "",
+    clientesCatalogRelatorios(clientes)
   );
   return resumo?.resumo.valorPrevisto ?? 0;
 }
@@ -104,25 +150,13 @@ export function buildKpis(
   agendamentosCustosClinicas: AgendamentoWithExames[] = agendamentos
 ): RelatoriosKpis {
   const filtered = filterAgendamentosRelatorios(agendamentos, filters);
-  const range = filters.mesReferencia.trim()
-    ? parseMonthYearBRToIsoRange(filters.mesReferencia)
-    : null;
 
-  const faturasMes = faturas.filter((f) => {
-    if (f.status === "cancelada") return false;
-    if (range) {
-      const mes = f.mes_referencia ?? f.periodo_inicio?.slice(0, 7);
-      const ref = `${range.inicio.slice(0, 7)}`;
-      return mes === ref;
-    }
-    return true;
-  });
-
-  const faturasCliente = faturasMes.filter((f) => f.tipo === "cliente");
-
-  const totalFaturado = faturasCliente.reduce(
-    (s, f) => s + Number(f.valor_total ?? 0),
-    0
+  const totalFaturado = faturamentoPrevistoNoMes(
+    agendamentosCustosClinicas,
+    faturas,
+    contratos,
+    clientes,
+    filters
   );
   const custosClinicas = custosClinicasPrevistoNoMes(
     agendamentosCustosClinicas,

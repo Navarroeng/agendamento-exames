@@ -52,7 +52,7 @@ export function RelatoriosFinanceiroSection({
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: "Total faturado", value: formatCurrency(kpis?.totalFaturado ?? 0) },
+          { label: "Previsto no mês", value: formatCurrency(kpis?.totalFaturado ?? 0) },
           { label: "Custos clínicas", value: formatCurrency(kpis?.custosClinicas ?? 0) },
           { label: "Lucro bruto", value: formatCurrency(kpis?.lucroBruto ?? 0) },
           { label: "Ticket médio", value: formatCurrency(ticketMedio) },

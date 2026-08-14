@@ -245,10 +245,13 @@ const hook = readFileSync(join(root, "hooks/useRelatoriosPage.ts"), "utf8");
 
 assert.match(aggregations, /buildResumoClinicasMes/);
 assert.match(aggregations, /custosClinicasPrevistoNoMes/);
+assert.match(aggregations, /buildResumoClientesMes/);
+assert.match(aggregations, /faturamentoPrevistoNoMes/);
 assert.doesNotMatch(
   aggregations,
   /faturasClinica\.reduce/
 );
+assert.doesNotMatch(aggregations, /faturasCliente\.reduce/);
 assert.match(service, /listarAgendamentosParaFatura/);
 assert.match(hook, /agendamentosCustosClinicas/);
 

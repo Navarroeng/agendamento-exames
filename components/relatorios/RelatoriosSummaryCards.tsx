@@ -14,7 +14,7 @@ const CARDS: {
   { key: "totalAsosMes", label: "ASOs no mês", tone: "bg-white text-navy border-[#e8edf5]" },
   {
     key: "totalFaturado",
-    label: "Total faturado",
+    label: "Previsto no mês",
     tone: "bg-[#f0f4ff] text-brand-blue border-[#c7d7f5]/80",
     format: formatCurrency,
   },

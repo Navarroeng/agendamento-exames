@@ -12,7 +12,7 @@ import type {
 
 export interface RelatoriosData {
   agendamentos: AgendamentoWithExames[];
-  /** Mesma base da página Custos Clínicas (`listarAgendamentosParaFatura`). */
+  /** Mesma base de Faturas Clientes e Custos Clínicas (`listarAgendamentosParaFatura`). */
   agendamentosCustosClinicas: AgendamentoWithExames[];
   faturas: FaturaRecord[];
   contratos: ClienteContratoRecord[];
