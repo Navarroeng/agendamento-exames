@@ -10,14 +10,10 @@ import type {
 } from "@/lib/types";
 import type {
   ChartPoint,
-  ClienteBloqueadoRow,
   ContratoRenovacaoRow,
   ContratoVencendoRow,
-  EsocialEmpresaPendenteRow,
-  ExameRealizadoRow,
   LucratividadeClinicaRow,
   LucratividadeEmpresaRow,
-  PendenciaOperacionalRow,
   PeriodicoRow,
   RelatoriosFilters,
   RelatoriosKpis,
@@ -170,66 +166,6 @@ export function buildKpis(
   };
 }
 
-export function buildPendenciasOperacionais(
-  agendamentos: AgendamentoWithExames[],
-  filters: RelatoriosFilters
-): PendenciaOperacionalRow[] {
-  const rows: PendenciaOperacionalRow[] = [];
-  const filtered = filterAgendamentosRelatorios(agendamentos, filters);
-
-  filtered.forEach((item) => {
-    const base = {
-      empresa: item.cliente_nome,
-      colaborador: item.colaborador,
-      data: formatDateBR(item.data_agendamento),
-      responsavel: item.responsavel,
-    };
-
-    if (!item.aso_enviado_cliente) {
-      rows.push({ id: `${item.id}-cliente`, ...base, statusPendente: "ASO não enviado ao cliente" });
-    }
-    if (!item.aso_enviado_clinica) {
-      rows.push({ id: `${item.id}-clinica`, ...base, statusPendente: "ASO não enviado à clínica" });
-    }
-    if (!item.aso_assinado) {
-      rows.push({ id: `${item.id}-assinado`, ...base, statusPendente: "ASO não assinado" });
-    }
-    if (
-      getESocialVisualStatus(item) === "pendente" ||
-      getESocialVisualStatus(item) === "urgente"
-    ) {
-      rows.push({ id: `${item.id}-esocial`, ...base, statusPendente: "e-Social pendente" });
-    }
-  });
-
-  return rows;
-}
-
-export function buildExamesRealizados(
-  agendamentos: AgendamentoWithExames[],
-  filters: RelatoriosFilters
-): ExameRealizadoRow[] {
-  const rows: ExameRealizadoRow[] = [];
-  filterAgendamentosRelatorios(agendamentos, filters).forEach((item) => {
-    (item.agendamento_exames ?? []).forEach((exame, idx) => {
-      const valor = Number(exame.valor_cliente ?? 0);
-      const custo = Number(exame.custo_clinica ?? 0);
-      rows.push({
-        id: `${item.id}-${idx}`,
-        data: formatDateBR(item.data_agendamento),
-        empresa: item.cliente_nome,
-        colaborador: item.colaborador,
-        exame: exame.tipo_exame,
-        clinica: item.clinica_nome,
-        valorCliente: valor,
-        custoClinica: custo,
-        lucro: valor - custo,
-      });
-    });
-  });
-  return rows;
-}
-
 export function buildLucratividadeEmpresa(
   agendamentos: AgendamentoWithExames[],
   filters: RelatoriosFilters
@@ -288,32 +224,6 @@ export function buildLucratividadeClinica(
       ticketMedio: v.exames > 0 ? v.custo / v.exames : 0,
     }))
     .sort((a, b) => b.custoTotal - a.custoTotal);
-}
-
-export function buildEsocialEmpresasPendentes(
-  agendamentos: AgendamentoWithExames[],
-  filters: RelatoriosFilters
-): EsocialEmpresaPendenteRow[] {
-  const map = new Map<string, Set<string>>();
-
-  filterAgendamentosRelatorios(agendamentos, filters)
-    .filter((a) => {
-      const status = getESocialVisualStatus(a);
-      return status === "pendente" || status === "urgente";
-    })
-    .forEach((a) => {
-      const set = map.get(a.cliente_nome) ?? new Set<string>();
-      set.add(a.colaborador);
-      map.set(a.cliente_nome, set);
-    });
-
-  return Array.from(map.entries())
-    .map(([empresa, colaboradores]) => ({
-      empresa,
-      quantidadePendente: colaboradores.size,
-      colaboradoresPendentes: colaboradores.size,
-    }))
-    .sort((a, b) => b.quantidadePendente - a.quantidadePendente);
 }
 
 export function buildPeriodicos(
@@ -455,59 +365,6 @@ export function buildContratosVencendo(
       };
     })
     .sort((a, b) => a.diasRestantes - b.diasRestantes);
-}
-
-export function buildClientesBloqueados(
-  contratos: ClienteContratoRecord[],
-  clientes: ClienteRecord[],
-  agendamentos: AgendamentoWithExames[]
-): ClienteBloqueadoRow[] {
-  const hoje = todayIso();
-  const ativos = new Map(
-    contratos
-      .filter((c) => c.status === "ativo" && c.data_fim && c.data_inicio)
-      .filter(
-        (c) => hoje >= c.data_inicio && hoje <= (c.data_fim as string)
-      )
-      .map((c) => [c.cliente_id, c])
-  );
-
-  const ultimoAgendamento = new Map<string, { data: string; responsavel: string }>();
-  agendamentos
-    .filter((a) => a.status !== "cancelado")
-    .forEach((a) => {
-      const cliente = clientes.find(
-        (c) => c.nome.toLowerCase() === a.cliente_nome.trim().toLowerCase()
-      );
-      if (!cliente) return;
-      const data = a.data_agendamento.split("T")[0];
-      const prev = ultimoAgendamento.get(cliente.id);
-      if (!prev || data > prev.data) {
-        ultimoAgendamento.set(cliente.id, {
-          data,
-          responsavel: a.responsavel,
-        });
-      }
-    });
-
-  return clientes
-    .filter((c) => !ativos.has(c.id))
-    .map((c) => {
-      const contrato = contratos.find(
-        (ct) => ct.cliente_id === c.id && ct.status === "ativo"
-      );
-      const ultimo = ultimoAgendamento.get(c.id);
-      return {
-        empresa: c.nome,
-        clienteId: c.id,
-        motivo: contrato
-          ? "Contrato fora da vigência"
-          : "Sem contrato ativo",
-        vencimentoContrato: formatDateBR(contrato?.data_fim),
-        ultimoAgendamento: ultimo ? formatDateBR(ultimo.data) : "—",
-        responsavel: ultimo?.responsavel ?? "—",
-      };
-    });
 }
 
 export function buildFaturamentoMensalChart(

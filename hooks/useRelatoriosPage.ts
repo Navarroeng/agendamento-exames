@@ -3,26 +3,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  buildClientesBloqueados,
   buildContratosRenovacoes,
   buildContratosVencendo,
-  buildEsocialEmpresasPendentes,
   buildExamesMaisRealizadosChart,
-  buildExamesRealizados,
   buildFaturamentoMensalChart,
   buildKpis,
   buildLucratividadeClinica,
   buildLucratividadeEmpresa,
-  buildPendenciasOperacionais,
-  buildPeriodicos,
   buildReceitaContratualChart,
 } from "@/lib/relatorios/aggregations";
 import {
   currentMonthReferenciaBR,
   extractRelatoriosFilterOptions,
-  filterAgendamentosRelatorios,
 } from "@/lib/relatorios/filters";
-import { computeESocialSummary } from "@/lib/esocial-filters";
 import {
   EMPTY_RELATORIOS_FILTERS,
   type RelatoriosFilters,
@@ -75,14 +68,6 @@ export function useRelatoriosPage() {
     };
   }, [data]);
 
-  const agendamentosFiltrados = useMemo(
-    () =>
-      data
-        ? filterAgendamentosRelatorios(data.agendamentos, filters)
-        : [],
-    [data, filters]
-  );
-
   const kpis = useMemo(
     () =>
       data
@@ -98,17 +83,6 @@ export function useRelatoriosPage() {
     [data, filters]
   );
 
-  const pendencias = useMemo(
-    () =>
-      data ? buildPendenciasOperacionais(data.agendamentos, filters) : [],
-    [data, filters]
-  );
-
-  const examesRealizados = useMemo(
-    () => (data ? buildExamesRealizados(data.agendamentos, filters) : []),
-    [data, filters]
-  );
-
   const lucratividadeEmpresa = useMemo(
     () =>
       data ? buildLucratividadeEmpresa(data.agendamentos, filters) : [],
@@ -119,22 +93,6 @@ export function useRelatoriosPage() {
     () =>
       data ? buildLucratividadeClinica(data.agendamentos, filters) : [],
     [data, filters]
-  );
-
-  const esocialSummary = useMemo(
-    () => computeESocialSummary(agendamentosFiltrados),
-    [agendamentosFiltrados]
-  );
-
-  const esocialEmpresas = useMemo(
-    () =>
-      data ? buildEsocialEmpresasPendentes(data.agendamentos, filters) : [],
-    [data, filters]
-  );
-
-  const periodicos = useMemo(
-    () => (data ? buildPeriodicos(data.agendamentos) : []),
-    [data]
   );
 
   const contratosRenovacoes = useMemo(
@@ -155,18 +113,6 @@ export function useRelatoriosPage() {
         ? buildContratosVencendo(data.contratos, data.clientes, filters)
         : [],
     [data, filters]
-  );
-
-  const clientesBloqueados = useMemo(
-    () =>
-      data
-        ? buildClientesBloqueados(
-            data.contratos,
-            data.clientes,
-            data.agendamentos
-          )
-        : [],
-    [data]
   );
 
   const chartFaturamento = useMemo(
@@ -206,16 +152,10 @@ export function useRelatoriosPage() {
     filtersExpanded,
     filterOptions,
     kpis,
-    pendencias,
-    examesRealizados,
     lucratividadeEmpresa,
     lucratividadeClinica,
-    esocialSummary,
-    esocialEmpresas,
-    periodicos,
     contratosRenovacoes,
     contratosVencendo,
-    clientesBloqueados,
     chartFaturamento,
     chartExames,
     chartReceitaContratual,

@@ -5,7 +5,6 @@ import { formatCurrency } from "@/lib/money";
 import { labelClienteContratoStatus } from "@/lib/cliente-contrato-mappers";
 import type {
   ChartPoint,
-  ClienteBloqueadoRow,
   ContratoRenovacaoRow,
   ContratoVencendoRow,
   RelatoriosKpis,
@@ -28,7 +27,6 @@ interface RelatoriosContratosSectionProps {
   kpis: RelatoriosKpis | null;
   renovacoes: ContratoRenovacaoRow[];
   vencendo: ContratoVencendoRow[];
-  bloqueados: ClienteBloqueadoRow[];
   chartReceita: ChartPoint[];
   contratos: {
     vencidos: number;
@@ -42,7 +40,6 @@ export function RelatoriosContratosSection({
   kpis,
   renovacoes,
   vencendo,
-  bloqueados,
   chartReceita,
   contratos,
 }: RelatoriosContratosSectionProps) {
@@ -74,18 +71,10 @@ export function RelatoriosContratosSection({
     </Link>,
   ]);
 
-  const bloqueadosRows = bloqueados.map((r) => [
-    r.empresa,
-    r.motivo,
-    r.vencimentoContrato,
-    r.ultimoAgendamento,
-    r.responsavel,
-  ]);
-
   return (
     <RelatoriosSection
       title="Contratos e renovações"
-      subtitle="Painel gerencial de contratos, vencimentos e clientes bloqueados."
+      subtitle="Painel gerencial de contratos e vencimentos."
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {[
@@ -168,20 +157,6 @@ export function RelatoriosContratosSection({
             "Ações",
           ]}
           rows={vencendoRows}
-        />
-      </div>
-
-      <div>
-        <h4 className="mb-3 text-sm font-bold text-navy">Clientes bloqueados</h4>
-        <RelatoriosDataTable
-          headers={[
-            "Empresa",
-            "Motivo",
-            "Vencimento",
-            "Último agendamento",
-            "Responsável",
-          ]}
-          rows={bloqueadosRows}
         />
       </div>
     </RelatoriosSection>
