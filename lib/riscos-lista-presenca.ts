@@ -47,6 +47,21 @@ function extensionOf(fileName: string): string {
   return parts.length > 1 ? parts[parts.length - 1] : "";
 }
 
+/** Excel da lista pode alimentar a importação automática de participantes. */
+export function isArquivoExcelListaPresenca(
+  fileName: string,
+  mimeType?: string | null
+): boolean {
+  const ext = extensionOf(fileName);
+  if (ext === "xlsx" || ext === "xls") return true;
+  const mime = (mimeType ?? "").toLowerCase();
+  return (
+    mime === "application/vnd.ms-excel" ||
+    mime ===
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+}
+
 export function isValidEmailListaPresenca(email: string): boolean {
   const trimmed = email.trim();
   if (!trimmed) return false;

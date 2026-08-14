@@ -50,6 +50,13 @@ import {
   type SituacaoImportacaoParticipante,
 } from "@/lib/riscos-participantes-excel";
 import { normalizeCpfDigits } from "@/lib/cpf";
+import { isArquivoExcelListaPresenca } from "@/lib/riscos-lista-presenca";
+import {
+  mensagemErroImportacaoLista,
+  mensagemSucessoRecebimentoComImportacao,
+  podeConcluirRecebimentoComExcel,
+  resumirAvaliacaoImportacaoLista,
+} from "@/lib/riscos-lista-presenca-importacao";
 import {
   removerAnexoListaPresenca,
   salvarRecebimentoListaPresenca,
@@ -482,6 +489,65 @@ export function useRiscosPsicossociaisPage() {
     [modalProcesso, auditContext, applyTrackingToModal, listaTargetFromProcesso]
   );
 
+  const handlePrepararImportacaoParticipantesExcel = useCallback(
+    async (file: File) => {
+      const campanha = modalProcesso?.campanha;
+      const campanhaId = campanha?.id;
+      if (!campanhaId || !campanha) {
+        throw new Error("Crie a pesquisa antes de importar participantes.");
+      }
+      const bloqueio = campanhaPermiteImportacaoParticipantes(campanha.status);
+      if (bloqueio) throw new Error(bloqueio);
+
+      const parsed = await parseArquivoImportacaoParticipantes(file);
+      if (!parsed.ok) {
+        throw new Error(parsed.error);
+      }
+
+      const server = await validarImportacaoParticipantesCampanha({
+        campanhaId,
+        linhas: parsed.linhas,
+      });
+
+      const avaliadas: LinhaAvaliacaoImportacao[] = server.linhas.map((l) => ({
+        linha: l.linha,
+        nomeCompleto: l.nomeCompleto,
+        cpf: l.cpf,
+        cpfDigits: normalizeCpfDigits(l.cpf),
+        dataNascimento: l.dataNascimento,
+        email: "",
+        situacao: l.situacao as SituacaoImportacaoParticipante,
+        motivo: l.motivo,
+        pronto: l.pronto,
+        input: l.pronto
+          ? {
+              nomeCompleto: l.nomeCompleto,
+              cpf: normalizeCpfDigits(l.cpf),
+              dataNascimento: l.dataNascimento,
+            }
+          : undefined,
+      }));
+
+      const linhasProntas = avaliadas
+        .filter((a) => a.pronto && a.input)
+        .map((a) => ({
+          linha: a.linha,
+          ...a.input!,
+        }));
+
+      return {
+        arquivoNome: file.name,
+        linhasEncontradas: parsed.totalLinhasDados,
+        validos: server.validos,
+        comErro: server.comErro,
+        avaliadas,
+        linhasProntas,
+        parseError: null as string | null,
+      };
+    },
+    [modalProcesso]
+  );
+
   const handleSalvarRecebimentoLista = useCallback(
     async (file: File) => {
       if (!modalProcesso) return;
@@ -492,8 +558,64 @@ export function useRiscosPsicossociaisPage() {
           : target.orcamentoId!;
       const antes = modalProcesso.listaPresenca;
       const substituindo = Boolean(antes.lista_anexo_path);
+      const ehExcel = isArquivoExcelListaPresenca(file.name, file.type);
+
       setSavingLista(true);
       try {
+        let importados = 0;
+        let jaExistentes = 0;
+        let errosImportacao = 0;
+
+        if (ehExcel) {
+          const campanha = modalProcesso.campanha;
+          if (!campanha?.id) {
+            toast.error(
+              "Crie a pesquisa antes de anexar o Excel, para importar os participantes automaticamente. PDF e imagem podem ser usados como comprovante."
+            );
+            return;
+          }
+
+          let preview: Awaited<
+            ReturnType<typeof handlePrepararImportacaoParticipantesExcel>
+          >;
+          try {
+            preview = await handlePrepararImportacaoParticipantesExcel(file);
+          } catch (err) {
+            toast.error(
+              mensagemErroImportacaoLista({
+                parseError:
+                  err instanceof Error ? err.message : String(err),
+              })
+            );
+            return;
+          }
+
+          if (
+            !podeConcluirRecebimentoComExcel({
+              parseOk: true,
+              avaliadas: preview.avaliadas,
+            })
+          ) {
+            toast.error(
+              mensagemErroImportacaoLista({ avaliadas: preview.avaliadas })
+            );
+            return;
+          }
+
+          const resumo = resumirAvaliacaoImportacaoLista(preview.avaliadas);
+          jaExistentes = resumo.jaExistentes;
+          errosImportacao = resumo.erros;
+
+          if (preview.linhasProntas.length > 0) {
+            const result = await confirmarImportacaoParticipantesCampanha(
+              { campanhaId: campanha.id, linhas: preview.linhasProntas },
+              { auditContext }
+            );
+            importados = result.importados;
+            await carregarParticipantes(campanha.id);
+          }
+        }
+
         const tracking = await salvarRecebimentoListaPresenca({
           ...target,
           file,
@@ -514,19 +636,35 @@ export function useRiscosPsicossociaisPage() {
             modalProcesso.implantacao.orcamento.numero,
           descricao: substituindo
             ? `Anexo da lista de presença substituído por ${file.name}.`
-            : `Lista de presença recebida e anexada (${file.name}).`,
+            : ehExcel
+              ? `Lista de presença recebida em Excel (${file.name}). ${importados} participante(s) importado(s).`
+              : `Lista de presença recebida e anexada (${file.name}).`,
           dadosAntes: { ...antes },
           dadosDepois: {
             lista_recebida: true,
             lista_anexo_nome: file.name,
             lista_anexo_path: tracking.lista_anexo_path,
+            participantes_importados: ehExcel ? importados : undefined,
           },
         });
-        toast.success(
-          substituindo
-            ? "Anexo substituído com sucesso."
-            : "Recebimento da lista salvo."
-        );
+
+        if (ehExcel) {
+          const msg = mensagemSucessoRecebimentoComImportacao({
+            importados,
+            jaExistentes,
+            erros: errosImportacao,
+          });
+          toast.success(
+            msg.titulo,
+            msg.descricao ? { description: msg.descricao } : undefined
+          );
+        } else {
+          toast.success(
+            substituindo
+              ? "Anexo substituído com sucesso."
+              : "Recebimento da lista salvo."
+          );
+        }
       } catch (err) {
         console.error(err);
         toast.error(
@@ -538,7 +676,14 @@ export function useRiscosPsicossociaisPage() {
         setSavingLista(false);
       }
     },
-    [modalProcesso, auditContext, applyTrackingToModal, listaTargetFromProcesso]
+    [
+      modalProcesso,
+      auditContext,
+      applyTrackingToModal,
+      listaTargetFromProcesso,
+      handlePrepararImportacaoParticipantesExcel,
+      carregarParticipantes,
+    ]
   );
 
   const handleRemoverAnexoLista = useCallback(async () => {
@@ -1015,64 +1160,6 @@ export function useRiscosPsicossociaisPage() {
       }
     },
     [modalProcesso, auditContext, carregarParticipantes, isAdmin]
-  );
-
-  const handlePrepararImportacaoParticipantesExcel = useCallback(
-    async (file: File) => {
-      const campanha = modalProcesso?.campanha;
-      const campanhaId = campanha?.id;
-      if (!campanhaId || !campanha) {
-        throw new Error("Crie a pesquisa antes de importar participantes.");
-      }
-      const bloqueio = campanhaPermiteImportacaoParticipantes(campanha.status);
-      if (bloqueio) throw new Error(bloqueio);
-
-      const parsed = await parseArquivoImportacaoParticipantes(file);
-      if (!parsed.ok) {
-        throw new Error(parsed.error);
-      }
-
-      const server = await validarImportacaoParticipantesCampanha({
-        campanhaId,
-        linhas: parsed.linhas,
-      });
-
-      const avaliadas: LinhaAvaliacaoImportacao[] = server.linhas.map((l) => ({
-        linha: l.linha,
-        nomeCompleto: l.nomeCompleto,
-        cpf: l.cpf,
-        cpfDigits: normalizeCpfDigits(l.cpf),
-        dataNascimento: l.dataNascimento,
-        email: "",
-        situacao: l.situacao as SituacaoImportacaoParticipante,
-        motivo: l.motivo,
-        pronto: l.pronto,
-        input: l.pronto
-          ? {
-              nomeCompleto: l.nomeCompleto,
-              cpf: normalizeCpfDigits(l.cpf),
-              dataNascimento: l.dataNascimento,
-            }
-          : undefined,
-      }));
-
-      const linhasProntas = avaliadas
-        .filter((a) => a.pronto && a.input)
-        .map((a) => ({
-          linha: a.linha,
-          ...a.input!,
-        }));
-
-      return {
-        arquivoNome: file.name,
-        linhasEncontradas: parsed.totalLinhasDados,
-        validos: server.validos,
-        comErro: server.comErro,
-        avaliadas,
-        linhasProntas,
-      };
-    },
-    [modalProcesso]
   );
 
   const handleConfirmarImportacaoParticipantesExcel = useCallback(

@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
+  isArquivoExcelListaPresenca,
   isRecebimentoListaConcluido,
   isSolicitacaoListaConcluida,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
+import { downloadModeloImportacaoParticipantesExcel } from "@/lib/riscos-participantes-excel";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
 interface RiscosListaPresencaTabProps {
@@ -107,6 +109,14 @@ export function RiscosListaPresencaTab({
     });
   };
 
+  const handleBaixarModelo = () => {
+    try {
+      downloadModeloImportacaoParticipantesExcel();
+    } catch {
+      toast.error("Não foi possível baixar o modelo.");
+    }
+  };
+
   const handleSalvarRecebimento = async () => {
     if (!recebidaSim) {
       toast.error("Selecione Sim para registrar o recebimento.");
@@ -122,6 +132,14 @@ export function RiscosListaPresencaTab({
     }
     await onSalvarRecebimento(file);
   };
+
+  const anexoEhExcel = isArquivoExcelListaPresenca(
+    dados.lista_anexo_nome ?? "",
+    dados.lista_anexo_tipo
+  );
+  const arquivoSelecionadoEhExcel = file
+    ? isArquivoExcelListaPresenca(file.name, file.type)
+    : false;
 
   return (
     <div className="space-y-4">
@@ -225,6 +243,13 @@ export function RiscosListaPresencaTab({
                   )}`
                 : ""}
             </p>
+            {anexoEhExcel && processo.participantesCadastrados > 0 ? (
+              <p className="font-semibold text-navy">
+                ✓ {processo.participantesCadastrados} participante
+                {processo.participantesCadastrados === 1 ? "" : "s"} importado
+                {processo.participantesCadastrados === 1 ? "" : "s"}
+              </p>
+            ) : null}
             <p>
               Arquivo:{" "}
               <span className="font-medium">
@@ -245,7 +270,7 @@ export function RiscosListaPresencaTab({
                   void onVisualizarAnexo();
                 }}
               >
-                Visualizar / baixar
+                Ver anexo
               </button>
               <button
                 type="button"
@@ -262,12 +287,25 @@ export function RiscosListaPresencaTab({
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8]">
                 Substituir arquivo
               </p>
+              <button
+                type="button"
+                className="mb-2 rounded-xl border border-[#e2e8f0] bg-white px-3 py-1.5 text-[11px] font-bold text-navy disabled:opacity-40"
+                disabled={saving}
+                onClick={handleBaixarModelo}
+              >
+                Baixar modelo
+              </button>
               <input
                 type="file"
                 accept=".pdf,.xls,.xlsx,.jpg,.jpeg,.png,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"
                 disabled={saving}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
+              {arquivoSelecionadoEhExcel ? (
+                <p className="mt-2 text-xs font-semibold text-navy">
+                  Ao salvar, os participantes serão importados automaticamente.
+                </p>
+              ) : null}
               {file ? (
                 <button
                   type="button"
@@ -321,6 +359,26 @@ export function RiscosListaPresencaTab({
             ) : (
               <div className="space-y-3">
                 <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                    Modelo da lista
+                  </p>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#e2e8f0] bg-white px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                    disabled={saving}
+                    onClick={handleBaixarModelo}
+                  >
+                    Baixar modelo
+                  </button>
+                </div>
+                {!processo.campanha ? (
+                  <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-[11px] font-semibold text-[#b45309]">
+                    Crie a pesquisa para importar participantes automaticamente
+                    a partir do Excel. PDF e imagem podem ser anexados como
+                    comprovante.
+                  </p>
+                ) : null}
+                <div>
                   <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
                     Anexar lista de presença
                   </label>
@@ -332,12 +390,17 @@ export function RiscosListaPresencaTab({
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
                   <p className="mt-1 text-[10px] text-[#94a3b8]">
-                    PDF, Excel (.xlsx / .xls) ou imagem (.jpg / .jpeg / .png)
+                    Excel (.xlsx / .xls), PDF ou imagem
                   </p>
                 </div>
                 {file ? (
                   <p className="text-xs text-[#64748b]">
                     Selecionado: <span className="font-medium">{file.name}</span>
+                  </p>
+                ) : null}
+                {arquivoSelecionadoEhExcel ? (
+                  <p className="text-xs font-semibold text-navy">
+                    Ao salvar, os participantes serão importados automaticamente.
                   </p>
                 ) : null}
                 <button
