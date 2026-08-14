@@ -336,7 +336,9 @@ export async function atualizarDocumentacaoAgendamento(
 export type EnvioEsocialUpdate = Pick<
   AgendamentoWithExames,
   "id" | "envio_esocial" | "data_envio_esocial" | "esocial_recibo"
->;
+> & {
+  numero_matricula?: string | null;
+};
 
 function isMissingEsocialReciboColumn(message: string): boolean {
   const lower = message.toLowerCase();
@@ -352,34 +354,53 @@ export async function atualizarEnvioEsocial(
   id: string,
   envio_esocial: boolean,
   data_envio_esocial: string | null,
-  esocial_recibo: string | null = null
+  esocial_recibo: string | null = null,
+  extras?: { numero_matricula: string | null }
 ): Promise<EnvioEsocialUpdate> {
   // Atualização documental (eSocial): não passa por assertAgendamentoEditavelPorFatura.
   await assertNumeroReciboDisponivel(esocial_recibo, id);
   const supabase = createClient();
 
-  const basePayload = {
+  const basePayload: {
+    envio_esocial: boolean;
+    data_envio_esocial: string | null;
+    esocial_recibo: string | null;
+    numero_matricula?: string | null;
+  } = {
     envio_esocial,
     data_envio_esocial,
     esocial_recibo,
   };
+  if (extras) {
+    basePayload.numero_matricula = extras.numero_matricula;
+  }
 
   let result = await supabase
     .from("agendamentos")
     .update(basePayload)
     .eq("id", id)
-    .select("id, envio_esocial, data_envio_esocial, esocial_recibo")
+    .select(
+      "id, envio_esocial, data_envio_esocial, esocial_recibo, numero_matricula"
+    )
     .single();
 
   if (result.error && isMissingEsocialReciboColumn(result.error.message)) {
+    const fallbackPayload: {
+      envio_esocial: boolean;
+      data_envio_esocial: string | null;
+      numero_matricula?: string | null;
+    } = {
+      envio_esocial,
+      data_envio_esocial,
+    };
+    if (extras) {
+      fallbackPayload.numero_matricula = extras.numero_matricula;
+    }
     result = await supabase
       .from("agendamentos")
-      .update({
-        envio_esocial,
-        data_envio_esocial,
-      })
+      .update(fallbackPayload)
       .eq("id", id)
-      .select("id, envio_esocial, data_envio_esocial")
+      .select("id, envio_esocial, data_envio_esocial, numero_matricula")
       .single();
   }
 

@@ -57,6 +57,8 @@ export function ESocialPage() {
     setDataEnvioInput,
     reciboInput,
     handleReciboInputChange,
+    matriculaInput,
+    setMatriculaInput,
   } = useESocialPage();
 
   return (
@@ -116,10 +118,12 @@ export function ESocialPage() {
         saving={saving}
         validatingRecibo={validatingRecibo}
         dataEnvio={dataEnvioInput}
+        numeroMatricula={matriculaInput}
         recibo={reciboInput}
         reciboError={reciboError}
         reciboDuplicadoInfo={reciboDuplicadoInfo}
         onChangeData={setDataEnvioInput}
+        onChangeMatricula={setMatriculaInput}
         onChangeRecibo={handleReciboInputChange}
         onClose={closeMarcarEnviado}
         onConfirm={handleConfirmMarcarEnviado}

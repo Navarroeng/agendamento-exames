@@ -18,10 +18,12 @@ interface ESocialMarcarEnviadoModalProps {
   saving: boolean;
   validatingRecibo: boolean;
   dataEnvio: string;
+  numeroMatricula: string;
   recibo: string;
   reciboError: string | null;
   reciboDuplicadoInfo: EsocialReciboDuplicadoInfo | null;
   onChangeData: (value: string) => void;
+  onChangeMatricula: (value: string) => void;
   onChangeRecibo: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
@@ -32,10 +34,12 @@ export function ESocialMarcarEnviadoModal({
   saving,
   validatingRecibo,
   dataEnvio,
+  numeroMatricula,
   recibo,
   reciboError,
   reciboDuplicadoInfo,
   onChangeData,
+  onChangeMatricula,
   onChangeRecibo,
   onClose,
   onConfirm,
@@ -74,7 +78,7 @@ export function ESocialMarcarEnviadoModal({
       }
     >
       <p className="mb-4 text-sm text-[#64748b]">
-        Informe a data de envio e o Nº Recibo do e-Social.
+        Informe os dados do envio ao e-Social.
       </p>
       <div className="flex flex-col gap-3">
         <Field label="Data envio e-Social">
@@ -87,6 +91,17 @@ export function ESocialMarcarEnviadoModal({
             value={dataEnvio}
             disabled={confirmDisabled}
             onChange={(e) => onChangeData(maskDateBR(e.target.value))}
+          />
+        </Field>
+        <Field label="Número da matrícula">
+          <input
+            className="field-input"
+            type="text"
+            autoComplete="off"
+            placeholder="Digite a matrícula"
+            value={numeroMatricula}
+            disabled={confirmDisabled}
+            onChange={(e) => onChangeMatricula(e.target.value)}
           />
         </Field>
         <Field label="Nº Recibo">

@@ -38,6 +38,7 @@ import {
   isValidEsocialRecibo,
   maskEsocialRecibo,
 } from "@/lib/esocial-recibo";
+import { emptyToNull } from "@/lib/money";
 import {
   ESOCIAL_RECIBO_DUPLICADO_MSG,
   ESOCIAL_RECIBO_VALIDATION_ERROR_MSG,
@@ -95,6 +96,7 @@ export function useESocialPage() {
   const [marcarEnviadoOpen, setMarcarEnviadoOpen] = useState(false);
   const [marcarEnviadoId, setMarcarEnviadoId] = useState<string | null>(null);
   const [dataEnvioInput, setDataEnvioInput] = useState("");
+  const [matriculaInput, setMatriculaInput] = useState("");
   const [reciboInput, setReciboInput] = useState("");
   const [bloqueioPorAgendamento, setBloqueioPorAgendamento] = useState<
     Map<string, AgendamentoFaturaBloqueio>
@@ -266,6 +268,7 @@ export function useESocialPage() {
     }
     setMarcarEnviadoId(id);
     setDataEnvioInput("");
+    setMatriculaInput(ag.numero_matricula ?? "");
     setReciboInput("");
     setReciboError(null);
     setReciboDuplicadoInfo(null);
@@ -277,6 +280,7 @@ export function useESocialPage() {
     setMarcarEnviadoOpen(false);
     setMarcarEnviadoId(null);
     setDataEnvioInput("");
+    setMatriculaInput("");
     setReciboInput("");
     setReciboError(null);
     setReciboDuplicadoInfo(null);
@@ -338,21 +342,28 @@ export function useESocialPage() {
 
     setSaving(true);
     try {
+      const numeroMatricula = emptyToNull(matriculaInput);
       const updated = await atualizarEnvioEsocial(
         marcarEnviadoId,
         true,
         dataIso,
-        recibo
+        recibo,
+        { numero_matricula: numeroMatricula }
       );
       updateAgendamentoInList(marcarEnviadoId, {
         envio_esocial: updated.envio_esocial,
         data_envio_esocial: updated.data_envio_esocial,
         esocial_recibo: updated.esocial_recibo ?? recibo,
+        numero_matricula:
+          updated.numero_matricula !== undefined
+            ? updated.numero_matricula
+            : numeroMatricula,
       });
+      const matriculaLabel = numeroMatricula?.trim() || "—";
       await registrarHistorico(marcarEnviadoId, usuario, [
         {
           acao: "Alteração",
-          detalhes: `${usuario} marcou o agendamento como enviado ao eSocial. Data: ${dataEnvioInput}. Recibo: ${recibo}.`,
+          detalhes: `${usuario} marcou o agendamento como enviado ao eSocial. Data: ${dataEnvioInput}. Recibo: ${recibo}. Matrícula: ${matriculaLabel}.`,
         },
       ], {
         auditContext,
@@ -364,6 +375,7 @@ export function useESocialPage() {
       setMarcarEnviadoOpen(false);
       setMarcarEnviadoId(null);
       setDataEnvioInput("");
+      setMatriculaInput("");
       setReciboInput("");
       setReciboError(null);
       setReciboDuplicadoInfo(null);
@@ -386,6 +398,7 @@ export function useESocialPage() {
     }
   }, [
     dataEnvioInput,
+    matriculaInput,
     reciboInput,
     marcarEnviadoId,
     reloadAgendamentos,
@@ -620,6 +633,8 @@ export function useESocialPage() {
     reciboDuplicadoInfo,
     dataEnvioInput,
     setDataEnvioInput,
+    matriculaInput,
+    setMatriculaInput,
     reciboInput,
     handleReciboInputChange,
   };
