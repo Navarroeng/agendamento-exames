@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
@@ -8,7 +9,6 @@ import type { NavItem } from "@/lib/constants";
 import { filterNavSectionsByPerfil } from "@/lib/perfil-access";
 import { useAuth } from "@/contexts/AuthContext";
 import { NavIcon } from "@/components/ui/icons/OutlineIcons";
-import { NavarroLogo } from "./NavarroLogo";
 
 function isNavItemActive(pathname: string, item: NavItem): boolean {
   if (item.href === null) return false;
@@ -80,8 +80,15 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-[5] hidden w-[248px] flex-col border-r border-white/[0.08] bg-[#384393] px-3 py-5 shadow-[4px_0_24px_rgba(56,67,147,0.18)] sidebar:flex">
       <div className="brand mb-5 flex justify-center px-1.5">
-        <div className="flex w-full items-center justify-center rounded-xl border border-white/20 bg-white px-4 py-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
-          <NavarroLogo priority size="sidebar" />
+        <div className="flex w-full items-center justify-center rounded-xl border border-white/20 bg-white px-3 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.12)]">
+          <Image
+            src="/logo-navarro-relatorio-riscos.png"
+            alt="Navarro Engenharia"
+            width={373}
+            height={110}
+            priority
+            className="h-auto w-full object-contain object-center"
+          />
         </div>
       </div>
 
@@ -111,4 +118,4 @@ export function Sidebar() {
     </aside>
   );
 }
-
+

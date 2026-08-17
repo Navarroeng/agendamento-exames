@@ -527,7 +527,7 @@ run("texto do ranking descreve ordenação por favorabilidade da barra", () => {
   assert.match(src, /valorVisualBarraDimensao/);
 });
 
-run("logo horizontal do relatório é exclusivo da capa e do cabeçalho interno", () => {
+run("logo horizontal do relatório é exclusivo da capa, cabeçalho interno e menu", () => {
   const capa = readFileSync(
     join(
       process.cwd(),
@@ -542,7 +542,11 @@ run("logo horizontal do relatório é exclusivo da capa e do cabeçalho interno"
     ),
     "utf8"
   );
-  const menu = readFileSync(
+  const sidebar = readFileSync(
+    join(process.cwd(), "components/layout/Sidebar.tsx"),
+    "utf8"
+  );
+  const logoGlobal = readFileSync(
     join(process.cwd(), "components/layout/NavarroLogo.tsx"),
     "utf8"
   );
@@ -550,8 +554,10 @@ run("logo horizontal do relatório é exclusivo da capa e do cabeçalho interno"
   assert.doesNotMatch(capa, /logoSrc: "\/logo-navarro\.png"/);
   assert.match(cabecalho, /\/logo-navarro-relatorio-riscos\.png/);
   assert.doesNotMatch(cabecalho, /\/logo-navarro\.png"/);
-  assert.match(menu, /src="\/logo-navarro\.png"/);
-  assert.doesNotMatch(menu, /logo-navarro-relatorio-riscos/);
+  assert.match(sidebar, /src="\/logo-navarro-relatorio-riscos\.png"/);
+  assert.match(sidebar, /object-contain/);
+  assert.match(logoGlobal, /src="\/logo-navarro\.png"/);
+  assert.doesNotMatch(logoGlobal, /logo-navarro-relatorio-riscos/);
   assert.ok(
     existsSync(join(process.cwd(), "public", "logo-navarro-relatorio-riscos.png"))
   );
