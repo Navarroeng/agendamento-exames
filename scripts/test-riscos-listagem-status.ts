@@ -8,8 +8,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_RISCOS_LISTAGEM_STATUS,
+  RISCOS_PSICOSSOCIAIS_ETAPAS,
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
+  indiceEtapaAtualRiscos,
   isRiscosProcessoListagemConcluido,
   sortRiscosPsicossociaisProcessosListagem,
   type RiscosPsicossociaisProcesso,
@@ -25,6 +27,7 @@ function run(name: string, fn: () => void) {
 function processo(
   overrides: {
     cliente: string;
+    origem?: RiscosPsicossociaisProcesso["origem"];
     status?: RiscosPsicossociaisProcesso["status"];
     etapaAtual?: RiscosPsicossociaisProcesso["etapaAtual"];
     etapasConcluidas: number;
@@ -34,10 +37,11 @@ function processo(
     concluidoEm?: string | null;
   }
 ): RiscosPsicossociaisProcesso {
+  const origem = overrides.origem ?? "orcamento";
   return {
     processoKey: overrides.cliente,
-    origem: "orcamento",
-    exigeLaudosSst: true,
+    origem,
+    exigeLaudosSst: origem !== "manual_cliente",
     implantacao: {
       orcamento: {
         cliente_nome: overrides.cliente,
@@ -96,6 +100,23 @@ run("padrão da listagem é Aberto", () => {
   assert.equal(DEFAULT_RISCOS_LISTAGEM_STATUS, "aberto");
 });
 
+run("índice da etapa reutiliza a sequência oficial da UI", () => {
+  assert.deepEqual(
+    RISCOS_PSICOSSOCIAIS_ETAPAS.map((e) => e.id),
+    [
+      "laudos_sst",
+      "lista_presenca",
+      "cadastro_colaboradores",
+      "link_enviado",
+      "aguardando_respostas",
+      "finalizado",
+    ]
+  );
+  assert.equal(indiceEtapaAtualRiscos("laudos_sst"), 0);
+  assert.equal(indiceEtapaAtualRiscos("lista_presenca"), 1);
+  assert.equal(indiceEtapaAtualRiscos("aguardando_respostas"), 4);
+});
+
 run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
   const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, "aberto");
   assert.deepEqual(
@@ -148,6 +169,7 @@ run("Aberto: maior percentual primeiro; 60% antes de 0%", () => {
 run("Aberto: empate de percentual → data de entrada mais antiga primeiro", () => {
   const empresaA = processo({
     cliente: "Empresa A",
+    etapaAtual: "aguardando_respostas",
     etapasConcluidas: 3,
     totalEtapas: 5,
     progressoPercentual: 60,
@@ -155,6 +177,7 @@ run("Aberto: empate de percentual → data de entrada mais antiga primeiro", () 
   });
   const empresaB = processo({
     cliente: "Empresa B",
+    etapaAtual: "aguardando_respostas",
     etapasConcluidas: 3,
     totalEtapas: 5,
     progressoPercentual: 60,
@@ -168,6 +191,126 @@ run("Aberto: empate de percentual → data de entrada mais antiga primeiro", () 
     ordenados.map((p) => p.implantacao.orcamento.cliente_nome),
     ["Empresa A", "Empresa B"]
   );
+});
+
+run("Aberto: Lista de Presença acima de Laudo SST Automático com 0%", () => {
+  const laudo = processo({
+    cliente: "Empresa B",
+    origem: "orcamento",
+    etapaAtual: "laudos_sst",
+    etapasConcluidas: 0,
+    totalEtapas: 6,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  const lista = processo({
+    cliente: "Empresa A",
+    origem: "manual_cliente",
+    etapaAtual: "lista_presenca",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-17T12:00:00Z",
+  });
+  const ordenados = sortRiscosPsicossociaisProcessosListagem(
+    [laudo, lista],
+    "aberto"
+  );
+  assert.deepEqual(
+    ordenados.map((p) => [p.implantacao.orcamento.cliente_nome, p.etapaAtual]),
+    [
+      ["Empresa A", "lista_presenca"],
+      ["Empresa B", "laudos_sst"],
+    ]
+  );
+});
+
+run("Aberto: etapa mais avançada acima, na sequência real da UI", () => {
+  const laudo = processo({
+    cliente: "Laudo",
+    origem: "orcamento",
+    etapaAtual: "laudos_sst",
+    etapasConcluidas: 0,
+    totalEtapas: 6,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  const lista = processo({
+    cliente: "Lista",
+    origem: "manual_cliente",
+    etapaAtual: "lista_presenca",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-02T12:00:00Z",
+  });
+  const cadastro = processo({
+    cliente: "Cadastro",
+    origem: "manual_cliente",
+    etapaAtual: "cadastro_colaboradores",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-03T12:00:00Z",
+  });
+  const link = processo({
+    cliente: "Link",
+    origem: "orcamento",
+    etapaAtual: "link_enviado",
+    etapasConcluidas: 0,
+    totalEtapas: 6,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-04T12:00:00Z",
+  });
+  const aguardando = processo({
+    cliente: "Aguardando",
+    origem: "orcamento",
+    etapaAtual: "aguardando_respostas",
+    etapasConcluidas: 0,
+    totalEtapas: 6,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-05T12:00:00Z",
+  });
+  const ordenados = sortRiscosPsicossociaisProcessosListagem(
+    [laudo, lista, cadastro, link, aguardando],
+    "aberto"
+  );
+  assert.deepEqual(
+    ordenados.map((p) => p.etapaAtual),
+    [
+      "aguardando_respostas",
+      "link_enviado",
+      "cadastro_colaboradores",
+      "lista_presenca",
+      "laudos_sst",
+    ]
+  );
+});
+
+run("Aberto: 60% continua acima de 0% mesmo com etapa menos avançada", () => {
+  const sessenta = processo({
+    cliente: "60%",
+    origem: "orcamento",
+    etapaAtual: "laudos_sst",
+    etapasConcluidas: 3,
+    totalEtapas: 5,
+    progressoPercentual: 60,
+    dataEntrada: "2026-08-20T12:00:00Z",
+  });
+  const zeroLista = processo({
+    cliente: "0% lista",
+    origem: "manual_cliente",
+    etapaAtual: "lista_presenca",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  const ordenados = sortRiscosPsicossociaisProcessosListagem(
+    [zeroLista, sessenta],
+    "aberto"
+  );
+  assert.equal(ordenados[0].implantacao.orcamento.cliente_nome, "60%");
 });
 
 run("Aberto: ordena por percentual, não pela quantidade absoluta de etapas", () => {

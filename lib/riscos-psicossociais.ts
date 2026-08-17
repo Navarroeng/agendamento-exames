@@ -253,6 +253,17 @@ export function getTotalEtapasRiscosPorOrigem(
   return getEtapasRiscosPorOrigem(origem).length;
 }
 
+/**
+ * Posição da etapa atual na sequência oficial da UI
+ * (`RISCOS_PSICOSSOCIAIS_ETAPAS`). Inclusão manual não tem Laudo SST, mas
+ * `lista_presenca` continua depois de `laudos_sst` nessa mesma sequência.
+ */
+export function indiceEtapaAtualRiscos(
+  etapaId: RiscosPsicossociaisEtapaId | string | null | undefined
+): number {
+  return RISCOS_PSICOSSOCIAIS_ETAPAS.findIndex((e) => e.id === etapaId);
+}
+
 /** Cadastro concluído quando há pelo menos 1 participante ativo na campanha atual. */
 export function isCadastroColaboradoresConcluido(input: {
   participantesCadastrados: number;
@@ -808,7 +819,7 @@ function compareNomeProcessoRiscos(
 }
 
 /**
- * Aberto: percentual DESC, empate data de entrada ASC.
+ * Aberto: percentual DESC, índice da etapa atual DESC, data de entrada ASC.
  * Concluído: concluidoEm DESC se existir; senão dataEntrada DESC.
  */
 export function sortRiscosPsicossociaisProcessosListagem(
@@ -820,6 +831,9 @@ export function sortRiscosPsicossociaisProcessosListagem(
       const pa = a.progressoPercentual ?? 0;
       const pb = b.progressoPercentual ?? 0;
       if (pa !== pb) return pb - pa;
+      const ia = indiceEtapaAtualRiscos(a.etapaAtual);
+      const ib = indiceEtapaAtualRiscos(b.etapaAtual);
+      if (ia !== ib) return ib - ia;
       const da = a.dataEntrada ?? "";
       const db = b.dataEntrada ?? "";
       if (da !== db) return da.localeCompare(db);
