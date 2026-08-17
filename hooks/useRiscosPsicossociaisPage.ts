@@ -6,12 +6,16 @@ import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
+  DEFAULT_RISCOS_LISTAGEM_STATUS,
   EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS,
   buildRiscosPsicossociaisProcesso,
   filterRiscosPsicossociaisProcessos,
   filterRiscosPsicossociaisProcessosPorMes,
+  filterRiscosPsicossociaisProcessosPorStatus,
+  sortRiscosPsicossociaisProcessosListagem,
   withRiscosProgressoAtualizado,
   type RiscosPsicossociaisFilters,
+  type RiscosPsicossociaisListagemStatus,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
 import { mesclarCampanhaListagemModal } from "@/lib/riscos-campanha-origem";
@@ -95,6 +99,8 @@ export function useRiscosPsicossociaisPage() {
   const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
     resolveInitialMesListagem()
   );
+  const [statusListagem, setStatusListagem] =
+    useState<RiscosPsicossociaisListagemStatus>(DEFAULT_RISCOS_LISTAGEM_STATUS);
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
   /** false até o status da campanha ser relido do banco (não usar listagem stale). */
@@ -162,8 +168,13 @@ export function useRiscosPsicossociaisPage() {
       processos,
       mesSelecionado
     );
-    return filterRiscosPsicossociaisProcessos(porMes, filters);
-  }, [processos, filters, mesSelecionado]);
+    const porBusca = filterRiscosPsicossociaisProcessos(porMes, filters);
+    const porStatus = filterRiscosPsicossociaisProcessosPorStatus(
+      porBusca,
+      statusListagem
+    );
+    return sortRiscosPsicossociaisProcessosListagem(porStatus, statusListagem);
+  }, [processos, filters, mesSelecionado, statusListagem]);
 
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -253,6 +264,13 @@ export function useRiscosPsicossociaisPage() {
   const handleYearChange = useCallback((year: number) => {
     setMesSelecionado((prev) => resolveMesParaAno(year, prev.month));
   }, []);
+
+  const handleStatusListagemChange = useCallback(
+    (status: RiscosPsicossociaisListagemStatus) => {
+      setStatusListagem(status);
+    },
+    []
+  );
 
   const carregarParticipantes = useCallback(async (campanhaId: string) => {
     try {
@@ -1262,6 +1280,7 @@ export function useRiscosPsicossociaisPage() {
     error,
     filters,
     mesSelecionado,
+    statusListagem,
     responsaveis,
     modalProcesso,
     modalParticipantes,
@@ -1273,6 +1292,7 @@ export function useRiscosPsicossociaisPage() {
     clearFilters,
     handleMesChange,
     handleYearChange,
+    handleStatusListagemChange,
     openProcesso,
     openVisualizarRelatorio,
     closeVisualizarRelatorio,

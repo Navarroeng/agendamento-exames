@@ -182,6 +182,8 @@ export interface RiscosPsicossociaisProcesso {
    * da Implantação). Não muda quando Laudos é concluído depois.
    */
   dataEntrada: string | null;
+  /** Data real de conclusão do tracking, se existir. */
+  concluidoEm: string | null;
 }
 
 export type RiscosProgressoParticipanteInput = {
@@ -534,6 +536,7 @@ export function buildRiscosPsicossociaisProcesso(
     participantesRespondidos: respondidos,
     relatorioGerado,
     dataEntrada: tracking?.entrada_em ?? laudos.dataEntrada ?? null,
+    concluidoEm: tracking?.concluido_em ?? null,
   };
 }
 
@@ -751,14 +754,81 @@ export function sortRiscosPsicossociaisProcessos(
     const da = a.dataEntrada ?? "";
     const db = b.dataEntrada ?? "";
     if (da !== db) return db.localeCompare(da);
-    const na =
-      a.implantacao.orcamento.cliente_nome ||
-      a.implantacao.orcamento.numero ||
-      a.processoKey;
-    const nb =
-      b.implantacao.orcamento.cliente_nome ||
-      b.implantacao.orcamento.numero ||
-      b.processoKey;
-    return na.localeCompare(nb, "pt-BR");
+    return compareNomeProcessoRiscos(a, b);
+  });
+}
+
+/** Filtro da listagem: Aberto = ainda não finalizado; Concluído = fluxo 100%. */
+export type RiscosPsicossociaisListagemStatus = "aberto" | "concluido";
+
+export const DEFAULT_RISCOS_LISTAGEM_STATUS: RiscosPsicossociaisListagemStatus =
+  "aberto";
+
+export function isRiscosProcessoListagemConcluido(
+  processo: Pick<
+    RiscosPsicossociaisProcesso,
+    | "status"
+    | "etapaAtual"
+    | "etapasConcluidas"
+    | "totalEtapas"
+    | "progressoPercentual"
+  >
+): boolean {
+  if (processo.status === "concluido") return true;
+  if (processo.etapaAtual === "finalizado") return true;
+  if (processo.totalEtapas > 0 && processo.etapasConcluidas >= processo.totalEtapas) {
+    return true;
+  }
+  return processo.progressoPercentual >= 100;
+}
+
+export function filterRiscosPsicossociaisProcessosPorStatus(
+  processos: RiscosPsicossociaisProcesso[],
+  status: RiscosPsicossociaisListagemStatus
+): RiscosPsicossociaisProcesso[] {
+  return processos.filter((p) => {
+    const concluido = isRiscosProcessoListagemConcluido(p);
+    return status === "concluido" ? concluido : !concluido;
+  });
+}
+
+function compareNomeProcessoRiscos(
+  a: RiscosPsicossociaisProcesso,
+  b: RiscosPsicossociaisProcesso
+): number {
+  const na =
+    a.implantacao.orcamento.cliente_nome ||
+    a.implantacao.orcamento.numero ||
+    a.processoKey;
+  const nb =
+    b.implantacao.orcamento.cliente_nome ||
+    b.implantacao.orcamento.numero ||
+    b.processoKey;
+  return na.localeCompare(nb, "pt-BR");
+}
+
+/**
+ * Aberto: percentual DESC, empate data de entrada ASC.
+ * Concluído: concluidoEm DESC se existir; senão dataEntrada DESC.
+ */
+export function sortRiscosPsicossociaisProcessosListagem(
+  processos: RiscosPsicossociaisProcesso[],
+  status: RiscosPsicossociaisListagemStatus
+): RiscosPsicossociaisProcesso[] {
+  return [...processos].sort((a, b) => {
+    if (status === "aberto") {
+      const pa = a.progressoPercentual ?? 0;
+      const pb = b.progressoPercentual ?? 0;
+      if (pa !== pb) return pb - pa;
+      const da = a.dataEntrada ?? "";
+      const db = b.dataEntrada ?? "";
+      if (da !== db) return da.localeCompare(db);
+      return compareNomeProcessoRiscos(a, b);
+    }
+
+    const ca = a.concluidoEm || a.dataEntrada || "";
+    const cb = b.concluidoEm || b.dataEntrada || "";
+    if (ca !== cb) return cb.localeCompare(ca);
+    return compareNomeProcessoRiscos(a, b);
   });
 }

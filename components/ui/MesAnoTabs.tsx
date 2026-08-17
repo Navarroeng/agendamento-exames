@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   formatMesLabel,
   isMesDisponivel,
@@ -16,6 +17,8 @@ interface MesAnoTabsProps {
   year?: number;
   years?: number[];
   onYearChange?: (year: number) => void;
+  /** Conteúdo extra na mesma linha do seletor de ano (ex.: filtro de status). */
+  yearRowExtra?: ReactNode;
   now?: Date;
   /**
    * Quando false, meses futuros permanecem clicáveis
@@ -34,6 +37,7 @@ export function MesAnoTabs({
   year,
   years,
   onYearChange,
+  yearRowExtra,
   now = new Date(),
   disableFutureMonths = true,
   ariaLabel = "Filtrar por mês",
@@ -43,27 +47,32 @@ export function MesAnoTabs({
 
   return (
     <div className="-mx-1 mb-3 space-y-2.5 px-1">
-      {showYear ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="listagem-mes-ano"
-            className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]"
-          >
-            Ano
-          </label>
-          <select
-            id="listagem-mes-ano"
-            className="field-input field-input-compact w-[110px] text-sm"
-            value={year}
-            onChange={(e) => onYearChange?.(Number(e.target.value))}
-            aria-label="Selecionar ano"
-          >
-            {years!.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+      {showYear || yearRowExtra ? (
+        <div className="flex flex-wrap items-center gap-4">
+          {showYear ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="listagem-mes-ano"
+                className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]"
+              >
+                Ano
+              </label>
+              <select
+                id="listagem-mes-ano"
+                className="field-input field-input-compact w-[110px] text-sm"
+                value={year}
+                onChange={(e) => onYearChange?.(Number(e.target.value))}
+                aria-label="Selecionar ano"
+              >
+                {years!.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          {yearRowExtra}
         </div>
       ) : null}
 

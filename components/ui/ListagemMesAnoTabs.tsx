@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { MesAnoTabs } from "@/components/ui/MesAnoTabs";
 import {
   LISTAGEM_ANO_INICIO,
@@ -35,6 +36,8 @@ export interface ListagemMesAnoTabsProps {
   /** Prefixo do title das abas, ex.: "Orçamentos de". */
   monthTitlePrefix?: string;
   monthTitle?: (mes: YearMonth, disponivel: boolean) => string;
+  /** Extra na mesma linha do seletor de ano (não altera o filtro mês/ano). */
+  yearRowExtra?: ReactNode;
 }
 
 /**
@@ -53,6 +56,7 @@ export function ListagemMesAnoTabs({
   ariaLabel = "Filtrar por mês",
   monthTitlePrefix,
   monthTitle,
+  yearRowExtra,
 }: ListagemMesAnoTabsProps) {
   const years = yearsProp ?? listAnosDisponiveis(startYear, now);
   const months = listMesAbasListagem(selected.year, {
@@ -68,6 +72,7 @@ export function ListagemMesAnoTabs({
       year={selected.year}
       years={years}
       onYearChange={onYearChange}
+      yearRowExtra={yearRowExtra}
       now={now}
       disableFutureMonths={disableFutureMonths}
       ariaLabel={ariaLabel}

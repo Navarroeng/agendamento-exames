@@ -16,6 +16,7 @@ export function RiscosPsicossociaisPage() {
     error,
     filters,
     mesSelecionado,
+    statusListagem,
     responsaveis,
     modalProcesso,
     modalParticipantes,
@@ -27,6 +28,7 @@ export function RiscosPsicossociaisPage() {
     clearFilters,
     handleMesChange,
     handleYearChange,
+    handleStatusListagemChange,
     openProcesso,
     openVisualizarRelatorio,
     closeVisualizarRelatorio,
@@ -88,6 +90,8 @@ export function RiscosPsicossociaisPage() {
         mesSelecionado={mesSelecionado}
         onMesChange={handleMesChange}
         onYearChange={handleYearChange}
+        statusListagem={statusListagem}
+        onStatusListagemChange={handleStatusListagemChange}
         onVisualizar={openProcesso}
         onVisualizarRelatorio={(p) => void openVisualizarRelatorio(p)}
         podeRemoverProcesso={isAdmin}

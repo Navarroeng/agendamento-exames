@@ -10,6 +10,7 @@ import {
   getEtapasRiscosPorOrigem,
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
+  type RiscosPsicossociaisListagemStatus,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
@@ -24,6 +25,8 @@ interface RiscosPsicossociaisTableProps {
   mesSelecionado: YearMonth;
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
+  statusListagem: RiscosPsicossociaisListagemStatus;
+  onStatusListagemChange: (status: RiscosPsicossociaisListagemStatus) => void;
   onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
   onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
   /** Admin only — remoção definitiva. */
@@ -84,6 +87,8 @@ export function RiscosPsicossociaisTable({
   mesSelecionado,
   onMesChange,
   onYearChange,
+  statusListagem,
+  onStatusListagemChange,
   onVisualizar,
   onVisualizarRelatorio,
   podeRemoverProcesso = false,
@@ -102,6 +107,30 @@ export function RiscosPsicossociaisTable({
         onYearChange={onYearChange}
         ariaLabel="Filtrar Riscos Psicossociais pelo mês de entrada na etapa"
         monthTitlePrefix="Entradas em Riscos Psicossociais de"
+        yearRowExtra={
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              htmlFor="riscos-listagem-status"
+              className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]"
+            >
+              Status
+            </label>
+            <select
+              id="riscos-listagem-status"
+              className="field-input field-input-compact w-[110px] text-sm"
+              value={statusListagem}
+              onChange={(e) =>
+                onStatusListagemChange(
+                  e.target.value as RiscosPsicossociaisListagemStatus
+                )
+              }
+              aria-label="Filtrar por status"
+            >
+              <option value="aberto">Aberto</option>
+              <option value="concluido">Concluído</option>
+            </select>
+          </div>
+        }
       />
 
       <div className="table-wrap -mx-6 overflow-x-auto px-6">
