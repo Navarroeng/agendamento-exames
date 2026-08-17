@@ -15,7 +15,6 @@ import {
 } from "@/lib/riscos-psicossociais";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type { YearMonth } from "@/lib/listagem-meses";
-import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { RiscosProcessoRowActionsMenu } from "@/components/riscos-psicossociais/RiscosProcessoRowActionsMenu";
 
 interface RiscosPsicossociaisTableProps {
@@ -42,7 +41,7 @@ function ProgressoRiscos({
 }) {
   const etapas = getEtapasRiscosPorOrigem(processo.origem);
   return (
-    <div className="min-w-[140px]">
+    <div className="min-w-[180px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
         {processo.progressoLabel} etapas · {processo.progressoPercentual}%
       </p>
@@ -146,13 +145,12 @@ export function RiscosPsicossociaisTable({
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[980px]">
+          <table className="table-premium w-full min-w-[860px]">
             <thead>
               <tr>
                 <th>Data de entrada</th>
                 <th>Cliente</th>
                 <th>CNPJ</th>
-                <th>Responsável</th>
                 <th>Etapa atual</th>
                 <th>Progresso</th>
                 <th className="w-[72px] text-center">Ações</th>
@@ -169,7 +167,7 @@ export function RiscosPsicossociaisTable({
                 return (
                   <tr key={processo.processoKey}>
                     <td className="whitespace-nowrap">{dataEntrada}</td>
-                    <td className="max-w-[220px] truncate font-semibold text-navy">
+                    <td className="max-w-[300px] truncate font-semibold text-navy">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
                       {isOrigemManualCliente(processo.origem) ? (
                         <span className="mt-0.5 block text-[10px] font-semibold text-[#64748b]">
@@ -184,12 +182,7 @@ export function RiscosPsicossociaisTable({
                           : cnpj
                         : "—"}
                     </td>
-                    <td>
-                      {formatResponsavelOrcamentoDisplay(
-                        processo.campanha?.responsavel || orcamento.responsavel
-                      )}
-                    </td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       {processo.status === "concluido" ||
                       processo.etapaAtual === "finalizado" ? (
                         <span className="inline-flex rounded-full bg-brand-green-soft px-2.5 py-0.5 text-[10px] font-extrabold text-brand-green">

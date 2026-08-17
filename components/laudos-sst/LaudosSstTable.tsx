@@ -14,7 +14,6 @@ import {
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
 import type { YearMonth } from "@/lib/listagem-meses";
-import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 
 interface LaudosSstTableProps {
   processos: LaudosSstProcesso[];
@@ -28,7 +27,7 @@ interface LaudosSstTableProps {
 
 function ProgressoLaudos({ processo }: { processo: LaudosSstProcesso }) {
   return (
-    <div className="min-w-[140px]">
+    <div className="min-w-[180px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
         {processo.progressoLabel} etapas
       </p>
@@ -89,14 +88,13 @@ export function LaudosSstTable({
           </p>
         )}
         {!loading && !error && processos.length > 0 && (
-          <table className="table-premium w-full min-w-[980px]">
+          <table className="table-premium w-full min-w-[860px]">
             <thead>
               <tr>
                 <th>Data de entrada</th>
                 <th>Orçamento</th>
                 <th>Cliente</th>
                 <th>CNPJ</th>
-                <th>Responsável</th>
                 <th>Etapa atual</th>
                 <th>Progresso</th>
                 <th className="w-[88px] text-center">Visualizar</th>
@@ -115,7 +113,7 @@ export function LaudosSstTable({
                   <tr key={orcamento.id}>
                     <td className="whitespace-nowrap">{dataEntrada}</td>
                     <td className="font-bold text-navy">{orcamento.numero}</td>
-                    <td className="max-w-[240px] truncate">
+                    <td className="max-w-[320px] truncate">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
                     </td>
                     <td className="whitespace-nowrap text-[12px]">
@@ -125,10 +123,7 @@ export function LaudosSstTable({
                           : cnpj
                         : "—"}
                     </td>
-                    <td>
-                      {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
-                    </td>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <span
                         className={laudosSstEtapaAtualBadgeClass(
                           processo.etapaAtual,
