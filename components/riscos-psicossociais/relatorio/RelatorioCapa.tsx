@@ -245,6 +245,18 @@ export function RelatorioCapa({
         <div className="relatorio-capa-indicadores-base" aria-hidden />
       </div>
 
+      {/* Acabamento no limite inferior — absoluto, sem alterar o fluxo da capa */}
+      <div className="relatorio-capa-acabamento" aria-hidden>
+        <div
+          className="relatorio-capa-acabamento-ouro"
+          style={{ backgroundColor: CAPA_GOLD }}
+        />
+        <div
+          className="relatorio-capa-acabamento-navy"
+          style={{ backgroundColor: CAPA_NAVY }}
+        />
+      </div>
+
       <div className="relatorio-capa-print-mask hidden" aria-hidden />
     </section>
   );
