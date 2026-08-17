@@ -436,13 +436,17 @@ function ParticipanteActionsMenu({
       if (!rootRef.current?.contains(e.target as Node)) onClose();
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
     }
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
+    // Captura: o dialog do Modal faz stopPropagation no mousedown/click.
+    document.addEventListener("mousedown", onDoc, true);
+    document.addEventListener("keydown", onKey, true);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDoc, true);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open, onClose]);
 
@@ -469,7 +473,10 @@ function ParticipanteActionsMenu({
               type="button"
               role="menuitem"
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-navy transition hover:bg-[#f8fafc]"
-              onClick={onEditar}
+              onClick={() => {
+                onClose();
+                onEditar();
+              }}
             >
               Editar
             </button>
@@ -479,7 +486,10 @@ function ParticipanteActionsMenu({
               type="button"
               role="menuitem"
               className="block w-full px-3 py-2 text-left text-xs font-semibold text-brand-red transition hover:bg-[#fef2f2]"
-              onClick={onRemover}
+              onClick={() => {
+                onClose();
+                onRemover();
+              }}
             >
               Remover participante
             </button>
