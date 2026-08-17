@@ -2,6 +2,8 @@
  * Conteúdo executivo automático do relatório (sem alterar classificação COPSOQ).
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type {
   RiscosRelatorioDimensaoSnapshot,
   RiscosRelatorioRecord,
@@ -192,6 +194,50 @@ run("conteúdo executivo é específico aos resultados da campanha", () => {
   assert.notEqual(
     out.conclusaoTecnica.join(" "),
     outOk.conclusaoTecnica.join(" ")
+  );
+
+  const intermediarioOnly = {
+    ...relatorio,
+    resultado_json: {
+      ...relatorio.resultado_json,
+      dimensoes: [favoravel, intermediario],
+      resumoExecutivo: {
+        ...relatorio.resultado_json.resumoExecutivo,
+        dimensoesCriticas: [],
+      },
+    },
+  } as RiscosRelatorioRecord;
+  const outModerada = gerarConteudoExecutivo(intermediarioOnly);
+  assert.equal(outModerada.recomendacoesGerais.length, 3);
+  assert.match(
+    outModerada.recomendacoesGerais[0],
+    /Monitorar trimestralmente as categorias em Situação Moderada/
+  );
+  assert.match(
+    outModerada.recomendacoesGerais[1],
+    /Fortalecer comunicação interna, desenvolvimento de lideranças e clareza de papéis/
+  );
+  assert.match(
+    outModerada.recomendacoesGerais[2],
+    /Compartilhar este relatório com a direção e os responsáveis por SST\/RH/
+  );
+  assert.ok(
+    !outModerada.recomendacoesGerais.some((p) => /PGR\/GRO|plano preventivo no sistema de gestão/i.test(p))
+  );
+  assert.ok(
+    !out.recomendacoesGerais.some((p) => /PGR\/GRO|plano preventivo no sistema de gestão/i.test(p))
+  );
+  assert.ok(
+    !outOk.recomendacoesGerais.some((p) => /PGR\/GRO|plano preventivo no sistema de gestão/i.test(p))
+  );
+
+  const helperSrc = readFileSync(
+    join(process.cwd(), "lib/riscos-relatorio-conteudo.ts"),
+    "utf8"
+  );
+  assert.doesNotMatch(
+    helperSrc,
+    /Registrar o plano preventivo no sistema de gestão/
   );
 });
 

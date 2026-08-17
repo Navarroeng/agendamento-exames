@@ -447,9 +447,6 @@ export function gerarConteudoExecutivo(
     recomendacoesGerais.push(
       "Fortalecer comunicação interna, desenvolvimento de lideranças e clareza de papéis como alavancas transversais de proteção."
     );
-    recomendacoesGerais.push(
-      "Registrar o plano preventivo no sistema de gestão (PGR/GRO ou equivalente interno) e revisar após novo ciclo de avaliação."
-    );
   } else {
     recomendacoesGerais.push(
       "Manter as boas práticas psicossociais identificadas e reconhecê-las formalmente junto às equipes e lideranças."
