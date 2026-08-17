@@ -2,7 +2,7 @@
 
 import { iniciaisEmpresa } from "@/lib/riscos-relatorio-view";
 
-const NAVARRO_LOGO = "/logo-navarro.png";
+const NAVARRO_LOGO_RELATORIO = "/logo-navarro-relatorio-riscos.png";
 
 /**
  * Cabeçalho institucional das páginas internas (não da capa).
@@ -22,7 +22,7 @@ export function RelatorioCabecalhoInterno({
       <div className="relatorio-cabecalho-interno-logos">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={NAVARRO_LOGO}
+          src={NAVARRO_LOGO_RELATORIO}
           alt="Navarro Engenharia"
           className="relatorio-cabecalho-logo relatorio-cabecalho-logo-navarro"
         />

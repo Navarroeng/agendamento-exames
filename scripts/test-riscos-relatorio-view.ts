@@ -2,7 +2,7 @@
  * Helpers de apresentação do relatório executivo (V2) — sem recalcular COPSOQ.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RiscosRelatorioDimensaoSnapshot } from "../lib/riscos-relatorio";
 import {
@@ -525,6 +525,37 @@ run("texto do ranking descreve ordenação por favorabilidade da barra", () => {
   );
   assert.match(src, /rankingGeralPorFavorabilidade/);
   assert.match(src, /valorVisualBarraDimensao/);
+});
+
+run("logo horizontal do relatório é exclusivo da capa e do cabeçalho interno", () => {
+  const capa = readFileSync(
+    join(
+      process.cwd(),
+      "components/riscos-psicossociais/relatorio/RelatorioCapa.tsx"
+    ),
+    "utf8"
+  );
+  const cabecalho = readFileSync(
+    join(
+      process.cwd(),
+      "components/riscos-psicossociais/relatorio/RelatorioCabecalhoInterno.tsx"
+    ),
+    "utf8"
+  );
+  const menu = readFileSync(
+    join(process.cwd(), "components/layout/NavarroLogo.tsx"),
+    "utf8"
+  );
+  assert.match(capa, /logoSrc: "\/logo-navarro-relatorio-riscos\.png"/);
+  assert.doesNotMatch(capa, /logoSrc: "\/logo-navarro\.png"/);
+  assert.match(cabecalho, /\/logo-navarro-relatorio-riscos\.png/);
+  assert.doesNotMatch(cabecalho, /\/logo-navarro\.png"/);
+  assert.match(menu, /src="\/logo-navarro\.png"/);
+  assert.doesNotMatch(menu, /logo-navarro-relatorio-riscos/);
+  assert.ok(
+    existsSync(join(process.cwd(), "public", "logo-navarro-relatorio-riscos.png"))
+  );
+  assert.ok(existsSync(join(process.cwd(), "public", "logo-navarro.png")));
 });
 
 console.log("\nTodos os testes de view do relatório passaram.");

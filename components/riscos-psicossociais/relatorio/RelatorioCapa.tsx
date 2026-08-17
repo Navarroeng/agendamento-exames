@@ -14,7 +14,7 @@ import { iniciaisEmpresa } from "@/lib/riscos-relatorio-view";
 const NAVARRO_INSTITUCIONAL = {
   nome: "Navarro Engenharia de Segurança e Medicina Ocupacional",
   cnpj: NAVARRO_DADOS_BANCARIOS.pixCnpj,
-  logoSrc: "/logo-navarro.png",
+  logoSrc: "/logo-navarro-relatorio-riscos.png",
   responsavel: "Pedro Navarro - CREA 5069206790/SP",
 } as const;
 
@@ -108,7 +108,7 @@ export function RelatorioCapa({
             <img
               src={NAVARRO_INSTITUCIONAL.logoSrc}
               alt="Logo Navarro Engenharia"
-              className="h-[3.75rem] w-auto max-w-[10.5rem] rounded-lg border border-white/20 bg-white object-contain p-1.5"
+              className="h-[3.75rem] w-auto max-w-[12rem] rounded-lg border border-white/20 bg-white object-contain p-1.5"
             />
           </div>
           <div className="min-w-0 max-w-[62%] text-right">
