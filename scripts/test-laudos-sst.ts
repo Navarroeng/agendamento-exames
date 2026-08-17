@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   buildLaudosSstProcesso,
   filterLaudosSstProcessos,
+  grupoOrdenacaoLaudosSst,
   isProcessoElegivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
@@ -220,9 +221,11 @@ function processoOrdenacao(
 ): ReturnType<typeof buildLaudosSstProcesso> {
   const base = baseProcesso({ etapaAtual: "concluido" });
   base.orcamento = { ...base.orcamento, id: numero, numero };
+  const etapaAtual =
+    etapas >= 6 ? "envio_cliente" : LAUDOS_SST_ETAPAS[etapas].id;
   return buildLaudosSstProcesso(base, {
     orcamento_id: numero,
-    etapa_atual: etapas >= 6 ? "envio_cliente" : "epis",
+    etapa_atual: etapaAtual,
     etapas_concluidas: etapas,
     status: etapas >= 6 ? "concluido" : "em_andamento",
     entrada_em: `${entrada}T12:00:00.000Z`,
@@ -238,11 +241,54 @@ const ordenados = sortLaudosSstProcessos([
 ]);
 assert.deepEqual(
   ordenados.map((p) => p.implantacao.orcamento.numero),
-  ["Empresa A", "Empresa B", "Empresa D", "Empresa C", "Empresa E"]
+  ["Empresa C", "Empresa D", "Empresa A", "Empresa B", "Empresa E"]
 );
-assert.equal(ordenados[0].etapasConcluidas, 0);
-assert.equal(ordenados[1].etapasConcluidas, 0);
-assert.equal(ordenados[4].etapasConcluidas, 6);
+assert.equal(grupoOrdenacaoLaudosSst(ordenados[0]), 1);
+assert.equal(grupoOrdenacaoLaudosSst(ordenados[2]), 2);
+assert.equal(grupoOrdenacaoLaudosSst(ordenados[4]), 3);
+assert.equal(ordenados[0].etapasConcluidas, 2);
+assert.equal(ordenados[1].etapasConcluidas, 1);
+assert.equal(ordenados[2].etapasConcluidas, 0);
+assert.equal(ordenados[4].status, "concluido");
+
+const isotechPrimeiro = sortLaudosSstProcessos([
+  processoOrdenacao("EPIs 1", 0, "2026-08-01"),
+  processoOrdenacao("ISOTECH", 1, "2026-08-15"),
+  processoOrdenacao("LEGRAND", 6, "2026-08-02"),
+  processoOrdenacao("EPIs 2", 0, "2026-08-10"),
+]);
+assert.deepEqual(
+  isotechPrimeiro.map((p) => p.implantacao.orcamento.numero),
+  ["ISOTECH", "EPIs 1", "EPIs 2", "LEGRAND"]
+);
+
+const progressoDesc = sortLaudosSstProcessos([
+  processoOrdenacao("Empresa C", 1, "2026-08-01"),
+  processoOrdenacao("Empresa A", 4, "2026-08-20"),
+  processoOrdenacao("Empresa B", 2, "2026-08-05"),
+  processoOrdenacao("Empresa D", 0, "2026-08-03"),
+  processoOrdenacao("Empresa E", 6, "2026-08-01"),
+]);
+assert.deepEqual(
+  progressoDesc.map((p) => p.implantacao.orcamento.numero),
+  ["Empresa A", "Empresa B", "Empresa C", "Empresa D", "Empresa E"]
+);
+
+const empateAndamento = sortLaudosSstProcessos([
+  processoOrdenacao("Mais nova", 3, "2026-08-17"),
+  processoOrdenacao("Mais antiga", 3, "2026-08-10"),
+]);
+assert.deepEqual(
+  empateAndamento.map((p) => p.implantacao.orcamento.numero),
+  ["Mais antiga", "Mais nova"]
+);
+
+const riscosSrc = readFileSync(
+  join(process.cwd(), "lib/riscos-psicossociais.ts"),
+  "utf8"
+);
+assert.match(riscosSrc, /sortRiscosPsicossociaisProcessosListagem/);
+assert.doesNotMatch(riscosSrc, /grupoOrdenacaoLaudosSst/);
 
 const indigo =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";

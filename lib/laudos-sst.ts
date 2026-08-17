@@ -294,23 +294,58 @@ export function filterLaudosSstProcessosPorMes(
 
 export const LAUDOS_SST_MES_VAZIO_MSG = LISTAGEM_MES_VAZIO_MSG;
 
+/**
+ * Grupos da listagem (não é status persistido):
+ * 1 = aberto e já iniciado (além de EPIs)
+ * 2 = aberto ainda em EPIs
+ * 3 = concluído
+ */
+export function grupoOrdenacaoLaudosSst(
+  processo: Pick<
+    LaudosSstProcesso,
+    "status" | "etapaAtual" | "etapasConcluidas" | "totalEtapas"
+  >
+): 1 | 2 | 3 {
+  if (
+    processo.status === "concluido" ||
+    (processo.totalEtapas > 0 &&
+      processo.etapasConcluidas >= processo.totalEtapas)
+  ) {
+    return 3;
+  }
+  if (processo.etapaAtual === "epis" && processo.etapasConcluidas === 0) {
+    return 2;
+  }
+  return 1;
+}
+
+function compareDataEntradaLaudosAsc(
+  a: LaudosSstProcesso,
+  b: LaudosSstProcesso
+): number {
+  const da = (a.dataEntrada ?? "").slice(0, 10);
+  const db = (b.dataEntrada ?? "").slice(0, 10);
+  if (da !== db) {
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db);
+  }
+  return a.implantacao.orcamento.numero.localeCompare(
+    b.implantacao.orcamento.numero,
+    "pt-BR"
+  );
+}
+
 export function sortLaudosSstProcessos(
   processos: LaudosSstProcesso[]
 ): LaudosSstProcesso[] {
   return [...processos].sort((a, b) => {
-    if (a.etapasConcluidas !== b.etapasConcluidas) {
-      return a.etapasConcluidas - b.etapasConcluidas;
+    const ga = grupoOrdenacaoLaudosSst(a);
+    const gb = grupoOrdenacaoLaudosSst(b);
+    if (ga !== gb) return ga - gb;
+    if (ga === 1 && a.etapasConcluidas !== b.etapasConcluidas) {
+      return b.etapasConcluidas - a.etapasConcluidas;
     }
-    const da = (a.dataEntrada ?? "").slice(0, 10);
-    const db = (b.dataEntrada ?? "").slice(0, 10);
-    if (da !== db) {
-      if (!da) return 1;
-      if (!db) return -1;
-      return da.localeCompare(db);
-    }
-    return a.implantacao.orcamento.numero.localeCompare(
-      b.implantacao.orcamento.numero,
-      "pt-BR"
-    );
+    return compareDataEntradaLaudosAsc(a, b);
   });
 }
