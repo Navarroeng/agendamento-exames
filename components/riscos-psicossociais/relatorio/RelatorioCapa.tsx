@@ -32,7 +32,7 @@ function IndicadorCapa({
 }) {
   return (
     <div
-      className="relative flex min-h-[3.1rem] flex-col items-center justify-center rounded-lg border bg-white px-2 py-2 text-center"
+      className="relatorio-capa-indicador relative flex flex-col items-center justify-center rounded-lg border bg-white text-center"
       style={{
         borderColor: CAPA_NAVY_BORDER,
         WebkitPrintColorAdjust: "exact",
@@ -51,7 +51,7 @@ function IndicadorCapa({
         {label}
       </p>
       <p
-        className="mt-1 text-[1.05rem] font-extrabold tabular-nums leading-none tracking-tight"
+        className="mt-1.5 text-[1.05rem] font-extrabold tabular-nums leading-none tracking-tight"
         style={{ color: CAPA_NAVY }}
       >
         {value}
@@ -164,12 +164,10 @@ export function RelatorioCapa({
         />
       </div>
 
-      {/* Área branca — identificação do cliente + indicadores */}
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-8 pt-5">
-        {/*
-         * Grupo inteiro desce 80px (padding-top no container).
-         * Vãos internos em px fixos — o flex:1 abaixo segura os indicadores na base.
-         */}
+      {/* Área branca — identificação do cliente + resumo; flex reparte o vazio */}
+      <div className="relatorio-capa-corpo">
+        <div className="relatorio-capa-respiro-topo" aria-hidden />
+
         <div className="relatorio-capa-empresa">
           <p className="relatorio-capa-empresa-rotulo">Empresa avaliada</p>
 
@@ -217,32 +215,39 @@ export function RelatorioCapa({
           </div>
         </div>
 
-        {/* Respiro entre dados e indicadores — não prende os cards no rodapé */}
-        <div className="relatorio-capa-indicadores-respiro" aria-hidden />
+        <div className="relatorio-capa-respiro-meio" aria-hidden />
 
-        <div className="relatorio-capa-indicadores grid shrink-0 grid-cols-4 gap-2">
-          <IndicadorCapa
-            label="Participantes"
-            value={capa?.participantes ?? relatorio.participantes ?? 0}
-          />
-          <IndicadorCapa
-            label="Respondentes"
-            value={capa?.respondentes ?? relatorio.respondentes ?? 0}
-          />
-          <IndicadorCapa
-            label="Participação"
-            value={formatTaxaParticipacao(
-              capa?.taxaParticipacao ?? relatorio.taxa_participacao
-            )}
-          />
-          <IndicadorCapa
-            label="Categorias"
-            value={resumo?.quantidadeDimensoes ?? 0}
-          />
+        <div className="relatorio-capa-resumo">
+          <p className="relatorio-capa-resumo-rotulo">Resumo da avaliação</p>
+          <div className="relatorio-capa-resumo-traco" aria-hidden />
+
+          <div className="relatorio-capa-indicadores grid grid-cols-4 gap-2">
+            <IndicadorCapa
+              label="Participantes"
+              value={capa?.participantes ?? relatorio.participantes ?? 0}
+            />
+            <IndicadorCapa
+              label="Respondentes"
+              value={capa?.respondentes ?? relatorio.respondentes ?? 0}
+            />
+            <IndicadorCapa
+              label="Participação"
+              value={formatTaxaParticipacao(
+                capa?.taxaParticipacao ?? relatorio.taxa_participacao
+              )}
+            />
+            <IndicadorCapa
+              label="Categorias"
+              value={resumo?.quantidadeDimensoes ?? 0}
+            />
+          </div>
+
+          <p className="relatorio-capa-instrumento">
+            Avaliação realizada por meio do instrumento COPSOQ II-Br
+          </p>
         </div>
 
-        {/* Espaço inferior explícito — sobe os cards ~110px em relação à base */}
-        <div className="relatorio-capa-indicadores-base" aria-hidden />
+        <div className="relatorio-capa-respiro-base" aria-hidden />
       </div>
 
       {/* Acabamento no limite inferior — absoluto, sem alterar o fluxo da capa */}

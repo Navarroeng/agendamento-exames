@@ -262,12 +262,36 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   print-color-adjust: exact;
 }
 
-/* Bloco EMPRESA AVALIADA — grupo inteiro desce 80px; vãos internos em px fixos. */
+/* Área branca da capa: três respiros flex repartem o vazio (topo / meio / base). */
+.relatorio-capa-corpo {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 32px;
+}
+
+.relatorio-capa-respiro-topo {
+  flex: 1.15 1 10mm;
+  min-height: 8mm;
+}
+
+.relatorio-capa-respiro-meio {
+  flex: 1 1 8mm;
+  min-height: 6mm;
+}
+
+.relatorio-capa-respiro-base {
+  flex: 0.95 1 14mm;
+  min-height: 12mm;
+}
+
+/* Bloco EMPRESA AVALIADA — conteúdo intacto; posição vem dos respiros. */
 .relatorio-capa-empresa {
   flex: 0 0 auto;
   align-self: stretch;
   text-align: center;
-  padding-top: 80px;
+  padding-top: 0;
   margin: 0;
 }
 
@@ -326,21 +350,45 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   color: #0b1f4d;
 }
 
-/* Indicadores: o flex restante fica ENTRE dados e cards; a base fixa sobe o bloco. */
-.relatorio-capa-indicadores-respiro {
-  flex: 1 1 auto;
-  min-height: 16mm;
+/* Indicadores: título + cards um pouco mais altos + frase institucional. */
+.relatorio-capa-resumo {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.relatorio-capa-resumo-rotulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #c9972b;
+}
+
+.relatorio-capa-resumo-traco {
+  margin: 8px auto 14px;
+  width: 32px;
+  height: 2px;
+  background-color: #c9972b;
 }
 
 .relatorio-capa-indicadores {
   flex: 0 0 auto;
 }
 
-.relatorio-capa-indicadores-base {
-  flex: 0 0 140px;
-  height: 140px;
-  min-height: 140px;
-  max-height: 140px;
+.relatorio-capa-indicador {
+  min-height: 4.35rem;
+  padding: 12px 8px 11px;
+}
+
+.relatorio-capa-instrumento {
+  margin: 14px 0 0;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  color: #7a8799;
 }
 
 /* Acabamento inferior da capa: linha dourada + faixa marinho no limite da folha.
@@ -685,9 +733,32 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     print-color-adjust: exact !important;
   }
 
+  body.riscos-relatorio-printing .relatorio-capa-corpo {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    padding: 0 32px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-respiro-topo {
+    flex: 1.15 1 10mm !important;
+    min-height: 8mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-respiro-meio {
+    flex: 1 1 8mm !important;
+    min-height: 6mm !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-respiro-base {
+    flex: 0.95 1 14mm !important;
+    min-height: 12mm !important;
+  }
+
   body.riscos-relatorio-printing .relatorio-capa-empresa {
     flex: 0 0 auto !important;
-    padding-top: 80px !important;
+    padding-top: 0 !important;
     margin: 0 !important;
   }
 
@@ -718,21 +789,44 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
     margin: 0 auto !important;
   }
 
-  body.riscos-relatorio-printing .relatorio-capa-indicadores-respiro {
-    flex: 1 1 auto !important;
-    min-height: 16mm !important;
+  body.riscos-relatorio-printing .relatorio-capa-resumo {
+    flex: 0 0 auto !important;
+    text-align: center !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-resumo-rotulo {
+    margin: 0 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 3px !important;
+    text-transform: uppercase !important;
+    color: #c9972b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-resumo-traco {
+    margin: 8px auto 14px !important;
+    width: 32px !important;
+    height: 2px !important;
+    background-color: #c9972b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body.riscos-relatorio-printing .relatorio-capa-indicadores {
     flex: 0 0 auto !important;
   }
 
-  body.riscos-relatorio-printing .relatorio-capa-indicadores-base {
-    flex: 0 0 140px !important;
-    height: 140px !important;
-    min-height: 140px !important;
-    max-height: 140px !important;
-    margin: 0 !important;
+  body.riscos-relatorio-printing .relatorio-capa-indicador {
+    min-height: 4.35rem !important;
+    padding: 12px 8px 11px !important;
+  }
+
+  body.riscos-relatorio-printing .relatorio-capa-instrumento {
+    margin: 14px 0 0 !important;
+    font-size: 10px !important;
+    color: #7a8799 !important;
   }
 
   body.riscos-relatorio-printing .relatorio-capa-acabamento {
