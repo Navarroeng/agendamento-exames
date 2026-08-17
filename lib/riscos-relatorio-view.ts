@@ -137,15 +137,17 @@ export function rankingMelhores(
 }
 
 /**
- * Ranking geral: todas as dimensões calculáveis, da mais favorável à menos
- * favorável (scoreFavorabilidade: PROTEÇÃO = média; RISCO = max − média).
+ * Ranking geral: mesma métrica da largura da barra (`valorVisualBarraDimensao`),
+ * da maior favorabilidade relativa para a menor. Classificação não entra no sort.
  */
 export function rankingGeralPorFavorabilidade(
   dimensoes: readonly RiscosRelatorioDimensaoSnapshot[]
 ): RiscosRelatorioDimensaoSnapshot[] {
   return [...dimensoesParaCalculo(dimensoes)].sort((a, b) => {
-    const fav = compararFavorabilidadeDesc(a, b);
-    if (fav !== 0) return fav;
+    const visual = valorVisualBarraDimensao(b) - valorVisualBarraDimensao(a);
+    if (visual !== 0) return visual;
+    const score = compararFavorabilidadeDesc(a, b);
+    if (score !== 0) return score;
     return a.nome.localeCompare(b.nome, "pt-BR");
   });
 }

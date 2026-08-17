@@ -2,6 +2,8 @@
  * Helpers de apresentação do relatório executivo (V2) — sem recalcular COPSOQ.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { RiscosRelatorioDimensaoSnapshot } from "../lib/riscos-relatorio";
 import {
   corCategoriaPorId,
@@ -240,13 +242,83 @@ run("ranking melhores prioriza situação favorável", () => {
   assert.equal(top[0].id, "b");
 });
 
-run("ranking geral ordena por favorabilidade RISCO×PROTEÇÃO", () => {
+run("ranking geral ordena pela mesma métrica da barra (favorabilidade relativa)", () => {
   const geral = rankingGeralPorFavorabilidade(amostra);
   assert.ok(geral.length >= 5);
   for (let i = 1; i < geral.length; i++) {
     assert.ok(
-      scoreFavorabilidade(geral[i - 1]) >= scoreFavorabilidade(geral[i]),
+      valorVisualBarraDimensao(geral[i - 1]) >=
+        valorVisualBarraDimensao(geral[i]),
       `ordem quebrada em ${geral[i - 1].id} → ${geral[i].id}`
+    );
+  }
+  const barras = montarDadosBarras(amostra);
+  assert.deepEqual(
+    geral.map((d) => d.id),
+    barras.map((b) => b.id)
+  );
+});
+
+run("ranking geral usa a barra, não a nota bruta nem a classificação", () => {
+  const protEscala3 = dim({
+    id: "interface-trabalho-individuo",
+    nome: "Interface trabalho-indivíduo",
+    tipo: "PROTECAO",
+    media: 2.7,
+    maxEscalaPadronizada: 3,
+    classificacaoId: "situacao_favoravel",
+    classificacaoLabel: "Situação Favorável",
+  });
+  const riscoEscala4 = dim({
+    id: "demandas-trabalho",
+    nome: "Demandas de Trabalho",
+    tipo: "RISCO",
+    media: 0.5,
+    maxEscalaPadronizada: 4,
+    classificacaoId: "situacao_favoravel",
+    classificacaoLabel: "Situação Favorável",
+  });
+  const protModerada = dim({
+    id: "valores-local-trabalho",
+    nome: "Valores no local de trabalho",
+    tipo: "PROTECAO",
+    media: 2.0,
+    maxEscalaPadronizada: 4,
+    classificacaoId: "risco_intermediario",
+    classificacaoLabel: "Situação Moderada",
+  });
+  const riscoDesfavoravel = dim({
+    id: "burnout-estresse",
+    nome: "Burnout e Estresse",
+    tipo: "RISCO",
+    media: 3.5,
+    maxEscalaPadronizada: 4,
+    classificacaoId: "risco_para_saude",
+    classificacaoLabel: "Situação Desfavorável",
+  });
+
+  // /3 proteção 2,7 → barra 90%; /4 risco 0,5 → barra 87,5% (score absoluto 3,5)
+  assert.ok(valorVisualBarraDimensao(protEscala3) > valorVisualBarraDimensao(riscoEscala4));
+  assert.ok(scoreFavorabilidade(riscoEscala4) > scoreFavorabilidade(protEscala3));
+
+  const geral = rankingGeralPorFavorabilidade([
+    riscoDesfavoravel,
+    protModerada,
+    riscoEscala4,
+    protEscala3,
+  ]);
+  assert.deepEqual(
+    geral.map((d) => d.id),
+    [
+      "interface-trabalho-individuo",
+      "demandas-trabalho",
+      "valores-local-trabalho",
+      "burnout-estresse",
+    ]
+  );
+  for (let i = 1; i < geral.length; i++) {
+    assert.ok(
+      valorVisualBarraDimensao(geral[i - 1]) >= valorVisualBarraDimensao(geral[i])
     );
   }
 });
@@ -440,6 +512,19 @@ run("contarFaixasClassificacao separa intermediário e saúde", () => {
   assert.equal(faixas.intermediario, 1);
   assert.equal(faixas.riscoParaSaude, 1);
   assert.equal(faixas.emAtencao, 2);
+});
+
+run("texto do ranking descreve ordenação por favorabilidade da barra", () => {
+  const src = readFileSync(
+    join(process.cwd(), "components/riscos-psicossociais/relatorio/RelatorioRanking.tsx"),
+    "utf8"
+  );
+  assert.match(
+    src,
+    /Ordenação das categorias da maior para a menor favorabilidade/
+  );
+  assert.match(src, /rankingGeralPorFavorabilidade/);
+  assert.match(src, /valorVisualBarraDimensao/);
 });
 
 console.log("\nTodos os testes de view do relatório passaram.");

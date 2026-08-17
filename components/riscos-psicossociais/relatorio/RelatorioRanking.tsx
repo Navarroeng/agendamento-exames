@@ -150,8 +150,8 @@ export function RelatorioRanking({
           Ranking Geral das Categorias
         </h3>
         <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-app-muted">
-          Ordenação automática considerando a favorabilidade da categoria,
-          respeitando se a categoria é de RISCO ou PROTEÇÃO.
+          Ordenação das categorias da maior para a menor favorabilidade,
+          considerando a natureza de cada indicador (Risco ou Proteção).
         </p>
         <div className="mt-3.5">
           <RelatorioLegendaCores />
