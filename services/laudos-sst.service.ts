@@ -3,6 +3,7 @@ import {
   buildLaudosSstProcesso,
   isLaudosSstConcluido,
   isProcessoElegivelLaudosSst,
+  isProcessoVisivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
   sortLaudosSstProcessos,
@@ -54,18 +55,27 @@ const LAUDOS_TRACKING_SELECT = [
 ].join(", ");
 
 /**
- * Lista processos elegíveis a Laudos SST a partir da Implantação concluída.
- * Garante tracking com `entrada_em` (data de entrada na etapa).
+ * Lista processos de Laudos SST.
+ * Cria tracking só com Pacote completo - SST; não apaga linhas antigas.
  */
 export async function listarProcessosLaudosSst(): Promise<LaudosSstProcesso[]> {
   const implantacao = await listarProcessosImplantacao();
-  const elegiveis = implantacao.filter(isProcessoElegivelLaudosSst);
-  if (elegiveis.length === 0) return [];
+  if (implantacao.length === 0) return [];
 
-  const trackingMap = await garantirTrackingLaudosSst(elegiveis);
+  const todosIds = implantacao.map((p) => p.orcamento.id);
+  const trackingExistente = await buscarTrackingLaudosSst(todosIds);
+  const elegiveis = implantacao.filter(isProcessoElegivelLaudosSst);
+  const trackingMap = await garantirTrackingLaudosSst(
+    elegiveis,
+    trackingExistente
+  );
   await sincronizarConclusaoLaudosSst(trackingMap);
 
-  const processos = elegiveis.map((p) =>
+  const visiveis = implantacao.filter((p) =>
+    isProcessoVisivelLaudosSst(p, trackingMap.get(p.orcamento.id) ?? null)
+  );
+
+  const processos = visiveis.map((p) =>
     buildLaudosSstProcesso(p, trackingMap.get(p.orcamento.id) ?? null)
   );
 
@@ -108,14 +118,21 @@ export async function buscarTrackingLaudosSst(
 }
 
 /**
- * Cria tracking ao entrar em Laudos SST, registrando `entrada_em`.
+ * Cria tracking ao entrar em Laudos SST, só se for elegível pelo pacote.
+ * Não apaga registros existentes.
  */
 async function garantirTrackingLaudosSst(
-  elegiveis: ImplantacaoProcesso[]
+  elegiveis: ImplantacaoProcesso[],
+  trackingExistente?: Map<string, OrcamentoLaudosSstRecord>
 ): Promise<Map<string, OrcamentoLaudosSstRecord>> {
-  const ids = elegiveis.map((p) => p.orcamento.id);
-  const map = await buscarTrackingLaudosSst(ids);
-  const faltantes = elegiveis.filter((p) => !map.has(p.orcamento.id));
+  const ids = elegiveis
+    .filter(isProcessoElegivelLaudosSst)
+    .map((p) => p.orcamento.id);
+  const map =
+    trackingExistente ?? (await buscarTrackingLaudosSst(ids));
+  const faltantes = elegiveis.filter(
+    (p) => isProcessoElegivelLaudosSst(p) && !map.has(p.orcamento.id)
+  );
   if (faltantes.length === 0) return map;
 
   const supabase = createClient();

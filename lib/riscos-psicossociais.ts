@@ -413,13 +413,47 @@ export function calcularProgressoEtapasRiscos(input: {
 }
 
 /**
- * Elegível a Riscos desde a Implantação concluída
- * (mesmo critério de entrada em Laudos SST).
+ * Encaminhamento automático da Implantação para Riscos:
+ * mesma regra de Laudos (implantação pronta + Pacote completo - SST).
+ * Inclusão manual (`origem = manual_cliente`) não usa esta função.
  */
 export function isProcessoElegivelRiscosPsicossociais(
   implantacao: ImplantacaoProcesso
 ): boolean {
   return isProcessoElegivelLaudosSst(implantacao);
+}
+
+/** Tracking automático com trabalho real (não só lista_presenca vazia). */
+export function riscosTrackingTemTrabalhoReal(
+  tracking: OrcamentoRiscosPsicossociaisRecord | null | undefined
+): boolean {
+  if (!tracking) return false;
+  if (tracking.status === "concluido") return true;
+  if (Number(tracking.etapas_concluidas) > 0) return true;
+  const etapa = (tracking.etapa_atual ?? "").trim();
+  if (etapa && etapa !== "lista_presenca") return true;
+  if (tracking.lista_solicitada === true) return true;
+  if (tracking.lista_recebida === true) return true;
+  if ((tracking.lista_anexo_path ?? "").trim()) return true;
+  return false;
+}
+
+export function isProcessoVisivelRiscosAutomatico(
+  implantacao: ImplantacaoProcesso,
+  tracking: OrcamentoRiscosPsicossociaisRecord | null | undefined,
+  temCampanha?: boolean
+): boolean {
+  if (isProcessoElegivelRiscosPsicossociais(implantacao)) return true;
+  if (
+    implantacao.orcamento.status === "cancelado" ||
+    implantacao.orcamento.status === "contrato_encerrado" ||
+    implantacao.etapaAtual === "contrato_encerrado" ||
+    implantacao.etapaAtual === "treinamento_cancelado"
+  ) {
+    return false;
+  }
+  if (temCampanha) return true;
+  return riscosTrackingTemTrabalhoReal(tracking);
 }
 
 /** @deprecated Use isProcessoElegivelRiscosPsicossociais(implantacao). */

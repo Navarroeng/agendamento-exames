@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/client";
-import type { LaudosSstProcesso } from "@/lib/laudos-sst";
+import { buildLaudosSstProcesso } from "@/lib/laudos-sst";
+import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import {
   buildRiscosProcessoManualCliente,
   buildRiscosPsicossociaisProcesso,
+  isProcessoElegivelRiscosPsicossociais,
+  isProcessoVisivelRiscosAutomatico,
   sortRiscosPsicossociaisProcessos,
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
@@ -13,23 +16,36 @@ import {
   listarCampanhasPorOrcamentos,
 } from "@/services/riscos-campanha.service";
 import { buscarFluxoCampanha } from "@/services/riscos-lista-presenca.service";
-import { listarProcessosLaudosSst } from "@/services/laudos-sst.service";
+import { listarProcessosImplantacao } from "@/services/implantacao-clientes.service";
+import { buscarTrackingLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
   "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
 
 /**
  * Lista processos de Riscos Psicossociais:
- * - fluxo normal (Implantação concluída / Laudos);
+ * - automático: Implantação pronta + Pacote completo - SST;
+ * - tracking antigo com trabalho real (não apaga, só exibe);
  * - inclusões manuais pelo cadastro do cliente.
+ * Não chama listarProcessosLaudosSst — não cria tracking de Laudos.
  */
 export async function listarProcessosRiscosPsicossociais(): Promise<
   RiscosPsicossociaisProcesso[]
 > {
-  const laudosProcessos = await listarProcessosLaudosSst();
-  const riscosMap = await garantirTrackingRiscosPsicossociais(laudosProcessos);
-  const campanhasMap = await listarCampanhasPorOrcamentos(
-    laudosProcessos.map((p) => p.implantacao.orcamento.id)
+  const implantacao = await listarProcessosImplantacao();
+  const ids = implantacao.map((p) => p.orcamento.id);
+  const [laudosTracking, riscosMap, campanhasMap] = await Promise.all([
+    buscarTrackingLaudosSst(ids),
+    garantirTrackingRiscosPsicossociais(implantacao),
+    listarCampanhasPorOrcamentos(ids),
+  ]);
+
+  const visiveis = implantacao.filter((p) =>
+    isProcessoVisivelRiscosAutomatico(
+      p,
+      riscosMap.get(p.orcamento.id) ?? null,
+      campanhasMap.has(p.orcamento.id)
+    )
   );
 
   const manuais = await listarCampanhasManuaisAtivas();
@@ -42,9 +58,13 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
   const relatoriosMap =
     await listarRelatoriosExistentesPorCampanhas(campanhaIds);
 
-  const processosNormais = laudosProcessos.map((laudos) => {
-    const orcamentoId = laudos.implantacao.orcamento.id;
+  const processosNormais = visiveis.map((processo) => {
+    const orcamentoId = processo.orcamento.id;
     const campanha = campanhasMap.get(orcamentoId) ?? null;
+    const laudos = buildLaudosSstProcesso(
+      processo,
+      laudosTracking.get(orcamentoId) ?? null
+    );
     return buildRiscosPsicossociaisProcesso(
       laudos,
       riscosMap.get(orcamentoId) ?? null,
@@ -161,10 +181,10 @@ async function listarRelatoriosExistentesPorCampanhas(
 }
 
 async function garantirTrackingRiscosPsicossociais(
-  laudosProcessos: LaudosSstProcesso[]
+  implantacao: ImplantacaoProcesso[]
 ): Promise<Map<string, OrcamentoRiscosPsicossociaisRecord>> {
   const map = new Map<string, OrcamentoRiscosPsicossociaisRecord>();
-  const ids = laudosProcessos.map((p) => p.implantacao.orcamento.id);
+  const ids = implantacao.map((p) => p.orcamento.id);
   if (ids.length === 0) return map;
 
   const supabase = createClient();
@@ -182,13 +202,19 @@ async function garantirTrackingRiscosPsicossociais(
     map.set(row.orcamento_id, row as OrcamentoRiscosPsicossociaisRecord);
   }
 
-  const faltantes = laudosProcessos.filter(
-    (p) => !map.has(p.implantacao.orcamento.id)
+  const faltantes = implantacao.filter(
+    (p) =>
+      isProcessoElegivelRiscosPsicossociais(p) &&
+      !map.has(p.orcamento.id)
   );
 
-  for (const laudos of faltantes) {
-    const orcamentoId = laudos.implantacao.orcamento.id;
-    const entradaEm = laudos.dataEntrada ?? new Date().toISOString();
+  for (const processo of faltantes) {
+    const orcamentoId = processo.orcamento.id;
+    const entradaEm =
+      processo.treinamento?.atualizado_em ??
+      processo.treinamento?.criado_em ??
+      processo.aprovacao?.updated_at ??
+      new Date().toISOString();
     const { data: inserted, error: insertError } = await supabase
       .from("orcamento_riscos_psicossociais")
       .upsert(

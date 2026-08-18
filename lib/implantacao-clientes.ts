@@ -273,6 +273,11 @@ export interface ImplantacaoProcesso {
   fluxoImplantacao: OrcamentoFluxoImplantacao;
   treinamento: ImplantacaoTreinamentoRecord | null;
   etapasOperacionais: Array<{ id: ImplantacaoEtapaOperacionalId; label: string }>;
+  /**
+   * Orçamento aprovado contém o serviço principal "Pacote completo - SST".
+   * Gatilho do encaminhamento automático para Laudos SST e Riscos.
+   */
+  possuiPacoteCompletoSst?: boolean;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -445,6 +450,7 @@ export function buildImplantacaoProcesso(params: {
   asosContratuaisEmAberto?: number;
   fluxoImplantacao?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
+  possuiPacoteCompletoSst?: boolean;
 }): ImplantacaoProcesso {
   const { orcamento, aprovacao, contrato } = params;
   const fluxo = params.fluxoImplantacao ?? "padrao";
@@ -537,6 +543,7 @@ export function buildImplantacaoProcesso(params: {
     fluxoImplantacao: fluxo,
     treinamento,
     etapasOperacionais,
+    possuiPacoteCompletoSst: Boolean(params.possuiPacoteCompletoSst),
   };
 }
 

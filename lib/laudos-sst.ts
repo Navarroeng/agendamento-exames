@@ -137,10 +137,10 @@ export function isLaudosSstConcluido(
 }
 
 /**
- * Mesmo critério do filtro "Concluídos" da Implantação:
- * etapa calculada concluído ou treinamento agendado.
+ * Implantação pronta para seguir (concluída ou treinamento agendado),
+ * sem cancelamento/encerramento.
  */
-export function isProcessoElegivelLaudosSst(
+export function isImplantacaoProntaParaEncaminhamento(
   processo: ImplantacaoProcesso
 ): boolean {
   if (
@@ -155,6 +155,47 @@ export function isProcessoElegivelLaudosSst(
     processo.etapaAtual === "concluido" ||
     processo.etapaAtual === "treinamento_agendado"
   );
+}
+
+/**
+ * Elegível ao encaminhamento automático para Laudos SST:
+ * implantação pronta E orçamento aprovado com "Pacote completo - SST".
+ * PGR/LTCAT/PCMSO avulsos não bastam.
+ */
+export function isProcessoElegivelLaudosSst(
+  processo: ImplantacaoProcesso
+): boolean {
+  if (!isImplantacaoProntaParaEncaminhamento(processo)) return false;
+  return Boolean(processo.possuiPacoteCompletoSst);
+}
+
+/** Tracking com trabalho real (não só a linha inicial em EPIs). */
+export function laudosTrackingTemTrabalhoReal(
+  tracking: OrcamentoLaudosSstRecord | null | undefined
+): boolean {
+  if (!tracking) return false;
+  if (tracking.status === "concluido") return true;
+  if (Number(tracking.etapas_concluidas) > 0) return true;
+  const etapa = (tracking.etapa_atual ?? "").trim();
+  if (etapa && etapa !== "epis") return true;
+  return workflowTemResposta(mapLaudosWorkflowFromRecord(tracking));
+}
+
+/** Lista automática: elegível pelo pacote, ou tracking antigo já trabalhado. */
+export function isProcessoVisivelLaudosSst(
+  processo: ImplantacaoProcesso,
+  tracking: OrcamentoLaudosSstRecord | null | undefined
+): boolean {
+  if (isProcessoElegivelLaudosSst(processo)) return true;
+  if (
+    processo.orcamento.status === "cancelado" ||
+    processo.orcamento.status === "contrato_encerrado" ||
+    processo.etapaAtual === "contrato_encerrado" ||
+    processo.etapaAtual === "treinamento_cancelado"
+  ) {
+    return false;
+  }
+  return laudosTrackingTemTrabalhoReal(tracking);
 }
 
 function dateOnly(value: string | null | undefined): string | null {

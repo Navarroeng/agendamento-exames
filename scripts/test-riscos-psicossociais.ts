@@ -44,6 +44,7 @@ const implantacao = {
   etapaAtual: "concluido",
   dataAprovacao: "2026-06-01T12:00:00Z",
   numeroContrato: "CT-1",
+  possuiPacoteCompletoSst: true,
 } as ImplantacaoProcesso;
 
 assert.equal(isProcessoElegivelRiscosPsicossociais(implantacao), true);

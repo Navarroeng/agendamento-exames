@@ -7,6 +7,10 @@ import {
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
 import {
+  orcamentoPossuiPacoteCompletoSst,
+  resolvePacoteCompletoSstServicoId,
+} from "@/lib/servico-sst-pacote";
+import {
   classifyOrcamentoFluxoImplantacao,
   resolveItensParaFluxoImplantacao,
   resolveTreinamentosServicoId,
@@ -56,9 +60,13 @@ export async function listarProcessosImplantacao(): Promise<
   if (orcamentosAprovadosRes.error) throw orcamentosAprovadosRes.error;
   if (servicosRes.error) throw servicosRes.error;
 
-  const treinamentosServicoId = resolveTreinamentosServicoId(
-    (servicosRes.data ?? []) as Array<{ id: string; nome: string }>
-  );
+  const catalogoServicos = (servicosRes.data ?? []) as Array<{
+    id: string;
+    nome: string;
+  }>;
+  const treinamentosServicoId = resolveTreinamentosServicoId(catalogoServicos);
+  const pacoteCompletoServicoId =
+    resolvePacoteCompletoSstServicoId(catalogoServicos);
 
   const aprovacoes = (aprovacoesRes.data ?? []).map((row) =>
     sortAprovacao(row as OrcamentoAprovacaoRecord)
@@ -208,6 +216,10 @@ export async function listarProcessosImplantacao(): Promise<
       treinamentosServicoId
     );
     const treinamento = treinamentosByOrcamento.get(id) ?? null;
+    const possuiPacoteCompletoSst = orcamentoPossuiPacoteCompletoSst(
+      itens,
+      pacoteCompletoServicoId
+    );
 
     processos.push(
       buildImplantacaoProcesso({
@@ -219,6 +231,7 @@ export async function listarProcessosImplantacao(): Promise<
         asosContratuaisEmAberto: emAberto,
         fluxoImplantacao,
         treinamento,
+        possuiPacoteCompletoSst,
       })
     );
   }

@@ -86,14 +86,29 @@ function baseProcesso(
 }
 
 assert.equal(
-  isProcessoElegivelLaudosSst(baseProcesso({ etapaAtual: "concluido" })),
+  isProcessoElegivelLaudosSst(
+    baseProcesso({ etapaAtual: "concluido", possuiPacoteCompletoSst: true })
+  ),
   true
 );
 assert.equal(
   isProcessoElegivelLaudosSst(
-    baseProcesso({ etapaAtual: "treinamento_agendado" })
+    baseProcesso({
+      etapaAtual: "treinamento_agendado",
+      possuiPacoteCompletoSst: true,
+    })
   ),
   true
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "treinamento_agendado",
+      possuiPacoteCompletoSst: false,
+    })
+  ),
+  false,
+  "somente treinamento sem pacote não entra em Laudos"
 );
 assert.equal(
   isProcessoElegivelLaudosSst(
@@ -105,6 +120,7 @@ assert.equal(
   isProcessoElegivelLaudosSst(
     baseProcesso({
       etapaAtual: "concluido",
+      possuiPacoteCompletoSst: true,
       orcamento: {
         ...baseProcesso({ etapaAtual: "concluido" }).orcamento,
         status: "cancelado",
