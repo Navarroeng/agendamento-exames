@@ -306,9 +306,10 @@ export function OrcamentoAbaAgendamentos({
             ].filter((n): n is string => Boolean(n))
           )
         );
-        if (nomesCliente.length > 0) {
+        if (contratoRow.cliente_id || nomesCliente.length > 0) {
           try {
             const sug = await listarSugestoesColaboradoresContrato({
+              clienteId: contratoRow.cliente_id,
               clienteNomes: nomesCliente,
             });
             setSugestoesColaboradores(sug);

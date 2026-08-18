@@ -187,6 +187,28 @@ export function isDataNaVigencia(
   return dia >= inicio && dia <= fim;
 }
 
+/**
+ * Isolamento da Implantação: o agendamento só entra se for do mesmo cliente.
+ * Com `cliente_id`, o UUID é decisivo — outro cliente é ignorado mesmo com
+ * nome, CNPJ, vigência ou colaborador coincidentes. Sem UUID (legado),
+ * compara só o nome exato deste cliente.
+ */
+export function agendamentoPertenceAoClienteContrato(
+  agendamento: Pick<AgendamentoWithExames, "cliente_id" | "cliente_nome">,
+  cliente: { id: string | null | undefined; nome?: string | null }
+): boolean {
+  const clienteId = (cliente.id ?? "").trim();
+  if (!clienteId) return false;
+
+  const agClienteId = (agendamento.cliente_id ?? "").trim();
+  if (agClienteId) return agClienteId === clienteId;
+
+  const nomeAg = (agendamento.cliente_nome ?? "").trim().toLowerCase();
+  const nomeCliente = (cliente.nome ?? "").trim().toLowerCase();
+  if (!nomeAg || !nomeCliente) return false;
+  return nomeAg === nomeCliente;
+}
+
 /** Compat: legado consome_saldo em agendamentos. */
 export function agendamentoConsomeSaldoContrato(
   agendamento: Pick<

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  agendamentoPertenceAoClienteContrato,
   buildContratoAgendamentoContagem,
   isAgendamentoSelecionavel,
   isDataNaVigencia,
@@ -8,7 +9,6 @@ import {
 import type {
   AgendamentoWithExames,
   ClienteContratoRecord,
-  ClienteRecord,
 } from "@/lib/types";
 
 const AGENDAMENTO_SELECT = `
@@ -41,10 +41,6 @@ export type AgendamentoNaVigenciaItem = {
   outroContratoNumero: string | null;
 };
 
-function digitsOnly(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
-}
-
 export async function buscarContratoPorOrcamentoId(
   orcamentoId: string
 ): Promise<ClienteContratoRecord | null> {
@@ -74,32 +70,6 @@ export async function buscarContratoPorId(
     .maybeSingle();
   if (error) throw error;
   return (data as ClienteContratoRecord | null) ?? null;
-}
-
-async function buscarNomesClienteParaMatch(
-  clienteId: string
-): Promise<{ nomes: string[]; cliente: ClienteRecord | null }> {
-  const supabase = createClient();
-  const { data: cliente, error } = await supabase
-    .from("clientes")
-    .select("*")
-    .eq("id", clienteId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!cliente) return { nomes: [], cliente: null };
-
-  const nomes = new Set<string>([String(cliente.nome).trim()]);
-  const cnpjDigits = digitsOnly(cliente.cnpj as string);
-  if (cnpjDigits.length >= 11) {
-    const { data: mesmos } = await supabase.from("clientes").select("nome, cnpj");
-    for (const row of mesmos ?? []) {
-      if (digitsOnly(row.cnpj as string) === cnpjDigits) {
-        const n = String(row.nome ?? "").trim();
-        if (n) nomes.add(n);
-      }
-    }
-  }
-  return { nomes: Array.from(nomes), cliente: cliente as ClienteRecord };
 }
 
 export async function listarVinculosAtivosPorContrato(
@@ -167,14 +137,12 @@ export async function carregarAgendamentosVigenciaContrato(params: {
 }> {
   const { contrato, quantidadeContratada } = params;
   const supabase = createClient();
-  const { nomes } = await buscarNomesClienteParaMatch(contrato.cliente_id);
+  const clienteId = (contrato.cliente_id ?? "").trim();
   const dispensado = Boolean(contrato.agendamentos_iniciais_dispensados);
+  const inicio = contrato.data_inicio?.slice(0, 10) ?? "";
+  const fim = contrato.data_fim?.slice(0, 10) ?? "";
 
-  if (
-    !nomes.length ||
-    !contrato.data_inicio?.trim() ||
-    !contrato.data_fim?.trim()
-  ) {
+  if (!clienteId || !inicio || !fim) {
     let programados = 0;
     if (!dispensado) {
       const { count, error: pErr } = await supabase
@@ -197,22 +165,53 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     };
   }
 
-  // Busca por nomes do cliente (agendamentos não têm cliente_id).
-  const { data: raw, error } = await supabase
-    .from("agendamentos")
-    .select(AGENDAMENTO_SELECT)
-    .gte("data_agendamento", contrato.data_inicio.slice(0, 10))
-    .lte("data_agendamento", contrato.data_fim.slice(0, 10))
-    .order("data_agendamento", { ascending: true })
-    .order("horario", { ascending: true })
-    .limit(2000);
+  const [byIdRes, legadoRes, clienteRes] = await Promise.all([
+    supabase
+      .from("agendamentos")
+      .select(AGENDAMENTO_SELECT)
+      .eq("cliente_id", clienteId)
+      .gte("data_agendamento", inicio)
+      .lte("data_agendamento", fim)
+      .order("data_agendamento", { ascending: true })
+      .order("horario", { ascending: true })
+      .limit(2000),
+    supabase
+      .from("agendamentos")
+      .select(AGENDAMENTO_SELECT)
+      .is("cliente_id", null)
+      .gte("data_agendamento", inicio)
+      .lte("data_agendamento", fim)
+      .order("data_agendamento", { ascending: true })
+      .order("horario", { ascending: true })
+      .limit(2000),
+    supabase
+      .from("clientes")
+      .select("id, nome")
+      .eq("id", clienteId)
+      .maybeSingle(),
+  ]);
 
-  if (error) throw error;
+  if (byIdRes.error) throw byIdRes.error;
+  if (legadoRes.error) throw legadoRes.error;
+  if (clienteRes.error) throw clienteRes.error;
 
-  const nomesNorm = new Set(nomes.map((n) => n.trim().toLowerCase()));
-  const agendamentos = ((raw ?? []) as AgendamentoWithExames[]).filter((ag) => {
-    const nome = (ag.cliente_nome ?? "").trim().toLowerCase();
-    if (!nomesNorm.has(nome)) return false;
+  const cliente = {
+    id: clienteId,
+    nome: String(clienteRes.data?.nome ?? "").trim(),
+  };
+
+  const agendamentos = [
+    ...((byIdRes.data ?? []) as AgendamentoWithExames[]),
+    ...((legadoRes.data ?? []) as AgendamentoWithExames[]),
+  ].filter((ag) => {
+    if (
+      !agendamentoPertenceAoClienteContrato(
+        { cliente_id: ag.cliente_id, cliente_nome: ag.cliente_nome },
+        cliente
+      )
+    ) {
+      return false;
+    }
     return isDataNaVigencia(
       ag.data_agendamento,
       contrato.data_inicio,

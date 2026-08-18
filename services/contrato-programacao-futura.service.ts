@@ -75,22 +75,30 @@ export async function listarProgramacoesFuturasDoContrato(
 }
 
 export async function listarSugestoesColaboradoresContrato(params: {
-  clienteNomes: string[];
+  clienteId?: string | null;
+  clienteNomes?: string[];
 }): Promise<ColaboradorSugestao[]> {
-  const nomes = params.clienteNomes
+  const clienteId = (params.clienteId ?? "").trim();
+  const nomes = (params.clienteNomes ?? [])
     .map((n) => n.trim())
     .filter(Boolean);
-  if (nomes.length === 0) return [];
+  if (!clienteId && nomes.length === 0) return [];
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("agendamentos")
-    .select("colaborador, colaborador_cpf, cliente_nome")
-    .in("cliente_nome", nomes)
+    .select("colaborador, colaborador_cpf, cliente_nome, cliente_id")
     .neq("status", "cancelado")
     .order("colaborador", { ascending: true })
     .limit(2000);
 
+  if (clienteId) {
+    query = query.eq("cliente_id", clienteId);
+  } else {
+    query = query.in("cliente_nome", nomes);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
 
   const byKey = new Map<string, ColaboradorSugestao>();

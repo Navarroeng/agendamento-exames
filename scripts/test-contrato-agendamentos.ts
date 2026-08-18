@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   agendamentoConsomeSaldoContrato,
+  agendamentoPertenceAoClienteContrato,
   buildContratoAgendamentoContagem,
   isAgendamentoSelecionavel,
   isDataNaVigencia,
@@ -28,6 +29,76 @@ assert.equal(
 assert.equal(isDataNaVigencia("2026-03-15", "2026-01-01", "2026-12-31"), true);
 assert.equal(isDataNaVigencia("2025-12-31", "2026-01-01", "2026-12-31"), false);
 assert.equal(isDataNaVigencia("2027-01-01", "2026-01-01", "2026-12-31"), false);
+
+const grecchi = {
+  id: "cliente-grecchi",
+  nome: "GRECCHI SOUZA SERVICOS MEDICOS LTDA",
+};
+const gibas = { id: "cliente-gibas", nome: "GIBAS BAR" };
+
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-gibas",
+      cliente_nome: "GIBAS BAR",
+    },
+    grecchi
+  ),
+  false,
+  "ELIETE/GIBAS BAR não entra na implantação GRECCHI"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-gibas",
+      cliente_nome: "GIBAS BAR",
+    },
+    gibas
+  ),
+  true
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-grecchi",
+      cliente_nome: "GRECCHI SOUZA SERVICOS MEDICOS LTDA",
+    },
+    grecchi
+  ),
+  true
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-gibas",
+      cliente_nome: "GRECCHI SOUZA SERVICOS MEDICOS LTDA",
+    },
+    grecchi
+  ),
+  false,
+  "outro cliente_id é ignorado mesmo se o nome coincidir"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    { cliente_id: null, cliente_nome: "GIBAS BAR" },
+    grecchi
+  ),
+  false
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: null,
+      cliente_nome: "GRECCHI SOUZA SERVICOS MEDICOS LTDA",
+    },
+    grecchi
+  ),
+  true,
+  "legado sem UUID ainda casa pelo nome exato deste cliente"
+);
+
+const extrasGrecchi = buildContratoAgendamentoContagem(3, 3, 0);
+assert.equal(extrasGrecchi.adicionais, 0);
 
 assert.equal(
   agendamentoConsomeSaldoContrato({
