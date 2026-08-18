@@ -294,6 +294,8 @@ const indigo =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
 const azulProcessoInicial =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#E8EEFF] text-[#3F51D7]";
+const lilasCronograma =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#F1EDFF] text-[#6D4AFF]";
 const verde =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
 
@@ -304,7 +306,7 @@ assert.equal(
 assert.equal(laudosSstEtapaAtualBadgeClass("epis", "em_andamento"), indigo);
 assert.equal(
   laudosSstEtapaAtualBadgeClass("cronograma_acoes", "em_andamento"),
-  indigo
+  lilasCronograma
 );
 assert.equal(
   laudosSstEtapaAtualBadgeClass("pgr_pcmso_ltcat", "em_andamento"),
@@ -320,8 +322,20 @@ assert.equal(
 );
 assert.equal(laudosSstEtapaAtualBadgeClass("processo_inicial", "concluido"), verde);
 assert.equal(laudosSstEtapaAtualBadgeClass("epis", "concluido"), verde);
+assert.equal(
+  laudosSstEtapaAtualBadgeClass("cronograma_acoes", "concluido"),
+  verde
+);
 
 const fonteBadge = readFileSync(join(process.cwd(), "lib/laudos-sst.ts"), "utf8");
-assert.doesNotMatch(fonteBadge, /#F3E8FF|#7E22CE|#E9D5FF|lilás/i);
+assert.match(fonteBadge, /cronograma_acoes[\s\S]*#F1EDFF[\s\S]*#6D4AFF/);
+assert.doesNotMatch(
+  [
+    laudosSstEtapaAtualBadgeClass("epis", "em_andamento"),
+    laudosSstEtapaAtualBadgeClass("processo_inicial", "em_andamento"),
+    laudosSstEtapaAtualBadgeClass("pgr_pcmso_ltcat", "em_andamento"),
+  ].join(" "),
+  /#F1EDFF|#6D4AFF/
+);
 
 console.log("test-laudos-sst: OK");

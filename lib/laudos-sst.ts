@@ -36,8 +36,10 @@ export const LAUDOS_SST_ETAPA_BADGE_BASE =
 
 /**
  * Cor do badge pela etapa/status real — não pela posição da linha.
- * "Processo inicial" usa azul (#E8EEFF / #3F51D7); as demais etapas em
- * andamento mantêm o indigo atual; Concluído permanece verde.
+ * "Processo inicial" usa azul (#E8EEFF / #3F51D7);
+ * "Cronograma de ações" usa lilás (#F1EDFF / #6D4AFF);
+ * as demais etapas em andamento mantêm o indigo atual;
+ * Concluído permanece verde.
  */
 export function laudosSstEtapaAtualBadgeClass(
   etapaAtual: LaudosSstEtapaId,
@@ -48,6 +50,9 @@ export function laudosSstEtapaAtualBadgeClass(
   }
   if (etapaAtual === "processo_inicial") {
     return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-[#E8EEFF] text-[#3F51D7]`;
+  }
+  if (etapaAtual === "cronograma_acoes") {
+    return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-[#F1EDFF] text-[#6D4AFF]`;
   }
   return `${LAUDOS_SST_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
 }
