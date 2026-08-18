@@ -36,6 +36,8 @@ import type { CreditoAsoModalVariant } from "@/components/agendamentos/CreditoAs
 import {
   applyValoresCreditoContratoNosExames,
   applyValoresCreditoContratoNosExamesPayload,
+  complementarZeradoIndevidoPeloCredito,
+  examesIndicamUsoDeCreditoContrato,
   type ContratoCreditoAsoRecord,
 } from "@/lib/contrato-creditos-aso";
 import {
@@ -369,6 +371,7 @@ export function useAgendamentosPage() {
     resetExams,
     loadExams,
     getExamesPayload,
+    refreshAllPricing,
     replaceExamesFromCargo,
     appendExamesFromNomes,
     enforceRetornoTrabalhoExames,
@@ -1431,18 +1434,7 @@ export function useAgendamentosPage() {
     setCreditoAsoNumeroContrato(credito?.contrato_numero ?? null);
     setCreditoAsoModalOpen(false);
 
-    void (async () => {
-      try {
-        let nomesCargo: string[] = [];
-        if (cargoId) {
-          const obrigatorios = await listarExamesObrigatoriosPorCargo(cargoId);
-          nomesCargo = obrigatorios.map((e) => e.nome).filter(Boolean);
-        }
-        loadExams(applyValoresCreditoContratoNosExames(exams, nomesCargo));
-      } catch (err) {
-        console.error(err);
-      }
-    })();
+    loadExams(applyValoresCreditoContratoNosExames(exams));
 
     const pending = pendingSaveStatusRef.current;
     if (pending) {
@@ -1456,7 +1448,6 @@ export function useAgendamentosPage() {
   }, [
     creditoAsoSelectedId,
     creditosAsoDisponiveis,
-    cargoId,
     exams,
     loadExams,
     setSaving,
@@ -1592,7 +1583,8 @@ export function useAgendamentosPage() {
         return;
       }
       loadForm(agendamentoToFormValues(agendamento));
-      loadExams(agendamentoToExams(agendamento));
+      const examesForm = agendamentoToExams(agendamento);
+      loadExams(examesForm);
       prevAsoRef.current = agendamento.aso ?? "";
       setClienteId(
         resolveClienteIdByNome(clientes, agendamento.cliente_nome ?? "")
@@ -1612,9 +1604,19 @@ export function useAgendamentosPage() {
       });
       if (isAsoRetornoAoTrabalho(agendamento.aso ?? "")) {
         void enforceRetornoTrabalhoExames();
+      } else if (examesForm.some(complementarZeradoIndevidoPeloCredito)) {
+        void refreshAllPricing();
       }
     },
-    [getById, loadForm, loadExams, clientes, enforceRetornoTrabalhoExames, obterBloqueioAtualizado]
+    [
+      getById,
+      loadForm,
+      loadExams,
+      clientes,
+      enforceRetornoTrabalhoExames,
+      obterBloqueioAtualizado,
+      refreshAllPricing,
+    ]
   );
 
   const handleVisualizar = useCallback(
@@ -2393,21 +2395,13 @@ export function useAgendamentosPage() {
         const examesPayloadRaw = getExamesPayload();
         let examesPayload = examesPayloadRaw;
 
-        if (!editingId && creditoEmUsoEfetivo) {
-          let nomesCargo: string[] = [];
-          if (cargoId) {
-            try {
-              const obrigatorios = await listarExamesObrigatoriosPorCargo(cargoId);
-              nomesCargo = obrigatorios
-                .map((e) => e.nome?.trim() || "")
-                .filter(Boolean);
-            } catch (cargoErr) {
-              console.error("Erro ao carregar exames do cargo:", cargoErr);
-            }
-          }
+        const aplicarValoresCredito =
+          Boolean(!editingId && creditoEmUsoEfetivo) ||
+          examesIndicamUsoDeCreditoContrato(examesPayloadRaw) ||
+          examesIndicamUsoDeCreditoContrato(exams);
+        if (aplicarValoresCredito) {
           examesPayload = applyValoresCreditoContratoNosExamesPayload(
-            examesPayloadRaw,
-            nomesCargo
+            examesPayloadRaw
           );
         }
 

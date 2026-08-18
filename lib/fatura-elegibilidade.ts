@@ -46,7 +46,8 @@ export function isAgendamentoElegivelFatura(
 /**
  * Regra única de exame faturável (Faturas Clientes e demais cálculos).
  * TRUE somente quando valor >= R$ 1,00, status ≠ Cancelado e
- * o exame não estiver coberto por crédito contratual utilizado.
+ * (em Faturas Clientes) o exame não estiver coberto pelo crédito contratual.
+ * Custos Clínicas não devem passar `inclusoCreditoContrato`.
  */
 export function isExameFaturavel(params: {
   status: string | null | undefined;

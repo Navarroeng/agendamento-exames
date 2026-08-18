@@ -78,9 +78,7 @@ export function isCreditoUtilizavel(
   return true;
 }
 
-/**
- * Normaliza nome de exame para comparar cargo × formulário.
- */
+/** Normaliza nome de exame para comparar cobertura do crédito. */
 function normalizeExameNome(nome: string): string {
   return nome
     .trim()
@@ -89,44 +87,49 @@ function normalizeExameNome(nome: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/** Só o Clínico é coberto pelo crédito/vaga contratual. Complementares não. */
+export function exameEhCobertoPeloCredito(tipoExame: string): boolean {
+  return isExameClinicoManual(tipoExame);
+}
+
 /**
- * Quais exames do formulário fazem parte do ASO contratual (Clínico + cargo).
- * Exames adicionais (fora do cargo) não entram.
+ * Quais exames do formulário são cobertos pelo ASO contratual.
+ * Apenas o Clínico: complementares (Audiometria, ECG, etc.) permanecem cobráveis.
  */
 export function examesCobertosPeloCreditoContrato(
-  exams: Pick<ExameFormItem, "tipo_exame">[],
-  nomesExamesCargo: string[]
+  exams: Pick<ExameFormItem, "tipo_exame">[]
 ): Set<string> {
-  const cargoSet = new Set(
-    nomesExamesCargo.map(normalizeExameNome).filter(Boolean)
-  );
   const cobertos = new Set<string>();
 
   for (const exam of exams) {
     const nome = exam.tipo_exame.trim();
     if (!nome) continue;
-    const key = normalizeExameNome(nome);
-    if (isExameClinicoManual(nome) || cargoSet.has(key)) {
-      cobertos.add(key);
+    if (exameEhCobertoPeloCredito(nome)) {
+      cobertos.add(normalizeExameNome(nome));
     }
   }
 
   return cobertos;
 }
 
+export function exameTemMotivoCreditoContrato(
+  motivo: string | null | undefined
+): boolean {
+  return (motivo ?? "").trim() === MOTIVO_ASO_INCLUSO_CONTRATO;
+}
+
 /**
- * Aplica valor zero + motivo oficial nos exames cobertos pelo crédito.
- * Retorna nova lista; exames fora do cargo permanecem inalterados.
+ * Aplica valor zero + motivo oficial somente no Clínico coberto pelo crédito.
+ * Complementares permanecem inalterados (preço de venda do cliente).
  */
 export function applyValoresCreditoContratoNosExames(
-  exams: ExameFormItem[],
-  nomesExamesCargo: string[]
+  exams: ExameFormItem[]
 ): ExameFormItem[] {
-  const cobertos = examesCobertosPeloCreditoContrato(exams, nomesExamesCargo);
-
   return exams.map((exam) => {
-    const key = normalizeExameNome(exam.tipo_exame);
-    if (!cobertos.has(key)) return exam;
+    if (!exameEhCobertoPeloCredito(exam.tipo_exame)) {
+      if (!exameTemMotivoCreditoContrato(exam.motivo_valor_zero)) return exam;
+      return { ...exam, motivo_valor_zero: "" };
+    }
 
     const custo = exam.custo_clinica;
     return {
@@ -149,16 +152,16 @@ export function applyValoresCreditoContratoNosExamesPayload<
     motivo_valor_zero?: string | null;
     incluso_credito_contrato?: boolean;
   },
->(exams: T[], nomesExamesCargo: string[]): T[] {
-  const cobertos = examesCobertosPeloCreditoContrato(
-    exams.map((e) => ({ tipo_exame: e.tipo_exame })),
-    nomesExamesCargo
-  );
-
+>(exams: T[]): T[] {
   return exams.map((exam) => {
-    const key = normalizeExameNome(exam.tipo_exame);
-    if (!cobertos.has(key)) {
-      return { ...exam, incluso_credito_contrato: false };
+    if (!exameEhCobertoPeloCredito(exam.tipo_exame)) {
+      return {
+        ...exam,
+        incluso_credito_contrato: false,
+        motivo_valor_zero: exameTemMotivoCreditoContrato(exam.motivo_valor_zero)
+          ? null
+          : exam.motivo_valor_zero,
+      };
     }
     return {
       ...exam,
@@ -169,12 +172,26 @@ export function applyValoresCreditoContratoNosExamesPayload<
   });
 }
 
-export function exameEhCobertoPeloCredito(
-  tipoExame: string,
-  nomesExamesCargo: string[]
+export function examesIndicamUsoDeCreditoContrato(
+  exams: Array<{
+    tipo_exame: string;
+    motivo_valor_zero?: string | null;
+    incluso_credito_contrato?: boolean | null;
+  }>
 ): boolean {
-  return examesCobertosPeloCreditoContrato(
-    [{ tipo_exame: tipoExame }],
-    nomesExamesCargo
-  ).has(normalizeExameNome(tipoExame));
+  return exams.some(
+    (exam) =>
+      exameEhCobertoPeloCredito(exam.tipo_exame) &&
+      (exam.incluso_credito_contrato === true ||
+        exameTemMotivoCreditoContrato(exam.motivo_valor_zero))
+  );
+}
+
+/** Complementar zerado indevidamente pelo crédito antigo (Clínico + cargo). */
+export function complementarZeradoIndevidoPeloCredito(
+  exam: Pick<ExameFormItem, "tipo_exame" | "valor_cliente" | "motivo_valor_zero">
+): boolean {
+  if (exameEhCobertoPeloCredito(exam.tipo_exame)) return false;
+  if (!exameTemMotivoCreditoContrato(exam.motivo_valor_zero)) return false;
+  return parseMoney(exam.valor_cliente) === 0;
 }

@@ -34,10 +34,12 @@ export function buildFaturaItensFromAgendamentos(
         !isExameFaturavel({
           status: ag.status,
           valor,
-          inclusoCreditoContrato: Boolean(
-            (exam as { incluso_credito_contrato?: boolean | null })
-              .incluso_credito_contrato
-          ),
+          inclusoCreditoContrato:
+            tipo === "cliente" &&
+            Boolean(
+              (exam as { incluso_credito_contrato?: boolean | null })
+                .incluso_credito_contrato
+            ),
         })
       ) {
         return;

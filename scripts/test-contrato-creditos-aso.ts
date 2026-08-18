@@ -3,17 +3,33 @@
 import assert from "node:assert/strict";
 import { buildContratoAgendamentoContagem } from "../lib/contrato-agendamentos";
 import {
+  applyValoresCreditoContratoNosExames,
   applyValoresCreditoContratoNosExamesPayload,
+  complementarZeradoIndevidoPeloCredito,
   creditoContaNoProgresso,
+  exameEhCobertoPeloCredito,
   examesCobertosPeloCreditoContrato,
   isCreditoUtilizavel,
   MOTIVO_ASO_INCLUSO_CONTRATO,
 } from "../lib/contrato-creditos-aso";
+import { buildFaturaItensFromAgendamentos } from "../lib/fatura-mappers";
+import {
+  assertExamesValorClientePermitido,
+  VALOR_CLIENTE_ZERO_BLOQUEADO_MSG,
+} from "../lib/agendamento-clinico-zero-demissional";
+import {
+  getAgendamentoValidationMessage,
+  isAgendamentoCompleto,
+} from "../lib/validate-agendamento";
 import { isExameFaturavel } from "../lib/fatura-elegibilidade";
 import { buildImplantacaoProcesso } from "../lib/implantacao-clientes";
 import { isAgendamentosEtapaConcluida } from "../lib/orcamento-etapas";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
-import type { ExameFormItem } from "../lib/types";
+import type {
+  AgendamentoFormValues,
+  AgendamentoWithExames,
+  ExameFormItem,
+} from "../lib/types";
 
 // Caso 8 previstos, 3 agendados, 3 futuros — ainda sem confirmar ASOs
 const casoAntes = buildContratoAgendamentoContagem(8, 6, 0, {
@@ -121,7 +137,7 @@ assert.equal(
   false
 );
 
-// Zero seletivo: Clínico + cargo; adicional permanece
+// Zero seletivo: somente Clínico; cargo/complementares permanecem cobráveis
 const exams: ExameFormItem[] = [
   {
     id: "1",
@@ -137,9 +153,9 @@ const exams: ExameFormItem[] = [
     id: "2",
     exame_id: "b",
     tipo_exame: "Audiometria",
-    valor_cliente: "50,00",
-    custo_clinica: "20,00",
-    lucro: "30,00",
+    valor_cliente: "33,00",
+    custo_clinica: "21,00",
+    lucro: "12,00",
     aviso: "",
     precoAutomatico: true,
   },
@@ -155,10 +171,21 @@ const exams: ExameFormItem[] = [
   },
 ];
 
-const cobertos = examesCobertosPeloCreditoContrato(exams, ["Audiometria"]);
+assert.equal(exameEhCobertoPeloCredito("Clínico"), true);
+assert.equal(exameEhCobertoPeloCredito("Audiometria"), false);
+
+const cobertos = examesCobertosPeloCreditoContrato(exams);
 assert.ok(cobertos.has("clinico"));
-assert.ok(cobertos.has("audiometria"));
+assert.ok(!cobertos.has("audiometria"));
 assert.ok(!cobertos.has("hemograma"));
+
+const aplicados = applyValoresCreditoContratoNosExames(exams);
+assert.equal(aplicados[0].valor_cliente, "0,00");
+assert.equal(aplicados[0].motivo_valor_zero, MOTIVO_ASO_INCLUSO_CONTRATO);
+assert.equal(aplicados[0].custo_clinica, "40,00");
+assert.equal(aplicados[1].valor_cliente, "33,00");
+assert.equal(aplicados[1].custo_clinica, "21,00");
+assert.equal(aplicados[2].valor_cliente, "80,00");
 
 const payload = applyValoresCreditoContratoNosExamesPayload(
   exams.map((e) => ({
@@ -167,13 +194,14 @@ const payload = applyValoresCreditoContratoNosExamesPayload(
     custo_clinica: Number(String(e.custo_clinica).replace(",", ".")),
     motivo_valor_zero: null as string | null,
     incluso_credito_contrato: false,
-  })),
-  ["Audiometria"]
+  }))
 );
 assert.equal(payload[0].valor_cliente, 0);
 assert.equal(payload[0].motivo_valor_zero, MOTIVO_ASO_INCLUSO_CONTRATO);
 assert.equal(payload[0].incluso_credito_contrato, true);
-assert.equal(payload[1].incluso_credito_contrato, true);
+assert.equal(payload[0].custo_clinica, 40);
+assert.equal(payload[1].valor_cliente, 33);
+assert.equal(payload[1].incluso_credito_contrato, false);
 assert.equal(payload[2].valor_cliente, 80);
 assert.equal(payload[2].incluso_credito_contrato, false);
 
@@ -228,6 +256,148 @@ assert.equal(
     agendamentosRealizados: 3,
   }),
   true
+);
+
+const andreExames = applyValoresCreditoContratoNosExames([
+  {
+    id: "c",
+    exame_id: "clinico",
+    tipo_exame: "Clínico",
+    valor_cliente: "100,00",
+    custo_clinica: "32,00",
+    lucro: "68,00",
+    aviso: "",
+    precoAutomatico: false,
+    clinicoValorManual: true,
+  },
+  {
+    id: "a",
+    exame_id: "audio",
+    tipo_exame: "Audiometria",
+    valor_cliente: "33,00",
+    custo_clinica: "21,00",
+    lucro: "12,00",
+    aviso: "",
+    precoAutomatico: true,
+  },
+]);
+assert.equal(andreExames[0].valor_cliente, "0,00");
+assert.equal(andreExames[1].valor_cliente, "33,00");
+assert.equal(
+  complementarZeradoIndevidoPeloCredito({
+    tipo_exame: "Audiometria",
+    valor_cliente: "0,00",
+    motivo_valor_zero: MOTIVO_ASO_INCLUSO_CONTRATO,
+  }),
+  true
+);
+assert.equal(
+  complementarZeradoIndevidoPeloCredito(andreExames[1]),
+  false
+);
+
+assert.doesNotThrow(() =>
+  assertExamesValorClientePermitido("Demissional", [
+    {
+      tipo_exame: "Clínico",
+      valor_cliente: 0,
+      custo_clinica: 32,
+      motivo_valor_zero: MOTIVO_ASO_INCLUSO_CONTRATO,
+    },
+    {
+      tipo_exame: "Audiometria",
+      valor_cliente: 33,
+      custo_clinica: 21,
+    },
+  ])
+);
+
+assert.throws(
+  () =>
+    assertExamesValorClientePermitido("Demissional", [
+      {
+        tipo_exame: "Audiometria",
+        valor_cliente: 0,
+        custo_clinica: 21,
+        motivo_valor_zero: MOTIVO_ASO_INCLUSO_CONTRATO,
+      },
+    ]),
+  (err: unknown) =>
+    err instanceof Error && err.message === VALOR_CLIENTE_ZERO_BLOQUEADO_MSG
+);
+
+const formAndre: AgendamentoFormValues = {
+  data_agendamento: "24/08/2026",
+  horario: "09:00",
+  cliente_nome: "D MARTINEZ COMERCIO DE CORANTES LTDA",
+  colaborador: "ANDRÉ FERREIRA DA SILVA",
+  colaborador_cpf: "529.982.247-25",
+  aso: "Demissional",
+  clinica_nome: "Clínica A",
+  responsavel: "Maria",
+  observacoes: "",
+  aso_enviado_clinica: "Não",
+  data_aso_enviado_clinica: "",
+  aso_assinado: "Não",
+  data_aso_assinado: "",
+  aso_enviado_cliente: "Não",
+  data_aso_enviado_cliente: "",
+  numero_matricula: "",
+  envio_esocial: "Não",
+  data_envio_esocial: "",
+  esocial_recibo: "",
+};
+assert.equal(
+  getAgendamentoValidationMessage(formAndre, andreExames, "cargo-1"),
+  null
+);
+assert.equal(isAgendamentoCompleto(formAndre, andreExames, "cargo-1"), true);
+
+const andreAgendamento = {
+  id: "andre",
+  cliente_nome: "D MARTINEZ COMERCIO DE CORANTES LTDA",
+  data_agendamento: "2026-08-24",
+  status: "agendado",
+  colaborador: "ANDRÉ FERREIRA DA SILVA",
+  clinica_nome: "Clínica A",
+  responsavel: "Maria",
+  aso: "Demissional",
+  agendamento_exames: [
+    {
+      id: "andre-c",
+      agendamento_id: "andre",
+      tipo_exame: "Clínico",
+      valor_cliente: 0,
+      custo_clinica: 32,
+      incluso_credito_contrato: true,
+    },
+    {
+      id: "andre-a",
+      agendamento_id: "andre",
+      tipo_exame: "Audiometria",
+      valor_cliente: 33,
+      custo_clinica: 21,
+      incluso_credito_contrato: false,
+    },
+  ],
+} as AgendamentoWithExames;
+
+const faturaClienteAndre = buildFaturaItensFromAgendamentos(
+  [andreAgendamento],
+  "cliente"
+);
+assert.equal(faturaClienteAndre.length, 1);
+assert.equal(faturaClienteAndre[0].exame_nome, "Audiometria");
+assert.equal(faturaClienteAndre[0].valor_unitario, 33);
+
+const custoClinicaAndre = buildFaturaItensFromAgendamentos(
+  [andreAgendamento],
+  "clinica"
+);
+assert.equal(custoClinicaAndre.length, 2);
+assert.equal(
+  custoClinicaAndre.reduce((sum, item) => sum + Number(item.valor_total), 0),
+  53
 );
 
 console.log("test-contrato-creditos-aso: OK");

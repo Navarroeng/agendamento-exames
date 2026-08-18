@@ -671,7 +671,9 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             };
           })
         : [];
-    setExams(ordenarExamesAgendamentoComClinicoPrimeiro(mapped));
+    const ordered = ordenarExamesAgendamentoComClinicoPrimeiro(mapped);
+    examsRef.current = ordered;
+    setExams(ordered);
   }, []);
 
   const getExamesPayload = useCallback(() => {

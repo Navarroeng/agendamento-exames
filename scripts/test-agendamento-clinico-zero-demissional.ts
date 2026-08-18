@@ -9,6 +9,7 @@ import {
   getAgendamentoValidationMessage,
   isAgendamentoCompleto,
 } from "../lib/validate-agendamento";
+import { MOTIVO_ASO_INCLUSO_CONTRATO } from "../lib/contrato-creditos-aso";
 import type { AgendamentoFormValues, ExameFormItem } from "../lib/types";
 
 function baseForm(aso: string): AgendamentoFormValues {
@@ -130,5 +131,28 @@ assert.equal(
   getAgendamentoValidationMessage(formAdmissional, [clinicoExam("0,00")], cargoId),
   "Preencha todos os campos obrigatórios antes de salvar."
 );
+
+assert.doesNotThrow(() =>
+  assertExamesValorClientePermitido("Admissional", [
+    {
+      tipo_exame: "Clínico",
+      valor_cliente: 0,
+      custo_clinica: 45,
+      motivo_valor_zero: MOTIVO_ASO_INCLUSO_CONTRATO,
+    },
+    {
+      tipo_exame: "Audiometria",
+      valor_cliente: 33,
+      custo_clinica: 21,
+    },
+  ])
+);
+
+const examContrato = clinicoExam("0,00", MOTIVO_ASO_INCLUSO_CONTRATO);
+assert.equal(
+  getAgendamentoValidationMessage(formAdmissional, [examContrato], cargoId),
+  null
+);
+assert.equal(isAgendamentoCompleto(formAdmissional, [examContrato], cargoId), true);
 
 console.log("test-agendamento-clinico-zero-demissional: ok");

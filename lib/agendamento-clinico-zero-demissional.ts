@@ -61,6 +61,14 @@ export function resolveMotivoValorZeroPayload(
   }
 
   if (
+    isExameClinicoManual(exam.tipo_exame) &&
+    parseMoney(exam.valor_cliente) === 0 &&
+    motivo === MOTIVO_ASO_INCLUSO_CONTRATO
+  ) {
+    return motivo;
+  }
+
+  if (
     isAsoDemissional(aso) &&
     isExameClinicoManual(exam.tipo_exame) &&
     parseMoney(exam.valor_cliente) > 0
@@ -84,7 +92,10 @@ export function assertExamesValorClientePermitido(
     }
 
     const motivo = exame.motivo_valor_zero?.trim() || "";
-    if (motivo === MOTIVO_ASO_INCLUSO_CONTRATO) {
+    if (
+      motivo === MOTIVO_ASO_INCLUSO_CONTRATO &&
+      isExameClinicoManual(exame.tipo_exame)
+    ) {
       continue;
     }
 

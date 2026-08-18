@@ -19,6 +19,7 @@ import {
   exigeMotivoClinicoZeroDemissional,
   MOTIVO_CLINICO_ZERO_DEMISSIONAL_TOAST,
 } from "@/lib/agendamento-clinico-zero-demissional";
+import { MOTIVO_ASO_INCLUSO_CONTRATO } from "@/lib/contrato-creditos-aso";
 import {
   isExameClinicoManual,
   permiteClinicoValorZero,
@@ -68,6 +69,14 @@ function hasValidValorCliente(exam: ExameFormItem, aso: string): boolean {
     permiteClinicoValorZero(aso)
   ) {
     return valor >= 0;
+  }
+
+  if (
+    isExameClinicoManual(exam.tipo_exame) &&
+    valor === 0 &&
+    (exam.motivo_valor_zero ?? "").trim() === MOTIVO_ASO_INCLUSO_CONTRATO
+  ) {
+    return true;
   }
 
   if (exigeMotivoClinicoZeroDemissional(aso, exam)) {
