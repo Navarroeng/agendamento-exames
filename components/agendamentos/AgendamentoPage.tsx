@@ -358,6 +358,7 @@ export function AgendamentoPage() {
         creditos={creditosAsoDisponiveis}
         selectedId={creditoAsoSelectedId}
         variant={creditoAsoModalVariant}
+        saving={saving}
         onSelectId={setCreditoAsoSelectedId}
         onNaoUtilizar={handleCreditoAsoNaoUtilizar}
         onUtilizar={handleCreditoAsoUtilizar}

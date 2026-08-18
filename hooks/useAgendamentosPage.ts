@@ -26,6 +26,12 @@ import {
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { cargoSemExamesVinculados } from "@/lib/agendamento-exames-cargo";
 import { resolverProximoAvisoBeneficio } from "@/lib/agendamento-beneficios-contratuais";
+import {
+  armAgendamentoSaveReentry,
+  createAgendamentoSaveLock,
+  exitAgendamentoSave,
+  tryEnterAgendamentoSave,
+} from "@/lib/agendamento-save-lock";
 import type { CreditoAsoModalVariant } from "@/components/agendamentos/CreditoAsoDisponivelModal";
 import {
   applyValoresCreditoContratoNosExames,
@@ -298,6 +304,8 @@ export function useAgendamentosPage() {
   >(null);
   const creditoDecisionRef = useRef<"none" | "skip" | "use">("none");
   const creditoAlertKeyRef = useRef<string | null>(null);
+  const creditoAsoEmUsoIdRef = useRef<string | null>(null);
+  const saveLockRef = useRef(createAgendamentoSaveLock());
   const continuarSaveAposCreditoRef = useRef<(() => void) | null>(null);
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
@@ -777,6 +785,7 @@ export function useAgendamentosPage() {
     setCreditosAsoDisponiveis([]);
     setCreditoAsoSelectedId(null);
     setCreditoAsoEmUsoId(null);
+    creditoAsoEmUsoIdRef.current = null;
     setCreditoAsoNumeroContrato(null);
     creditoDecisionRef.current = "none";
     creditoAlertKeyRef.current = null;
@@ -888,6 +897,7 @@ export function useAgendamentosPage() {
         setCreditoAsoModalOpen(false);
         setCreditoAsoModalVariant("padrao");
         setCreditoAsoEmUsoId(null);
+        creditoAsoEmUsoIdRef.current = null;
         setCreditoAsoNumeroContrato(null);
         setCreditoAsoSelectedId(null);
 
@@ -1071,6 +1081,7 @@ export function useAgendamentosPage() {
         creditoDecisionRef.current = "none";
         creditoAlertKeyRef.current = null;
         setCreditoAsoEmUsoId(null);
+        creditoAsoEmUsoIdRef.current = null;
         setCreditoAsoNumeroContrato(null);
         setCreditoAsoModalOpen(false);
         setCreditoAsoModalVariant("padrao");
@@ -1312,6 +1323,7 @@ export function useAgendamentosPage() {
         setCreditosAsoDisponiveis([]);
         setCreditoAsoSelectedId(null);
         setCreditoAsoEmUsoId(null);
+        creditoAsoEmUsoIdRef.current = null;
         setCreditoAsoNumeroContrato(null);
         return;
       }
@@ -1363,6 +1375,7 @@ export function useAgendamentosPage() {
           // Sem modal aqui — aguarda CPF.
           setCreditoAsoModalOpen(false);
           setCreditoAsoEmUsoId(null);
+          creditoAsoEmUsoIdRef.current = null;
           setCreditoAsoNumeroContrato(null);
           creditoDecisionRef.current = "none";
         } catch (credErr) {
@@ -1386,18 +1399,20 @@ export function useAgendamentosPage() {
     creditoDecisionRef.current = "skip";
     setCreditoAsoModalOpen(false);
     setCreditoAsoEmUsoId(null);
+    creditoAsoEmUsoIdRef.current = null;
     setCreditoAsoNumeroContrato(null);
     setCreditoAsoSelectedId(null);
     const pending = pendingSaveStatusRef.current;
     if (pending) {
+      if (!armAgendamentoSaveReentry(saveLockRef.current)) return;
+      setSaving(true);
       pendingSaveStatusRef.current = pending;
-      // executeSave é chamado via fila abaixo (ref atualizada após definição).
       queueMicrotask(() => {
         const fn = continuarSaveAposCreditoRef.current;
         if (fn) fn();
       });
     }
-  }, []);
+  }, [setSaving]);
 
   const handleCreditoAsoUtilizar = useCallback(() => {
     const id =
@@ -1411,6 +1426,7 @@ export function useAgendamentosPage() {
     }
     const credito = creditosAsoDisponiveis.find((c) => c.id === id);
     creditoDecisionRef.current = "use";
+    creditoAsoEmUsoIdRef.current = id;
     setCreditoAsoEmUsoId(id);
     setCreditoAsoNumeroContrato(credito?.contrato_numero ?? null);
     setCreditoAsoModalOpen(false);
@@ -1430,6 +1446,8 @@ export function useAgendamentosPage() {
 
     const pending = pendingSaveStatusRef.current;
     if (pending) {
+      if (!armAgendamentoSaveReentry(saveLockRef.current)) return;
+      setSaving(true);
       queueMicrotask(() => {
         const fn = continuarSaveAposCreditoRef.current;
         if (fn) fn();
@@ -1441,6 +1459,7 @@ export function useAgendamentosPage() {
     cargoId,
     exams,
     loadExams,
+    setSaving,
   ]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
@@ -2013,6 +2032,11 @@ export function useAgendamentosPage() {
 
   const executeSave = useCallback(
     async (status: AgendamentoStatus) => {
+      if (!tryEnterAgendamentoSave(saveLockRef.current)) {
+        return;
+      }
+      setSaving(true);
+      try {
       const bloquearCamposAso = isAgendamentoAsoRetido(editingStatus);
 
       if (editingId && editingSomenteDocumentacao) {
@@ -2023,7 +2047,6 @@ export function useAgendamentosPage() {
           return;
         }
 
-        setSaving(true);
         try {
           const anterior = getById(editingId);
           if (!anterior) {
@@ -2070,8 +2093,6 @@ export function useAgendamentosPage() {
               ? String((err as { message: unknown }).message)
               : "";
           toast.error(message || "Erro ao salvar documentação");
-        } finally {
-          setSaving(false);
         }
         return;
       }
@@ -2264,7 +2285,9 @@ export function useAgendamentosPage() {
 
       // Vínculo específico do periódico prevalece — não consome ASO genérico.
       const usandoPeriodico = periodicoDecisionRef.current === "link";
-      const creditoEmUsoEfetivo = usandoPeriodico ? null : creditoAsoEmUsoId;
+      const creditoEmUsoEfetivo = usandoPeriodico
+        ? null
+        : creditoAsoEmUsoIdRef.current;
 
       if (!editingId && creditoEmUsoEfetivo) {
         try {
@@ -2281,6 +2304,7 @@ export function useAgendamentosPage() {
               "O ASO contratual selecionado não está mais disponível. Refaça a escolha."
             );
             setCreditoAsoEmUsoId(null);
+            creditoAsoEmUsoIdRef.current = null;
             setCreditoAsoNumeroContrato(null);
             creditoDecisionRef.current = "none";
             setCreditosAsoDisponiveis(frescos);
@@ -2325,7 +2349,6 @@ export function useAgendamentosPage() {
         }
       }
 
-      setSaving(true);
       try {
         const cargoFields = buildCargoAgendamentoFields(
           cargoId,
@@ -2614,7 +2637,9 @@ export function useAgendamentosPage() {
           }
         }
         toast.error(message || "Erro ao salvar agendamento");
+      }
       } finally {
+        exitAgendamentoSave(saveLockRef.current);
         setSaving(false);
       }
     },
@@ -2649,12 +2674,17 @@ export function useAgendamentosPage() {
       verificarPeriodicoFuturoPendente,
       avaliarBeneficiosAposCpf,
       creditosAsoDisponiveis,
-      creditoAsoEmUsoId,
     ]
   );
 
   const handleSave = useCallback(
     async (status: AgendamentoStatus) => {
+      if (
+        saveLockRef.current.inFlight &&
+        !saveLockRef.current.allowReentry
+      ) {
+        return;
+      }
       await executeSave(status);
     },
     [executeSave]
@@ -2779,6 +2809,7 @@ export function useAgendamentosPage() {
       // Não consumir ASO genérico junto com o vínculo específico.
       creditoDecisionRef.current = "skip";
       setCreditoAsoEmUsoId(null);
+      creditoAsoEmUsoIdRef.current = null;
       setCreditoAsoNumeroContrato(null);
       setCreditoAsoModalOpen(false);
       setPeriodicoVinculoOpen(false);

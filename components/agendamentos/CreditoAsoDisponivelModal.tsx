@@ -17,6 +17,7 @@ interface CreditoAsoDisponivelModalProps {
   creditos: CreditoComContrato[];
   selectedId: string | null;
   variant?: CreditoAsoModalVariant;
+  saving?: boolean;
   onSelectId: (id: string) => void;
   onNaoUtilizar: () => void;
   onUtilizar: () => void;
@@ -28,6 +29,7 @@ export function CreditoAsoDisponivelModal({
   creditos,
   selectedId,
   variant = "padrao",
+  saving = false,
   onSelectId,
   onNaoUtilizar,
   onUtilizar,
@@ -164,6 +166,7 @@ export function CreditoAsoDisponivelModal({
           <button
             type="button"
             className="btn btn-muted text-xs"
+            disabled={saving}
             onClick={onNaoUtilizar}
           >
             {aposRecusa ? "Não utilizar" : "Não utilizar neste agendamento"}
@@ -171,12 +174,14 @@ export function CreditoAsoDisponivelModal({
           <button
             type="button"
             className="btn btn-primary text-xs"
-            disabled={multiplo && !selecionado}
+            disabled={saving || (multiplo && !selecionado)}
             onClick={onUtilizar}
           >
-            {aposRecusa
-              ? "Utilizar outro ASO contratual"
-              : "Utilizar ASO do contrato"}
+            {saving
+              ? "Salvando..."
+              : aposRecusa
+                ? "Utilizar outro ASO contratual"
+                : "Utilizar ASO do contrato"}
           </button>
         </div>
       </div>
