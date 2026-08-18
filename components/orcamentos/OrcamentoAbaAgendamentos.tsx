@@ -18,6 +18,7 @@ import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
+  agendamentoPertenceAoClienteContrato,
   buildContratoAgendamentoContagem,
   contratoTemAgendamentosIniciaisDispensados,
   isAgendamentoSelecionavel,
@@ -283,28 +284,37 @@ export function OrcamentoAbaAgendamentos({
           carregarAgendamentosVigenciaContrato({
             contrato: contratoRow,
             quantidadeContratada: qtd,
+            clienteNomeOrcamento: clienteNome,
           }),
           listarProgramacoesFuturasDoContrato(contratoRow.id),
           listarCreditosDoContrato(contratoRow.id),
         ]);
-        setItens(resumo.itens);
+        const itensDoCliente = resumo.itens.filter((i) =>
+          agendamentoPertenceAoClienteContrato(
+            {
+              cliente_id: i.agendamento.cliente_id,
+              cliente_nome: i.agendamento.cliente_nome,
+            },
+            {
+              id: contratoRow.cliente_id,
+              nome: clienteNome,
+              nomes: [clienteNome],
+            }
+          )
+        );
+        setItens(itensDoCliente);
         setProgramacoes(progs);
         setCreditosAso(creditos);
         setSelectedIds(
           new Set(
-            resumo.itens
+            itensDoCliente
               .filter((i) => i.selecionado)
               .map((i) => i.agendamento.id)
           )
         );
 
-        const nomesCliente = Array.from(
-          new Set(
-            [
-              clienteNome?.trim(),
-              ...resumo.itens.map((i) => i.agendamento.cliente_nome?.trim()),
-            ].filter((n): n is string => Boolean(n))
-          )
+        const nomesCliente = [clienteNome?.trim()].filter(
+          (n): n is string => Boolean(n)
         );
         if (contratoRow.cliente_id || nomesCliente.length > 0) {
           try {

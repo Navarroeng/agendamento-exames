@@ -189,24 +189,61 @@ export function isDataNaVigencia(
 
 /**
  * Isolamento da Implantação: o agendamento só entra se for do mesmo cliente.
- * Com `cliente_id`, o UUID é decisivo — outro cliente é ignorado mesmo com
- * nome, CNPJ, vigência ou colaborador coincidentes. Sem UUID (legado),
- * compara só o nome exato deste cliente.
+ *
+ * 1. Outro `cliente_id` → nunca entra.
+ * 2. `cliente_nome` de outro cliente cadastrado → nunca entra, mesmo que o
+ *    UUID esteja apontando para esta implantação (inconsistência de dados).
+ * 3. Se este cliente tem nome conhecido e o agendamento também, os nomes
+ *    precisam coincidir.
+ * 4. Sem UUID (legado): só o nome exato deste cliente.
  */
 export function agendamentoPertenceAoClienteContrato(
-  agendamento: Pick<AgendamentoWithExames, "cliente_id" | "cliente_nome">,
-  cliente: { id: string | null | undefined; nome?: string | null }
+  agendamento: {
+    cliente_id?: string | null;
+    cliente_nome?: string | null;
+  },
+  cliente: {
+    id: string | null | undefined;
+    nome?: string | null;
+    nomes?: Array<string | null | undefined>;
+  },
+  catalog?: Array<{ id: string; nome: string }>
 ): boolean {
   const clienteId = (cliente.id ?? "").trim();
   if (!clienteId) return false;
 
   const agClienteId = (agendamento.cliente_id ?? "").trim();
-  if (agClienteId) return agClienteId === clienteId;
+  if (agClienteId && agClienteId !== clienteId) return false;
 
-  const nomeAg = (agendamento.cliente_nome ?? "").trim().toLowerCase();
-  const nomeCliente = (cliente.nome ?? "").trim().toLowerCase();
-  if (!nomeAg || !nomeCliente) return false;
-  return nomeAg === nomeCliente;
+  const nomeAg = normalizeNomeClienteContrato(agendamento.cliente_nome);
+  const nomesDeste = new Set(
+    [cliente.nome, ...(cliente.nomes ?? [])]
+      .map(normalizeNomeClienteContrato)
+      .filter(Boolean)
+  );
+
+  if (nomeAg && catalog?.length) {
+    const nomeDeOutroCliente = catalog.some(
+      (c) =>
+        normalizeNomeClienteContrato(c.nome) === nomeAg &&
+        (c.id ?? "").trim() !== "" &&
+        (c.id ?? "").trim() !== clienteId
+    );
+    if (nomeDeOutroCliente) return false;
+  }
+
+  if (nomeAg && nomesDeste.size > 0 && !nomesDeste.has(nomeAg)) {
+    return false;
+  }
+
+  if (agClienteId) return true;
+  return Boolean(nomeAg) && nomesDeste.has(nomeAg);
+}
+
+function normalizeNomeClienteContrato(
+  nome: string | null | undefined
+): string {
+  return (nome ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 }
 
 /** Compat: legado consome_saldo em agendamentos. */

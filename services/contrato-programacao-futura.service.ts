@@ -101,8 +101,22 @@ export async function listarSugestoesColaboradoresContrato(params: {
   const { data, error } = await query;
   if (error) throw error;
 
+  const nomesNorm = new Set(
+    nomes.map((n) => n.replace(/\s+/g, " ").toLocaleLowerCase("pt-BR"))
+  );
   const byKey = new Map<string, ColaboradorSugestao>();
   for (const row of data ?? []) {
+    const clienteNomeRow = String(row.cliente_nome ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("pt-BR");
+    if (
+      nomesNorm.size > 0 &&
+      clienteNomeRow &&
+      !nomesNorm.has(clienteNomeRow)
+    ) {
+      continue;
+    }
     const nome = String(row.colaborador ?? "").trim();
     if (!nome) continue;
     const cpf = row.colaborador_cpf

@@ -70,6 +70,40 @@ assert.equal(
 assert.equal(
   agendamentoPertenceAoClienteContrato(
     {
+      cliente_id: "cliente-grecchi",
+      cliente_nome: "GIBAS BAR",
+    },
+    grecchi
+  ),
+  false,
+  "UUID da GRECCHI com nome GIBAS BAR não entra na implantação GRECCHI"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-grecchi",
+      cliente_nome: "GIBAS BAR",
+    },
+    grecchi,
+    [grecchi, gibas]
+  ),
+  false,
+  "catálogo confirma que GIBAS BAR é outro cliente"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cliente-grecchi",
+      cliente_nome: null,
+    },
+    grecchi
+  ),
+  true,
+  "UUID deste cliente sem nome no agendamento ainda entra"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
       cliente_id: "cliente-gibas",
       cliente_nome: "GRECCHI SOUZA SERVICOS MEDICOS LTDA",
     },

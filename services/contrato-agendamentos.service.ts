@@ -131,11 +131,12 @@ export async function contarColaboradoresPorContratos(
 export async function carregarAgendamentosVigenciaContrato(params: {
   contrato: ClienteContratoRecord;
   quantidadeContratada: number;
+  clienteNomeOrcamento?: string | null;
 }): Promise<{
   itens: AgendamentoNaVigenciaItem[];
   contagem: ContratoAgendamentoContagem;
 }> {
-  const { contrato, quantidadeContratada } = params;
+  const { contrato, quantidadeContratada, clienteNomeOrcamento } = params;
   const supabase = createClient();
   const clienteId = (contrato.cliente_id ?? "").trim();
   const dispensado = Boolean(contrato.agendamentos_iniciais_dispensados);
@@ -165,7 +166,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     };
   }
 
-  const [byIdRes, legadoRes, clienteRes] = await Promise.all([
+  const [byIdRes, legadoRes, clienteRes, catalogRes] = await Promise.all([
     supabase
       .from("agendamentos")
       .select(AGENDAMENTO_SELECT)
@@ -189,6 +190,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       .select("id, nome")
       .eq("id", clienteId)
       .maybeSingle(),
+    supabase.from("clientes").select("id, nome"),
   ]);
 
   if (byIdRes.error) throw byIdRes.error;
@@ -198,7 +200,16 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   const cliente = {
     id: clienteId,
     nome: String(clienteRes.data?.nome ?? "").trim(),
+    nomes: [clienteRes.data?.nome, clienteNomeOrcamento],
   };
+  const catalog = catalogRes.error
+    ? []
+    : (catalogRes.data ?? [])
+        .map((row) => ({
+          id: String(row.id ?? "").trim(),
+          nome: String(row.nome ?? "").trim(),
+        }))
+        .filter((row) => row.id && row.nome);
 
   const agendamentos = [
     ...((byIdRes.data ?? []) as AgendamentoWithExames[]),
@@ -207,7 +218,8 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     if (
       !agendamentoPertenceAoClienteContrato(
         { cliente_id: ag.cliente_id, cliente_nome: ag.cliente_nome },
-        cliente
+        cliente,
+        catalog
       )
     ) {
       return false;
