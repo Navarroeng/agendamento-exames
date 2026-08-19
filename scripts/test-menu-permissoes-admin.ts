@@ -37,7 +37,7 @@ assert.deepEqual(
   NAV_SECTIONS.find((s) => s.title === "Gestão Comercial")?.items.map(
     (i) => i.label
   ),
-  ["Orçamentos", "Implantação de Clientes"]
+  ["Orçamentos", "Implantação de Clientes", "Portal do Cliente"]
 );
 
 assert.deepEqual(

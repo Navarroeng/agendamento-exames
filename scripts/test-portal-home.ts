@@ -379,9 +379,11 @@ run("serviço não consulta respostas/sessão/vínculo", () => {
   assert.doesNotMatch(svc, /data_nascimento/);
 });
 
-run("menu admin não inclui /portal", () => {
-  const hrefs = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
-  assert.equal(hrefs.includes("/portal"), false);
+run("menu admin tem atalho para /portal em Gestão Comercial", () => {
+  const comercial = NAV_SECTIONS.find((s) => s.title === "Gestão Comercial");
+  assert.ok(comercial);
+  const atalho = comercial!.items.find((i) => i.href === "/portal");
+  assert.equal(atalho?.label, "Portal do Cliente");
 });
 
 console.log("test-portal-home: OK");
