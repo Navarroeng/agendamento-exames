@@ -71,12 +71,15 @@ export type AvaliacaoSessionPayload = {
   exp: number;
 };
 
+const AVALIACAO_SESSION_SECRET_MISSING =
+  "AVALIACAO_SESSION_SECRET não configurada. Defina um segredo próprio no servidor.";
+
 function sessionSecret(): string {
-  return (
-    process.env.AVALIACAO_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    "dev-insecure-avaliacao-secret"
-  );
+  const secret = process.env.AVALIACAO_SESSION_SECRET;
+  if (typeof secret !== "string" || secret.trim() === "") {
+    throw new Error(AVALIACAO_SESSION_SECRET_MISSING);
+  }
+  return secret.trim();
 }
 
 function sign(body: string): string {

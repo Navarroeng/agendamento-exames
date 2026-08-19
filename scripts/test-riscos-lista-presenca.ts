@@ -98,7 +98,7 @@ assert.equal(
 assert.equal(isRiscosEtapaLiberada(soSolicitacao, "lista_presenca"), true);
 assert.equal(
   isRiscosEtapaLiberada(soSolicitacao, "cadastro_colaboradores"),
-  true
+  false
 );
 
 const completa = buildRiscosPsicossociaisProcesso(laudosConcluido, {
@@ -160,6 +160,6 @@ assert.equal(
   isRiscosEtapaLiberadaByFluxo(semAnexo, "cadastro_colaboradores"),
   false
 );
-assert.equal(isRiscosEtapaLiberada(semAnexo, "cadastro_colaboradores"), true);
+assert.equal(isRiscosEtapaLiberada(semAnexo, "cadastro_colaboradores"), false);
 
 console.log("test-riscos-lista-presenca: OK");

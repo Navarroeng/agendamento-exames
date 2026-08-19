@@ -71,16 +71,16 @@ assert.equal(riscosAguardando.progressoLabel, "0 de 6");
 assert.equal(riscosAguardando.progressoPercentual, 0);
 assert.equal(riscosAguardando.dataEntrada, "2026-08-12T15:00:00Z");
 assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "laudos_sst"), true);
-assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberadaByFluxo(riscosAguardando, "lista_presenca"), false);
 assert.equal(
   isRiscosEtapaLiberadaByFluxo(riscosAguardando, "cadastro_colaboradores"),
   false
 );
 assert.equal(isRiscosEtapaLiberada(riscosAguardando, "laudos_sst"), true);
-assert.equal(isRiscosEtapaLiberada(riscosAguardando, "lista_presenca"), true);
+assert.equal(isRiscosEtapaLiberada(riscosAguardando, "lista_presenca"), false);
 assert.equal(
   isRiscosEtapaLiberada(riscosAguardando, "cadastro_colaboradores"),
-  true
+  false
 );
 
 const laudosConcluido = buildLaudosSstProcesso(implantacao, {
@@ -114,7 +114,7 @@ assert.equal(
 );
 assert.equal(
   isRiscosEtapaLiberada(riscosLiberado, "cadastro_colaboradores"),
-  true
+  false
 );
 
 const listaTracking = {

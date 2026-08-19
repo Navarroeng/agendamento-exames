@@ -26,8 +26,8 @@ function cliente(
 
 assert.equal(isClienteDisponivelAgendamento(true), true);
 assert.equal(isClienteDisponivelAgendamento(false), false);
-assert.equal(isClienteDisponivelAgendamento(undefined), true);
-assert.equal(isClienteDisponivelAgendamento(null), true);
+assert.equal(isClienteDisponivelAgendamento(undefined), false);
+assert.equal(isClienteDisponivelAgendamento(null), false);
 
 assert.equal(formToDisponivelAgendamento("Sim"), true);
 assert.equal(formToDisponivelAgendamento("Não"), false);

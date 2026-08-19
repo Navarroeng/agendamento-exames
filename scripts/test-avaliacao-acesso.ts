@@ -17,6 +17,10 @@ import {
 import { normalizeCpfDigits, isValidCPF } from "../lib/cpf";
 import { isAvaliacaoDemoCodigo } from "../lib/avaliacao-demo";
 
+if (!process.env.AVALIACAO_SESSION_SECRET?.trim()) {
+  process.env.AVALIACAO_SESSION_SECRET = "test-avaliacao-session-secret";
+}
+
 const hoje = "2026-08-10";
 
 function campanhaBase(
@@ -90,6 +94,25 @@ run("sessão assina e verifica", () => {
   const parsed = verifyAvaliacaoSessionToken(token);
   assert.ok(parsed);
   assert.equal(parsed!.campanhaId, "camp-a");
+});
+
+run("sessão exige AVALIACAO_SESSION_SECRET", () => {
+  const prev = process.env.AVALIACAO_SESSION_SECRET;
+  delete process.env.AVALIACAO_SESSION_SECRET;
+  try {
+    assert.throws(
+      () =>
+        createAvaliacaoSessionToken({
+          campanhaId: "camp-a",
+          participanteId: "part-joao",
+          codigoPublico: "5UA22W",
+        }),
+      /AVALIACAO_SESSION_SECRET/
+    );
+  } finally {
+    if (prev == null) delete process.env.AVALIACAO_SESSION_SECRET;
+    else process.env.AVALIACAO_SESSION_SECRET = prev;
+  }
 });
 
 run("sessão não aceita outra campanha na URL", () => {

@@ -37,27 +37,6 @@ import type { RiscosParticipanteStatus } from "@/lib/riscos-campanha-participant
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /**
- * Modo de desenvolvimento do módulo Riscos Psicossociais.
- *
- * `true`  → todas as abas/etapas ficam navegáveis (bloqueio sequencial ignorado).
- * `false` → restaura o fluxo normal (exige conclusão das etapas anteriores).
- *
- * Não altera status, regras de negócio persistidas nem o banco — apenas a
- * liberação de navegação na UI, via `isRiscosEtapaLiberada`.
- */
-export const DEVELOPMENT_UNLOCK_ALL_TABS = true;
-
-/**
- * TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
- *
- * Enquanto `true`, o status de Laudos SST continua sendo exibido no painel,
- * mas não impede o uso do restante do fluxo (Lista de Presença, pesquisa,
- * participantes, etc.). A regra de negócio permanece no código — apenas
- * esta validação de avanço fica desabilitada.
- */
-export const DEVELOPMENT_SKIP_LAUDOS_SST_GATE = true;
-
-/**
  * Etapas do fluxo na UI (sem Laudo SST automático).
  * Progresso é derivado de fatos reais — não de `tracking.etapas_concluidas`.
  */
@@ -466,8 +445,9 @@ export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
 }
 
 /**
- * Regra real de liberação sequencial (sempre preservada).
- * Usada por `isRiscosEtapaLiberada` quando o modo de desenvolvimento está off.
+ * Liberação sequencial das etapas:
+ * Laudos SST (quando a origem exige) → Lista de Presença → Cadastro e demais.
+ * Inclusão manual (`exigeLaudosSst === false`) não espera Laudos SST.
  */
 export function isRiscosEtapaLiberadaByFluxo(
   processo: Pick<
@@ -477,21 +457,15 @@ export function isRiscosEtapaLiberadaByFluxo(
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
   if (etapaId === "laudos_sst") return true;
-  // Fluxo manual: Laudos SST não faz parte — não bloqueia.
   const exigeLaudos = processo.exigeLaudosSst !== false;
-  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (
-    exigeLaudos &&
-    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
-    !processo.laudosSstConcluido
-  ) {
+  if (exigeLaudos && !processo.laudosSstConcluido) {
     return false;
   }
   if (etapaId === "lista_presenca") return true;
   return processo.listaPresencaConcluida;
 }
 
-/** Etapas manuais só liberam após Laudos SST (fluxo normal); Cadastro+ após Lista. */
+/** Mesma regra de `isRiscosEtapaLiberadaByFluxo` (fluxo de produção). */
 export function isRiscosEtapaLiberada(
   processo: Pick<
     RiscosPsicossociaisProcesso,
@@ -499,7 +473,6 @@ export function isRiscosEtapaLiberada(
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
-  if (DEVELOPMENT_UNLOCK_ALL_TABS) return true;
   return isRiscosEtapaLiberadaByFluxo(processo, etapaId);
 }
 
@@ -512,12 +485,7 @@ export function mensagemBloqueioEtapaRiscos(
 ): string | null {
   if (isRiscosEtapaLiberada(processo, etapaId)) return null;
   const exigeLaudos = processo.exigeLaudosSst !== false;
-  // TODO: Reativar dependência automática de Laudos SST quando o módulo estiver finalizado.
-  if (
-    exigeLaudos &&
-    !DEVELOPMENT_SKIP_LAUDOS_SST_GATE &&
-    !processo.laudosSstConcluido
-  ) {
+  if (exigeLaudos && !processo.laudosSstConcluido) {
     return "Aguardando finalização do processo de Laudos SST.";
   }
   return "Aguardando conclusão da Lista de Presença (recebimento e anexo).";

@@ -26,9 +26,6 @@ import {
   type RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
-import {
-  DEVELOPMENT_SKIP_LAUDOS_SST_GATE,
-} from "@/lib/riscos-psicossociais";
 import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-logo.service";
 interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
@@ -224,8 +221,7 @@ export function RiscosPainelCards({
       validatePreRequisitosAbrirCampanha({
         listaPresencaConcluida: processo.listaPresencaConcluida,
         participantesCadastrados: participantes.length,
-        exigeLaudosSst:
-          processo.exigeLaudosSst && !DEVELOPMENT_SKIP_LAUDOS_SST_GATE,
+        exigeLaudosSst: processo.exigeLaudosSst,
         laudosSstConcluido: processo.laudosSstConcluido,
       }) ?? validateAbrirCampanhaRiscos(campanha)
     );

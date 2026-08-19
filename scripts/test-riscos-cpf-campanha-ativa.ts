@@ -78,10 +78,10 @@ run("motivo de importação ignorada", () => {
     codigoPublico: "QCWMKJ",
     status: "aberta",
   });
-  assert.equal(
-    m,
-    "CPF já pertence à campanha QCWMKJ da empresa J. A. BRASIL."
-  );
+  assert.match(m, /CPF já cadastrado em outra campanha ativa/);
+  assert.match(m, /J\. A\. BRASIL/);
+  assert.match(m, /QCWMKJ/);
+  assert.match(m, /Aberta/);
 });
 
 run("cenários empresa diferente / mesma empresa (contrato lógico)", () => {
