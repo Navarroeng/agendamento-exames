@@ -7,13 +7,18 @@ import {
   isListaPresencaEtapaConcluida,
   isSolicitacaoListaConcluida,
   isValidEmailListaPresenca,
+  resolverEtapaAtualListaPresenca,
 } from "../lib/riscos-lista-presenca";
 import {
+  buildRiscosProcessoManualCliente,
   buildRiscosPsicossociaisProcesso,
   isRiscosEtapaLiberada,
   isRiscosEtapaLiberadaByFluxo,
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
 } from "../lib/riscos-psicossociais";
+import { RISCOS_CAMPANHA_ORIGEM } from "../lib/riscos-campanha-origem";
+import type { RiscosCampanhaRecord } from "../lib/riscos-campanha";
 
 assert.equal(isValidEmailListaPresenca("cliente@empresa.com.br"), true);
 assert.equal(isValidEmailListaPresenca("invalido"), false);
@@ -89,7 +94,7 @@ assert.equal(
   false
 );
 assert.equal(soSolicitacao.etapasConcluidas, 1); // só Laudo SST automático
-assert.equal(soSolicitacao.etapaAtual, "lista_presenca");
+assert.equal(soSolicitacao.etapaAtual, "lista_presenca_solicitada");
 assert.equal(isRiscosEtapaLiberadaByFluxo(soSolicitacao, "lista_presenca"), true);
 assert.equal(
   isRiscosEtapaLiberadaByFluxo(soSolicitacao, "cadastro_colaboradores"),
@@ -161,5 +166,64 @@ assert.equal(
   false
 );
 assert.equal(isRiscosEtapaLiberada(semAnexo, "cadastro_colaboradores"), false);
+
+assert.equal(solicitacaoSemData.etapaAtual, "solicitar_lista_presenca");
+assert.equal(
+  resolverEtapaAtualListaPresenca(solicitacaoSemData.listaPresenca),
+  "solicitar_lista_presenca"
+);
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[soSolicitacao.etapaAtual],
+  "Lista de presença solicitada"
+);
+
+const campanhaManual: RiscosCampanhaRecord = {
+  id: "camp-manual-lista",
+  orcamento_id: null,
+  cliente_id: "cli-1",
+  cnpj: "12345678000199",
+  empresa_nome: "Empresa Manual",
+  data_inicio: "2026-08-01",
+  data_encerramento: "2026-08-31",
+  quantidade_prevista: 10,
+  status: "em_preparacao",
+  codigo_publico: "MANUAL1",
+  codigo_acesso_exibicao: "XXXX",
+  origem: RISCOS_CAMPANHA_ORIGEM.manual_cliente,
+  responsavel: "AGATHA",
+  observacoes: null,
+  criado_por: "AGATHA",
+  logo_url: null,
+  logo_storage_path: null,
+  logo_origem: null,
+  logo_nome: null,
+  logo_tipo: null,
+  logo_tamanho: null,
+  created_at: "2026-08-11T12:00:00.000Z",
+};
+
+const manualSemSolicitacao = buildRiscosProcessoManualCliente({
+  campanha: campanhaManual,
+  tracking: null,
+});
+assert.equal(manualSemSolicitacao.etapaAtual, "solicitar_lista_presenca");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[manualSemSolicitacao.etapaAtual],
+  "Solicitar lista de presença"
+);
+
+const manualSolicitada = buildRiscosProcessoManualCliente({
+  campanha: campanhaManual,
+  tracking: {
+    orcamento_id: campanhaManual.id,
+    etapa_atual: "lista_presenca",
+    etapas_concluidas: 0,
+    lista_solicitada: true,
+    lista_solicitada_em: "2026-08-12",
+    lista_recebida: false,
+  },
+});
+assert.equal(manualSolicitada.etapaAtual, "lista_presenca_solicitada");
+assert.equal(manualSolicitada.listaPresencaConcluida, false);
 
 console.log("test-riscos-lista-presenca: OK");

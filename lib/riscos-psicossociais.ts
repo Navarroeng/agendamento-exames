@@ -19,6 +19,7 @@ import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import {
   isListaPresencaEtapaConcluida,
   mapListaPresencaFromTracking,
+  resolverEtapaAtualListaPresenca,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
 import {
@@ -83,6 +84,24 @@ export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
 export type RiscosPsicossociaisEtapaId =
   (typeof RISCOS_PSICOSSOCIAIS_ETAPAS)[number]["id"];
 
+/**
+ * IDs da coluna ETAPA ATUAL. `lista_presenca` permanece no progresso/modal;
+ * na listagem ela se desdobra em solicitar vs. já solicitada.
+ */
+export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
+  "laudos_sst",
+  "solicitar_lista_presenca",
+  "lista_presenca_solicitada",
+  "cadastro_colaboradores",
+  "link_enviado",
+  "aguardando_respostas",
+  "finalizado",
+] as const;
+
+export type RiscosPsicossociaisEtapaAtualId =
+  | (typeof RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM)[number]
+  | "lista_presenca";
+
 export type RiscosPsicossociaisStatus = "em_andamento" | "concluido";
 
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS =
@@ -93,11 +112,37 @@ export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS =
   RISCOS_PSICOSSOCIAIS_ETAPAS.length;
 
 export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
-  RiscosPsicossociaisEtapaId,
+  RiscosPsicossociaisEtapaAtualId,
   string
-> = Object.fromEntries(
-  RISCOS_PSICOSSOCIAIS_ETAPAS.map((e) => [e.id, e.label])
-) as Record<RiscosPsicossociaisEtapaId, string>;
+> = {
+  ...(Object.fromEntries(
+    RISCOS_PSICOSSOCIAIS_ETAPAS.map((e) => [e.id, e.label])
+  ) as Record<RiscosPsicossociaisEtapaId, string>),
+  solicitar_lista_presenca: "Solicitar lista de presença",
+  lista_presenca_solicitada: "Lista de presença solicitada",
+};
+
+const RISCOS_ETAPA_BADGE_BASE =
+  "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold";
+
+export function riscosPsicossociaisEtapaAtualBadgeClass(
+  etapaAtual: RiscosPsicossociaisEtapaAtualId,
+  status: RiscosPsicossociaisStatus
+): string {
+  if (status === "concluido" || etapaAtual === "finalizado") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-brand-green-soft text-brand-green`;
+  }
+  if (etapaAtual === "laudos_sst") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#fef3c7] text-[#b45309]`;
+  }
+  if (etapaAtual === "solicitar_lista_presenca") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#E8EEFF] text-[#3F51D7]`;
+  }
+  if (etapaAtual === "lista_presenca_solicitada") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#F1EDFF] text-[#6D4AFF]`;
+  }
+  return `${RISCOS_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
+}
 
 /** Tracking persistido: etapas manuais persistíveis (0–6 no banco atual). */
 export interface OrcamentoRiscosPsicossociaisRecord {
@@ -133,7 +178,7 @@ export interface RiscosPsicossociaisProcesso {
   exigeLaudosSst: boolean;
   implantacao: ImplantacaoProcesso;
   laudos: LaudosSstProcesso;
-  etapaAtual: RiscosPsicossociaisEtapaId;
+  etapaAtual: RiscosPsicossociaisEtapaAtualId;
   /** Progresso total exibido (0–N), conforme origem. */
   etapasConcluidas: number;
   /** Etapas do fluxo (sem Laudo SST) já concluídas. */
@@ -204,10 +249,30 @@ export function isRiscosPsicossociaisEtapaPersistidaId(
   );
 }
 
+export function isRiscosPsicossociaisEtapaAtualId(
+  value: string
+): value is RiscosPsicossociaisEtapaAtualId {
+  return (
+    (RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM as readonly string[]).includes(
+      value
+    ) || value === "lista_presenca"
+  );
+}
+
 export function isRiscosPsicossociaisEtapaId(
   value: string
 ): value is RiscosPsicossociaisEtapaId {
   return RISCOS_PSICOSSOCIAIS_ETAPAS.some((e) => e.id === value);
+}
+
+export function isEtapaListaPresencaListagem(
+  etapaId: string | null | undefined
+): boolean {
+  return (
+    etapaId === "lista_presenca" ||
+    etapaId === "solicitar_lista_presenca" ||
+    etapaId === "lista_presenca_solicitada"
+  );
 }
 
 export function isRiscosEtapaAutomatica(
@@ -233,14 +298,15 @@ export function getTotalEtapasRiscosPorOrigem(
 }
 
 /**
- * Posição da etapa atual na sequência oficial da UI
- * (`RISCOS_PSICOSSOCIAIS_ETAPAS`). Inclusão manual não tem Laudo SST, mas
- * `lista_presenca` continua depois de `laudos_sst` nessa mesma sequência.
+ * Posição da etapa atual na sequência da coluna ETAPA ATUAL.
+ * `lista_presenca` legado conta como "Solicitar lista de presença".
  */
 export function indiceEtapaAtualRiscos(
-  etapaId: RiscosPsicossociaisEtapaId | string | null | undefined
+  etapaId: RiscosPsicossociaisEtapaAtualId | string | null | undefined
 ): number {
-  return RISCOS_PSICOSSOCIAIS_ETAPAS.findIndex((e) => e.id === etapaId);
+  const id =
+    etapaId === "lista_presenca" ? "solicitar_lista_presenca" : etapaId;
+  return RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM.findIndex((e) => e === id);
 }
 
 /** Cadastro concluído quando há pelo menos 1 participante ativo na campanha atual. */
@@ -317,13 +383,14 @@ export function calcularProgressoEtapasRiscos(input: {
   origem: RiscosCampanhaOrigem | string | null | undefined;
   laudosSstConcluido: boolean;
   listaPresencaConcluida: boolean;
+  listaPresenca?: RiscosListaPresencaDados | null;
   quantidadePrevista: number | null | undefined;
   participantesCadastrados: number;
   participantesRespondidos: number;
   campanhaStatus: RiscosCampanhaRecord["status"] | string | null | undefined;
   relatorioGerado: boolean;
 }): {
-  etapaAtual: RiscosPsicossociaisEtapaId;
+  etapaAtual: RiscosPsicossociaisEtapaAtualId;
   etapasConcluidas: number;
   etapasManuaisConcluidas: number;
   totalEtapas: number;
@@ -355,7 +422,8 @@ export function calcularProgressoEtapasRiscos(input: {
   };
 
   let etapasConcluidas = 0;
-  let etapaAtual: RiscosPsicossociaisEtapaId = etapas[0]?.id ?? "lista_presenca";
+  let etapaAtual: RiscosPsicossociaisEtapaAtualId =
+    etapas[0]?.id ?? "solicitar_lista_presenca";
 
   for (const etapa of etapas) {
     if (concluidaPorId[etapa.id]) {
@@ -369,6 +437,8 @@ export function calcularProgressoEtapasRiscos(input: {
   if (etapasConcluidas >= totalEtapas) {
     etapaAtual = "finalizado";
     etapasConcluidas = totalEtapas;
+  } else if (etapaAtual === "lista_presenca") {
+    etapaAtual = resolverEtapaAtualListaPresenca(input.listaPresenca);
   }
 
   const etapasManuaisConcluidas = exigeLaudos
@@ -521,6 +591,7 @@ export function buildRiscosPsicossociaisProcesso(
     origem,
     laudosSstConcluido,
     listaPresencaConcluida,
+    listaPresenca,
     quantidadePrevista: campanhaAtiva?.quantidade_prevista ?? null,
     participantesCadastrados: cadastrados,
     participantesRespondidos: respondidos,
@@ -580,6 +651,7 @@ export function withRiscosProgressoAtualizado(
     origem: processo.origem,
     laudosSstConcluido: processo.laudosSstConcluido,
     listaPresencaConcluida: processo.listaPresencaConcluida,
+    listaPresenca: processo.listaPresenca,
     quantidadePrevista: campanha?.quantidade_prevista ?? null,
     participantesCadastrados: contagem.cadastrados,
     participantesRespondidos: contagem.respondidos,

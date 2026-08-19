@@ -98,6 +98,19 @@ export function isListaPresencaEtapaConcluida(
   );
 }
 
+/**
+ * Subestado da Lista de Presença na coluna ETAPA ATUAL.
+ * Solicitada = Sim (com data) e ainda não recebida → aguardando o cliente.
+ */
+export function resolverEtapaAtualListaPresenca(
+  dados: RiscosListaPresencaDados | null | undefined
+): "solicitar_lista_presenca" | "lista_presenca_solicitada" {
+  if (dados && isSolicitacaoListaConcluida(dados)) {
+    return "lista_presenca_solicitada";
+  }
+  return "solicitar_lista_presenca";
+}
+
 export function validateRiscosListaPresencaFile(file: File): void {
   if (!file || file.size <= 0) {
     throw new Error("Selecione o arquivo da lista de presença.");

@@ -106,7 +106,7 @@ run("TESTE 2/3/5 processo manual sem Laudos SST no total", () => {
   assert.equal(getEtapasRiscosPorOrigem(p.origem).some((e) => e.id === "laudos_sst"), false);
   assert.equal(p.campanha?.orcamento_id, null);
   assert.equal(p.implantacao.numeroContrato, null);
-  assert.equal(p.etapaAtual, "lista_presenca");
+  assert.equal(p.etapaAtual, "solicitar_lista_presenca");
   assert.ok(!p.progressoLabel.includes("de 6"));
   assert.ok(p.progressoLabel.includes("de 5"));
 });

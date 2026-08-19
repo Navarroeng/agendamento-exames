@@ -23,6 +23,7 @@ assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].id, "laudos_sst");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].label, "Laudo SST Automático");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].automatica, true);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].id, "lista_presenca");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].label, "Lista de Presença");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[2].id, "cadastro_colaboradores");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[3].id, "link_enviado");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[4].id, "aguardando_respostas");
@@ -65,6 +66,10 @@ const riscosAguardando = buildRiscosPsicossociaisProcesso(laudosEmAndamento, {
 });
 
 assert.equal(riscosAguardando.etapaAtual, "laudos_sst");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosAguardando.etapaAtual],
+  "Laudo SST Automático"
+);
 assert.equal(riscosAguardando.laudosSstConcluido, false);
 assert.equal(riscosAguardando.etapasConcluidas, 0);
 assert.equal(riscosAguardando.progressoLabel, "0 de 6");
@@ -101,7 +106,11 @@ const riscosLiberado = buildRiscosPsicossociaisProcesso(laudosConcluido, {
 });
 
 assert.equal(riscosLiberado.laudosSstConcluido, true);
-assert.equal(riscosLiberado.etapaAtual, "lista_presenca");
+assert.equal(riscosLiberado.etapaAtual, "solicitar_lista_presenca");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosLiberado.etapaAtual],
+  "Solicitar lista de presença"
+);
 assert.equal(riscosLiberado.etapasConcluidas, 1);
 assert.equal(riscosLiberado.progressoLabel, "1 de 6");
 assert.equal(riscosLiberado.progressoPercentual, 17);

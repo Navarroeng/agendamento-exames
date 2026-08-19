@@ -8,8 +8,10 @@ import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   getEtapasRiscosPorOrigem,
+  isEtapaListaPresencaListagem,
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
+  riscosPsicossociaisEtapaAtualBadgeClass,
   type RiscosPsicossociaisListagemStatus,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
@@ -50,8 +52,10 @@ function ProgressoRiscos({
           const concluida = index < processo.etapasConcluidas;
           const atual =
             !concluida &&
-            etapa.id === processo.etapaAtual &&
-            processo.etapasConcluidas < processo.totalEtapas;
+            processo.etapasConcluidas < processo.totalEtapas &&
+            (etapa.id === processo.etapaAtual ||
+              (etapa.id === "lista_presenca" &&
+                isEtapaListaPresencaListagem(processo.etapaAtual)));
           const automatica = etapa.id === "laudos_sst";
           const tone = concluida
             ? automatica
@@ -183,22 +187,17 @@ export function RiscosPsicossociaisTable({
                         : "—"}
                     </td>
                     <td className="whitespace-nowrap">
-                      {processo.status === "concluido" ||
-                      processo.etapaAtual === "finalizado" ? (
-                        <span className="inline-flex rounded-full bg-brand-green-soft px-2.5 py-0.5 text-[10px] font-extrabold text-brand-green">
-                          {RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado}
-                        </span>
-                      ) : (
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                            processo.etapaAtual === "laudos_sst"
-                              ? "bg-[#fef3c7] text-[#b45309]"
-                              : "bg-[#eef2ff] text-[#4338ca]"
-                          }`}
-                        >
-                          {RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
-                        </span>
-                      )}
+                      <span
+                        className={riscosPsicossociaisEtapaAtualBadgeClass(
+                          processo.etapaAtual,
+                          processo.status
+                        )}
+                      >
+                        {processo.status === "concluido" ||
+                        processo.etapaAtual === "finalizado"
+                          ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado
+                          : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
+                      </span>
                     </td>
                     <td>
                       <ProgressoRiscos processo={processo} />

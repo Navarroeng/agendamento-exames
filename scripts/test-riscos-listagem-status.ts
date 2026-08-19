@@ -8,11 +8,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DEFAULT_RISCOS_LISTAGEM_STATUS,
+  RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
   indiceEtapaAtualRiscos,
   isRiscosProcessoListagemConcluido,
+  riscosPsicossociaisEtapaAtualBadgeClass,
   sortRiscosPsicossociaisProcessosListagem,
   type RiscosPsicossociaisProcesso,
 } from "../lib/riscos-psicossociais";
@@ -48,7 +50,7 @@ function processo(
         numero: overrides.cliente,
       },
     },
-    etapaAtual: overrides.etapaAtual ?? "lista_presenca",
+    etapaAtual: overrides.etapaAtual ?? "solicitar_lista_presenca",
     etapasConcluidas: overrides.etapasConcluidas,
     totalEtapas: overrides.totalEtapas,
     progressoPercentual: overrides.progressoPercentual,
@@ -112,9 +114,20 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
       "finalizado",
     ]
   );
+  assert.deepEqual(RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM, [
+    "laudos_sst",
+    "solicitar_lista_presenca",
+    "lista_presenca_solicitada",
+    "cadastro_colaboradores",
+    "link_enviado",
+    "aguardando_respostas",
+    "finalizado",
+  ]);
   assert.equal(indiceEtapaAtualRiscos("laudos_sst"), 0);
+  assert.equal(indiceEtapaAtualRiscos("solicitar_lista_presenca"), 1);
   assert.equal(indiceEtapaAtualRiscos("lista_presenca"), 1);
-  assert.equal(indiceEtapaAtualRiscos("aguardando_respostas"), 4);
+  assert.equal(indiceEtapaAtualRiscos("lista_presenca_solicitada"), 2);
+  assert.equal(indiceEtapaAtualRiscos("aguardando_respostas"), 5);
 });
 
 run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
@@ -206,7 +219,7 @@ run("Aberto: Lista de Presença acima de Laudo SST Automático com 0%", () => {
   const lista = processo({
     cliente: "Empresa A",
     origem: "manual_cliente",
-    etapaAtual: "lista_presenca",
+    etapaAtual: "solicitar_lista_presenca",
     etapasConcluidas: 0,
     totalEtapas: 5,
     progressoPercentual: 0,
@@ -219,7 +232,7 @@ run("Aberto: Lista de Presença acima de Laudo SST Automático com 0%", () => {
   assert.deepEqual(
     ordenados.map((p) => [p.implantacao.orcamento.cliente_nome, p.etapaAtual]),
     [
-      ["Empresa A", "lista_presenca"],
+      ["Empresa A", "solicitar_lista_presenca"],
       ["Empresa B", "laudos_sst"],
     ]
   );
@@ -238,7 +251,7 @@ run("Aberto: etapa mais avançada acima, na sequência real da UI", () => {
   const lista = processo({
     cliente: "Lista",
     origem: "manual_cliente",
-    etapaAtual: "lista_presenca",
+    etapaAtual: "solicitar_lista_presenca",
     etapasConcluidas: 0,
     totalEtapas: 5,
     progressoPercentual: 0,
@@ -281,7 +294,7 @@ run("Aberto: etapa mais avançada acima, na sequência real da UI", () => {
       "aguardando_respostas",
       "link_enviado",
       "cadastro_colaboradores",
-      "lista_presenca",
+      "solicitar_lista_presenca",
       "laudos_sst",
     ]
   );
@@ -300,7 +313,7 @@ run("Aberto: 60% continua acima de 0% mesmo com etapa menos avançada", () => {
   const zeroLista = processo({
     cliente: "0% lista",
     origem: "manual_cliente",
-    etapaAtual: "lista_presenca",
+    etapaAtual: "solicitar_lista_presenca",
     etapasConcluidas: 0,
     totalEtapas: 5,
     progressoPercentual: 0,
@@ -427,7 +440,79 @@ run("UI: STATUS ao lado do ano, padrão Aberto, sem persistir no refresh", () =>
   assert.match(table, />Aberto</);
   assert.match(table, />Concluído</);
   assert.match(table, /yearRowExtra/);
+  assert.match(table, /riscosPsicossociaisEtapaAtualBadgeClass/);
   assert.match(page, /statusListagem=\{statusListagem\}/);
+});
+
+run("Aberto: lista solicitada acima de solicitar, no mesmo percentual", () => {
+  const solicitar = processo({
+    cliente: "Ainda solicitar",
+    origem: "manual_cliente",
+    etapaAtual: "solicitar_lista_presenca",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  const solicitada = processo({
+    cliente: "Já solicitada",
+    origem: "manual_cliente",
+    etapaAtual: "lista_presenca_solicitada",
+    etapasConcluidas: 0,
+    totalEtapas: 5,
+    progressoPercentual: 0,
+    dataEntrada: "2026-08-10T12:00:00Z",
+  });
+  const ordenados = sortRiscosPsicossociaisProcessosListagem(
+    [solicitar, solicitada],
+    "aberto"
+  );
+  assert.deepEqual(
+    ordenados.map((p) => p.etapaAtual),
+    ["lista_presenca_solicitada", "solicitar_lista_presenca"]
+  );
+});
+
+run("badges: solicitar azul claro, solicitada lilás, demais intactos", () => {
+  const azul =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#E8EEFF] text-[#3F51D7]";
+  const lilas =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#F1EDFF] text-[#6D4AFF]";
+  const amarelo =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#fef3c7] text-[#b45309]";
+  const indigo =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
+  const verde =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass(
+      "solicitar_lista_presenca",
+      "em_andamento"
+    ),
+    azul
+  );
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass(
+      "lista_presenca_solicitada",
+      "em_andamento"
+    ),
+    lilas
+  );
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass("laudos_sst", "em_andamento"),
+    amarelo
+  );
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass(
+      "cadastro_colaboradores",
+      "em_andamento"
+    ),
+    indigo
+  );
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass("finalizado", "concluido"),
+    verde
+  );
 });
 
 console.log("\nTodos os testes de listagem STATUS passaram.");
