@@ -5,11 +5,12 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  consolidarEmpresasPortalPreview,
   escolherCampanhaAtualPortal,
   montarPortalResumo,
   portalResumoVazio,
-  resolvePortalDevClienteId,
   type PortalCampanhaFonte,
+  type PortalEmpresaOpcao,
   type PortalParticipanteFonte,
   type PortalResumo,
   type PortalSnapshotFonte,
@@ -17,23 +18,68 @@ import {
 import type { RiscosRelatorioResultadoJson } from "@/lib/riscos-relatorio";
 
 const CAMPANHA_SELECT =
-  "id, empresa_nome, status, data_inicio, data_encerramento, created_at";
+  "id, cliente_id, empresa_nome, status, data_inicio, data_encerramento, created_at";
 
 const PARTICIPANTE_SELECT = "nome_completo, status, removido_em";
 
 const RELATORIO_SELECT = "gerado_em, resultado_json";
 
+const CAMPANHA_LISTA_SELECT = "cliente_id, empresa_nome, status";
+
 export type PortalHomeResultado = {
-  habilitado: boolean;
   resumo: PortalResumo;
 };
 
-export async function carregarPortalHome(): Promise<PortalHomeResultado> {
-  const clienteId = resolvePortalDevClienteId();
-  if (!clienteId) {
-    return { habilitado: false, resumo: portalResumoVazio() };
+function mapCampanhas(
+  rows: Array<Record<string, unknown>> | null
+): PortalCampanhaFonte[] {
+  return (rows ?? []).map((row) => ({
+    id: String(row.id ?? ""),
+    empresa_nome: String(row.empresa_nome ?? ""),
+    status: String(row.status ?? ""),
+    data_inicio: String(row.data_inicio ?? ""),
+    data_encerramento: String(row.data_encerramento ?? ""),
+    created_at: row.created_at ? String(row.created_at) : null,
+  }));
+}
+
+export async function listarEmpresasPortalPreview(): Promise<
+  PortalEmpresaOpcao[]
+> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("riscos_campanhas")
+    .select(CAMPANHA_LISTA_SELECT)
+    .not("cliente_id", "is", null);
+
+  if (error) throw error;
+
+  const campanhas = (data ?? []) as Array<{
+    cliente_id: string | null;
+    empresa_nome: string | null;
+    status: string | null;
+  }>;
+  const ids = Array.from(
+    new Set(
+      campanhas
+        .map((c) => String(c.cliente_id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  let clientes: Array<{ id: string; nome: string | null }> = [];
+  if (ids.length > 0) {
+    const cli = await admin.from("clientes").select("id, nome").in("id", ids);
+    if (cli.error) throw cli.error;
+    clientes = (cli.data ?? []) as Array<{ id: string; nome: string | null }>;
   }
 
+  return consolidarEmpresasPortalPreview(campanhas, clientes);
+}
+
+export async function carregarPortalHome(
+  clienteId: string
+): Promise<PortalHomeResultado> {
   const admin = createAdminClient();
 
   const { data: campanhasRaw, error: campanhasError } = await admin
@@ -44,20 +90,26 @@ export async function carregarPortalHome(): Promise<PortalHomeResultado> {
 
   if (campanhasError) throw campanhasError;
 
-  const campanhas: PortalCampanhaFonte[] = (campanhasRaw ?? []).map((row) => ({
-    id: String((row as { id: string }).id),
-    empresa_nome: String((row as { empresa_nome?: string }).empresa_nome ?? ""),
-    status: String((row as { status?: string }).status ?? ""),
-    data_inicio: String((row as { data_inicio?: string }).data_inicio ?? ""),
-    data_encerramento: String(
-      (row as { data_encerramento?: string }).data_encerramento ?? ""
-    ),
-    created_at: (row as { created_at?: string | null }).created_at ?? null,
-  }));
-
+  const campanhas = mapCampanhas(
+    (campanhasRaw ?? []) as Array<Record<string, unknown>>
+  );
   const campanha = escolherCampanhaAtualPortal(campanhas);
   if (!campanha) {
-    return { habilitado: true, resumo: portalResumoVazio() };
+    const cliente = await admin
+      .from("clientes")
+      .select("nome")
+      .eq("id", clienteId)
+      .maybeSingle();
+    const vazio = portalResumoVazio();
+    const nome = String(
+      (cliente.data as { nome?: string } | null)?.nome ?? ""
+    ).trim();
+    return {
+      resumo: {
+        ...vazio,
+        empresaNome: nome || null,
+      },
+    };
   }
 
   const { data: participantesRaw, error: participantesError } = await admin
@@ -89,7 +141,6 @@ export async function carregarPortalHome(): Promise<PortalHomeResultado> {
       /does not exist/i.test(relatorioError.message ?? "")
     ) {
       return {
-        habilitado: true,
         resumo: montarPortalResumo({
           campanha,
           participantes,
@@ -112,7 +163,6 @@ export async function carregarPortalHome(): Promise<PortalHomeResultado> {
   }
 
   return {
-    habilitado: true,
     resumo: montarPortalResumo({
       campanha,
       participantes,

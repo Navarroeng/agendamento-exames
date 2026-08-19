@@ -1,19 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { NavarroLogo } from "@/components/layout/NavarroLogo";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatDateBR } from "@/lib/format";
 import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
 import {
-  PORTAL_NAO_HABILITADO_MSG,
+  PORTAL_PREVIEW_INTERNO_LABEL,
   PORTAL_PRIVACIDADE_AVISO,
   PORTAL_RESULTADOS_AGUARDANDO_MSG,
+  PORTAL_SELECIONE_EMPRESA_MSG,
   PORTAL_SEM_AVALIACAO_MSG,
   PORTAL_STATUS_LABELS,
   PORTAL_TIMELINE_ETAPAS,
   estadoTimelinePortal,
   type PortalCategoriaResumo,
   type PortalClassificacao,
+  type PortalEmpresaOpcao,
   type PortalResumo,
   type PortalStatusHome,
   portalResumoVazio,
@@ -21,9 +23,14 @@ import {
 
 type HomeResponse = {
   ok?: boolean;
-  habilitado?: boolean;
+  precisaSelecionar?: boolean;
   resumo?: PortalResumo;
   error?: string;
+};
+
+type EmpresasResponse = {
+  ok?: boolean;
+  empresas?: PortalEmpresaOpcao[];
 };
 
 const CLASSIFICACAO_VISUAL: Record<
@@ -55,60 +62,94 @@ function hojeIso(): string {
 }
 
 export function PortalHome() {
-  const [habilitado, setHabilitado] = useState<boolean | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const clienteId = (searchParams.get("cliente") ?? "").trim();
+
+  const [empresas, setEmpresas] = useState<PortalEmpresaOpcao[]>([]);
   const [resumo, setResumo] = useState<PortalResumo>(portalResumoVazio);
+  const [carregandoEmpresas, setCarregandoEmpresas] = useState(true);
+  const [carregandoHome, setCarregandoHome] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [relatorioAberto, setRelatorioAberto] = useState(false);
 
-  const carregar = useCallback(async () => {
-    setErro(null);
-    try {
-      const res = await fetch("/api/portal/home", { cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as HomeResponse;
-      if (!res.ok) {
-        setErro(PORTAL_SEM_AVALIACAO_MSG);
-        setHabilitado(true);
-        setResumo(portalResumoVazio());
-        return;
+  const selecionarEmpresa = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (id) params.set("cliente", id);
+      else params.delete("cliente");
+      const qs = params.toString();
+      router.replace(qs ? `/portal?${qs}` : "/portal");
+    },
+    [router, searchParams]
+  );
+
+  useEffect(() => {
+    let cancel = false;
+    async function loadEmpresas() {
+      setCarregandoEmpresas(true);
+      try {
+        const res = await fetch("/api/portal/empresas", { cache: "no-store" });
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const json = (await res.json().catch(() => ({}))) as EmpresasResponse;
+        if (!cancel) setEmpresas(json.empresas ?? []);
+      } catch {
+        if (!cancel) setEmpresas([]);
+      } finally {
+        if (!cancel) setCarregandoEmpresas(false);
       }
-      setHabilitado(json.habilitado !== false);
-      setResumo(json.resumo ?? portalResumoVazio());
-    } catch {
-      setErro(PORTAL_SEM_AVALIACAO_MSG);
-      setHabilitado(true);
-      setResumo(portalResumoVazio());
     }
+    void loadEmpresas();
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   useEffect(() => {
-    void carregar();
-  }, [carregar]);
-
-  if (habilitado === null) {
-    return (
-      <PortalShell>
-        <p className="py-24 text-center text-sm text-[#64748b]">
-          Carregando painel...
-        </p>
-      </PortalShell>
-    );
-  }
-
-  if (!habilitado) {
-    return (
-      <PortalShell>
-        <EmptyState mensagem={PORTAL_NAO_HABILITADO_MSG} />
-      </PortalShell>
-    );
-  }
-
-  if (resumo.statusPortal === "sem_avaliacao") {
-    return (
-      <PortalShell>
-        <EmptyState mensagem={erro ?? PORTAL_SEM_AVALIACAO_MSG} />
-      </PortalShell>
-    );
-  }
+    let cancel = false;
+    async function loadHome() {
+      if (!clienteId) {
+        setResumo(portalResumoVazio());
+        setErro(null);
+        setCarregandoHome(false);
+        return;
+      }
+      setCarregandoHome(true);
+      setErro(null);
+      try {
+        const res = await fetch(
+          `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
+          { cache: "no-store" }
+        );
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const json = (await res.json().catch(() => ({}))) as HomeResponse;
+        if (cancel) return;
+        if (!res.ok) {
+          setResumo(portalResumoVazio());
+          setErro(PORTAL_SEM_AVALIACAO_MSG);
+          return;
+        }
+        setResumo(json.resumo ?? portalResumoVazio());
+      } catch {
+        if (!cancel) {
+          setResumo(portalResumoVazio());
+          setErro(PORTAL_SEM_AVALIACAO_MSG);
+        }
+      } finally {
+        if (!cancel) setCarregandoHome(false);
+      }
+    }
+    void loadHome();
+    return () => {
+      cancel = true;
+    };
+  }, [clienteId]);
 
   const pct = resumo.participacaoPercentual;
   const pesquisaAberta =
@@ -116,9 +157,38 @@ export function PortalHome() {
   const prazoFuturo =
     Boolean(resumo.dataEncerramento) && resumo.dataEncerramento! >= hojeIso();
   const temResultados = resumo.relatorioDisponivel;
+  const mostrarHome =
+    Boolean(clienteId) &&
+    !carregandoHome &&
+    resumo.statusPortal !== "sem_avaliacao";
 
   return (
     <PortalShell>
+      <PreviewBar
+        empresas={empresas}
+        clienteId={clienteId}
+        loading={carregandoEmpresas}
+        onChange={selecionarEmpresa}
+      />
+
+      {carregandoHome ? (
+        <p className="py-16 text-center text-sm text-[#64748b]">
+          Carregando painel...
+        </p>
+      ) : null}
+
+      {!carregandoHome && !clienteId ? (
+        <EmptyState mensagem={PORTAL_SELECIONE_EMPRESA_MSG} />
+      ) : null}
+
+      {!carregandoHome &&
+      clienteId &&
+      resumo.statusPortal === "sem_avaliacao" ? (
+        <EmptyState mensagem={erro ?? PORTAL_SEM_AVALIACAO_MSG} />
+      ) : null}
+
+      {mostrarHome ? (
+        <>
       <header className="border-b border-[#e8edf5] pb-8">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#94a3b8]">
           {resumo.empresaNome}
@@ -306,25 +376,56 @@ export function PortalHome() {
       {relatorioAberto ? (
         <RelatorioModal resumo={resumo} onClose={() => setRelatorioAberto(false)} />
       ) : null}
+        </>
+      ) : null}
     </PortalShell>
+  );
+}
+
+function PreviewBar({
+  empresas,
+  clienteId,
+  loading,
+  onChange,
+}: {
+  empresas: PortalEmpresaOpcao[];
+  clienteId: string;
+  loading: boolean;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
+          Modo de visualização
+        </p>
+        <p className="mt-1 text-xs text-[#64748b]">{PORTAL_PREVIEW_INTERNO_LABEL}</p>
+      </div>
+      <label className="flex min-w-[240px] flex-1 flex-col gap-1.5 sm:max-w-sm">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
+          Visualizar portal de
+        </span>
+        <select
+          className="h-10 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+          value={clienteId}
+          disabled={loading}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">Selecionar empresa</option>
+          {empresas.map((empresa) => (
+            <option key={empresa.id} value={empresa.id}>
+              {empresa.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }
 
 function PortalShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#f4f6fa] text-[#0b1f4d]">
-      <div className="border-b border-[#e8edf5] bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <NavarroLogo size="default" />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">
-            Portal do Cliente
-          </p>
-        </div>
-      </div>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-        {children}
-      </div>
-    </div>
+    <div className="flex flex-col gap-6 text-[#0b1f4d]">{children}</div>
   );
 }
 

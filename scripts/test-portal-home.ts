@@ -7,20 +7,24 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   PORTAL_DEV_CLIENTE_ID_ENV,
+  consolidarEmpresasPortalPreview,
   dtoContemCampoProibido,
   escolherCampanhaAtualPortal,
   estadoTimelinePortal,
+  isPerfilStaffNavarro,
   mapParticipacaoPortal,
   montarPortalResumo,
   participanteAtivoNoPortal,
   portalResumoVazio,
   resolvePortalDevClienteId,
+  resolverClienteIdPortalPreview,
   type PortalCampanhaFonte,
   type PortalParticipanteFonte,
   type PortalSnapshotFonte,
 } from "../lib/portal-cliente";
 import type { RiscosRelatorioResultadoJson } from "../lib/riscos-relatorio";
 import { NAV_SECTIONS } from "../lib/constants";
+import { canAccessPath } from "../lib/perfil-access";
 
 const root = process.cwd();
 
@@ -353,14 +357,16 @@ run("campanha atual: exclui cancelada e prefere aberta", () => {
   assert.equal(escolhida?.id, "aberta-atual");
 });
 
-run("API não aceita cliente_id na query", () => {
+run("API preview exige staff e valida cliente_id", () => {
   const api = readFileSync(
     join(root, "app/api/portal/home/route.ts"),
     "utf8"
   );
-  assert.doesNotMatch(api, /searchParams/);
-  assert.doesNotMatch(api, /cliente_id/);
+  assert.match(api, /requirePortalStaffUser/);
+  assert.match(api, /resolverClienteIdPortalPreview/);
+  assert.match(api, /cliente_id/);
   assert.match(api, /carregarPortalHome/);
+  assert.doesNotMatch(api, /PORTAL_DEV_CLIENTE_ID(?!_ENV)/);
 });
 
 run("serviço não consulta respostas/sessão/vínculo", () => {
@@ -384,6 +390,166 @@ run("menu admin tem atalho para /portal em Gestão Comercial", () => {
   assert.ok(comercial);
   const atalho = comercial!.items.find((i) => i.href === "/portal");
   assert.equal(atalho?.label, "Portal do Cliente");
+});
+
+run("staff admin e operacional acessam /portal", () => {
+  assert.equal(canAccessPath("admin", "/portal"), true);
+  assert.equal(canAccessPath("operacional", "/portal"), true);
+});
+
+run("UUID inválido na request não cai no fallback de env", () => {
+  const envId = "11111111-1111-4111-8111-111111111111";
+  const invalid = resolverClienteIdPortalPreview({
+    requestedClienteId: "nao-e-uuid",
+    envClienteId: envId,
+  });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.motivo, "uuid_invalido");
+
+  const fromEnv = resolverClienteIdPortalPreview({
+    requestedClienteId: "",
+    envClienteId: envId,
+  });
+  assert.equal(fromEnv.ok, true);
+  if (fromEnv.ok) {
+    assert.equal(fromEnv.clienteId, envId);
+    assert.equal(fromEnv.origem, "env");
+  }
+
+  const fromRequest = resolverClienteIdPortalPreview({
+    requestedClienteId: "22222222-2222-4222-8222-222222222222",
+    envClienteId: envId,
+  });
+  assert.equal(fromRequest.ok, true);
+  if (fromRequest.ok) {
+    assert.equal(fromRequest.clienteId, "22222222-2222-4222-8222-222222222222");
+    assert.equal(fromRequest.origem, "request");
+  }
+
+  const none = resolverClienteIdPortalPreview({
+    requestedClienteId: "",
+    envClienteId: "",
+  });
+  assert.equal(none.ok, true);
+  if (none.ok) {
+    assert.equal(none.clienteId, null);
+    assert.equal(none.origem, "none");
+  }
+});
+
+run("consolidar empresas: só campanha elegível, um por cliente", () => {
+  const navarro = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const al = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const soCancelada = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const empresas = consolidarEmpresasPortalPreview(
+    [
+      {
+        cliente_id: navarro,
+        empresa_nome: "Navarro campanha",
+        status: "aberta",
+      },
+      {
+        cliente_id: navarro,
+        empresa_nome: "Navarro outra",
+        status: "encerrada",
+      },
+      {
+        cliente_id: al,
+        empresa_nome: "AL campanha",
+        status: "em_preparacao",
+      },
+      {
+        cliente_id: soCancelada,
+        empresa_nome: "Só cancelada",
+        status: "cancelada",
+      },
+    ],
+    [
+      { id: navarro, nome: "NAVARRO ENGENHARIA" },
+      { id: al, nome: "AL ASSESSORIA" },
+    ]
+  );
+  assert.deepEqual(
+    empresas.map((e) => e.nome),
+    ["AL ASSESSORIA", "NAVARRO ENGENHARIA"]
+  );
+  assert.equal(empresas.length, 2);
+});
+
+run("troca de empresa não mistura dados", () => {
+  const a = montarPortalResumo({
+    campanha: campanha({
+      id: "camp-a",
+      status: "aberta",
+      empresa_nome: "NAVARRO ENGENHARIA",
+    }),
+    participantes: [{ nome_completo: "Ana Souza", status: "respondido" }],
+    snapshot: null,
+  });
+  const b = montarPortalResumo({
+    campanha: campanha({
+      id: "camp-b",
+      status: "em_preparacao",
+      empresa_nome: "ULTRAMED MEDICINA OCUPACIONAL",
+    }),
+    participantes: [
+      { nome_completo: "Bruno Lima", status: "pendente" },
+      { nome_completo: "Carla Dias", status: "pendente" },
+    ],
+    snapshot: null,
+  });
+  assert.equal(a.empresaNome, "NAVARRO ENGENHARIA");
+  assert.equal(a.campanhaId, "camp-a");
+  assert.equal(a.respondidos, 1);
+  assert.equal(b.empresaNome, "ULTRAMED MEDICINA OCUPACIONAL");
+  assert.equal(b.campanhaId, "camp-b");
+  assert.equal(b.respondidos, 0);
+  assert.equal(b.cadastrados, 2);
+  assert.notEqual(a.campanhaId, b.campanhaId);
+});
+
+run("somente staff Navarro no preview", () => {
+  assert.equal(isPerfilStaffNavarro("admin"), true);
+  assert.equal(isPerfilStaffNavarro("operacional"), true);
+  assert.equal(isPerfilStaffNavarro("admin", false), false);
+  assert.equal(isPerfilStaffNavarro("cliente"), false);
+  assert.equal(isPerfilStaffNavarro(null), false);
+});
+
+run("middleware não deixa /portal público", () => {
+  const mw = readFileSync(join(root, "middleware.ts"), "utf8");
+  assert.match(mw, /PUBLIC_PATHS = new Set\(\["\/login", "\/sem-permissao"\]\)/);
+  assert.doesNotMatch(mw, /pathname === "\/portal"/);
+  assert.doesNotMatch(mw, /pathname.startsWith\("\/api\/portal/);
+  assert.doesNotMatch(mw, /pathname.startsWith\("\/portal/);
+});
+
+run("APIs do portal exigem sessão staff", () => {
+  const home = readFileSync(
+    join(root, "app/api/portal/home/route.ts"),
+    "utf8"
+  );
+  const empresas = readFileSync(
+    join(root, "app/api/portal/empresas/route.ts"),
+    "utf8"
+  );
+  const staff = readFileSync(
+    join(root, "services/portal-staff.server.ts"),
+    "utf8"
+  );
+  const page = readFileSync(join(root, "app/portal/page.tsx"), "utf8");
+  const ui = readFileSync(
+    join(root, "components/portal-cliente/PortalHome.tsx"),
+    "utf8"
+  );
+  assert.match(staff, /is_staff_user/);
+  assert.match(staff, /isPerfilStaffNavarro/);
+  assert.match(home, /requirePortalStaffUser/);
+  assert.match(empresas, /requirePortalStaffUser/);
+  assert.match(page, /PerfilRouteGuard/);
+  assert.match(page, /AppShell/);
+  assert.match(ui, /Pré-visualização interna|PORTAL_PREVIEW_INTERNO_LABEL/);
+  assert.match(ui, /Visualizar portal de/);
 });
 
 console.log("test-portal-home: OK");

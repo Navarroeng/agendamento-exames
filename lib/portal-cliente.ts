@@ -22,6 +22,11 @@ export const PORTAL_SEM_AVALIACAO_MSG =
 export const PORTAL_PRIVACIDADE_AVISO =
   "Sua empresa pode acompanhar apenas a situação de participação dos colaboradores. As respostas individuais são confidenciais e os resultados são apresentados de forma consolidada.";
 
+export const PORTAL_SELECIONE_EMPRESA_MSG =
+  "Selecione uma empresa para visualizar o portal.";
+
+export const PORTAL_PREVIEW_INTERNO_LABEL = "Pré-visualização interna";
+
 export const PORTAL_RESULTADOS_AGUARDANDO_MSG =
   "Os resultados consolidados estarão disponíveis após a conclusão da avaliação e geração do relatório.";
 
@@ -145,13 +150,80 @@ export function isPortalUuid(value: string | null | undefined): boolean {
   return Boolean(value && UUID_RE.test(value.trim()));
 }
 
-/** Lê o cliente de desenvolvimento. Nunca usa query string. */
+/** Fallback local opcional. Produção usa o cliente escolhido pelo staff. */
 export function resolvePortalDevClienteId(
   env: Record<string, string | undefined> = process.env
 ): string | null {
   const raw = String(env[PORTAL_DEV_CLIENTE_ID_ENV] ?? "").trim();
   if (!isPortalUuid(raw)) return null;
   return raw;
+}
+
+export type PortalEmpresaOpcao = {
+  id: string;
+  nome: string;
+};
+
+export type ResolveClientePortalPreview =
+  | { ok: true; clienteId: string; origem: "request" | "env" }
+  | { ok: true; clienteId: null; origem: "none" }
+  | { ok: false; motivo: "uuid_invalido" };
+
+/**
+ * Cliente do preview interno.
+ * UUID inválido na request NÃO cai no fallback de ambiente (evita misturar empresas).
+ */
+export function resolverClienteIdPortalPreview(input: {
+  requestedClienteId?: string | null;
+  envClienteId?: string | null;
+}): ResolveClientePortalPreview {
+  const requested = String(input.requestedClienteId ?? "").trim();
+  if (requested) {
+    if (!isPortalUuid(requested)) return { ok: false, motivo: "uuid_invalido" };
+    return { ok: true, clienteId: requested, origem: "request" };
+  }
+  const envId = String(input.envClienteId ?? "").trim();
+  if (isPortalUuid(envId)) {
+    return { ok: true, clienteId: envId, origem: "env" };
+  }
+  return { ok: true, clienteId: null, origem: "none" };
+}
+
+export function isPerfilStaffNavarro(
+  perfil: string | null | undefined,
+  ativo: boolean | null | undefined = true
+): boolean {
+  if (ativo === false) return false;
+  return perfil === "admin" || perfil === "operacional";
+}
+
+/** Uma opção por cliente, só campanhas não canceladas. */
+export function consolidarEmpresasPortalPreview(
+  campanhas: ReadonlyArray<{
+    cliente_id?: string | null;
+    empresa_nome?: string | null;
+    status?: string | null;
+  }>,
+  clientes: ReadonlyArray<{ id: string; nome?: string | null }>
+): PortalEmpresaOpcao[] {
+  const nomesCadastro = new Map(
+    clientes.map((c) => [c.id, String(c.nome ?? "").trim()])
+  );
+  const porCliente = new Map<string, string>();
+  for (const campanha of campanhas) {
+    if (String(campanha.status ?? "") === "cancelada") continue;
+    const id = String(campanha.cliente_id ?? "").trim();
+    if (!isPortalUuid(id)) continue;
+    if (porCliente.has(id)) continue;
+    const nome =
+      nomesCadastro.get(id) ||
+      String(campanha.empresa_nome ?? "").trim() ||
+      "Empresa";
+    porCliente.set(id, nome);
+  }
+  return Array.from(porCliente.entries())
+    .map(([id, nome]) => ({ id, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 export function escolherCampanhaAtualPortal(

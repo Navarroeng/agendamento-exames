@@ -66,6 +66,12 @@ assert.deepEqual(
 assert.ok(!operacionalSections.some((s) => s.title === "Gestão"));
 assert.ok(!operacionalSections.some((s) => s.title === "Administração"));
 assert.ok(!operacionalSections.some((s) => s.title === "Operação"));
+assert.equal(
+  operacionalSections
+    .find((s) => s.title === "Gestão Comercial")
+    ?.items.find((i) => i.href === "/portal")?.label,
+  "Portal do Cliente"
+);
 
 assert.equal(canAccessPath("operacional", "/gestao-comercial"), false);
 assert.equal(canAccessPath("operacional", "/relatorios"), false);
@@ -75,8 +81,10 @@ assert.equal(canAccessPath("operacional", "/orcamentos"), true);
 assert.equal(canAccessPath("operacional", "/faturas-clientes"), true);
 assert.equal(canAccessPath("operacional", "/dashboard"), true);
 assert.equal(canAccessPath("operacional", "/e-social"), true);
+assert.equal(canAccessPath("operacional", "/portal"), true);
 
 assert.equal(canAccessPath("admin", "/gestao-comercial"), true);
 assert.equal(canAccessPath("admin", "/usuarios"), true);
+assert.equal(canAccessPath("admin", "/portal"), true);
 
 console.log("test-menu-permissoes-admin: OK");
