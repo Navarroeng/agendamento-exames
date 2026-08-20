@@ -3,6 +3,7 @@ import {
   acoesConvitePorStatus,
   campanhaExibeLinkConvite,
   campanhaPermiteCopiarLink,
+  isPesquisaEfetivamenteAberta,
   validateAbrirCampanhaRiscos,
   validateEncerrarCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
@@ -88,16 +89,20 @@ run("pré-requisitos: lista pendente bloqueia", () => {
 run("convite: em preparação não exibe link", () => {
   assert.equal(campanhaExibeLinkConvite("em_preparacao"), false);
   assert.equal(campanhaPermiteCopiarLink("em_preparacao"), false);
+  assert.equal(isPesquisaEfetivamenteAberta("em_preparacao"), false);
+  assert.equal(isPesquisaEfetivamenteAberta(null), false);
 });
 
 run("convite: aberta exibe e permite copiar", () => {
   assert.equal(campanhaExibeLinkConvite("aberta"), true);
   assert.equal(campanhaPermiteCopiarLink("aberta"), true);
+  assert.equal(isPesquisaEfetivamenteAberta("aberta"), true);
 });
 
 run("convite: encerrada exibe mas não copia", () => {
   assert.equal(campanhaExibeLinkConvite("encerrada"), true);
   assert.equal(campanhaPermiteCopiarLink("encerrada"), false);
+  assert.equal(isPesquisaEfetivamenteAberta("encerrada"), true);
 });
 
 run("ações: em_preparacao → Abrir sim, Encerrar não", () => {

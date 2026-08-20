@@ -170,7 +170,7 @@ run("progresso usa nova campanha; não herda da cancelada", () => {
   );
   // Cancelada descartada → sem campanha no progresso (cadastro/link não avançam).
   assert.equal(comCancelada.campanha, null);
-  assert.equal(comCancelada.etapaAtual, "cadastro_colaboradores");
+  assert.equal(comCancelada.etapaAtual, "abrir_pesquisa");
   assert.equal(comCancelada.progressoLabel, "2 de 6");
 
   const nova = campanha({

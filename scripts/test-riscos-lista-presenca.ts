@@ -142,7 +142,7 @@ assert.equal(
 );
 assert.equal(completa.etapasConcluidas, 2);
 assert.equal(completa.progressoLabel, `2 de ${RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS}`);
-assert.equal(completa.etapaAtual, "cadastro_colaboradores");
+assert.equal(completa.etapaAtual, "abrir_pesquisa");
 assert.equal(
   isRiscosEtapaLiberadaByFluxo(completa, "cadastro_colaboradores"),
   true

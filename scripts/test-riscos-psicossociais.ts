@@ -20,7 +20,7 @@ assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS.length, 6);
 assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS, 6);
 assert.equal(RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS, 5);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].id, "laudos_sst");
-assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].label, "Laudo SST Automático");
+assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].label, "Aguardando Laudos SST");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[0].automatica, true);
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].id, "lista_presenca");
 assert.equal(RISCOS_PSICOSSOCIAIS_ETAPAS[1].label, "Lista de Presença");
@@ -68,7 +68,7 @@ const riscosAguardando = buildRiscosPsicossociaisProcesso(laudosEmAndamento, {
 assert.equal(riscosAguardando.etapaAtual, "laudos_sst");
 assert.equal(
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosAguardando.etapaAtual],
-  "Laudo SST Automático"
+  "Aguardando Laudos SST"
 );
 assert.equal(riscosAguardando.laudosSstConcluido, false);
 assert.equal(riscosAguardando.etapasConcluidas, 0);
@@ -142,7 +142,11 @@ const riscosComLista = buildRiscosPsicossociaisProcesso(
   laudosConcluido,
   listaTracking
 );
-assert.equal(riscosComLista.etapaAtual, "cadastro_colaboradores");
+assert.equal(riscosComLista.etapaAtual, "abrir_pesquisa");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosComLista.etapaAtual],
+  "Abrir pesquisa"
+);
 assert.equal(riscosComLista.progressoLabel, "2 de 6");
 assert.equal(
   isRiscosEtapaLiberadaByFluxo(riscosComLista, "cadastro_colaboradores"),
@@ -181,7 +185,11 @@ const riscosCadastro = buildRiscosPsicossociaisProcesso(
     participantes: [{ status: "pendente" }],
   }
 );
-assert.equal(riscosCadastro.etapaAtual, "link_enviado");
+assert.equal(riscosCadastro.etapaAtual, "abrir_pesquisa");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosCadastro.etapaAtual],
+  "Abrir pesquisa"
+);
 assert.equal(riscosCadastro.progressoLabel, "3 de 6");
 
 const campanhaAberta = { ...campanhaPrep, status: "aberta" as const };
@@ -246,5 +254,41 @@ const riscosSemTracking = buildRiscosPsicossociaisProcesso(
 );
 assert.equal(riscosSemTracking.etapaAtual, "laudos_sst");
 assert.equal(riscosSemTracking.dataEntrada, "2026-08-12T15:00:00Z");
+
+// Lista recebida + campanha existente (código/link) SEM abrir ≠ Aguardando respostas.
+const campanhaComCodigoPrep = {
+  ...campanhaPrep,
+  codigo_publico: "XYZ999",
+  codigo_acesso_exibicao: "ABCD",
+};
+const riscosListaRecebidaSemAbrir = buildRiscosPsicossociaisProcesso(
+  laudosConcluido,
+  listaTracking,
+  campanhaComCodigoPrep,
+  { participantes: [{ status: "pendente" }, { status: "pendente" }] }
+);
+assert.equal(riscosListaRecebidaSemAbrir.etapaAtual, "abrir_pesquisa");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosListaRecebidaSemAbrir.etapaAtual],
+  "Abrir pesquisa"
+);
+assert.notEqual(riscosListaRecebidaSemAbrir.etapaAtual, "aguardando_respostas");
+assert.equal(riscosListaRecebidaSemAbrir.progressoLabel, "3 de 6");
+
+// Pesquisa aberta + respostas parciais permanece em Aguardando respostas.
+const riscosRespostasParciais = buildRiscosPsicossociaisProcesso(
+  laudosConcluido,
+  listaTracking,
+  campanhaAberta,
+  {
+    participantes: [{ status: "respondido" }, { status: "pendente" }],
+  }
+);
+assert.equal(riscosRespostasParciais.etapaAtual, "aguardando_respostas");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosRespostasParciais.etapaAtual],
+  "Aguardando respostas"
+);
+assert.equal(riscosRespostasParciais.progressoLabel, "4 de 6");
 
 console.log("test-riscos-psicossociais: OK");

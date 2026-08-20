@@ -23,7 +23,7 @@ import {
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
 import {
-  campanhaExibeLinkConvite,
+  isPesquisaEfetivamenteAberta,
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
 import {
@@ -41,8 +41,10 @@ import type { RiscosParticipanteStatus } from "@/lib/riscos-campanha-participant
 import { normalizeSearchText } from "@/lib/text-normalize";
 
 /**
- * Etapas do fluxo na UI (sem Laudo SST automático).
+ * Etapas do fluxo na UI (sem a etapa automática de Laudos SST).
  * Progresso é derivado de fatos reais — não de `tracking.etapas_concluidas`.
+ * A coluna ETAPA ATUAL não usa `cadastro_colaboradores`/`link_enviado`:
+ * após a lista recebida, exibe "Abrir pesquisa" até a pesquisa ser aberta.
  */
 export const RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS = [
   { id: "lista_presenca", label: "Lista de Presença" },
@@ -75,7 +77,7 @@ export type RiscosPsicossociaisEtapaPersistidaId =
 export const RISCOS_PSICOSSOCIAIS_ETAPAS = [
   {
     id: "laudos_sst",
-    label: "Laudo SST Automático",
+    label: "Aguardando Laudos SST",
     automatica: true as const,
   },
   ...RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.map((e) => ({
@@ -90,13 +92,14 @@ export type RiscosPsicossociaisEtapaId =
 /**
  * IDs da coluna ETAPA ATUAL. `lista_presenca` permanece no progresso/modal;
  * na listagem ela se desdobra em solicitar vs. já solicitada.
+ * `cadastro_colaboradores` e `link_enviado` continuam no progresso, mas a
+ * listagem unifica os dois em `abrir_pesquisa` até a pesquisa ser aberta.
  */
 export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
   "laudos_sst",
   "solicitar_lista_presenca",
   "lista_presenca_solicitada",
-  "cadastro_colaboradores",
-  "link_enviado",
+  "abrir_pesquisa",
   "aguardando_respostas",
   "finalizado",
 ] as const;
@@ -104,6 +107,8 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
 export type RiscosPsicossociaisEtapaAtualId =
   | (typeof RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM)[number]
   | "lista_presenca"
+  | "cadastro_colaboradores"
+  | "link_enviado"
   | "cancelado";
 
 export type RiscosPsicossociaisStatus =
@@ -127,6 +132,9 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   ) as Record<RiscosPsicossociaisEtapaId, string>),
   solicitar_lista_presenca: "Solicitar lista de presença",
   lista_presenca_solicitada: "Lista de presença solicitada",
+  abrir_pesquisa: "Abrir pesquisa",
+  cadastro_colaboradores: "Abrir pesquisa",
+  link_enviado: "Abrir pesquisa",
   cancelado: "Cancelado",
 };
 
@@ -274,6 +282,8 @@ export function isRiscosPsicossociaisEtapaAtualId(
       value
     ) ||
     value === "lista_presenca" ||
+    value === "cadastro_colaboradores" ||
+    value === "link_enviado" ||
     value === "cancelado"
   );
 }
@@ -292,6 +302,47 @@ export function isEtapaListaPresencaListagem(
     etapaId === "solicitar_lista_presenca" ||
     etapaId === "lista_presenca_solicitada"
   );
+}
+
+export function isEtapaAbrirPesquisaListagem(
+  etapaId: string | null | undefined
+): boolean {
+  return (
+    etapaId === "abrir_pesquisa" ||
+    etapaId === "cadastro_colaboradores" ||
+    etapaId === "link_enviado"
+  );
+}
+
+/** Destaca na barra de progresso a etapa correspondente à ETAPA ATUAL. */
+export function isEtapaBarraProgressoAtual(
+  etapaId: string,
+  etapaAtual: RiscosPsicossociaisEtapaAtualId,
+  etapaIndex: number,
+  etapasConcluidas: number
+): boolean {
+  if (etapaId === "lista_presenca" && isEtapaListaPresencaListagem(etapaAtual)) {
+    return true;
+  }
+  if (isEtapaAbrirPesquisaListagem(etapaAtual)) {
+    return (
+      (etapaId === "cadastro_colaboradores" || etapaId === "link_enviado") &&
+      etapaIndex === etapasConcluidas
+    );
+  }
+  return etapaId === etapaAtual;
+}
+
+export function labelEtapaAtualProcessoRiscos(
+  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual">
+): string {
+  if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
+    return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.cancelado;
+  }
+  if (processo.status === "concluido" || processo.etapaAtual === "finalizado") {
+    return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado;
+  }
+  return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual];
 }
 
 export function isRiscosEtapaAutomatica(
@@ -319,12 +370,17 @@ export function getTotalEtapasRiscosPorOrigem(
 /**
  * Posição da etapa atual na sequência da coluna ETAPA ATUAL.
  * `lista_presenca` legado conta como "Solicitar lista de presença".
+ * Cadastro/link enviado legado contam como "Abrir pesquisa".
  */
 export function indiceEtapaAtualRiscos(
   etapaId: RiscosPsicossociaisEtapaAtualId | string | null | undefined
 ): number {
   const id =
-    etapaId === "lista_presenca" ? "solicitar_lista_presenca" : etapaId;
+    etapaId === "lista_presenca"
+      ? "solicitar_lista_presenca"
+      : isEtapaAbrirPesquisaListagem(etapaId)
+        ? "abrir_pesquisa"
+        : etapaId;
   return RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM.findIndex((e) => e === id);
 }
 
@@ -337,11 +393,11 @@ export function isCadastroColaboradoresConcluido(input: {
   return Math.max(0, Number(input.participantesCadastrados) || 0) >= 1;
 }
 
-/** Link enviado: pesquisa aberta (ou já encerrada — link foi liberado). */
+/** Link enviado (progresso): pesquisa efetivamente aberta (ou já encerrada). */
 export function isLinkEnviadoConcluido(
   campanhaStatus: string | null | undefined
 ): boolean {
-  return campanhaExibeLinkConvite(campanhaStatus);
+  return isPesquisaEfetivamenteAberta(campanhaStatus);
 }
 
 /**
@@ -458,6 +514,11 @@ export function calcularProgressoEtapasRiscos(input: {
     etapasConcluidas = totalEtapas;
   } else if (etapaAtual === "lista_presenca") {
     etapaAtual = resolverEtapaAtualListaPresenca(input.listaPresenca);
+  } else if (
+    etapaAtual === "cadastro_colaboradores" ||
+    etapaAtual === "link_enviado"
+  ) {
+    etapaAtual = "abrir_pesquisa";
   }
 
   const etapasManuaisConcluidas = exigeLaudos

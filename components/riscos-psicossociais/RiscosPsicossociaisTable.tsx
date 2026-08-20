@@ -8,8 +8,8 @@ import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   getEtapasRiscosPorOrigem,
-  isEtapaListaPresencaListagem,
-  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
+  isEtapaBarraProgressoAtual,
+  labelEtapaAtualProcessoRiscos,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
   riscosPsicossociaisEtapaAtualBadgeClass,
   type RiscosPsicossociaisListagemStatus,
@@ -58,9 +58,12 @@ function ProgressoRiscos({
             !cancelado &&
             !concluida &&
             processo.etapasConcluidas < processo.totalEtapas &&
-            (etapa.id === processo.etapaAtual ||
-              (etapa.id === "lista_presenca" &&
-                isEtapaListaPresencaListagem(processo.etapaAtual)));
+            isEtapaBarraProgressoAtual(
+              etapa.id,
+              processo.etapaAtual,
+              index,
+              processo.etapasConcluidas
+            );
           const automatica = etapa.id === "laudos_sst";
           const tone = concluida
             ? automatica
@@ -201,13 +204,7 @@ export function RiscosPsicossociaisTable({
                           processo.status
                         )}
                       >
-                        {processo.status === "cancelado" ||
-                        processo.etapaAtual === "cancelado"
-                          ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.cancelado
-                          : processo.status === "concluido" ||
-                              processo.etapaAtual === "finalizado"
-                            ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado
-                            : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
+                        {labelEtapaAtualProcessoRiscos(processo)}
                       </span>
                     </td>
                     <td>

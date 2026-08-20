@@ -4,12 +4,12 @@ import { useMemo } from "react";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
-import {
-  RISCOS_CAMPANHA_STATUS_LABELS,
-} from "@/lib/riscos-campanha";
 import type { RiscosCampanhaParticipanteRecord } from "@/lib/riscos-campanha-participantes";
 import type { RiscosParticipanteInput } from "@/lib/riscos-campanha-participantes";
-import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
+import {
+  labelEtapaAtualProcessoRiscos,
+  type RiscosPsicossociaisProcesso,
+} from "@/lib/riscos-psicossociais";
 import { RiscosPainelCards } from "@/components/riscos-psicossociais/RiscosPainelCards";
 
 interface RiscosPsicossociaisPainelProps {
@@ -103,14 +103,10 @@ export function RiscosPsicossociaisPainel({
   const cnpjDisplay =
     cnpjDigits.length === 14 ? formatCNPJ(cnpjRaw) : cnpjRaw.trim() || "—";
 
-  const statusLabel = useMemo(() => {
-    if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
-      return "Cancelado";
-    }
-    if (!campanha) return "Em andamento";
-    if (!campanhaStatusSincronizado) return "Sincronizando…";
-    return RISCOS_CAMPANHA_STATUS_LABELS[campanha.status];
-  }, [campanha, campanhaStatusSincronizado, processo.status, processo.etapaAtual]);
+  const etapaAtualLabel = useMemo(
+    () => labelEtapaAtualProcessoRiscos(processo),
+    [processo]
+  );
 
   const progressoPct = Math.round(
     (processo.etapasConcluidas / Math.max(processo.totalEtapas, 1)) * 100
@@ -198,8 +194,8 @@ export function RiscosPsicossociaisPainel({
             </p>
           </div>
           <p className="text-xs font-semibold text-[#64748b]">
-            Status:{" "}
-            <span className="font-extrabold text-navy">{statusLabel}</span>
+            Etapa atual:{" "}
+            <span className="font-extrabold text-navy">{etapaAtualLabel}</span>
           </p>
         </div>
       </section>

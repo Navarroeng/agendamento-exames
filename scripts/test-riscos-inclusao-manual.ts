@@ -138,7 +138,7 @@ run("TESTE 4 Laudos não bloqueia fluxo manual", () => {
     tracking,
   });
   assert.equal(isRiscosEtapaLiberadaByFluxo(comLista, "cadastro_colaboradores"), true);
-  assert.equal(comLista.etapaAtual, "cadastro_colaboradores");
+  assert.equal(comLista.etapaAtual, "abrir_pesquisa");
   assert.equal(comLista.progressoLabel, "1 de 5");
 });
 

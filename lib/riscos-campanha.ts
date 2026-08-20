@@ -279,13 +279,24 @@ export function nomeArquivoQrCodePesquisa(
 }
 
 /**
+ * Pesquisa efetivamente aberta: a ação "Abrir pesquisa" persistiu
+ * `riscos_campanhas.status = aberta`. Encerrada também conta (já foi aberta).
+ * Existência de campanha, código ou link NÃO indica abertura.
+ */
+export function isPesquisaEfetivamenteAberta(
+  status: RiscosCampanhaStatus | string | null | undefined
+): boolean {
+  return status === "aberta" || status === "encerrada";
+}
+
+/**
  * Link/código no card Convites: só após abertura (ou encerrada, como info admin).
  * O codigo_publico pode existir no banco antes — a UX não deve divulgá-lo.
  */
 export function campanhaExibeLinkConvite(
   status: RiscosCampanhaStatus | string | null | undefined
 ): boolean {
-  return status === "aberta" || status === "encerrada";
+  return isPesquisaEfetivamenteAberta(status);
 }
 
 /** Copiar link só enquanto a pesquisa está aberta ao portal. */
