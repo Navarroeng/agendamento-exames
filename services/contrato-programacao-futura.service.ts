@@ -7,7 +7,7 @@ import {
   type ColaboradorSugestao,
   type CriarExameFuturoInput,
 } from "@/lib/contrato-programacao-futura";
-import { normalizeCpfDigits } from "@/lib/cpf";
+import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -288,12 +288,13 @@ export async function listarPeriodicosPendentesColaborador(params: {
   const supabase = createClient();
   const cliente = params.clienteNome.trim();
   const colaborador = params.colaborador.trim();
-  const cpf = params.colaboradorCpf
+  const cpfDigits = params.colaboradorCpf
     ? normalizeCpfDigits(params.colaboradorCpf)
     : "";
+  const cpf = isValidCPF(cpfDigits) ? cpfDigits : "";
   const tipoAso = (params.tipoAso ?? "").trim();
 
-  if (!cliente || (!colaborador && cpf.length !== 11)) return [];
+  if (!cliente || (!colaborador && !cpf)) return [];
 
   let query = supabase
     .from("periodicos_futuros")
@@ -302,8 +303,8 @@ export async function listarPeriodicosPendentesColaborador(params: {
     .order("proxima_data", { ascending: true })
     .limit(100);
 
-  if (cpf.length === 11) {
-    const masked = `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+  if (cpf) {
+    const masked = maskCPFInput(cpf);
     query = query.or(
       `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
     );
@@ -319,7 +320,7 @@ export async function listarPeriodicosPendentesColaborador(params: {
   let rows = (data ?? []) as PeriodicoFuturoRecord[];
   if (rows.length === 0) return [];
 
-  if (cpf.length === 11) {
+  if (cpf) {
     rows = rows.filter(
       (r) => normalizeCpfDigits(r.colaborador_cpf) === cpf
     );

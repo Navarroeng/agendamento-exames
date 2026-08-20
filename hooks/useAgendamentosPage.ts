@@ -170,7 +170,7 @@ import {
   vincularPeriodicoAoAgendamento,
 } from "@/services/contrato-programacao-futura.service";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeCpfDigits } from "@/lib/cpf";
+import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import {
   AGENDAMENTO_BLOQUEADO_FATURA_MSG,
   CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST,
@@ -1213,9 +1213,11 @@ export function useAgendamentosPage() {
         return false;
       }
 
-      const cpf = normalizeCpfDigits(form.colaborador_cpf);
-      if (cpf.length !== 11 && !form.colaborador.trim()) return false;
+      const cpfValido = isValidCPF(form.colaborador_cpf);
+      if (!cpfValido && !form.colaborador.trim()) return false;
       if (!form.cliente_nome.trim()) return false;
+
+      const cpf = cpfValido ? normalizeCpfDigits(form.colaborador_cpf) : "";
 
       const alertKey = `${cpf}|${form.cliente_nome.trim().toLowerCase()}|${form.aso.trim().toLowerCase()}`;
       if (
@@ -1230,7 +1232,7 @@ export function useAgendamentosPage() {
         const pendentes = await listarPeriodicosPendentesColaborador({
           clienteNome: form.cliente_nome,
           colaborador: form.colaborador,
-          colaboradorCpf: form.colaborador_cpf,
+          colaboradorCpf: cpfValido ? form.colaborador_cpf : null,
           tipoAso: form.aso || null,
         });
         if (pendentes.length === 0) {
@@ -2658,6 +2660,7 @@ export function useAgendamentosPage() {
               const criados = await criarPeriodicosDeAgendamento(editingId, {
                 cliente_nome: payload.cliente_nome,
                 colaborador: payload.colaborador,
+                colaborador_cpf: payload.colaborador_cpf,
                 cargo_id: cargoFields.cargo_id,
                 cargo_nome: cargoFields.cargo_nome ?? null,
                 data_agendamento: dataIso,
@@ -2775,6 +2778,7 @@ export function useAgendamentosPage() {
               const criados = await criarPeriodicosDeAgendamento(novoId, {
                 cliente_nome: payload.cliente_nome,
                 colaborador: payload.colaborador,
+                colaborador_cpf: payload.colaborador_cpf,
                 cargo_id: cargoFields.cargo_id,
                 cargo_nome: cargoFields.cargo_nome ?? null,
                 data_agendamento: dataIso,

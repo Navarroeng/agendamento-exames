@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { IconClock } from "@/components/ui/icons/OutlineIcons";
 import { usePeriodicosFuturosPage } from "@/hooks/usePeriodicosFuturosPage";
+import { PeriodicoAdicionarCpfModal } from "./PeriodicoAdicionarCpfModal";
 import { PeriodicoEditarProximaDataModal } from "./PeriodicoEditarProximaDataModal";
 import { PeriodicosFuturosCards } from "./PeriodicosFuturosCards";
 import { PeriodicosFuturosFilters } from "./PeriodicosFuturosFilters";
@@ -24,6 +25,8 @@ export function PeriodicosFuturosPage() {
     totalPages,
     activeCard,
     editProximaDataRecord,
+    adicionarCpfGrupo,
+    adicionarCpfError,
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
@@ -37,6 +40,9 @@ export function PeriodicosFuturosPage() {
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
+    handleAbrirAdicionarCpf,
+    handleFecharAdicionarCpf,
+    handleSalvarCpf,
     canActOnRecord,
   } = usePeriodicosFuturosPage();
 
@@ -79,6 +85,7 @@ export function PeriodicosFuturosPage() {
           onMarcarReagendado={handleMarcarReagendado}
           onCancelarAcompanhamento={handleCancelarAcompanhamento}
           onVisualizarAgendamento={handleVisualizarAgendamento}
+          onAdicionarCpf={handleAbrirAdicionarCpf}
         />
       </div>
 
@@ -112,6 +119,14 @@ export function PeriodicosFuturosPage() {
         saving={saving}
         onClose={handleFecharEditarProximaData}
         onSave={handleSalvarProximaData}
+      />
+      <PeriodicoAdicionarCpfModal
+        open={Boolean(adicionarCpfGrupo)}
+        grupo={adicionarCpfGrupo}
+        saving={saving}
+        error={adicionarCpfError}
+        onClose={handleFecharAdicionarCpf}
+        onSave={handleSalvarCpf}
       />
     </AppShell>
   );

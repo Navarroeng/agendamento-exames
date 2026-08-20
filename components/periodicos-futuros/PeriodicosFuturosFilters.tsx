@@ -41,7 +41,7 @@ export function PeriodicosFuturosFilters({
         <p className="text-[11px] font-medium text-[#94a3b8]">
           {loading
             ? "Carregando registros..."
-            : `${totalFiltrados} registro${totalFiltrados !== 1 ? "s" : ""} no filtro atual`}
+            : `${totalFiltrados} periódico${totalFiltrados === 1 ? "" : "s"} futuro${totalFiltrados === 1 ? "" : "s"} no filtro atual`}
         </p>
         <button
           type="button"

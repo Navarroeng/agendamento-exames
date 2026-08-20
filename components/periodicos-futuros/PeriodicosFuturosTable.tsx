@@ -9,13 +9,13 @@ import {
 } from "@/lib/contrato-programacao-futura";
 import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
-import type { PeriodicoFuturoRow } from "@/lib/types";
+import type { PeriodicoFuturoGrupo } from "@/lib/periodico-agrupamento";
 import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import type { YearMonth } from "@/lib/listagem-meses";
 import { PeriodicoRowActionsMenu } from "./PeriodicoRowActionsMenu";
 
 interface PeriodicosFuturosTableProps {
-  records: PeriodicoFuturoRow[];
+  records: PeriodicoFuturoGrupo[];
   loading: boolean;
   error: string | null;
   saving: boolean;
@@ -23,11 +23,12 @@ interface PeriodicosFuturosTableProps {
   anosDisponiveis: number[];
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
-  canActOnRecord: (record: PeriodicoFuturoRow) => boolean;
-  onCriarAgendamento: (record: PeriodicoFuturoRow) => void;
-  onEditarProximaData: (record: PeriodicoFuturoRow) => void;
-  onMarcarReagendado: (id: string) => void;
-  onCancelarAcompanhamento: (id: string) => void;
+  canActOnRecord: (record: PeriodicoFuturoGrupo) => boolean;
+  onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
+  onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
+  onAdicionarCpf: (record: PeriodicoFuturoGrupo) => void;
+  onMarcarReagendado: (ids: string[]) => void;
+  onCancelarAcompanhamento: (ids: string[]) => void;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
 }
 
@@ -43,6 +44,7 @@ export function PeriodicosFuturosTable({
   canActOnRecord,
   onCriarAgendamento,
   onEditarProximaData,
+  onAdicionarCpf,
   onMarcarReagendado,
   onCancelarAcompanhamento,
   onVisualizarAgendamento,
@@ -100,7 +102,7 @@ export function PeriodicosFuturosTable({
                   (record.status === "reagendado" || Boolean(record.antecipado));
                 return (
                   <tr
-                    key={record.id}
+                    key={record.grupoKey}
                     className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#fafbfc]"
                   >
                     <td className="px-3 py-2.5 font-medium text-navy">
@@ -108,11 +110,23 @@ export function PeriodicosFuturosTable({
                     </td>
                     <td className="px-3 py-2.5">{record.colaborador}</td>
                     <td className="px-3 py-2.5 tabular-nums">
-                      {formatCPF(record.colaborador_cpf)}
+                      {record.temCpf ? (
+                        formatCPF(record.colaborador_cpf)
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-left text-[11px] font-semibold text-brand-blue hover:underline disabled:opacity-50"
+                          disabled={saving}
+                          onClick={() => onAdicionarCpf(record)}
+                          title="Informar CPF deste colaborador"
+                        >
+                          Adicionar CPF
+                        </button>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">{record.cargo_nome ?? "—"}</td>
                     <td className="px-3 py-2.5">
-                      {record.tipo_aso || record.exame_nome}
+                      <span title={record.examesTitulo}>{record.examesLabel}</span>
                     </td>
                     <td className="px-3 py-2.5 tabular-nums">
                       {record.dataRealizadaBR}
@@ -174,6 +188,7 @@ export function PeriodicosFuturosTable({
                         onCriarAgendamento={onCriarAgendamento}
                         onVisualizarAgendamento={onVisualizarAgendamento}
                         onEditarProximaData={onEditarProximaData}
+                        onAdicionarCpf={onAdicionarCpf}
                         onReagendar={onMarcarReagendado}
                         onCancelar={onCancelarAcompanhamento}
                       />

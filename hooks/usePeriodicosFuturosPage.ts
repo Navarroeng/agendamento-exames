@@ -7,16 +7,19 @@ import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
 import {
   EMPTY_PERIODICO_FUTURO_FILTERS,
-  canEditarProximaDataPeriodico,
-  countPeriodicosByDisplayStatus,
   extractPeriodicoFilterOptions,
-  filterPeriodicosFuturos,
   filterPeriodicosFuturosPorMes,
-  isPeriodicoActionable,
   listPeriodicoAnosDisponiveis,
   resolveInitialMesPeriodicos,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
+import {
+  agruparPeriodicosPorColaboradorCiclo,
+  countPeriodicoGruposByDisplayStatus,
+  filterPeriodicoGrupos,
+  isExameClinico,
+  type PeriodicoFuturoGrupo,
+} from "@/lib/periodico-agrupamento";
 import {
   resolveMesParaAno,
   type YearMonth,
@@ -31,7 +34,9 @@ import {
   atualizarProximaDataPeriodico,
   listarPeriodicosFuturos,
   marcarPeriodicoReagendado,
+  regularizarCpfPeriodicosFuturos,
 } from "@/services/periodico-futuro.service";
+import { PeriodicoCpfConflitoError } from "@/lib/periodico-cpf-regularizacao";
 
 const PAGE_SIZE = 20;
 
@@ -54,7 +59,12 @@ export function usePeriodicosFuturosPage() {
     resolveInitialMesPeriodicos([])
   );
   const [editProximaDataRecord, setEditProximaDataRecord] =
-    useState<PeriodicoFuturoRow | null>(null);
+    useState<PeriodicoFuturoGrupo | null>(null);
+  const [adicionarCpfGrupo, setAdicionarCpfGrupo] =
+    useState<PeriodicoFuturoGrupo | null>(null);
+  const [adicionarCpfError, setAdicionarCpfError] = useState<string | null>(
+    null
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,6 +107,11 @@ export function usePeriodicosFuturosPage() {
     [records, mesSelecionado]
   );
 
+  const gruposDoMes = useMemo(
+    () => agruparPeriodicosPorColaboradorCiclo(recordsDoMes),
+    [recordsDoMes]
+  );
+
   const filterOptions = useMemo(
     () => extractPeriodicoFilterOptions(recordsDoMes),
     [recordsDoMes]
@@ -108,12 +123,12 @@ export function usePeriodicosFuturosPage() {
       mesReferencia: "",
       status: activeCard || filters.status,
     };
-    return filterPeriodicosFuturos(recordsDoMes, mergedFilters);
-  }, [recordsDoMes, filters, activeCard]);
+    return filterPeriodicoGrupos(gruposDoMes, mergedFilters);
+  }, [gruposDoMes, filters, activeCard]);
 
   const counts = useMemo(
-    () => countPeriodicosByDisplayStatus(recordsDoMes),
-    [recordsDoMes]
+    () => countPeriodicoGruposByDisplayStatus(gruposDoMes),
+    [gruposDoMes]
   );
 
   const totalPages = useMemo(
@@ -163,14 +178,17 @@ export function usePeriodicosFuturosPage() {
   }, []);
 
   const handleCriarAgendamento = useCallback(
-    (record: PeriodicoFuturoRow) => {
+    (record: PeriodicoFuturoGrupo) => {
       saveAgendamentoPrefill({
         cliente_nome: record.cliente_nome,
         colaborador: record.colaborador,
         colaborador_cpf: record.colaborador_cpf ?? undefined,
         cargo_id: record.cargo_id ?? undefined,
         cargo_nome: record.cargo_nome ?? undefined,
-        exame_nome: record.exame_nome,
+        exame_nome:
+          record.examesNomes.find((nome) => isExameClinico(nome)) ??
+          record.examesNomes[0] ??
+          record.exame_nome,
         aso: record.tipo_aso || "Periódico",
       });
       router.push("/");
@@ -186,11 +204,17 @@ export function usePeriodicosFuturosPage() {
   );
 
   const handleMarcarReagendado = useCallback(
-    async (id: string) => {
+    async (ids: string[]) => {
       setSaving(true);
       try {
-        await marcarPeriodicoReagendado(id, auditOptions);
-        toast.success("Marcado como reagendado.");
+        for (const id of ids) {
+          await marcarPeriodicoReagendado(id, auditOptions);
+        }
+        toast.success(
+          ids.length > 1
+            ? "Periódicos do ciclo marcados como reagendados."
+            : "Marcado como reagendado."
+        );
         await refresh();
       } catch (err) {
         console.error(err);
@@ -203,11 +227,17 @@ export function usePeriodicosFuturosPage() {
   );
 
   const handleCancelarAcompanhamento = useCallback(
-    async (id: string) => {
+    async (ids: string[]) => {
       setSaving(true);
       try {
-        await cancelarAcompanhamentoPeriodico(id, auditOptions);
-        toast.success("Acompanhamento cancelado.");
+        for (const id of ids) {
+          await cancelarAcompanhamentoPeriodico(id, auditOptions);
+        }
+        toast.success(
+          ids.length > 1
+            ? "Acompanhamentos do ciclo cancelados."
+            : "Acompanhamento cancelado."
+        );
         await refresh();
       } catch (err) {
         console.error(err);
@@ -220,8 +250,8 @@ export function usePeriodicosFuturosPage() {
   );
 
   const handleAbrirEditarProximaData = useCallback(
-    (record: PeriodicoFuturoRow) => {
-      if (!canEditarProximaDataPeriodico(record)) {
+    (record: PeriodicoFuturoGrupo) => {
+      if (!record.podeEditarProximaData) {
         toast.error(
           "Não é possível editar a próxima data de um periódico já realizado."
         );
@@ -239,9 +269,18 @@ export function usePeriodicosFuturosPage() {
 
   const handleSalvarProximaData = useCallback(
     async (id: string, novaDataIso: string) => {
+      const ids = editProximaDataRecord?.ids?.length
+        ? editProximaDataRecord.ids
+        : [id];
       setSaving(true);
       try {
-        await atualizarProximaDataPeriodico(id, novaDataIso, auditOptions);
+        for (const periodicoId of ids) {
+          await atualizarProximaDataPeriodico(
+            periodicoId,
+            novaDataIso,
+            auditOptions
+          );
+        }
         toast.success("Próxima data atualizada.");
         setEditProximaDataRecord(null);
         await refresh();
@@ -256,11 +295,58 @@ export function usePeriodicosFuturosPage() {
         setSaving(false);
       }
     },
-    [refresh, auditOptions]
+    [refresh, auditOptions, editProximaDataRecord]
+  );
+
+  const handleAbrirAdicionarCpf = useCallback((grupo: PeriodicoFuturoGrupo) => {
+    if (grupo.temCpf) return;
+    setAdicionarCpfError(null);
+    setAdicionarCpfGrupo(grupo);
+  }, []);
+
+  const handleFecharAdicionarCpf = useCallback(() => {
+    if (saving) return;
+    setAdicionarCpfGrupo(null);
+    setAdicionarCpfError(null);
+  }, [saving]);
+
+  const handleSalvarCpf = useCallback(
+    async (grupo: PeriodicoFuturoGrupo, cpf: string) => {
+      setSaving(true);
+      setAdicionarCpfError(null);
+      try {
+        await regularizarCpfPeriodicosFuturos({
+          periodicoIds: grupo.ids,
+          cpf,
+          colaborador: grupo.colaborador,
+          clienteNome: grupo.cliente_nome,
+          cargoId: grupo.cargo_id,
+          cargoNome: grupo.cargo_nome,
+          contratoId: grupo.contrato_id,
+          auditOptions,
+        });
+        toast.success("CPF regularizado. O colaborador passa a ser identificado por este CPF.");
+        setAdicionarCpfGrupo(null);
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof PeriodicoCpfConflitoError
+            ? err.message
+            : err instanceof Error && err.message
+              ? err.message
+              : "Não foi possível salvar o CPF.";
+        setAdicionarCpfError(message);
+        toast.error(message);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [auditOptions, refresh]
   );
 
   const canActOnRecord = useCallback(
-    (record: PeriodicoFuturoRow) => isPeriodicoActionable(record.status),
+    (record: PeriodicoFuturoGrupo) => record.temAcaoAtiva,
     []
   );
 
@@ -280,6 +366,8 @@ export function usePeriodicosFuturosPage() {
     totalPages,
     activeCard,
     editProximaDataRecord,
+    adicionarCpfGrupo,
+    adicionarCpfError,
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
@@ -293,6 +381,9 @@ export function usePeriodicosFuturosPage() {
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
+    handleAbrirAdicionarCpf,
+    handleFecharAdicionarCpf,
+    handleSalvarCpf,
     canActOnRecord,
     refresh,
   };

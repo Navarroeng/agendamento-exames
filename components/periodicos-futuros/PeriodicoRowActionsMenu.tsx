@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
-import type { PeriodicoFuturoRow } from "@/lib/types";
+import type { PeriodicoFuturoGrupo } from "@/lib/periodico-agrupamento";
 
 interface PeriodicoRowActionsMenuProps {
-  record: PeriodicoFuturoRow;
+  record: PeriodicoFuturoGrupo;
   canAct: boolean;
   disabled?: boolean;
-  onCriarAgendamento: (record: PeriodicoFuturoRow) => void;
+  onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
-  onEditarProximaData: (record: PeriodicoFuturoRow) => void;
-  onReagendar: (id: string) => void;
-  onCancelar: (id: string) => void;
+  onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
+  onAdicionarCpf?: (record: PeriodicoFuturoGrupo) => void;
+  onReagendar: (ids: string[]) => void;
+  onCancelar: (ids: string[]) => void;
 }
 
 type MenuItem = {
@@ -28,6 +28,7 @@ export function PeriodicoRowActionsMenu({
   onCriarAgendamento,
   onVisualizarAgendamento,
   onEditarProximaData,
+  onAdicionarCpf,
   onReagendar,
   onCancelar,
 }: PeriodicoRowActionsMenuProps) {
@@ -52,7 +53,7 @@ export function PeriodicoRowActionsMenu({
     Boolean(record.agendamento_id) &&
     Boolean(onVisualizarAgendamento);
 
-  const podeEditarProximaData = canEditarProximaDataPeriodico(record);
+  const podeEditarProximaData = record.podeEditarProximaData;
 
   const items: MenuItem[] = [];
 
@@ -66,6 +67,10 @@ export function PeriodicoRowActionsMenu({
         ? { key: "ver", label: "Ver agendamento" }
         : { key: "criar", label: "Criar agendamento" }
     );
+  }
+
+  if (onAdicionarCpf && !record.temCpf) {
+    items.push({ key: "cpf", label: "Adicionar CPF" });
   }
 
   if (canAct) {
@@ -95,14 +100,17 @@ export function PeriodicoRowActionsMenu({
         }
         break;
       case "editar_data":
-        if (!canEditarProximaDataPeriodico(record)) return;
+        if (!record.podeEditarProximaData) return;
         onEditarProximaData(record);
         break;
+      case "cpf":
+        onAdicionarCpf?.(record);
+        break;
       case "reagendar":
-        onReagendar(record.id);
+        onReagendar(record.ids);
         break;
       case "cancelar":
-        onCancelar(record.id);
+        onCancelar(record.ids);
         break;
     }
   }

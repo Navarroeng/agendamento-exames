@@ -17,10 +17,22 @@ import {
 } from "@/lib/cargo-periodico";
 import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
 import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
+import {
+  nomesColaboradorEquivalentes,
+  normalizeIdentidadeColaborador,
+} from "@/lib/periodico-agrupamento";
+import {
+  PeriodicoCpfConflitoError,
+  resolverConflitoCpfRegularizacao,
+  validarCpfRegularizacaoPeriodico,
+  type PeriodicoCpfConflito,
+} from "@/lib/periodico-cpf-regularizacao";
+import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
   colaborador: string;
+  colaborador_cpf?: string | null;
   cargo_id: string;
   cargo_nome: string | null;
   data_agendamento: string;
@@ -89,12 +101,16 @@ export async function criarPeriodicosDeAgendamento(
   const dataRealizada = params.data_agendamento.split("T")[0];
   const proximaData = computeProximaDataPeriodico(dataRealizada, validade);
 
+  const cpfDigits = normalizeCpfDigits(params.colaborador_cpf);
+  const cpf = isValidCPF(cpfDigits) ? cpfDigits : null;
+
   const rows = examesCargo
     .filter((exame) => tiposAgendamento.has(exame.nome.trim().toLowerCase()))
     .map((exame) => ({
       agendamento_id: agendamentoId,
       cliente_nome: params.cliente_nome.trim(),
       colaborador: params.colaborador.trim(),
+      colaborador_cpf: cpf,
       cargo_id: params.cargo_id,
       cargo_nome: params.cargo_nome,
       exame_id: exame.id,
@@ -320,4 +336,229 @@ export async function atualizarProximaDataPeriodico(
   );
 
   return updated as PeriodicoFuturoRecord;
+}
+
+export async function regularizarCpfPeriodicosFuturos(params: {
+  periodicoIds: string[];
+  cpf: string;
+  colaborador: string;
+  clienteNome: string;
+  cargoId?: string | null;
+  cargoNome?: string | null;
+  contratoId?: string | null;
+  auditOptions?: PeriodicoAuditOptions;
+}): Promise<{ atualizados: number }> {
+  const validado = validarCpfRegularizacaoPeriodico(params.cpf);
+  if (!validado.ok) {
+    throw new Error(validado.message);
+  }
+  const { digits, masked } = validado;
+  const ids = Array.from(new Set(params.periodicoIds.filter(Boolean)));
+  if (ids.length === 0) {
+    throw new Error("Nenhum periódico selecionado para regularizar o CPF.");
+  }
+
+  const supabase = createClient();
+  const ocorrencias: Array<{
+    colaborador: string;
+    cliente_nome: string;
+    origem: PeriodicoCpfConflito["origem"];
+  }> = [];
+
+  const { data: periodicosCpf, error: perErr } = await supabase
+    .from("periodicos_futuros")
+    .select("id, colaborador, cliente_nome, colaborador_cpf")
+    .or(`colaborador_cpf.eq.${digits},colaborador_cpf.eq."${masked}"`);
+  if (perErr) throw perErr;
+  for (const row of periodicosCpf ?? []) {
+    if (normalizeCpfDigits(row.colaborador_cpf as string | null) !== digits) {
+      continue;
+    }
+    ocorrencias.push({
+      colaborador: String(row.colaborador ?? ""),
+      cliente_nome: String(row.cliente_nome ?? ""),
+      origem: "periodico",
+    });
+  }
+
+  const { data: agsCpf, error: agErr } = await supabase
+    .from("agendamentos")
+    .select("id, colaborador, cliente_nome, colaborador_cpf")
+    .eq("colaborador_cpf_digits", digits);
+  if (agErr) throw agErr;
+  for (const row of agsCpf ?? []) {
+    ocorrencias.push({
+      colaborador: String(row.colaborador ?? ""),
+      cliente_nome: String(row.cliente_nome ?? ""),
+      origem: "agendamento",
+    });
+  }
+
+  const { data: vagasCpf, error: vagasCpfErr } = await supabase
+    .from("contrato_vagas")
+    .select("colaborador, colaborador_cpf")
+    .or(`colaborador_cpf.eq.${digits},colaborador_cpf.eq."${masked}"`);
+  if (!vagasCpfErr) {
+    for (const row of vagasCpf ?? []) {
+      if (normalizeCpfDigits(row.colaborador_cpf as string | null) !== digits) {
+        continue;
+      }
+      if (!String(row.colaborador ?? "").trim()) continue;
+      ocorrencias.push({
+        colaborador: String(row.colaborador ?? ""),
+        cliente_nome: "Lista de funcionários do contrato",
+        origem: "vaga",
+      });
+    }
+  }
+
+  const conflito = resolverConflitoCpfRegularizacao({
+    colaboradorAtual: params.colaborador,
+    ocorrencias,
+  });
+  if (conflito) {
+    throw new PeriodicoCpfConflitoError(conflito);
+  }
+
+  const { data: grupoRows, error: grupoErr } = await supabase
+    .from("periodicos_futuros")
+    .select(
+      "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
+    )
+    .in("id", ids);
+  if (grupoErr) throw grupoErr;
+  const grupo = (grupoRows ?? []) as Array<{
+    id: string;
+    agendamento_id: string | null;
+    contrato_id: string | null;
+    cliente_nome: string;
+    colaborador: string;
+    cargo_id: string | null;
+    cargo_nome: string | null;
+    colaborador_cpf: string | null;
+  }>;
+  if (grupo.length === 0) {
+    throw new Error("Periódico futuro não encontrado.");
+  }
+  if (grupo.some((row) => isValidCPF(row.colaborador_cpf))) {
+    throw new Error("Este agrupamento já possui CPF. A alteração de CPF existente não é permitida nesta tela.");
+  }
+
+  const empresaNorm = normalizeIdentidadeColaborador(params.clienteNome);
+  const nomeNorm = normalizeIdentidadeColaborador(params.colaborador);
+  const cargoId = (params.cargoId ?? grupo[0].cargo_id ?? "").trim();
+  const cargoNomeNorm = normalizeIdentidadeColaborador(
+    params.cargoNome ?? grupo[0].cargo_nome
+  );
+
+  const { data: irmaos, error: irmaosErr } = await supabase
+    .from("periodicos_futuros")
+    .select(
+      "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
+    )
+    .eq("cliente_nome", grupo[0].cliente_nome);
+  if (irmaosErr) throw irmaosErr;
+
+  const idsParaAtualizar = new Set(ids);
+  const agendamentoIds = new Set<string>();
+  const contratoIds = new Set<string>();
+
+  for (const row of [...grupo, ...(irmaos ?? [])]) {
+    const cpfAtual = normalizeCpfDigits(row.colaborador_cpf as string | null);
+    if (cpfAtual && cpfAtual !== digits) continue;
+    if (cpfAtual === digits) {
+      idsParaAtualizar.add(String(row.id));
+      continue;
+    }
+    if (normalizeIdentidadeColaborador(row.cliente_nome) !== empresaNorm) {
+      continue;
+    }
+    if (normalizeIdentidadeColaborador(row.colaborador) !== nomeNorm) {
+      continue;
+    }
+    const rowCargoId = String(row.cargo_id ?? "").trim();
+    const mesmoCargo = cargoId
+      ? rowCargoId === cargoId
+      : normalizeIdentidadeColaborador(row.cargo_nome) === cargoNomeNorm;
+    if (!mesmoCargo) continue;
+    idsParaAtualizar.add(String(row.id));
+    if (row.agendamento_id) agendamentoIds.add(String(row.agendamento_id));
+    if (row.contrato_id) contratoIds.add(String(row.contrato_id));
+  }
+
+  for (const row of grupo) {
+    if (row.agendamento_id) agendamentoIds.add(row.agendamento_id);
+    if (row.contrato_id) contratoIds.add(row.contrato_id);
+  }
+
+  const { error: updPerErr } = await supabase
+    .from("periodicos_futuros")
+    .update({ colaborador_cpf: digits })
+    .in("id", Array.from(idsParaAtualizar));
+  if (updPerErr) throw updPerErr;
+
+  if (agendamentoIds.size > 0) {
+    const { data: ags, error: agLoadErr } = await supabase
+      .from("agendamentos")
+      .select("id, colaborador_cpf")
+      .in("id", Array.from(agendamentoIds));
+    if (agLoadErr) throw agLoadErr;
+    const agsSemCpf = (ags ?? []).filter(
+      (row) => !isValidCPF(row.colaborador_cpf as string | null)
+    );
+    if (agsSemCpf.length > 0) {
+      const { error: updAgErr } = await supabase
+        .from("agendamentos")
+        .update({ colaborador_cpf: masked })
+        .in(
+          "id",
+          agsSemCpf.map((row) => String(row.id))
+        );
+      if (updAgErr) throw updAgErr;
+    }
+  }
+
+  const contratoAlvo =
+    params.contratoId?.trim() ||
+    (contratoIds.size === 1 ? Array.from(contratoIds)[0] : "");
+  if (contratoAlvo) {
+    const { data: vagas, error: vagasErr } = await supabase
+      .from("contrato_vagas")
+      .select("id, colaborador, colaborador_cpf")
+      .eq("contrato_id", contratoAlvo);
+    if (!vagasErr) {
+      const candidatas = (vagas ?? []).filter((vaga) => {
+        if (isValidCPF(vaga.colaborador_cpf as string | null)) return false;
+        return nomesColaboradorEquivalentes(
+          vaga.colaborador as string | null,
+          params.colaborador
+        );
+      });
+      const cpfJaNaLista = (vagas ?? []).some(
+        (vaga) => normalizeCpfDigits(vaga.colaborador_cpf as string | null) === digits
+      );
+      if (candidatas.length === 1 && !cpfJaNaLista) {
+        await supabase
+          .from("contrato_vagas")
+          .update({ colaborador_cpf: digits })
+          .eq("id", candidatas[0].id)
+          .is("colaborador_cpf", null);
+      }
+    }
+  }
+
+  const nome = params.auditOptions?.auditContext?.usuarioNome ?? "Sistema";
+  await registrarAuditoria({
+    usuarioId: params.auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: params.auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.periodicos_futuros,
+    acao: AUDITORIA_ACOES.periodico_cpf_regularizado,
+    registroId: ids[0],
+    registroNome: params.colaborador,
+    descricao: `${nome} regularizou o CPF de ${params.colaborador} (${params.clienteNome}) em ${idsParaAtualizar.size} periódico(s) futuro(s).`,
+    dadosDepois: { colaborador_cpf: masked, ids: Array.from(idsParaAtualizar) },
+  });
+
+  return { atualizados: idsParaAtualizar.size };
 }
