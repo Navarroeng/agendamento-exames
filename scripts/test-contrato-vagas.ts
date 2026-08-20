@@ -14,6 +14,7 @@ import {
   isClassificacaoVagasContratoCompleta,
   isNomeFuncionarioReal,
   labelColaboradorOuVaga,
+  resolverDadosExibicaoVagaContrato,
   resolveStatusVagaRascunho,
   validarDraftsListaVagas,
   vagaPermiteRemoverFuncionario,
@@ -554,5 +555,111 @@ assert.equal(
   ),
   false
 );
+
+const agNatalia = {
+  id: "ag-natalia",
+  status: "agendado",
+  data_agendamento: "2026-08-24",
+  aso: "Admissional",
+  colaborador_cpf: "52998224725",
+};
+const agNataliaCancelado = {
+  id: "ag-natalia-cancelado",
+  status: "cancelado",
+  data_agendamento: "2026-07-01",
+  aso: "Periódico",
+  colaborador_cpf: "52998224725",
+};
+const agDiogo = {
+  id: "ag-diogo",
+  status: "agendado",
+  data_agendamento: "2026-08-24",
+  aso: "Periódico",
+  colaborador_cpf: "39053344705",
+};
+
+const linhaAgendada = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("agendada", {
+    colaborador_cpf: "52998224725",
+    agendamento_id: "ag-natalia",
+  }),
+  agendamentos: [agNatalia],
+});
+assert.equal(linhaAgendada.dataExameIso, "2026-08-24");
+assert.equal(linhaAgendada.tipoAso, "Admissional");
+assert.equal(linhaAgendada.agendamentoIdVisualizar, "ag-natalia");
+
+const linhaAsoAberto = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("aso_aberto", { indice: 2 }),
+  agendamentos: [agNatalia],
+});
+assert.equal(linhaAsoAberto.dataExameIso, null);
+assert.equal(linhaAsoAberto.tipoAso, null);
+assert.equal(linhaAsoAberto.agendamentoIdVisualizar, null);
+
+const linhaComprometida = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("comprometida", { colaborador_cpf: "52998224725" }),
+  agendamentos: [agNatalia],
+});
+assert.equal(linhaComprometida.agendamentoIdVisualizar, null);
+assert.equal(linhaComprometida.dataExameIso, null);
+
+const linhaAberta = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("aberta"),
+  agendamentos: [agNatalia],
+});
+assert.equal(linhaAberta.agendamentoIdVisualizar, null);
+
+const linhaProgramada = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("programada", {
+    indice: 2,
+    periodico_futuro_id: "pf-1",
+  }),
+  agendamentos: [],
+  periodicos: [
+    { id: "pf-1", proxima_data: "2026-11-15", tipo_aso: "Periódico" },
+  ],
+});
+assert.equal(linhaProgramada.dataExameIso, "2026-11-15");
+assert.equal(linhaProgramada.tipoAso, "Periódico");
+assert.equal(linhaProgramada.agendamentoIdVisualizar, null);
+
+const linhaProgramadaSemTipo = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("programada", { periodico_futuro_id: "pf-2" }),
+  agendamentos: [],
+  periodicos: [{ id: "pf-2", proxima_data: "2026-12-01", tipo_aso: null }],
+});
+assert.equal(linhaProgramadaSemTipo.tipoAso, null);
+assert.equal(linhaProgramadaSemTipo.dataExameIso, "2026-12-01");
+
+const linhaSoCancelado = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("agendada", {
+    colaborador_cpf: "52998224725",
+    agendamento_id: "ag-natalia-cancelado",
+  }),
+  agendamentos: [agNataliaCancelado],
+});
+assert.equal(linhaSoCancelado.agendamentoIdVisualizar, null);
+assert.equal(linhaSoCancelado.dataExameIso, null);
+assert.equal(linhaSoCancelado.tipoAso, null);
+
+const linhaCanceladoMaisValido = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("agendada", {
+    id: "v-agendada-1",
+    colaborador_cpf: "52998224725",
+    agendamento_id: "ag-natalia-cancelado",
+  }),
+  demaisVagas: [
+    vagaCard("agendada", {
+      id: "v-agendada-2",
+      indice: 2,
+      agendamento_id: "ag-diogo",
+    }),
+  ],
+  agendamentos: [agNataliaCancelado, agNatalia, agDiogo],
+});
+assert.equal(linhaCanceladoMaisValido.agendamentoIdVisualizar, "ag-natalia");
+assert.equal(linhaCanceladoMaisValido.dataExameIso, "2026-08-24");
+assert.equal(linhaCanceladoMaisValido.tipoAso, "Admissional");
 
 console.log("test-contrato-vagas: OK");

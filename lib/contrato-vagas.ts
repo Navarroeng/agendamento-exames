@@ -276,6 +276,118 @@ export function contarCardsPorVagasContrato(
   };
 }
 
+export type AgendamentoExibicaoVaga = {
+  id: string;
+  status: string;
+  data_agendamento?: string | null;
+  aso?: string | null;
+  colaborador_cpf?: string | null;
+};
+
+export type PeriodicoExibicaoVaga = {
+  id: string;
+  proxima_data?: string | null;
+  tipo_aso?: string | null;
+};
+
+export type DadosExibicaoVagaContrato = {
+  dataExameIso: string | null;
+  tipoAso: string | null;
+  agendamentoIdVisualizar: string | null;
+};
+
+const DADOS_EXIBICAO_VAGA_VAZIO: DadosExibicaoVagaContrato = {
+  dataExameIso: null,
+  tipoAso: null,
+  agendamentoIdVisualizar: null,
+};
+
+function isoDateOrNull(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+}
+
+function tipoAsoOrNull(value: string | null | undefined): string | null {
+  const tipo = (value ?? "").trim();
+  return tipo || null;
+}
+
+/**
+ * Data, tipo de ASO e Visualizar da tabela "Vagas do contrato".
+ * Fonte: vínculo explícito da vaga. Cancelado nunca preenche a linha.
+ */
+export function resolverDadosExibicaoVagaContrato(params: {
+  vaga: Pick<
+    ContratoVagaRecord,
+    | "id"
+    | "status"
+    | "agendamento_id"
+    | "periodico_futuro_id"
+    | "colaborador_cpf"
+  >;
+  demaisVagas?: Array<Pick<ContratoVagaRecord, "id" | "agendamento_id">>;
+  agendamentos: AgendamentoExibicaoVaga[];
+  periodicos?: PeriodicoExibicaoVaga[];
+}): DadosExibicaoVagaContrato {
+  const { vaga } = params;
+
+  if (
+    vaga.status === "aberta" ||
+    vaga.status === "aso_aberto" ||
+    vaga.status === "comprometida"
+  ) {
+    return DADOS_EXIBICAO_VAGA_VAZIO;
+  }
+
+  if (vaga.status === "programada") {
+    const pid = (vaga.periodico_futuro_id ?? "").trim();
+    const periodico = pid
+      ? (params.periodicos ?? []).find((item) => item.id === pid)
+      : undefined;
+    return {
+      dataExameIso: isoDateOrNull(periodico?.proxima_data),
+      tipoAso: tipoAsoOrNull(periodico?.tipo_aso),
+      agendamentoIdVisualizar: null,
+    };
+  }
+
+  if (vaga.status !== "agendada") {
+    return DADOS_EXIBICAO_VAGA_VAZIO;
+  }
+
+  const byId = new Map(params.agendamentos.map((ag) => [ag.id, ag]));
+  const vinculado = vaga.agendamento_id
+    ? byId.get(vaga.agendamento_id)
+    : undefined;
+
+  let escolhido: AgendamentoExibicaoVaga | undefined;
+  if (vinculado && vinculado.status !== "cancelado") {
+    escolhido = vinculado;
+  } else {
+    const ocupados = new Set(
+      (params.demaisVagas ?? [])
+        .filter((outra) => outra.id !== vaga.id && outra.agendamento_id)
+        .map((outra) => outra.agendamento_id as string)
+    );
+    const cpf = normalizeCpfDigits(vaga.colaborador_cpf);
+    const candidatos = params.agendamentos.filter((ag) => {
+      if (ocupados.has(ag.id)) return false;
+      if (ag.status === "cancelado") return false;
+      if (!isValidCPF(cpf)) return false;
+      return cpfVagaIguais(ag.colaborador_cpf, cpf);
+    });
+    if (candidatos.length === 1) escolhido = candidatos[0];
+  }
+
+  if (!escolhido) return DADOS_EXIBICAO_VAGA_VAZIO;
+
+  return {
+    dataExameIso: isoDateOrNull(escolhido.data_agendamento),
+    tipoAso: tipoAsoOrNull(escolhido.aso),
+    agendamentoIdVisualizar: escolhido.id,
+  };
+}
+
 export function agendamentoOcupaVagaPrevista(
   agendamento: { id: string; colaborador_cpf?: string | null },
   vagas: Array<

@@ -41,6 +41,7 @@ import {
   CONTRATO_VAGA_STATUS_LABELS,
   isNomeFuncionarioReal,
   labelColaboradorOuVaga,
+  resolverDadosExibicaoVagaContrato,
   type ContratoVagaRecord,
   type ContratoVagaStatus,
 } from "@/lib/contrato-vagas";
@@ -131,6 +132,11 @@ function Card({
       </p>
     </div>
   );
+}
+
+function labelOuTraco(value: string | null | undefined): string {
+  const texto = (value ?? "").trim();
+  return texto || "—";
 }
 
 function VagaSituacaoBadge({ status }: { status: ContratoVagaStatus }) {
@@ -449,6 +455,34 @@ export function OrcamentoAbaAgendamentos({
     vagasComprometidas,
     vagas,
   ]);
+
+  const agendamentosPorId = useMemo(() => {
+    const map = new Map<string, AgendamentoWithExames>();
+    for (const item of itens) {
+      map.set(item.agendamento.id, item.agendamento);
+    }
+    return map;
+  }, [itens]);
+
+  const dadosExibicaoPorVagaId = useMemo(() => {
+    const map = new Map<
+      string,
+      ReturnType<typeof resolverDadosExibicaoVagaContrato>
+    >();
+    const agendamentos = itens.map((item) => item.agendamento);
+    for (const vaga of vagas) {
+      map.set(
+        vaga.id,
+        resolverDadosExibicaoVagaContrato({
+          vaga,
+          demaisVagas: vagas,
+          agendamentos,
+          periodicos: programacoes,
+        })
+      );
+    }
+    return map;
+  }, [vagas, itens, programacoes]);
 
   useEffect(() => {
     onContagemChangeRef.current?.(contagemPreview);
@@ -1089,14 +1123,17 @@ export function OrcamentoAbaAgendamentos({
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
+            <table className="w-full min-w-[920px] text-left text-xs">
               <thead className="bg-[#f8fafc]">
                 <tr>
                   <th className="border-b px-4 py-2 font-bold text-navy">
-                    Colaborador/vaga
+                    Colaborador / vaga
                   </th>
-                  <th className="border-b px-4 py-2 font-bold text-navy">
-                    Cargo
+                  <th className="whitespace-nowrap border-b px-4 py-2 font-bold text-navy">
+                    Data do exame
+                  </th>
+                  <th className="whitespace-nowrap border-b px-4 py-2 font-bold text-navy">
+                    Tipo de ASO
                   </th>
                   <th className="border-b px-4 py-2 font-bold text-navy">
                     Situação
@@ -1104,42 +1141,74 @@ export function OrcamentoAbaAgendamentos({
                   <th className="border-b px-4 py-2 font-bold text-navy">
                     Ação
                   </th>
+                  <th className="w-[88px] border-b px-4 py-2 text-center font-bold text-navy">
+                    Visualizar
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {vagas.map((vaga) => (
-                  <tr key={vaga.id} className="odd:bg-white even:bg-[#fbfdff]">
-                    <td className="border-b border-[#eef2f7] px-4 py-2.5 font-semibold text-navy">
-                      {labelColaboradorOuVaga(vaga)}
-                    </td>
-                    <td className="border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
-                      {vaga.cargo_nome?.trim() || "—"}
-                    </td>
-                    <td className="border-b border-[#eef2f7] px-4 py-2.5">
-                      <VagaSituacaoBadge status={vaga.status} />
-                    </td>
-                    <td className="border-b border-[#eef2f7] px-4 py-2.5">
-                      {vaga.status === "comprometida" ? (
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold text-brand-blue hover:underline"
-                          onClick={() => handleAgendarVaga(vaga)}
-                        >
-                          Agendar
-                        </button>
-                      ) : null}
-                      {vaga.status === "aberta" || vaga.status === "aso_aberto" ? (
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold text-brand-blue hover:underline"
-                          onClick={() => onIrParaListaFuncionarios?.()}
-                        >
-                          Definir funcionário
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
+                {vagas.map((vaga) => {
+                  const dados = dadosExibicaoPorVagaId.get(vaga.id);
+                  const agVisualizar = dados?.agendamentoIdVisualizar
+                    ? agendamentosPorId.get(dados.agendamentoIdVisualizar) ??
+                      null
+                    : null;
+                  return (
+                    <tr
+                      key={vaga.id}
+                      className="odd:bg-white even:bg-[#fbfdff]"
+                    >
+                      <td className="border-b border-[#eef2f7] px-4 py-2.5 font-semibold text-navy">
+                        {labelColaboradorOuVaga(vaga)}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
+                        {labelOuTraco(formatDateIsoToBR(dados?.dataExameIso))}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
+                        {labelOuTraco(dados?.tipoAso)}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5">
+                        <VagaSituacaoBadge status={vaga.status} />
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5">
+                        {vaga.status === "comprometida" ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-brand-blue hover:underline"
+                            onClick={() => handleAgendarVaga(vaga)}
+                          >
+                            Agendar
+                          </button>
+                        ) : vaga.status === "aberta" ||
+                          vaga.status === "aso_aberto" ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-brand-blue hover:underline"
+                            onClick={() => onIrParaListaFuncionarios?.()}
+                          >
+                            Definir funcionário
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="border-b border-[#eef2f7] px-4 py-2.5 text-center">
+                        {agVisualizar ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe3ef] text-brand-blue hover:bg-[#eff6ff]"
+                            title="Visualizar agendamento"
+                            onClick={() => setViewAgendamento(agVisualizar)}
+                          >
+                            <IconEye size={16} />
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
