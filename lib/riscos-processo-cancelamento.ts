@@ -98,6 +98,33 @@ export function deveInserirTrackingRiscosNoSincronismo(
   return elegivel;
 }
 
+/**
+ * Identidade para POST /api/riscos/processo/cancelar.
+ * Automático: orcamento_id (campanha é opcional).
+ * Manual: campanha.id / processoKey — nunca o stub `manual:`.
+ */
+export function identidadeCancelamentoProcessoRiscos(input: {
+  origem?: string | null;
+  processoKey?: string | null;
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+}): { orcamentoId?: string; campanhaId?: string } {
+  const campanhaId = String(input.campanhaId ?? "").trim();
+  const orcamentoRaw = String(input.orcamentoId ?? "").trim();
+  const orcamentoId =
+    orcamentoRaw && !orcamentoRaw.startsWith("manual:") ? orcamentoRaw : "";
+
+  if (isOrigemManualCliente(input.origem)) {
+    const id = campanhaId || String(input.processoKey ?? "").trim();
+    return id ? { campanhaId: id } : {};
+  }
+
+  const out: { orcamentoId?: string; campanhaId?: string } = {};
+  if (orcamentoId) out.orcamentoId = orcamentoId;
+  if (campanhaId) out.campanhaId = campanhaId;
+  return out;
+}
+
 export function resolverCancelamentoProcessoRiscos(input: {
   tracking?: {
     status?: string | null;

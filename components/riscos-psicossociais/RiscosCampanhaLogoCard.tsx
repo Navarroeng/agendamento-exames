@@ -8,6 +8,7 @@ import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-log
 interface RiscosCampanhaLogoCardProps {
   campanha: RiscosCampanhaRecord | null;
   saving?: boolean;
+  somenteConsulta?: boolean;
   onUpload: (file: File) => Promise<void>;
   onRemove: () => Promise<void>;
 }
@@ -15,6 +16,7 @@ interface RiscosCampanhaLogoCardProps {
 export function RiscosCampanhaLogoCard({
   campanha,
   saving = false,
+  somenteConsulta = false,
   onUpload,
   onRemove,
 }: RiscosCampanhaLogoCardProps) {
@@ -57,6 +59,7 @@ export function RiscosCampanhaLogoCard({
     );
   }
 
+  const bloqueado = saving || somenteConsulta;
   const temLogoCampanha = Boolean(campanha.logo_storage_path);
   const origemLabel =
     campanha.logo_origem === "empresa"
@@ -70,7 +73,7 @@ export function RiscosCampanhaLogoCard({
             : null;
 
   async function handleFile(file: File | null) {
-    if (!file) return;
+    if (!file || somenteConsulta) return;
     setLocalError(null);
     if (file.size > RISCOS_CAMPANHA_LOGO_MAX_BYTES) {
       setLocalError("O logo deve ter no máximo 5 MB.");
@@ -128,13 +131,13 @@ export function RiscosCampanhaLogoCard({
             type="file"
             accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
             className="hidden"
-            disabled={saving}
+            disabled={bloqueado}
             onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
           />
           <button
             type="button"
             className="rounded-xl bg-[#082b63] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
-            disabled={saving}
+            disabled={bloqueado}
             onClick={() => inputRef.current?.click()}
           >
             {temLogoCampanha || previewUrl
@@ -145,7 +148,7 @@ export function RiscosCampanhaLogoCard({
             <button
               type="button"
               className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3 py-1.5 text-[11px] font-bold text-[#b91c1c] disabled:opacity-40"
-              disabled={saving}
+              disabled={bloqueado}
               onClick={() => void onRemove()}
             >
               Remover

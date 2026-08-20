@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatCreatedAtBR } from "@/lib/format-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
@@ -103,10 +104,13 @@ export function RiscosPsicossociaisPainel({
     cnpjDigits.length === 14 ? formatCNPJ(cnpjRaw) : cnpjRaw.trim() || "—";
 
   const statusLabel = useMemo(() => {
+    if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
+      return "Cancelado";
+    }
     if (!campanha) return "Em andamento";
     if (!campanhaStatusSincronizado) return "Sincronizando…";
     return RISCOS_CAMPANHA_STATUS_LABELS[campanha.status];
-  }, [campanha, campanhaStatusSincronizado]);
+  }, [campanha, campanhaStatusSincronizado, processo.status, processo.etapaAtual]);
 
   const progressoPct = Math.round(
     (processo.etapasConcluidas / Math.max(processo.totalEtapas, 1)) * 100
@@ -142,6 +146,36 @@ export function RiscosPsicossociaisPainel({
           </span>
         </p>
       </header>
+
+      {processo.status === "cancelado" || processo.etapaAtual === "cancelado" ? (
+        <section className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3.5 sm:px-5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand-red">
+            Processo cancelado
+          </p>
+          <dl className="mt-2 space-y-1.5 text-sm text-[#475569]">
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                Motivo
+              </dt>
+              <dd className="font-semibold text-navy">
+                {processo.motivoCancelamento?.trim() || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                Cancelado em
+              </dt>
+              <dd>{formatCreatedAtBR(processo.canceladoEm)}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                Cancelado por
+              </dt>
+              <dd>{processo.canceladoPor?.trim() || "—"}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
 
       <section className="w-full rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5 shadow-sm sm:px-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -199,7 +233,11 @@ export function RiscosPsicossociaisPainel({
           onConfirmarImportacaoParticipantesExcel
         }
         onRemoverParticipante={onRemoverParticipante}
-        podeGerenciarParticipante={podeGerenciarParticipante}
+        podeGerenciarParticipante={
+          podeGerenciarParticipante &&
+          processo.status !== "cancelado" &&
+          processo.etapaAtual !== "cancelado"
+        }
         campanhaStatusSincronizado={campanhaStatusSincronizado}
         auditContext={auditContext}
         onRelatorioAtualizado={onRelatorioAtualizado}

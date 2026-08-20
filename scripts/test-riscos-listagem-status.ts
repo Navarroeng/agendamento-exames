@@ -13,6 +13,7 @@ import {
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
   indiceEtapaAtualRiscos,
+  isRiscosProcessoListagemCancelado,
   isRiscosProcessoListagemConcluido,
   riscosPsicossociaisEtapaAtualBadgeClass,
   sortRiscosPsicossociaisProcessosListagem,
@@ -96,7 +97,17 @@ const navarro = processo({
   concluidoEm: "2026-08-20T12:00:00Z",
 });
 
-const todos = [zeroA, navarro, alAssessoria, zeroB];
+const legrandLikeCancelado = processo({
+  cliente: "LEGRAND LIKE",
+  status: "cancelado",
+  etapaAtual: "cancelado",
+  etapasConcluidas: 0,
+  totalEtapas: 6,
+  progressoPercentual: 0,
+  dataEntrada: "2026-07-01T12:00:00Z",
+});
+
+const todos = [zeroA, navarro, alAssessoria, zeroB, legrandLikeCancelado];
 
 run("padrão da listagem é Aberto", () => {
   assert.equal(DEFAULT_RISCOS_LISTAGEM_STATUS, "aberto");
@@ -137,6 +148,7 @@ run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
     ["ZERO A", "AL ASSESSORIA", "ZERO B"]
   );
   assert.ok(!abertos.some((p) => p.implantacao.orcamento.cliente_nome === "NAVARRO ENGENHARIA"));
+  assert.ok(!abertos.some((p) => p.implantacao.orcamento.cliente_nome === "LEGRAND LIKE"));
 });
 
 run("Concluído mostra somente processos finalizados", () => {
@@ -148,6 +160,19 @@ run("Concluído mostra somente processos finalizados", () => {
     concluidos.map((p) => p.implantacao.orcamento.cliente_nome),
     ["NAVARRO ENGENHARIA"]
   );
+});
+
+run("Cancelado mostra somente processos cancelados", () => {
+  const cancelados = filterRiscosPsicossociaisProcessosPorStatus(
+    todos,
+    "cancelado"
+  );
+  assert.deepEqual(
+    cancelados.map((p) => p.implantacao.orcamento.cliente_nome),
+    ["LEGRAND LIKE"]
+  );
+  assert.equal(isRiscosProcessoListagemCancelado(legrandLikeCancelado), true);
+  assert.equal(isRiscosProcessoListagemConcluido(legrandLikeCancelado), false);
 });
 
 run("conclusão usa status/etapas reais, não texto de badge", () => {
@@ -439,6 +464,7 @@ run("UI: STATUS ao lado do ano, padrão Aberto, sem persistir no refresh", () =>
   assert.match(table, /htmlFor="riscos-listagem-status"/);
   assert.match(table, />Aberto</);
   assert.match(table, />Concluído</);
+  assert.match(table, />Cancelado</);
   assert.match(table, /yearRowExtra/);
   assert.match(table, /riscosPsicossociaisEtapaAtualBadgeClass/);
   assert.match(page, /statusListagem=\{statusListagem\}/);
@@ -484,6 +510,8 @@ run("badges: solicitar azul claro, solicitada lilás, demais intactos", () => {
     "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
   const verde =
     "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
+  const vermelho =
+    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#fef2f2] text-brand-red";
   assert.equal(
     riscosPsicossociaisEtapaAtualBadgeClass(
       "solicitar_lista_presenca",
@@ -512,6 +540,10 @@ run("badges: solicitar azul claro, solicitada lilás, demais intactos", () => {
   assert.equal(
     riscosPsicossociaisEtapaAtualBadgeClass("finalizado", "concluido"),
     verde
+  );
+  assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass("cancelado", "cancelado"),
+    vermelho
   );
 });
 

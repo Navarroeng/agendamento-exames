@@ -26,6 +26,7 @@ import {
 } from "@/lib/auditoria";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 const PARTICIPANTE_SELECT =
   "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at, removido_em";
@@ -284,6 +285,11 @@ export async function criarParticipanteCampanhaNoServidor(
   const campanha = await buscarCampanha(params.campanhaId);
   if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
 
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: campanha.orcamento_id,
+    campanhaId: campanha.id,
+  });
+
   const bloqueio = campanhaPermiteImportacaoParticipantes(
     String(campanha.status ?? "")
   );
@@ -382,6 +388,10 @@ export async function atualizarParticipanteCampanhaNoServidor(
   if (!atual) throw new Error("Participante não encontrado.");
 
   const before = mapParticipante(atual as Record<string, unknown>);
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: before.orcamento_id,
+    campanhaId: before.campanha_id,
+  });
   if (before.status !== "pendente") {
     throw new Error(
       "Só é possível editar participantes com status Pendente (ainda não iniciaram o questionário)."
@@ -514,6 +524,11 @@ export async function validarImportacaoParticipantesNoServidor(params: {
   const campanha = await buscarCampanha(params.campanhaId);
   if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
 
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: campanha.orcamento_id,
+    campanhaId: campanha.id,
+  });
+
   const campanhaBloqueada = campanhaPermiteImportacaoParticipantes(
     String(campanha.status ?? "")
   );
@@ -645,6 +660,11 @@ export async function importarParticipantesCampanhaNoServidor(
 ): Promise<ImportacaoParticipantesResultado> {
   const campanha = await buscarCampanha(params.campanhaId);
   if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
+
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: campanha.orcamento_id,
+    campanhaId: campanha.id,
+  });
 
   const bloqueio = campanhaPermiteImportacaoParticipantes(
     String(campanha.status ?? "")

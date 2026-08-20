@@ -83,6 +83,16 @@ run("ignora removidos/invalidados no gate", () => {
   assert.equal(msg, null);
 });
 
+run("processo cancelado: bloqueia gerar relatório", () => {
+  const msg = validatePodeGerarRelatorioFinal({
+    campanhaStatus: "encerrada",
+    participantesAtivos: [{ status: "respondido" }],
+    jaExisteRelatorio: false,
+    processoCancelado: true,
+  });
+  assert.match(String(msg), /cancelado/i);
+});
+
 run("montarResultadoJsonRelatorio: snapshot com placeholders", () => {
   const consolidado = {
     previstos: 10,

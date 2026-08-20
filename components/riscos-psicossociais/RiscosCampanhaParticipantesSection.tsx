@@ -29,6 +29,7 @@ interface RiscosCampanhaParticipantesSectionProps {
   saving?: boolean;
   /** Somente admin vê/usa Editar e Remover participante. */
   podeGerenciarParticipante?: boolean;
+  somenteConsulta?: boolean;
   onCriar: (input: RiscosParticipanteInput) => Promise<void>;
   onEditar: (
     participanteId: string,
@@ -59,6 +60,7 @@ export function RiscosCampanhaParticipantesSection({
   participantes,
   saving = false,
   podeGerenciarParticipante = false,
+  somenteConsulta = false,
   onCriar,
   onEditar,
   onRemover,
@@ -87,9 +89,9 @@ export function RiscosCampanhaParticipantesSection({
   const [importados, setImportados] = useState(0);
   const [naoImportados, setNaoImportados] = useState(0);
 
-  const bloqueioImportacao = campanhaPermiteImportacaoParticipantes(
-    campanha.status
-  );
+  const bloqueioImportacao = somenteConsulta
+    ? "Processo cancelado. O histórico permanece disponível somente para consulta."
+    : campanhaPermiteImportacaoParticipantes(campanha.status);
   const podeImportar =
     Boolean(onPrepararImportacaoExcel && onConfirmarImportacaoExcel) &&
     !bloqueioImportacao;

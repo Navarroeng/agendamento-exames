@@ -186,11 +186,12 @@ export function RiscosPainelCards({
     [participantes]
   );
 
-  const pesquisaCancelada = campanha?.status === "cancelada";
+  const processoCancelado =
+    processo.status === "cancelado" || processo.etapaAtual === "cancelado";
   const podeCancelarProcesso =
-    Boolean(campanha) &&
-    campanhaStatusSincronizado &&
-    !pesquisaCancelada;
+    !processoCancelado &&
+    processo.status !== "concluido" &&
+    processo.etapaAtual !== "finalizado";
 
   const historico = useMemo(
     () => buildHistorico(processo, participantes),
@@ -297,7 +298,7 @@ export function RiscosPainelCards({
         </PanelCard>
 
         <PanelCard title="Pesquisa" className="min-w-0">
-          {!campanha && !criarAberto ? (
+          {!campanha && !criarAberto && !processoCancelado ? (
             <div className="flex h-full flex-col justify-between gap-3">
               <PlaceholderNote>
                 Nenhuma pesquisa criada ainda. Cadastre o período de início e
@@ -314,7 +315,7 @@ export function RiscosPainelCards({
             </div>
           ) : null}
 
-        {!campanha && criarAberto ? (
+        {!campanha && criarAberto && !processoCancelado ? (
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
@@ -492,7 +493,9 @@ export function RiscosPainelCards({
                   </button>
                 </>
               ) : null}
-              {campanhaStatusSincronizado && acoesConvite.exibirAbrir ? (
+              {campanhaStatusSincronizado &&
+              !processoCancelado &&
+              acoesConvite.exibirAbrir ? (
                 <button
                   type="button"
                   className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -506,7 +509,9 @@ export function RiscosPainelCards({
                   Abrir pesquisa
                 </button>
               ) : null}
-              {campanhaStatusSincronizado && acoesConvite.exibirEncerrar ? (
+              {campanhaStatusSincronizado &&
+              !processoCancelado &&
+              acoesConvite.exibirEncerrar ? (
                 <button
                   type="button"
                   className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -566,6 +571,7 @@ export function RiscosPainelCards({
             onConfirmarImportacaoExcel={onConfirmarImportacaoParticipantesExcel}
             onRemover={onRemoverParticipante}
             podeGerenciarParticipante={podeGerenciarParticipante}
+            somenteConsulta={processoCancelado}
           />
         ) : (
           <PlaceholderNote>
@@ -587,7 +593,8 @@ export function RiscosPainelCards({
           <RiscosRelatorioPanel
             campanha={campanha}
             participantes={participantes}
-            isAdmin={podeGerenciarParticipante}
+            isAdmin={podeGerenciarParticipante && !processoCancelado}
+            processoCancelado={processoCancelado}
             auditContext={auditContext}
             onRelatorioChange={(relatorio: RiscosRelatorioRecord | null) => {
               onRelatorioAtualizado?.(Boolean(relatorio));
@@ -762,7 +769,7 @@ export function RiscosPainelCards({
             <button
               type="button"
               className="rounded-xl bg-brand-red px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-              disabled={savingCampanha || !campanha || !motivoCancelamento.trim()}
+              disabled={savingCampanha || !motivoCancelamento.trim()}
               onClick={() => {
                 void (async () => {
                   setErroCancelar(null);

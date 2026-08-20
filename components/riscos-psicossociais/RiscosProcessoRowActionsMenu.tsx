@@ -12,8 +12,10 @@ type RiscosProcessoRowActionsMenuProps = {
   processo: RiscosPsicossociaisProcesso;
   isAdmin: boolean;
   savingRemover?: boolean;
+  savingCancelar?: boolean;
   onAbrir: (processo: RiscosPsicossociaisProcesso) => void;
   onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
+  onCancelarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
   onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
 };
 
@@ -21,8 +23,10 @@ export function RiscosProcessoRowActionsMenu({
   processo,
   isAdmin,
   savingRemover = false,
+  savingCancelar = false,
   onAbrir,
   onVisualizarRelatorio,
+  onCancelarProcesso,
   onRemoverProcesso,
 }: RiscosProcessoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -30,6 +34,8 @@ export function RiscosProcessoRowActionsMenu({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const campanha = processo.campanha;
+  const processoCancelado =
+    processo.status === "cancelado" || processo.etapaAtual === "cancelado";
   const acoes = acoesMenuListagemProcessoRiscos({
     campanhaStatus: campanha?.status,
     codigoPublico: campanha?.codigo_publico,
@@ -38,6 +44,9 @@ export function RiscosProcessoRowActionsMenu({
     relatorioGerado: processo.relatorioGerado,
     participantesCadastrados: processo.participantesCadastrados,
     participantesRespondidos: processo.participantesRespondidos,
+    processoCancelado,
+    processoConcluido:
+      processo.status === "concluido" || processo.etapaAtual === "finalizado",
   });
 
   useEffect(() => {
@@ -137,6 +146,20 @@ export function RiscosProcessoRowActionsMenu({
               }
             }}
           />
+          {acoes.mostrarCancelar ? (
+            <>
+              <div className="my-1 border-t border-[#eef2f7]" />
+              <MenuItem
+                label="Cancelar"
+                danger
+                disabled={savingCancelar}
+                onClick={() => {
+                  setOpen(false);
+                  onCancelarProcesso?.(processo);
+                }}
+              />
+            </>
+          ) : null}
           {acoes.mostrarRemoverProcesso ? (
             <>
               <div className="my-1 border-t border-[#eef2f7]" />

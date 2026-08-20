@@ -111,6 +111,7 @@ export async function POST(
       message.includes("Já existe") ||
       message.includes("Cadastre") ||
       message.includes("cancelada") ||
+      message.includes("cancelado") ||
       message.includes("não encontrada")
         ? 400
         : 500;

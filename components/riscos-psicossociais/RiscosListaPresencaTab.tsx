@@ -69,6 +69,9 @@ export function RiscosListaPresencaTab({
   onVisualizarAnexo,
 }: RiscosListaPresencaTabProps) {
   const dados: RiscosListaPresencaDados = processo.listaPresenca;
+  const somenteConsulta =
+    processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+  const savingOuConsulta = saving || somenteConsulta;
 
   const [solicitadaSim, setSolicitadaSim] = useState(dados.lista_solicitada);
   const [dataSolicitacao, setDataSolicitacao] = useState(
@@ -95,6 +98,12 @@ export function RiscosListaPresencaTab({
   );
 
   const handleSalvarSolicitacao = async () => {
+    if (somenteConsulta) {
+      toast.error(
+        "Processo cancelado. O histórico permanece disponível somente para consulta."
+      );
+      return;
+    }
     if (!solicitadaSim) {
       toast.error("Selecione Sim para registrar a solicitação.");
       return;
@@ -109,6 +118,12 @@ export function RiscosListaPresencaTab({
   };
 
   const handleSalvarRecebimento = async () => {
+    if (somenteConsulta) {
+      toast.error(
+        "Processo cancelado. O histórico permanece disponível somente para consulta."
+      );
+      return;
+    }
     if (!recebidaSim) {
       toast.error("Selecione Sim para registrar o recebimento.");
       return;
@@ -165,7 +180,7 @@ export function RiscosListaPresencaTab({
                   type="radio"
                   name="lista-solicitada"
                   checked={solicitadaSim === true}
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onChange={() => setSolicitadaSim(true)}
                 />
                 Sim
@@ -175,7 +190,7 @@ export function RiscosListaPresencaTab({
                   type="radio"
                   name="lista-solicitada"
                   checked={solicitadaSim === false}
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onChange={() => setSolicitadaSim(false)}
                 />
                 Não
@@ -192,14 +207,14 @@ export function RiscosListaPresencaTab({
                     type="date"
                     className="field-input"
                     value={dataSolicitacao}
-                    disabled={saving}
+                    disabled={savingOuConsulta}
                     onChange={(e) => setDataSolicitacao(e.target.value)}
                   />
                 </div>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onClick={() => {
                     void handleSalvarSolicitacao();
                   }}
@@ -256,7 +271,7 @@ export function RiscosListaPresencaTab({
               <button
                 type="button"
                 className="btn"
-                disabled={saving}
+                disabled={savingOuConsulta}
                 onClick={() => {
                   void onVisualizarAnexo();
                 }}
@@ -266,7 +281,7 @@ export function RiscosListaPresencaTab({
               <button
                 type="button"
                 className="btn text-brand-red"
-                disabled={saving}
+                disabled={savingOuConsulta}
                 onClick={() => {
                   void onRemoverAnexo();
                 }}
@@ -281,7 +296,7 @@ export function RiscosListaPresencaTab({
               <input
                 type="file"
                 accept=".pdf,.xls,.xlsx,.jpg,.jpeg,.png,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"
-                disabled={saving}
+                disabled={savingOuConsulta}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
               {arquivoSelecionadoEhExcel ? (
@@ -293,7 +308,7 @@ export function RiscosListaPresencaTab({
                 <button
                   type="button"
                   className="btn btn-primary mt-2"
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onClick={() => {
                     void handleSalvarRecebimento();
                   }}
@@ -314,7 +329,7 @@ export function RiscosListaPresencaTab({
                   type="radio"
                   name="lista-recebida"
                   checked={recebidaSim === true}
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onChange={() => setRecebidaSim(true)}
                 />
                 Sim
@@ -324,7 +339,7 @@ export function RiscosListaPresencaTab({
                   type="radio"
                   name="lista-recebida"
                   checked={recebidaSim === false}
-                  disabled={saving}
+                  disabled={savingOuConsulta}
                   onChange={() => {
                     setRecebidaSim(false);
                     setFile(null);
@@ -356,7 +371,7 @@ export function RiscosListaPresencaTab({
                     type="file"
                     className="block w-full text-sm"
                     accept=".pdf,.xls,.xlsx,.jpg,.jpeg,.png,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png"
-                    disabled={saving}
+                    disabled={savingOuConsulta}
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
                   <p className="mt-1 text-[10px] text-[#94a3b8]">

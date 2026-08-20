@@ -9,6 +9,7 @@ import {
   participanteEstaRemovido,
 } from "@/lib/riscos-remocao-participante";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 type AuditOptions = { auditContext?: AuditoriaUsuarioContext };
 
@@ -37,12 +38,19 @@ export async function removerParticipanteCampanhaSoft(
   const { data: participante, error: partErr } = await supabase
     .from("riscos_campanha_participantes")
     .select(
-      "id, campanha_id, nome_completo, status, cpf, concluiu_em, removido_em"
+      "id, campanha_id, orcamento_id, nome_completo, status, cpf, concluiu_em, removido_em"
     )
     .eq("id", participanteId)
     .maybeSingle();
   if (partErr) throw partErr;
   if (!participante) throw new Error("Participante não encontrado.");
+
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: participante.orcamento_id
+      ? String(participante.orcamento_id)
+      : null,
+    campanhaId: String(participante.campanha_id),
+  });
 
   if (
     participanteEstaRemovido({

@@ -23,6 +23,7 @@ interface RiscosRelatorioPanelProps {
   campanha: RiscosCampanhaRecord | null;
   participantes: RiscosCampanhaParticipanteRecord[];
   isAdmin?: boolean;
+  processoCancelado?: boolean;
   auditContext?: AuditoriaUsuarioContext;
   onRelatorioChange?: (relatorio: RiscosRelatorioRecord | null) => void;
 }
@@ -31,6 +32,7 @@ export function RiscosRelatorioPanel({
   campanha,
   participantes,
   isAdmin = false,
+  processoCancelado = false,
   auditContext,
   onRelatorioChange,
 }: RiscosRelatorioPanelProps) {
@@ -58,8 +60,9 @@ export function RiscosRelatorioPanel({
         campanhaStatus: campanha?.status,
         participantesAtivos: ativos,
         jaExisteRelatorio: Boolean(relatorio),
+        processoCancelado,
       }),
-    [campanha?.status, ativos, relatorio]
+    [campanha?.status, ativos, relatorio, processoCancelado]
   );
 
   useEffect(() => {

@@ -81,8 +81,12 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
+      status: result.status,
+      cancelado_em: result.cancelado_em,
+      cancelado_por: result.cancelado_por,
+      motivo_cancelamento: result.motivo_cancelamento,
       campanha: result.campanha,
-      ...result,
+      orcamento_id: result.orcamento_id,
     });
   } catch (err) {
     console.error("[riscos/campanha/cancelar]", err);

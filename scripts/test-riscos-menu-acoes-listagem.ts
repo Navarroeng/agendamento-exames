@@ -87,7 +87,7 @@ run("não admin não vê Remover processo", () => {
   assert.equal(a.mostrarRemoverProcesso, false);
 });
 
-run("sem campanha: sem copiar e sem remover", () => {
+run("sem campanha: Cancelar visível, sem copiar e sem remover", () => {
   const a = acoesMenuListagemProcessoRiscos({
     campanhaStatus: null,
     codigoPublico: null,
@@ -97,6 +97,29 @@ run("sem campanha: sem copiar e sem remover", () => {
   assert.equal(a.podeCopiarLink, false);
   assert.equal(a.mostrarRemoverProcesso, false);
   assert.equal(a.podeAbrir, true);
+  assert.equal(a.mostrarCancelar, true);
+});
+
+run("processo cancelado: Cancelar oculto", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: null,
+    codigoPublico: null,
+    isAdmin: true,
+    hasCampanha: false,
+    processoCancelado: true,
+  });
+  assert.equal(a.mostrarCancelar, false);
+});
+
+run("processo concluído: Cancelar oculto", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "encerrada",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+    processoConcluido: true,
+  });
+  assert.equal(a.mostrarCancelar, false);
 });
 
 console.log("\nTodos os testes do menu de ações passaram.");

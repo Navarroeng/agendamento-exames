@@ -19,6 +19,7 @@ import {
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
 import { mesclarCampanhaListagemModal } from "@/lib/riscos-campanha-origem";
+import { identidadeCancelamentoProcessoRiscos } from "@/lib/riscos-processo-cancelamento";
 import {
   resolveInitialMesListagem,
   resolveMesParaAno,
@@ -28,7 +29,7 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   abrirCampanhaRiscos,
   buscarCampanhaPorCodigoPublico,
-  cancelarProcessoRiscos,
+  cancelarProcessoListagemRiscos,
   criarCampanhaRiscos,
   exclusaoDefinitivaDisponivelNoClient,
   excluirCampanhaRiscos,
@@ -89,6 +90,8 @@ export function useRiscosPsicossociaisPage() {
   const [savingRemoverProcesso, setSavingRemoverProcesso] = useState(false);
   const [processoParaRemover, setProcessoParaRemover] =
     useState<RiscosPsicossociaisProcesso | null>(null);
+  const [processoParaCancelar, setProcessoParaCancelar] =
+    useState<RiscosPsicossociaisProcesso | null>(null);
   const [modalParticipantes, setModalParticipantes] = useState<
     RiscosCampanhaParticipanteRecord[]
   >([]);
@@ -132,6 +135,12 @@ export function useRiscosPsicossociaisPage() {
             ? data.find((p) => p.campanha?.id === prev.campanha?.id)
             : undefined);
         if (!updated) return prev;
+        if (
+          updated.status === "cancelado" ||
+          updated.etapaAtual === "cancelado"
+        ) {
+          return { ...updated, processoKey: prev.processoKey };
+        }
         // Modal aberto: status da campanha só vem de sync/abrir/encerrar (API),
         // nunca volta a ser o da listagem (pode estar stale/otimista).
         if (prev.campanha?.id) {
@@ -954,30 +963,32 @@ export function useRiscosPsicossociaisPage() {
   }, [modalProcesso, auditContext, refresh]);
 
   const handleCancelarProcesso = useCallback(
-    async (motivo: string) => {
-      const campanhaId = modalProcesso?.campanha?.id;
-      if (!campanhaId) return;
+    async (motivo: string, processoAlvo?: RiscosPsicossociaisProcesso) => {
+      const alvo =
+        processoAlvo ?? processoParaCancelar ?? modalProcesso ?? null;
+      if (!alvo) return;
+      const ids = identidadeCancelamentoProcessoRiscos({
+        origem: alvo.origem,
+        processoKey: alvo.processoKey,
+        orcamentoId: alvo.implantacao.orcamento.id,
+        campanhaId: alvo.campanha?.id ?? null,
+      });
+      if (!ids.orcamentoId && !ids.campanhaId) {
+        toast.error("Não foi possível identificar o processo a cancelar.");
+        return;
+      }
       setSavingCampanha(true);
       try {
-        const campanha = await cancelarProcessoRiscos(campanhaId, motivo, {
-          auditContext,
+        const result = await cancelarProcessoListagemRiscos({
+          orcamentoId: ids.orcamentoId,
+          campanhaId: ids.campanhaId,
+          motivo,
+          auditOptions: { auditContext },
         });
-        if (campanha.status !== "cancelada") {
-          throw new Error(
-            "O cancelamento não foi confirmado no banco. O status da campanha não foi alterado."
-          );
+        if (result.status !== "cancelado") {
+          throw new Error("O cancelamento não foi confirmado no banco.");
         }
-        setModalProcesso((prev) =>
-          prev ? withRiscosProgressoAtualizado(prev, { campanha }) : prev
-        );
-        setProcessos((prev) =>
-          prev.map((p) =>
-            p.campanha?.id === campanha.id
-              ? withRiscosProgressoAtualizado(p, { campanha })
-              : p
-          )
-        );
-        setCampanhaStatusSincronizado(true);
+        setProcessoParaCancelar(null);
         await refresh();
         toast.success("Processo cancelado. O histórico foi preservado.");
       } catch (err) {
@@ -990,8 +1001,34 @@ export function useRiscosPsicossociaisPage() {
         setSavingCampanha(false);
       }
     },
-    [modalProcesso, auditContext, refresh]
+    [modalProcesso, processoParaCancelar, auditContext, refresh]
   );
+
+  const openCancelarProcesso = useCallback(
+    (processo: RiscosPsicossociaisProcesso) => {
+      if (
+        processo.status === "cancelado" ||
+        processo.etapaAtual === "cancelado"
+      ) {
+        toast.error("Este processo já está cancelado.");
+        return;
+      }
+      if (
+        processo.status === "concluido" ||
+        processo.etapaAtual === "finalizado"
+      ) {
+        toast.error("Processo concluído não pode ser cancelado.");
+        return;
+      }
+      setProcessoParaCancelar(processo);
+    },
+    []
+  );
+
+  const closeCancelarProcesso = useCallback(() => {
+    if (savingCampanha) return;
+    setProcessoParaCancelar(null);
+  }, [savingCampanha]);
 
   const handleExcluirCampanha = useCallback(
     async (confirmacaoCodigo: string) => {
@@ -1312,6 +1349,9 @@ export function useRiscosPsicossociaisPage() {
     handleAbrirCampanha,
     handleEncerrarCampanha,
     handleCancelarProcesso,
+    openCancelarProcesso,
+    closeCancelarProcesso,
+    processoParaCancelar,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
     isAdmin,

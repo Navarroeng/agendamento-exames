@@ -34,6 +34,8 @@ interface RiscosPsicossociaisTableProps {
   podeRemoverProcesso?: boolean;
   onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
   savingRemover?: boolean;
+  onCancelarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
+  savingCancelar?: boolean;
 }
 
 function ProgressoRiscos({
@@ -49,8 +51,11 @@ function ProgressoRiscos({
       </p>
       <div className="flex items-center gap-0.5">
         {etapas.map((etapa, index) => {
+          const cancelado =
+            processo.status === "cancelado" || processo.etapaAtual === "cancelado";
           const concluida = index < processo.etapasConcluidas;
           const atual =
+            !cancelado &&
             !concluida &&
             processo.etapasConcluidas < processo.totalEtapas &&
             (etapa.id === processo.etapaAtual ||
@@ -97,6 +102,8 @@ export function RiscosPsicossociaisTable({
   podeRemoverProcesso = false,
   onRemoverProcesso,
   savingRemover = false,
+  onCancelarProcesso,
+  savingCancelar = false,
 }: RiscosPsicossociaisTableProps) {
   return (
     <Panel
@@ -120,7 +127,7 @@ export function RiscosPsicossociaisTable({
             </label>
             <select
               id="riscos-listagem-status"
-              className="field-input field-input-compact w-[110px] text-sm"
+              className="field-input field-input-compact w-[128px] text-sm"
               value={statusListagem}
               onChange={(e) =>
                 onStatusListagemChange(
@@ -131,6 +138,7 @@ export function RiscosPsicossociaisTable({
             >
               <option value="aberto">Aberto</option>
               <option value="concluido">Concluído</option>
+              <option value="cancelado">Cancelado</option>
             </select>
           </div>
         }
@@ -193,10 +201,13 @@ export function RiscosPsicossociaisTable({
                           processo.status
                         )}
                       >
-                        {processo.status === "concluido" ||
-                        processo.etapaAtual === "finalizado"
-                          ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado
-                          : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
+                        {processo.status === "cancelado" ||
+                        processo.etapaAtual === "cancelado"
+                          ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.cancelado
+                          : processo.status === "concluido" ||
+                              processo.etapaAtual === "finalizado"
+                            ? RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado
+                            : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual]}
                       </span>
                     </td>
                     <td>
@@ -209,7 +220,9 @@ export function RiscosPsicossociaisTable({
                         savingRemover={savingRemover}
                         onAbrir={onVisualizar}
                         onVisualizarRelatorio={onVisualizarRelatorio}
+                        onCancelarProcesso={onCancelarProcesso}
                         onRemoverProcesso={onRemoverProcesso}
+                        savingCancelar={savingCancelar}
                       />
                     </td>
                   </tr>

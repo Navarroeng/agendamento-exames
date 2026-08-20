@@ -5,6 +5,7 @@ import { IconShield } from "@/components/ui/icons/OutlineIcons";
 import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/RiscosPsicossociaisModal";
 import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
 import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
+import { RiscosCancelarProcessoModal } from "@/components/riscos-psicossociais/RiscosCancelarProcessoModal";
 import { RiscosRemoverProcessoModal } from "@/components/riscos-psicossociais/RiscosRemoverProcessoModal";
 import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
 import { useRiscosPsicossociaisPage } from "@/hooks/useRiscosPsicossociaisPage";
@@ -48,6 +49,9 @@ export function RiscosPsicossociaisPage() {
     handleAbrirCampanha,
     handleEncerrarCampanha,
     handleCancelarProcesso,
+    openCancelarProcesso,
+    closeCancelarProcesso,
+    processoParaCancelar,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel,
     isAdmin,
@@ -97,6 +101,16 @@ export function RiscosPsicossociaisPage() {
         podeRemoverProcesso={isAdmin}
         onRemoverProcesso={openRemoverProcesso}
         savingRemover={savingRemoverProcesso}
+        onCancelarProcesso={openCancelarProcesso}
+        savingCancelar={savingCampanha}
+      />
+
+      <RiscosCancelarProcessoModal
+        open={Boolean(processoParaCancelar)}
+        processo={processoParaCancelar}
+        saving={savingCampanha}
+        onClose={closeCancelarProcesso}
+        onConfirm={(motivo) => handleCancelarProcesso(motivo)}
       />
 
       <RiscosRemoverProcessoModal

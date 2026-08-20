@@ -12,6 +12,7 @@ import {
 } from "@/lib/riscos-relatorio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 import { obterResultadosCampanhaRiscos } from "@/services/riscos-resultados.service";
 
 const RELATORIO_SELECT =
@@ -134,7 +135,7 @@ async function buscarCampanhaBasica(campanhaId: string) {
   const { data, error } = await admin
     .from("riscos_campanhas")
     .select(
-      "id, cliente_id, empresa_nome, codigo_publico, status, data_inicio, data_encerramento"
+      "id, cliente_id, orcamento_id, empresa_nome, codigo_publico, status, data_inicio, data_encerramento"
     )
     .eq("id", campanhaId)
     .maybeSingle();
@@ -149,6 +150,11 @@ async function persistirRelatorio(params: {
 }): Promise<RiscosRelatorioRecord> {
   const campanha = await buscarCampanhaBasica(params.campanhaId);
   if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
+
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: campanha.orcamento_id ? String(campanha.orcamento_id) : null,
+    campanhaId: String(campanha.id),
+  });
 
   const existente = await buscarRelatorioPorCampanhaId(params.campanhaId);
   const participantes = await listarStatusParticipantesAtivos(params.campanhaId);
@@ -266,6 +272,13 @@ export async function gerarRelatorioFinalNoServidor(
 ): Promise<RiscosRelatorioRecord> {
   const id = campanhaId.trim();
   if (!id) throw new Error("Campanha inválida.");
+
+  const campanha = await buscarCampanhaBasica(id);
+  if (!campanha) throw new Error("Campanha/pesquisa não encontrada.");
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: campanha.orcamento_id ? String(campanha.orcamento_id) : null,
+    campanhaId: String(campanha.id),
+  });
 
   const existente = await buscarRelatorioPorCampanhaId(id);
   if (existente) {

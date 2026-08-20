@@ -81,6 +81,7 @@ export async function POST(
       message.includes("Ainda existem") ||
       message.includes("Cadastre") ||
       message.includes("cancelada") ||
+      message.includes("cancelado") ||
       message.includes("não encontrada")
         ? 400
         : 500;
