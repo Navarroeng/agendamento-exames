@@ -5,6 +5,8 @@ interface OrcamentoAnexoRemoverModalProps {
   titulo: string;
   mensagem: string;
   saving?: boolean;
+  cancelLabel?: string;
+  confirmLabel?: string;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -14,6 +16,8 @@ export function OrcamentoAnexoRemoverModal({
   titulo,
   mensagem,
   saving = false,
+  cancelLabel = "Voltar",
+  confirmLabel = "Confirmar remoção",
   onClose,
   onConfirm,
 }: OrcamentoAnexoRemoverModalProps) {
@@ -48,7 +52,7 @@ export function OrcamentoAnexoRemoverModal({
             onClick={handleClose}
             disabled={saving}
           >
-            Voltar
+            {cancelLabel}
           </button>
           <button
             type="button"
@@ -56,7 +60,7 @@ export function OrcamentoAnexoRemoverModal({
             onClick={onConfirm}
             disabled={saving}
           >
-            {saving ? "Removendo..." : "Confirmar remoção"}
+            {saving ? "Removendo..." : confirmLabel}
           </button>
         </div>
       </div>

@@ -14,10 +14,13 @@ import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
   CONTRATO_VAGA_STATUS_LABELS,
   buildVagaDraftsIniciais,
+  draftAposRemoverFuncionario,
   emptyVagaDraft,
   isNomeFuncionarioReal,
+  normalizeNomeOcupante,
   resolveStatusVagaRascunho,
   validarDraftsListaVagas,
+  vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -33,6 +36,7 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
 import {
   garantirVagasDoContrato,
+  liberarFuncionarioDaVagaComprometida,
   listarVagasDoContrato,
   salvarListaVagasContrato,
 } from "@/services/contrato-vagas.service";
@@ -111,6 +115,11 @@ export function OrcamentoAbaFuncionarios({
   const [drafts, setDrafts] = useState<ContratoVagaDraft[]>([]);
   const [cargos, setCargos] = useState<CargoRecord[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [removerFuncionario, setRemoverFuncionario] = useState<{
+    vagaId: string;
+    indice: number;
+    nome: string;
+  } | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -334,6 +343,39 @@ export function OrcamentoAbaFuncionarios({
     }
   }
 
+  async function handleConfirmRemoverFuncionario() {
+    if (!removerFuncionario) return;
+    setActionSaving(true);
+    try {
+      const atualizada = await liberarFuncionarioDaVagaComprometida({
+        vagaId: removerFuncionario.vagaId,
+        usuarioNome,
+        numeroContrato: contrato?.numero ?? null,
+      });
+      setVagas((prev) =>
+        prev.map((vaga) => (vaga.id === atualizada.id ? atualizada : vaga))
+      );
+      setDrafts((prev) =>
+        prev.map((row) =>
+          row.indice === removerFuncionario.indice
+            ? draftAposRemoverFuncionario(row)
+            : row
+        )
+      );
+      setRemoverFuncionario(null);
+      toast.success("Funcionário desvinculado. A vaga continua disponível.");
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível remover o funcionário da vaga."
+      );
+    } finally {
+      setActionSaving(false);
+    }
+  }
+
   const visiveis = drafts.slice(0, quantidadePrevista);
 
   return (
@@ -432,6 +474,9 @@ export function OrcamentoAbaFuncionarios({
                       colaboradorCpf: row.colaboradorCpf,
                       manterAsoAberto: row.manterAsoAberto,
                     });
+                const podeRemoverFuncionario = persistida
+                  ? vagaPermiteRemoverFuncionario(persistida)
+                  : false;
                 const vazia =
                   !isNomeFuncionarioReal(row.colaborador) &&
                   normalizeCpfDigits(row.colaboradorCpf).length === 0;
@@ -524,6 +569,27 @@ export function OrcamentoAbaFuncionarios({
                     <td className="border-b border-[#eef2f7] px-2 py-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={statusPreview} />
+                        {persistida && podeRemoverFuncionario ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red hover:underline disabled:opacity-50"
+                            disabled={busy}
+                            title="Desvincular funcionário e manter a vaga disponível"
+                            onClick={() =>
+                              setRemoverFuncionario({
+                                vagaId: persistida.id,
+                                indice: row.indice,
+                                nome:
+                                  normalizeNomeOcupante(row.colaborador) ||
+                                  normalizeNomeOcupante(persistida.colaborador) ||
+                                  `Vaga ${row.indice}`,
+                              })
+                            }
+                          >
+                            <IconTrash size={12} />
+                            Remover
+                          </button>
+                        ) : null}
                         {!locked && vazia ? (
                           <button
                             type="button"
@@ -624,6 +690,19 @@ export function OrcamentoAbaFuncionarios({
         saving={actionSaving}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void handleConfirmRemover()}
+      />
+      <OrcamentoAnexoRemoverModal
+        open={Boolean(removerFuncionario)}
+        titulo="Remover funcionário da vaga?"
+        mensagem={`${removerFuncionario?.nome ?? "O funcionário"} será desvinculado(a) deste contrato. A vaga continuará disponível para outro funcionário.`}
+        saving={actionSaving}
+        cancelLabel="Cancelar"
+        confirmLabel="Remover funcionário"
+        onClose={() => {
+          if (actionSaving) return;
+          setRemoverFuncionario(null);
+        }}
+        onConfirm={() => void handleConfirmRemoverFuncionario()}
       />
     </div>
   );

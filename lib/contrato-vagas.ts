@@ -106,6 +106,30 @@ export function vagaStatusBloqueiaEdicao(status: ContratoVagaStatus): boolean {
   return status === "agendada" || status === "programada";
 }
 
+/**
+ * Só vaga comprometida, sem agendamento nem periódico futuro.
+ * Não apaga a linha: o ocupante é limpo e o status volta para aberta.
+ */
+export function vagaPermiteRemoverFuncionario(vaga: {
+  status?: ContratoVagaStatus | null;
+  agendamento_id?: string | null;
+  periodico_futuro_id?: string | null;
+}): boolean {
+  if (vaga.status !== "comprometida") return false;
+  if (vagaStatusBloqueiaEdicao(vaga.status)) return false;
+  if (vaga.agendamento_id || vaga.periodico_futuro_id) return false;
+  return true;
+}
+
+export function draftAposRemoverFuncionario(
+  draft: Pick<ContratoVagaDraft, "id" | "indice">
+): ContratoVagaDraft {
+  return {
+    ...emptyVagaDraft(draft.indice),
+    id: draft.id,
+  };
+}
+
 export function resolveStatusVagaRascunho(input: {
   statusAtual?: ContratoVagaStatus | null;
   colaborador: string;

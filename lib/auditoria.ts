@@ -76,6 +76,7 @@ export const AUDITORIA_ACOES = {
   credito_aso_observacao_editada: "credito_aso_observacao_editada",
   contrato_vagas_salvas: "contrato_vagas_salvas",
   contrato_vaga_vinculada: "contrato_vaga_vinculada",
+  contrato_vaga_funcionario_removido: "contrato_vaga_funcionario_removido",
   riscos_lista_solicitada: "riscos_lista_solicitada",
   riscos_lista_recebida: "riscos_lista_recebida",
   riscos_lista_anexo_removido: "riscos_lista_anexo_removido",
@@ -175,6 +176,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   credito_aso_observacao_editada: "Observação do ASO em aberto editada",
   contrato_vagas_salvas: "Lista de vagas/funcionários do contrato salva",
   contrato_vaga_vinculada: "Agendamento vinculado à vaga contratual",
+  contrato_vaga_funcionario_removido:
+    "Funcionário desvinculado da vaga contratual",
   riscos_lista_solicitada: "Lista de presença solicitada",
   riscos_lista_recebida: "Lista de presença recebida",
   riscos_lista_anexo_removido: "Anexo da lista de presença removido",

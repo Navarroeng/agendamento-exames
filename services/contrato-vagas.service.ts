@@ -10,6 +10,7 @@ import {
   normalizeNomeOcupante,
   resolveStatusVagaRascunho,
   validarDraftsListaVagas,
+  vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -247,6 +248,67 @@ async function atualizarVaga(
     }
     throw error;
   }
+}
+
+export async function liberarFuncionarioDaVagaComprometida(params: {
+  vagaId: string;
+  usuarioNome: string;
+  numeroContrato?: string | null;
+}): Promise<ContratoVagaRecord> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contrato_vagas")
+    .select(SELECT_VAGA)
+    .eq("id", params.vagaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Vaga contratual não encontrada.");
+
+  const vaga = mapVaga(data as Record<string, unknown>);
+  if (vaga.status === "agendada" || vaga.agendamento_id) {
+    throw new Error(
+      "Esta vaga já possui agendamento vinculado. Cancele o agendamento para liberá-la."
+    );
+  }
+  if (vaga.status === "programada" || vaga.periodico_futuro_id) {
+    throw new Error(
+      "Esta vaga está programada para exame futuro e não pode ser limpa por aqui."
+    );
+  }
+  if (!vagaPermiteRemoverFuncionario(vaga)) {
+    throw new Error(
+      "Só é possível remover o funcionário de uma vaga comprometida, ainda sem agendamento."
+    );
+  }
+
+  const nome = normalizeNomeOcupante(vaga.colaborador) || "funcionário";
+  await atualizarVaga(vaga.id, {
+    status: "aberta",
+    colaborador: null,
+    colaborador_cpf: null,
+    cargo_id: null,
+    cargo_nome: null,
+    credito_aso_id: null,
+  });
+
+  await registrarAuditoria({
+    modulo: AUDITORIA_MODULOS.orcamentos,
+    acao: AUDITORIA_ACOES.contrato_vaga_funcionario_removido,
+    registroId: vaga.id,
+    registroNome: params.numeroContrato ?? vaga.contrato_id,
+    descricao: `${params.usuarioNome} desvinculou ${nome} da vaga ${vaga.indice} do contrato ${params.numeroContrato ?? vaga.contrato_id}. A vaga permaneceu disponível.`,
+    usuarioNome: params.usuarioNome,
+    usuarioEmail: "",
+  });
+
+  const { data: atualizada, error: reloadError } = await supabase
+    .from("contrato_vagas")
+    .select(SELECT_VAGA)
+    .eq("id", vaga.id)
+    .maybeSingle();
+  if (reloadError) throw reloadError;
+  if (!atualizada) throw new Error("Vaga contratual não encontrada após a remoção.");
+  return mapVaga(atualizada as Record<string, unknown>);
 }
 
 export async function buscarVagaComprometidaPorCpf(params: {

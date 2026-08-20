@@ -4,11 +4,13 @@ import assert from "node:assert/strict";
 import {
   buildVagaDraftsIniciais,
   contarVagasComprometidas,
+  draftAposRemoverFuncionario,
   emptyVagaDraft,
   isNomeFuncionarioReal,
   labelColaboradorOuVaga,
   resolveStatusVagaRascunho,
   validarDraftsListaVagas,
+  vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -64,6 +66,54 @@ assert.equal(
 
 assert.equal(vagaStatusBloqueiaEdicao("agendada"), true);
 assert.equal(vagaStatusBloqueiaEdicao("comprometida"), false);
+assert.equal(vagaStatusBloqueiaEdicao("programada"), true);
+
+assert.equal(
+  vagaPermiteRemoverFuncionario({
+    status: "comprometida",
+    agendamento_id: null,
+    periodico_futuro_id: null,
+  }),
+  true
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario({ status: "agendada", agendamento_id: "ag-1" }),
+  false
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario({
+    status: "programada",
+    periodico_futuro_id: "pf-1",
+  }),
+  false
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario({
+    status: "comprometida",
+    agendamento_id: "ag-1",
+  }),
+  false
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario({ status: "aberta" }),
+  false
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario({ status: "aso_aberto" }),
+  false
+);
+
+const draftLimpo = draftAposRemoverFuncionario({
+  id: "vaga-2",
+  indice: 2,
+});
+assert.equal(draftLimpo.id, "vaga-2");
+assert.equal(draftLimpo.indice, 2);
+assert.equal(draftLimpo.colaborador, "");
+assert.equal(draftLimpo.colaboradorCpf, "");
+assert.equal(draftLimpo.cargoNome, "");
+assert.equal(draftLimpo.cargoId, null);
+assert.equal(draftLimpo.manterAsoAberto, false);
 
 const drafts2: ContratoVagaDraft[] = [
   {
@@ -143,6 +193,18 @@ assert.equal(caso.vagasComprometidas, 1);
 assert.equal(caso.pendentesDefinicao, 0);
 assert.equal(caso.comprometidos, 2);
 assert.equal(caso.percentual, 50);
+
+const aposRemoverComprometido = buildContratoAgendamentoContagem(2, 1, 0, {
+  agendados: 1,
+  programadosFuturos: 0,
+  emAberto: 0,
+  vagasComprometidas: 0,
+});
+assert.equal(aposRemoverComprometido.previstos, 2);
+assert.equal(aposRemoverComprometido.agendados, 1);
+assert.equal(aposRemoverComprometido.vagasComprometidas, 0);
+assert.equal(aposRemoverComprometido.pendentesDefinicao, 1);
+assert.equal(aposRemoverComprometido.emAberto, 0);
 
 assert.equal(
   resolverProximoAvisoBeneficio({
