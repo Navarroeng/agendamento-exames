@@ -3,6 +3,7 @@
 import type {
   OrcamentoEtapaEstado,
   OrcamentoEtapaId,
+  OrcamentoEtapasContagemAgendamentos,
   OrcamentoEtapasContexto,
 } from "@/lib/orcamento-etapas";
 import {
@@ -20,11 +21,7 @@ interface OrcamentoEtapasNavProps {
   disabled?: boolean;
   fluxo?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
-  contagemAgendamentos?: {
-    quantidadeContratada: number;
-    agendamentosRealizados: number;
-    agendamentosDispensados?: boolean;
-  } | null;
+  contagemAgendamentos?: OrcamentoEtapasContagemAgendamentos | null;
   onChange: (tab: OrcamentoEtapaId) => void;
 }
 

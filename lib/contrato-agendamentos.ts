@@ -1,4 +1,5 @@
 import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
+import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 
 export type ContratoAgendamentoContagem = {
   contratados: number;
@@ -117,7 +118,11 @@ export function buildContratoAgendamentoContagem(
       : usadosProgresso > 0
         ? 100
         : 0;
-  const concluido = previstos > 0 ? usadosProgresso >= previstos : false;
+  const concluido = isClassificacaoVagasContratoCompleta({
+    previstos,
+    pendentesDefinicao,
+    vagasComprometidas,
+  });
 
   let mensagem = "";
   let mensagemComplemento: string | null = null;

@@ -378,6 +378,8 @@ export function OrcamentoAprovarModal({
             quantidadeContratada: agendamentosContagem.contratados,
             agendamentosRealizados: agendamentosContagem.realizados,
             agendamentosDispensados: agendamentosContagem.dispensado,
+            pendentesDefinicao: agendamentosContagem.pendentesDefinicao,
+            vagasComprometidas: agendamentosContagem.vagasComprometidas,
           }
         : aprovacao
           ? {
@@ -782,6 +784,8 @@ export function OrcamentoAprovarModal({
                     quantidadeContratada: agendamentosContagem.contratados,
                     agendamentosRealizados: agendamentosContagem.realizados,
                     agendamentosDispensados: agendamentosContagem.dispensado,
+                    pendentesDefinicao: agendamentosContagem.pendentesDefinicao,
+                    vagasComprometidas: agendamentosContagem.vagasComprometidas,
                   }
                 : aprovacao
                   ? {

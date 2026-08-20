@@ -5,6 +5,8 @@ import {
 } from "@/lib/auditoria";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import {
+  cpfVagaIguais,
+  escolherAgendamentoValidoParaVaga,
   isContratoVagaStatus,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
@@ -343,15 +345,14 @@ export async function buscarVagaComprometidaPorCpf(params: {
     .from("contrato_vagas")
     .select(SELECT_VAGA)
     .in("contrato_id", ids)
-    .eq("colaborador_cpf", cpf)
     .eq("status", "comprometida")
-    .order("indice", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("indice", { ascending: true });
   if (error) throw error;
-  if (!data) return null;
-
-  const mapped = mapVaga(data as Record<string, unknown>);
+  const matched = (data ?? [])
+    .map((row) => mapVaga(row as Record<string, unknown>))
+    .filter((vaga) => cpfVagaIguais(vaga.colaborador_cpf, cpf));
+  if (matched.length === 0) return null;
+  const mapped = matched[0];
   const ctr = (contratos ?? []).find((c) => String(c.id) === mapped.contrato_id);
   return {
     ...mapped,
@@ -382,9 +383,24 @@ export async function vincularAgendamentoAVaga(params: {
   if (fetchErr) throw fetchErr;
   if (!vaga) throw new Error("Vaga contratual não encontrada.");
   const mapped = mapVaga(vaga as Record<string, unknown>);
-  if (mapped.status === "agendada" && mapped.agendamento_id) {
-    if (mapped.agendamento_id === params.agendamentoId) return;
-    throw new Error("Esta vaga já possui um agendamento vinculado.");
+  if (mapped.agendamento_id === params.agendamentoId && mapped.status === "agendada") {
+    return;
+  }
+  const contratoId = params.contratoId.trim() || mapped.contrato_id;
+  if (!contratoId) {
+    throw new Error("Contrato da vaga não encontrado.");
+  }
+
+  if (mapped.agendamento_id && mapped.agendamento_id !== params.agendamentoId) {
+    const { data: atualAg } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .eq("id", mapped.agendamento_id)
+      .maybeSingle();
+    const statusAtual = String(atualAg?.status ?? "");
+    if (mapped.status === "agendada" && statusAtual && statusAtual !== "cancelado") {
+      throw new Error("Esta vaga já possui um agendamento vinculado.");
+    }
   }
   if (mapped.status === "aso_aberto") {
     throw new Error("Esta vaga está classificada como ASO em aberto.");
@@ -406,7 +422,7 @@ export async function vincularAgendamentoAVaga(params: {
   await supabase
     .from("agendamentos")
     .update({
-      contrato_id: params.contratoId,
+      contrato_id: contratoId,
       consome_saldo_contrato: true,
       vinculado_contrato_em: agora,
       vinculado_contrato_por: params.usuarioNome,
@@ -416,7 +432,7 @@ export async function vincularAgendamentoAVaga(params: {
   const { data: existing } = await supabase
     .from("contrato_agendamentos")
     .select("id")
-    .eq("contrato_id", params.contratoId)
+    .eq("contrato_id", contratoId)
     .eq("agendamento_id", params.agendamentoId)
     .maybeSingle();
 
@@ -434,7 +450,7 @@ export async function vincularAgendamentoAVaga(params: {
       .eq("id", existing.id);
   } else {
     await supabase.from("contrato_agendamentos").insert({
-      contrato_id: params.contratoId,
+      contrato_id: contratoId,
       agendamento_id: params.agendamentoId,
       contabiliza_previsao: true,
       vinculado_por: params.usuarioNome,
@@ -451,6 +467,108 @@ export async function vincularAgendamentoAVaga(params: {
     usuarioNome: params.usuarioNome,
     usuarioEmail: "",
   });
+}
+
+export async function reconciliarVagasComprometidasDoContrato(params: {
+  contratoId: string;
+  usuarioNome?: string;
+}): Promise<number> {
+  const contratoId = params.contratoId.trim();
+  if (!contratoId) return 0;
+
+  const supabase = createClient();
+  const { data: contrato, error: ctrErr } = await supabase
+    .from("cliente_contratos")
+    .select("id, cliente_id, data_inicio, data_fim, numero")
+    .eq("id", contratoId)
+    .maybeSingle();
+  if (ctrErr) throw ctrErr;
+  if (!contrato) return 0;
+
+  let vagas = await listarVagasDoContrato(contratoId);
+  const usuarioNome = params.usuarioNome?.trim() || "Sistema";
+
+  for (const vaga of vagas) {
+    if (vaga.status !== "agendada" || !vaga.agendamento_id) continue;
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .eq("id", vaga.agendamento_id)
+      .maybeSingle();
+    if (!ag || String(ag.status) === "cancelado") {
+      await reverterVagaPorCancelamentoAgendamento(vaga.agendamento_id);
+    }
+  }
+
+  vagas = await listarVagasDoContrato(contratoId);
+  const idsJaVinculados = new Set(
+    vagas
+      .filter((v) => v.agendamento_id)
+      .map((v) => String(v.agendamento_id))
+  );
+
+  const clienteId = String(contrato.cliente_id ?? "").trim();
+  const { data: ags, error: agErr } = await supabase
+    .from("agendamentos")
+    .select(
+      "id, status, colaborador, colaborador_cpf, contrato_id, cliente_id, data_agendamento, cargo_id, cargo_nome"
+    )
+    .or(
+      [
+        `contrato_id.eq.${contratoId}`,
+        clienteId ? `cliente_id.eq.${clienteId}` : "",
+      ]
+        .filter(Boolean)
+        .join(",")
+    );
+  if (agErr) throw agErr;
+
+  const agendamentos = (ags ?? []).map((row) => ({
+    id: String(row.id),
+    status: String(row.status ?? ""),
+    colaborador: String(row.colaborador ?? ""),
+    colaborador_cpf: row.colaborador_cpf
+      ? String(row.colaborador_cpf)
+      : null,
+    contrato_id: row.contrato_id ? String(row.contrato_id) : null,
+    cliente_id: row.cliente_id ? String(row.cliente_id) : null,
+    data_agendamento: row.data_agendamento
+      ? String(row.data_agendamento)
+      : null,
+    cargo_id: row.cargo_id ? String(row.cargo_id) : null,
+    cargo_nome: row.cargo_nome ? String(row.cargo_nome) : null,
+  }));
+
+  let vinculados = 0;
+  for (const vaga of vagas) {
+    if (vaga.status !== "comprometida") continue;
+    const escolhido = escolherAgendamentoValidoParaVaga({
+      vaga,
+      agendamentos,
+      contratoClienteId: clienteId,
+      vigenciaInicio: contrato.data_inicio,
+      vigenciaFim: contrato.data_fim,
+      idsJaVinculadosEmOutraVaga: idsJaVinculados,
+    });
+    if (!escolhido) continue;
+    const ag = agendamentos.find((item) => item.id === escolhido);
+    if (!ag) continue;
+    await vincularAgendamentoAVaga({
+      vagaId: vaga.id,
+      agendamentoId: ag.id,
+      contratoId,
+      colaborador: ag.colaborador || vaga.colaborador || "",
+      colaboradorCpf: ag.colaborador_cpf ?? vaga.colaborador_cpf,
+      cargoId: ag.cargo_id ?? vaga.cargo_id,
+      cargoNome: ag.cargo_nome ?? vaga.cargo_nome,
+      usuarioNome,
+      numeroContrato: contrato.numero ? String(contrato.numero) : null,
+    });
+    idsJaVinculados.add(ag.id);
+    vinculados += 1;
+  }
+
+  return vinculados;
 }
 
 export async function ocuparVagasAbertasComCreditos(params: {
@@ -509,7 +627,7 @@ export async function marcarVagaAgendadaPorAgendamento(params: {
   const alvo =
     (cpf &&
       vagas.find(
-        (v) => v.status === "comprometida" && v.colaborador_cpf === cpf
+        (v) => v.status === "comprometida" && cpfVagaIguais(v.colaborador_cpf, cpf)
       )) ||
     vagas.find((v) => v.status === "aberta") ||
     null;
@@ -603,7 +721,7 @@ export async function ocuparVagaComExameFuturo(params: {
   const alvo =
     (cpf &&
       vagas.find(
-        (v) => v.status === "comprometida" && v.colaborador_cpf === cpf
+        (v) => v.status === "comprometida" && cpfVagaIguais(v.colaborador_cpf, cpf)
       )) ||
     vagas.find((v) => v.status === "aberta");
   if (!alvo) return;

@@ -326,6 +326,7 @@ export function useAgendamentosPage() {
   const vagaContratoIdRef = useRef<string | null>(null);
   const vagaContratoNumeroRef = useRef<string | null>(null);
   const vagaAlertKeyRef = useRef<string | null>(null);
+  const vagaLockRef = useRef(false);
   const saveLockRef = useRef(createAgendamentoSaveLock());
   const continuarSaveAposCreditoRef = useRef<(() => void) | null>(null);
   const pendingPrefillCargoRef = useRef<{
@@ -822,6 +823,7 @@ export function useAgendamentosPage() {
     vagaContratoIdRef.current = null;
     vagaContratoNumeroRef.current = null;
     vagaAlertKeyRef.current = null;
+    vagaLockRef.current = false;
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
     setInadimplenciaCliente(null);
@@ -1037,11 +1039,12 @@ export function useAgendamentosPage() {
       }
       if (staged.aso) setField("aso", staged.aso);
 
-      if (staged.vaga_id) {
+        if (staged.vaga_id) {
         vagaDecisionRef.current = "link";
         vagaEmUsoIdRef.current = staged.vaga_id;
         vagaContratoIdRef.current = staged.contrato_id ?? null;
         vagaContratoNumeroRef.current = staged.contrato_numero ?? null;
+        vagaLockRef.current = true;
         creditoDecisionRef.current = "skip";
       }
 
@@ -1172,11 +1175,13 @@ export function useAgendamentosPage() {
         setCreditoAsoNumeroContrato(null);
         setCreditoAsoModalOpen(false);
         setCreditoAsoModalVariant("padrao");
-        vagaDecisionRef.current = "none";
-        vagaEmUsoIdRef.current = null;
-        vagaAlertKeyRef.current = null;
-        setVagaComprometida(null);
-        setVagaComprometidaModalOpen(false);
+        if (field === "colaborador_cpf" && !vagaLockRef.current) {
+          vagaDecisionRef.current = "none";
+          vagaEmUsoIdRef.current = null;
+          vagaAlertKeyRef.current = null;
+          setVagaComprometida(null);
+          setVagaComprometidaModalOpen(false);
+        }
       }
       if (field !== "data_agendamento") return;
 
@@ -1447,6 +1452,7 @@ export function useAgendamentosPage() {
         vagaEmUsoIdRef.current = null;
         vagaContratoIdRef.current = null;
         vagaAlertKeyRef.current = null;
+        vagaLockRef.current = false;
         setVagaComprometida(null);
         setVagaComprometidaModalOpen(false);
         return;
@@ -1606,6 +1612,7 @@ export function useAgendamentosPage() {
     vagaDecisionRef.current = "skip";
     vagaEmUsoIdRef.current = null;
     vagaContratoIdRef.current = null;
+    vagaLockRef.current = false;
     setVagaComprometidaModalOpen(false);
     creditoDecisionRef.current = "skip";
     const pending = pendingSaveStatusRef.current;
@@ -1630,6 +1637,7 @@ export function useAgendamentosPage() {
     vagaEmUsoIdRef.current = vaga.id;
     vagaContratoIdRef.current = vaga.contrato_id;
     vagaContratoNumeroRef.current = vaga.contrato_numero;
+    vagaLockRef.current = true;
     creditoDecisionRef.current = "skip";
     setCreditoAsoEmUsoId(null);
     creditoAsoEmUsoIdRef.current = null;
@@ -2713,29 +2721,30 @@ export function useAgendamentosPage() {
             }
           }
 
-          if (vagaDecisionRef.current === "link" && vagaEmUsoIdRef.current) {
-            const contratoIdVaga = vagaContratoIdRef.current;
-            if (contratoIdVaga) {
-              try {
-                await vincularAgendamentoAVaga({
-                  vagaId: vagaEmUsoIdRef.current,
-                  agendamentoId: novoId,
-                  contratoId: contratoIdVaga,
-                  colaborador: payload.colaborador,
-                  colaboradorCpf: payload.colaborador_cpf ?? null,
-                  cargoId: cargoFields.cargo_id,
-                  cargoNome: cargoFields.cargo_nome ?? null,
-                  usuarioNome: historicoUsuario,
-                  numeroContrato: vagaContratoNumeroRef.current,
-                });
-              } catch (vagaErr) {
-                console.error(vagaErr);
-                toast.error(
-                  vagaErr instanceof Error
-                    ? vagaErr.message
-                    : "Agendamento salvo, mas a vaga contratual não pôde ser vinculada."
-                );
-              }
+          if (
+            vagaEmUsoIdRef.current &&
+            (vagaDecisionRef.current === "link" || vagaLockRef.current)
+          ) {
+            try {
+              await vincularAgendamentoAVaga({
+                vagaId: vagaEmUsoIdRef.current,
+                agendamentoId: novoId,
+                contratoId: vagaContratoIdRef.current ?? "",
+                colaborador: payload.colaborador,
+                colaboradorCpf: payload.colaborador_cpf ?? null,
+                cargoId: cargoFields.cargo_id,
+                cargoNome: cargoFields.cargo_nome ?? null,
+                usuarioNome: historicoUsuario,
+                numeroContrato: vagaContratoNumeroRef.current,
+              });
+              toast.message("Vaga contratual marcada como Agendada.");
+            } catch (vagaErr) {
+              console.error(vagaErr);
+              toast.error(
+                vagaErr instanceof Error
+                  ? vagaErr.message
+                  : "Agendamento salvo, mas a vaga contratual não pôde ser vinculada."
+              );
             }
           }
 

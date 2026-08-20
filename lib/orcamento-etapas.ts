@@ -1,5 +1,6 @@
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { isProcuracaoStatusConcluida } from "@/lib/cliente-procuracao";
+import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 import {
   isTreinamentoEtapaConcluida,
   type ImplantacaoTreinamentoRecord,
@@ -82,6 +83,8 @@ export type OrcamentoEtapasContagemAgendamentos = {
   quantidadeContratada: number;
   agendamentosRealizados: number;
   agendamentosDispensados?: boolean;
+  pendentesDefinicao?: number;
+  vagasComprometidas?: number;
 };
 
 export type OrcamentoEtapasContexto = {
@@ -163,8 +166,18 @@ export function isAgendamentosEtapaConcluida(
   if (!isVisitaEtapaConcluida(aprovacao)) return false;
   if (contagem?.agendamentosDispensados) return true;
   const qtd = Math.max(0, contagem?.quantidadeContratada ?? 0);
-  const feitos = Math.max(0, contagem?.agendamentosRealizados ?? 0);
   if (qtd <= 0) return false;
+  if (
+    contagem?.pendentesDefinicao != null &&
+    contagem?.vagasComprometidas != null
+  ) {
+    return isClassificacaoVagasContratoCompleta({
+      previstos: qtd,
+      pendentesDefinicao: contagem.pendentesDefinicao,
+      vagasComprometidas: contagem.vagasComprometidas,
+    });
+  }
+  const feitos = Math.max(0, contagem?.agendamentosRealizados ?? 0);
   return feitos >= qtd;
 }
 

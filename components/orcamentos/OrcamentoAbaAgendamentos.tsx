@@ -63,6 +63,7 @@ import {
   listarVagasDoContrato,
   ocuparVagasAbertasComCreditos,
   liberarVagaPorCreditoRemovido,
+  reconciliarVagasComprometidasDoContrato,
 } from "@/services/contrato-vagas.service";
 import {
   criarExameFuturoImplantacao,
@@ -322,6 +323,18 @@ export function OrcamentoAbaAgendamentos({
           return;
         }
 
+        try {
+          await reconciliarVagasComprometidasDoContrato({
+            contratoId: contratoRow.id,
+            usuarioNome,
+          });
+        } catch (reconcileErr) {
+          console.error(
+            "Erro ao reconciliar vagas comprometidas com agendamentos:",
+            reconcileErr
+          );
+        }
+
         const [resumo, progs, creditos, vagasContrato] = await Promise.all([
           carregarAgendamentosVigenciaContrato({
             contrato: contratoRow,
@@ -387,7 +400,7 @@ export function OrcamentoAbaAgendamentos({
         setRefreshing(false);
       }
     },
-    [aprovacao.quantidade_colaboradores, clienteNome, orcamentoId]
+    [aprovacao.quantidade_colaboradores, clienteNome, orcamentoId, usuarioNome]
   );
 
   // Carrega uma vez ao montar (abrir modal / entrar na aba). Sem polling.

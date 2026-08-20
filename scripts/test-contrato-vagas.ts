@@ -4,8 +4,11 @@ import assert from "node:assert/strict";
 import {
   buildVagaDraftsIniciais,
   contarVagasComprometidas,
+  cpfVagaIguais,
   draftAposRemoverFuncionario,
   emptyVagaDraft,
+  escolherAgendamentoValidoParaVaga,
+  isClassificacaoVagasContratoCompleta,
   isNomeFuncionarioReal,
   labelColaboradorOuVaga,
   resolveStatusVagaRascunho,
@@ -21,7 +24,10 @@ import {
   parsePlanilhaListaFuncionarios,
 } from "../lib/contrato-vagas-import";
 import { resolverProximoAvisoBeneficio } from "../lib/agendamento-beneficios-contratuais";
-import { isFuncionariosEtapaConcluida } from "../lib/orcamento-etapas";
+import {
+  isAgendamentosEtapaConcluida,
+  isFuncionariosEtapaConcluida,
+} from "../lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 
 assert.equal(isNomeFuncionarioReal("Natália Porfírio"), true);
@@ -193,6 +199,83 @@ assert.equal(caso.vagasComprometidas, 1);
 assert.equal(caso.pendentesDefinicao, 0);
 assert.equal(caso.comprometidos, 2);
 assert.equal(caso.percentual, 50);
+assert.equal(caso.concluido, false);
+
+const nataliaAgendadaMaisAso = buildContratoAgendamentoContagem(2, 2, 0, {
+  agendados: 1,
+  programadosFuturos: 0,
+  emAberto: 1,
+  vagasComprometidas: 0,
+});
+assert.equal(nataliaAgendadaMaisAso.previstos, 2);
+assert.equal(nataliaAgendadaMaisAso.agendados, 1);
+assert.equal(nataliaAgendadaMaisAso.emAberto, 1);
+assert.equal(nataliaAgendadaMaisAso.vagasComprometidas, 0);
+assert.equal(nataliaAgendadaMaisAso.pendentesDefinicao, 0);
+assert.equal(nataliaAgendadaMaisAso.concluido, true);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 2,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  true
+);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 2,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 1,
+  }),
+  false
+);
+
+const vagaNatalia = existentes[0];
+assert.equal(cpfVagaIguais("529.982.247-25", "52998224725"), true);
+assert.equal(
+  escolherAgendamentoValidoParaVaga({
+    vaga: vagaNatalia,
+    agendamentos: [
+      {
+        id: "ag-cancelado",
+        status: "cancelado",
+        colaborador_cpf: "52998224725",
+        contrato_id: "c1",
+        cliente_id: "cli-1",
+        data_agendamento: "2026-01-10",
+      },
+      {
+        id: "ag-valido",
+        status: "agendado",
+        colaborador_cpf: "529.982.247-25",
+        contrato_id: null,
+        cliente_id: "cli-1",
+        data_agendamento: "2026-04-20",
+      },
+    ],
+    contratoClienteId: "cli-1",
+    vigenciaInicio: "2026-01-01",
+    vigenciaFim: "2026-12-31",
+  }),
+  "ag-valido"
+);
+assert.equal(
+  escolherAgendamentoValidoParaVaga({
+    vaga: vagaNatalia,
+    agendamentos: [
+      {
+        id: "ag-outro-contrato",
+        status: "agendado",
+        colaborador_cpf: "52998224725",
+        contrato_id: "contrato-errado",
+        cliente_id: "cli-1",
+        data_agendamento: "2026-04-20",
+      },
+    ],
+    contratoClienteId: "cli-1",
+  }),
+  null
+);
 
 const aposRemoverComprometido = buildContratoAgendamentoContagem(2, 1, 0, {
   agendados: 1,
@@ -307,6 +390,37 @@ assert.equal(
     aprovacao({ funcionarios_vagas_salvas_em: "2026-08-20T12:00:00Z" })
   ),
   true
+);
+
+assert.equal(
+  isAgendamentosEtapaConcluida(
+    aprovacao({
+      visita_tecnica_necessaria: false,
+      visita_tecnica_salva_em: "2026-01-05",
+    }),
+    {
+      quantidadeContratada: 2,
+      agendamentosRealizados: 1,
+      pendentesDefinicao: 0,
+      vagasComprometidas: 0,
+    }
+  ),
+  true
+);
+assert.equal(
+  isAgendamentosEtapaConcluida(
+    aprovacao({
+      visita_tecnica_necessaria: false,
+      visita_tecnica_salva_em: "2026-01-05",
+    }),
+    {
+      quantidadeContratada: 2,
+      agendamentosRealizados: 2,
+      pendentesDefinicao: 0,
+      vagasComprometidas: 1,
+    }
+  ),
+  false
 );
 
 console.log("test-contrato-vagas: OK");

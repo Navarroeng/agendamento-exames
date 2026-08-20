@@ -197,6 +197,93 @@ export function buildVagaDraftsIniciais(
   return rows;
 }
 
+export function cpfVagaIguais(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const da = normalizeCpfDigits(a);
+  const db = normalizeCpfDigits(b);
+  return isValidCPF(da) && da === db;
+}
+
+export function vagaStatusEClassificacaoFinal(
+  status: ContratoVagaStatus
+): boolean {
+  return status === "agendada" || status === "programada" || status === "aso_aberto";
+}
+
+/**
+ * Etapa Agendamentos da Implantação: todas as vagas classificadas
+ * (agendada / programada / ASO em aberto). Comprometida ainda não conclui.
+ * Não usa percentual de progresso operacional.
+ */
+export function isClassificacaoVagasContratoCompleta(input: {
+  previstos: number;
+  pendentesDefinicao: number;
+  vagasComprometidas: number;
+}): boolean {
+  if (input.previstos <= 0) return false;
+  return input.pendentesDefinicao === 0 && input.vagasComprometidas === 0;
+}
+
+export type AgendamentoCandidatoVaga = {
+  id: string;
+  status: string;
+  colaborador_cpf?: string | null;
+  contrato_id?: string | null;
+  cliente_id?: string | null;
+  data_agendamento?: string | null;
+};
+
+/**
+ * Escolhe um agendamento válido para ocupar vaga comprometida.
+ * Cancelados nunca entram. Em empate inseguro, não escolhe.
+ */
+export function escolherAgendamentoValidoParaVaga(params: {
+  vaga: Pick<ContratoVagaRecord, "contrato_id" | "colaborador_cpf" | "status">;
+  agendamentos: AgendamentoCandidatoVaga[];
+  contratoClienteId?: string | null;
+  vigenciaInicio?: string | null;
+  vigenciaFim?: string | null;
+  idsJaVinculadosEmOutraVaga?: Iterable<string>;
+}): string | null {
+  if (params.vaga.status !== "comprometida") return null;
+  const cpf = normalizeCpfDigits(params.vaga.colaborador_cpf);
+  if (!isValidCPF(cpf)) return null;
+
+  const ocupados = new Set(
+    Array.from(params.idsJaVinculadosEmOutraVaga ?? []).filter(Boolean)
+  );
+  const inicio = (params.vigenciaInicio ?? "").slice(0, 10);
+  const fim = (params.vigenciaFim ?? "").slice(0, 10);
+  const clienteId = (params.contratoClienteId ?? "").trim();
+
+  const candidatos = params.agendamentos.filter((ag) => {
+    if (ocupados.has(ag.id)) return false;
+    if (ag.status === "cancelado") return false;
+    if (!cpfVagaIguais(ag.colaborador_cpf, cpf)) return false;
+    const contratoAg = (ag.contrato_id ?? "").trim();
+    if (contratoAg && contratoAg !== params.vaga.contrato_id) return false;
+    if (contratoAg === params.vaga.contrato_id) return true;
+    if (!clienteId) return false;
+    if ((ag.cliente_id ?? "").trim() !== clienteId) return false;
+    const dia = (ag.data_agendamento ?? "").slice(0, 10);
+    if (inicio && fim && dia) {
+      return dia >= inicio && dia <= fim;
+    }
+    return true;
+  });
+
+  if (candidatos.length === 0) return null;
+
+  const doContrato = candidatos.filter(
+    (ag) => (ag.contrato_id ?? "").trim() === params.vaga.contrato_id
+  );
+  const pool = doContrato.length > 0 ? doContrato : candidatos;
+  if (pool.length !== 1) return null;
+  return pool[0].id;
+}
+
 export function contarVagasComprometidas(
   vagas: Array<Pick<ContratoVagaRecord, "status">>
 ): number {
