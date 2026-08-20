@@ -56,6 +56,40 @@ export function isAgendamentoSelecionavel(
   return status !== "cancelado";
 }
 
+export type AgendamentoVigenciaParaExibicao = {
+  agendamento: { id: string; status: string };
+  selecionado?: boolean;
+};
+
+/** Agrupa a lista da Implantação sem exibir cancelados. */
+export function agruparAgendamentosVigenciaParaExibicao<
+  T extends AgendamentoVigenciaParaExibicao,
+>(
+  itens: T[],
+  params: { selectedIds: Iterable<string>; dispensado: boolean }
+): { doContrato: T[]; demais: T[] } {
+  const selected = new Set(params.selectedIds);
+  const doContrato: T[] = [];
+  const demais: T[] = [];
+  for (const item of itens) {
+    if (!isAgendamentoSelecionavel(item.agendamento.status)) continue;
+    const selecionado =
+      !params.dispensado && selected.has(item.agendamento.id);
+    if (selecionado) {
+      doContrato.push({ ...item, selecionado: true });
+    } else {
+      demais.push({ ...item, selecionado: false });
+    }
+  }
+  return { doContrato, demais };
+}
+
+export function temAgendamentoVisivelNaAbaContrato(
+  itens: Array<{ agendamento: { status: string } }>
+): boolean {
+  return itens.some((item) => isAgendamentoSelecionavel(item.agendamento.status));
+}
+
 export function buildContratoAgendamentoContagem(
   quantidadeContratada: number,
   utilizados: number,

@@ -20,11 +20,13 @@ import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datet
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
   agendamentoVisivelNaAbaContrato,
+  agruparAgendamentosVigenciaParaExibicao,
   buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
   contratoTemAgendamentosIniciaisDispensados,
   isAgendamentoSelecionavel,
   resolveClassificacaoAgendamento,
+  temAgendamentoVisivelNaAbaContrato,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
 import type { ContratoCreditoAsoRecord } from "@/lib/contrato-creditos-aso";
@@ -806,31 +808,23 @@ export function OrcamentoAbaAgendamentos({
     }
   }
 
-  const grupos = useMemo(() => {
-    const doContrato: AgendamentoNaVigenciaItem[] = [];
-    const demais: AgendamentoNaVigenciaItem[] = [];
-    const cancelados: AgendamentoNaVigenciaItem[] = [];
-    for (const item of itens) {
-      const selecionado = !dispensado && selectedIds.has(item.agendamento.id);
-      if (item.agendamento.status === "cancelado") {
-        cancelados.push({ ...item, selecionado: false });
-      } else if (selecionado) {
-        doContrato.push({ ...item, selecionado: true });
-      } else {
-        demais.push({ ...item, selecionado: false });
-      }
-    }
-    return { doContrato, demais, cancelados };
-  }, [itens, selectedIds, dispensado]);
+  const grupos = useMemo(
+    () =>
+      agruparAgendamentosVigenciaParaExibicao(itens, {
+        selectedIds,
+        dispensado,
+      }),
+    [itens, selectedIds, dispensado]
+  );
+  const temAgendamentosVisiveis = temAgendamentoVisivelNaAbaContrato(itens);
 
   function renderTabela(
     titulo: string,
-    rows: AgendamentoNaVigenciaItem[],
-    atenuada?: boolean
+    rows: AgendamentoNaVigenciaItem[]
   ) {
     if (rows.length === 0) return null;
     return (
-      <div className={atenuada ? "opacity-70" : undefined}>
+      <div>
         <div className="border-b border-[#eef2f7] bg-[#f8fafc] px-4 py-2">
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#64748b]">
             {titulo}
@@ -1233,15 +1227,15 @@ export function OrcamentoAbaAgendamentos({
               Carregando...
             </p>
           ) : null}
-          {!showInitialLoading && error && itens.length === 0 ? (
+          {!showInitialLoading && error && !temAgendamentosVisiveis ? (
             <p className="px-4 py-8 text-center text-sm text-brand-red">{error}</p>
           ) : null}
-          {!showInitialLoading && !error && itens.length === 0 ? (
+          {!showInitialLoading && !error && !temAgendamentosVisiveis ? (
             <p className="px-4 py-8 text-center text-sm text-app-muted">
               Nenhum agendamento encontrado na vigência deste contrato.
             </p>
           ) : null}
-          {!showInitialLoading && itens.length > 0 ? (
+          {!showInitialLoading && temAgendamentosVisiveis ? (
             <>
               {renderTabela("Agendamentos do contrato", grupos.doContrato)}
               {renderTabela(
@@ -1250,7 +1244,6 @@ export function OrcamentoAbaAgendamentos({
                   : "Demais agendamentos da vigência",
                 grupos.demais
               )}
-              {renderTabela("Cancelados", grupos.cancelados, true)}
             </>
           ) : null}
         </div>

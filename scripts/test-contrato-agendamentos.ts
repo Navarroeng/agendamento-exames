@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   agendamentoConsomeSaldoContrato,
+  agruparAgendamentosVigenciaParaExibicao,
   agendamentoEVinculadoAoContrato,
   agendamentoPertenceAoClienteContrato,
   agendamentoVisivelNaAbaContrato,
@@ -10,6 +11,7 @@ import {
   isDataNaVigencia,
   mesclarAgendamentosPorId,
   resolveClassificacaoAgendamento,
+  temAgendamentoVisivelNaAbaContrato,
 } from "../lib/contrato-agendamentos";
 import type { AgendamentoWithExames } from "../lib/types";
 
@@ -257,5 +259,48 @@ assert.equal(
   false,
   "o filtro antigo de nome isolado excluiria a Natália"
 );
+
+const nataliaCancelado = {
+  agendamento: { id: "ag-natalia-cancelado", status: "cancelado" },
+};
+const nataliaAtivo = {
+  agendamento: { id: "ag-natalia-ativo", status: "agendado" },
+};
+
+const soAtivo = agruparAgendamentosVigenciaParaExibicao([nataliaAtivo], {
+  selectedIds: ["ag-natalia-ativo"],
+  dispensado: false,
+});
+assert.equal(soAtivo.doContrato.length, 1);
+assert.equal(soAtivo.demais.length, 0);
+assert.equal(temAgendamentoVisivelNaAbaContrato([nataliaAtivo]), true);
+
+const soCancelado = agruparAgendamentosVigenciaParaExibicao(
+  [nataliaCancelado],
+  { selectedIds: ["ag-natalia-cancelado"], dispensado: false }
+);
+assert.equal(soCancelado.doContrato.length, 0);
+assert.equal(soCancelado.demais.length, 0);
+assert.equal(temAgendamentoVisivelNaAbaContrato([nataliaCancelado]), false);
+
+const ativoECancelado = agruparAgendamentosVigenciaParaExibicao(
+  [nataliaCancelado, nataliaAtivo],
+  { selectedIds: ["ag-natalia-ativo"], dispensado: false }
+);
+assert.equal(ativoECancelado.doContrato.map((i) => i.agendamento.id).join(), "ag-natalia-ativo");
+assert.equal(ativoECancelado.demais.length, 0);
+assert.equal(
+  temAgendamentoVisivelNaAbaContrato([nataliaCancelado, nataliaAtivo]),
+  true
+);
+
+const cardsComCancelado = buildContratoAgendamentoContagem(2, 1, 0, {
+  agendados: 1,
+  programadosFuturos: 0,
+  emAberto: 1,
+  vagasComprometidas: 0,
+});
+assert.equal(cardsComCancelado.agendados, 1);
+assert.equal(cardsComCancelado.pendentesDefinicao, 0);
 
 console.log("ok: contrato-agendamentos");
