@@ -16,9 +16,10 @@ import {
   type PortalSnapshotFonte,
 } from "@/lib/portal-cliente";
 import type { RiscosRelatorioResultadoJson } from "@/lib/riscos-relatorio";
+import { resolverUrlLogoCampanhaAdmin } from "@/services/riscos-campanha-logo.server";
 
 const CAMPANHA_SELECT =
-  "id, cliente_id, empresa_nome, status, data_inicio, data_encerramento, created_at";
+  "id, cliente_id, empresa_nome, status, data_inicio, data_encerramento, created_at, logo_storage_path, orcamento_id, cnpj";
 
 const PARTICIPANTE_SELECT = "nome_completo, status, removido_em";
 
@@ -40,8 +41,15 @@ function mapCampanhas(
     data_inicio: String(row.data_inicio ?? ""),
     data_encerramento: String(row.data_encerramento ?? ""),
     created_at: row.created_at ? String(row.created_at) : null,
+    cnpj: row.cnpj ? String(row.cnpj) : null,
   }));
 }
+
+type CampanhaLogoRow = {
+  logo_storage_path?: string | null;
+  orcamento_id?: string | null;
+  cliente_id?: string | null;
+};
 
 export async function listarEmpresasPortalPreview(): Promise<
   PortalEmpresaOpcao[]
@@ -94,6 +102,10 @@ export async function carregarPortalHome(
     (campanhasRaw ?? []) as Array<Record<string, unknown>>
   );
   const campanha = escolherCampanhaAtualPortal(campanhas);
+  const campanhaLogoRow = campanhasRaw?.find(
+    (row) => String((row as { id?: string }).id ?? "") === campanha?.id
+  ) as CampanhaLogoRow | undefined;
+
   if (!campanha) {
     const cliente = await admin
       .from("clientes")
@@ -111,6 +123,12 @@ export async function carregarPortalHome(
       },
     };
   }
+
+  const logoUrl = await resolverUrlLogoCampanhaAdmin({
+    logo_storage_path: campanhaLogoRow?.logo_storage_path ?? null,
+    orcamento_id: campanhaLogoRow?.orcamento_id ?? null,
+    cliente_id: clienteId,
+  });
 
   const { data: participantesRaw, error: participantesError } = await admin
     .from("riscos_campanha_participantes")
@@ -145,6 +163,7 @@ export async function carregarPortalHome(
           campanha,
           participantes,
           snapshot: null,
+          logoUrl,
         }),
       };
     }
@@ -167,6 +186,7 @@ export async function carregarPortalHome(
       campanha,
       participantes,
       snapshot,
+      logoUrl,
     }),
   };
 }

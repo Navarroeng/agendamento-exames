@@ -147,7 +147,10 @@ run("1. campanha em preparação → programada", () => {
   assert.equal(resumo.statusPortal, "programada");
   assert.equal(resumo.ciclo, 2026);
   assert.equal(resumo.empresaNome, "Empresa Demo LTDA");
-  assert.equal(estadoTimelinePortal(resumo.statusPortal, "participantes"), "atual");
+  assert.equal(resumo.logoUrl, null);
+  assert.equal(resumo.planoAcaoDisponivel, false);
+  assert.equal(estadoTimelinePortal(resumo, "participantes"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "pesquisa"), "proxima");
   assert.equal(resumo.relatorioDisponivel, false);
   assert.equal(resumo.categoriasFavoraveis.length, 0);
 });
@@ -165,7 +168,8 @@ run("2. campanha aberta com 0 respondidos → aberta", () => {
   assert.equal(resumo.respondidos, 0);
   assert.equal(resumo.cadastrados, 2);
   assert.equal(resumo.participacaoPercentual, 0);
-  assert.equal(estadoTimelinePortal(resumo.statusPortal, "pesquisa"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "pesquisa"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "participantes"), "concluida");
 });
 
 run("3. campanha aberta em andamento", () => {
@@ -190,7 +194,8 @@ run("4. campanha encerrada sem snapshot → concluida", () => {
   assert.equal(resumo.statusPortal, "concluida");
   assert.equal(resumo.relatorioDisponivel, false);
   assert.equal(resumo.categoriasAtencao.length, 0);
-  assert.equal(estadoTimelinePortal(resumo.statusPortal, "resultados"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "resultados"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "pesquisa"), "concluida");
 });
 
 run("5. campanha encerrada com snapshot → resultados_disponiveis", () => {
@@ -207,12 +212,48 @@ run("5. campanha encerrada com snapshot → resultados_disponiveis", () => {
   assert.equal(resumo.relatorioDisponivel, true);
   assert.equal(resumo.relatorioGeradoEm, "2026-08-19T14:00:00.000Z");
   assert.equal(resumo.categoriasFavoraveis.length, 1);
+  assert.equal(
+    resumo.categoriasFavoraveis[0]?.label,
+    "Situação Favorável"
+  );
   assert.equal(resumo.categoriasAtencao.length, 1);
   assert.equal(resumo.categoriasDesfavoraveis.length, 1);
   assert.equal(resumo.pontosAtencao.length, 2);
-  assert.equal(resumo.pontosAtencao[0]?.nome, "Exigências quantitativas");
-  assert.equal(estadoTimelinePortal(resumo.statusPortal, "plano_acao"), "atual");
-  assert.equal(estadoTimelinePortal(resumo.statusPortal, "resultados"), "concluida");
+  assert.equal(resumo.pontosAtencao[0]?.nome, "Insegurança no trabalho");
+  assert.equal(resumo.pontosAtencao[0]?.label, "Situação Desfavorável");
+  assert.equal(resumo.pontosAtencao[1]?.nome, "Exigências quantitativas");
+  assert.equal(estadoTimelinePortal(resumo, "resultados"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "pesquisa"), "concluida");
+  assert.equal(estadoTimelinePortal(resumo, "plano_acao"), "proxima");
+  assert.equal(estadoTimelinePortal(resumo, "concluido"), "futura");
+});
+
+run("5b. campanha aberta 100% com relatório → resultados, não pesquisa", () => {
+  const resumo = montarPortalResumo({
+    campanha: campanha({ id: "c5b", status: "aberta" }),
+    participantes: [
+      { nome_completo: "Ana Souza", status: "respondido" },
+      { nome_completo: "Bruno Lima", status: "respondido" },
+    ],
+    snapshot: snapshotFonte(),
+  });
+  assert.equal(resumo.statusPortal, "resultados_disponiveis");
+  assert.equal(resumo.relatorioDisponivel, true);
+  assert.equal(resumo.pendentes, 0);
+  assert.equal(resumo.participacaoPercentual, 100);
+  assert.equal(estadoTimelinePortal(resumo, "pesquisa"), "concluida");
+  assert.equal(estadoTimelinePortal(resumo, "resultados"), "atual");
+  assert.equal(estadoTimelinePortal(resumo, "plano_acao"), "proxima");
+});
+
+run("5c. logo da campanha entra no DTO sem cadastro paralelo", () => {
+  const resumo = montarPortalResumo({
+    campanha: campanha({ id: "c5c", status: "aberta" }),
+    participantes: [{ nome_completo: "Ana Souza", status: "respondido" }],
+    snapshot: null,
+    logoUrl: "https://storage.example/logo-campanha.png",
+  });
+  assert.equal(resumo.logoUrl, "https://storage.example/logo-campanha.png");
 });
 
 run("6. participante iniciado = pendente", () => {
@@ -378,10 +419,13 @@ run("serviço não consulta respostas/sessão/vínculo", () => {
   assert.doesNotMatch(svc, /riscos_avaliacao_sessoes/);
   assert.doesNotMatch(svc, /riscos_avaliacao_vinculos/);
   assert.match(svc, /nome_completo, status, removido_em/);
-  assert.match(svc, /id, empresa_nome, status, data_inicio/);
+  assert.match(svc, /id, cliente_id, empresa_nome, status, data_inicio/);
+  assert.match(svc, /logo_storage_path/);
+  assert.match(svc, /resolverUrlLogoCampanhaAdmin/);
+  assert.match(svc, /\.eq\("campanha_id", campanha\.id\)/);
   assert.doesNotMatch(svc, /codigo_publico/);
   assert.doesNotMatch(svc, /codigo_acesso/);
-  assert.doesNotMatch(svc, /cpf/);
+  assert.doesNotMatch(svc, /\bcpf\b/);
   assert.doesNotMatch(svc, /data_nascimento/);
 });
 
@@ -542,6 +586,22 @@ run("APIs do portal exigem sessão staff", () => {
     join(root, "components/portal-cliente/PortalHome.tsx"),
     "utf8"
   );
+  const avaliacao = readFileSync(
+    join(root, "components/portal-cliente/PortalAvaliacaoRiscos.tsx"),
+    "utf8"
+  );
+  const identidade = readFileSync(
+    join(root, "components/portal-cliente/PortalEmpresaIdentidade.tsx"),
+    "utf8"
+  );
+  const modulos = readFileSync(
+    join(root, "components/portal-cliente/PortalModulosSst.tsx"),
+    "utf8"
+  );
+  const logoServer = readFileSync(
+    join(root, "services/riscos-campanha-logo.server.ts"),
+    "utf8"
+  );
   assert.match(staff, /is_staff_user/);
   assert.match(staff, /isPerfilStaffNavarro/);
   assert.match(home, /requirePortalStaffUser/);
@@ -550,6 +610,17 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(page, /AppShell/);
   assert.match(ui, /Pré-visualização interna|PORTAL_PREVIEW_INTERNO_LABEL/);
   assert.match(ui, /Visualizar portal de/);
+  assert.match(modulos, /Ver avaliação/);
+  assert.match(modulos, /Em preparação/);
+  assert.match(identidade, /object-contain/);
+  assert.match(identidade, /iniciaisEmpresa/);
+  assert.match(avaliacao, /RiscosRelatorioViewerModal/);
+  assert.match(avaliacao, /buscarRelatorioCampanha/);
+  assert.match(avaliacao, /campanha_id !== campanhaId/);
+  assert.match(avaliacao, /Salvar em PDF/);
+  assert.match(avaliacao, /Relatório ainda não disponível/);
+  assert.match(logoServer, /RISCOS_LISTA_PRESENCA_BUCKET/);
+  assert.match(logoServer, /ORCAMENTO_ONBOARDING_BUCKET/);
 });
 
 console.log("test-portal-home: OK");

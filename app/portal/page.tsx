@@ -9,7 +9,7 @@ export default function PortalPage() {
     <PerfilRouteGuard>
       <AppShell
         title="Portal do Cliente"
-        subtitle="Pré-visualização interna da Home do cliente."
+        subtitle="Pré-visualização interna do Portal SST do cliente."
         icon={<IconUsers size={20} />}
       >
         <Suspense

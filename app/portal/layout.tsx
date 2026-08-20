@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Painel de Riscos Psicossociais | Navarro Engenharia",
+  title: "Portal do Cliente | Navarro Engenharia",
   description:
-    "Acompanhe a avaliação de riscos psicossociais da sua empresa.",
+    "Portal SST para acompanhar serviços, avaliações e documentos da empresa.",
 };
 
 export default function PortalLayout({

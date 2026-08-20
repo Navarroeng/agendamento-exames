@@ -46,6 +46,8 @@ export type PortalCategoriaResumo = {
   id: string;
   nome: string;
   classificacao: PortalClassificacao;
+  /** Rótulo da metodologia do produto (ex.: Situação Moderada). */
+  label: string;
 };
 
 export type PortalStatusHome =
@@ -67,6 +69,7 @@ export type PortalResumo = {
   empresaNome: string | null;
   ciclo: number | null;
   statusPortal: PortalStatusHome;
+  statusCampanha: string | null;
   dataInicio: string | null;
   dataEncerramento: string | null;
   cadastrados: number;
@@ -76,6 +79,9 @@ export type PortalResumo = {
   participantes: PortalParticipanteStatus[];
   relatorioDisponivel: boolean;
   relatorioGeradoEm: string | null;
+  logoUrl: string | null;
+  empresaCnpj: string | null;
+  planoAcaoDisponivel: boolean;
   categoriasFavoraveis: PortalCategoriaResumo[];
   categoriasAtencao: PortalCategoriaResumo[];
   categoriasDesfavoraveis: PortalCategoriaResumo[];
@@ -89,6 +95,7 @@ export type PortalCampanhaFonte = {
   data_inicio: string;
   data_encerramento: string;
   created_at?: string | null;
+  cnpj?: string | null;
 };
 
 export type PortalParticipanteFonte = {
@@ -124,12 +131,19 @@ export const PORTAL_STATUS_LABELS: Record<PortalStatusHome, string> = {
   resultados_disponiveis: "Resultados disponíveis",
 };
 
+export const PORTAL_CLASSIFICACAO_LABEL: Record<PortalClassificacao, string> = {
+  favoravel: "Situação Favorável",
+  atencao: "Situação Moderada",
+  desfavoravel: "Situação Desfavorável",
+};
+
 export function portalResumoVazio(): PortalResumo {
   return {
     campanhaId: null,
     empresaNome: null,
     ciclo: null,
     statusPortal: "sem_avaliacao",
+    statusCampanha: null,
     dataInicio: null,
     dataEncerramento: null,
     cadastrados: 0,
@@ -139,6 +153,9 @@ export function portalResumoVazio(): PortalResumo {
     participantes: [],
     relatorioDisponivel: false,
     relatorioGeradoEm: null,
+    logoUrl: null,
+    empresaCnpj: null,
+    planoAcaoDisponivel: false,
     categoriasFavoraveis: [],
     categoriasAtencao: [],
     categoriasDesfavoraveis: [],
@@ -264,22 +281,52 @@ export function mapClassificacaoPortal(
   return null;
 }
 
+export function pesquisaConcluidaPortal(input: {
+  cadastrados: number;
+  respondidos: number;
+  pendentes: number;
+}): boolean {
+  return (
+    input.cadastrados > 0 &&
+    input.pendentes === 0 &&
+    input.respondidos >= input.cadastrados
+  );
+}
+
+/**
+ * Status executivo do Portal.
+ * Não usa só a porcentagem nem só o status da campanha:
+ * relatório persistido da campanha prevalece mesmo se ela ainda estiver aberta.
+ */
 export function resolverStatusPortal(input: {
   statusCampanha: string | null | undefined;
   respondidos: number;
+  pendentes: number;
+  cadastrados: number;
   relatorioDisponivel: boolean;
 }): PortalStatusHome {
   const status = String(input.statusCampanha ?? "").trim();
+  if (!status || status === "cancelada") return "sem_avaliacao";
   if (status === "em_preparacao") return "programada";
+
+  if (input.relatorioDisponivel) return "resultados_disponiveis";
+
+  if (status === "encerrada") return "concluida";
+
   if (status === "aberta") {
+    if (pesquisaConcluidaPortal(input)) return "concluida";
     return input.respondidos > 0 ? "em_andamento" : "aberta";
   }
-  if (status === "encerrada") {
-    return input.relatorioDisponivel
-      ? "resultados_disponiveis"
-      : "concluida";
-  }
+
   return "sem_avaliacao";
+}
+
+function labelCategoriaPortal(
+  classificacao: PortalClassificacao,
+  classificacaoLabel: string | null | undefined
+): string {
+  const fromSnapshot = String(classificacaoLabel ?? "").trim();
+  return fromSnapshot || PORTAL_CLASSIFICACAO_LABEL[classificacao];
 }
 
 export function extrairCategoriasDoSnapshot(
@@ -306,6 +353,7 @@ export function extrairCategoriasDoSnapshot(
       id: String(d.id ?? ""),
       nome: String(d.nome ?? "").trim(),
       classificacao,
+      label: labelCategoriaPortal(classificacao, d.classificacaoLabel),
     };
     if (!item.id || !item.nome) continue;
     if (classificacao === "favoravel") favoraveis.push(item);
@@ -313,17 +361,14 @@ export function extrairCategoriasDoSnapshot(
     else desfavoraveis.push(item);
   }
 
-  const criticasRaw = (json as RiscosRelatorioResultadoJson | undefined)
-    ?.resumoExecutivo?.dimensoesCriticas;
-  const criticas = Array.isArray(criticasRaw) ? criticasRaw : [];
-  const pontosAtencao: PortalPontoAtencao[] = criticas
-    .slice(0, 3)
-    .map((c) => ({
-      id: String(c.id ?? ""),
-      nome: String(c.nome ?? "").trim(),
-      label: String(c.classificacaoLabel ?? "").trim(),
-    }))
-    .filter((c) => c.id && c.nome);
+  const pontosAtencao: PortalPontoAtencao[] = [
+    ...desfavoraveis,
+    ...atencao,
+  ].map((c) => ({
+    id: c.id,
+    nome: c.nome,
+    label: c.label,
+  }));
 
   return { favoraveis, atencao, desfavoraveis, pontosAtencao };
 }
@@ -332,6 +377,7 @@ export function montarPortalResumo(input: {
   campanha: PortalCampanhaFonte | null;
   participantes: readonly PortalParticipanteFonte[];
   snapshot: PortalSnapshotFonte | null;
+  logoUrl?: string | null;
 }): PortalResumo {
   if (!input.campanha) return portalResumoVazio();
 
@@ -359,6 +405,8 @@ export function montarPortalResumo(input: {
   const statusPortal = resolverStatusPortal({
     statusCampanha: input.campanha.status,
     respondidos: resumo.respondidos,
+    pendentes: resumo.pendentes,
+    cadastrados: resumo.cadastrados,
     relatorioDisponivel: temSnapshot,
   });
 
@@ -379,6 +427,7 @@ export function montarPortalResumo(input: {
     empresaNome: String(input.campanha.empresa_nome ?? "").trim() || null,
     ciclo: cicloFromDataInicio(dataInicio),
     statusPortal,
+    statusCampanha: String(input.campanha.status ?? "").trim() || null,
     dataInicio,
     dataEncerramento,
     cadastrados: resumo.cadastrados,
@@ -390,6 +439,9 @@ export function montarPortalResumo(input: {
     relatorioGeradoEm: temSnapshot
       ? String(input.snapshot?.gerado_em ?? "").trim() || null
       : null,
+    logoUrl: String(input.logoUrl ?? "").trim() || null,
+    empresaCnpj: String(input.campanha.cnpj ?? "").trim() || null,
+    planoAcaoDisponivel: false,
     categoriasFavoraveis: extraido.favoraveis,
     categoriasAtencao: extraido.atencao,
     categoriasDesfavoraveis: extraido.desfavoraveis,
@@ -397,8 +449,36 @@ export function montarPortalResumo(input: {
   };
 }
 
+export type PortalTimelineFonte = Pick<
+  PortalResumo,
+  "statusPortal" | "relatorioDisponivel" | "planoAcaoDisponivel"
+>;
+
+/**
+ * Etapa atual a partir do estado real:
+ * pesquisa só permanece atual enquanto houver pendências ou a coleta não tiver
+ * sido consolidada; relatório da campanha avança para Resultados.
+ * Plano de Ação / Concluído só avançam quando houver dado real.
+ */
+export function etapaAtualPortal(
+  resumo: PortalTimelineFonte
+): PortalTimelineEtapaId {
+  if (resumo.planoAcaoDisponivel) return "plano_acao";
+  if (resumo.relatorioDisponivel) return "resultados";
+  if (resumo.statusPortal === "concluida") return "resultados";
+  if (
+    resumo.statusPortal === "aberta" ||
+    resumo.statusPortal === "em_andamento"
+  ) {
+    return "pesquisa";
+  }
+  if (resumo.statusPortal === "programada") return "participantes";
+  if (resumo.statusPortal === "resultados_disponiveis") return "resultados";
+  return "participantes";
+}
+
 export function estadoTimelinePortal(
-  statusPortal: PortalStatusHome,
+  resumo: PortalTimelineFonte,
   etapaId: PortalTimelineEtapaId
 ): PortalTimelineEstado {
   const ordem: PortalTimelineEtapaId[] = [
@@ -408,29 +488,12 @@ export function estadoTimelinePortal(
     "plano_acao",
     "concluido",
   ];
-  const atual: PortalTimelineEtapaId =
-    statusPortal === "programada"
-      ? "participantes"
-      : statusPortal === "aberta" || statusPortal === "em_andamento"
-        ? "pesquisa"
-        : statusPortal === "concluida"
-          ? "resultados"
-          : statusPortal === "resultados_disponiveis"
-            ? "plano_acao"
-            : "participantes";
-
+  const atual = etapaAtualPortal(resumo);
   const iEtapa = ordem.indexOf(etapaId);
   const iAtual = ordem.indexOf(atual);
   if (iEtapa < iAtual) return "concluida";
-  if (iEtapa === iAtual) {
-    if (statusPortal === "concluida" && etapaId === "resultados") {
-      return "atual";
-    }
-    return "atual";
-  }
-  if (iEtapa === iAtual + 1 && statusPortal === "resultados_disponiveis") {
-    return "proxima";
-  }
+  if (iEtapa === iAtual) return "atual";
+  if (iEtapa === iAtual + 1) return "proxima";
   return "futura";
 }
 
