@@ -4,6 +4,7 @@
  */
 
 import { calcularParticipacaoOperacional } from "@/lib/copsoq-engine";
+import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
 import { escolherCampanhaParaProgresso } from "@/lib/riscos-campanha-origem";
 import {
   buildParticipantesResumo,
@@ -29,6 +30,9 @@ export const PORTAL_PREVIEW_INTERNO_LABEL = "Pré-visualização interna";
 
 export const PORTAL_RESULTADOS_AGUARDANDO_MSG =
   "Os resultados consolidados estarão disponíveis após a conclusão da avaliação e geração do relatório.";
+
+export const PORTAL_HISTORICO_UM_CICLO_MSG =
+  "A comparação histórica ficará disponível após a realização de novos ciclos de avaliação.";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -86,6 +90,32 @@ export type PortalResumo = {
   categoriasAtencao: PortalCategoriaResumo[];
   categoriasDesfavoraveis: PortalCategoriaResumo[];
   pontosAtencao: PortalPontoAtencao[];
+  historicoRiscos: PortalHistoricoCiclo[];
+};
+
+export type PortalHistoricoCategoriaPonto = {
+  id: string;
+  nome: string;
+  classificacao: PortalClassificacao;
+  label: string;
+};
+
+export type PortalHistoricoCiclo = {
+  campanhaId: string;
+  label: string;
+  periodo: string | null;
+  dataInicio: string | null;
+  favoraveis: number;
+  atencao: number;
+  desfavoraveis: number;
+  categorias: PortalHistoricoCategoriaPonto[];
+};
+
+export type PortalHistoricoSnapshotFonte = {
+  campanha_id: string;
+  cliente_id?: string | null;
+  gerado_em?: string | null;
+  resultado_json: RiscosRelatorioResultadoJson | Record<string, unknown> | null;
 };
 
 export type PortalCampanhaFonte = {
@@ -160,6 +190,7 @@ export function portalResumoVazio(): PortalResumo {
     categoriasAtencao: [],
     categoriasDesfavoraveis: [],
     pontosAtencao: [],
+    historicoRiscos: [],
   };
 }
 
@@ -378,6 +409,7 @@ export function montarPortalResumo(input: {
   participantes: readonly PortalParticipanteFonte[];
   snapshot: PortalSnapshotFonte | null;
   logoUrl?: string | null;
+  historicoRiscos?: PortalHistoricoCiclo[];
 }): PortalResumo {
   if (!input.campanha) return portalResumoVazio();
 
@@ -446,7 +478,129 @@ export function montarPortalResumo(input: {
     categoriasAtencao: extraido.atencao,
     categoriasDesfavoraveis: extraido.desfavoraveis,
     pontosAtencao: extraido.pontosAtencao,
+    historicoRiscos: input.historicoRiscos ?? [],
   };
+}
+
+export function pathPortalRelatorio(campanhaId: string): string {
+  const id = campanhaId.trim();
+  if (!isPortalUuid(id)) return "";
+  return `/portal/relatorio/${id}`;
+}
+
+export function snapshotTemResultadoConsolidado(
+  json: RiscosRelatorioResultadoJson | Record<string, unknown> | null | undefined
+): boolean {
+  return Array.isArray((json as { dimensoes?: unknown } | null)?.dimensoes);
+}
+
+export function labelCicloPortal(input: {
+  dataInicio: string | null | undefined;
+  dataEncerramento: string | null | undefined;
+  anoDuplicado: boolean;
+}): string {
+  const inicio = String(input.dataInicio ?? "").slice(0, 10) || null;
+  const fim = String(input.dataEncerramento ?? "").slice(0, 10) || null;
+  const ciclo = cicloFromDataInicio(inicio);
+  const base = ciclo ? `Ciclo ${ciclo}` : "Avaliação";
+  if (!input.anoDuplicado) return base;
+  if (inicio && fim) return `${base} · ${formatPeriodoCampanha(inicio, fim)}`;
+  return base;
+}
+
+/**
+ * Histórico consolidado por campanha com relatório persistido.
+ * Não recalcula COPSOQ — usa classificação já gravada no snapshot.
+ */
+export function montarHistoricoRiscosPortal(input: {
+  clienteId: string;
+  campanhas: readonly PortalCampanhaFonte[];
+  snapshots: readonly PortalHistoricoSnapshotFonte[];
+}): PortalHistoricoCiclo[] {
+  const clienteId = String(input.clienteId ?? "").trim();
+  const porId = new Map(
+    input.campanhas
+      .filter((c) => c.id && String(c.status ?? "") !== "cancelada")
+      .map((c) => [c.id, c])
+  );
+
+  const elegiveis: Array<{
+    campanha: PortalCampanhaFonte;
+    extraido: ReturnType<typeof extrairCategoriasDoSnapshot>;
+  }> = [];
+
+  for (const snap of input.snapshots) {
+    const campanhaId = String(snap.campanha_id ?? "").trim();
+    const campanha = porId.get(campanhaId);
+    if (!campanha) continue;
+    const snapCliente = String(snap.cliente_id ?? "").trim();
+    if (snapCliente && clienteId && snapCliente !== clienteId) continue;
+    if (!snapshotTemResultadoConsolidado(snap.resultado_json)) continue;
+    elegiveis.push({
+      campanha,
+      extraido: extrairCategoriasDoSnapshot(snap.resultado_json),
+    });
+  }
+
+  elegiveis.sort((a, b) => {
+    const da = String(a.campanha.data_inicio ?? "").slice(0, 10);
+    const db = String(b.campanha.data_inicio ?? "").slice(0, 10);
+    if (da !== db) return da.localeCompare(db);
+    return String(a.campanha.created_at ?? "").localeCompare(
+      String(b.campanha.created_at ?? "")
+    );
+  });
+
+  const porAno = new Map<number, number>();
+  for (const item of elegiveis) {
+    const ano = cicloFromDataInicio(item.campanha.data_inicio);
+    if (ano == null) continue;
+    porAno.set(ano, (porAno.get(ano) ?? 0) + 1);
+  }
+
+  return elegiveis.map(({ campanha, extraido }) => {
+    const dataInicio = String(campanha.data_inicio ?? "").slice(0, 10) || null;
+    const dataEncerramento =
+      String(campanha.data_encerramento ?? "").slice(0, 10) || null;
+    const ciclo = cicloFromDataInicio(dataInicio);
+    const anoDuplicado = ciclo != null && (porAno.get(ciclo) ?? 0) > 1;
+    return {
+      campanhaId: campanha.id,
+      label: labelCicloPortal({
+        dataInicio,
+        dataEncerramento,
+        anoDuplicado,
+      }),
+      periodo:
+        dataInicio && dataEncerramento
+          ? formatPeriodoCampanha(dataInicio, dataEncerramento)
+          : null,
+      dataInicio,
+      favoraveis: extraido.favoraveis.length,
+      atencao: extraido.atencao.length,
+      desfavoraveis: extraido.desfavoraveis.length,
+      categorias: [
+        ...extraido.desfavoraveis,
+        ...extraido.atencao,
+        ...extraido.favoraveis,
+      ],
+    };
+  });
+}
+
+export function categoriasHistoricoUnicas(
+  historico: readonly PortalHistoricoCiclo[]
+): Array<{ id: string; nome: string }> {
+  const map = new Map<string, string>();
+  for (const ciclo of historico) {
+    for (const c of ciclo.categorias) {
+      if (!c.id || map.has(c.id)) continue;
+      map.set(c.id, c.nome);
+    }
+  }
+  return Array.from(map.entries())
+    .map(([id, nome]) => ({ id, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
 export type PortalTimelineFonte = Pick<

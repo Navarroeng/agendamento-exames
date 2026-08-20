@@ -13,11 +13,14 @@ import {
   estadoTimelinePortal,
   isPerfilStaffNavarro,
   mapParticipacaoPortal,
+  montarHistoricoRiscosPortal,
   montarPortalResumo,
   participanteAtivoNoPortal,
+  pathPortalRelatorio,
   portalResumoVazio,
   resolvePortalDevClienteId,
   resolverClienteIdPortalPreview,
+  categoriasHistoricoUnicas,
   type PortalCampanhaFonte,
   type PortalParticipanteFonte,
   type PortalSnapshotFonte,
@@ -423,6 +426,8 @@ run("serviço não consulta respostas/sessão/vínculo", () => {
   assert.match(svc, /logo_storage_path/);
   assert.match(svc, /resolverUrlLogoCampanhaAdmin/);
   assert.match(svc, /\.eq\("campanha_id", campanha\.id\)/);
+  assert.match(svc, /\.in\("campanha_id", campanhaIds\)/);
+  assert.match(svc, /montarHistoricoRiscosPortal/);
   assert.doesNotMatch(svc, /codigo_publico/);
   assert.doesNotMatch(svc, /codigo_acesso/);
   assert.doesNotMatch(svc, /\bcpf\b/);
@@ -439,6 +444,13 @@ run("menu admin tem atalho para /portal em Gestão Comercial", () => {
 run("staff admin e operacional acessam /portal", () => {
   assert.equal(canAccessPath("admin", "/portal"), true);
   assert.equal(canAccessPath("operacional", "/portal"), true);
+  assert.equal(
+    canAccessPath(
+      "admin",
+      "/portal/relatorio/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    ),
+    true
+  );
 });
 
 run("UUID inválido na request não cai no fallback de env", () => {
@@ -550,6 +562,296 @@ run("troca de empresa não mistura dados", () => {
   assert.equal(b.respondidos, 0);
   assert.equal(b.cadastrados, 2);
   assert.notEqual(a.campanhaId, b.campanhaId);
+  assert.deepEqual(a.historicoRiscos, []);
+  assert.deepEqual(b.historicoRiscos, []);
+});
+
+run("PDF do portal usa campanhaId selecionado", () => {
+  const a = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const b = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  assert.equal(pathPortalRelatorio(a), `/portal/relatorio/${a}`);
+  assert.equal(pathPortalRelatorio(b), `/portal/relatorio/${b}`);
+  assert.notEqual(pathPortalRelatorio(a), pathPortalRelatorio(b));
+  assert.equal(pathPortalRelatorio("nao-e-uuid"), "");
+});
+
+run("histórico: um ciclo, zeros e campanha sem relatório fora da comparação", () => {
+  const cliente = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const c2026 = campanha({
+    id: "camp-2026",
+    status: "encerrada",
+    data_inicio: "2026-08-17",
+    data_encerramento: "2026-08-19",
+  });
+  const semRelatorio = campanha({
+    id: "camp-aberta",
+    status: "aberta",
+    data_inicio: "2027-01-10",
+    data_encerramento: "2027-01-20",
+  });
+  const hist = montarHistoricoRiscosPortal({
+    clienteId: cliente,
+    campanhas: [c2026, semRelatorio],
+    snapshots: [
+      {
+        campanha_id: "camp-2026",
+        cliente_id: cliente,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+    ],
+  });
+  assert.equal(hist.length, 1);
+  assert.equal(hist[0]?.campanhaId, "camp-2026");
+  assert.equal(hist[0]?.label, "Ciclo 2026");
+  assert.equal(hist[0]?.favoraveis, 1);
+  assert.equal(hist[0]?.atencao, 1);
+  assert.equal(hist[0]?.desfavoraveis, 1);
+});
+
+run("histórico: dois ciclos ordenados e da mesma empresa", () => {
+  const cliente = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const outroCliente = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const c2025 = campanha({
+    id: "camp-2025",
+    status: "encerrada",
+    data_inicio: "2025-03-01",
+    data_encerramento: "2025-03-10",
+    created_at: "2025-02-01T00:00:00.000Z",
+  });
+  const c2026 = campanha({
+    id: "camp-2026",
+    status: "encerrada",
+    data_inicio: "2026-08-17",
+    data_encerramento: "2026-08-19",
+    created_at: "2026-08-01T00:00:00.000Z",
+  });
+  const alheia = campanha({
+    id: "camp-outra-empresa",
+    status: "encerrada",
+    data_inicio: "2024-01-01",
+    data_encerramento: "2024-01-10",
+  });
+  const snap2025: RiscosRelatorioResultadoJson = {
+    ...(snapshotFonte().resultado_json as RiscosRelatorioResultadoJson),
+    dimensoes: [
+      {
+        id: "compromisso-local-trabalho",
+        nome: "Compromisso com o local de trabalho",
+        tipo: "PROTECAO",
+        entraNoCalculo: true,
+        media: 3.2,
+        classificacaoId: "situacao_favoravel",
+        classificacaoLabel: "Situação Favorável",
+        classificacaoInterpretacao: "",
+        cor: "#16a34a",
+        respondentesValidos: 3,
+        descricao: "",
+      },
+      {
+        id: "exigencias-quantitativas",
+        nome: "Exigências quantitativas",
+        tipo: "RISCO",
+        entraNoCalculo: true,
+        media: 2.0,
+        classificacaoId: "risco_intermediario",
+        classificacaoLabel: "Situação Moderada",
+        classificacaoInterpretacao: "",
+        cor: "#ca8a04",
+        respondentesValidos: 3,
+        descricao: "",
+      },
+    ],
+  };
+  const hist = montarHistoricoRiscosPortal({
+    clienteId: cliente,
+    campanhas: [c2026, c2025],
+    snapshots: [
+      {
+        campanha_id: "camp-2026",
+        cliente_id: cliente,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+      {
+        campanha_id: "camp-2025",
+        cliente_id: cliente,
+        resultado_json: snap2025,
+      },
+      {
+        campanha_id: "camp-outra-empresa",
+        cliente_id: outroCliente,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+    ],
+  });
+  assert.deepEqual(
+    hist.map((h) => h.campanhaId),
+    ["camp-2025", "camp-2026"]
+  );
+  assert.equal(hist[0]?.favoraveis, 1);
+  assert.equal(hist[0]?.atencao, 1);
+  assert.equal(hist[0]?.desfavoraveis, 0);
+  assert.equal(hist[1]?.desfavoraveis, 1);
+  assert.ok(hist.every((h) => h.campanhaId !== "camp-outra-empresa"));
+});
+
+run("histórico: categoria ausente em um ciclo não quebra", () => {
+  const cliente = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const c1 = campanha({
+    id: "c-a",
+    status: "encerrada",
+    data_inicio: "2025-01-01",
+    data_encerramento: "2025-01-10",
+  });
+  const c2 = campanha({
+    id: "c-b",
+    status: "encerrada",
+    data_inicio: "2026-01-01",
+    data_encerramento: "2026-01-10",
+  });
+  const hist = montarHistoricoRiscosPortal({
+    clienteId: cliente,
+    campanhas: [c1, c2],
+    snapshots: [
+      {
+        campanha_id: "c-a",
+        cliente_id: cliente,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+      {
+        campanha_id: "c-b",
+        cliente_id: cliente,
+        resultado_json: {
+          ...(snapshotFonte().resultado_json as RiscosRelatorioResultadoJson),
+          dimensoes: [
+            {
+              id: "lideranca",
+              nome: "Liderança",
+              tipo: "PROTECAO",
+              entraNoCalculo: true,
+              media: 3,
+              classificacaoId: "situacao_favoravel",
+              classificacaoLabel: "Situação Favorável",
+              classificacaoInterpretacao: "",
+              cor: "#16a34a",
+              respondentesValidos: 2,
+              descricao: "",
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const nomes = categoriasHistoricoUnicas(hist).map((c) => c.id);
+  assert.ok(nomes.includes("inseguranca-trabalho"));
+  assert.ok(nomes.includes("lideranca"));
+  const cicloB = hist.find((h) => h.campanhaId === "c-b");
+  assert.equal(
+    cicloB?.categorias.find((c) => c.id === "inseguranca-trabalho"),
+    undefined
+  );
+});
+
+run("histórico: zeros e dois ciclos no mesmo ano distinguíveis", () => {
+  const cliente = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const a = campanha({
+    id: "c-2026-a",
+    status: "encerrada",
+    data_inicio: "2026-02-01",
+    data_encerramento: "2026-02-10",
+  });
+  const b = campanha({
+    id: "c-2026-b",
+    status: "encerrada",
+    data_inicio: "2026-08-17",
+    data_encerramento: "2026-08-19",
+  });
+  const hist = montarHistoricoRiscosPortal({
+    clienteId: cliente,
+    campanhas: [a, b],
+    snapshots: [
+      {
+        campanha_id: "c-2026-a",
+        cliente_id: cliente,
+        resultado_json: { dimensoes: [] },
+      },
+      {
+        campanha_id: "c-2026-b",
+        cliente_id: cliente,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+    ],
+  });
+  assert.equal(hist.length, 2);
+  assert.equal(hist[0]?.favoraveis, 0);
+  assert.equal(hist[0]?.atencao, 0);
+  assert.equal(hist[0]?.desfavoraveis, 0);
+  assert.notEqual(hist[0]?.label, hist[1]?.label);
+  assert.match(hist[0]?.label ?? "", /Ciclo 2026/);
+  assert.match(hist[1]?.label ?? "", /Ciclo 2026/);
+});
+
+run("troca de empresa substitui histórico anterior", () => {
+  const clienteA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const clienteB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const campA = campanha({
+    id: "hist-a",
+    status: "encerrada",
+    empresa_nome: "Empresa A",
+    data_inicio: "2026-01-01",
+    data_encerramento: "2026-01-10",
+  });
+  const campB = campanha({
+    id: "hist-b",
+    status: "encerrada",
+    empresa_nome: "Empresa B",
+    data_inicio: "2025-01-01",
+    data_encerramento: "2025-01-10",
+  });
+  const histA = montarHistoricoRiscosPortal({
+    clienteId: clienteA,
+    campanhas: [campA],
+    snapshots: [
+      {
+        campanha_id: "hist-a",
+        cliente_id: clienteA,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+    ],
+  });
+  const histB = montarHistoricoRiscosPortal({
+    clienteId: clienteB,
+    campanhas: [campB],
+    snapshots: [
+      {
+        campanha_id: "hist-b",
+        cliente_id: clienteB,
+        resultado_json: snapshotFonte().resultado_json,
+      },
+    ],
+  });
+  const resumoA = montarPortalResumo({
+    campanha: campA,
+    participantes: [],
+    snapshot: snapshotFonte(),
+    historicoRiscos: histA,
+  });
+  const resumoB = montarPortalResumo({
+    campanha: campB,
+    participantes: [],
+    snapshot: snapshotFonte(),
+    historicoRiscos: histB,
+  });
+  const vazio = portalResumoVazio();
+  assert.deepEqual(
+    resumoA.historicoRiscos.map((h) => h.campanhaId),
+    ["hist-a"]
+  );
+  assert.deepEqual(
+    resumoB.historicoRiscos.map((h) => h.campanhaId),
+    ["hist-b"]
+  );
+  assert.equal(vazio.historicoRiscos.length, 0);
+  assert.notEqual(resumoA.historicoRiscos[0]?.campanhaId, resumoB.historicoRiscos[0]?.campanhaId);
 });
 
 run("somente staff Navarro no preview", () => {
@@ -614,11 +916,28 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(modulos, /Em preparação/);
   assert.match(identidade, /object-contain/);
   assert.match(identidade, /iniciaisEmpresa/);
-  assert.match(avaliacao, /RiscosRelatorioViewerModal/);
-  assert.match(avaliacao, /buscarRelatorioCampanha/);
-  assert.match(avaliacao, /campanha_id !== campanhaId/);
-  assert.match(avaliacao, /Salvar em PDF/);
+  assert.match(avaliacao, /pathPortalRelatorio/);
+  assert.match(avaliacao, /window\.open/);
+  assert.match(avaliacao, /PortalEvolucaoRiscos/);
+  assert.doesNotMatch(avaliacao, /RiscosRelatorioViewerModal/);
   assert.match(avaliacao, /Relatório ainda não disponível/);
+  const printView = readFileSync(
+    join(root, "components/portal-cliente/PortalRelatorioPrintView.tsx"),
+    "utf8"
+  );
+  const evolucao = readFileSync(
+    join(root, "components/portal-cliente/PortalEvolucaoRiscos.tsx"),
+    "utf8"
+  );
+  const printPage = readFileSync(
+    join(root, "app/portal/relatorio/[campanhaId]/page.tsx"),
+    "utf8"
+  );
+  assert.match(printView, /buscarRelatorioCampanha/);
+  assert.match(printView, /campanha_id !== campanhaId/);
+  assert.match(printView, /RelatorioDocumento/);
+  assert.match(printPage, /PerfilRouteGuard/);
+  assert.match(evolucao, /PORTAL_HISTORICO_UM_CICLO_MSG/);
   assert.match(logoServer, /RISCOS_LISTA_PRESENCA_BUCKET/);
   assert.match(logoServer, /ORCAMENTO_ONBOARDING_BUCKET/);
 });

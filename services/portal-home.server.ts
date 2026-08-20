@@ -7,10 +7,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   consolidarEmpresasPortalPreview,
   escolherCampanhaAtualPortal,
+  montarHistoricoRiscosPortal,
   montarPortalResumo,
   portalResumoVazio,
   type PortalCampanhaFonte,
   type PortalEmpresaOpcao,
+  type PortalHistoricoSnapshotFonte,
   type PortalParticipanteFonte,
   type PortalResumo,
   type PortalSnapshotFonte,
@@ -23,7 +25,7 @@ const CAMPANHA_SELECT =
 
 const PARTICIPANTE_SELECT = "nome_completo, status, removido_em";
 
-const RELATORIO_SELECT = "gerado_em, resultado_json";
+const RELATORIO_SELECT = "campanha_id, cliente_id, gerado_em, resultado_json";
 
 const CAMPANHA_LISTA_SELECT = "cliente_id, empresa_nome, status";
 
@@ -147,39 +149,20 @@ export async function carregarPortalHome(
     })
   );
 
-  const { data: relatorioRaw, error: relatorioError } = await admin
-    .from("riscos_relatorios")
-    .select(RELATORIO_SELECT)
-    .eq("campanha_id", campanha.id)
-    .maybeSingle();
-
-  if (relatorioError) {
-    if (
-      relatorioError.code === "42P01" ||
-      /does not exist/i.test(relatorioError.message ?? "")
-    ) {
-      return {
-        resumo: montarPortalResumo({
-          campanha,
-          participantes,
-          snapshot: null,
-          logoUrl,
-        }),
-      };
-    }
-    throw relatorioError;
-  }
-
-  let snapshot: PortalSnapshotFonte | null = null;
-  if (relatorioRaw) {
-    snapshot = {
-      gerado_em: (relatorioRaw as { gerado_em?: string | null }).gerado_em
-        ? String((relatorioRaw as { gerado_em: string }).gerado_em)
-        : null,
-      resultado_json: ((relatorioRaw as { resultado_json?: unknown })
-        .resultado_json ?? null) as RiscosRelatorioResultadoJson | null,
-    };
-  }
+  const campanhaIds = campanhas.map((c) => c.id).filter(Boolean);
+  const snapshots = await carregarSnapshotsPortal(admin, campanhaIds);
+  const historicoRiscos = montarHistoricoRiscosPortal({
+    clienteId,
+    campanhas,
+    snapshots,
+  });
+  const snapshotAtual = snapshots.find((s) => s.campanha_id === campanha.id);
+  const snapshot: PortalSnapshotFonte | null = snapshotAtual?.resultado_json
+    ? {
+        gerado_em: snapshotAtual.gerado_em ?? null,
+        resultado_json: snapshotAtual.resultado_json,
+      }
+    : null;
 
   return {
     resumo: montarPortalResumo({
@@ -187,6 +170,35 @@ export async function carregarPortalHome(
       participantes,
       snapshot,
       logoUrl,
+      historicoRiscos,
     }),
   };
+}
+
+async function carregarSnapshotsPortal(
+  admin: ReturnType<typeof createAdminClient>,
+  campanhaIds: string[]
+): Promise<PortalHistoricoSnapshotFonte[]> {
+  if (campanhaIds.length === 0) return [];
+  const { data, error } = await admin
+    .from("riscos_relatorios")
+    .select(RELATORIO_SELECT)
+    .in("campanha_id", campanhaIds);
+
+  if (error) {
+    if (error.code === "42P01" || /does not exist/i.test(error.message ?? "")) {
+      return [];
+    }
+    throw error;
+  }
+
+  return (data ?? []).map((row) => ({
+    campanha_id: String((row as { campanha_id?: string }).campanha_id ?? ""),
+    cliente_id: (row as { cliente_id?: string | null }).cliente_id ?? null,
+    gerado_em: (row as { gerado_em?: string | null }).gerado_em
+      ? String((row as { gerado_em: string }).gerado_em)
+      : null,
+    resultado_json: ((row as { resultado_json?: unknown }).resultado_json ??
+      null) as RiscosRelatorioResultadoJson | null,
+  }));
 }

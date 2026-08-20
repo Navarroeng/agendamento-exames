@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
-import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
+import { PortalEvolucaoRiscos } from "@/components/portal-cliente/PortalEvolucaoRiscos";
 import { formatDateBR } from "@/lib/format";
 import {
   PORTAL_PRIVACIDADE_AVISO,
@@ -11,18 +10,13 @@ import {
   PORTAL_STATUS_LABELS,
   PORTAL_TIMELINE_ETAPAS,
   estadoTimelinePortal,
+  pathPortalRelatorio,
   type PortalCategoriaResumo,
   type PortalClassificacao,
   type PortalResumo,
   type PortalStatusHome,
 } from "@/lib/portal-cliente";
 import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
-import {
-  exportarRelatorioRiscosPdf,
-  nomeArquivoPdfRelatorioRiscos,
-} from "@/lib/riscos-relatorio-pdf";
-import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
-import { buscarRelatorioCampanha } from "@/services/riscos-relatorio.service";
 
 const CLASSIFICACAO_VISUAL: Record<
   PortalClassificacao,
@@ -61,96 +55,24 @@ export function PortalAvaliacaoRiscos({
   resumo: PortalResumo;
   onVoltar: () => void;
 }) {
-  const [relatorio, setRelatorio] = useState<RiscosRelatorioRecord | null>(
-    null
-  );
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [carregandoRelatorio, setCarregandoRelatorio] = useState(false);
-
-  useEffect(() => {
-    setRelatorio(null);
-    setViewerOpen(false);
-  }, [resumo.campanhaId]);
-
   const empresaNome = resumo.empresaNome || "Empresa";
   const temResultados = resumo.relatorioDisponivel;
   const pesquisaAberta =
     resumo.statusPortal === "aberta" || resumo.statusPortal === "em_andamento";
   const pct = resumo.participacaoPercentual;
 
-  async function carregarRelatorioDaCampanha(): Promise<RiscosRelatorioRecord | null> {
+  function handleVisualizar() {
     const campanhaId = resumo.campanhaId;
-    if (!campanhaId || !resumo.relatorioDisponivel) return null;
-    const row = await buscarRelatorioCampanha(campanhaId);
-    if (!row) return null;
-    if (row.campanha_id !== campanhaId) {
-      throw new Error("O relatório retornado não corresponde a este ciclo.");
+    if (!campanhaId || !resumo.relatorioDisponivel) {
+      toast.error("Relatório ainda não disponível.");
+      return;
     }
-    return row;
-  }
-
-  async function handleVisualizar() {
-    setCarregandoRelatorio(true);
-    try {
-      const row = await carregarRelatorioDaCampanha();
-      if (!row) {
-        toast.error("Relatório ainda não disponível.");
-        return;
-      }
-      setRelatorio(row);
-      setViewerOpen(true);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Não foi possível abrir o relatório."
-      );
-    } finally {
-      setCarregandoRelatorio(false);
+    const path = pathPortalRelatorio(campanhaId);
+    if (!path) {
+      toast.error("Campanha inválida para o relatório.");
+      return;
     }
-  }
-
-  async function handleSalvarPdf() {
-    setCarregandoRelatorio(true);
-    try {
-      const jaCarregado =
-        relatorio?.campanha_id === resumo.campanhaId ? relatorio : null;
-      const row = jaCarregado ?? (await carregarRelatorioDaCampanha());
-      if (!row) {
-        toast.error("Relatório ainda não disponível.");
-        return;
-      }
-      setRelatorio(row);
-      setViewerOpen(true);
-      window.setTimeout(() => {
-        void (async () => {
-          try {
-            const empresa =
-              row.empresa_nome ||
-              row.resultado_json?.capa?.empresaNome ||
-              empresaNome;
-            toast.message("Abrindo impressão…", {
-              description: `Use “Salvar como PDF”. Nome sugerido: ${nomeArquivoPdfRelatorioRiscos(
-                empresa,
-                row.gerado_em
-              )}`,
-            });
-            await exportarRelatorioRiscosPdf({
-              empresaNome: empresa,
-              geradoEm: row.gerado_em,
-            });
-          } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : "Falha ao exportar o PDF."
-            );
-          }
-        })();
-      }, 400);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Não foi possível abrir o relatório."
-      );
-    } finally {
-      setCarregandoRelatorio(false);
-    }
+    window.open(path, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -327,6 +249,11 @@ export function PortalAvaliacaoRiscos({
         </section>
       ) : null}
 
+      <PortalEvolucaoRiscos
+        key={resumo.historicoRiscos.map((c) => c.campanhaId).join("|")}
+        historico={resumo.historicoRiscos}
+      />
+
       <section className="rounded-2xl border border-[#e8edf5] bg-white px-6 py-5">
         <h2 className="text-sm font-semibold text-[#0b1f4d]">
           Relatório Técnico
@@ -340,22 +267,13 @@ export function PortalAvaliacaoRiscos({
               <span className="font-medium">Gerado em:</span>{" "}
               {formatDateBR(resumo.relatorioGeradoEm)}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4">
               <button
                 type="button"
-                className="inline-flex items-center rounded-lg bg-[#0b1f4d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#12316f] disabled:opacity-50"
-                disabled={carregandoRelatorio}
-                onClick={() => void handleVisualizar()}
+                className="inline-flex items-center rounded-lg bg-[#0b1f4d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#12316f]"
+                onClick={handleVisualizar}
               >
-                {carregandoRelatorio ? "Carregando…" : "Visualizar relatório"}
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center rounded-lg border border-[#e2e8f0] px-4 py-2 text-sm font-semibold text-[#0b1f4d] transition hover:bg-[#f8fafc] disabled:opacity-50"
-                disabled={carregandoRelatorio}
-                onClick={() => void handleSalvarPdf()}
-              >
-                Salvar em PDF
+                Visualizar relatório
               </button>
             </div>
           </>
@@ -401,15 +319,6 @@ export function PortalAvaliacaoRiscos({
           {PORTAL_PRIVACIDADE_AVISO}
         </p>
       </section>
-
-      <RiscosRelatorioViewerModal
-        open={viewerOpen}
-        relatorio={relatorio}
-        onClose={() => setViewerOpen(false)}
-        logoUrl={resumo.logoUrl}
-        empresaCnpj={resumo.empresaCnpj}
-        campanhaStatus={resumo.statusCampanha}
-      />
     </div>
   );
 }
