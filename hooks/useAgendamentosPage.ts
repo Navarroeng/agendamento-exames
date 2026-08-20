@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import {
   consumeAgendamentoPrefill,
   parseAgendamentoPrefillFromSearchParams,
+  peekAgendamentoPrefill,
+  resolveClienteIdFromPrefill,
+  shouldDeferAgendamentoPrefillApply,
 } from "@/lib/agendamento-prefill";
 import {
   agendamentoToExams,
@@ -82,6 +85,7 @@ import { useClientesList } from "@/hooks/useClientesList";
 import {
   buildCargoAgendamentoFields,
   buildCargosFormOptions,
+  resolveCargoIdFromPrefill,
 } from "@/lib/agendamento-cargo";
 import {
   buildClienteFilterOptionsHistorico,
@@ -324,10 +328,14 @@ export function useAgendamentosPage() {
   const vagaAlertKeyRef = useRef<string | null>(null);
   const saveLockRef = useRef(createAgendamentoSaveLock());
   const continuarSaveAposCreditoRef = useRef<(() => void) | null>(null);
+  const pendingPrefillCargoRef = useRef<{
+    cargoId: string;
+    cargoNome?: string;
+  } | null>(null);
   const [cargoId, setCargoId] = useState("");
   const [cargoNomeSalvo, setCargoNomeSalvo] = useState("");
   const [cargosAtivos, setCargosAtivos] = useState<CargoRecord[]>([]);
-  const [cargosLoading, setCargosLoading] = useState(false);
+  const [cargosLoading, setCargosLoading] = useState(true);
 
   const formularioClienteLiberado = useMemo(() => {
     const isNovo = !editingId && !editingSomenteDocumentacao;
@@ -820,6 +828,7 @@ export function useAgendamentosPage() {
     setClienteValidacaoLoading(false);
     clienteValidacaoSeqRef.current += 1;
     prevAsoRef.current = "";
+    pendingPrefillCargoRef.current = null;
   }, [reset, resetExams]);
 
   const clearFormPorInadimplencia = useCallback(() => {
@@ -830,6 +839,7 @@ export function useAgendamentosPage() {
     setField("clinica_nome", "");
     resetExams();
     examsManuallyModifiedRef.current = false;
+    pendingPrefillCargoRef.current = null;
   }, [setField, resetExams]);
 
   const resolverInfoClienteInadimplencia = useCallback(
@@ -997,69 +1007,104 @@ export function useAgendamentosPage() {
   useEffect(() => {
     if (prefillAppliedRef.current) return;
 
-    const prefill =
-      consumeAgendamentoPrefill() ??
+    const staged =
+      peekAgendamentoPrefill() ??
       parseAgendamentoPrefillFromSearchParams(searchParams);
+    if (!staged) return;
 
-    if (!prefill) return;
+    if (
+      shouldDeferAgendamentoPrefillApply({
+        clientesLoading,
+        cargosLoading,
+        cargoId: staged.cargo_id,
+        cargoNome: staged.cargo_nome,
+      })
+    ) {
+      return;
+    }
+
     prefillAppliedRef.current = true;
+    consumeAgendamentoPrefill();
 
-    resetForm();
-    setField("cliente_nome", prefill.cliente_nome);
-    setField("colaborador", prefill.colaborador);
-    if (prefill.colaborador_cpf) {
-      setField("colaborador_cpf", prefill.colaborador_cpf);
-    }
-    if (prefill.aso) setField("aso", prefill.aso);
+    let cancelled = false;
 
-    const clienteResolved = resolveClienteIdByNome(clientes, prefill.cliente_nome);
-    if (clienteResolved) {
-      void validarESelecionarCliente(clienteResolved);
-    }
+    void (async () => {
+      resetForm();
+      setField("cliente_nome", staged.cliente_nome);
+      setField("colaborador", staged.colaborador);
+      if (staged.colaborador_cpf) {
+        setField("colaborador_cpf", staged.colaborador_cpf);
+      }
+      if (staged.aso) setField("aso", staged.aso);
 
-    if (prefill.cargo_id && clienteResolved) {
-      setCargoId(prefill.cargo_id);
-      if (prefill.cargo_nome) setCargoNomeSalvo(prefill.cargo_nome);
+      if (staged.vaga_id) {
+        vagaDecisionRef.current = "link";
+        vagaEmUsoIdRef.current = staged.vaga_id;
+        vagaContratoIdRef.current = staged.contrato_id ?? null;
+        vagaContratoNumeroRef.current = staged.contrato_numero ?? null;
+        creditoDecisionRef.current = "skip";
+      }
 
-      void (async () => {
+      setShowForm(true);
+      setFiltersExpanded(false);
+
+      const clienteResolved = resolveClienteIdFromPrefill(clientes, staged);
+      const cargoResolved = resolveCargoIdFromPrefill(cargosAtivos, staged);
+      if (cargoResolved) {
+        pendingPrefillCargoRef.current = {
+          cargoId: cargoResolved,
+          cargoNome: staged.cargo_nome,
+        };
+      }
+
+      let clienteOk = false;
+      if (clienteResolved) {
+        clienteOk = await validarESelecionarCliente(clienteResolved);
+      }
+      if (cancelled) return;
+
+      const cargoPendente = pendingPrefillCargoRef.current;
+      if (cargoPendente && (clienteOk || !clienteResolved)) {
+        setCargoId(cargoPendente.cargoId);
+        if (cargoPendente.cargoNome) {
+          setCargoNomeSalvo(cargoPendente.cargoNome);
+        }
+        pendingPrefillCargoRef.current = null;
         try {
           const examesObrigatorios = await listarExamesObrigatoriosPorCargo(
-            prefill.cargo_id!
+            cargoPendente.cargoId
           );
+          if (cancelled) return;
           const nomes = examesObrigatorios.map((exame) => exame.nome);
           await replaceExamesFromCargo(nomes);
-          if (nomes.length > 0 && prefill.cargo_nome) {
+          if (nomes.length > 0 && cargoPendente.cargoNome) {
             await registrarExamesCarregadosPorCargo(auditContext, {
-              cargoNome: prefill.cargo_nome,
+              cargoNome: cargoPendente.cargoNome,
               exames: nomes,
-              colaborador: prefill.colaborador,
+              colaborador: staged.colaborador,
             });
           }
         } catch (err) {
           console.error("Erro ao carregar exames do cargo (prefill):", err);
         }
-      })();
-    }
+      }
 
-    if (prefill.vaga_id) {
-      vagaDecisionRef.current = "link";
-      vagaEmUsoIdRef.current = prefill.vaga_id;
-      vagaContratoIdRef.current = prefill.contrato_id ?? null;
-      vagaContratoNumeroRef.current = prefill.contrato_numero ?? null;
-      creditoDecisionRef.current = "skip";
-    }
+      requestAnimationFrame(() => {
+        document
+          .getElementById("novo-agendamento")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    })();
 
-    setShowForm(true);
-    setFiltersExpanded(false);
-
-    requestAnimationFrame(() => {
-      document
-        .getElementById("novo-agendamento")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    return () => {
+      cancelled = true;
+    };
   }, [
     searchParams,
     clientes,
+    clientesLoading,
+    cargosAtivos,
+    cargosLoading,
     resetForm,
     setField,
     replaceExamesFromCargo,
@@ -1415,6 +1460,7 @@ export function useAgendamentosPage() {
     setPendingClienteId(null);
     setClienteId("");
     setField("cliente_nome", "");
+    pendingPrefillCargoRef.current = null;
   }, [setField]);
 
   const handleConfirmClienteProcuracao = useCallback(async () => {
@@ -1438,6 +1484,32 @@ export function useAgendamentosPage() {
       });
       setClienteProcuracaoModalOpen(false);
       setPendingClienteId(null);
+
+      const cargoPendente = pendingPrefillCargoRef.current;
+      if (cargoPendente) {
+        setCargoId(cargoPendente.cargoId);
+        if (cargoPendente.cargoNome) {
+          setCargoNomeSalvo(cargoPendente.cargoNome);
+        }
+        pendingPrefillCargoRef.current = null;
+        try {
+          const examesObrigatorios = await listarExamesObrigatoriosPorCargo(
+            cargoPendente.cargoId
+          );
+          const nomes = examesObrigatorios.map((exame) => exame.nome);
+          await replaceExamesFromCargo(nomes);
+          if (nomes.length > 0 && cargoPendente.cargoNome) {
+            await registrarExamesCarregadosPorCargo(auditContext, {
+              cargoNome: cargoPendente.cargoNome,
+              exames: nomes,
+              colaborador: form.colaborador,
+              agendamentoId: editingId,
+            });
+          }
+        } catch (err) {
+          console.error("Erro ao carregar exames do cargo (prefill):", err);
+        }
+      }
 
       if (!editingId) {
         try {
@@ -1470,6 +1542,7 @@ export function useAgendamentosPage() {
     auditContext,
     editingId,
     form.colaborador,
+    replaceExamesFromCargo,
   ]);
 
   const handleCreditoAsoNaoUtilizar = useCallback(() => {

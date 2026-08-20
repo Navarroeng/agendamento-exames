@@ -1564,6 +1564,7 @@ export function OrcamentoAprovarModal({
               usuarioNome={usuarioNome}
               clienteNome={orcamento.cliente_nome}
               clienteCnpj={orcamento.cliente_cnpj}
+              clienteId={orcamento.cliente_id}
               onContagemChange={setAgendamentosContagem}
               onIrParaListaFuncionarios={() => setTab("funcionarios")}
             />

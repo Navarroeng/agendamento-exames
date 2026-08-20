@@ -55,3 +55,31 @@ export function formatCargoVisualizacao(
   const nome = cargoNome?.trim();
   return nome || "—";
 }
+
+export function normalizeCargoNomeMatch(
+  value: string | null | undefined
+): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+}
+
+/**
+ * Localiza o cargo do catálogo sem criar duplicata.
+ * Prefere cargo_id; se só houver nome, compara caixa/espaços.
+ */
+export function resolveCargoIdFromPrefill(
+  cargos: Pick<CargoRecord, "id" | "nome">[],
+  prefill: { cargo_id?: string | null; cargo_nome?: string | null }
+): string {
+  const id = prefill.cargo_id?.trim() ?? "";
+  if (id) {
+    const byId = cargos.find((cargo) => cargo.id === id);
+    return byId?.id ?? id;
+  }
+
+  const nome = normalizeCargoNomeMatch(prefill.cargo_nome);
+  if (!nome) return "";
+  return (
+    cargos.find((cargo) => normalizeCargoNomeMatch(cargo.nome) === nome)?.id ??
+    ""
+  );
+}

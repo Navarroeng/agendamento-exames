@@ -77,6 +77,7 @@ interface OrcamentoAbaAgendamentosProps {
   usuarioNome: string;
   clienteNome?: string;
   clienteCnpj?: string | null;
+  clienteId?: string | null;
   onContagemChange?: (contagem: ContratoAgendamentoContagem) => void;
   onIrParaListaFuncionarios?: () => void;
 }
@@ -244,6 +245,7 @@ export function OrcamentoAbaAgendamentos({
   usuarioNome,
   clienteNome,
   clienteCnpj,
+  clienteId,
   onContagemChange,
   onIrParaListaFuncionarios,
 }: OrcamentoAbaAgendamentosProps) {
@@ -636,6 +638,7 @@ export function OrcamentoAbaAgendamentos({
     }
     saveAgendamentoPrefill({
       cliente_nome: empresa,
+      cliente_id: contrato?.cliente_id || clienteId || undefined,
       colaborador: vaga.colaborador ?? colaborador,
       colaborador_cpf: vaga.colaborador_cpf
         ? maskCPFInput(vaga.colaborador_cpf)

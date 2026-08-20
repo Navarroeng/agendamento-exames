@@ -63,7 +63,7 @@ export function buildClienteFilterOptionsHistorico(
 }
 
 export function resolveClienteIdByNome(
-  clientes: ClienteRecord[],
+  clientes: Array<{ id: string; nome: string }>,
   nome: string
 ): string {
   const trimmed = nome.trim();
