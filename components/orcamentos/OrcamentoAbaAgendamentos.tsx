@@ -20,6 +20,7 @@ import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datet
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
   agendamentoPertenceAoClienteContrato,
+  buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
   contratoTemAgendamentosIniciaisDispensados,
   isAgendamentoSelecionavel,
@@ -409,38 +410,35 @@ export function OrcamentoAbaAgendamentos({
   }, [load]);
 
   const contagemPreview = useMemo(() => {
-    if (dispensado) {
-      const adicionais = itens.filter((i) =>
-        isAgendamentoSelecionavel(i.agendamento.status)
-      ).length;
-      return buildContratoAgendamentoContagem(
-        quantidadePrevista,
-        0,
-        adicionais,
-        { dispensado: true }
-      );
-    }
-    const utilizadosAg = itens.filter(
-      (i) =>
-        selectedIds.has(i.agendamento.id) &&
-        isAgendamentoSelecionavel(i.agendamento.status)
+    const adicionaisLegado = itens.filter((i) =>
+      isAgendamentoSelecionavel(i.agendamento.status) &&
+      (dispensado || !selectedIds.has(i.agendamento.id))
     ).length;
-    const adicionais = itens.filter(
-      (i) =>
-        !selectedIds.has(i.agendamento.id) &&
-        isAgendamentoSelecionavel(i.agendamento.status)
-    ).length;
-    return buildContratoAgendamentoContagem(
+    const utilizadosAg = dispensado
+      ? 0
+      : itens.filter(
+          (i) =>
+            selectedIds.has(i.agendamento.id) &&
+            isAgendamentoSelecionavel(i.agendamento.status)
+        ).length;
+    const agendamentosValidos = itens
+      .filter((i) => isAgendamentoSelecionavel(i.agendamento.status))
+      .map((i) => ({
+        id: i.agendamento.id,
+        colaborador_cpf: i.agendamento.colaborador_cpf,
+      }));
+
+    return buildContagemContratoComVagas({
       quantidadePrevista,
-      utilizadosAg + programacoesAtivas + creditosDisponiveis,
-      adicionais,
-      {
-        agendados: utilizadosAg,
-        programadosFuturos: programacoesAtivas,
-        emAberto: creditosDisponiveis,
-        vagasComprometidas,
-      }
-    );
+      vagas,
+      utilizadosAg,
+      programadosLegado: programacoesAtivas,
+      emAbertoLegado: creditosDisponiveis,
+      vagasComprometidasLegado: vagasComprometidas,
+      adicionaisLegado,
+      dispensado,
+      agendamentosValidos,
+    });
   }, [
     itens,
     selectedIds,
@@ -449,6 +447,7 @@ export function OrcamentoAbaAgendamentos({
     programacoesAtivas,
     creditosDisponiveis,
     vagasComprometidas,
+    vagas,
   ]);
 
   useEffect(() => {

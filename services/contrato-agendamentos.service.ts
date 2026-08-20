@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   agendamentoPertenceAoClienteContrato,
+  buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
   isAgendamentoSelecionavel,
   isDataNaVigencia,
@@ -11,6 +12,7 @@ import type {
   AgendamentoWithExames,
   ClienteContratoRecord,
 } from "@/lib/types";
+import { listarVagasDoContrato } from "@/services/contrato-vagas.service";
 
 const AGENDAMENTO_SELECT = `
   *,
@@ -331,20 +333,28 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     vagasComprometidas = vagaCount ?? 0;
   }
 
+  const vagas = dispensado
+    ? []
+    : await listarVagasDoContrato(contrato.id).catch(() => []);
+
   return {
     itens,
-    contagem: buildContratoAgendamentoContagem(
-      quantidadeContratada,
-      utilizadosAg + programados + emAberto,
-      adicionais,
-      {
-        dispensado,
-        agendados: utilizadosAg,
-        programadosFuturos: programados,
-        emAberto,
-        vagasComprometidas,
-      }
-    ),
+    contagem: buildContagemContratoComVagas({
+      quantidadePrevista: quantidadeContratada,
+      vagas,
+      utilizadosAg,
+      programadosLegado: programados,
+      emAbertoLegado: emAberto,
+      vagasComprometidasLegado: vagasComprometidas,
+      adicionaisLegado: adicionais,
+      dispensado,
+      agendamentosValidos: itens
+        .filter((i) => isAgendamentoSelecionavel(i.agendamento.status))
+        .map((i) => ({
+          id: i.agendamento.id,
+          colaborador_cpf: i.agendamento.colaborador_cpf,
+        })),
+    }),
   };
 }
 

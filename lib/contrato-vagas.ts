@@ -226,6 +226,79 @@ export function isClassificacaoVagasContratoCompleta(input: {
   return input.pendentesDefinicao === 0 && input.vagasComprometidas === 0;
 }
 
+export type CardsVagasContrato = {
+  agendados: number;
+  programadosFuturos: number;
+  emAberto: number;
+  vagasComprometidas: number;
+  pendentesDefinicao: number;
+};
+
+/**
+ * Há classificação real nas vagas (não só linhas em aberto criadas pela migration).
+ * Nesse caso os cards devem seguir contrato_vagas, não contrato_agendamentos.
+ */
+export function deveUsarVagasComoFonteDosCards(
+  vagas: Array<Pick<ContratoVagaRecord, "status">>
+): boolean {
+  return vagas.some((vaga) => vaga.status !== "aberta");
+}
+
+/**
+ * Cada vaga prevista entra em uma única categoria.
+ * pendentes = previstos - agendados - programados - ASOs - comprometidos.
+ */
+export function contarCardsPorVagasContrato(
+  vagas: Array<Pick<ContratoVagaRecord, "status">>,
+  quantidadePrevista: number
+): CardsVagasContrato {
+  let agendados = 0;
+  let programadosFuturos = 0;
+  let emAberto = 0;
+  let vagasComprometidas = 0;
+  for (const vaga of vagas) {
+    if (vaga.status === "agendada") agendados += 1;
+    else if (vaga.status === "programada") programadosFuturos += 1;
+    else if (vaga.status === "aso_aberto") emAberto += 1;
+    else if (vaga.status === "comprometida") vagasComprometidas += 1;
+  }
+  const previstos = Math.max(0, Math.floor(Number(quantidadePrevista) || 0));
+  const pendentesDefinicao = Math.max(
+    0,
+    previstos - agendados - programadosFuturos - emAberto - vagasComprometidas
+  );
+  return {
+    agendados,
+    programadosFuturos,
+    emAberto,
+    vagasComprometidas,
+    pendentesDefinicao,
+  };
+}
+
+export function agendamentoOcupaVagaPrevista(
+  agendamento: { id: string; colaborador_cpf?: string | null },
+  vagas: Array<
+    Pick<ContratoVagaRecord, "status" | "agendamento_id" | "colaborador_cpf">
+  >
+): boolean {
+  if (vagas.some((vaga) => vaga.agendamento_id === agendamento.id)) {
+    return true;
+  }
+  const cpf = normalizeCpfDigits(agendamento.colaborador_cpf);
+  if (!isValidCPF(cpf)) return false;
+  return vagas.some((vaga) => {
+    if (
+      vaga.status !== "agendada" &&
+      vaga.status !== "programada" &&
+      vaga.status !== "comprometida"
+    ) {
+      return false;
+    }
+    return cpfVagaIguais(vaga.colaborador_cpf, cpf);
+  });
+}
+
 export type AgendamentoCandidatoVaga = {
   id: string;
   status: string;

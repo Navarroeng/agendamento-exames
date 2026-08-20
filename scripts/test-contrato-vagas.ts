@@ -2,9 +2,12 @@
 
 import assert from "node:assert/strict";
 import {
+  agendamentoOcupaVagaPrevista,
   buildVagaDraftsIniciais,
+  contarCardsPorVagasContrato,
   contarVagasComprometidas,
   cpfVagaIguais,
+  deveUsarVagasComoFonteDosCards,
   draftAposRemoverFuncionario,
   emptyVagaDraft,
   escolherAgendamentoValidoParaVaga,
@@ -18,7 +21,10 @@ import {
   type ContratoVagaDraft,
   type ContratoVagaRecord,
 } from "../lib/contrato-vagas";
-import { buildContratoAgendamentoContagem } from "../lib/contrato-agendamentos";
+import {
+  buildContagemContratoComVagas,
+  buildContratoAgendamentoContagem,
+} from "../lib/contrato-agendamentos";
 import {
   aplicarImportacaoNasVagas,
   parsePlanilhaListaFuncionarios,
@@ -185,6 +191,132 @@ assert.equal(iniciais[0].colaborador, "Natália Porfírio");
 assert.equal(iniciais[1].colaborador, "");
 assert.equal(contarVagasComprometidas(existentes), 1);
 assert.equal(labelColaboradorOuVaga({ indice: 2, colaborador: "", status: "aso_aberto" }), "Vaga 2");
+
+function vagaCard(
+  status: ContratoVagaRecord["status"],
+  extra: Partial<ContratoVagaRecord> = {}
+): ContratoVagaRecord {
+  return {
+    id: extra.id ?? `v-${status}-${extra.indice ?? 1}`,
+    contrato_id: "c1",
+    orcamento_id: "o1",
+    indice: extra.indice ?? 1,
+    colaborador: extra.colaborador ?? null,
+    colaborador_cpf: extra.colaborador_cpf ?? null,
+    cargo_id: null,
+    cargo_nome: null,
+    status,
+    credito_aso_id: extra.credito_aso_id ?? null,
+    agendamento_id: extra.agendamento_id ?? null,
+    periodico_futuro_id: extra.periodico_futuro_id ?? null,
+    created_at: "",
+    updated_at: "",
+  };
+}
+
+assert.equal(
+  deveUsarVagasComoFonteDosCards([vagaCard("aberta"), vagaCard("aberta", { indice: 2 })]),
+  false
+);
+assert.equal(
+  deveUsarVagasComoFonteDosCards([
+    vagaCard("agendada", { agendamento_id: "ag-1" }),
+    vagaCard("aso_aberto", { indice: 2 }),
+  ]),
+  true
+);
+
+const casoAtual = contarCardsPorVagasContrato(
+  [
+    vagaCard("agendada", {
+      colaborador: "NATÁLIA PORFÍRIO BATISTA",
+      colaborador_cpf: "52998224725",
+      agendamento_id: "ag-natalia",
+    }),
+    vagaCard("aso_aberto", { indice: 2 }),
+  ],
+  2
+);
+assert.equal(casoAtual.agendados, 1);
+assert.equal(casoAtual.emAberto, 1);
+assert.equal(casoAtual.programadosFuturos, 0);
+assert.equal(casoAtual.vagasComprometidas, 0);
+assert.equal(casoAtual.pendentesDefinicao, 0);
+
+const cardsAtual = buildContagemContratoComVagas({
+  quantidadePrevista: 2,
+  vagas: [
+    vagaCard("agendada", {
+      colaborador_cpf: "52998224725",
+      agendamento_id: "ag-natalia",
+    }),
+    vagaCard("aso_aberto", { indice: 2 }),
+  ],
+  utilizadosAg: 0,
+  programadosLegado: 0,
+  emAbertoLegado: 1,
+  vagasComprometidasLegado: 0,
+  adicionaisLegado: 1,
+  agendamentosValidos: [
+    { id: "ag-natalia", colaborador_cpf: "52998224725" },
+  ],
+});
+assert.equal(cardsAtual.agendados, 1);
+assert.equal(cardsAtual.emAberto, 1);
+assert.equal(cardsAtual.pendentesDefinicao, 0);
+assert.equal(cardsAtual.vagasComprometidas, 0);
+assert.equal(cardsAtual.adicionais, 0);
+assert.equal(cardsAtual.percentual, 100);
+assert.equal(
+  cardsAtual.agendados +
+    cardsAtual.programadosFuturos +
+    cardsAtual.emAberto +
+    cardsAtual.vagasComprometidas +
+    cardsAtual.pendentesDefinicao,
+  2
+);
+
+const caso2 = contarCardsPorVagasContrato(
+  [vagaCard("comprometida"), vagaCard("aso_aberto", { indice: 2 })],
+  2
+);
+assert.equal(caso2.vagasComprometidas, 1);
+assert.equal(caso2.emAberto, 1);
+assert.equal(caso2.pendentesDefinicao, 0);
+
+const caso3 = contarCardsPorVagasContrato(
+  [vagaCard("agendada"), vagaCard("aberta", { indice: 2 })],
+  2
+);
+assert.equal(caso3.agendados, 1);
+assert.equal(caso3.pendentesDefinicao, 1);
+
+const caso4 = contarCardsPorVagasContrato(
+  [
+    vagaCard("agendada"),
+    vagaCard("programada", { indice: 2 }),
+    vagaCard("aso_aberto", { indice: 3 }),
+  ],
+  3
+);
+assert.equal(caso4.pendentesDefinicao, 0);
+assert.equal(caso4.agendados + caso4.programadosFuturos + caso4.emAberto, 3);
+
+const caso5 = contarCardsPorVagasContrato(
+  [vagaCard("comprometida"), vagaCard("aberta", { indice: 2 })],
+  2
+);
+assert.equal(caso5.agendados, 0);
+assert.equal(caso5.vagasComprometidas, 1);
+assert.equal(caso5.pendentesDefinicao, 1);
+
+assert.equal(
+  agendamentoOcupaVagaPrevista(
+    { id: "ag-natalia", colaborador_cpf: "529.982.247-25" },
+    [vagaCard("agendada", { colaborador_cpf: "52998224725", agendamento_id: "ag-natalia" })]
+  ),
+  true
+);
 
 const caso = buildContratoAgendamentoContagem(2, 1, 0, {
   agendados: 0,

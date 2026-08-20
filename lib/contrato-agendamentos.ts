@@ -1,5 +1,11 @@
 import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
-import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
+import {
+  agendamentoOcupaVagaPrevista,
+  contarCardsPorVagasContrato,
+  deveUsarVagasComoFonteDosCards,
+  isClassificacaoVagasContratoCompleta,
+  type ContratoVagaRecord,
+} from "@/lib/contrato-vagas";
 
 export type ContratoAgendamentoContagem = {
   contratados: number;
@@ -176,6 +182,60 @@ export function buildContratoAgendamentoContagem(
     progressoLabel: `${percentual}%`,
     situacaoLabel: null,
   };
+}
+
+export function buildContagemContratoComVagas(input: {
+  quantidadePrevista: number;
+  vagas: Array<
+    Pick<ContratoVagaRecord, "status" | "agendamento_id" | "colaborador_cpf">
+  >;
+  utilizadosAg: number;
+  programadosLegado: number;
+  emAbertoLegado: number;
+  vagasComprometidasLegado: number;
+  adicionaisLegado: number;
+  dispensado?: boolean;
+  agendamentosValidos?: Array<{
+    id: string;
+    colaborador_cpf?: string | null;
+  }>;
+}): ContratoAgendamentoContagem {
+  if (input.dispensado) {
+    return buildContratoAgendamentoContagem(
+      input.quantidadePrevista,
+      0,
+      input.adicionaisLegado,
+      { dispensado: true }
+    );
+  }
+
+  if (deveUsarVagasComoFonteDosCards(input.vagas)) {
+    const cards = contarCardsPorVagasContrato(
+      input.vagas,
+      input.quantidadePrevista
+    );
+    const adicionais = (input.agendamentosValidos ?? []).filter(
+      (ag) => !agendamentoOcupaVagaPrevista(ag, input.vagas)
+    ).length;
+    return buildContratoAgendamentoContagem(
+      input.quantidadePrevista,
+      cards.agendados + cards.programadosFuturos + cards.emAberto,
+      adicionais,
+      cards
+    );
+  }
+
+  return buildContratoAgendamentoContagem(
+    input.quantidadePrevista,
+    input.utilizadosAg + input.programadosLegado + input.emAbertoLegado,
+    input.adicionaisLegado,
+    {
+      agendados: input.utilizadosAg,
+      programadosFuturos: input.programadosLegado,
+      emAberto: input.emAbertoLegado,
+      vagasComprometidas: input.vagasComprometidasLegado,
+    }
+  );
 }
 
 export function resolveClassificacaoAgendamento(params: {
