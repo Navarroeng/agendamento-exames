@@ -13,6 +13,7 @@ import { AgendamentoDuplicidade90DiasAvisoModal } from "@/components/modals/Agen
 import { AgendamentoExamesAdicionaisModal } from "@/components/modals/AgendamentoExamesAdicionaisModal";
 import { PeriodicoFuturoVinculoModal } from "@/components/agendamentos/PeriodicoFuturoVinculoModal";
 import { CreditoAsoDisponivelModal } from "@/components/agendamentos/CreditoAsoDisponivelModal";
+import { VagaComprometidaModal } from "@/components/agendamentos/VagaComprometidaModal";
 import { AgendamentoForm } from "./AgendamentoForm";
 import { AgendamentoHistoricoModal } from "@/components/modals/AgendamentoHistoricoModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
@@ -59,6 +60,10 @@ export function AgendamentoPage() {
     creditoAsoNumeroContrato,
     handleCreditoAsoNaoUtilizar,
     handleCreditoAsoUtilizar,
+    vagaComprometidaModalOpen,
+    vagaComprometida,
+    handleVagaComprometidaNaoVincular,
+    handleVagaComprometidaVincular,
     cargoId,
     cargosAtivos,
     cargosLoading,
@@ -351,6 +356,14 @@ export function AgendamentoPage() {
         exames={examesDisponiveisParaAdicionar}
         onClose={closeExamesAdicionaisModal}
         onConfirm={handleConfirmExamesAdicionais}
+      />
+      <VagaComprometidaModal
+        open={vagaComprometidaModalOpen}
+        clienteNome={form.cliente_nome}
+        vaga={vagaComprometida}
+        saving={saving}
+        onNaoVincular={handleVagaComprometidaNaoVincular}
+        onVincular={handleVagaComprometidaVincular}
       />
       <CreditoAsoDisponivelModal
         open={creditoAsoModalOpen}

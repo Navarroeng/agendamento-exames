@@ -6,6 +6,7 @@ import {
   isDataNaVigencia,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
+import { normalizeCpfDigits } from "@/lib/cpf";
 import type {
   AgendamentoWithExames,
   ClienteContratoRecord,
@@ -317,6 +318,17 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       .eq("status", "disponivel");
     if (cErr) throw cErr;
     emAberto = credCount ?? 0;
+    }
+
+  let vagasComprometidas = 0;
+  if (!dispensado) {
+    const { count: vagaCount, error: vagaErr } = await supabase
+      .from("contrato_vagas")
+      .select("id", { count: "exact", head: true })
+      .eq("contrato_id", contrato.id)
+      .eq("status", "comprometida");
+    if (vagaErr) throw vagaErr;
+    vagasComprometidas = vagaCount ?? 0;
   }
 
   return {
@@ -330,6 +342,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
         agendados: utilizadosAg,
         programadosFuturos: programados,
         emAberto,
+        vagasComprometidas,
       }
     ),
   };
@@ -397,32 +410,68 @@ export async function salvarSelecaoAgendamentosContrato(params: {
   if (creditoErr) throw creditoErr;
   const emAberto = creditoCount ?? 0;
 
-  if (
-    agendamentoIdsSelecionados.length + programados + emAberto >
-    quantidadePrevista
-  ) {
-    throw new Error(
-      `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
-    );
-  }
+  const { data: vagasComp, error: vagaCompErr } = await supabase
+    .from("contrato_vagas")
+    .select("id, colaborador_cpf")
+    .eq("contrato_id", contratoId)
+    .eq("status", "comprometida");
+  if (vagaCompErr) throw vagaCompErr;
 
   const agora = new Date().toISOString();
+
+  let agsSelecionados: Array<{
+    id: string;
+    status: string;
+    colaborador: string | null;
+    colaborador_cpf: string | null;
+    cargo_id: string | null;
+    cargo_nome: string | null;
+  }> = [];
 
   // Validar status e existência
   if (agendamentoIdsSelecionados.length > 0) {
     const { data: ags, error: agStatusErr } = await supabase
       .from("agendamentos")
-      .select("id, status, colaborador")
+      .select("id, status, colaborador, colaborador_cpf, cargo_id, cargo_nome")
       .in("id", agendamentoIdsSelecionados);
     if (agStatusErr) throw agStatusErr;
-    const invalidos = (ags ?? []).filter(
-      (a) => !isAgendamentoSelecionavel(String(a.status))
+    agsSelecionados = (ags ?? []).map((a) => ({
+      id: String(a.id),
+      status: String(a.status),
+      colaborador: a.colaborador ? String(a.colaborador) : null,
+      colaborador_cpf: a.colaborador_cpf ? String(a.colaborador_cpf) : null,
+      cargo_id: a.cargo_id ? String(a.cargo_id) : null,
+      cargo_nome: a.cargo_nome ? String(a.cargo_nome) : null,
+    }));
+    const invalidos = agsSelecionados.filter(
+      (a) => !isAgendamentoSelecionavel(a.status)
     );
     if (invalidos.length > 0) {
       throw new Error(
         "Agendamento cancelado não pode ser contabilizado no contrato."
       );
     }
+  }
+
+  const cpfsSelecionados = new Set(
+    agsSelecionados
+      .map((a) => normalizeCpfDigits(a.colaborador_cpf))
+      .filter((d) => d.length === 11)
+  );
+  const comprometidasNaoConsumidas = (vagasComp ?? []).filter(
+    (v) => !cpfsSelecionados.has(normalizeCpfDigits(v.colaborador_cpf))
+  ).length;
+
+  if (
+    agendamentoIdsSelecionados.length +
+      programados +
+      emAberto +
+      comprometidasNaoConsumidas >
+    quantidadePrevista
+  ) {
+    throw new Error(
+      `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
+    );
   }
 
   // Validar bloqueio em outros contratos
@@ -595,6 +644,26 @@ export async function salvarSelecaoAgendamentosContrato(params: {
         : `${usuarioNome} reabriu a etapa Agendamentos do contrato ${contratoNumero} (${utilizados} de ${quantidadePrevista}).`,
     });
   }
+
+  const { marcarVagaAgendadaPorAgendamento, desmarcarVagaPorAgendamentoRemovido } =
+    await import("@/services/contrato-vagas.service");
+  for (const id of adicionados) {
+    const ag = agsSelecionados.find((a) => a.id === id);
+    await marcarVagaAgendadaPorAgendamento({
+      contratoId,
+      agendamentoId: id,
+      colaborador: ag?.colaborador || nomesById.get(id) || id,
+      colaboradorCpf: ag?.colaborador_cpf ?? null,
+      cargoId: ag?.cargo_id ?? null,
+      cargoNome: ag?.cargo_nome ?? null,
+    });
+  }
+  for (const row of removidos) {
+    await desmarcarVagaPorAgendamentoRemovido({
+      contratoId,
+      agendamentoId: String(row.agendamento_id),
+    });
+  }
 }
 
 /** Ao cancelar agendamento: deixa de contabilizar previsão. */
@@ -698,6 +767,11 @@ export async function invalidarContabilizacaoPorCancelamento(
     usuarioNome,
     contratoVigente,
   });
+
+  const { reverterVagaPorCancelamentoAgendamento } = await import(
+    "@/services/contrato-vagas.service"
+  );
+  await reverterVagaPorCancelamentoAgendamento(agendamentoId);
 }
 
 export async function dispensarAgendamentosIniciaisContrato(params: {

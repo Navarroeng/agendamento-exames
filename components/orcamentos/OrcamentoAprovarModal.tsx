@@ -38,11 +38,11 @@ import {
 } from "@/lib/orcamento-types";
 import { OrcamentoEtapasNav } from "./OrcamentoEtapasNav";
 import {
-  OrcamentoAbaFuncionarios,
   OrcamentoAbaLogo,
   OrcamentoAbaProcuracao,
   OrcamentoAbaVisitaTecnica,
 } from "./OrcamentoEtapasExtras";
+import { OrcamentoAbaFuncionarios } from "./OrcamentoAbaFuncionarios";
 import { OrcamentoAbaAgendamentos } from "./OrcamentoAbaAgendamentos";
 import {
   emptyTreinamentoForm,
@@ -116,6 +116,7 @@ interface OrcamentoAprovarModalProps {
   onSalvarFuncionarios: (aprovacaoId: string, file: File | null) => Promise<void>;
   onSubstituirFuncionarios: (aprovacaoId: string, file: File) => Promise<void>;
   onRemoverFuncionarios: (aprovacaoId: string) => Promise<void>;
+  onAprovacaoAtualizada?: (aprovacao: OrcamentoAprovacaoRecord) => void;
   onSalvarLogo: (
     aprovacaoId: string,
     file: File | null,
@@ -165,9 +166,9 @@ export function OrcamentoAprovarModal({
   onSalvarContrato,
   onSalvarFinanceiro,
   onSalvarProcuracao,
-  onSalvarFuncionarios,
   onSubstituirFuncionarios,
   onRemoverFuncionarios,
+  onAprovacaoAtualizada,
   onSalvarLogo,
   onSubstituirLogo,
   onRemoverLogo,
@@ -609,17 +610,6 @@ export function OrcamentoAprovarModal({
     if (isProcuracaoStatusConcluida(procuracaoStatus)) {
       setTab("funcionarios");
     }
-  }
-
-  async function handleSalvarFuncionariosClick() {
-    if (!aprovacao) return;
-    if (!funcionariosFile && !aprovacao.funcionarios_lista_path) {
-      toast.error("Anexe a lista de funcionários.");
-      return;
-    }
-    await onSalvarFuncionarios(aprovacao.id, funcionariosFile);
-    setFuncionariosFile(null);
-    setTab("logo");
   }
 
   async function handleSalvarLogoClick() {
@@ -1464,6 +1454,7 @@ export function OrcamentoAprovarModal({
           ) : null}
 
           {tab === "funcionarios" &&
+          orcamento &&
           aprovacao &&
           isOrcamentoEtapaLiberada(
             "funcionarios",
@@ -1472,13 +1463,22 @@ export function OrcamentoAprovarModal({
             etapasCtx
           ) ? (
             <OrcamentoAbaFuncionarios
+              orcamentoId={orcamento.id}
+              aprovacao={aprovacao}
+              usuarioNome={usuarioNome}
+              clienteNome={orcamento.cliente_nome}
+              clienteCnpj={orcamento.cliente_cnpj}
+              clienteId={orcamento.cliente_id}
               file={funcionariosFile}
               savedName={aprovacao.funcionarios_lista_nome ?? null}
               savedUrl={funcionariosPreviewUrl}
               savedTipo={aprovacao.funcionarios_lista_tipo ?? null}
               saving={saving}
               onFileChange={setFuncionariosFile}
-              onSalvar={() => void handleSalvarFuncionariosClick()}
+              onEtapaSalva={(saved) => {
+                onAprovacaoAtualizada?.(saved);
+                setTab("logo");
+              }}
               onSubstituir={async (file) => {
                 await onSubstituirFuncionarios(aprovacao.id, file);
                 setFuncionariosFile(null);
@@ -1563,7 +1563,9 @@ export function OrcamentoAprovarModal({
               aprovacao={aprovacao}
               usuarioNome={usuarioNome}
               clienteNome={orcamento.cliente_nome}
+              clienteCnpj={orcamento.cliente_cnpj}
               onContagemChange={setAgendamentosContagem}
+              onIrParaListaFuncionarios={() => setTab("funcionarios")}
             />
           ) : null}
 

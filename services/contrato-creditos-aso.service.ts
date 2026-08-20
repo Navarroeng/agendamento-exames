@@ -420,6 +420,16 @@ export async function vincularCreditoUtilizadoAoContrato(params: {
       vinculado_em: agora,
     });
   }
+
+  const { marcarVagaUtilizadaPorCredito } = await import(
+    "@/services/contrato-vagas.service"
+  );
+  await marcarVagaUtilizadaPorCredito({
+    creditoId: params.creditoId,
+    agendamentoId: params.agendamentoId,
+    colaborador: params.colaborador,
+    colaboradorCpf: params.colaboradorCpf,
+  });
 }
 
 export async function devolverCreditoAsoPorCancelamento(params: {

@@ -262,6 +262,16 @@ export async function criarExameFuturoImplantacao(
     descricao: `${input.criadoPor} programou exame futuro (${tipoAso}) de ${colaborador} para ${dataPrevista} no contrato ${contrato.numero ?? input.contratoId} (Implantação Inicial).`,
   });
 
+  const { ocuparVagaComExameFuturo } = await import(
+    "@/services/contrato-vagas.service"
+  );
+  await ocuparVagaComExameFuturo({
+    contratoId: input.contratoId,
+    periodicoFuturoId: record.id,
+    colaborador,
+    colaboradorCpf: cpfDigits || null,
+  });
+
   return record;
 }
 

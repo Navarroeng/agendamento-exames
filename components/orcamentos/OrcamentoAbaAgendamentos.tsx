@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { DispensaAgendamentosIniciaisModal } from "@/components/orcamentos/DispensaAgendamentosIniciaisModal";
@@ -33,6 +34,15 @@ import {
   type ColaboradorSugestao,
 } from "@/lib/contrato-programacao-futura";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
+import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
+import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  CONTRATO_VAGA_STATUS_LABELS,
+  isNomeFuncionarioReal,
+  labelColaboradorOuVaga,
+  type ContratoVagaRecord,
+  type ContratoVagaStatus,
+} from "@/lib/contrato-vagas";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { AgendamentoWithExames, ClienteContratoRecord } from "@/lib/types";
 import {
@@ -50,6 +60,11 @@ import {
   removerCreditoAsoEmAberto,
 } from "@/services/contrato-creditos-aso.service";
 import {
+  listarVagasDoContrato,
+  ocuparVagasAbertasComCreditos,
+  liberarVagaPorCreditoRemovido,
+} from "@/services/contrato-vagas.service";
+import {
   criarExameFuturoImplantacao,
   listarProgramacoesFuturasDoContrato,
   listarSugestoesColaboradoresContrato,
@@ -61,7 +76,9 @@ interface OrcamentoAbaAgendamentosProps {
   aprovacao: OrcamentoAprovacaoRecord;
   usuarioNome: string;
   clienteNome?: string;
+  clienteCnpj?: string | null;
   onContagemChange?: (contagem: ContratoAgendamentoContagem) => void;
+  onIrParaListaFuncionarios?: () => void;
 }
 
 function Card({
@@ -110,6 +127,23 @@ function Card({
         {value}
       </p>
     </div>
+  );
+}
+
+function VagaSituacaoBadge({ status }: { status: ContratoVagaStatus }) {
+  const map: Record<ContratoVagaStatus, string> = {
+    aberta: "bg-[#fffbeb] text-[#b45309]",
+    comprometida: "bg-[#ffedd5] text-[#c2410c]",
+    aso_aberto: "bg-[#e0f2fe] text-[#0369a1]",
+    agendada: "bg-brand-green-soft text-brand-green",
+    programada: "bg-[#eef2ff] text-[#4338ca]",
+  };
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${map[status]}`}
+    >
+      {CONTRATO_VAGA_STATUS_LABELS[status]}
+    </span>
   );
 }
 
@@ -209,8 +243,11 @@ export function OrcamentoAbaAgendamentos({
   aprovacao,
   usuarioNome,
   clienteNome,
+  clienteCnpj,
   onContagemChange,
+  onIrParaListaFuncionarios,
 }: OrcamentoAbaAgendamentosProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -237,6 +274,7 @@ export function OrcamentoAbaAgendamentos({
   const [sugestoesColaboradores, setSugestoesColaboradores] = useState<
     ColaboradorSugestao[]
   >([]);
+  const [vagas, setVagas] = useState<ContratoVagaRecord[]>([]);
 
   const onContagemChangeRef = useRef(onContagemChange);
   onContagemChangeRef.current = onContagemChange;
@@ -251,6 +289,7 @@ export function OrcamentoAbaAgendamentos({
   const creditosDisponiveis = creditosAso.filter(
     (c) => c.status === "disponivel"
   ).length;
+  const vagasComprometidas = vagas.filter((v) => v.status === "comprometida").length;
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -275,12 +314,13 @@ export function OrcamentoAbaAgendamentos({
           setSelectedIds(new Set());
           setProgramacoes([]);
           setCreditosAso([]);
+          setVagas([]);
           setSugestoesColaboradores([]);
           onContagemChangeRef.current?.(empty);
           return;
         }
 
-        const [resumo, progs, creditos] = await Promise.all([
+        const [resumo, progs, creditos, vagasContrato] = await Promise.all([
           carregarAgendamentosVigenciaContrato({
             contrato: contratoRow,
             quantidadeContratada: qtd,
@@ -288,6 +328,7 @@ export function OrcamentoAbaAgendamentos({
           }),
           listarProgramacoesFuturasDoContrato(contratoRow.id),
           listarCreditosDoContrato(contratoRow.id),
+          listarVagasDoContrato(contratoRow.id).catch(() => [] as ContratoVagaRecord[]),
         ]);
         const itensDoCliente = resumo.itens.filter((i) =>
           agendamentoPertenceAoClienteContrato(
@@ -305,6 +346,7 @@ export function OrcamentoAbaAgendamentos({
         setItens(itensDoCliente);
         setProgramacoes(progs);
         setCreditosAso(creditos);
+        setVagas(vagasContrato);
         setSelectedIds(
           new Set(
             itensDoCliente
@@ -381,6 +423,7 @@ export function OrcamentoAbaAgendamentos({
         agendados: utilizadosAg,
         programadosFuturos: programacoesAtivas,
         emAberto: creditosDisponiveis,
+        vagasComprometidas,
       }
     );
   }, [
@@ -390,6 +433,7 @@ export function OrcamentoAbaAgendamentos({
     dispensado,
     programacoesAtivas,
     creditosDisponiveis,
+    vagasComprometidas,
   ]);
 
   useEffect(() => {
@@ -422,14 +466,32 @@ export function OrcamentoAbaAgendamentos({
         next.delete(item.agendamento.id);
         return next;
       }
-      if (next.size + programacoesAtivas + creditosDisponiveis >= quantidadePrevista) {
+      const nextIds = new Set(next);
+      nextIds.add(item.agendamento.id);
+      const cpfsNext = new Set(
+        itens
+          .filter((i) => nextIds.has(i.agendamento.id))
+          .map((i) => normalizeCpfDigits(i.agendamento.colaborador_cpf))
+          .filter((d) => d.length === 11)
+      );
+      const comprometidasNaoConsumidas = vagas.filter(
+        (v) =>
+          v.status === "comprometida" &&
+          !cpfsNext.has(normalizeCpfDigits(v.colaborador_cpf))
+      ).length;
+      if (
+        nextIds.size +
+          programacoesAtivas +
+          creditosDisponiveis +
+          comprometidasNaoConsumidas >
+        quantidadePrevista
+      ) {
         toast.error(
           `A quantidade prevista de ${quantidadePrevista} colaboradores para este contrato já foi atingida.`
         );
         return prev;
       }
-      next.add(item.agendamento.id);
-      return next;
+      return nextIds;
     });
   }
 
@@ -480,16 +542,20 @@ export function OrcamentoAbaAgendamentos({
     if (!contrato || asoAbertoSaving) return;
     setAsoAbertoSaving(true);
     try {
-      await registrarCreditosAsoEmAberto({
+      const created = await registrarCreditosAsoEmAberto({
         contratoId: contrato.id,
         orcamentoId,
         clienteId: contrato.cliente_id,
-        clienteCnpj: null,
+        clienteCnpj: clienteCnpj ?? null,
         quantidade: data.quantidade,
         observacao: data.observacao,
         validoAte: contrato.data_fim,
         usuarioNome,
         numeroContrato: contrato.numero,
+      });
+      await ocuparVagasAbertasComCreditos({
+        contratoId: contrato.id,
+        creditoIds: created.map((c) => c.id),
       });
       toast.success(
         data.quantidade === 1
@@ -524,6 +590,7 @@ export function OrcamentoAbaAgendamentos({
         usuarioNome,
         numeroContrato: contrato?.numero ?? null,
       });
+      await liberarVagaPorCreditoRemovido(credito.id);
       toast.success("Classificação de ASO em aberto removida.");
       await load({ silent: true });
     } catch (err) {
@@ -558,6 +625,30 @@ export function OrcamentoAbaAgendamentos({
           : "Não foi possível atualizar a observação."
       );
     }
+  }
+
+  function handleAgendarVaga(vaga: ContratoVagaRecord) {
+    const empresa = clienteNome?.trim() || "";
+    const colaborador = labelColaboradorOuVaga(vaga);
+    if (!empresa || !isNomeFuncionarioReal(vaga.colaborador)) {
+      toast.error("Preencha o funcionário na Lista de funcionários antes de agendar.");
+      return;
+    }
+    saveAgendamentoPrefill({
+      cliente_nome: empresa,
+      colaborador: vaga.colaborador ?? colaborador,
+      colaborador_cpf: vaga.colaborador_cpf
+        ? maskCPFInput(vaga.colaborador_cpf)
+        : undefined,
+      cargo_id: vaga.cargo_id ?? undefined,
+      cargo_nome: vaga.cargo_nome ?? undefined,
+      cliente_cnpj: clienteCnpj ?? undefined,
+      contrato_id: contrato?.id,
+      contrato_numero: contrato?.numero ?? undefined,
+      vaga_id: vaga.id,
+      aso: "Admissional",
+    });
+    router.push("/");
   }
 
   async function handleSalvar() {
@@ -879,7 +970,8 @@ export function OrcamentoAbaAgendamentos({
           />
           <Card
             label="Comprometidos"
-            value={String(contagemPreview.comprometidos)}
+            value={String(contagemPreview.vagasComprometidas)}
+            title="Funcionários já identificados na lista, ainda sem agendamento."
           />
           {dispensado ? (
             <Card
@@ -970,6 +1062,74 @@ export function OrcamentoAbaAgendamentos({
           </div>
         </div>
       </section>
+
+      {!dispensado && vagas.length > 0 ? (
+        <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
+          <div className="border-b border-[#eef2f7] px-4 py-3">
+            <h3 className="text-sm font-extrabold text-navy">
+              Vagas do contrato
+            </h3>
+            <p className="mt-0.5 text-xs text-[#64748b]">
+              Funcionários e vagas definidos na Lista de funcionários.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-[#f8fafc]">
+                <tr>
+                  <th className="border-b px-4 py-2 font-bold text-navy">
+                    Colaborador/vaga
+                  </th>
+                  <th className="border-b px-4 py-2 font-bold text-navy">
+                    Cargo
+                  </th>
+                  <th className="border-b px-4 py-2 font-bold text-navy">
+                    Situação
+                  </th>
+                  <th className="border-b px-4 py-2 font-bold text-navy">
+                    Ação
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {vagas.map((vaga) => (
+                  <tr key={vaga.id} className="odd:bg-white even:bg-[#fbfdff]">
+                    <td className="border-b border-[#eef2f7] px-4 py-2.5 font-semibold text-navy">
+                      {labelColaboradorOuVaga(vaga)}
+                    </td>
+                    <td className="border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
+                      {vaga.cargo_nome?.trim() || "—"}
+                    </td>
+                    <td className="border-b border-[#eef2f7] px-4 py-2.5">
+                      <VagaSituacaoBadge status={vaga.status} />
+                    </td>
+                    <td className="border-b border-[#eef2f7] px-4 py-2.5">
+                      {vaga.status === "comprometida" ? (
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-brand-blue hover:underline"
+                          onClick={() => handleAgendarVaga(vaga)}
+                        >
+                          Agendar
+                        </button>
+                      ) : null}
+                      {vaga.status === "aberta" || vaga.status === "aso_aberto" ? (
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-brand-blue hover:underline"
+                          onClick={() => onIrParaListaFuncionarios?.()}
+                        >
+                          Definir funcionário
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-2xl border border-[#e4ebf4] bg-white">
         {dispensado ? (

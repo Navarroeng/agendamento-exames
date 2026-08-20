@@ -51,6 +51,7 @@ export function ImplantacaoClientesPage() {
     handleSalvarVisita,
     handleSalvarTreinamento,
     handleVerComprovante,
+    handleAprovacaoAtualizada,
   } = useImplantacaoClientesPage();
 
   return (
@@ -109,6 +110,7 @@ export function ImplantacaoClientesPage() {
         onSalvarFuncionarios={handleSalvarFuncionarios}
         onSubstituirFuncionarios={handleSubstituirFuncionarios}
         onRemoverFuncionarios={handleRemoverFuncionarios}
+        onAprovacaoAtualizada={handleAprovacaoAtualizada}
         onSalvarLogo={handleSalvarLogo}
         onSubstituirLogo={handleSubstituirLogo}
         onRemoverLogo={handleRemoverLogo}

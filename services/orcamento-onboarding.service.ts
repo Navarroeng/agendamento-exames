@@ -121,6 +121,20 @@ export async function removerOrcamentoListaFuncionarios(
   return fetchAprovacao(aprovacaoId);
 }
 
+export async function marcarOrcamentoListaVagasSalva(
+  aprovacaoId: string
+): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      funcionarios_vagas_salvas_em: new Date().toISOString(),
+    })
+    .eq("id", aprovacaoId);
+  if (error) throw error;
+  return fetchAprovacao(aprovacaoId);
+}
+
 export async function salvarOrcamentoLogo(
   aprovacaoId: string,
   payload: {

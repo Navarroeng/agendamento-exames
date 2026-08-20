@@ -136,6 +136,11 @@ import {
   listarCreditosDisponiveisDoCliente,
   vincularCreditoUtilizadoAoContrato,
 } from "@/services/contrato-creditos-aso.service";
+import {
+  buscarVagaComprometidaPorCpf,
+  vincularAgendamentoAVaga,
+} from "@/services/contrato-vagas.service";
+import type { ContratoVagaRecord } from "@/lib/contrato-vagas";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -307,6 +312,16 @@ export function useAgendamentosPage() {
   const creditoDecisionRef = useRef<"none" | "skip" | "use">("none");
   const creditoAlertKeyRef = useRef<string | null>(null);
   const creditoAsoEmUsoIdRef = useRef<string | null>(null);
+  const [vagaComprometidaModalOpen, setVagaComprometidaModalOpen] =
+    useState(false);
+  const [vagaComprometida, setVagaComprometida] = useState<
+    (ContratoVagaRecord & { contrato_numero: string | null }) | null
+  >(null);
+  const vagaDecisionRef = useRef<"none" | "skip" | "link">("none");
+  const vagaEmUsoIdRef = useRef<string | null>(null);
+  const vagaContratoIdRef = useRef<string | null>(null);
+  const vagaContratoNumeroRef = useRef<string | null>(null);
+  const vagaAlertKeyRef = useRef<string | null>(null);
   const saveLockRef = useRef(createAgendamentoSaveLock());
   const continuarSaveAposCreditoRef = useRef<(() => void) | null>(null);
   const [cargoId, setCargoId] = useState("");
@@ -792,6 +807,13 @@ export function useAgendamentosPage() {
     setCreditoAsoNumeroContrato(null);
     creditoDecisionRef.current = "none";
     creditoAlertKeyRef.current = null;
+    setVagaComprometidaModalOpen(false);
+    setVagaComprometida(null);
+    vagaDecisionRef.current = "none";
+    vagaEmUsoIdRef.current = null;
+    vagaContratoIdRef.current = null;
+    vagaContratoNumeroRef.current = null;
+    vagaAlertKeyRef.current = null;
     setInadimplenciaModalOpen(false);
     setInadimplenciaPendencias([]);
     setInadimplenciaCliente(null);
@@ -904,6 +926,15 @@ export function useAgendamentosPage() {
         setCreditoAsoNumeroContrato(null);
         setCreditoAsoSelectedId(null);
 
+        if (vagaDecisionRef.current !== "link") {
+          vagaDecisionRef.current = "none";
+          vagaEmUsoIdRef.current = null;
+          vagaContratoIdRef.current = null;
+          vagaAlertKeyRef.current = null;
+          setVagaComprometida(null);
+          setVagaComprometidaModalOpen(false);
+        }
+
         if (!editingId) {
           try {
             // Carrega silenciosamente — modal só após CPF.
@@ -1010,6 +1041,14 @@ export function useAgendamentosPage() {
       })();
     }
 
+    if (prefill.vaga_id) {
+      vagaDecisionRef.current = "link";
+      vagaEmUsoIdRef.current = prefill.vaga_id;
+      vagaContratoIdRef.current = prefill.contrato_id ?? null;
+      vagaContratoNumeroRef.current = prefill.contrato_numero ?? null;
+      creditoDecisionRef.current = "skip";
+    }
+
     setShowForm(true);
     setFiltersExpanded(false);
 
@@ -1088,6 +1127,11 @@ export function useAgendamentosPage() {
         setCreditoAsoNumeroContrato(null);
         setCreditoAsoModalOpen(false);
         setCreditoAsoModalVariant("padrao");
+        vagaDecisionRef.current = "none";
+        vagaEmUsoIdRef.current = null;
+        vagaAlertKeyRef.current = null;
+        setVagaComprometida(null);
+        setVagaComprometidaModalOpen(false);
       }
       if (field !== "data_agendamento") return;
 
@@ -1230,7 +1274,27 @@ export function useAgendamentosPage() {
         // periodicoAlertKey inclui ASO; se mudou ASO o periodico reabre via effect.
       }
 
-      // 1) Periódico Futuro (prioridade)
+      // 0) Vaga comprometida daquele CPF (antes de ASO genérico)
+      const cliente = clientes.find((c) => c.id === clienteId);
+      if (vagaDecisionRef.current === "none") {
+        try {
+          const vaga = await buscarVagaComprometidaPorCpf({
+            clienteId: clienteId || undefined,
+            clienteCnpj: cliente?.cnpj ?? null,
+            cpf,
+          });
+          setVagaComprometida(vaga);
+          if (vaga) {
+            vagaAlertKeyRef.current = alertKey;
+            setVagaComprometidaModalOpen(true);
+            return true;
+          }
+        } catch (vagaErr) {
+          console.error("Erro ao consultar vaga comprometida:", vagaErr);
+        }
+      }
+
+      // 1) Periódico Futuro (prioridade após vaga nomeada)
       if (periodicoDecisionRef.current === "none") {
         const openedPeriodico = await verificarPeriodicoFuturoPendente({
           force: opts?.force,
@@ -1242,8 +1306,10 @@ export function useAgendamentosPage() {
         }
       }
 
-      // 2) ASO genérico — só se não vinculou periódico
+      // 2) ASO genérico — só se não vinculou periódico nem vaga nomeada
       const proximo = resolverProximoAvisoBeneficio({
+        temVagaComprometida: vagaDecisionRef.current !== "none",
+        vagaDecisao: vagaDecisionRef.current,
         temPeriodicoFuturo: false,
         periodicoDecisao: periodicoDecisionRef.current,
         temAsoAberto: creditosAsoDisponiveis.length > 0,
@@ -1263,6 +1329,8 @@ export function useAgendamentosPage() {
     },
     [
       creditosAsoDisponiveis.length,
+      clienteId,
+      clientes,
       editingId,
       form.cliente_nome,
       form.colaborador_cpf,
@@ -1328,6 +1396,12 @@ export function useAgendamentosPage() {
         setCreditoAsoEmUsoId(null);
         creditoAsoEmUsoIdRef.current = null;
         setCreditoAsoNumeroContrato(null);
+        vagaDecisionRef.current = "none";
+        vagaEmUsoIdRef.current = null;
+        vagaContratoIdRef.current = null;
+        vagaAlertKeyRef.current = null;
+        setVagaComprometida(null);
+        setVagaComprometidaModalOpen(false);
         return;
       }
 
@@ -1452,6 +1526,58 @@ export function useAgendamentosPage() {
     loadExams,
     setSaving,
   ]);
+
+  const handleVagaComprometidaNaoVincular = useCallback(() => {
+    vagaDecisionRef.current = "skip";
+    vagaEmUsoIdRef.current = null;
+    vagaContratoIdRef.current = null;
+    setVagaComprometidaModalOpen(false);
+    creditoDecisionRef.current = "skip";
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      if (!armAgendamentoSaveReentry(saveLockRef.current)) return;
+      setSaving(true);
+      pendingSaveStatusRef.current = pending;
+      queueMicrotask(() => {
+        const fn = continuarSaveAposCreditoRef.current;
+        if (fn) fn();
+      });
+    }
+  }, [setSaving]);
+
+  const handleVagaComprometidaVincular = useCallback(() => {
+    const vaga = vagaComprometida;
+    if (!vaga) {
+      toast.error("Vaga contratual não encontrada.");
+      return;
+    }
+    vagaDecisionRef.current = "link";
+    vagaEmUsoIdRef.current = vaga.id;
+    vagaContratoIdRef.current = vaga.contrato_id;
+    vagaContratoNumeroRef.current = vaga.contrato_numero;
+    creditoDecisionRef.current = "skip";
+    setCreditoAsoEmUsoId(null);
+    creditoAsoEmUsoIdRef.current = null;
+    setVagaComprometidaModalOpen(false);
+
+    if (vaga.colaborador && !form.colaborador.trim()) {
+      setField("colaborador", vaga.colaborador);
+    }
+    if (vaga.cargo_id) {
+      setCargoId(vaga.cargo_id);
+      if (vaga.cargo_nome) setCargoNomeSalvo(vaga.cargo_nome);
+    }
+
+    const pending = pendingSaveStatusRef.current;
+    if (pending) {
+      if (!armAgendamentoSaveReentry(saveLockRef.current)) return;
+      setSaving(true);
+      queueMicrotask(() => {
+        const fn = continuarSaveAposCreditoRef.current;
+        if (fn) fn();
+      });
+    }
+  }, [vagaComprometida, form.colaborador, setField, setSaving]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
     if (!clienteId) return false;
@@ -2272,6 +2398,7 @@ export function useAgendamentosPage() {
         !editingId &&
         periodicoDecisionRef.current === "skip" &&
         creditoDecisionRef.current === "none" &&
+        vagaDecisionRef.current === "none" &&
         creditosAsoDisponiveis.length > 0
       ) {
         pendingSaveStatusRef.current = status;
@@ -2285,11 +2412,11 @@ export function useAgendamentosPage() {
         return;
       }
 
-      // Vínculo específico do periódico prevalece — não consome ASO genérico.
+      // Vínculo específico do periódico ou da vaga prevalece — não consome ASO genérico.
       const usandoPeriodico = periodicoDecisionRef.current === "link";
-      const creditoEmUsoEfetivo = usandoPeriodico
-        ? null
-        : creditoAsoEmUsoIdRef.current;
+      const usandoVaga = vagaDecisionRef.current === "link";
+      const creditoEmUsoEfetivo =
+        usandoPeriodico || usandoVaga ? null : creditoAsoEmUsoIdRef.current;
 
       if (!editingId && creditoEmUsoEfetivo) {
         try {
@@ -2505,6 +2632,32 @@ export function useAgendamentosPage() {
                   creditoErr instanceof Error
                     ? creditoErr.message
                     : "Agendamento salvo, mas o crédito contratual não pôde ser vinculado."
+                );
+              }
+            }
+          }
+
+          if (vagaDecisionRef.current === "link" && vagaEmUsoIdRef.current) {
+            const contratoIdVaga = vagaContratoIdRef.current;
+            if (contratoIdVaga) {
+              try {
+                await vincularAgendamentoAVaga({
+                  vagaId: vagaEmUsoIdRef.current,
+                  agendamentoId: novoId,
+                  contratoId: contratoIdVaga,
+                  colaborador: payload.colaborador,
+                  colaboradorCpf: payload.colaborador_cpf ?? null,
+                  cargoId: cargoFields.cargo_id,
+                  cargoNome: cargoFields.cargo_nome ?? null,
+                  usuarioNome: historicoUsuario,
+                  numeroContrato: vagaContratoNumeroRef.current,
+                });
+              } catch (vagaErr) {
+                console.error(vagaErr);
+                toast.error(
+                  vagaErr instanceof Error
+                    ? vagaErr.message
+                    : "Agendamento salvo, mas a vaga contratual não pôde ser vinculada."
                 );
               }
             }
@@ -2927,6 +3080,10 @@ export function useAgendamentosPage() {
     creditoAsoNumeroContrato,
     handleCreditoAsoNaoUtilizar,
     handleCreditoAsoUtilizar,
+    vagaComprometidaModalOpen,
+    vagaComprometida,
+    handleVagaComprometidaNaoVincular,
+    handleVagaComprometidaVincular,
     cargoId,
     cargosAtivos: cargosFormOptions,
     cargosLoading,

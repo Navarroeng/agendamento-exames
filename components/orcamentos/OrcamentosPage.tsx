@@ -92,6 +92,7 @@ export function OrcamentosPage() {
     handleSalvarVisita,
     handleSalvarTreinamento,
     handleVerComprovante,
+    handleAprovacaoAtualizada,
     handleFilterChange,
     clearFilters,
     handleSelectCliente,
@@ -214,6 +215,7 @@ export function OrcamentosPage() {
         onSalvarFuncionarios={handleSalvarFuncionarios}
         onSubstituirFuncionarios={handleSubstituirFuncionarios}
         onRemoverFuncionarios={handleRemoverFuncionarios}
+        onAprovacaoAtualizada={handleAprovacaoAtualizada}
         onSalvarLogo={handleSalvarLogo}
         onSubstituirLogo={handleSubstituirLogo}
         onRemoverLogo={handleRemoverLogo}

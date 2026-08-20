@@ -85,6 +85,7 @@ export interface OrcamentoAprovacaoRecord {
   funcionarios_lista_tipo?: string | null;
   funcionarios_lista_tamanho?: number | null;
   funcionarios_lista_salva_em?: string | null;
+  funcionarios_vagas_salvas_em?: string | null;
   logo_path?: string | null;
   logo_nome?: string | null;
   logo_tipo?: string | null;

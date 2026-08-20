@@ -8,6 +8,10 @@ export interface AgendamentoPrefillData {
   cargo_nome?: string;
   exame_nome?: string;
   aso?: string;
+  cliente_cnpj?: string;
+  contrato_id?: string;
+  contrato_numero?: string;
+  vaga_id?: string;
 }
 
 export function saveAgendamentoPrefill(data: AgendamentoPrefillData): void {
@@ -46,9 +50,14 @@ export function parseAgendamentoPrefillFromSearchParams(
   return {
     cliente_nome,
     colaborador,
+    colaborador_cpf: params.get("cpf")?.trim() || undefined,
     cargo_id: params.get("cargo_id")?.trim() || undefined,
     cargo_nome: params.get("cargo")?.trim() || undefined,
     exame_nome: params.get("exame")?.trim() || undefined,
     aso: params.get("aso")?.trim() || "Periódico",
+    cliente_cnpj: params.get("cnpj")?.trim() || undefined,
+    contrato_id: params.get("contrato_id")?.trim() || undefined,
+    contrato_numero: params.get("contrato")?.trim() || undefined,
+    vaga_id: params.get("vaga_id")?.trim() || undefined,
   };
 }

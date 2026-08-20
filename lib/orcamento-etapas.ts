@@ -130,7 +130,10 @@ export function isProcuracaoEtapaConcluida(
 export function isFuncionariosEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
 ): boolean {
-  return Boolean(aprovacao?.funcionarios_lista_path);
+  return Boolean(
+    aprovacao?.funcionarios_lista_path ||
+      aprovacao?.funcionarios_vagas_salvas_em
+  );
 }
 
 export function isLogoEtapaConcluida(

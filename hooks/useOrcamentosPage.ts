@@ -1656,6 +1656,13 @@ export function useOrcamentosPage() {
     }
   }, []);
 
+  const handleAprovacaoAtualizada = useCallback(
+    (saved: OrcamentoAprovacaoRecord) => {
+      setAprovarAprovacao(saved);
+    },
+    []
+  );
+
   const handleFilterChange = useCallback(
     (field: keyof OrcamentoFilters, value: string) => {
       setFilters((prev) => ({ ...prev, [field]: value }));
@@ -1769,6 +1776,7 @@ export function useOrcamentosPage() {
     handleSalvarVisita,
     handleSalvarTreinamento,
     handleVerComprovante,
+    handleAprovacaoAtualizada,
     handleFilterChange,
     clearFilters,
     handleSelectCliente,

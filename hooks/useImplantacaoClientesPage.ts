@@ -915,6 +915,14 @@ export function useImplantacaoClientesPage() {
     }
   }, []);
 
+  const handleAprovacaoAtualizada = useCallback(
+    (saved: OrcamentoAprovacaoRecord) => {
+      setModalAprovacao(saved);
+      void refresh();
+    },
+    [refresh]
+  );
+
   return {
     processos: filtrados,
     loading,
@@ -957,5 +965,6 @@ export function useImplantacaoClientesPage() {
     handleSalvarVisita,
     handleSalvarTreinamento,
     handleVerComprovante,
+    handleAprovacaoAtualizada,
   };
 }

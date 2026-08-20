@@ -20,8 +20,13 @@ export type ContratoAgendamentoContagem = {
    * Nunca negativo.
    */
   pendentesDefinicao: number;
-  /** Total comprometido (agendados + futuros + ASOs em aberto). */
+  /** Total comprometido (agendados + futuros + ASOs em aberto + vagas nomeadas). */
   comprometidos: number;
+  /**
+   * Funcionários já identificados na lista, ainda sem agendamento/futuro/ASO.
+   * Card "Comprometidos" da Implantação.
+   */
+  vagasComprometidas: number;
   /** @deprecated Alias de pendentesDefinicao. */
   pendentes: number;
   /** @deprecated Alias de pendentesDefinicao. */
@@ -53,6 +58,7 @@ export function buildContratoAgendamentoContagem(
     agendados?: number;
     programadosFuturos?: number;
     emAberto?: number;
+    vagasComprometidas?: number;
   }
 ): ContratoAgendamentoContagem {
   const previstos = Math.max(0, quantidadeContratada || 0);
@@ -60,19 +66,20 @@ export function buildContratoAgendamentoContagem(
   const agendados = Math.max(0, opts?.agendados ?? 0);
   const programadosFuturos = Math.max(0, opts?.programadosFuturos ?? 0);
   const emAberto = Math.max(0, opts?.emAberto ?? 0);
+  const vagasComprometidas = Math.max(0, opts?.vagasComprometidas ?? 0);
 
-  // Comprometidos = classificação já formalizada (sem dupla contagem).
-  // `utilizados` continua sendo a fonte de verdade do progresso quando
-  // passado como agendados+futuros+emAberto pelo chamador.
+  // Comprometidos (classificados) = formalização da vaga, sem dupla contagem.
+  // Progresso (`utilizados`) continua sendo agendados+futuros+emAberto.
   const hasBreakdown =
     opts?.agendados != null ||
     opts?.programadosFuturos != null ||
-    opts?.emAberto != null;
+    opts?.emAberto != null ||
+    opts?.vagasComprometidas != null;
   const comprometidos = Math.max(
     0,
     hasBreakdown
-      ? agendados + programadosFuturos + emAberto
-      : Math.max(0, utilizados)
+      ? agendados + programadosFuturos + emAberto + vagasComprometidas
+      : Math.max(0, utilizados) + vagasComprometidas
   );
   const usadosProgresso = Math.max(0, utilizados);
 
@@ -88,6 +95,7 @@ export function buildContratoAgendamentoContagem(
       emAberto: 0,
       pendentesDefinicao: 0,
       comprometidos: 0,
+      vagasComprometidas: 0,
       pendentes: 0,
       disponiveis: 0,
       adicionais: extras,
@@ -151,6 +159,7 @@ export function buildContratoAgendamentoContagem(
     emAberto: hasBreakdown ? emAberto : 0,
     pendentesDefinicao,
     comprometidos,
+    vagasComprometidas,
     pendentes: pendentesDefinicao,
     disponiveis: pendentesDefinicao,
     adicionais: extras,
