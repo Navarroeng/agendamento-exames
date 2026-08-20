@@ -6,6 +6,7 @@ import {
   type RiscosListaPresencaAnexoMeta,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
+import { MSG_PROCESSO_RISCOS_CANCELADO } from "@/lib/riscos-processo-cancelamento";
 import type {
   OrcamentoRiscosPsicossociaisRecord,
   RiscosPsicossociaisEtapaPersistidaId,
@@ -16,10 +17,10 @@ import {
 } from "@/services/riscos-lista-presenca-storage.service";
 
 const RISCOS_TRACKING_SELECT =
-  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
 
 const FLUXO_SELECT =
-  "campanha_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
+  "campanha_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
 
 export type ListaPresencaTarget =
   | { kind: "orcamento"; orcamentoId: string }
@@ -41,9 +42,18 @@ function mapFluxoToTracking(
     ) as RiscosPsicossociaisEtapaPersistidaId,
     etapas_concluidas: Number(row.etapas_concluidas) || 0,
     status:
-      row.status === "concluido" ? "concluido" : "em_andamento",
+      row.status === "concluido"
+        ? "concluido"
+        : row.status === "cancelado"
+          ? "cancelado"
+          : "em_andamento",
     entrada_em: row.entrada_em ? String(row.entrada_em) : null,
     concluido_em: row.concluido_em ? String(row.concluido_em) : null,
+    cancelado_em: row.cancelado_em ? String(row.cancelado_em) : null,
+    cancelado_por: row.cancelado_por ? String(row.cancelado_por) : null,
+    motivo_cancelamento: row.motivo_cancelamento
+      ? String(row.motivo_cancelamento)
+      : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
     lista_solicitada: row.lista_solicitada === true,
@@ -204,6 +214,9 @@ export async function salvarSolicitacaoListaPresenca(params: {
   if (!atual) {
     throw new Error("Tracking de Riscos Psicossociais não encontrado.");
   }
+  if (atual.status === "cancelado") {
+    throw new Error(MSG_PROCESSO_RISCOS_CANCELADO);
+  }
 
   const now = new Date().toISOString();
   const listaPreview: RiscosListaPresencaDados = {
@@ -258,6 +271,9 @@ export async function salvarRecebimentoListaPresenca(params: {
   const atual = await buscarTrackingPorTarget(target);
   if (!atual) {
     throw new Error("Tracking de Riscos Psicossociais não encontrado.");
+  }
+  if (atual.status === "cancelado") {
+    throw new Error(MSG_PROCESSO_RISCOS_CANCELADO);
   }
 
   const listaAtual = mapListaPresencaFromTracking(atual);
@@ -363,6 +379,9 @@ export async function removerAnexoListaPresenca(params: {
   const atual = await buscarTrackingPorTarget(target);
   if (!atual) {
     throw new Error("Tracking de Riscos Psicossociais não encontrado.");
+  }
+  if (atual.status === "cancelado") {
+    throw new Error(MSG_PROCESSO_RISCOS_CANCELADO);
   }
 
   const listaAtual = mapListaPresencaFromTracking(atual);

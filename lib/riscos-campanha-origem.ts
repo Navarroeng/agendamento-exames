@@ -66,6 +66,12 @@ export const RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO = [
   "encerrada",
 ] as const;
 
+/** Listagem do módulo: inclui cancelada para o filtro Cancelado. */
+export const RISCOS_CAMPANHA_STATUS_LISTAGEM = [
+  ...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO,
+  "cancelada",
+] as const;
+
 export function isCampanhaStatusAtivo(
   status: string | null | undefined
 ): boolean {

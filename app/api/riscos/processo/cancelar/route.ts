@@ -5,10 +5,7 @@ import { cancelarProcessoListagemRiscosNoServidor } from "@/services/riscos-camp
 
 export const runtime = "nodejs";
 
-export async function POST(
-  request: Request,
-  context: { params: { campanhaId: string } }
-) {
+export async function POST(request: Request) {
   try {
     const supabase = createClient();
     const {
@@ -33,36 +30,37 @@ export async function POST(
       );
     }
 
-    const campanhaId = String(context.params.campanhaId ?? "").trim();
-    if (!campanhaId) {
-      return NextResponse.json({ error: "Campanha inválida." }, { status: 400 });
-    }
-
     let usuarioNome =
       (typeof perfil.nome === "string" && perfil.nome.trim()) ||
       user.email ||
-      "Administrador";
+      "Usuário";
     let usuarioEmail =
       (typeof perfil.email === "string" && perfil.email.trim()) ||
       user.email ||
       "";
     let motivo = "";
+    let orcamentoId = "";
+    let campanhaId = "";
 
     try {
       const body = (await request.json()) as {
         motivo?: string;
+        orcamentoId?: string;
+        campanhaId?: string;
         usuarioNome?: string;
         usuarioEmail?: string;
       };
       if (body?.motivo != null) motivo = String(body.motivo);
+      if (body?.orcamentoId?.trim()) orcamentoId = body.orcamentoId.trim();
+      if (body?.campanhaId?.trim()) campanhaId = body.campanhaId.trim();
       if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
       if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
-      // body obrigatório para motivo
+      // body obrigatório
     }
 
     const result = await cancelarProcessoListagemRiscosNoServidor(
-      { campanhaId, motivo },
+      { orcamentoId, campanhaId, motivo },
       {
         auditContext: {
           usuarioId: user.id,
@@ -79,21 +77,19 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      campanha: result.campanha,
-      ...result,
-    });
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[riscos/campanha/cancelar]", err);
+    console.error("[riscos/processo/cancelar]", err);
     const message =
       err instanceof Error
         ? err.message
         : "Não foi possível cancelar o processo.";
     const status =
-      message.includes("Somente") ||
-      message.includes("já está cancelada") ||
+      message.includes("Sem permissão") ||
+      message.includes("já está cancelado") ||
+      message.includes("não pode ser cancelado") ||
       message.includes("motivo") ||
+      message.includes("Informe") ||
       message.includes("não encontrada") ||
       message.includes("inválida") ||
       message.includes("Migration")

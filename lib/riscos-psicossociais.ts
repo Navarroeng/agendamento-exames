@@ -27,6 +27,9 @@ import {
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
 import {
+  resolverCancelamentoProcessoRiscos,
+} from "@/lib/riscos-processo-cancelamento";
+import {
   exigeLaudosSstPorOrigem,
   isOrigemManualCliente,
   normalizeRiscosCampanhaOrigem,
@@ -100,9 +103,13 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
 
 export type RiscosPsicossociaisEtapaAtualId =
   | (typeof RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM)[number]
-  | "lista_presenca";
+  | "lista_presenca"
+  | "cancelado";
 
-export type RiscosPsicossociaisStatus = "em_andamento" | "concluido";
+export type RiscosPsicossociaisStatus =
+  | "em_andamento"
+  | "concluido"
+  | "cancelado";
 
 export const RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS_MANUAIS =
   RISCOS_PSICOSSOCIAIS_ETAPAS_MANUAIS.length;
@@ -120,6 +127,7 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   ) as Record<RiscosPsicossociaisEtapaId, string>),
   solicitar_lista_presenca: "Solicitar lista de presença",
   lista_presenca_solicitada: "Lista de presença solicitada",
+  cancelado: "Cancelado",
 };
 
 const RISCOS_ETAPA_BADGE_BASE =
@@ -129,6 +137,9 @@ export function riscosPsicossociaisEtapaAtualBadgeClass(
   etapaAtual: RiscosPsicossociaisEtapaAtualId,
   status: RiscosPsicossociaisStatus
 ): string {
+  if (status === "cancelado" || etapaAtual === "cancelado") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#fef2f2] text-brand-red`;
+  }
   if (status === "concluido" || etapaAtual === "finalizado") {
     return `${RISCOS_ETAPA_BADGE_BASE} bg-brand-green-soft text-brand-green`;
   }
@@ -166,6 +177,9 @@ export interface OrcamentoRiscosPsicossociaisRecord {
   lista_anexo_tamanho?: number | null;
   lista_recebida_em?: string | null;
   lista_recebida_por?: string | null;
+  cancelado_em?: string | null;
+  cancelado_por?: string | null;
+  motivo_cancelamento?: string | null;
 }
 
 export interface RiscosPsicossociaisProcesso {
@@ -208,6 +222,9 @@ export interface RiscosPsicossociaisProcesso {
   dataEntrada: string | null;
   /** Data real de conclusão do tracking, se existir. */
   concluidoEm: string | null;
+  canceladoEm: string | null;
+  canceladoPor: string | null;
+  motivoCancelamento: string | null;
 }
 
 export type RiscosProgressoParticipanteInput = {
@@ -255,7 +272,9 @@ export function isRiscosPsicossociaisEtapaAtualId(
   return (
     (RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM as readonly string[]).includes(
       value
-    ) || value === "lista_presenca"
+    ) ||
+    value === "lista_presenca" ||
+    value === "cancelado"
   );
 }
 
@@ -477,7 +496,9 @@ export function riscosTrackingTemTrabalhoReal(
   tracking: OrcamentoRiscosPsicossociaisRecord | null | undefined
 ): boolean {
   if (!tracking) return false;
-  if (tracking.status === "concluido") return true;
+  if (tracking.status === "concluido" || tracking.status === "cancelado") {
+    return true;
+  }
   if (Number(tracking.etapas_concluidas) > 0) return true;
   const etapa = (tracking.etapa_atual ?? "").trim();
   if (etapa && etapa !== "lista_presenca") return true;
@@ -492,6 +513,7 @@ export function isProcessoVisivelRiscosAutomatico(
   tracking: OrcamentoRiscosPsicossociaisRecord | null | undefined,
   temCampanha?: boolean
 ): boolean {
+  if (tracking?.status === "cancelado") return true;
   if (isProcessoElegivelRiscosPsicossociais(implantacao)) return true;
   if (
     implantacao.orcamento.status === "cancelado" ||
@@ -522,10 +544,17 @@ export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
 export function isRiscosEtapaLiberadaByFluxo(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
+    | "laudosSstConcluido"
+    | "listaPresencaConcluida"
+    | "exigeLaudosSst"
+    | "status"
+    | "etapaAtual"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
+  if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
+    return false;
+  }
   if (etapaId === "laudos_sst") return true;
   const exigeLaudos = processo.exigeLaudosSst !== false;
   if (exigeLaudos && !processo.laudosSstConcluido) {
@@ -539,7 +568,11 @@ export function isRiscosEtapaLiberadaByFluxo(
 export function isRiscosEtapaLiberada(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
+    | "laudosSstConcluido"
+    | "listaPresencaConcluida"
+    | "exigeLaudosSst"
+    | "status"
+    | "etapaAtual"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): boolean {
@@ -549,16 +582,43 @@ export function isRiscosEtapaLiberada(
 export function mensagemBloqueioEtapaRiscos(
   processo: Pick<
     RiscosPsicossociaisProcesso,
-    "laudosSstConcluido" | "listaPresencaConcluida" | "exigeLaudosSst"
+    | "laudosSstConcluido"
+    | "listaPresencaConcluida"
+    | "exigeLaudosSst"
+    | "status"
+    | "etapaAtual"
   >,
   etapaId: RiscosPsicossociaisEtapaId
 ): string | null {
+  if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
+    return "Processo cancelado. O histórico permanece disponível somente para consulta.";
+  }
   if (isRiscosEtapaLiberada(processo, etapaId)) return null;
   const exigeLaudos = processo.exigeLaudosSst !== false;
   if (exigeLaudos && !processo.laudosSstConcluido) {
     return "Aguardando finalização do processo de Laudos SST.";
   }
   return "Aguardando conclusão da Lista de Presença (recebimento e anexo).";
+}
+
+export function aplicarEstadoCanceladoProcesso(
+  processo: RiscosPsicossociaisProcesso,
+  cancelamento: {
+    canceladoEm: string | null;
+    canceladoPor: string | null;
+    motivoCancelamento: string | null;
+  },
+  campanha?: RiscosCampanhaRecord | null
+): RiscosPsicossociaisProcesso {
+  return {
+    ...processo,
+    campanha: campanha === undefined ? processo.campanha : campanha,
+    status: "cancelado",
+    etapaAtual: "cancelado",
+    canceladoEm: cancelamento.canceladoEm,
+    canceladoPor: cancelamento.canceladoPor,
+    motivoCancelamento: cancelamento.motivoCancelamento,
+  };
 }
 
 export function buildRiscosPsicossociaisProcesso(
@@ -571,8 +631,16 @@ export function buildRiscosPsicossociaisProcesso(
     opts?.origem ?? campanha?.origem ?? RISCOS_CAMPANHA_ORIGEM.orcamento
   );
   const exigeLaudosSst = exigeLaudosSstPorOrigem(origem);
-  /** Cancelada nunca entra no progresso — fonte única com a listagem. */
+  const cancelamento = resolverCancelamentoProcessoRiscos({
+    tracking,
+    campanha,
+    origem,
+  });
+  /** Cancelada nunca entra no progresso — salvo processo já cancelado (consulta). */
   const campanhaAtiva = escolherCampanhaParaProgresso([campanha]);
+  const campanhaExibida = cancelamento.cancelado
+    ? campanhaAtiva ?? campanha
+    : campanhaAtiva;
 
   const laudosSstConcluido = exigeLaudosSst
     ? laudos.status === "concluido"
@@ -580,10 +648,10 @@ export function buildRiscosPsicossociaisProcesso(
   const listaPresenca = mapListaPresencaFromTracking(tracking);
   const listaPresencaConcluida = isListaPresencaEtapaConcluida(listaPresenca);
 
-  const { cadastrados, respondidos } = campanhaAtiva
+  const { cadastrados, respondidos } = campanhaExibida
     ? resolveContagemParticipantes(opts)
     : { cadastrados: 0, respondidos: 0 };
-  const relatorioGerado = campanhaAtiva
+  const relatorioGerado = campanhaExibida
     ? opts?.relatorioGerado === true
     : false;
 
@@ -592,14 +660,14 @@ export function buildRiscosPsicossociaisProcesso(
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
-    quantidadePrevista: campanhaAtiva?.quantidade_prevista ?? null,
+    quantidadePrevista: campanhaExibida?.quantidade_prevista ?? null,
     participantesCadastrados: cadastrados,
     participantesRespondidos: respondidos,
     campanhaStatus: campanhaAtiva?.status ?? null,
     relatorioGerado,
   });
 
-  return {
+  const processo: RiscosPsicossociaisProcesso = {
     processoKey: laudos.implantacao.orcamento.id,
     origem,
     exigeLaudosSst,
@@ -615,13 +683,23 @@ export function buildRiscosPsicossociaisProcesso(
     laudosSstConcluido,
     listaPresencaConcluida,
     listaPresenca,
-    campanha: campanhaAtiva,
+    campanha: campanhaExibida,
     participantesCadastrados: cadastrados,
     participantesRespondidos: respondidos,
     relatorioGerado,
     dataEntrada: tracking?.entrada_em ?? laudos.dataEntrada ?? null,
     concluidoEm: tracking?.concluido_em ?? null,
+    canceladoEm: cancelamento.canceladoEm,
+    canceladoPor: cancelamento.canceladoPor,
+    motivoCancelamento: cancelamento.motivoCancelamento,
   };
+
+  if (!cancelamento.cancelado) return processo;
+  return aplicarEstadoCanceladoProcesso(
+    processo,
+    cancelamento,
+    campanhaExibida
+  );
 }
 
 /** Recalcula etapa/progresso mantendo o restante do processo. */
@@ -635,7 +713,12 @@ export function withRiscosProgressoAtualizado(
 ): RiscosPsicossociaisProcesso {
   const campanhaRaw =
     patch && "campanha" in patch ? patch.campanha ?? null : processo.campanha;
-  const campanha = escolherCampanhaParaProgresso([campanhaRaw]);
+  const campanhaAtiva = escolherCampanhaParaProgresso([campanhaRaw]);
+  const processoJaCancelado =
+    processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+  const campanha = processoJaCancelado
+    ? campanhaAtiva ?? campanhaRaw
+    : campanhaAtiva;
   const contagem = patch?.participantes
     ? contarParticipantesParaProgresso(patch.participantes)
     : {
@@ -655,11 +738,11 @@ export function withRiscosProgressoAtualizado(
     quantidadePrevista: campanha?.quantidade_prevista ?? null,
     participantesCadastrados: contagem.cadastrados,
     participantesRespondidos: contagem.respondidos,
-    campanhaStatus: campanha?.status ?? null,
+    campanhaStatus: campanhaAtiva?.status ?? null,
     relatorioGerado,
   });
 
-  return {
+  const next: RiscosPsicossociaisProcesso = {
     ...processo,
     campanha,
     participantesCadastrados: contagem.cadastrados,
@@ -673,6 +756,17 @@ export function withRiscosProgressoAtualizado(
     progressoPercentual: progresso.progressoPercentual,
     status: progresso.status,
   };
+
+  if (!processoJaCancelado) return next;
+  return aplicarEstadoCanceladoProcesso(
+    next,
+    {
+      canceladoEm: processo.canceladoEm,
+      canceladoPor: processo.canceladoPor,
+      motivoCancelamento: processo.motivoCancelamento,
+    },
+    campanha
+  );
 }
 
 /**
@@ -807,7 +901,9 @@ export function filterRiscosPsicossociaisProcessos(
       orcamento.cliente_cnpj ?? "",
       responsavel,
       isOrigemManualCliente(p.origem) ? "Inclusão manual" : "",
-      p.status === "concluido"
+      p.status === "cancelado" || p.etapaAtual === "cancelado"
+        ? "Cancelado"
+        : p.status === "concluido"
         ? "Concluído"
         : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[p.etapaAtual],
     ].join(" ");
@@ -843,11 +939,20 @@ export function sortRiscosPsicossociaisProcessos(
   });
 }
 
-/** Filtro da listagem: Aberto = ainda não finalizado; Concluído = fluxo 100%. */
-export type RiscosPsicossociaisListagemStatus = "aberto" | "concluido";
+/** Filtro da listagem: Aberto / Concluído / Cancelado. Padrão: Aberto. */
+export type RiscosPsicossociaisListagemStatus =
+  | "aberto"
+  | "concluido"
+  | "cancelado";
 
 export const DEFAULT_RISCOS_LISTAGEM_STATUS: RiscosPsicossociaisListagemStatus =
   "aberto";
+
+export function isRiscosProcessoListagemCancelado(
+  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual">
+): boolean {
+  return processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+}
 
 export function isRiscosProcessoListagemConcluido(
   processo: Pick<
@@ -859,6 +964,7 @@ export function isRiscosProcessoListagemConcluido(
     | "progressoPercentual"
   >
 ): boolean {
+  if (isRiscosProcessoListagemCancelado(processo)) return false;
   if (processo.status === "concluido") return true;
   if (processo.etapaAtual === "finalizado") return true;
   if (processo.totalEtapas > 0 && processo.etapasConcluidas >= processo.totalEtapas) {
@@ -872,8 +978,11 @@ export function filterRiscosPsicossociaisProcessosPorStatus(
   status: RiscosPsicossociaisListagemStatus
 ): RiscosPsicossociaisProcesso[] {
   return processos.filter((p) => {
+    const cancelado = isRiscosProcessoListagemCancelado(p);
     const concluido = isRiscosProcessoListagemConcluido(p);
-    return status === "concluido" ? concluido : !concluido;
+    if (status === "cancelado") return cancelado;
+    if (status === "concluido") return concluido;
+    return !concluido && !cancelado;
   });
 }
 
@@ -894,7 +1003,7 @@ function compareNomeProcessoRiscos(
 
 /**
  * Aberto: percentual DESC, índice da etapa atual DESC, data de entrada ASC.
- * Concluído: concluidoEm DESC se existir; senão dataEntrada DESC.
+ * Concluído / Cancelado: data do evento DESC se existir; senão dataEntrada DESC.
  */
 export function sortRiscosPsicossociaisProcessosListagem(
   processos: RiscosPsicossociaisProcesso[],
@@ -914,8 +1023,14 @@ export function sortRiscosPsicossociaisProcessosListagem(
       return compareNomeProcessoRiscos(a, b);
     }
 
-    const ca = a.concluidoEm || a.dataEntrada || "";
-    const cb = b.concluidoEm || b.dataEntrada || "";
+    const ca =
+      status === "cancelado"
+        ? a.canceladoEm || a.dataEntrada || ""
+        : a.concluidoEm || a.dataEntrada || "";
+    const cb =
+      status === "cancelado"
+        ? b.canceladoEm || b.dataEntrada || ""
+        : b.concluidoEm || b.dataEntrada || "";
     if (ca !== cb) return cb.localeCompare(ca);
     return compareNomeProcessoRiscos(a, b);
   });

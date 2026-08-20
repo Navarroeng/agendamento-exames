@@ -307,6 +307,8 @@ export function acoesMenuListagemProcessoRiscos(input: {
   relatorioGerado?: boolean;
   participantesCadastrados?: number;
   participantesRespondidos?: number;
+  processoCancelado?: boolean;
+  processoConcluido?: boolean;
 }): {
   podeAbrir: boolean;
   podeCopiarLink: boolean;
@@ -314,9 +316,12 @@ export function acoesMenuListagemProcessoRiscos(input: {
   podeGerarRelatorio: boolean;
   gerarRelatorioMotivoDesabilitado: string;
   mostrarRemoverProcesso: boolean;
+  mostrarCancelar: boolean;
 } {
   const codigo = String(input.codigoPublico ?? "").trim();
+  const processoCancelado = input.processoCancelado === true;
   const podeCopiar =
+    !processoCancelado &&
     Boolean(input.hasCampanha) &&
     Boolean(codigo) &&
     campanhaPermiteCopiarLink(input.campanhaStatus);
@@ -326,7 +331,9 @@ export function acoesMenuListagemProcessoRiscos(input: {
   const status = String(input.campanhaStatus ?? "");
   let gerarMotivo = "";
   let podeGerar = false;
-  if (!input.hasCampanha) {
+  if (processoCancelado) {
+    gerarMotivo = "Não é possível gerar relatório de processo cancelado.";
+  } else if (!input.hasCampanha) {
     gerarMotivo = "Crie a pesquisa antes de gerar o relatório.";
   } else if (status === "cancelada") {
     gerarMotivo = "Não é possível gerar relatório de campanha cancelada.";
@@ -343,13 +350,16 @@ export function acoesMenuListagemProcessoRiscos(input: {
   return {
     podeAbrir: true,
     podeCopiarLink: podeCopiar,
-    copiarLinkMotivoDesabilitado: podeCopiar
-      ? ""
-      : "Disponível após abrir a pesquisa.",
+    copiarLinkMotivoDesabilitado: processoCancelado
+      ? "Processo cancelado."
+      : podeCopiar
+        ? ""
+        : "Disponível após abrir a pesquisa.",
     podeGerarRelatorio: podeGerar,
     gerarRelatorioMotivoDesabilitado: gerarMotivo,
     mostrarRemoverProcesso:
-      input.isAdmin && input.hasCampanha && Boolean(codigo),
+      input.isAdmin && input.hasCampanha && Boolean(codigo) && !processoCancelado,
+    mostrarCancelar: !processoCancelado && input.processoConcluido !== true,
   };
 }
 

@@ -61,6 +61,13 @@ export function isPerfilAdmin(
   return getPermissionsForPerfil(perfil).fullAccess === true;
 }
 
+/** Staff Navarro (admin e operacional) que acessa Riscos Psicossociais. */
+export function isPerfilStaffNavarro(
+  perfil: PerfilUsuarioTipo | null | undefined
+): boolean {
+  return isPerfilAdmin(perfil) || String(perfil ?? "") === "operacional";
+}
+
 export function canAccessPath(
   perfil: PerfilUsuarioTipo | null | undefined,
   pathname: string

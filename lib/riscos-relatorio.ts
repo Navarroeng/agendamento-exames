@@ -114,7 +114,11 @@ export function validatePodeGerarRelatorioFinal(input: {
   campanhaStatus: string | null | undefined;
   participantesAtivos: ReadonlyArray<{ status: string }>;
   jaExisteRelatorio: boolean;
+  processoCancelado?: boolean;
 }): string | null {
+  if (input.processoCancelado) {
+    return "Não é possível gerar relatório de processo cancelado.";
+  }
   const status = String(input.campanhaStatus ?? "");
   if (status === "cancelada") return MSG_RELATORIO_CAMPANHA_CANCELADA;
   if (input.jaExisteRelatorio) return MSG_RELATORIO_JA_EXISTE;

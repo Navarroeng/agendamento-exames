@@ -23,7 +23,7 @@ import {
   MSG_CAMPANHA_ATIVA_CLIENTE,
   RISCOS_CAMPANHA_ORIGEM,
   RISCOS_CAMPANHA_STATUS_ATIVOS,
-  RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO,
+  RISCOS_CAMPANHA_STATUS_LISTAGEM,
   escolherCampanhaParaProgresso,
   normalizeRiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
@@ -244,7 +244,16 @@ export async function listarCampanhasPorOrcamentos(
 
   for (const [orcamentoId, camps] of Array.from(porOrcamento.entries())) {
     const escolhida = escolherCampanhaParaProgresso(camps);
-    if (escolhida) map.set(orcamentoId, escolhida);
+    if (escolhida) {
+      map.set(orcamentoId, escolhida);
+      continue;
+    }
+    const canceladas = camps
+      .filter((c) => c.status === "cancelada")
+      .sort((a, b) =>
+        String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+      );
+    if (canceladas[0]) map.set(orcamentoId, canceladas[0]);
   }
   return map;
 }
@@ -261,7 +270,7 @@ export async function listarCampanhasManuaisAtivas(): Promise<
     .select(CAMPANHA_SELECT)
     .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
     .is("orcamento_id", null)
-    .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
+    .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
     .order("created_at", { ascending: false });
   data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
   error = primary.error;
@@ -273,7 +282,7 @@ export async function listarCampanhasManuaisAtivas(): Promise<
       .select(CAMPANHA_SELECT_SEM_LOGO)
       .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
       .is("orcamento_id", null)
-      .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
+      .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
       .order("created_at", { ascending: false });
     data = (fbLogo.data as Array<Record<string, unknown>> | null) ?? null;
     error = fbLogo.error;
@@ -283,7 +292,7 @@ export async function listarCampanhasManuaisAtivas(): Promise<
         .from("riscos_campanhas")
         .select(CAMPANHA_SELECT_LEGACY)
         .is("orcamento_id", null)
-        .in("status", [...RISCOS_CAMPANHA_STATUS_PARA_PROGRESSO])
+        .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
         .order("created_at", { ascending: false });
       data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
       error = fbLegacy.error;
@@ -466,39 +475,66 @@ export async function cancelarProcessoRiscos(
   motivo: string,
   auditOptions?: CampanhaAuditOptions
 ): Promise<RiscosCampanhaRecord> {
-  const id = campanhaId.trim();
-  if (!id) throw new Error("Campanha inválida.");
+  const result = await cancelarProcessoListagemRiscos({
+    campanhaId,
+    motivo,
+    auditOptions,
+  });
+  if (result.campanha) return result.campanha;
+  throw new Error("Campanha não encontrada.");
+}
 
-  const res = await fetch(
-    `/api/riscos/campanha/${encodeURIComponent(id)}/cancelar`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        motivo,
-        usuarioNome: auditOptions?.auditContext?.usuarioNome,
-        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
-      }),
-    }
-  );
+export async function cancelarProcessoListagemRiscos(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+  motivo: string;
+  auditOptions?: CampanhaAuditOptions;
+}): Promise<{
+  status: "cancelado";
+  cancelado_em: string;
+  cancelado_por: string;
+  motivo_cancelamento: string;
+  campanha: RiscosCampanhaRecord | null;
+}> {
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  const campanhaId = String(input.campanhaId ?? "").trim();
+  if (!orcamentoId && !campanhaId) {
+    throw new Error("Informe o processo a cancelar.");
+  }
+
+  const res = await fetch("/api/riscos/processo/cancelar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orcamentoId: orcamentoId || undefined,
+      campanhaId: campanhaId || undefined,
+      motivo: input.motivo,
+      usuarioNome: input.auditOptions?.auditContext?.usuarioNome,
+      usuarioEmail: input.auditOptions?.auditContext?.usuarioEmail,
+    }),
+  });
 
   const json = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     error?: string;
-    campanha?: RiscosCampanhaRecord;
+    status?: string;
+    cancelado_em?: string;
+    cancelado_por?: string;
+    motivo_cancelamento?: string;
+    campanha?: RiscosCampanhaRecord | null;
   };
 
-  if (!res.ok || !json.ok || !json.campanha) {
+  if (!res.ok || !json.ok || json.status !== "cancelado") {
     throw new Error(json.error || "Não foi possível cancelar o processo.");
   }
 
-  if (json.campanha.status !== "cancelada") {
-    throw new Error(
-      "O cancelamento não foi confirmado no banco. O status da campanha não foi alterado."
-    );
-  }
-
-  return json.campanha;
+  return {
+    status: "cancelado",
+    cancelado_em: json.cancelado_em ?? new Date().toISOString(),
+    cancelado_por: json.cancelado_por ?? "",
+    motivo_cancelamento: json.motivo_cancelamento ?? input.motivo.trim(),
+    campanha: json.campanha ?? null,
+  };
 }
 
 export async function excluirCampanhaRiscos(
@@ -618,6 +654,18 @@ export async function criarCampanhaRiscos(
   const existente = await buscarCampanhaAtivaPorOrcamento(input.orcamentoId);
   if (existente) {
     throw new Error("Já existe uma campanha ativa para este processo.");
+  }
+
+  const supabaseCheck = createClient();
+  const trackingCheck = await supabaseCheck
+    .from("orcamento_riscos_psicossociais")
+    .select("status")
+    .eq("orcamento_id", input.orcamentoId)
+    .maybeSingle();
+  if (String(trackingCheck.data?.status ?? "") === "cancelado") {
+    throw new Error(
+      "Este processo de Riscos Psicossociais está cancelado. O histórico permanece disponível somente para consulta."
+    );
   }
 
   const supabase = createClient();

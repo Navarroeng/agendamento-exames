@@ -3,12 +3,18 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
+import {
+  MSG_PROCESSO_RISCOS_CANCELADO,
+  deveCancelarCampanhaVinculada,
+  isTrackingRiscosCancelado,
+  validateCancelarProcessoListagem,
+} from "@/lib/riscos-processo-cancelamento";
 import {
   mapRiscosCampanhaRow,
   RISCOS_CAMPANHA_SELECT,
   RISCOS_CAMPANHA_SELECT_LEGACY,
   resolverTextoMotivoRemocao,
-  validateCancelarProcessoRiscos,
   validateConfirmacaoExclusaoCampanha,
   validateMotivoCancelamento,
   validateMotivoRemocaoProcesso,
@@ -101,28 +107,186 @@ async function invalidarSessoesDaCampanha(
   return (data ?? []).length;
 }
 
-export async function cancelarProcessoRiscosNoServidor(
-  campanhaId: string,
+function isMissingTrackingCancelColumn(error: {
+  message?: string;
+  code?: string;
+} | null): boolean {
+  if (!error) return false;
+  return (
+    /cancelado_em|cancelado_por|motivo_cancelamento/i.test(error.message ?? "") ||
+    error.code === "42703"
+  );
+}
+
+export type RiscosProcessoCanceladoResultado = {
+  status: "cancelado";
+  cancelado_em: string;
+  cancelado_por: string;
+  motivo_cancelamento: string;
+  campanha: RiscosCampanhaRecord | null;
+  orcamento_id: string | null;
+};
+
+async function buscarCampanhaAtivaOuCanceladaPorOrcamento(
+  orcamentoId: string
+): Promise<RiscosCampanhaRecord | null> {
+  const admin = createAdminClient();
+  const primary = await admin
+    .from("riscos_campanhas")
+    .select(CAMPANHA_SELECT)
+    .eq("orcamento_id", orcamentoId)
+    .order("created_at", { ascending: false });
+
+  if (isMissingColumnError(primary.error)) {
+    return null;
+  }
+  if (primary.error) throw primary.error;
+  const rows = (primary.data ?? []) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return null;
+  const mapped = rows.map((row) => mapCampanhaRow(row));
+  return (
+    mapped.find((c) => c.status === "aberta") ??
+    mapped.find((c) => c.status === "em_preparacao") ??
+    mapped.find((c) => c.status === "encerrada") ??
+    mapped.find((c) => c.status === "cancelada") ??
+    mapped[0]
+  );
+}
+
+export async function processoRiscosEstaCanceladoNoServidor(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+}): Promise<boolean> {
+  const admin = createAdminClient();
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  const campanhaId = String(input.campanhaId ?? "").trim();
+
+  if (orcamentoId && !orcamentoId.startsWith("manual:")) {
+    const { data, error } = await admin
+      .from("orcamento_riscos_psicossociais")
+      .select("status")
+      .eq("orcamento_id", orcamentoId)
+      .maybeSingle();
+    if (error && !isMissingTrackingCancelColumn(error) && error.code !== "42703") {
+      throw error;
+    }
+    if (isTrackingRiscosCancelado(data)) return true;
+  }
+
+  if (campanhaId) {
+    const { data, error } = await admin
+      .from("riscos_campanha_fluxo")
+      .select("status")
+      .eq("campanha_id", campanhaId)
+      .maybeSingle();
+    if (error && error.code !== "42P01" && !isMissingTrackingCancelColumn(error)) {
+      if (!/does not exist|riscos_campanha_fluxo/i.test(error.message ?? "")) {
+        throw error;
+      }
+    }
+    if (isTrackingRiscosCancelado(data)) return true;
+
+    const campanha = await selecionarCampanhaPorId(campanhaId);
+    if (campanha && isOrigemManualCliente(campanha.origem) && campanha.status === "cancelada") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export async function assertProcessoRiscosNaoCanceladoNoServidor(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+}): Promise<void> {
+  const cancelado = await processoRiscosEstaCanceladoNoServidor(input);
+  if (cancelado) throw new Error(MSG_PROCESSO_RISCOS_CANCELADO);
+}
+
+async function persistirCancelamentoTracking(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+  origemManual: boolean;
+  agora: string;
+  nome: string;
+  motivo: string;
+}): Promise<void> {
+  const admin = createAdminClient();
+  const patch = {
+    status: "cancelado",
+    cancelado_em: input.agora,
+    cancelado_por: input.nome,
+    motivo_cancelamento: input.motivo,
+  };
+
+  if (input.origemManual && input.campanhaId) {
+    const upd = await admin
+      .from("riscos_campanha_fluxo")
+      .update(patch)
+      .eq("campanha_id", input.campanhaId)
+      .select("campanha_id")
+      .maybeSingle();
+    if (isMissingTrackingCancelColumn(upd.error)) {
+      throw new Error(
+        "Migration de cancelamento do processo não aplicada (colunas cancelado_*). Aplique a migration 111."
+      );
+    }
+    if (upd.error) throw upd.error;
+    if (upd.data) return;
+
+    const ins = await admin.from("riscos_campanha_fluxo").insert({
+      campanha_id: input.campanhaId,
+      etapa_atual: "lista_presenca",
+      etapas_concluidas: 0,
+      ...patch,
+    });
+    if (ins.error && ins.error.code !== "23505") throw ins.error;
+    return;
+  }
+
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  if (!orcamentoId || orcamentoId.startsWith("manual:")) {
+    return;
+  }
+
+  const upd = await admin
+    .from("orcamento_riscos_psicossociais")
+    .update(patch)
+    .eq("orcamento_id", orcamentoId)
+    .select("orcamento_id")
+    .maybeSingle();
+  if (isMissingTrackingCancelColumn(upd.error)) {
+    throw new Error(
+      "Migration de cancelamento do processo não aplicada (colunas cancelado_*). Aplique a migration 111."
+    );
+  }
+  if (upd.error) throw upd.error;
+  if (upd.data) return;
+
+  const ins = await admin.from("orcamento_riscos_psicossociais").upsert(
+    {
+      orcamento_id: orcamentoId,
+      etapa_atual: "lista_presenca",
+      etapas_concluidas: 0,
+      entrada_em: input.agora,
+      ...patch,
+    },
+    { onConflict: "orcamento_id", ignoreDuplicates: false }
+  );
+  if (ins.error) throw ins.error;
+}
+
+async function cancelarCampanhaAbertaSeNecessario(
+  campanha: RiscosCampanhaRecord,
   motivo: string,
-  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+  agora: string,
+  nome: string
 ): Promise<RiscosCampanhaRecord> {
-  const id = campanhaId.trim();
-  if (!id) throw new Error("Campanha inválida.");
+  if (!deveCancelarCampanhaVinculada(campanha.status)) {
+    return campanha;
+  }
 
-  const motivoErr = validateMotivoCancelamento(motivo);
-  if (motivoErr) throw new Error(motivoErr);
-  const motivoTrim = motivo.trim();
-
-  const before = await selecionarCampanhaPorId(id);
-  if (!before) throw new Error("Campanha não encontrada.");
-
-  const validacao = validateCancelarProcessoRiscos(before);
-  if (validacao) throw new Error(validacao);
-
-  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  const agora = new Date().toISOString();
-
-  const sessoesInvalidas = await invalidarSessoesDaCampanha(id, nome);
+  await invalidarSessoesDaCampanha(campanha.id, nome);
 
   const admin = createAdminClient();
   const updatePrimary = await admin
@@ -131,29 +295,116 @@ export async function cancelarProcessoRiscosNoServidor(
       status: "cancelada",
       cancelada_em: agora,
       cancelada_por: nome,
-      motivo_cancelamento: motivoTrim,
+      motivo_cancelamento: motivo,
     })
-    .eq("id", id)
+    .eq("id", campanha.id)
     .neq("status", "cancelada")
     .select(CAMPANHA_SELECT)
     .maybeSingle();
 
-  let updateError = updatePrimary.error;
-
-  if (isMissingColumnError(updateError)) {
+  if (isMissingColumnError(updatePrimary.error)) {
     throw new Error(
       "Migration de cancelamento não aplicada (colunas cancelada_* / status cancelada). Aplique a migration 102."
     );
   }
+  if (updatePrimary.error) throw updatePrimary.error;
 
-  if (updateError) throw updateError;
-
-  const confirmed = await selecionarCampanhaPorId(id);
+  const confirmed = await selecionarCampanhaPorId(campanha.id);
   if (!confirmed || confirmed.status !== "cancelada") {
     throw new Error(
-      `O cancelamento não foi confirmado no banco (status atual: ${confirmed?.status ?? "desconhecido"}).`
+      `O cancelamento da campanha não foi confirmado no banco (status atual: ${confirmed?.status ?? "desconhecido"}).`
     );
   }
+  return confirmed;
+}
+
+export async function cancelarProcessoListagemRiscosNoServidor(
+  input: {
+    orcamentoId?: string | null;
+    campanhaId?: string | null;
+    motivo: string;
+  },
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+): Promise<RiscosProcessoCanceladoResultado> {
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  const campanhaId = String(input.campanhaId ?? "").trim();
+  const orcamentoReal =
+    orcamentoId && !orcamentoId.startsWith("manual:") ? orcamentoId : "";
+
+  if (!orcamentoReal && !campanhaId) {
+    throw new Error("Informe o processo a cancelar.");
+  }
+
+  const motivoErr = validateMotivoCancelamento(input.motivo);
+  if (motivoErr) throw new Error(motivoErr);
+  const motivoTrim = input.motivo.trim();
+
+  let campanha: RiscosCampanhaRecord | null = campanhaId
+    ? await selecionarCampanhaPorId(campanhaId)
+    : null;
+  if (campanhaId && !campanha) {
+    throw new Error("Campanha não encontrada.");
+  }
+  if (!campanha && orcamentoReal) {
+    campanha = await buscarCampanhaAtivaOuCanceladaPorOrcamento(orcamentoReal);
+  }
+
+  const origemManual = campanha
+    ? isOrigemManualCliente(campanha.origem)
+    : false;
+  const trackingOrcamentoId = origemManual
+    ? ""
+    : orcamentoReal || String(campanha?.orcamento_id ?? "").trim();
+
+  const adminStatus = createAdminClient();
+  let trackingStatus: string | null = null;
+  if (origemManual && campanha?.id) {
+    const fluxo = await adminStatus
+      .from("riscos_campanha_fluxo")
+      .select("status")
+      .eq("campanha_id", campanha.id)
+      .maybeSingle();
+    trackingStatus = fluxo.data?.status ? String(fluxo.data.status) : null;
+  } else if (trackingOrcamentoId) {
+    const row = await adminStatus
+      .from("orcamento_riscos_psicossociais")
+      .select("status")
+      .eq("orcamento_id", trackingOrcamentoId)
+      .maybeSingle();
+    trackingStatus = row.data?.status ? String(row.data.status) : null;
+  }
+
+  const regra = validateCancelarProcessoListagem({
+    status: trackingStatus,
+    etapaAtual: trackingStatus === "cancelado" ? "cancelado" : undefined,
+    motivo: motivoTrim,
+  });
+  if (regra) throw new Error(regra);
+
+  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+  const agora = new Date().toISOString();
+
+  await persistirCancelamentoTracking({
+    orcamentoId: trackingOrcamentoId || null,
+    campanhaId: campanha?.id ?? null,
+    origemManual,
+    agora,
+    nome,
+    motivo: motivoTrim,
+  });
+
+  if (campanha && deveCancelarCampanhaVinculada(campanha.status)) {
+    campanha = await cancelarCampanhaAbertaSeNecessario(
+      campanha,
+      motivoTrim,
+      agora,
+      nome
+    );
+  }
+
+  const empresaNome =
+    campanha?.empresa_nome || trackingOrcamentoId || campanha?.id || "processo";
+  const registroId = campanha?.id || trackingOrcamentoId;
 
   await registrarAuditoria({
     usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
@@ -161,24 +412,46 @@ export async function cancelarProcessoRiscosNoServidor(
     usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_processo_cancelado,
-    registroId: confirmed.id,
-    registroNome: confirmed.empresa_nome,
-    descricao: `${nome} cancelou o processo da campanha ${confirmed.codigo_publico}. Motivo: ${motivoTrim}`,
+    registroId,
+    registroNome: empresaNome,
+    descricao: `${nome} cancelou o processo de Riscos Psicossociais${
+      campanha?.codigo_publico ? ` (${campanha.codigo_publico})` : ""
+    }. Motivo: ${motivoTrim}`,
     dadosAntes: {
-      status: before.status,
-      codigo_publico: before.codigo_publico,
+      campanha_status: campanha?.status ?? null,
+      orcamento_id: trackingOrcamentoId || null,
+      campanha_id: campanha?.id ?? null,
     },
     dadosDepois: {
-      status: confirmed.status,
-      codigo_publico: confirmed.codigo_publico,
-      cancelada_em: confirmed.cancelada_em ?? agora,
-      cancelada_por: confirmed.cancelada_por ?? nome,
-      motivo_cancelamento: confirmed.motivo_cancelamento ?? motivoTrim,
-      sessoes_invalidadas: sessoesInvalidas,
+      status: "cancelado",
+      cancelado_em: agora,
+      cancelado_por: nome,
+      motivo_cancelamento: motivoTrim,
+      campanha_status: campanha?.status ?? null,
     },
   });
 
-  return confirmed;
+  return {
+    status: "cancelado",
+    cancelado_em: agora,
+    cancelado_por: nome,
+    motivo_cancelamento: motivoTrim,
+    campanha,
+    orcamento_id: trackingOrcamentoId || null,
+  };
+}
+
+export async function cancelarProcessoRiscosNoServidor(
+  campanhaId: string,
+  motivo: string,
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+): Promise<RiscosCampanhaRecord> {
+  const result = await cancelarProcessoListagemRiscosNoServidor(
+    { campanhaId, motivo },
+    auditOptions
+  );
+  if (result.campanha) return result.campanha;
+  throw new Error("Campanha não encontrada.");
 }
 
 async function contarDadosCampanha(campanhaId: string): Promise<{

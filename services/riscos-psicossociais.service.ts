@@ -10,6 +10,7 @@ import {
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import { deveInserirTrackingRiscosNoSincronismo } from "@/lib/riscos-processo-cancelamento";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import {
   listarCampanhasManuaisAtivas,
@@ -20,6 +21,9 @@ import { listarProcessosImplantacao } from "@/services/implantacao-clientes.serv
 import { buscarTrackingLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
+
+const RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO =
   "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por";
 
 /**
@@ -193,19 +197,34 @@ async function garantirTrackingRiscosPsicossociais(
     .select(RISCOS_TRACKING_SELECT)
     .in("orcamento_id", ids);
 
-  if (error) {
-    console.warn("riscos-psicossociais tracking indisponível:", error.message);
+  const trackingError =
+    error &&
+    /cancelado_em|cancelado_por|motivo_cancelamento/i.test(error.message ?? "")
+      ? (
+          await supabase
+            .from("orcamento_riscos_psicossociais")
+            .select(RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO)
+            .in("orcamento_id", ids)
+        )
+      : { data, error };
+
+  if (trackingError.error) {
+    console.warn(
+      "riscos-psicossociais tracking indisponível:",
+      trackingError.error.message
+    );
     return map;
   }
 
-  for (const row of data ?? []) {
+  for (const row of trackingError.data ?? []) {
     map.set(row.orcamento_id, row as OrcamentoRiscosPsicossociaisRecord);
   }
 
-  const faltantes = implantacao.filter(
-    (p) =>
-      isProcessoElegivelRiscosPsicossociais(p) &&
-      !map.has(p.orcamento.id)
+  const faltantes = implantacao.filter((p) =>
+    deveInserirTrackingRiscosNoSincronismo(
+      isProcessoElegivelRiscosPsicossociais(p),
+      map.get(p.orcamento.id) ?? null
+    )
   );
 
   for (const processo of faltantes) {

@@ -12,6 +12,7 @@ import {
 } from "@/lib/riscos-campanha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
 const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
@@ -85,6 +86,11 @@ export async function abrirCampanhaRiscosNoServidor(
 
   const before = await selecionarCampanhaPorId(id);
   if (!before) throw new Error("Campanha não encontrada.");
+
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: before.orcamento_id,
+    campanhaId: before.id,
+  });
 
   if (before.status === "aberta") {
     return before;
