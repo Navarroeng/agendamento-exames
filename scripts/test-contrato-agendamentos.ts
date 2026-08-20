@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import {
   agendamentoConsomeSaldoContrato,
+  agendamentoEVinculadoAoContrato,
   agendamentoPertenceAoClienteContrato,
+  agendamentoVisivelNaAbaContrato,
   buildContratoAgendamentoContagem,
+  idsAgendamentoDasVagas,
   isAgendamentoSelecionavel,
   isDataNaVigencia,
+  mesclarAgendamentosPorId,
   resolveClassificacaoAgendamento,
 } from "../lib/contrato-agendamentos";
+import type { AgendamentoWithExames } from "../lib/types";
 
 assert.equal(isAgendamentoSelecionavel("agendado"), true);
 assert.equal(isAgendamentoSelecionavel("rascunho"), true);
@@ -188,6 +193,69 @@ assert.equal(
     dispensado: true,
   }),
   "adicional"
+);
+
+const nataliaAg = {
+  id: "ag-natalia",
+  data_agendamento: "2026-08-24",
+  horario: "08:00",
+  contrato_id: "ctr-13",
+  cliente_id: "cli-anto",
+  cliente_nome: "ANTÔ CAFE E BAR LTDA",
+  status: "agendado",
+  aso: "Admissional",
+} as AgendamentoWithExames;
+
+assert.deepEqual(idsAgendamentoDasVagas([
+  { agendamento_id: "ag-natalia" },
+  { agendamento_id: null },
+  { agendamento_id: "ag-natalia" },
+]), ["ag-natalia"]);
+
+const mesclados = mesclarAgendamentosPorId([
+  [],
+  [nataliaAg],
+]);
+assert.equal(mesclados.length, 1);
+assert.equal(mesclados[0].id, "ag-natalia");
+assert.equal(mesclados[0].aso, "Admissional");
+
+assert.equal(
+  agendamentoEVinculadoAoContrato({
+    agendamento: nataliaAg,
+    contratoId: "ctr-13",
+    idsAgendamentoDasVagas: [],
+  }),
+  true
+);
+assert.equal(
+  agendamentoEVinculadoAoContrato({
+    agendamento: { id: "ag-natalia", contrato_id: null },
+    contratoId: "ctr-13",
+    idsAgendamentoDasVagas: ["ag-natalia"],
+  }),
+  true
+);
+assert.equal(
+  agendamentoVisivelNaAbaContrato({
+    agendamento: nataliaAg,
+    contratoId: "ctr-13",
+    idsAgendamentoDasVagas: ["ag-natalia"],
+    cliente: { id: "cli-anto", nome: "Nome diferente no orçamento" },
+  }),
+  true,
+  "vaga vinculada permanece visível mesmo se o nome do orçamento divergir"
+);
+assert.equal(
+  agendamentoPertenceAoClienteContrato(
+    {
+      cliente_id: "cli-anto",
+      cliente_nome: "ANTÔ CAFE E BAR LTDA",
+    },
+    { id: "cli-anto", nome: "Nome diferente no orçamento" }
+  ),
+  false,
+  "o filtro antigo de nome isolado excluiria a Natália"
 );
 
 console.log("ok: contrato-agendamentos");

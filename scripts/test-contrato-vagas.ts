@@ -16,6 +16,7 @@ import {
   labelColaboradorOuVaga,
   resolverDadosExibicaoVagaContrato,
   resolveStatusVagaRascunho,
+  vagaPrecisaReconciliarAgendamento,
   validarDraftsListaVagas,
   vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
@@ -661,5 +662,59 @@ const linhaCanceladoMaisValido = resolverDadosExibicaoVagaContrato({
 assert.equal(linhaCanceladoMaisValido.agendamentoIdVisualizar, "ag-natalia");
 assert.equal(linhaCanceladoMaisValido.dataExameIso, "2026-08-24");
 assert.equal(linhaCanceladoMaisValido.tipoAso, "Admissional");
+
+assert.equal(
+  vagaPrecisaReconciliarAgendamento(vagaCard("agendada", { agendamento_id: "ag-natalia" })),
+  false
+);
+assert.equal(
+  vagaPrecisaReconciliarAgendamento(
+    vagaCard("agendada", { agendamento_id: null, colaborador_cpf: "52998224725" })
+  ),
+  true
+);
+assert.equal(
+  escolherAgendamentoValidoParaVaga({
+    vaga: vagaCard("agendada", {
+      colaborador_cpf: "52998224725",
+      agendamento_id: null,
+    }),
+    agendamentos: [
+      agNataliaCancelado,
+      {
+        id: "ag-natalia",
+        status: "agendado",
+        colaborador_cpf: "52998224725",
+        contrato_id: "c1",
+        cliente_id: "cli-1",
+        data_agendamento: "2026-08-24",
+      },
+    ],
+    contratoClienteId: "cli-1",
+  }),
+  "ag-natalia"
+);
+
+const vagaComIdForaDaColecao = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("agendada", {
+    colaborador_cpf: "52998224725",
+    agendamento_id: "ag-natalia",
+  }),
+  agendamentos: [],
+});
+assert.equal(vagaComIdForaDaColecao.dataExameIso, null);
+assert.equal(vagaComIdForaDaColecao.tipoAso, null);
+assert.equal(vagaComIdForaDaColecao.agendamentoIdVisualizar, null);
+
+const vagaComIdCarregadoAvulso = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("agendada", {
+    colaborador_cpf: "52998224725",
+    agendamento_id: "ag-natalia",
+  }),
+  agendamentos: [agNatalia],
+});
+assert.equal(vagaComIdCarregadoAvulso.dataExameIso, "2026-08-24");
+assert.equal(vagaComIdCarregadoAvulso.tipoAso, "Admissional");
+assert.equal(vagaComIdCarregadoAvulso.agendamentoIdVisualizar, "ag-natalia");
 
 console.log("test-contrato-vagas: OK");

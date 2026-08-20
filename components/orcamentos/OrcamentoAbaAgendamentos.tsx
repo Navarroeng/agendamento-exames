@@ -19,7 +19,7 @@ import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
-  agendamentoPertenceAoClienteContrato,
+  agendamentoVisivelNaAbaContrato,
   buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
   contratoTemAgendamentosIniciaisDispensados,
@@ -352,18 +352,22 @@ export function OrcamentoAbaAgendamentos({
           listarCreditosDoContrato(contratoRow.id),
           listarVagasDoContrato(contratoRow.id).catch(() => [] as ContratoVagaRecord[]),
         ]);
+        const idsVagas = new Set(
+          vagasContrato
+            .map((vaga) => (vaga.agendamento_id ?? "").trim())
+            .filter(Boolean)
+        );
         const itensDoCliente = resumo.itens.filter((i) =>
-          agendamentoPertenceAoClienteContrato(
-            {
-              cliente_id: i.agendamento.cliente_id,
-              cliente_nome: i.agendamento.cliente_nome,
-            },
-            {
+          agendamentoVisivelNaAbaContrato({
+            agendamento: i.agendamento,
+            contratoId: contratoRow.id,
+            idsAgendamentoDasVagas: idsVagas,
+            cliente: {
               id: contratoRow.cliente_id,
               nome: clienteNome,
               nomes: [clienteNome],
-            }
-          )
+            },
+          })
         );
         setItens(itensDoCliente);
         setProgramacoes(progs);

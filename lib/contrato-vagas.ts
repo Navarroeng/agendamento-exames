@@ -424,15 +424,25 @@ export type AgendamentoCandidatoVaga = {
  * Escolhe um agendamento válido para ocupar vaga comprometida.
  * Cancelados nunca entram. Em empate inseguro, não escolhe.
  */
+export function vagaPrecisaReconciliarAgendamento(
+  vaga: Pick<ContratoVagaRecord, "status" | "agendamento_id">
+): boolean {
+  if (vaga.status === "comprometida") return true;
+  return vaga.status === "agendada" && !(vaga.agendamento_id ?? "").trim();
+}
+
 export function escolherAgendamentoValidoParaVaga(params: {
-  vaga: Pick<ContratoVagaRecord, "contrato_id" | "colaborador_cpf" | "status">;
+  vaga: Pick<
+    ContratoVagaRecord,
+    "contrato_id" | "colaborador_cpf" | "status" | "agendamento_id"
+  >;
   agendamentos: AgendamentoCandidatoVaga[];
   contratoClienteId?: string | null;
   vigenciaInicio?: string | null;
   vigenciaFim?: string | null;
   idsJaVinculadosEmOutraVaga?: Iterable<string>;
 }): string | null {
-  if (params.vaga.status !== "comprometida") return null;
+  if (!vagaPrecisaReconciliarAgendamento(params.vaga)) return null;
   const cpf = normalizeCpfDigits(params.vaga.colaborador_cpf);
   if (!isValidCPF(cpf)) return null;
 
@@ -452,6 +462,7 @@ export function escolherAgendamentoValidoParaVaga(params: {
     if (contratoAg === params.vaga.contrato_id) return true;
     if (!clienteId) return false;
     if ((ag.cliente_id ?? "").trim() !== clienteId) return false;
+    if (params.vaga.status === "agendada") return true;
     const dia = (ag.data_agendamento ?? "").slice(0, 10);
     if (inicio && fim && dia) {
       return dia >= inicio && dia <= fim;

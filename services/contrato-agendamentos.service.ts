@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import {
-  agendamentoPertenceAoClienteContrato,
+  agendamentoEVinculadoAoContrato,
+  agendamentoVisivelNaAbaContrato,
   buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
+  idsAgendamentoDasVagas,
   isAgendamentoSelecionavel,
   isDataNaVigencia,
+  mesclarAgendamentosPorId,
   type ContratoAgendamentoContagem,
 } from "@/lib/contrato-agendamentos";
 import { normalizeCpfDigits } from "@/lib/cpf";
@@ -146,59 +149,68 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   const inicio = contrato.data_inicio?.slice(0, 10) ?? "";
   const fim = contrato.data_fim?.slice(0, 10) ?? "";
 
-  if (!clienteId || !inicio || !fim) {
-    let programados = 0;
-    if (!dispensado) {
-      const { count, error: pErr } = await supabase
-        .from("periodicos_futuros")
-        .select("id", { count: "exact", head: true })
-        .eq("contrato_id", contrato.id)
-        .eq("consome_previsao_contrato", true)
-        .in("status", ["ativo", "reagendado"]);
-      if (pErr) throw pErr;
-      programados = count ?? 0;
-    }
-    return {
-      itens: [],
-      contagem: buildContratoAgendamentoContagem(
-        quantidadeContratada,
-        programados,
-        0,
-        { dispensado }
-      ),
-    };
-  }
+  const vagas = dispensado
+    ? []
+    : await listarVagasDoContrato(contrato.id).catch(() => []);
+  const idsVagas = idsAgendamentoDasVagas(vagas);
+  const idsVagasSet = new Set(idsVagas);
+  const podeBuscarVigencia = Boolean(clienteId && inicio && fim);
 
-  const [byIdRes, legadoRes, clienteRes, catalogRes] = await Promise.all([
-    supabase
-      .from("agendamentos")
-      .select(AGENDAMENTO_SELECT)
-      .eq("cliente_id", clienteId)
-      .gte("data_agendamento", inicio)
-      .lte("data_agendamento", fim)
-      .order("data_agendamento", { ascending: true })
-      .order("horario", { ascending: true })
-      .limit(2000),
-    supabase
-      .from("agendamentos")
-      .select(AGENDAMENTO_SELECT)
-      .is("cliente_id", null)
-      .gte("data_agendamento", inicio)
-      .lte("data_agendamento", fim)
-      .order("data_agendamento", { ascending: true })
-      .order("horario", { ascending: true })
-      .limit(2000),
-    supabase
-      .from("clientes")
-      .select("id, nome")
-      .eq("id", clienteId)
-      .maybeSingle(),
-    supabase.from("clientes").select("id, nome"),
-  ]);
+  const emptyAg = {
+    data: [] as AgendamentoWithExames[],
+    error: null as { message: string } | null,
+  };
+
+  const [byIdRes, legadoRes, clienteRes, catalogRes, porContratoRes, porVagaRes] =
+    await Promise.all([
+      podeBuscarVigencia
+        ? supabase
+            .from("agendamentos")
+            .select(AGENDAMENTO_SELECT)
+            .eq("cliente_id", clienteId)
+            .gte("data_agendamento", inicio)
+            .lte("data_agendamento", fim)
+            .order("data_agendamento", { ascending: true })
+            .order("horario", { ascending: true })
+            .limit(2000)
+        : Promise.resolve(emptyAg),
+      podeBuscarVigencia
+        ? supabase
+            .from("agendamentos")
+            .select(AGENDAMENTO_SELECT)
+            .is("cliente_id", null)
+            .gte("data_agendamento", inicio)
+            .lte("data_agendamento", fim)
+            .order("data_agendamento", { ascending: true })
+            .order("horario", { ascending: true })
+            .limit(2000)
+        : Promise.resolve(emptyAg),
+      clienteId
+        ? supabase
+            .from("clientes")
+            .select("id, nome")
+            .eq("id", clienteId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase.from("clientes").select("id, nome"),
+      supabase
+        .from("agendamentos")
+        .select(AGENDAMENTO_SELECT)
+        .eq("contrato_id", contrato.id)
+        .limit(2000),
+      idsVagas.length > 0
+        ? supabase
+            .from("agendamentos")
+            .select(AGENDAMENTO_SELECT)
+            .in("id", idsVagas)
+        : Promise.resolve(emptyAg),
+    ]);
 
   if (byIdRes.error) throw byIdRes.error;
   if (legadoRes.error) throw legadoRes.error;
   if (clienteRes.error) throw clienteRes.error;
+  if (porContratoRes.error) throw porContratoRes.error;
+  if (porVagaRes.error) throw porVagaRes.error;
 
   const cliente = {
     id: clienteId,
@@ -214,24 +226,37 @@ export async function carregarAgendamentosVigenciaContrato(params: {
         }))
         .filter((row) => row.id && row.nome);
 
-  const agendamentos = [
-    ...((byIdRes.data ?? []) as AgendamentoWithExames[]),
-    ...((legadoRes.data ?? []) as AgendamentoWithExames[]),
-  ].filter((ag) => {
+  const agendamentos = mesclarAgendamentosPorId([
+    (byIdRes.data ?? []) as AgendamentoWithExames[],
+    (legadoRes.data ?? []) as AgendamentoWithExames[],
+    (porContratoRes.data ?? []) as AgendamentoWithExames[],
+    (porVagaRes.data ?? []) as AgendamentoWithExames[],
+  ]).filter((ag) => {
     if (
-      !agendamentoPertenceAoClienteContrato(
-        { cliente_id: ag.cliente_id, cliente_nome: ag.cliente_nome },
+      agendamentoVisivelNaAbaContrato({
+        agendamento: ag,
+        contratoId: contrato.id,
+        idsAgendamentoDasVagas: idsVagasSet,
         cliente,
-        catalog
-      )
+        catalog,
+      })
     ) {
-      return false;
+      if (
+        agendamentoEVinculadoAoContrato({
+          agendamento: ag,
+          contratoId: contrato.id,
+          idsAgendamentoDasVagas: idsVagasSet,
+        })
+      ) {
+        return true;
+      }
+      return isDataNaVigencia(
+        ag.data_agendamento,
+        contrato.data_inicio,
+        contrato.data_fim
+      );
     }
-    return isDataNaVigencia(
-      ag.data_agendamento,
-      contrato.data_inicio,
-      contrato.data_fim
-    );
+    return false;
   });
 
   const { data: vinculos, error: vErr } = await supabase
@@ -274,8 +299,11 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   }
 
   const itens: AgendamentoNaVigenciaItem[] = agendamentos.map((ag) => {
+    const vinculadoAVaga = idsVagasSet.has(ag.id);
     const selecionado =
-      !dispensado && selecionadosDeste.has(ag.id);
+      !dispensado &&
+      isAgendamentoSelecionavel(ag.status) &&
+      (selecionadosDeste.has(ag.id) || vinculadoAVaga);
     const outro = emOutroContrato.get(ag.id) ?? null;
     const selecionavel =
       !dispensado &&
@@ -324,18 +352,8 @@ export async function carregarAgendamentosVigenciaContrato(params: {
 
   let vagasComprometidas = 0;
   if (!dispensado) {
-    const { count: vagaCount, error: vagaErr } = await supabase
-      .from("contrato_vagas")
-      .select("id", { count: "exact", head: true })
-      .eq("contrato_id", contrato.id)
-      .eq("status", "comprometida");
-    if (vagaErr) throw vagaErr;
-    vagasComprometidas = vagaCount ?? 0;
+    vagasComprometidas = vagas.filter((v) => v.status === "comprometida").length;
   }
-
-  const vagas = dispensado
-    ? []
-    : await listarVagasDoContrato(contrato.id).catch(() => []);
 
   return {
     itens,

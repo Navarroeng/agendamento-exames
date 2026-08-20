@@ -13,6 +13,7 @@ import {
   resolveStatusVagaRascunho,
   validarDraftsListaVagas,
   vagaPermiteRemoverFuncionario,
+  vagaPrecisaReconciliarAgendamento,
   vagaStatusBloqueiaEdicao,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -541,7 +542,7 @@ export async function reconciliarVagasComprometidasDoContrato(params: {
 
   let vinculados = 0;
   for (const vaga of vagas) {
-    if (vaga.status !== "comprometida") continue;
+    if (!vagaPrecisaReconciliarAgendamento(vaga)) continue;
     const escolhido = escolherAgendamentoValidoParaVaga({
       vaga,
       agendamentos,

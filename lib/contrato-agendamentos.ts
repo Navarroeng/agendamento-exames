@@ -261,6 +261,85 @@ export function isDataNaVigencia(
   return dia >= inicio && dia <= fim;
 }
 
+export function idsAgendamentoDasVagas(
+  vagas: Array<{ agendamento_id?: string | null }>
+): string[] {
+  return Array.from(
+    new Set(
+      vagas
+        .map((vaga) => (vaga.agendamento_id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+export function mesclarAgendamentosPorId(
+  grupos: Array<AgendamentoWithExames[] | undefined | null>
+): AgendamentoWithExames[] {
+  const map = new Map<string, AgendamentoWithExames>();
+  for (const grupo of grupos) {
+    for (const ag of grupo ?? []) {
+      if (ag?.id) map.set(ag.id, ag);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const data = (a.data_agendamento ?? "").localeCompare(
+      b.data_agendamento ?? ""
+    );
+    if (data !== 0) return data;
+    return (a.horario ?? "").localeCompare(b.horario ?? "");
+  });
+}
+
+export function agendamentoEVinculadoAoContrato(params: {
+  agendamento: { id: string; contrato_id?: string | null };
+  contratoId: string;
+  idsAgendamentoDasVagas: Iterable<string>;
+}): boolean {
+  const contratoId = params.contratoId.trim();
+  if (contratoId && (params.agendamento.contrato_id ?? "").trim() === contratoId) {
+    return true;
+  }
+  const ids =
+    params.idsAgendamentoDasVagas instanceof Set
+      ? params.idsAgendamentoDasVagas
+      : new Set(Array.from(params.idsAgendamentoDasVagas));
+  return ids.has(params.agendamento.id);
+}
+
+/** Mantém na aba o que já está na vaga/contrato, mesmo fora do recorte de vigência. */
+export function agendamentoVisivelNaAbaContrato(params: {
+  agendamento: {
+    id: string;
+    contrato_id?: string | null;
+    cliente_id?: string | null;
+    cliente_nome?: string | null;
+  };
+  contratoId: string;
+  idsAgendamentoDasVagas: Iterable<string>;
+  cliente: {
+    id: string | null | undefined;
+    nome?: string | null;
+    nomes?: Array<string | null | undefined>;
+  };
+  catalog?: Array<{ id: string; nome: string }>;
+}): boolean {
+  if (
+    agendamentoEVinculadoAoContrato({
+      agendamento: params.agendamento,
+      contratoId: params.contratoId,
+      idsAgendamentoDasVagas: params.idsAgendamentoDasVagas,
+    })
+  ) {
+    return true;
+  }
+  return agendamentoPertenceAoClienteContrato(
+    params.agendamento,
+    params.cliente,
+    params.catalog
+  );
+}
+
 /**
  * Isolamento da Implantação: o agendamento só entra se for do mesmo cliente.
  *
