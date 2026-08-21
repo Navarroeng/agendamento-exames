@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { RequiredMark } from "@/components/ui/Field";
-import { TIPOS_ASO } from "@/lib/constants";
 import {
   MOTIVOS_EXAME_FUTURO,
+  TIPOS_ASO_EXAME_FUTURO,
   type ColaboradorSugestao,
   type MotivoExameFuturo,
 } from "@/lib/contrato-programacao-futura";
@@ -247,7 +247,7 @@ export function InformarExameFuturoModal({
                 setError(null);
               }}
             >
-              {TIPOS_ASO.map((t) => (
+              {TIPOS_ASO_EXAME_FUTURO.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>

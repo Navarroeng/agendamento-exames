@@ -16,6 +16,8 @@ export interface AgendamentoPrefillData {
   contrato_id?: string;
   contrato_numero?: string;
   vaga_id?: string;
+  /** Ciclo de Periódico Futuro a vincular automaticamente (caminho A). */
+  periodico_ids?: string[];
 }
 
 export type PrefillClienteCatalogItem = {

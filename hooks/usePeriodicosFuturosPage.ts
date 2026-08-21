@@ -207,6 +207,7 @@ export function usePeriodicosFuturosPage() {
           record.examesNomes[0] ??
           record.exame_nome,
         aso: record.tipo_aso || "Periódico",
+        periodico_ids: record.ids,
       });
       router.push("/");
     },

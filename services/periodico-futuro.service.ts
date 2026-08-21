@@ -29,6 +29,11 @@ import {
   type PeriodicoCpfConflito,
 } from "@/lib/periodico-cpf-regularizacao";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import { verificarContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
+import {
+  decidirOrigemPeriodicoFuturo,
+  isAsoDemissional,
+} from "@/lib/periodico-geracao";
 
 export interface CriarPeriodicosAgendamentoParams {
   cliente_nome: string;
@@ -38,6 +43,8 @@ export interface CriarPeriodicosAgendamentoParams {
   cargo_nome: string | null;
   data_agendamento: string;
   exames: { tipo_exame: string }[];
+  tipoAso?: string | null;
+  cumprindoPeriodicoExistente?: boolean;
 }
 
 type PeriodicoFuturoWithCargo = PeriodicoFuturoRecord & {
@@ -131,12 +138,77 @@ export async function criarPeriodicosDeAgendamento(
   agendamentoId: string,
   params: CriarPeriodicosAgendamentoParams
 ): Promise<number> {
+  if (isAsoDemissional(params.tipoAso)) return 0;
+  if (params.cumprindoPeriodicoExistente) return 0;
+
+  const supabase = createClient();
+  const { count: jaCumprindo, error: vinculoErr } = await supabase
+    .from("periodicos_futuros")
+    .select("id", { count: "exact", head: true })
+    .eq("agendamento_vinculado_id", agendamentoId);
+  if (vinculoErr) throw vinculoErr;
+  if ((jaCumprindo ?? 0) > 0) return 0;
+
   const cargo = await buscarCargoPorId(params.cargo_id);
-  if (!cargo || !cargoGeraAlertaPeriodico(cargo.validade_periodico_meses)) {
-    return 0;
+  const cargoGeraAlerta = cargo
+    ? cargoGeraAlertaPeriodico(cargo.validade_periodico_meses)
+    : false;
+  const validade = parseValidadePeriodicoMeses(
+    cargo?.validade_periodico_meses
+  );
+  const dataRealizada = params.data_agendamento.split("T")[0];
+  const proximaData = computeProximaDataPeriodico(dataRealizada, validade);
+
+  let contratoDataFim: string | null = null;
+  try {
+    const cobertura = await verificarContratoVigentePorNome(
+      params.cliente_nome,
+      dataRealizada
+    );
+    contratoDataFim = cobertura.dataFim ?? null;
+  } catch {
+    contratoDataFim = null;
   }
 
-  const validade = parseValidadePeriodicoMeses(cargo.validade_periodico_meses);
+  const cpfDigits = normalizeCpfDigits(params.colaborador_cpf);
+  const cpf = isValidCPF(cpfDigits) ? cpfDigits : null;
+
+  let jaExisteObrigacaoEquivalente = false;
+  if (cpf) {
+    const masked = maskCPFInput(cpf);
+    const { data: existentes, error: eqErr } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, agendamento_id, proxima_data, data_prevista_original, status, colaborador_cpf"
+      )
+      .in("status", ["ativo", "reagendado"])
+      .or(`colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`);
+    if (eqErr) throw eqErr;
+    jaExisteObrigacaoEquivalente = ((existentes ?? []) as Array<{
+      agendamento_id?: string | null;
+      proxima_data: string;
+      data_prevista_original?: string | null;
+      colaborador_cpf?: string | null;
+    }>).some((row) => {
+      if ((row.agendamento_id ?? "") === agendamentoId) return false;
+      if (normalizeCpfDigits(row.colaborador_cpf) !== cpf) return false;
+      const ciclo = String(
+        row.data_prevista_original || row.proxima_data || ""
+      ).slice(0, 10);
+      return ciclo === proximaData;
+    });
+  }
+
+  const decisao = decidirOrigemPeriodicoFuturo({
+    tipoAso: params.tipoAso,
+    cumprindoPeriodicoExistente: false,
+    cargoGeraAlerta,
+    proximaDataIso: proximaData,
+    contratoDataFim,
+    jaExisteObrigacaoEquivalente,
+  });
+  if (!decisao.gerar) return 0;
+
   const examesCargo = await listarExamesObrigatoriosPorCargo(params.cargo_id);
   if (examesCargo.length === 0) return 0;
 
@@ -145,12 +217,6 @@ export async function criarPeriodicosDeAgendamento(
       .map((exame) => exame.tipo_exame.trim().toLowerCase())
       .filter(Boolean)
   );
-
-  const dataRealizada = params.data_agendamento.split("T")[0];
-  const proximaData = computeProximaDataPeriodico(dataRealizada, validade);
-
-  const cpfDigits = normalizeCpfDigits(params.colaborador_cpf);
-  const cpf = isValidCPF(cpfDigits) ? cpfDigits : null;
 
   const rows = examesCargo
     .filter((exame) => tiposAgendamento.has(exame.nome.trim().toLowerCase()))
@@ -173,7 +239,6 @@ export async function criarPeriodicosDeAgendamento(
 
   if (rows.length === 0) return 0;
 
-  const supabase = createClient();
   const { data, error } = await supabase
     .from("periodicos_futuros")
     .upsert(rows, {

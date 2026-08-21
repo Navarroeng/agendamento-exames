@@ -1,4 +1,4 @@
-import { TIPOS_ASO } from "@/lib/constants";
+import { TIPOS_ASO_PODEM_ORIGINAR_PERIODICO } from "@/lib/periodico-geracao";
 
 /** Motivos disponíveis no modal “Informar exame futuro”. */
 export const MOTIVOS_EXAME_FUTURO = [
@@ -18,7 +18,7 @@ export type OrigemPeriodicoFuturo =
   | typeof ORIGEM_PERIODICO_AGENDAMENTO
   | string;
 
-export const TIPOS_ASO_EXAME_FUTURO = TIPOS_ASO;
+export const TIPOS_ASO_EXAME_FUTURO = TIPOS_ASO_PODEM_ORIGINAR_PERIODICO;
 
 export function isMotivoExameFuturo(value: string): value is MotivoExameFuturo {
   return (MOTIVOS_EXAME_FUTURO as readonly string[]).includes(value);

@@ -1051,6 +1051,12 @@ export function useAgendamentosPage() {
         creditoDecisionRef.current = "skip";
       }
 
+      if ((staged.periodico_ids ?? []).length > 0) {
+        periodicoDecisionRef.current = "link";
+        periodicoLinkIdsRef.current = staged.periodico_ids ?? [];
+        creditoDecisionRef.current = "skip";
+      }
+
       setShowForm(true);
       setFiltersExpanded(false);
 
@@ -2679,6 +2685,7 @@ export function useAgendamentosPage() {
                 cargo_nome: cargoFields.cargo_nome ?? null,
                 data_agendamento: dataIso,
                 exames: examesPayload,
+                tipoAso: payload.aso,
               });
               if (criados > 0) {
                 toast.message(
@@ -2788,7 +2795,7 @@ export function useAgendamentosPage() {
             }
           }
 
-          if (cargoFields.cargo_id && dataIso && periodicoIdsParaVincular.length === 0) {
+          if (cargoFields.cargo_id && dataIso) {
             try {
               const criados = await criarPeriodicosDeAgendamento(novoId, {
                 cliente_nome: payload.cliente_nome,
@@ -2798,6 +2805,9 @@ export function useAgendamentosPage() {
                 cargo_nome: cargoFields.cargo_nome ?? null,
                 data_agendamento: dataIso,
                 exames: examesPayload,
+                tipoAso: payload.aso,
+                cumprindoPeriodicoExistente:
+                  periodicoIdsParaVincular.length > 0,
               });
               if (criados > 0) {
                 toast.message(

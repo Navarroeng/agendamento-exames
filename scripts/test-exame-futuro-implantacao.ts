@@ -10,6 +10,7 @@ import {
   labelOrigemPeriodico,
   MOTIVOS_EXAME_FUTURO,
   ORIGEM_PERIODICO_IMPLANTACAO,
+  TIPOS_ASO_EXAME_FUTURO,
 } from "../lib/contrato-programacao-futura";
 import {
   buildImplantacaoProcesso,
@@ -22,6 +23,8 @@ import type { ClienteContratoRecord } from "../lib/types";
 
 assert.ok(MOTIVOS_EXAME_FUTURO.includes("ASO ainda vigente"));
 assert.ok(MOTIVOS_EXAME_FUTURO.includes("Outro"));
+assert.ok(!TIPOS_ASO_EXAME_FUTURO.includes("Demissional" as never));
+assert.ok(TIPOS_ASO_EXAME_FUTURO.includes("Admissional"));
 assert.equal(labelOrigemPeriodico(ORIGEM_PERIODICO_IMPLANTACAO), "Implantação Inicial");
 assert.equal(labelOrigemPeriodico("agendamento"), "Agendamento");
 assert.equal(
