@@ -9,14 +9,13 @@ import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   getEtapasRiscosPorOrigem,
   isEtapaBarraProgressoAtual,
-  labelEtapaAtualProcessoRiscos,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
-  riscosPsicossociaisEtapaAtualBadgeClass,
   type RiscosPsicossociaisListagemStatus,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type { YearMonth } from "@/lib/listagem-meses";
+import { RiscosEtapaAtualBadge } from "@/components/riscos-psicossociais/RiscosEtapaAtualBadge";
 import { RiscosProcessoRowActionsMenu } from "@/components/riscos-psicossociais/RiscosProcessoRowActionsMenu";
 
 interface RiscosPsicossociaisTableProps {
@@ -198,14 +197,7 @@ export function RiscosPsicossociaisTable({
                         : "—"}
                     </td>
                     <td className="whitespace-nowrap">
-                      <span
-                        className={riscosPsicossociaisEtapaAtualBadgeClass(
-                          processo.etapaAtual,
-                          processo.status
-                        )}
-                      >
-                        {labelEtapaAtualProcessoRiscos(processo)}
-                      </span>
+                      <RiscosEtapaAtualBadge processo={processo} />
                     </td>
                     <td>
                       <ProgressoRiscos processo={processo} />

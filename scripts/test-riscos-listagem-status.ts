@@ -9,8 +9,10 @@ import { join } from "node:path";
 import {
   DEFAULT_RISCOS_LISTAGEM_STATUS,
   RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM,
+  RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE,
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
+  RISCOS_ETAPA_BADGE_BASE,
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
   indiceEtapaAtualRiscos,
@@ -463,8 +465,7 @@ run("UI: STATUS ao lado do ano, padrão Aberto, sem persistir no refresh", () =>
   assert.match(table, />Concluído</);
   assert.match(table, />Cancelado</);
   assert.match(table, /yearRowExtra/);
-  assert.match(table, /riscosPsicossociaisEtapaAtualBadgeClass/);
-  assert.match(table, /labelEtapaAtualProcessoRiscos/);
+  assert.match(table, /RiscosEtapaAtualBadge/);
   assert.match(page, /statusListagem=\{statusListagem\}/);
 });
 
@@ -506,6 +507,7 @@ run("labels da etapa atual: Abrir pesquisa e Aguardando Laudos SST", () => {
   );
   assert.doesNotMatch(lib, /Laudo SST Automático/);
   assert.match(painel, /Etapa atual:/);
+  assert.match(painel, /RiscosEtapaAtualBadge/);
 });
 
 run("Aberto: lista solicitada acima de solicitar, no mesmo percentual", () => {
@@ -537,63 +539,106 @@ run("Aberto: lista solicitada acima de solicitar, no mesmo percentual", () => {
   );
 });
 
-run("badges: solicitar azul claro, solicitada lilás, demais intactos", () => {
-  const azul =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#E8EEFF] text-[#3F51D7]";
-  const lilas =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#F1EDFF] text-[#6D4AFF]";
-  const amarelo =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#fef3c7] text-[#b45309]";
-  const indigo =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#eef2ff] text-[#4338ca]";
-  const verde =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-brand-green-soft text-brand-green";
-  const vermelho =
-    "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold bg-[#fef2f2] text-brand-red";
+run("badges: cada etapa operacional tem tom próprio", () => {
+  const badge = (
+    etapa: Parameters<typeof riscosPsicossociaisEtapaAtualBadgeClass>[0],
+    status: Parameters<typeof riscosPsicossociaisEtapaAtualBadgeClass>[1]
+  ) => riscosPsicossociaisEtapaAtualBadgeClass(etapa, status);
+
+  const cinza = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.laudos_sst}`;
+  const laranja = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.solicitar_lista_presenca}`;
+  const amarelo = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.lista_presenca_solicitada}`;
+  const azulClaro = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.lista_presenca}`;
+  const roxo = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.abrir_pesquisa}`;
+  const azul = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.aguardando_respostas}`;
+  const ambar = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.gerar_relatorio}`;
+  const verde = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.finalizado}`;
+  const vermelho = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.cancelado}`;
+
+  assert.equal(badge("laudos_sst", "em_andamento"), cinza);
+  assert.equal(badge("solicitar_lista_presenca", "em_andamento"), laranja);
+  assert.equal(badge("lista_presenca_solicitada", "em_andamento"), amarelo);
+  assert.equal(badge("lista_presenca", "em_andamento"), azulClaro);
+  assert.equal(badge("abrir_pesquisa", "em_andamento"), roxo);
+  assert.equal(badge("cadastro_colaboradores", "em_andamento"), roxo);
+  assert.equal(badge("link_enviado", "em_andamento"), roxo);
+  assert.equal(badge("aguardando_respostas", "em_andamento"), azul);
+  assert.equal(badge("gerar_relatorio", "em_andamento"), ambar);
+  assert.equal(badge("finalizado", "concluido"), verde);
+  assert.equal(badge("cancelado", "cancelado"), vermelho);
+
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass(
-      "solicitar_lista_presenca",
-      "em_andamento"
-    ),
-    azul
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.laudos_sst,
+    "bg-[#f1f5f9] text-[#475569]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass(
-      "lista_presenca_solicitada",
-      "em_andamento"
-    ),
-    lilas
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.solicitar_lista_presenca,
+    "bg-[#ffedd5] text-[#c2410c]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass("laudos_sst", "em_andamento"),
-    amarelo
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.lista_presenca_solicitada,
+    "bg-[#fef9c3] text-[#a16207]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass(
-      "abrir_pesquisa",
-      "em_andamento"
-    ),
-    indigo
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.lista_presenca,
+    "bg-[#E8EEFF] text-[#3F51D7]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass(
-      "cadastro_colaboradores",
-      "em_andamento"
-    ),
-    indigo
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.abrir_pesquisa,
+    "bg-[#f3e8ff] text-[#7e22ce]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass("gerar_relatorio", "em_andamento"),
-    indigo
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.aguardando_respostas,
+    "bg-[#eff6ff] text-[#1d4ed8]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass("finalizado", "concluido"),
-    verde
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.gerar_relatorio,
+    "bg-[#fef3c7] text-[#b45309]"
   );
   assert.equal(
-    riscosPsicossociaisEtapaAtualBadgeClass("cancelado", "cancelado"),
-    vermelho
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.finalizado,
+    "bg-brand-green-soft text-brand-green"
   );
+  assert.equal(
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.cancelado,
+    "bg-[#fef2f2] text-brand-red"
+  );
+  assert.match(ambar, /#fef3c7/);
+  assert.match(ambar, /#b45309/);
+  assert.match(azul, /#eff6ff/);
+  assert.match(azul, /#1d4ed8/);
+  assert.notEqual(laranja, ambar, "Solicitar lista e Gerar Relatório não compartilham o mesmo tom");
+
+  const etapas: Array<keyof typeof RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE> = [
+    "laudos_sst",
+    "solicitar_lista_presenca",
+    "lista_presenca_solicitada",
+    "lista_presenca",
+    "abrir_pesquisa",
+    "cadastro_colaboradores",
+    "link_enviado",
+    "aguardando_respostas",
+    "gerar_relatorio",
+    "finalizado",
+    "cancelado",
+  ];
+  for (const etapa of etapas) {
+    const cls = badge(etapa, etapa === "cancelado" ? "cancelado" : etapa === "finalizado" ? "concluido" : "em_andamento");
+    assert.ok(
+      cls.startsWith(RISCOS_ETAPA_BADGE_BASE),
+      `badge sem classe base em ${etapa}`
+    );
+    assert.ok(
+      RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE[etapa],
+      `tom ausente para ${etapa}`
+    );
+  }
+
+  const badgeComponent = readFileSync(
+    join(root, "components/riscos-psicossociais/RiscosEtapaAtualBadge.tsx"),
+    "utf8"
+  );
+  assert.match(badgeComponent, /riscosPsicossociaisEtapaAtualBadgeClass/);
 });
 
 run("Gerar Relatório (5/6) fica em Aberto e fora de Concluído", () => {

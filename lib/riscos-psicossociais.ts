@@ -142,32 +142,45 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   cancelado: "Cancelado",
 };
 
-const RISCOS_ETAPA_BADGE_BASE =
+/** Tamanho/forma do badge — só o tom muda por etapa. */
+export const RISCOS_ETAPA_BADGE_BASE =
   "inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold";
+
+/**
+ * Variante visual única da coluna ETAPA ATUAL (fundo claro + texto mais escuro).
+ * Não altera o cálculo da etapa — apenas a cor do badge.
+ */
+export const RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE: Record<
+  RiscosPsicossociaisEtapaAtualId,
+  string
+> = {
+  laudos_sst: "bg-[#f1f5f9] text-[#475569]",
+  solicitar_lista_presenca: "bg-[#ffedd5] text-[#c2410c]",
+  lista_presenca_solicitada: "bg-[#fef9c3] text-[#a16207]",
+  lista_presenca: "bg-[#E8EEFF] text-[#3F51D7]",
+  abrir_pesquisa: "bg-[#f3e8ff] text-[#7e22ce]",
+  cadastro_colaboradores: "bg-[#f3e8ff] text-[#7e22ce]",
+  link_enviado: "bg-[#f3e8ff] text-[#7e22ce]",
+  aguardando_respostas: "bg-[#eff6ff] text-[#1d4ed8]",
+  gerar_relatorio: "bg-[#fef3c7] text-[#b45309]",
+  finalizado: "bg-brand-green-soft text-brand-green",
+  cancelado: "bg-[#fef2f2] text-brand-red",
+};
 
 export function riscosPsicossociaisEtapaAtualBadgeClass(
   etapaAtual: RiscosPsicossociaisEtapaAtualId,
   status: RiscosPsicossociaisStatus
 ): string {
-  if (status === "cancelado" || etapaAtual === "cancelado") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#fef2f2] text-brand-red`;
-  }
-  if (status === "concluido" || etapaAtual === "finalizado") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-brand-green-soft text-brand-green`;
-  }
-  if (etapaAtual === "laudos_sst") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#fef3c7] text-[#b45309]`;
-  }
-  if (etapaAtual === "solicitar_lista_presenca") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#E8EEFF] text-[#3F51D7]`;
-  }
-  if (etapaAtual === "lista_presenca_solicitada") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#F1EDFF] text-[#6D4AFF]`;
-  }
-  if (etapaAtual === "gerar_relatorio") {
-    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
-  }
-  return `${RISCOS_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
+  const toneKey: RiscosPsicossociaisEtapaAtualId =
+    status === "cancelado" || etapaAtual === "cancelado"
+      ? "cancelado"
+      : status === "concluido" || etapaAtual === "finalizado"
+        ? "finalizado"
+        : etapaAtual;
+  const tone =
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE[toneKey] ??
+    RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.aguardando_respostas;
+  return `${RISCOS_ETAPA_BADGE_BASE} ${tone}`;
 }
 
 /** Tracking persistido: etapas manuais persistíveis (0–6 no banco atual). */

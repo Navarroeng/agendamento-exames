@@ -1,15 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import type { RiscosCampanhaParticipanteRecord } from "@/lib/riscos-campanha-participantes";
 import type { RiscosParticipanteInput } from "@/lib/riscos-campanha-participantes";
-import {
-  labelEtapaAtualProcessoRiscos,
-  type RiscosPsicossociaisProcesso,
-} from "@/lib/riscos-psicossociais";
+import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
+import { RiscosEtapaAtualBadge } from "@/components/riscos-psicossociais/RiscosEtapaAtualBadge";
 import { RiscosPainelCards } from "@/components/riscos-psicossociais/RiscosPainelCards";
 
 interface RiscosPsicossociaisPainelProps {
@@ -103,11 +100,6 @@ export function RiscosPsicossociaisPainel({
   const cnpjDisplay =
     cnpjDigits.length === 14 ? formatCNPJ(cnpjRaw) : cnpjRaw.trim() || "—";
 
-  const etapaAtualLabel = useMemo(
-    () => labelEtapaAtualProcessoRiscos(processo),
-    [processo]
-  );
-
   const progressoPct = Math.round(
     (processo.etapasConcluidas / Math.max(processo.totalEtapas, 1)) * 100
   );
@@ -193,9 +185,9 @@ export function RiscosPsicossociaisPainel({
               concluídas
             </p>
           </div>
-          <p className="text-xs font-semibold text-[#64748b]">
-            Etapa atual:{" "}
-            <span className="font-extrabold text-navy">{etapaAtualLabel}</span>
+          <p className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#64748b]">
+            Etapa atual:
+            <RiscosEtapaAtualBadge processo={processo} />
           </p>
         </div>
       </section>
