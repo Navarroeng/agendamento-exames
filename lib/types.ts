@@ -181,6 +181,10 @@ export interface PeriodicoFuturoRecord {
   colaborador_cpf?: string | null;
   tipo_aso?: string | null;
   consome_previsao_contrato?: boolean | null;
+  motivo_cancelamento?: string | null;
+  cancelado_em?: string | null;
+  cancelado_por?: string | null;
+  cancelado_por_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

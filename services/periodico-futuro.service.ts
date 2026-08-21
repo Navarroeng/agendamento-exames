@@ -16,6 +16,7 @@ import {
   parseValidadePeriodicoMeses,
 } from "@/lib/cargo-periodico";
 import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
+import { efeitoCancelamentoAsoSobrePeriodico } from "@/lib/periodico-cancelamento";
 import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
 import {
   nomesColaboradorEquivalentes,
@@ -192,23 +193,20 @@ export async function cancelarPeriodicosPorAgendamento(
 ): Promise<void> {
   const supabase = createClient();
 
-  // Origem ainda ativa (gerado a partir deste agendamento): cancela acompanhamento.
-  const { error: cancelOrigemErr } = await supabase
-    .from("periodicos_futuros")
-    .update({ status: "cancelado" })
-    .eq("agendamento_id", agendamentoId)
-    .eq("status", "ativo");
-  if (cancelOrigemErr) throw cancelOrigemErr;
-
-  // Vínculo de cumprimento (reagendado): volta a pendente (ativo) e libera o ID.
+  // ASO/agendamento cancelado não encerra a obrigação periódica.
+  // Periódicos gerados a partir deste agendamento permanecem ativos.
+  // Vínculo de cumprimento (reagendado): volta a pendente e libera o ID.
   const { data: vinculados, error: findVinculoErr } = await supabase
     .from("periodicos_futuros")
-    .select("id, data_prevista_original, proxima_data")
+    .select("id, status, data_prevista_original, proxima_data")
     .eq("agendamento_id", agendamentoId)
     .eq("status", "reagendado");
   if (findVinculoErr) throw findVinculoErr;
 
   for (const row of vinculados ?? []) {
+    if (efeitoCancelamentoAsoSobrePeriodico(String(row.status)) !== "reativar_cumprimento") {
+      continue;
+    }
     const dataOriginal =
       (row.data_prevista_original as string | null)?.slice(0, 10) ||
       String(row.proxima_data ?? "").slice(0, 10) ||
@@ -252,29 +250,48 @@ export async function marcarPeriodicoReagendado(
   }
 }
 
-export async function cancelarAcompanhamentoPeriodico(
-  id: string,
-  auditOptions?: PeriodicoAuditOptions
-): Promise<void> {
-  const record = await buscarPeriodicoPorId(id);
-
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("periodicos_futuros")
-    .update({ status: "cancelado" })
-    .eq("id", id)
-    .in("status", ["ativo", "reagendado"]);
-
-  if (error) throw error;
-
-  if (record) {
-    await auditarPeriodico(
-      auditOptions,
-      record,
-      AUDITORIA_ACOES.cancelamento,
-      "cancelou o acompanhamento de"
-    );
+export async function cancelarPeriodicoFuturoManual(params: {
+  ids: string[];
+  motivo: string;
+  usuarioNome?: string;
+  usuarioEmail?: string;
+}): Promise<{ atualizados: number; ids: string[] }> {
+  const res = await fetch("/api/periodicos-futuros/cancelar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ids: params.ids,
+      motivo: params.motivo,
+      usuarioNome: params.usuarioNome,
+      usuarioEmail: params.usuarioEmail,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    atualizados?: number;
+    ids?: string[];
+  };
+  if (!res.ok) {
+    throw new Error(data.error || "Não foi possível cancelar o periódico.");
   }
+  return {
+    atualizados: data.atualizados ?? 0,
+    ids: data.ids ?? params.ids,
+  };
+}
+
+export async function periodicoTemAgendamentoAtivoVinculado(
+  agendamentoIds: string[]
+): Promise<boolean> {
+  const ids = Array.from(new Set(agendamentoIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) return false;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select("id, status")
+    .in("id", ids);
+  if (error) throw error;
+  return (data ?? []).some((row) => String(row.status ?? "") !== "cancelado");
 }
 
 export async function atualizarProximaDataPeriodico(

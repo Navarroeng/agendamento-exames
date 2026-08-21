@@ -78,6 +78,7 @@ export const AUDITORIA_ACOES = {
   contrato_vaga_vinculada: "contrato_vaga_vinculada",
   contrato_vaga_funcionario_removido: "contrato_vaga_funcionario_removido",
   periodico_cpf_regularizado: "periodico_cpf_regularizado",
+  periodico_futuro_cancelado: "periodico_futuro_cancelado",
   riscos_lista_solicitada: "riscos_lista_solicitada",
   riscos_lista_recebida: "riscos_lista_recebida",
   riscos_lista_anexo_removido: "riscos_lista_anexo_removido",
@@ -180,6 +181,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   contrato_vaga_funcionario_removido:
     "Funcionário desvinculado da vaga contratual",
   periodico_cpf_regularizado: "CPF regularizado em periódicos futuros",
+  periodico_futuro_cancelado: "Periódico futuro cancelado",
   riscos_lista_solicitada: "Lista de presença solicitada",
   riscos_lista_recebida: "Lista de presença recebida",
   riscos_lista_anexo_removido: "Anexo da lista de presença removido",

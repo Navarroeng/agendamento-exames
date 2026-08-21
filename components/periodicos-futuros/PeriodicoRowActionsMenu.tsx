@@ -6,13 +6,14 @@ import type { PeriodicoFuturoGrupo } from "@/lib/periodico-agrupamento";
 interface PeriodicoRowActionsMenuProps {
   record: PeriodicoFuturoGrupo;
   canAct: boolean;
+  canCancelarPeriodico?: boolean;
   disabled?: boolean;
   onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
   onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
   onAdicionarCpf?: (record: PeriodicoFuturoGrupo) => void;
   onReagendar: (ids: string[]) => void;
-  onCancelar: (ids: string[]) => void;
+  onCancelarPeriodico?: (record: PeriodicoFuturoGrupo) => void;
 }
 
 type MenuItem = {
@@ -24,13 +25,14 @@ type MenuItem = {
 export function PeriodicoRowActionsMenu({
   record,
   canAct,
+  canCancelarPeriodico = false,
   disabled = false,
   onCriarAgendamento,
   onVisualizarAgendamento,
   onEditarProximaData,
   onAdicionarCpf,
   onReagendar,
-  onCancelar,
+  onCancelarPeriodico,
 }: PeriodicoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -54,14 +56,11 @@ export function PeriodicoRowActionsMenu({
     Boolean(onVisualizarAgendamento);
 
   const podeEditarProximaData = record.podeEditarProximaData;
+  const periodicoCancelado = record.displayStatus === "cancelado";
 
   const items: MenuItem[] = [];
 
-  // Criar / Ver: mantém a regra anterior (disponível fora de cancelado só quando há vínculo;
-  // cancelado não oferece ações de acompanhamento).
-  if (record.status === "cancelado") {
-    // sem ações válidas
-  } else {
+  if (!periodicoCancelado) {
     items.push(
       verAgendamento
         ? { key: "ver", label: "Ver agendamento" }
@@ -77,10 +76,11 @@ export function PeriodicoRowActionsMenu({
     if (podeEditarProximaData) {
       items.push({ key: "editar_data", label: "Editar próxima data" });
     }
-    items.push(
-      { key: "reagendar", label: "Reagendar" },
-      { key: "cancelar", label: "Cancelar", danger: true }
-    );
+    items.push({ key: "reagendar", label: "Reagendar" });
+  }
+
+  if (canCancelarPeriodico && onCancelarPeriodico) {
+    items.push({ key: "cancelar_periodico", label: "Cancelar periódico", danger: true });
   }
 
   if (items.length === 0) {
@@ -109,8 +109,8 @@ export function PeriodicoRowActionsMenu({
       case "reagendar":
         onReagendar(record.ids);
         break;
-      case "cancelar":
-        onCancelar(record.ids);
+      case "cancelar_periodico":
+        onCancelarPeriodico?.(record);
         break;
     }
   }

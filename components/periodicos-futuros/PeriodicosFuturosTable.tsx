@@ -28,7 +28,8 @@ interface PeriodicosFuturosTableProps {
   onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
   onAdicionarCpf: (record: PeriodicoFuturoGrupo) => void;
   onMarcarReagendado: (ids: string[]) => void;
-  onCancelarAcompanhamento: (ids: string[]) => void;
+  onCancelarPeriodico?: (record: PeriodicoFuturoGrupo) => void;
+  canCancelarPeriodico?: (record: PeriodicoFuturoGrupo) => boolean;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
 }
 
@@ -46,7 +47,8 @@ export function PeriodicosFuturosTable({
   onEditarProximaData,
   onAdicionarCpf,
   onMarcarReagendado,
-  onCancelarAcompanhamento,
+  onCancelarPeriodico,
+  canCancelarPeriodico,
   onVisualizarAgendamento,
 }: PeriodicosFuturosTableProps) {
   return (
@@ -143,18 +145,24 @@ export function PeriodicosFuturosTable({
                       {labelOrigemPeriodico(record.origem)}
                     </td>
                     <td className="max-w-[160px] px-3 py-2.5">
-                      <span
-                        className="line-clamp-2"
-                        title={labelMotivoExameFuturo(
-                          record.motivo,
-                          record.motivo_detalhe
-                        )}
-                      >
-                        {labelMotivoExameFuturo(
-                          record.motivo,
-                          record.motivo_detalhe
-                        )}
-                      </span>
+                      {(() => {
+                        const motivoCancelamento = (
+                          record.motivo_cancelamento ?? ""
+                        ).trim();
+                        const motivo =
+                          record.displayStatus === "cancelado" &&
+                          motivoCancelamento
+                            ? motivoCancelamento
+                            : labelMotivoExameFuturo(
+                                record.motivo,
+                                record.motivo_detalhe
+                              );
+                        return (
+                          <span className="line-clamp-2" title={motivo}>
+                            {motivo}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="max-w-[160px] px-3 py-2.5 text-[#64748b]">
                       <span
@@ -184,13 +192,16 @@ export function PeriodicosFuturosTable({
                       <PeriodicoRowActionsMenu
                         record={record}
                         canAct={actionable}
+                        canCancelarPeriodico={Boolean(
+                          canCancelarPeriodico?.(record)
+                        )}
                         disabled={saving}
                         onCriarAgendamento={onCriarAgendamento}
                         onVisualizarAgendamento={onVisualizarAgendamento}
                         onEditarProximaData={onEditarProximaData}
                         onAdicionarCpf={onAdicionarCpf}
                         onReagendar={onMarcarReagendado}
-                        onCancelar={onCancelarAcompanhamento}
+                        onCancelarPeriodico={onCancelarPeriodico}
                       />
                     </td>
                   </tr>

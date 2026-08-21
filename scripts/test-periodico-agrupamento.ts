@@ -48,6 +48,8 @@ const gruposIsabel = agruparPeriodicosPorColaboradorCiclo(isabelMesmoCiclo);
 assert.equal(gruposIsabel.length, 1);
 assert.equal(gruposIsabel[0].examesLabel, "Clínico + 3");
 assert.equal(gruposIsabel[0].ids.length, 4);
+assert.equal(gruposIsabel[0].agendamentoIds.length, 0);
+assert.equal(gruposIsabel[0].temPeriodicoCancelavel, true);
 assert.equal(gruposIsabel[0].temCpf, false);
 assert.equal(
   formatarExamesGrupo(["Clínico"]).label,

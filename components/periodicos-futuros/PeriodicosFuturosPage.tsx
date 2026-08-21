@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { IconClock } from "@/components/ui/icons/OutlineIcons";
 import { usePeriodicosFuturosPage } from "@/hooks/usePeriodicosFuturosPage";
 import { PeriodicoAdicionarCpfModal } from "./PeriodicoAdicionarCpfModal";
+import { PeriodicoCancelarModal } from "./PeriodicoCancelarModal";
 import { PeriodicoEditarProximaDataModal } from "./PeriodicoEditarProximaDataModal";
 import { PeriodicosFuturosCards } from "./PeriodicosFuturosCards";
 import { PeriodicosFuturosFilters } from "./PeriodicosFuturosFilters";
@@ -36,7 +37,7 @@ export function PeriodicosFuturosPage() {
     handleCriarAgendamento,
     handleVisualizarAgendamento,
     handleMarcarReagendado,
-    handleCancelarAcompanhamento,
+    handleAbrirCancelarPeriodico,
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
@@ -44,6 +45,12 @@ export function PeriodicosFuturosPage() {
     handleFecharAdicionarCpf,
     handleSalvarCpf,
     canActOnRecord,
+    canCancelarPeriodico,
+    cancelarGrupo,
+    cancelarError,
+    cancelarTemAgendamentoAtivo,
+    handleFecharCancelarPeriodico,
+    handleConfirmarCancelarPeriodico,
   } = usePeriodicosFuturosPage();
 
   return (
@@ -83,7 +90,8 @@ export function PeriodicosFuturosPage() {
           onCriarAgendamento={handleCriarAgendamento}
           onEditarProximaData={handleAbrirEditarProximaData}
           onMarcarReagendado={handleMarcarReagendado}
-          onCancelarAcompanhamento={handleCancelarAcompanhamento}
+          onCancelarPeriodico={handleAbrirCancelarPeriodico}
+          canCancelarPeriodico={canCancelarPeriodico}
           onVisualizarAgendamento={handleVisualizarAgendamento}
           onAdicionarCpf={handleAbrirAdicionarCpf}
         />
@@ -127,6 +135,15 @@ export function PeriodicosFuturosPage() {
         error={adicionarCpfError}
         onClose={handleFecharAdicionarCpf}
         onSave={handleSalvarCpf}
+      />
+      <PeriodicoCancelarModal
+        open={Boolean(cancelarGrupo)}
+        grupo={cancelarGrupo}
+        temAgendamentoAtivoVinculado={cancelarTemAgendamentoAtivo}
+        saving={saving}
+        error={cancelarError}
+        onClose={handleFecharCancelarPeriodico}
+        onConfirm={handleConfirmarCancelarPeriodico}
       />
     </AppShell>
   );

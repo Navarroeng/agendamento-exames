@@ -10,6 +10,7 @@ import {
   yearMonthFromIsoDate,
   type YearMonth,
 } from "@/lib/listagem-meses";
+import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import type {
   PeriodicoFuturoDisplayStatus,
   PeriodicoFuturoFilters,
@@ -52,11 +53,14 @@ export function computeProximaData6m(dataRealizadaIso: string): string {
 }
 
 export function computePeriodicoDisplayStatus(
-  record: Pick<PeriodicoFuturoRecord, "proxima_data" | "status">,
+  record: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "status" | "cancelado_em" | "motivo_cancelamento"
+  >,
   referenceDate = todayIso()
 ): PeriodicoFuturoDisplayStatus {
+  if (isPeriodicoCanceladoManualmente(record)) return "cancelado";
   if (record.status === "reagendado") return "reagendado";
-  if (record.status === "cancelado") return "cancelado";
 
   const proxima = record.proxima_data.split("T")[0];
   const limite30 = addDaysToIsoDate(referenceDate, 30);

@@ -10,6 +10,7 @@ import {
   isPeriodicoActionable,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
+import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { currentMonthReferenciaBR } from "@/lib/relatorios/filters";
 import type {
   AgendamentoWithExames,
@@ -65,7 +66,11 @@ function currentMonthRange() {
 
 function actionablePeriodicos(periodicos: PeriodicoFuturoRecord[]) {
   return periodicos
-    .filter((p) => isPeriodicoActionable(p.status))
+    .filter((p) => {
+      if (isPeriodicoCanceladoManualmente(p)) return false;
+      if (p.status === "reagendado") return false;
+      return isPeriodicoActionable(p.status) || p.status === "cancelado";
+    })
     .map(toPeriodicoFuturoRow);
 }
 

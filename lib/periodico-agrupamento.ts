@@ -1,5 +1,6 @@
 import { labelOrigemPeriodico } from "@/lib/contrato-programacao-futura";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import {
   canEditarProximaDataPeriodico,
   toPeriodicoFuturoRow,
@@ -14,11 +15,13 @@ import type {
 export type PeriodicoFuturoGrupo = PeriodicoFuturoRow & {
   grupoKey: string;
   ids: string[];
+  agendamentoIds: string[];
   examesNomes: string[];
   examesLabel: string;
   examesTitulo: string;
   temCpf: boolean;
   temAcaoAtiva: boolean;
+  temPeriodicoCancelavel: boolean;
   podeEditarProximaData: boolean;
 };
 
@@ -116,8 +119,9 @@ export function formatarExamesGrupo(nomes: string[]): {
 function escolherRepresentante(
   records: PeriodicoFuturoRow[]
 ): PeriodicoFuturoRow {
-  const ativos = records.filter((r) => r.status === "ativo");
-  const base = ativos.length > 0 ? ativos : records;
+  const abertos = records.filter((r) => !isPeriodicoCanceladoManualmente(r));
+  const ativos = abertos.filter((r) => r.status === "ativo");
+  const base = ativos.length > 0 ? ativos : abertos.length > 0 ? abertos : records;
   const comClinico = base.find((r) =>
     isExameClinico(r.exame_nome || r.tipo_exame || r.tipo_aso)
   );
@@ -165,17 +169,33 @@ export function agruparPeriodicosPorColaboradorCiclo(
     );
     const formatado = formatarExamesGrupo(examesNomes);
     const displayStatus = statusDoGrupo(ordenados);
+    const ids = ordenados.map((item) => item.id);
+    const agendamentoIds = Array.from(
+      new Set(
+        ordenados
+          .map((item) => (item.agendamento_id ?? "").trim())
+          .filter(Boolean)
+      )
+    );
     grupos.push({
       ...representante,
       origem: consolidarOrigem(ordenados),
       displayStatus,
       grupoKey,
-      ids: ordenados.map((item) => item.id),
+      ids,
+      agendamentoIds,
       examesNomes: formatado.nomes,
       examesLabel: formatado.label,
       examesTitulo: formatado.titulo,
       temCpf: periodicoTemCpf(representante) || ordenados.some(periodicoTemCpf),
-      temAcaoAtiva: ordenados.some((item) => item.status === "ativo"),
+      temAcaoAtiva: ordenados.some(
+        (item) =>
+          !isPeriodicoCanceladoManualmente(item) &&
+          (item.status === "ativo" || item.status === "cancelado")
+      ),
+      temPeriodicoCancelavel: ordenados.some(
+        (item) => !isPeriodicoCanceladoManualmente(item)
+      ),
       podeEditarProximaData: ordenados.every(canEditarProximaDataPeriodico),
     });
   });

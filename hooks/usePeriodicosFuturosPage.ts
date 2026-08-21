@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
 import {
   EMPTY_PERIODICO_FUTURO_FILTERS,
@@ -21,6 +21,11 @@ import {
   type PeriodicoFuturoGrupo,
 } from "@/lib/periodico-agrupamento";
 import {
+  podeExibirCancelarPeriodicoGrupo,
+  validarMotivoCancelamentoPeriodico,
+} from "@/lib/periodico-cancelamento";
+import { isPerfilAdmin } from "@/lib/permissions";
+import {
   resolveMesParaAno,
   type YearMonth,
 } from "@/lib/listagem-meses";
@@ -30,10 +35,11 @@ import type {
   PeriodicoFuturoRow,
 } from "@/lib/types";
 import {
-  cancelarAcompanhamentoPeriodico,
   atualizarProximaDataPeriodico,
+  cancelarPeriodicoFuturoManual,
   listarPeriodicosFuturos,
   marcarPeriodicoReagendado,
+  periodicoTemAgendamentoAtivoVinculado,
   regularizarCpfPeriodicosFuturos,
 } from "@/services/periodico-futuro.service";
 import { PeriodicoCpfConflitoError } from "@/lib/periodico-cpf-regularizacao";
@@ -42,6 +48,8 @@ const PAGE_SIZE = 20;
 
 export function usePeriodicosFuturosPage() {
   const router = useRouter();
+  const { profile } = useAuth();
+  const isAdmin = isPerfilAdmin(profile?.perfil);
   const auditContext = useAuditoriaUsuario();
   const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const [records, setRecords] = useState<PeriodicoFuturoRow[]>([]);
@@ -65,6 +73,11 @@ export function usePeriodicosFuturosPage() {
   const [adicionarCpfError, setAdicionarCpfError] = useState<string | null>(
     null
   );
+  const [cancelarGrupo, setCancelarGrupo] =
+    useState<PeriodicoFuturoGrupo | null>(null);
+  const [cancelarError, setCancelarError] = useState<string | null>(null);
+  const [cancelarTemAgendamentoAtivo, setCancelarTemAgendamentoAtivo] =
+    useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -226,27 +239,88 @@ export function usePeriodicosFuturosPage() {
     [refresh, auditOptions]
   );
 
-  const handleCancelarAcompanhamento = useCallback(
-    async (ids: string[]) => {
-      setSaving(true);
+  const handleAbrirCancelarPeriodico = useCallback(
+    async (grupo: PeriodicoFuturoGrupo) => {
+      if (
+        !podeExibirCancelarPeriodicoGrupo({
+          isAdmin,
+          temPeriodicoCancelavel: grupo.temPeriodicoCancelavel,
+          displayStatus: grupo.displayStatus,
+        })
+      ) {
+        toast.error("Somente administradores podem cancelar um periódico futuro.");
+        return;
+      }
+      setCancelarError(null);
+      setCancelarGrupo(grupo);
+      setCancelarTemAgendamentoAtivo(false);
       try {
-        for (const id of ids) {
-          await cancelarAcompanhamentoPeriodico(id, auditOptions);
-        }
-        toast.success(
-          ids.length > 1
-            ? "Acompanhamentos do ciclo cancelados."
-            : "Acompanhamento cancelado."
+        const temAtivo = await periodicoTemAgendamentoAtivoVinculado(
+          grupo.agendamentoIds ?? (grupo.agendamento_id ? [grupo.agendamento_id] : [])
         );
+        setCancelarTemAgendamentoAtivo(temAtivo);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [isAdmin]
+  );
+
+  const handleFecharCancelarPeriodico = useCallback(() => {
+    if (saving) return;
+    setCancelarGrupo(null);
+    setCancelarError(null);
+    setCancelarTemAgendamentoAtivo(false);
+  }, [saving]);
+
+  const handleConfirmarCancelarPeriodico = useCallback(
+    async (motivo: string) => {
+      const motivoErro = validarMotivoCancelamentoPeriodico(motivo);
+      if (motivoErro) {
+        setCancelarError(motivoErro);
+        return;
+      }
+      if (!cancelarGrupo) return;
+      setSaving(true);
+      setCancelarError(null);
+      try {
+        await cancelarPeriodicoFuturoManual({
+          ids: cancelarGrupo.ids,
+          motivo,
+          usuarioNome: auditContext.usuarioNome,
+          usuarioEmail: auditContext.usuarioEmail,
+        });
+        toast.success("Periódico futuro cancelado.");
+        setCancelarGrupo(null);
         await refresh();
       } catch (err) {
         console.error(err);
-        toast.error("Erro ao cancelar acompanhamento.");
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Erro ao cancelar o periódico.";
+        setCancelarError(message);
+        toast.error(message);
       } finally {
         setSaving(false);
       }
     },
-    [refresh, auditOptions]
+    [auditContext.usuarioEmail, auditContext.usuarioNome, cancelarGrupo, refresh]
+  );
+
+  const canActOnRecord = useCallback(
+    (record: PeriodicoFuturoGrupo) => record.temAcaoAtiva,
+    []
+  );
+
+  const canCancelarPeriodico = useCallback(
+    (record: PeriodicoFuturoGrupo) =>
+      podeExibirCancelarPeriodicoGrupo({
+        isAdmin,
+        temPeriodicoCancelavel: record.temPeriodicoCancelavel,
+        displayStatus: record.displayStatus,
+      }),
+    [isAdmin]
   );
 
   const handleAbrirEditarProximaData = useCallback(
@@ -345,11 +419,6 @@ export function usePeriodicosFuturosPage() {
     [auditOptions, refresh]
   );
 
-  const canActOnRecord = useCallback(
-    (record: PeriodicoFuturoGrupo) => record.temAcaoAtiva,
-    []
-  );
-
   return {
     records,
     loading,
@@ -368,6 +437,10 @@ export function usePeriodicosFuturosPage() {
     editProximaDataRecord,
     adicionarCpfGrupo,
     adicionarCpfError,
+    cancelarGrupo,
+    cancelarError,
+    cancelarTemAgendamentoAtivo,
+    isAdmin,
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
@@ -377,7 +450,9 @@ export function usePeriodicosFuturosPage() {
     handleCriarAgendamento,
     handleVisualizarAgendamento,
     handleMarcarReagendado,
-    handleCancelarAcompanhamento,
+    handleAbrirCancelarPeriodico,
+    handleFecharCancelarPeriodico,
+    handleConfirmarCancelarPeriodico,
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
@@ -385,6 +460,7 @@ export function usePeriodicosFuturosPage() {
     handleFecharAdicionarCpf,
     handleSalvarCpf,
     canActOnRecord,
+    canCancelarPeriodico,
     refresh,
   };
 }
