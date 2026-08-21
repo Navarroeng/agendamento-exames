@@ -94,6 +94,8 @@ export type RiscosPsicossociaisEtapaId =
  * na listagem ela se desdobra em solicitar vs. já solicitada.
  * `cadastro_colaboradores` e `link_enviado` continuam no progresso, mas a
  * listagem unifica os dois em `abrir_pesquisa` até a pesquisa ser aberta.
+ * Com 100% de respostas e sem relatório persistido, a etapa atual é
+ * `gerar_relatorio` — `finalizado` só após o snapshot em `riscos_relatorios`.
  */
 export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
   "laudos_sst",
@@ -101,6 +103,7 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_ATUAL_ORDEM = [
   "lista_presenca_solicitada",
   "abrir_pesquisa",
   "aguardando_respostas",
+  "gerar_relatorio",
   "finalizado",
 ] as const;
 
@@ -135,6 +138,7 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_LABELS: Record<
   abrir_pesquisa: "Abrir pesquisa",
   cadastro_colaboradores: "Abrir pesquisa",
   link_enviado: "Abrir pesquisa",
+  gerar_relatorio: "Gerar Relatório",
   cancelado: "Cancelado",
 };
 
@@ -159,6 +163,9 @@ export function riscosPsicossociaisEtapaAtualBadgeClass(
   }
   if (etapaAtual === "lista_presenca_solicitada") {
     return `${RISCOS_ETAPA_BADGE_BASE} bg-[#F1EDFF] text-[#6D4AFF]`;
+  }
+  if (etapaAtual === "gerar_relatorio") {
+    return `${RISCOS_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
   }
   return `${RISCOS_ETAPA_BADGE_BASE} bg-[#eef2ff] text-[#4338ca]`;
 }
@@ -221,7 +228,10 @@ export interface RiscosPsicossociaisProcesso {
   participantesCadastrados: number;
   /** Participantes com status operacional Concluído (`respondido`). */
   participantesRespondidos: number;
-  /** Relatório final efetivamente gerado (não confundir com campanha encerrada). */
+  /**
+   * Relatório final efetivamente gerado (não confundir com campanha encerrada
+   * nem com 100% de respostas). Fonte: registro em `riscos_relatorios`.
+   */
   relatorioGerado: boolean;
   /**
    * Data de entrada em Riscos (= entrada simultânea com Laudos, na conclusão
@@ -330,6 +340,9 @@ export function isEtapaBarraProgressoAtual(
       etapaIndex === etapasConcluidas
     );
   }
+  if (etapaAtual === "gerar_relatorio") {
+    return etapaId === "finalizado";
+  }
   return etapaId === etapaAtual;
 }
 
@@ -420,6 +433,23 @@ export function isQuestionarioFinalizadoConcluido(input: {
   return isAguardandoRespostasConcluido(input);
 }
 
+/**
+ * Fato persistido de relatório final (tabela `riscos_relatorios`).
+ * Não usa 100% de respostas, campanha encerrada nem clique no botão.
+ */
+export function isRelatorioFinalGerado(input: {
+  existeRegistro?: boolean | null;
+  relatorioId?: string | null;
+  geradoEm?: string | null;
+  status?: string | null;
+}): boolean {
+  if (input.existeRegistro === true) return true;
+  if ((input.relatorioId ?? "").trim()) return true;
+  if ((input.geradoEm ?? "").trim()) return true;
+  const status = (input.status ?? "").trim().toLowerCase();
+  return status === "gerado";
+}
+
 export function contarParticipantesParaProgresso(
   participantes: readonly RiscosProgressoParticipanteInput[] | null | undefined
 ): { cadastrados: number; respondidos: number } {
@@ -485,7 +515,9 @@ export function calcularProgressoEtapasRiscos(input: {
     participantesCadastrados: input.participantesCadastrados,
     participantesRespondidos: input.participantesRespondidos,
   });
-  const finalizadoOk = input.relatorioGerado === true;
+  const finalizadoOk = isRelatorioFinalGerado({
+    existeRegistro: input.relatorioGerado === true,
+  });
 
   const concluidaPorId: Record<RiscosPsicossociaisEtapaId, boolean> = {
     laudos_sst: !exigeLaudos || input.laudosSstConcluido,
@@ -512,6 +544,8 @@ export function calcularProgressoEtapasRiscos(input: {
   if (etapasConcluidas >= totalEtapas) {
     etapaAtual = "finalizado";
     etapasConcluidas = totalEtapas;
+  } else if (etapaAtual === "finalizado") {
+    etapaAtual = "gerar_relatorio";
   } else if (etapaAtual === "lista_presenca") {
     etapaAtual = resolverEtapaAtualListaPresenca(input.listaPresenca);
   } else if (
@@ -713,7 +747,7 @@ export function buildRiscosPsicossociaisProcesso(
     ? resolveContagemParticipantes(opts)
     : { cadastrados: 0, respondidos: 0 };
   const relatorioGerado = campanhaExibida
-    ? opts?.relatorioGerado === true
+    ? isRelatorioFinalGerado({ existeRegistro: opts?.relatorioGerado === true })
     : false;
 
   const progresso = calcularProgressoEtapasRiscos({
@@ -1026,6 +1060,7 @@ export function isRiscosProcessoListagemConcluido(
   >
 ): boolean {
   if (isRiscosProcessoListagemCancelado(processo)) return false;
+  if (processo.etapaAtual === "gerar_relatorio") return false;
   if (processo.status === "concluido") return true;
   if (processo.etapaAtual === "finalizado") return true;
   if (processo.totalEtapas > 0 && processo.etapasConcluidas >= processo.totalEtapas) {

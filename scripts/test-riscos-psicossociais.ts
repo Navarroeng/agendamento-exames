@@ -10,6 +10,8 @@ import {
   isProcessoElegivelRiscosPsicossociais,
   isRiscosEtapaLiberada,
   isRiscosEtapaLiberadaByFluxo,
+  isRelatorioFinalGerado,
+  withRiscosProgressoAtualizado,
   RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   RISCOS_PSICOSSOCIAIS_TOTAL_ETAPAS,
@@ -216,9 +218,15 @@ const riscosQuestionario = buildRiscosPsicossociaisProcesso(
     participantes: [{ status: "respondido" }, { status: "respondido" }],
   }
 );
-assert.equal(riscosQuestionario.etapaAtual, "finalizado");
+assert.equal(riscosQuestionario.etapaAtual, "gerar_relatorio");
+assert.equal(
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[riscosQuestionario.etapaAtual],
+  "Gerar Relatório"
+);
 assert.equal(riscosQuestionario.progressoLabel, "5 de 6");
+assert.equal(riscosQuestionario.progressoPercentual, 83);
 assert.equal(riscosQuestionario.status, "em_andamento");
+assert.notEqual(riscosQuestionario.etapaAtual, "finalizado");
 
 const riscosFinal = buildRiscosPsicossociaisProcesso(
   laudosConcluido,
@@ -245,8 +253,9 @@ const riscosEncerradaSemRelatorio = buildRiscosPsicossociaisProcesso(
   }
 );
 assert.equal(riscosEncerradaSemRelatorio.status, "em_andamento");
-assert.equal(riscosEncerradaSemRelatorio.etapaAtual, "finalizado");
+assert.equal(riscosEncerradaSemRelatorio.etapaAtual, "gerar_relatorio");
 assert.equal(riscosEncerradaSemRelatorio.progressoLabel, "5 de 6");
+assert.notEqual(riscosEncerradaSemRelatorio.etapaAtual, "finalizado");
 
 const riscosSemTracking = buildRiscosPsicossociaisProcesso(
   laudosEmAndamento,
@@ -290,5 +299,28 @@ assert.equal(
   "Aguardando respostas"
 );
 assert.equal(riscosRespostasParciais.progressoLabel, "4 de 6");
+
+assert.equal(isRelatorioFinalGerado({ existeRegistro: false }), false);
+assert.equal(isRelatorioFinalGerado({ existeRegistro: true }), true);
+assert.equal(isRelatorioFinalGerado({ geradoEm: "2026-08-21T12:00:00Z" }), true);
+assert.equal(isRelatorioFinalGerado({ relatorioId: "rel-1" }), true);
+assert.equal(isRelatorioFinalGerado({ status: "gerado" }), true);
+assert.equal(isRelatorioFinalGerado({ status: "rascunho" }), false);
+
+const riscosAposFalhaGeracao = withRiscosProgressoAtualizado(riscosQuestionario, {
+  relatorioGerado: false,
+});
+assert.equal(riscosAposFalhaGeracao.etapaAtual, "gerar_relatorio");
+assert.equal(riscosAposFalhaGeracao.progressoLabel, "5 de 6");
+assert.equal(riscosAposFalhaGeracao.status, "em_andamento");
+
+const riscosAposSucessoGeracao = withRiscosProgressoAtualizado(
+  riscosQuestionario,
+  { relatorioGerado: true }
+);
+assert.equal(riscosAposSucessoGeracao.etapaAtual, "finalizado");
+assert.equal(riscosAposSucessoGeracao.progressoLabel, "6 de 6");
+assert.equal(riscosAposSucessoGeracao.progressoPercentual, 100);
+assert.equal(riscosAposSucessoGeracao.status, "concluido");
 
 console.log("test-riscos-psicossociais: OK");

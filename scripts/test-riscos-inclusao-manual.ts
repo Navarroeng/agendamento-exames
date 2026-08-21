@@ -22,6 +22,7 @@ import {
   getEtapasRiscosPorOrigem,
   getTotalEtapasRiscosPorOrigem,
   isRiscosEtapaLiberadaByFluxo,
+  RISCOS_PSICOSSOCIAIS_ETAPA_LABELS,
   RISCOS_PSICOSSOCIAIS_ETAPAS,
   type OrcamentoRiscosPsicossociaisRecord,
 } from "../lib/riscos-psicossociais";
@@ -258,6 +259,56 @@ run("TESTE 11 contrato vigente é pré-requisito da inclusão manual", () => {
     false
   );
   assert.ok(CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE.includes("contrato vigente"));
+});
+
+run("manual 5 etapas: 100% respostas sem relatório = Gerar Relatório", () => {
+  const tracking: OrcamentoRiscosPsicossociaisRecord = {
+    orcamento_id: campanhaManual.id,
+    etapa_atual: "cadastro_empresa",
+    etapas_concluidas: 1,
+    status: "em_andamento",
+    lista_solicitada: true,
+    lista_solicitada_em: "2026-08-01",
+    lista_solicitada_email: "a@b.com",
+    lista_recebida: true,
+    lista_anexo_path: "x/y.pdf",
+    lista_anexo_nome: "y.pdf",
+    lista_anexo_tipo: "application/pdf",
+    lista_anexo_tamanho: 10,
+  };
+  const semRelatorio = buildRiscosProcessoManualCliente({
+    campanha: { ...campanhaManual, status: "aberta" },
+    tracking,
+    participantes: [
+      { status: "respondido" },
+      { status: "respondido" },
+      { status: "respondido" },
+    ],
+    relatorioGerado: false,
+  });
+  assert.equal(semRelatorio.totalEtapas, 5);
+  assert.equal(semRelatorio.etapaAtual, "gerar_relatorio");
+  assert.equal(
+    RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[semRelatorio.etapaAtual],
+    "Gerar Relatório"
+  );
+  assert.equal(semRelatorio.progressoLabel, "4 de 5");
+  assert.equal(semRelatorio.status, "em_andamento");
+
+  const comRelatorio = buildRiscosProcessoManualCliente({
+    campanha: { ...campanhaManual, status: "aberta" },
+    tracking,
+    participantes: [
+      { status: "respondido" },
+      { status: "respondido" },
+      { status: "respondido" },
+    ],
+    relatorioGerado: true,
+  });
+  assert.equal(comRelatorio.etapaAtual, "finalizado");
+  assert.equal(comRelatorio.progressoLabel, "5 de 5");
+  assert.equal(comRelatorio.progressoPercentual, 100);
+  assert.equal(comRelatorio.status, "concluido");
 });
 
 console.log("\nTodos os testes de inclusão manual passaram.");

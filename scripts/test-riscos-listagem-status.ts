@@ -133,6 +133,7 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
     "lista_presenca_solicitada",
     "abrir_pesquisa",
     "aguardando_respostas",
+    "gerar_relatorio",
     "finalizado",
   ]);
   assert.equal(indiceEtapaAtualRiscos("laudos_sst"), 0);
@@ -143,6 +144,8 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
   assert.equal(indiceEtapaAtualRiscos("cadastro_colaboradores"), 3);
   assert.equal(indiceEtapaAtualRiscos("link_enviado"), 3);
   assert.equal(indiceEtapaAtualRiscos("aguardando_respostas"), 4);
+  assert.equal(indiceEtapaAtualRiscos("gerar_relatorio"), 5);
+  assert.equal(indiceEtapaAtualRiscos("finalizado"), 6);
 });
 
 run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
@@ -489,6 +492,13 @@ run("labels da etapa atual: Abrir pesquisa e Aguardando Laudos SST", () => {
     }),
     "Aguardando Laudos SST"
   );
+  assert.equal(
+    labelEtapaAtualProcessoRiscos({
+      status: "em_andamento",
+      etapaAtual: "gerar_relatorio",
+    }),
+    "Gerar Relatório"
+  );
   const lib = readFileSync(join(root, "lib/riscos-psicossociais.ts"), "utf8");
   const painel = readFileSync(
     join(root, "components/riscos-psicossociais/RiscosPsicossociaisPainel.tsx"),
@@ -573,12 +583,52 @@ run("badges: solicitar azul claro, solicitada lilás, demais intactos", () => {
     indigo
   );
   assert.equal(
+    riscosPsicossociaisEtapaAtualBadgeClass("gerar_relatorio", "em_andamento"),
+    indigo
+  );
+  assert.equal(
     riscosPsicossociaisEtapaAtualBadgeClass("finalizado", "concluido"),
     verde
   );
   assert.equal(
     riscosPsicossociaisEtapaAtualBadgeClass("cancelado", "cancelado"),
     vermelho
+  );
+});
+
+run("Gerar Relatório (5/6) fica em Aberto e fora de Concluído", () => {
+  const gerar = processo({
+    cliente: "ACS",
+    status: "em_andamento",
+    etapaAtual: "gerar_relatorio",
+    etapasConcluidas: 5,
+    totalEtapas: 6,
+    progressoPercentual: 83,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  assert.equal(isRiscosProcessoListagemConcluido(gerar), false);
+  assert.equal(
+    filterRiscosPsicossociaisProcessosPorStatus([gerar], "aberto").length,
+    1
+  );
+  assert.equal(
+    filterRiscosPsicossociaisProcessosPorStatus([gerar], "concluido").length,
+    0
+  );
+  const finalizado = processo({
+    cliente: "ACS OK",
+    status: "concluido",
+    etapaAtual: "finalizado",
+    etapasConcluidas: 6,
+    totalEtapas: 6,
+    progressoPercentual: 100,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  });
+  assert.equal(isRiscosProcessoListagemConcluido(finalizado), true);
+  assert.equal(
+    filterRiscosPsicossociaisProcessosPorStatus([finalizado], "concluido")
+      .length,
+    1
   );
 });
 

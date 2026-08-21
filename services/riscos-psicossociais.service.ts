@@ -6,6 +6,7 @@ import {
   buildRiscosPsicossociaisProcesso,
   isProcessoElegivelRiscosPsicossociais,
   isProcessoVisivelRiscosAutomatico,
+  isRelatorioFinalGerado,
   sortRiscosPsicossociaisProcessos,
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
@@ -78,7 +79,9 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
           ? participantesPorCampanha.get(campanha.id) ?? []
           : [],
         relatorioGerado: campanha
-          ? relatoriosMap.get(campanha.id) === true
+          ? isRelatorioFinalGerado({
+              existeRegistro: relatoriosMap.get(campanha.id) === true,
+            })
           : false,
       }
     );
@@ -93,7 +96,9 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
         campanha,
         tracking: fluxo,
         participantes: participantesPorCampanha.get(campanha.id) ?? [],
-        relatorioGerado: relatoriosMap.get(campanha.id) === true,
+        relatorioGerado: isRelatorioFinalGerado({
+          existeRegistro: relatoriosMap.get(campanha.id) === true,
+        }),
       })
     );
   }
