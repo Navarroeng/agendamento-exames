@@ -137,7 +137,7 @@ export function PeriodicosFuturosTable({
                     <td
                       className={`px-3 py-2.5 tabular-nums ${
                         record.agendadoParaBR !== "—"
-                          ? periodicoDisplayStatusClass("em_dia")
+                          ? `font-semibold ${periodicoDisplayStatusClass("em_dia")}`
                           : ""
                       }`}
                     >
