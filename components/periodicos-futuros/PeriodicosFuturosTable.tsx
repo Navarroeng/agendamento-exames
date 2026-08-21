@@ -8,7 +8,6 @@ import {
   labelOrigemPeriodico,
 } from "@/lib/contrato-programacao-futura";
 import { formatCPF } from "@/lib/cpf";
-import { formatDateBR } from "@/lib/format";
 import type { PeriodicoFuturoGrupo } from "@/lib/periodico-agrupamento";
 import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
 import type { ListagemPeriodoSelecionado, YearMonth } from "@/lib/listagem-meses";
@@ -80,7 +79,7 @@ export function PeriodicosFuturosTable({
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-[#e8edf5] bg-white">
-          <table className="w-full min-w-[1180px] text-left text-xs">
+          <table className="w-full min-w-[1280px] text-left text-xs">
             <thead>
               <tr className="border-b border-[#eef2f7] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
                 <th className="px-3 py-2.5">Empresa</th>
@@ -90,6 +89,7 @@ export function PeriodicosFuturosTable({
                 <th className="px-3 py-2.5">Exame / ASO</th>
                 <th className="px-3 py-2.5">Realizado em</th>
                 <th className="px-3 py-2.5">Próxima data</th>
+                <th className="px-3 py-2.5">Agendado para</th>
                 <th className="px-3 py-2.5">Origem</th>
                 <th className="px-3 py-2.5">Motivo</th>
                 <th className="px-3 py-2.5">Observações</th>
@@ -100,13 +100,6 @@ export function PeriodicosFuturosTable({
             <tbody>
               {records.map((record) => {
                 const actionable = canActOnRecord(record);
-                const dataOriginal =
-                  record.data_prevista_original?.slice(0, 10) || null;
-                const dataAtual = record.proxima_data?.slice(0, 10) || null;
-                const mostrouOriginal =
-                  Boolean(dataOriginal) &&
-                  dataOriginal !== dataAtual &&
-                  (record.status === "reagendado" || Boolean(record.antecipado));
                 return (
                   <tr
                     key={record.grupoKey}
@@ -139,12 +132,10 @@ export function PeriodicosFuturosTable({
                       {record.dataRealizadaBR}
                     </td>
                     <td className="px-3 py-2.5 tabular-nums font-bold">
-                      <div>{record.proximaDataBR}</div>
-                      {mostrouOriginal && dataOriginal ? (
-                        <div className="mt-0.5 text-[10px] font-medium text-[#64748b]">
-                          Previsto: {formatDateBR(dataOriginal)}
-                        </div>
-                      ) : null}
+                      {record.proximaDataBR}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums">
+                      {record.agendadoParaBR}
                     </td>
                     <td className="px-3 py-2.5">
                       {labelOrigemPeriodico(record.origem)}
@@ -182,9 +173,7 @@ export function PeriodicosFuturosTable({
                         <span
                           className={`font-bold ${periodicoDisplayStatusClass(record.displayStatus)}`}
                         >
-                          {record.status === "reagendado"
-                            ? "Agendamento criado"
-                            : periodicoDisplayStatusLabel(record.displayStatus)}
+                          {periodicoDisplayStatusLabel(record.displayStatus)}
                         </span>
                         {record.antecipado ? (
                           <span className="w-fit rounded bg-[#fef3c7] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#92400e]">

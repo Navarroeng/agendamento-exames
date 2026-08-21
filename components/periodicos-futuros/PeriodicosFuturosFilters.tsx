@@ -23,7 +23,7 @@ const STATUS_OPTIONS: { value: PeriodicoFuturoFilters["status"]; label: string }
     { value: "vencido", label: "Vencido" },
     { value: "vence_30_dias", label: "Vence em 30 dias" },
     { value: "em_dia", label: "Em dia" },
-    { value: "reagendado", label: "Reagendado" },
+    { value: "reagendado", label: "Agendamento criado" },
     { value: "cancelado", label: "Cancelado" },
   ];
 

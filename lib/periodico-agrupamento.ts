@@ -1,8 +1,11 @@
 import { labelOrigemPeriodico } from "@/lib/contrato-programacao-futura";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { formatDateBR } from "@/lib/format";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import {
   canEditarProximaDataPeriodico,
+  dataAgendadaPeriodico,
+  dataCicloPeriodico,
   periodicoAtendeFiltroStatus,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
@@ -17,6 +20,7 @@ export type PeriodicoFuturoGrupo = PeriodicoFuturoRow & {
   grupoKey: string;
   ids: string[];
   agendamentoIds: string[];
+  agendamentoVinculadoIds: string[];
   examesNomes: string[];
   examesLabel: string;
   examesTitulo: string;
@@ -77,9 +81,11 @@ export function chaveCicloPeriodico(
     | "cargo_id"
     | "cargo_nome"
     | "proxima_data"
+    | "data_prevista_original"
+    | "status"
   >
 ): string {
-  const data = String(record.proxima_data ?? "").split("T")[0];
+  const data = dataCicloPeriodico(record);
   return `${chaveColaboradorPeriodico(record)}|${data}`;
 }
 
@@ -121,8 +127,16 @@ function escolherRepresentante(
   records: PeriodicoFuturoRow[]
 ): PeriodicoFuturoRow {
   const abertos = records.filter((r) => !isPeriodicoCanceladoManualmente(r));
+  const vinculados = abertos.filter((r) => r.status === "reagendado");
   const ativos = abertos.filter((r) => r.status === "ativo");
-  const base = ativos.length > 0 ? ativos : abertos.length > 0 ? abertos : records;
+  const base =
+    vinculados.length > 0
+      ? vinculados
+      : ativos.length > 0
+        ? ativos
+        : abertos.length > 0
+          ? abertos
+          : records;
   const comClinico = base.find((r) =>
     isExameClinico(r.exame_nome || r.tipo_exame || r.tipo_aso)
   );
@@ -178,6 +192,17 @@ export function agruparPeriodicosPorColaboradorCiclo(
           .filter(Boolean)
       )
     );
+    const agendamentoVinculadoIds = Array.from(
+      new Set(
+        ordenados
+          .map((item) => (item.agendamento_vinculado_id ?? "").trim())
+          .filter(Boolean)
+      )
+    );
+    const agendadoPara =
+      dataAgendadaPeriodico(representante) ||
+      ordenados.map(dataAgendadaPeriodico).find(Boolean) ||
+      null;
     grupos.push({
       ...representante,
       origem: consolidarOrigem(ordenados),
@@ -185,6 +210,9 @@ export function agruparPeriodicosPorColaboradorCiclo(
       grupoKey,
       ids,
       agendamentoIds,
+      agendamentoVinculadoIds,
+      data_agendada: agendadoPara,
+      agendadoParaBR: agendadoPara ? formatDateBR(agendadoPara) : "—",
       examesNomes: formatado.nomes,
       examesLabel: formatado.label,
       examesTitulo: formatado.titulo,
@@ -202,7 +230,7 @@ export function agruparPeriodicosPorColaboradorCiclo(
   });
 
   return grupos.sort((a, b) => {
-    const data = a.proxima_data.localeCompare(b.proxima_data);
+    const data = dataCicloPeriodico(a).localeCompare(dataCicloPeriodico(b));
     if (data !== 0) return data;
     return a.colaborador.localeCompare(b.colaborador, "pt-BR");
   });

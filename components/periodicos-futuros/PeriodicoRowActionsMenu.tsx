@@ -50,9 +50,13 @@ export function PeriodicoRowActionsMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const agendamentoParaVer =
+    record.agendamentoVinculadoIds?.[0] ||
+    record.agendamento_vinculado_id ||
+    (record.displayStatus === "reagendado" ? record.agendamento_id : null);
   const verAgendamento =
-    record.status === "reagendado" &&
-    Boolean(record.agendamento_id) &&
+    record.displayStatus === "reagendado" &&
+    Boolean(agendamentoParaVer) &&
     Boolean(onVisualizarAgendamento);
 
   const podeEditarProximaData = record.podeEditarProximaData;
@@ -95,8 +99,8 @@ export function PeriodicoRowActionsMenu({
         onCriarAgendamento(record);
         break;
       case "ver":
-        if (record.agendamento_id) {
-          onVisualizarAgendamento?.(record.agendamento_id);
+        if (agendamentoParaVer) {
+          onVisualizarAgendamento?.(agendamentoParaVer);
         }
         break;
       case "editar_data":

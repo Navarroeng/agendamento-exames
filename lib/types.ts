@@ -171,6 +171,10 @@ export interface PeriodicoFuturoRecord {
   proxima_data: string;
   /** Data prevista original (preservada na antecipação). */
   data_prevista_original?: string | null;
+  /** Agendamento que cumpre/antecipa este periódico. */
+  agendamento_vinculado_id?: string | null;
+  /** Data do agendamento vinculado (enriquecida na leitura). */
+  data_agendada?: string | null;
   antecipado?: boolean | null;
   status: PeriodicoFuturoStoredStatus;
   origem?: string | null;
@@ -193,6 +197,7 @@ export interface PeriodicoFuturoRow extends PeriodicoFuturoRecord {
   displayStatus: PeriodicoFuturoDisplayStatus;
   dataRealizadaBR: string;
   proximaDataBR: string;
+  agendadoParaBR: string;
 }
 
 export interface PeriodicoFuturoFilters {

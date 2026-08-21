@@ -75,9 +75,56 @@ export async function listarPeriodicosFuturos(
 
   if (error) throw error;
 
-  return ((data ?? []) as PeriodicoFuturoWithCargo[])
-    .filter(deveListarPeriodico)
-    .map(stripCargoJoin);
+  return anexarDatasAgendamentoVinculado(
+    ((data ?? []) as PeriodicoFuturoWithCargo[])
+      .filter(deveListarPeriodico)
+      .map(stripCargoJoin)
+  );
+}
+
+async function anexarDatasAgendamentoVinculado(
+  rows: PeriodicoFuturoRecord[]
+): Promise<PeriodicoFuturoRecord[]> {
+  const ids = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [
+          row.agendamento_vinculado_id,
+          row.status === "reagendado" ? row.agendamento_id : null,
+        ])
+        .map((id) => (id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+  if (ids.length === 0) return rows;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select("id, data_agendamento, status")
+    .in("id", ids);
+  if (error) throw error;
+
+  const porId = new Map(
+    (data ?? []).map((row) => [
+      String(row.id),
+      {
+        data: String(row.data_agendamento ?? "").slice(0, 10),
+        status: String(row.status ?? ""),
+      },
+    ])
+  );
+
+  return rows.map((row) => {
+    const vinculoId =
+      (row.agendamento_vinculado_id ?? "").trim() ||
+      (row.status === "reagendado" ? (row.agendamento_id ?? "").trim() : "");
+    const ag = vinculoId ? porId.get(vinculoId) : undefined;
+    if (!ag || ag.status === "cancelado" || !/^\d{4}-\d{2}-\d{2}$/.test(ag.data)) {
+      return row;
+    }
+    return { ...row, data_agendada: ag.data };
+  });
 }
 
 export async function criarPeriodicosDeAgendamento(
@@ -198,9 +245,11 @@ export async function cancelarPeriodicosPorAgendamento(
   // Vínculo de cumprimento (reagendado): volta a pendente e libera o ID.
   const { data: vinculados, error: findVinculoErr } = await supabase
     .from("periodicos_futuros")
-    .select("id, status, data_prevista_original, proxima_data")
-    .eq("agendamento_id", agendamentoId)
-    .eq("status", "reagendado");
+    .select("id, status, data_prevista_original, proxima_data, agendamento_id, agendamento_vinculado_id")
+    .eq("status", "reagendado")
+    .or(
+      `agendamento_vinculado_id.eq.${agendamentoId},agendamento_id.eq.${agendamentoId}`
+    );
   if (findVinculoErr) throw findVinculoErr;
 
   for (const row of vinculados ?? []) {
@@ -211,12 +260,15 @@ export async function cancelarPeriodicosPorAgendamento(
       (row.data_prevista_original as string | null)?.slice(0, 10) ||
       String(row.proxima_data ?? "").slice(0, 10) ||
       null;
+    const origemSobrescrita =
+      String(row.agendamento_id ?? "") === agendamentoId;
     const { error: restoreErr } = await supabase
       .from("periodicos_futuros")
       .update({
         status: "ativo",
-        agendamento_id: null,
         antecipado: false,
+        agendamento_vinculado_id: null,
+        ...(origemSobrescrita ? { agendamento_id: null } : {}),
         ...(dataOriginal ? { proxima_data: dataOriginal } : {}),
       })
       .eq("id", row.id)

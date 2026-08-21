@@ -2788,7 +2788,7 @@ export function useAgendamentosPage() {
             }
           }
 
-          if (cargoFields.cargo_id && dataIso) {
+          if (cargoFields.cargo_id && dataIso && periodicoIdsParaVincular.length === 0) {
             try {
               const criados = await criarPeriodicosDeAgendamento(novoId, {
                 cliente_nome: payload.cliente_nome,

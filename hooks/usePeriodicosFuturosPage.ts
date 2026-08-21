@@ -260,7 +260,12 @@ export function usePeriodicosFuturosPage() {
       setCancelarTemAgendamentoAtivo(false);
       try {
         const temAtivo = await periodicoTemAgendamentoAtivoVinculado(
-          grupo.agendamentoIds ?? (grupo.agendamento_id ? [grupo.agendamento_id] : [])
+          [
+            ...(grupo.agendamentoVinculadoIds ?? []),
+            ...(grupo.agendamentoIds ?? []),
+            grupo.agendamento_vinculado_id ?? "",
+            grupo.agendamento_id ?? "",
+          ]
         );
         setCancelarTemAgendamentoAtivo(temAtivo);
       } catch (err) {

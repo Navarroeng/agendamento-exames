@@ -10,10 +10,12 @@ import {
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
   agruparPeriodicosPendentesParaVinculo,
+  chaveCicloPeriodico,
   labelExamesCicloVinculo,
   type PeriodicoFuturoGrupo,
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
+import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -431,30 +433,49 @@ export async function vincularPeriodicoAoAgendamento(params: {
 
   const grupos = agruparPeriodicosPendentesParaVinculo(records);
   const grupo = grupos[0];
-  const idsDoCiclo = grupo?.ids?.length ? grupo.ids : records.map((r) => r.id);
   const representante =
-    records.find((r) => r.id === idsDoCiclo[0]) ?? records[0];
+    records.find((r) => r.id === (grupo?.ids[0] ?? "")) ?? records[0];
+  const chaveCiclo = chaveCicloPeriodico(representante);
+
+  const cpf = normalizeCpfDigits(representante.colaborador_cpf);
+  let doCiclo = [...records];
+  if (isValidCPF(cpf)) {
+    const masked = maskCPFInput(cpf);
+    const { data: irmaos, error: irmaosErr } = await supabase
+      .from("periodicos_futuros")
+      .select("*")
+      .eq("status", "ativo")
+      .or(`colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`);
+    if (irmaosErr) throw irmaosErr;
+    doCiclo = [
+      ...doCiclo,
+      ...((irmaos ?? []) as PeriodicoFuturoRecord[]).filter(
+        (row) =>
+          !isPeriodicoCanceladoManualmente(row) &&
+          chaveCicloPeriodico(row) === chaveCiclo
+      ),
+    ];
+  }
+
+  const idsDoCiclo = Array.from(
+    new Set(
+      [...(grupo?.ids ?? []), ...doCiclo.map((row) => row.id)].filter(Boolean)
+    )
+  );
 
   const dataPrevistaOriginal =
     (representante.data_prevista_original as string | null)?.slice(0, 10) ||
     String(representante.proxima_data).slice(0, 10);
   const dataAgLabel = (params.dataAgendamentoIso ?? "").slice(0, 10);
-  const antecipado = isAntecipacaoPeriodico(
-    params.dataAgendamentoIso,
-    dataPrevistaOriginal
-  );
+  const { antecipado, patch } = buildPatchVinculoPeriodico({
+    agendamentoId: params.agendamentoId,
+    dataAgendamentoIso: params.dataAgendamentoIso,
+    dataPrevistaOriginal,
+  });
 
   const { error } = await supabase
     .from("periodicos_futuros")
-    .update({
-      agendamento_id: params.agendamentoId,
-      status: "reagendado",
-      data_prevista_original: dataPrevistaOriginal,
-      antecipado,
-      ...(dataAgLabel && /^\d{4}-\d{2}-\d{2}$/.test(dataAgLabel)
-        ? { proxima_data: dataAgLabel }
-        : {}),
-    })
+    .update(patch)
     .in("id", idsDoCiclo)
     .eq("status", "ativo");
   if (error) throw error;
@@ -482,11 +503,12 @@ export async function vincularPeriodicoAoAgendamento(params: {
     },
     dadosDepois: {
       status: "reagendado",
-      agendamento_id: params.agendamentoId,
+      agendamento_vinculado_id: params.agendamentoId,
       antecipado,
       data_prevista_original: dataPrevistaOriginal,
       data_agendamento: dataAgLabel || null,
       periodico_futuro_ids: idsDoCiclo,
+      proxima_data: representante.proxima_data,
     },
   });
 

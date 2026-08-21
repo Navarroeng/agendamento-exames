@@ -71,6 +71,85 @@ export function computePeriodicoDisplayStatus(
   return "em_dia";
 }
 
+/** Data da obrigação periódica (não a data do agendamento de cumprimento). */
+export function dataCicloPeriodico(
+  record: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "data_prevista_original" | "status"
+  >
+): string {
+  const original = String(record.data_prevista_original ?? "").slice(0, 10);
+  const proxima = String(record.proxima_data ?? "").slice(0, 10);
+  if (
+    record.status === "reagendado" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(original)
+  ) {
+    return original;
+  }
+  return proxima;
+}
+
+/** Data do agendamento que antecipa/cumpre o periódico, se houver. */
+export function dataAgendadaPeriodico(
+  record: Pick<
+    PeriodicoFuturoRecord,
+    | "status"
+    | "proxima_data"
+    | "data_prevista_original"
+    | "data_agendada"
+    | "agendamento_vinculado_id"
+  >
+): string | null {
+  const direta = String(record.data_agendada ?? "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(direta)) return direta;
+  if (record.status !== "reagendado") return null;
+  const original = String(record.data_prevista_original ?? "").slice(0, 10);
+  const proxima = String(record.proxima_data ?? "").slice(0, 10);
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(proxima) &&
+    original &&
+    proxima !== original
+  ) {
+    return proxima;
+  }
+  return null;
+}
+
+export function buildPatchVinculoPeriodico(params: {
+  agendamentoId: string;
+  dataAgendamentoIso?: string | null;
+  dataPrevistaOriginal: string;
+}): {
+  antecipado: boolean;
+  patch: {
+    agendamento_vinculado_id: string;
+    status: "reagendado";
+    data_prevista_original: string;
+    antecipado: boolean;
+  };
+} {
+  const dataPrevista = params.dataPrevistaOriginal.slice(0, 10);
+  const antecipado = (() => {
+    const ag = (params.dataAgendamentoIso ?? "").slice(0, 10);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(ag) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(dataPrevista)
+    ) {
+      return false;
+    }
+    return ag < dataPrevista;
+  })();
+  return {
+    antecipado,
+    patch: {
+      agendamento_vinculado_id: params.agendamentoId,
+      status: "reagendado",
+      data_prevista_original: dataPrevista,
+      antecipado,
+    },
+  };
+}
+
 export function periodicoDisplayStatusLabel(
   status: PeriodicoFuturoDisplayStatus
 ): string {
@@ -82,7 +161,7 @@ export function periodicoDisplayStatusLabel(
     case "em_dia":
       return "Em dia";
     case "reagendado":
-      return "Reagendado";
+      return "Agendamento criado";
     case "cancelado":
       return "Cancelado";
   }
@@ -109,13 +188,16 @@ export function toPeriodicoFuturoRow(
   record: PeriodicoFuturoRecord
 ): PeriodicoFuturoRow {
   const displayStatus = computePeriodicoDisplayStatus(record);
+  const ciclo = dataCicloPeriodico(record);
+  const agendado = dataAgendadaPeriodico(record);
   return {
     ...record,
     displayStatus,
     dataRealizadaBR: record.data_realizada
       ? formatDateBR(record.data_realizada)
       : "—",
-    proximaDataBR: formatDateBR(record.proxima_data),
+    proximaDataBR: ciclo ? formatDateBR(ciclo) : "—",
+    agendadoParaBR: agendado ? formatDateBR(agendado) : "—",
   };
 }
 
@@ -182,7 +264,7 @@ export function filterPeriodicosFuturos(
     if (filters.mesReferencia.trim()) {
       const mesIso = mesReferenciaIsoFromBR(filters.mesReferencia);
       if (mesIso) {
-        const proxima = record.proxima_data.split("T")[0];
+        const proxima = dataCicloPeriodico(record);
         if (proxima.slice(0, 7) !== mesIso) return false;
       }
     }
@@ -199,16 +281,20 @@ export function filterPeriodicosFuturosPorMes(
   records: PeriodicoFuturoRow[],
   mes: ListagemPeriodoSelecionado
 ): PeriodicoFuturoRow[] {
-  return filterByEtapaEntradaMes(records, (r) => r.proxima_data, mes);
+  return filterByEtapaEntradaMes(records, (r) => dataCicloPeriodico(r), mes);
 }
 
 /** Anos presentes em `proxima_data` (sem limitar ao ano civil atual). */
+/** Anos presentes na data da obrigação periódica. */
 export function extractPeriodicoAnos(
-  records: Pick<PeriodicoFuturoRecord, "proxima_data">[]
+  records: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "data_prevista_original" | "status"
+  >[]
 ): number[] {
   const years = new Set<number>();
   for (const record of records) {
-    const ym = yearMonthFromIsoDate(record.proxima_data);
+    const ym = yearMonthFromIsoDate(dataCicloPeriodico(record));
     if (ym) years.add(ym.year);
   }
   return Array.from(years).sort((a, b) => a - b);
@@ -216,19 +302,25 @@ export function extractPeriodicoAnos(
 
 /** Anos do seletor: existentes nos registros + ano atual (fallback de UI). */
 export function listPeriodicoAnosDisponiveis(
-  records: Pick<PeriodicoFuturoRecord, "proxima_data">[],
+  records: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "data_prevista_original" | "status"
+  >[],
   now: Date = new Date()
 ): number[] {
   return mergeAnosComAtual(extractPeriodicoAnos(records), now);
 }
 
-/** Contagem por ano civil da próxima data. */
+/** Contagem por ano civil da obrigação periódica. */
 export function countPeriodicosPorAno(
-  records: Pick<PeriodicoFuturoRecord, "proxima_data">[]
+  records: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "data_prevista_original" | "status"
+  >[]
 ): Record<number, number> {
   const counts: Record<number, number> = {};
   for (const record of records) {
-    const ym = yearMonthFromIsoDate(record.proxima_data);
+    const ym = yearMonthFromIsoDate(dataCicloPeriodico(record));
     if (!ym) continue;
     counts[ym.year] = (counts[ym.year] || 0) + 1;
   }
@@ -241,7 +333,10 @@ export function countPeriodicosPorAno(
  * Meses futuros NÃO são bloqueados neste módulo.
  */
 export function resolveInitialMesPeriodicos(
-  records: Pick<PeriodicoFuturoRecord, "proxima_data">[],
+  records: Pick<
+    PeriodicoFuturoRecord,
+    "proxima_data" | "data_prevista_original" | "status"
+  >[],
   now: Date = new Date()
 ): YearMonth {
   const current = getNowYearMonth(now);
