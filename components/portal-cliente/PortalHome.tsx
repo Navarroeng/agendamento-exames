@@ -136,7 +136,7 @@ export function PortalHome() {
     Boolean(resumo.empresaNome || mostrarPainel);
 
   return (
-    <div className="flex flex-col gap-6 text-[#0b1f4d]">
+    <div className="mx-auto flex w-full max-w-[72rem] flex-col gap-5 text-[#0b1f4d]">
       <PreviewBar
         empresas={empresas}
         clienteId={clienteId}
@@ -145,7 +145,7 @@ export function PortalHome() {
       />
 
       {carregandoHome ? (
-        <p className="py-16 text-center text-sm text-[#64748b]">
+        <p className="py-12 text-center text-sm text-[#64748b]">
           Carregando painel...
         </p>
       ) : null}
@@ -166,7 +166,7 @@ export function PortalHome() {
       ) : null}
 
       {mostrarHomeSst && !viewRiscos ? (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           <PortalEmpresaIdentidade
             nome={resumo.empresaNome || "Empresa"}
             logoUrl={resumo.logoUrl}
@@ -198,7 +198,7 @@ function PreviewBar({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+    <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-[#e8edf5] bg-white px-5 py-3.5">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
           Modo de visualização
@@ -229,7 +229,7 @@ function PreviewBar({
 
 function EmptyState({ mensagem }: { mensagem: string }) {
   return (
-    <div className="rounded-2xl border border-[#e8edf5] bg-white px-8 py-20 text-center">
+    <div className="rounded-2xl border border-[#e8edf5] bg-white px-8 py-14 text-center">
       <p className="text-sm text-[#64748b]">{mensagem}</p>
     </div>
   );

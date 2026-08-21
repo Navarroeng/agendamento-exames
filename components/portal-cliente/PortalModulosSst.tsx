@@ -29,16 +29,17 @@ export function PortalModulosSst({
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-[#0b1f4d]">
+      <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
         Serviços da sua empresa
       </h2>
       <p className="mt-1 text-sm text-[#64748b]">
         Acompanhe o andamento de cada módulo de SST.
       </p>
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <ModuloCard
           id="riscos"
           titulo="Riscos Psicossociais"
+          destaque
           disponivel={temAvaliacao}
           linhas={
             temAvaliacao
@@ -86,31 +87,56 @@ function ModuloCard({
   disponivel,
   linhas,
   acao,
+  destaque,
 }: {
   id: ModuloSstId;
   titulo: string;
   disponivel: boolean;
   linhas: string[];
   acao?: { label: string; onClick: () => void } | null;
+  destaque?: boolean;
 }) {
   return (
-    <article className="flex flex-col rounded-2xl border border-[#e8edf5] bg-white px-5 py-5">
+    <article
+      className={`flex flex-col rounded-2xl border px-4 py-3.5 ${
+        destaque && disponivel
+          ? "border-[#d7e0ee] bg-white"
+          : disponivel
+            ? "border-[#e8edf5] bg-white"
+            : "border-[#eef2f7] bg-[#f8fafc]"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f1f5f9] text-[#0b1f4d]">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+              destaque && disponivel
+                ? "bg-[#0b1f4d] text-white"
+                : "bg-[#eef2f7] text-[#64748b]"
+            }`}
+          >
             <ModuloIcon id={id} />
           </span>
           <h3 className="text-[15px] font-semibold text-[#0b1f4d]">{titulo}</h3>
         </div>
-        {!disponivel ? (
-          <span className="shrink-0 rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+        {disponivel ? (
+          <span className="shrink-0 rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#334155]">
+            Disponível
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
             Em preparação
           </span>
-        ) : null}
+        )}
       </div>
-      <ul className="mt-3 space-y-1">
+      <ul className="mt-2.5 space-y-0.5">
         {linhas.map((linha) => (
-          <li key={linha} className="text-sm text-[#64748b]">
+          <li
+            key={linha}
+            className={`text-sm leading-snug ${
+              disponivel ? "text-[#475569]" : "text-[#94a3b8]"
+            }`}
+          >
             {linha}
           </li>
         ))}
@@ -118,13 +144,13 @@ function ModuloCard({
       {acao ? (
         <button
           type="button"
-          className="mt-4 inline-flex w-fit items-center rounded-lg bg-[#0b1f4d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#12316f]"
+          className="mt-3 inline-flex w-fit items-center rounded-lg bg-[#0b1f4d] px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-[#12316f]"
           onClick={acao.onClick}
         >
           {acao.label}
         </button>
       ) : (
-        <p className="mt-4 text-xs text-[#94a3b8]">
+        <p className="mt-2.5 text-xs leading-relaxed text-[#94a3b8]">
           Este módulo será liberado quando o serviço estiver disponível para
           a sua empresa.
         </p>
@@ -134,7 +160,7 @@ function ModuloCard({
 }
 
 function ModuloIcon({ id }: { id: ModuloSstId }) {
-  const props = { size: 18 };
+  const props = { size: 16 };
   if (id === "riscos") return <IconShield {...props} />;
   if (id === "exames") return <IconCalendar {...props} />;
   if (id === "laudos") return <IconFileText {...props} />;

@@ -32,7 +32,7 @@ export const PORTAL_RESULTADOS_AGUARDANDO_MSG =
   "Os resultados consolidados estarão disponíveis após a conclusão da avaliação e geração do relatório.";
 
 export const PORTAL_HISTORICO_UM_CICLO_MSG =
-  "A comparação histórica ficará disponível após a realização de novos ciclos de avaliação.";
+  "A comparação histórica será apresentada automaticamente após a realização de uma nova avaliação.";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

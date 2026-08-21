@@ -41,6 +41,10 @@ export function PortalEvolucaoRiscos({
 
   if (historico.length === 0) return null;
 
+  if (historico.length === 1) {
+    return <EvolucaoUmCiclo ciclo={historico[0]} />;
+  }
+
   const max = Math.max(
     1,
     ...historico.flatMap((c) => [c.favoraveis, c.atencao, c.desfavoraveis])
@@ -48,15 +52,15 @@ export function PortalEvolucaoRiscos({
 
   return (
     <>
-      <section className="rounded-2xl border border-[#e8edf5] bg-white px-6 py-5">
-        <h2 className="text-lg font-semibold tracking-tight text-[#0b1f4d]">
+      <section className="rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
           Evolução dos Riscos Psicossociais
         </h2>
-        <p className="mt-1 text-sm text-[#64748b]">
+        <p className="mt-0.5 text-sm text-[#64748b]">
           Comparativo consolidado entre ciclos da mesma empresa.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-[#64748b]">
+        <div className="mt-3 flex flex-wrap gap-4 text-xs font-medium text-[#64748b]">
           {SERIES.map((s) => (
             <span key={s.key} className="inline-flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-sm ${s.bar}`} />
@@ -65,15 +69,22 @@ export function PortalEvolucaoRiscos({
           ))}
         </div>
 
-        <div className="mt-5 overflow-x-auto">
-          <div className="flex min-w-0 items-end gap-6 sm:gap-10">
+        <div className="mt-4 overflow-x-auto">
+          <div
+            className="flex min-w-full items-end gap-4 sm:gap-6"
+            style={
+              historico.length > 3
+                ? { minWidth: `${historico.length * 7.5}rem` }
+                : undefined
+            }
+          >
             {historico.map((ciclo) => (
               <div
                 key={ciclo.campanhaId}
-                className="flex min-w-[7.5rem] flex-1 flex-col items-center"
+                className="flex min-w-[6.5rem] flex-1 flex-col items-center"
               >
                 <div
-                  className="flex h-36 w-full items-end justify-center gap-1.5"
+                  className="flex h-40 w-full max-w-[11rem] items-end justify-center gap-2"
                   role="img"
                   aria-label={`${ciclo.label}: ${ciclo.favoraveis} favoráveis, ${ciclo.atencao} em atenção, ${ciclo.desfavoraveis} desfavoráveis`}
                 >
@@ -83,14 +94,18 @@ export function PortalEvolucaoRiscos({
                     return (
                       <div
                         key={s.key}
-                        className="flex h-full w-7 flex-col items-center justify-end sm:w-8"
+                        className="flex h-full w-8 flex-col items-center justify-end sm:w-9"
                       >
-                        <span className={`mb-1 text-[11px] font-semibold tabular-nums ${s.text}`}>
+                        <span
+                          className={`mb-1 text-[11px] font-semibold tabular-nums ${s.text}`}
+                        >
                           {valor}
                         </span>
                         <div
                           className={`w-full rounded-t-md ${s.bar}`}
-                          style={{ height: `${Math.max(valor === 0 ? 2 : pct, 2)}%` }}
+                          style={{
+                            height: `${Math.max(valor === 0 ? 4 : pct, 4)}%`,
+                          }}
                         />
                       </div>
                     );
@@ -103,16 +118,10 @@ export function PortalEvolucaoRiscos({
             ))}
           </div>
         </div>
-
-        {historico.length === 1 ? (
-          <p className="mt-4 text-xs leading-relaxed text-[#94a3b8]">
-            {PORTAL_HISTORICO_UM_CICLO_MSG}
-          </p>
-        ) : null}
       </section>
 
-      <section className="rounded-2xl border border-[#e8edf5] bg-white px-6 py-5">
-        <h2 className="text-base font-semibold text-[#0b1f4d]">
+      <section className="rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
           Evolução por categoria
         </h2>
         {categoriaSel ? (
@@ -133,7 +142,10 @@ export function PortalEvolucaoRiscos({
                 ))}
               </select>
             </label>
-            <ul className="mt-4 divide-y divide-[#f1f5f9]">
+            <p className="mt-4 text-sm font-semibold text-[#0b1f4d]">
+              {categoriaSel.nome}
+            </p>
+            <ul className="mt-2 divide-y divide-[#f1f5f9]">
               {historico.map((ciclo) => {
                 const ponto = ciclo.categorias.find(
                   (c) => c.id === categoriaSel.id
@@ -141,7 +153,7 @@ export function PortalEvolucaoRiscos({
                 return (
                   <li
                     key={ciclo.campanhaId}
-                    className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                    className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
                   >
                     <span className="text-sm font-medium text-[#334155]">
                       {ciclo.label}
@@ -151,7 +163,8 @@ export function PortalEvolucaoRiscos({
                         <span
                           className={`h-2 w-2 rounded-full ${CLASSIF_DOT[ponto.classificacao]}`}
                         />
-                        {ponto.label || PORTAL_CLASSIFICACAO_LABEL[ponto.classificacao]}
+                        {ponto.label ||
+                          PORTAL_CLASSIFICACAO_LABEL[ponto.classificacao]}
                       </span>
                     ) : (
                       <span className="text-sm text-[#94a3b8]">
@@ -170,5 +183,52 @@ export function PortalEvolucaoRiscos({
         )}
       </section>
     </>
+  );
+}
+
+function EvolucaoUmCiclo({ ciclo }: { ciclo: PortalHistoricoCiclo }) {
+  const max = Math.max(
+    1,
+    ciclo.favoraveis,
+    ciclo.atencao,
+    ciclo.desfavoraveis
+  );
+
+  return (
+    <section className="rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+      <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
+        Evolução dos Riscos Psicossociais
+      </h2>
+      <p className="mt-1 text-sm font-semibold text-[#0b1f4d]">{ciclo.label}</p>
+      <ul className="mt-3 space-y-2">
+        {SERIES.map((s) => {
+          const valor = ciclo[s.key];
+          const pct = Math.round((valor / max) * 100);
+          return (
+            <li key={s.key} className="flex items-center gap-3">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${s.bar}`} />
+              <span className={`w-6 text-sm font-semibold tabular-nums ${s.text}`}>
+                {valor}
+              </span>
+              <span className="w-[7.5rem] shrink-0 text-sm text-[#475569]">
+                {s.label}
+              </span>
+              <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#eef2f7]">
+                <span
+                  className={`block h-full rounded-full ${s.bar}`}
+                  style={{ width: `${Math.max(valor === 0 ? 0 : pct, 0)}%` }}
+                />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-sm font-semibold text-[#0b1f4d]">
+        Este é o primeiro ciclo registrado.
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-[#64748b]">
+        {PORTAL_HISTORICO_UM_CICLO_MSG}
+      </p>
+    </section>
   );
 }
