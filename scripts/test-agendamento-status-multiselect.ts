@@ -1,5 +1,7 @@
 /** Testes do filtro Status em múltipla seleção (Agendamentos / histórico). */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   EMPTY_AGENDAMENTO_FILTERS,
   filterAgendamentos,
@@ -379,6 +381,31 @@ test("filtro não usa AND entre status", () => {
     filters({ status: ["agendado", "aso_retido"] })
   );
   assertEqual(filtrados.length, 1, "Agendado passa no OR mesmo sem ASO Retido");
+});
+
+test("dropdown de Status usa portal para não ser cortado pelo card", () => {
+  const root = join(__dirname, "..");
+  const select = readFileSync(
+    join(root, "components/ui/CheckboxMultiSelect.tsx"),
+    "utf8"
+  );
+  const filtersUi = readFileSync(
+    join(root, "components/agendamentos/AgendamentosFilters.tsx"),
+    "utf8"
+  );
+  assert(select.includes("createPortal"), "createPortal");
+  assert(select.includes("document.body"), "portal no body");
+  assert(select.includes("overflow-y-auto"), "scroll interno");
+  assert(select.includes("maxHeight"), "altura máxima");
+  assert(select.includes("z-[55]"), "z-index acima da tabela");
+  assert(
+    filtersUi.includes("overflow-hidden"),
+    "card continua com overflow-hidden"
+  );
+  assert(
+    filtersUi.includes("CheckboxMultiSelect"),
+    "filtro Status segue usando o componente"
+  );
 });
 
 if (failed > 0) {
