@@ -3,11 +3,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  DEFAULT_AGENDAMENTO_STATUS_FILTRO,
   EMPTY_AGENDAMENTO_FILTERS,
   filterAgendamentos,
   getDefaultAgendamentoFilters,
   hasActiveFilters,
   isAgendamentoStatusFiltroMarcado,
+  isAgendamentoStatusFiltroPadrao,
   isAgendamentoStatusFiltroTodos,
   labelAgendamentoStatusFiltro,
   matchesAgendamentoStatusFiltro,
@@ -309,14 +311,50 @@ test("Status + Pendência", () => {
   );
 });
 
-test("Limpar filtros restaura Status Todos", () => {
+test("padrão da página exclui Cancelado", () => {
+  const initial = getDefaultAgendamentoFilters();
+  assertEqual(
+    [...initial.status],
+    ["agendado", "aso_retido", "rascunho"],
+    "três status operacionais"
+  );
+  assert(isAgendamentoStatusFiltroPadrao(initial.status), "é o padrão");
+  assert(!isAgendamentoStatusFiltroTodos(initial.status), "não é Todos");
+  assert(!isAgendamentoStatusFiltroMarcado(initial.status, "todos"), "Todos off");
+  assert(isAgendamentoStatusFiltroMarcado(initial.status, "agendado"), "Agendado");
+  assert(
+    isAgendamentoStatusFiltroMarcado(initial.status, "aso_retido"),
+    "ASO Retido"
+  );
+  assert(isAgendamentoStatusFiltroMarcado(initial.status, "rascunho"), "Rascunho");
+  assert(
+    !isAgendamentoStatusFiltroMarcado(initial.status, "cancelado"),
+    "Cancelado off"
+  );
+  assertEqual(
+    labelAgendamentoStatusFiltro(initial.status),
+    "Agendado + 2",
+    "rótulo fechado"
+  );
+  assertEqual(ids(base, [...initial.status]), "ag,ret,ras", "sem cancelados");
+});
+
+test("Limpar filtros restaura o padrão sem Cancelado", () => {
   const cleared = {
     ...getDefaultAgendamentoFilters(),
     mesReferencia: "08/2026",
   };
-  assert(isAgendamentoStatusFiltroTodos(cleared.status), "status Todos");
-  assertEqual(cleared.status, [], "array vazio");
-  assertEqual(labelAgendamentoStatusFiltro(cleared.status), "Todos", "rótulo");
+  assertEqual(
+    [...cleared.status],
+    [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
+    "mesmo padrão da página"
+  );
+  assert(!isAgendamentoStatusFiltroTodos(cleared.status), "não volta para Todos");
+  assertEqual(
+    labelAgendamentoStatusFiltro(cleared.status),
+    "Agendado + 2",
+    "rótulo"
+  );
 });
 
 test("contador X agendamentos encontrados", () => {
@@ -357,21 +395,48 @@ test("nenhum resultado", () => {
   assertEqual(countLabel(0), "0 agendamentos encontrados", "contador zero");
 });
 
-test("hasActiveFilters: Todos não conta; subconjunto conta", () => {
-  assert(!hasActiveFilters(filters({ mesReferencia: "08/2026" })), "só mês");
+test("hasActiveFilters: padrão da página não conta; Todos e outros subconjuntos contam", () => {
+  assert(
+    !hasActiveFilters(
+      filters({
+        mesReferencia: "08/2026",
+        status: [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
+      })
+    ),
+    "mês + padrão não é extra"
+  );
+  assert(
+    hasActiveFilters(filters({ mesReferencia: "08/2026", status: [] })),
+    "Todos é desvio do padrão"
+  );
   assert(
     hasActiveFilters(filters({ mesReferencia: "08/2026", status: ["agendado"] })),
     "status específico é ativo"
   );
   assert(
-    !hasActiveFilters(
+    hasActiveFilters(filters({ mesReferencia: "08/2026", status: ["cancelado"] })),
+    "somente Cancelado é ativo"
+  );
+  assert(
+    hasActiveFilters(
       filters({
         mesReferencia: "08/2026",
         status: ["agendado", "aso_retido", "rascunho", "cancelado"],
       })
     ),
-    "quatro status = Todos, não ativo"
+    "quatro status = Todos, desvio do padrão"
   );
+});
+
+test("marcar Cancelado no padrão passa a ser Todos", () => {
+  const next = toggleAgendamentoStatusFiltro(
+    [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
+    "cancelado"
+  );
+  assertEqual(next, [], "quatro status = Todos");
+  assert(isAgendamentoStatusFiltroTodos(next), "é Todos");
+  assert(isAgendamentoStatusFiltroMarcado(next, "todos"), "Todos marcado");
+  assertEqual(ids(base, next), "ag,ret,ras,can", "inclui cancelados");
 });
 
 test("filtro não usa AND entre status", () => {
@@ -381,6 +446,38 @@ test("filtro não usa AND entre status", () => {
     filters({ status: ["agendado", "aso_retido"] })
   );
   assertEqual(filtrados.length, 1, "Agendado passa no OR mesmo sem ASO Retido");
+});
+
+test("página inicializa e limpa filtros pelo mesmo padrão", () => {
+  const hook = readFileSync(
+    join(__dirname, "..", "hooks/useAgendamentosPage.ts"),
+    "utf8"
+  );
+  const filtersLib = readFileSync(
+    join(__dirname, "..", "lib/agendamento-filters.ts"),
+    "utf8"
+  );
+  assert(
+    hook.includes("useState<AgendamentoFilters>(() =>") &&
+      hook.includes("getDefaultAgendamentoFilters()"),
+    "estado inicial via getDefault"
+  );
+  assert(
+    hook.includes("setFilters(getDefaultAgendamentoFilters())"),
+    "Limpar filtros via getDefault"
+  );
+  assert(
+    (hook.match(/setFilters\(/g) ?? []).length === 2,
+    "somente change e clear mexem em filters"
+  );
+  assert(
+    filtersLib.includes("DEFAULT_AGENDAMENTO_STATUS_FILTRO"),
+    "constante do padrão"
+  );
+  assert(
+    filtersLib.includes("status: [...DEFAULT_AGENDAMENTO_STATUS_FILTRO]"),
+    "getDefault usa o padrão sem Cancelado"
+  );
 });
 
 test("dropdown de Status usa portal para não ser cortado pelo card", () => {

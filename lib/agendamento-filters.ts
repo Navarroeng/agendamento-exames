@@ -27,7 +27,10 @@ export interface AgendamentoFilters {
   clinica: string;
   tipoExame: string;
   aso: string;
-  /** Vazio = Todos. Subconjunto = OR entre os status. */
+  /**
+   * Vazio = Todos (inclui Cancelado). Subconjunto = OR entre os status.
+   * O padrão da página não é Todos: ver DEFAULT_AGENDAMENTO_STATUS_FILTRO.
+   */
   status: AgendamentoStatusFiltro[];
   responsavel: string;
   pendencia: string;
@@ -61,11 +64,15 @@ export const EMPTY_AGENDAMENTO_FILTERS: AgendamentoFilters = {
   esocial: "",
 };
 
+/** Estado inicial / Limpar filtros: todos os status operacionais, sem Cancelado. */
+export const DEFAULT_AGENDAMENTO_STATUS_FILTRO: readonly AgendamentoStatusFiltro[] =
+  ["agendado", "aso_retido", "rascunho"];
+
 export function getDefaultAgendamentoFilters(): AgendamentoFilters {
   return {
     ...EMPTY_AGENDAMENTO_FILTERS,
     mesReferencia: getCurrentMonthReferenceBR(),
-    status: [],
+    status: [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
   };
 }
 
@@ -136,6 +143,19 @@ export function normalizeAgendamentoStatusFiltro(
   );
 }
 
+export function isAgendamentoStatusFiltroPadrao(
+  selected: readonly string[] | null | undefined
+): boolean {
+  if (isAgendamentoStatusFiltroTodos(selected)) return false;
+  const normalized = normalizeAgendamentoStatusFiltro(selected);
+  if (normalized.length !== DEFAULT_AGENDAMENTO_STATUS_FILTRO.length) {
+    return false;
+  }
+  return DEFAULT_AGENDAMENTO_STATUS_FILTRO.every((value) =>
+    normalized.includes(value)
+  );
+}
+
 export function toggleAgendamentoStatusFiltro(
   current: readonly AgendamentoStatusFiltro[],
   option: "todos" | AgendamentoStatusFiltro
@@ -180,7 +200,7 @@ export function matchesAgendamentoStatusFiltro(
 
 export function hasActiveFilters(filters: AgendamentoFilters): boolean {
   const { mesReferencia: _mes, status, ...rest } = filters;
-  if (!isAgendamentoStatusFiltroTodos(status)) return true;
+  if (!isAgendamentoStatusFiltroPadrao(status)) return true;
   return Object.values(rest).some((v) => v.trim() !== "");
 }
 

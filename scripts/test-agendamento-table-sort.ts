@@ -2,6 +2,7 @@
 
 import {
   compareAgendamentosPorDataExameAsc,
+  DEFAULT_AGENDAMENTO_STATUS_FILTRO,
   filterAgendamentos,
   hasActiveFilters,
   type AgendamentoFilters,
@@ -70,7 +71,7 @@ const emptyFilters: AgendamentoFilters = {
   clinica: "",
   tipoExame: "",
   aso: "",
-  status: [],
+  status: [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
   responsavel: "",
   pendencia: "",
   pendenciaSituacao: "",
