@@ -150,6 +150,19 @@ export function extractPeriodicoFilterOptions(
   };
 }
 
+/**
+ * `status` vazio (Todos) = obrigações operacionais, sem cancelados.
+ * `status = cancelado` = somente o histórico cancelado.
+ */
+export function periodicoAtendeFiltroStatus(
+  displayStatus: PeriodicoFuturoDisplayStatus,
+  filtroStatus: string | null | undefined
+): boolean {
+  const status = (filtroStatus ?? "").trim();
+  if (status) return displayStatus === status;
+  return displayStatus !== "cancelado";
+}
+
 export function filterPeriodicosFuturos(
   records: PeriodicoFuturoRow[],
   filters: PeriodicoFuturoFilters
@@ -162,8 +175,8 @@ export function filterPeriodicosFuturos(
     if (filters.cargo && record.cargo_nome !== filters.cargo) return false;
     if (filters.exame && record.exame_nome !== filters.exame) return false;
 
-    if (filters.status) {
-      if (record.displayStatus !== filters.status) return false;
+    if (!periodicoAtendeFiltroStatus(record.displayStatus, filters.status)) {
+      return false;
     }
 
     if (filters.mesReferencia.trim()) {

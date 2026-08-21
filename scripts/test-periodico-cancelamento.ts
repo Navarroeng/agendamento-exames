@@ -197,6 +197,32 @@ run("12. filtro Cancelado", () => {
   assert.equal(filtrados[0].displayStatus, "cancelado");
 });
 
+run("12b. filtro Todos exclui cancelado", () => {
+  const mistos = agruparPeriodicosPorColaboradorCiclo([
+    ...cicloIsabel.map(toPeriodicoFuturoRow),
+    ...cicloIsabel.map((item) =>
+      toPeriodicoFuturoRow({
+        ...item,
+        id: `c-${item.id}`,
+        proxima_data: "2027-06-01",
+        status: "cancelado",
+        cancelado_em: "2026-08-21T12:00:00.000Z",
+        motivo_cancelamento: "Desligamento",
+      })
+    ),
+  ]);
+  const todos = filterPeriodicoGrupos(mistos, {
+    empresa: "",
+    colaborador: "",
+    cargo: "",
+    exame: "",
+    status: "",
+    mesReferencia: "",
+  });
+  assert.equal(todos.length, 1);
+  assert.ok(todos.every((g) => g.displayStatus !== "cancelado"));
+});
+
 run("13-14. Clínico + N cancela o ciclo inteiro", () => {
   const grupo = agruparPeriodicosPorColaboradorCiclo(
     cicloIsabel.map(toPeriodicoFuturoRow)

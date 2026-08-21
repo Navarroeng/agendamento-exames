@@ -271,8 +271,8 @@ run("Todos + filtro Colaborador", () => {
     { ...EMPTY, colaborador: "ISABEL TELES" }
   );
   assert.ok(p.filtrados.every((g) => g.colaborador === "ISABEL TELES"));
-  assert.equal(p.filtrados.length, 3);
-  assert.ok(p.filtrados.some((g) => g.examesLabel === "Clínico + 1"));
+  assert.equal(p.filtrados.length, 2);
+  assert.ok(p.filtrados.every((g) => g.displayStatus !== "cancelado"));
 });
 
 run("Todos + Empresa", () => {
@@ -327,7 +327,13 @@ run("KPIs e contador usam o período; KPI agrupa ciclo", () => {
   assert.equal(kpisSoma, todos.grupos.length);
   assert.equal(todos.kpis.reagendado, 1);
   assert.equal(todos.kpis.cancelado, 1);
-  assert.equal(todos.contador, todos.grupos.length);
+  assert.equal(
+    todos.contador,
+    todos.grupos.length - todos.kpis.cancelado,
+    "Status Todos não conta cancelados"
+  );
+  assert.equal(todos.contador, todos.filtrados.length);
+  assert.ok(todos.filtrados.every((g) => g.displayStatus !== "cancelado"));
   const soIsabel = pipeline(
     { year: 2026, month: null },
     { ...EMPTY, colaborador: "ISABEL TELES" }
@@ -340,6 +346,124 @@ run("periódico cancelado e reagendado no ano Todos", () => {
   const p = pipeline({ year: 2026, month: null });
   assert.ok(p.grupos.some((g) => g.displayStatus === "cancelado"));
   assert.ok(p.grupos.some((g) => g.displayStatus === "reagendado"));
+  assert.ok(p.filtrados.every((g) => g.displayStatus !== "cancelado"));
+});
+
+function isoOffset(days: number): string {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+run("Status Todos não lista cancelados", () => {
+  const p = pipeline({ year: 2026, month: null }, EMPTY);
+  assert.ok(p.filtrados.length > 0);
+  assert.ok(p.filtrados.every((g) => g.displayStatus !== "cancelado"));
+  assert.ok(p.grupos.some((g) => g.displayStatus === "cancelado"));
+});
+
+run("Status Cancelado lista somente cancelados", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, status: "cancelado" }
+  );
+  assert.equal(p.filtrados.length, 1);
+  assert.ok(p.filtrados.every((g) => g.displayStatus === "cancelado"));
+  assert.equal(p.contador, 1);
+});
+
+run("Status Vencido", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, status: "vencido" }
+  );
+  assert.ok(p.filtrados.length > 0);
+  assert.ok(p.filtrados.every((g) => g.displayStatus === "vencido"));
+});
+
+run("Status Reagendado", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, status: "reagendado" }
+  );
+  assert.equal(p.filtrados.length, 1);
+  assert.equal(p.filtrados[0].id, "mr");
+});
+
+run("Status Em dia e Vence em 30 dias", () => {
+  const extras = [
+    row({
+      id: "em-dia",
+      colaborador: "ANA LIMA",
+      proxima_data: isoOffset(60),
+      exame_nome: "Clínico",
+      tipo_exame: "Clínico",
+    }),
+    row({
+      id: "vence-30",
+      colaborador: "BRUNO COSTA",
+      proxima_data: isoOffset(10),
+      exame_nome: "Clínico",
+      tipo_exame: "Clínico",
+    }),
+  ];
+  const grupos = agruparPeriodicosPorColaboradorCiclo([...amostra, ...extras]);
+  const emDia = filterPeriodicoGrupos(grupos, { ...EMPTY, status: "em_dia" });
+  const vence30 = filterPeriodicoGrupos(grupos, {
+    ...EMPTY,
+    status: "vence_30_dias",
+  });
+  assert.ok(emDia.some((g) => g.id === "em-dia"));
+  assert.ok(emDia.every((g) => g.displayStatus === "em_dia"));
+  assert.ok(vence30.some((g) => g.id === "vence-30"));
+  assert.ok(vence30.every((g) => g.displayStatus === "vence_30_dias"));
+});
+
+run("Mês Todos + Status Todos exclui cancelado", () => {
+  const p = pipeline({ year: 2026, month: null }, EMPTY);
+  assert.ok(p.filtrados.every((g) => g.displayStatus !== "cancelado"));
+  assert.equal(p.contador, p.filtrados.length);
+});
+
+run("Mês Todos + Status Cancelado", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, status: "cancelado" }
+  );
+  assert.ok(p.filtrados.every((g) => g.displayStatus === "cancelado"));
+  assert.equal(p.contador, p.filtrados.length);
+});
+
+run("colaborador + Status Todos", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, colaborador: "ISABEL TELES" }
+  );
+  assert.ok(p.filtrados.every((g) => g.colaborador === "ISABEL TELES"));
+  assert.ok(p.filtrados.every((g) => g.displayStatus !== "cancelado"));
+});
+
+run("colaborador + Status Cancelado", () => {
+  const p = pipeline(
+    { year: 2026, month: null },
+    { ...EMPTY, colaborador: "ISABEL TELES", status: "cancelado" }
+  );
+  assert.equal(p.filtrados.length, 1);
+  assert.equal(p.filtrados[0].id, "ic");
+  assert.equal(p.contador, 1);
+});
+
+run("KPIs operacionais não misturam cancelado", () => {
+  const p = pipeline({ year: 2026, month: null });
+  assert.equal(p.kpis.cancelado, 1);
+  assert.equal(p.kpis.reagendado, 1);
+  assert.equal(
+    p.kpis.vencido + p.kpis.vence_30_dias + p.kpis.em_dia + p.kpis.reagendado,
+    p.grupos.length - p.kpis.cancelado
+  );
 });
 
 run("trocar Todos para um mês específico", () => {

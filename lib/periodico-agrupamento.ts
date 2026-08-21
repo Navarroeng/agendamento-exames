@@ -3,6 +3,7 @@ import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import {
   canEditarProximaDataPeriodico,
+  periodicoAtendeFiltroStatus,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
 import type {
@@ -224,7 +225,9 @@ export function filterPeriodicoGrupos(
       );
       if (!bate) return false;
     }
-    if (filters.status && grupo.displayStatus !== filters.status) return false;
+    if (!periodicoAtendeFiltroStatus(grupo.displayStatus, filters.status)) {
+      return false;
+    }
     return true;
   });
 }
