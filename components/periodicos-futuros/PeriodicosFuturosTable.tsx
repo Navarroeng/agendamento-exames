@@ -134,7 +134,13 @@ export function PeriodicosFuturosTable({
                     <td className="px-3 py-2.5 tabular-nums font-bold">
                       {record.proximaDataBR}
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums">
+                    <td
+                      className={`px-3 py-2.5 tabular-nums ${
+                        record.agendadoParaBR !== "—"
+                          ? periodicoDisplayStatusClass("em_dia")
+                          : ""
+                      }`}
+                    >
                       {record.agendadoParaBR}
                     </td>
                     <td className="px-3 py-2.5">
