@@ -16,6 +16,7 @@ import {
 } from "../lib/listagem-meses";
 import {
   filterPeriodicosFuturosPorMes,
+  resolveInitialMesPeriodicos,
   toPeriodicoFuturoRow,
 } from "../lib/periodicos-futuro";
 import {
@@ -520,6 +521,32 @@ run("UI: aba Todos só em Periódicos Futuros", () => {
   assert.match(table, /showAllMonthsTab/);
   assert.match(tabs, /showAllMonthsTab/);
   assert.doesNotMatch(implantacao, /showAllMonthsTab/);
+});
+
+run("página inicia em ano atual + Todos, não no mês civil", () => {
+  const inicial = resolveInitialMesPeriodicos(agoraAgosto);
+  assert.deepEqual(inicial, { year: 2026, month: null });
+  assert.equal(isPeriodoTodosMeses(inicial), true);
+  assert.notEqual(inicial.month, 8);
+  const janeiro = resolveInitialMesPeriodicos(new Date(2027, 0, 15));
+  assert.deepEqual(janeiro, { year: 2027, month: null });
+});
+
+run("Limpar filtros e estado inicial usam o mesmo período Todos", () => {
+  const hook = readFileSync(
+    join(root, "hooks/usePeriodicosFuturosPage.ts"),
+    "utf8"
+  );
+  assert.match(hook, /resolveInitialMesPeriodicos\(\)/);
+  assert.match(
+    hook,
+    /setMesSelecionado\(resolveInitialMesPeriodicos\(\)\)/
+  );
+  assert.doesNotMatch(hook, /resolveInitialMesPeriodicos\(\[\]\)/);
+  assert.doesNotMatch(
+    hook,
+    /getNowYearMonth/
+  );
 });
 
 console.log(

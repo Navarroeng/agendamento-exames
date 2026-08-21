@@ -65,7 +65,7 @@ export function usePeriodicosFuturosPage() {
     PeriodicoFuturoDisplayStatus | ""
   >("");
   const [mesSelecionado, setMesSelecionado] =
-    useState<ListagemPeriodoSelecionado>(() => resolveInitialMesPeriodicos([]));
+    useState<ListagemPeriodoSelecionado>(() => resolveInitialMesPeriodicos());
   const [editProximaDataRecord, setEditProximaDataRecord] =
     useState<PeriodicoFuturoGrupo | null>(null);
   const [adicionarCpfGrupo, setAdicionarCpfGrupo] =
@@ -173,6 +173,7 @@ export function usePeriodicosFuturosPage() {
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_PERIODICO_FUTURO_FILTERS);
     setActiveCard("");
+    setMesSelecionado(resolveInitialMesPeriodicos());
   }, []);
 
   const handleMesChange = useCallback((mes: YearMonth) => {

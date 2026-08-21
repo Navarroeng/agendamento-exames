@@ -328,27 +328,13 @@ export function countPeriodicosPorAno(
 }
 
 /**
- * Mês inicial: mês civil atual se o ano existir nos dados (ou na lista);
- * senão, primeiro ano com registros (janeiro).
- * Meses futuros NÃO são bloqueados neste módulo.
+ * Período inicial da página: ano civil atual + Todos os meses.
+ * Não usa o mês de `new Date()` como aba ativa.
  */
 export function resolveInitialMesPeriodicos(
-  records: Pick<
-    PeriodicoFuturoRecord,
-    "proxima_data" | "data_prevista_original" | "status"
-  >[],
   now: Date = new Date()
-): YearMonth {
-  const current = getNowYearMonth(now);
-  const anos = listPeriodicoAnosDisponiveis(records, now);
-  if (anos.includes(current.year)) {
-    return current;
-  }
-  const anosComDados = extractPeriodicoAnos(records);
-  if (anosComDados.length > 0) {
-    return { year: anosComDados[0], month: 1 };
-  }
-  return current;
+): ListagemPeriodoSelecionado {
+  return { year: getNowYearMonth(now).year, month: null };
 }
 
 /** 12 meses do ano (sempre janeiro–dezembro neste módulo). */
