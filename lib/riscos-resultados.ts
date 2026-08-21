@@ -175,3 +175,20 @@ export function temResultadosConcluidos(
 ): boolean {
   return resultado.sessoesConcluidas > 0;
 }
+
+/** Há detalhes úteis para expandir o bloco qualitativo no modal. */
+export function comportamentosOfensivosPermiteExpansao(
+  respondentesComAlgumaResposta: number
+): boolean {
+  return respondentesComAlgumaResposta > 0;
+}
+
+/** Resumo compacto do cabeçalho (não altera o cálculo qualitativo). */
+export function labelResumoComportamentosOfensivos(
+  respondentesComAlgumaResposta: number
+): string {
+  const n = Math.max(0, Math.floor(respondentesComAlgumaResposta));
+  if (n <= 0) return "Nenhuma ocorrência registrada";
+  if (n === 1) return "1 sessão com alguma resposta";
+  return `${n} sessões com alguma resposta`;
+}

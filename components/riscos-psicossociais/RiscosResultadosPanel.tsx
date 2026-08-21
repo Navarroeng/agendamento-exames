@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { RISCOS_CAMPANHA_STATUS_LABELS } from "@/lib/riscos-campanha";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
+import {
+  comportamentosOfensivosPermiteExpansao,
+  labelResumoComportamentosOfensivos,
+} from "@/lib/riscos-resultados";
 
 type DimensaoResultadoUi = {
   id: string;
@@ -108,6 +113,106 @@ function contarResumoGeral(dimensoes: DimensaoResultadoUi[]) {
   };
 }
 
+function ComportamentosOfensivosAccordion({
+  data,
+  aberto,
+  onToggle,
+}: {
+  data: OfensivosUi;
+  aberto: boolean;
+  onToggle: () => void;
+}) {
+  const painelId = useId();
+  const permiteExpandir = comportamentosOfensivosPermiteExpansao(
+    data.respondentesComAlgumaResposta
+  );
+  const resumo = labelResumoComportamentosOfensivos(
+    data.respondentesComAlgumaResposta
+  );
+  const expandido = permiteExpandir && aberto;
+
+  const header = (
+    <>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+          {data.titulo}
+        </span>
+        <span className="mt-0.5 block text-[11px] leading-snug text-[#64748b]">
+          {resumo}
+        </span>
+      </span>
+      {permiteExpandir ? (
+        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#64748b]">
+          {expandido ? null : <span>Ver detalhes</span>}
+          {expandido ? (
+            <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+          )}
+        </span>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#e8edf5] bg-[#f8fafc]">
+      {permiteExpandir ? (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[#f1f5f9]"
+          aria-expanded={expandido}
+          aria-controls={painelId}
+          onClick={onToggle}
+        >
+          {header}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2">{header}</div>
+      )}
+
+      {expandido ? (
+        <div
+          id={painelId}
+          className="space-y-2 border-t border-[#eef2f7] bg-white px-3 py-2.5"
+        >
+          <p className="text-[11px] text-[#64748b]">
+            Análise qualitativa consolidada · sem média ou classificação de
+            risco.
+          </p>
+          {data.itens.map((item) => (
+            <div
+              key={item.perguntaCodigo}
+              className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-3 py-2.5"
+            >
+              <p className="text-xs font-extrabold text-navy">
+                {item.perguntaCodigo}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[#64748b]">
+                {item.perguntaTexto}
+              </p>
+              {item.totais.length === 0 ? (
+                <p className="mt-1.5 text-[11px] text-[#94a3b8]">
+                  Sem respostas.
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-0.5 text-[11px] text-navy">
+                  {item.totais.map((t) => (
+                    <li key={`${item.perguntaCodigo}-${t.label}`}>
+                      <span className="font-semibold">{t.label}</span>
+                      {": "}
+                      <span className="tabular-nums">{t.quantidade}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 interface RiscosResultadosPanelProps {
   campanha: RiscosCampanhaRecord | null;
   /** Muda após invalidação/remoção para recarregar consolidação. */
@@ -121,17 +226,20 @@ export function RiscosResultadosPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ResultadosPayload | null>(null);
+  const [ofensivosAberto, setOfensivosAberto] = useState(false);
 
   useEffect(() => {
     if (!campanha?.id) {
       setData(null);
       setError(null);
+      setOfensivosAberto(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setOfensivosAberto(false);
 
     void (async () => {
       try {
@@ -248,45 +356,11 @@ export function RiscosResultadosPanel({
         </p>
       </div>
 
-      <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          {data.comportamentosOfensivos.titulo}
-        </p>
-        <p className="text-[11px] text-[#64748b]">
-          Análise qualitativa consolidada · sem média ou classificação de risco.
-          {data.comportamentosOfensivos.respondentesComAlgumaResposta > 0
-            ? ` · ${data.comportamentosOfensivos.respondentesComAlgumaResposta} sessão(ões) com alguma resposta nesta categoria.`
-            : " · Nenhuma resposta registrada nesta categoria."}
-        </p>
-        <div className="space-y-2">
-          {data.comportamentosOfensivos.itens.map((item) => (
-            <div
-              key={item.perguntaCodigo}
-              className="rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-3 py-2.5"
-            >
-              <p className="text-xs font-extrabold text-navy">
-                {item.perguntaCodigo}
-              </p>
-              <p className="mt-0.5 text-[11px] text-[#64748b]">
-                {item.perguntaTexto}
-              </p>
-              {item.totais.length === 0 ? (
-                <p className="mt-1.5 text-[11px] text-[#94a3b8]">Sem respostas.</p>
-              ) : (
-                <ul className="mt-1.5 space-y-0.5 text-[11px] text-navy">
-                  {item.totais.map((t) => (
-                    <li key={`${item.perguntaCodigo}-${t.label}`}>
-                      <span className="font-semibold">{t.label}</span>
-                      {": "}
-                      <span className="tabular-nums">{t.quantidade}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <ComportamentosOfensivosAccordion
+        data={data.comportamentosOfensivos}
+        aberto={ofensivosAberto}
+        onToggle={() => setOfensivosAberto((v) => !v)}
+      />
     </div>
   );
 }

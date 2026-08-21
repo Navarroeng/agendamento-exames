@@ -3,10 +3,14 @@
  * Sem PII; apenas sessões concluídas; isolamento por campanha.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { interpretarCampanhaCopsoq } from "../lib/copsoq-engine";
 import {
+  comportamentosOfensivosPermiteExpansao,
   consolidarResultadosCampanha,
   filtrarSessoesConcluidasCampanha,
+  labelResumoComportamentosOfensivos,
   montarRespondentesEngine,
   RISCO_GERAL_NAO_DEFINIDO,
   temResultadosConcluidos,
@@ -264,6 +268,40 @@ run("TESTE 8: payload sem campos nominais (nome/CPF/participante)", () => {
   assert.equal("respondentes" in resultado, false);
   assert.ok(!("sessoes" in resultado));
   assert.ok(!("vinculos" in resultado));
+});
+
+run("UI: resumo compacto de comportamentos ofensivos", () => {
+  assert.equal(
+    labelResumoComportamentosOfensivos(0),
+    "Nenhuma ocorrência registrada"
+  );
+  assert.equal(
+    labelResumoComportamentosOfensivos(1),
+    "1 sessão com alguma resposta"
+  );
+  assert.equal(
+    labelResumoComportamentosOfensivos(3),
+    "3 sessões com alguma resposta"
+  );
+  assert.equal(comportamentosOfensivosPermiteExpansao(0), false);
+  assert.equal(comportamentosOfensivosPermiteExpansao(3), true);
+});
+
+run("UI: bloco ofensivos recolhido por padrão, dados intactos ao expandir", () => {
+  const src = readFileSync(
+    join(__dirname, "../components/riscos-psicossociais/RiscosResultadosPanel.tsx"),
+    "utf8"
+  );
+  assert.match(src, /const \[ofensivosAberto, setOfensivosAberto\] = useState\(false\)/);
+  assert.match(src, /setOfensivosAberto\(false\)/);
+  assert.match(src, /Ver detalhes/);
+  assert.match(src, /ChevronDown/);
+  assert.match(src, /ChevronUp/);
+  assert.match(src, /aria-expanded/);
+  assert.match(src, /item\.perguntaCodigo/);
+  assert.match(src, /item\.perguntaTexto/);
+  assert.match(src, /t\.quantidade/);
+  assert.doesNotMatch(src, /sessionStorage/);
 });
 
 console.log("\nTodos os testes de consolidação COPSOQ passaram.");
