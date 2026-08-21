@@ -166,11 +166,15 @@ import {
   criarPeriodicosDeAgendamento,
 } from "@/services/periodico-futuro.service";
 import {
-  listarPeriodicosPendentesColaborador,
+  listarPeriodicosPendentesAgrupadosColaborador,
   vincularPeriodicoAoAgendamento,
 } from "@/services/contrato-programacao-futura.service";
 import { createClient } from "@/lib/supabase/client";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  encontrarGrupoPeriodicoPorIds,
+  type PeriodicoFuturoGrupo,
+} from "@/lib/periodico-agrupamento";
 import {
   AGENDAMENTO_BLOQUEADO_FATURA_MSG,
   CANCELAMENTO_EXCEPCIONAL_POS_CANCEL_TOAST,
@@ -213,7 +217,6 @@ import type {
   AgendamentoWithExames,
   CargoRecord,
   ExameFormItem,
-  PeriodicoFuturoRecord,
 } from "@/lib/types";
 
 export function useAgendamentosPage() {
@@ -265,13 +268,13 @@ export function useAgendamentosPage() {
   const duplicidadeAvisoConfirmadaRef = useRef<string | null>(null);
   const [periodicoVinculoOpen, setPeriodicoVinculoOpen] = useState(false);
   const [periodicoVinculoList, setPeriodicoVinculoList] = useState<
-    PeriodicoFuturoRecord[]
+    PeriodicoFuturoGrupo[]
   >([]);
   const [periodicoContratoNumeros, setPeriodicoContratoNumeros] = useState<
     Record<string, string>
   >({});
   const periodicoDecisionRef = useRef<"none" | "skip" | "link">("none");
-  const periodicoLinkIdRef = useRef<string | null>(null);
+  const periodicoLinkIdsRef = useRef<string[]>([]);
   const periodicoAlertKeyRef = useRef<string | null>(null);
   const pendingSaveStatusRef = useRef<AgendamentoStatus | null>(null);
   const [cargoChangeModalOpen, setCargoChangeModalOpen] = useState(false);
@@ -925,7 +928,7 @@ export function useAgendamentosPage() {
 
         // Troca de empresa: limpa vínculos/decisões anteriores.
         periodicoDecisionRef.current = "none";
-        periodicoLinkIdRef.current = null;
+        periodicoLinkIdsRef.current = [];
         periodicoAlertKeyRef.current = null;
         setPeriodicoVinculoOpen(false);
         setPeriodicoVinculoList([]);
@@ -1166,7 +1169,7 @@ export function useAgendamentosPage() {
       if (field === "colaborador_cpf" || field === "aso") {
         // Reabre verificação quando CPF/ASO mudam
         periodicoDecisionRef.current = "none";
-        periodicoLinkIdRef.current = null;
+        periodicoLinkIdsRef.current = [];
         periodicoAlertKeyRef.current = null;
         creditoDecisionRef.current = "none";
         creditoAlertKeyRef.current = null;
@@ -1234,23 +1237,23 @@ export function useAgendamentosPage() {
       }
 
       try {
-        const pendentes = await listarPeriodicosPendentesColaborador({
+        const grupos = await listarPeriodicosPendentesAgrupadosColaborador({
           clienteNome: form.cliente_nome,
           colaborador: form.colaborador,
           colaboradorCpf: cpfValido ? form.colaborador_cpf : null,
           tipoAso: form.aso || null,
         });
-        if (pendentes.length === 0) {
+        if (grupos.length === 0) {
           setPeriodicoVinculoList([]);
           return false;
         }
 
         periodicoAlertKeyRef.current = alertKey;
-        setPeriodicoVinculoList(pendentes);
+        setPeriodicoVinculoList(grupos);
 
         const contratoIds = Array.from(
           new Set(
-            pendentes
+            grupos
               .map((p) => p.contrato_id)
               .filter((id): id is string => Boolean(id))
           )
@@ -1436,7 +1439,7 @@ export function useAgendamentosPage() {
         setClienteId("");
         setField("cliente_nome", "");
         periodicoDecisionRef.current = "none";
-        periodicoLinkIdRef.current = null;
+        periodicoLinkIdsRef.current = [];
         periodicoAlertKeyRef.current = null;
         setPeriodicoVinculoOpen(false);
         setPeriodicoVinculoList([]);
@@ -2532,26 +2535,29 @@ export function useAgendamentosPage() {
         }
       }
 
-      const periodicoLinkId = usandoPeriodico
-        ? periodicoLinkIdRef.current
-        : null;
+      const periodicoLinkIds = usandoPeriodico
+        ? periodicoLinkIdsRef.current
+        : [];
+      let periodicoIdsParaVincular = periodicoLinkIds;
 
-      if (!editingId && periodicoLinkId) {
+      if (!editingId && periodicoLinkIds.length > 0) {
         try {
-          const pendentes = await listarPeriodicosPendentesColaborador({
+          const grupos = await listarPeriodicosPendentesAgrupadosColaborador({
             clienteNome: form.cliente_nome,
             colaborador: form.colaborador,
             colaboradorCpf: form.colaborador_cpf,
             tipoAso: form.aso || null,
           });
-          if (!pendentes.some((p) => p.id === periodicoLinkId)) {
+          const grupo = encontrarGrupoPeriodicoPorIds(grupos, periodicoLinkIds);
+          if (!grupo) {
             toast.error(
-              "O exame futuro selecionado não está mais disponível. Refaça a escolha."
+              "O periódico futuro selecionado não está mais disponível. Refaça a escolha."
             );
             periodicoDecisionRef.current = "none";
-            periodicoLinkIdRef.current = null;
+            periodicoLinkIdsRef.current = [];
             return;
           }
+          periodicoIdsParaVincular = grupo.ids;
         } catch (perErr) {
           console.error(perErr);
           toast.error(
@@ -2758,10 +2764,10 @@ export function useAgendamentosPage() {
             }
           );
 
-          if (periodicoLinkId) {
+          if (periodicoIdsParaVincular.length > 0) {
             try {
               await vincularPeriodicoAoAgendamento({
-                periodicoId: periodicoLinkId,
+                periodicoIds: periodicoIdsParaVincular,
                 agendamentoId: novoId,
                 usuarioNome: historicoUsuario,
                 dataAgendamentoIso: dataIso,
@@ -2818,7 +2824,7 @@ export function useAgendamentosPage() {
         setPeriodicoVinculoOpen(false);
         setPeriodicoVinculoList([]);
         periodicoDecisionRef.current = "none";
-        periodicoLinkIdRef.current = null;
+        periodicoLinkIdsRef.current = [];
         pendingSaveStatusRef.current = null;
         periodicoAlertKeyRef.current = null;
         setShowForm(false);
@@ -2933,10 +2939,10 @@ export function useAgendamentosPage() {
   const auditarDecisaoPeriodico = useCallback(
     async (
       decisao: "cancelou" | "continuou_sem_vinculo" | "antecipou_e_vinculou",
-      periodicoId?: string | null
+      grupoKey?: string | null
     ) => {
       const periodico =
-        periodicoVinculoList.find((p) => p.id === periodicoId) ??
+        periodicoVinculoList.find((p) => p.grupoKey === grupoKey) ??
         periodicoVinculoList[0] ??
         null;
       const dataPrevista =
@@ -2969,6 +2975,8 @@ export function useAgendamentosPage() {
             colaborador: form.colaborador,
             colaborador_cpf: normalizeCpfDigits(form.colaborador_cpf),
             periodico_futuro_id: periodico?.id ?? null,
+            periodico_futuro_ids: periodico?.ids ?? [],
+            ciclo: periodico?.examesLabel ?? null,
             data_prevista: dataPrevista || null,
             aso: form.aso || null,
           },
@@ -2994,7 +3002,7 @@ export function useAgendamentosPage() {
     setPeriodicoVinculoOpen(false);
     setPeriodicoVinculoList([]);
     periodicoDecisionRef.current = "none";
-    periodicoLinkIdRef.current = null;
+    periodicoLinkIdsRef.current = [];
     pendingSaveStatusRef.current = null;
     periodicoAlertKeyRef.current = null;
     if (!fromSave) {
@@ -3006,7 +3014,7 @@ export function useAgendamentosPage() {
   const handleContinuarComPeriodicoPendente = useCallback(() => {
     void auditarDecisaoPeriodico("continuou_sem_vinculo");
     periodicoDecisionRef.current = "skip";
-    periodicoLinkIdRef.current = null;
+    periodicoLinkIdsRef.current = [];
     setPeriodicoVinculoOpen(false);
 
     // Após recusar antecipação, exige confirmação explícita do ASO genérico.
@@ -3031,14 +3039,15 @@ export function useAgendamentosPage() {
   }, [auditarDecisaoPeriodico, creditosAsoDisponiveis, executeSave]);
 
   const handleUtilizarPeriodicoPendente = useCallback(
-    (periodicoId: string) => {
-      if (!periodicoId) {
+    (grupoKey: string) => {
+      const grupo = periodicoVinculoList.find((g) => g.grupoKey === grupoKey);
+      if (!grupo || grupo.ids.length === 0) {
         handleCancelarPeriodicoVinculo();
         return;
       }
-      void auditarDecisaoPeriodico("antecipou_e_vinculou", periodicoId);
+      void auditarDecisaoPeriodico("antecipou_e_vinculou", grupo.grupoKey);
       periodicoDecisionRef.current = "link";
-      periodicoLinkIdRef.current = periodicoId;
+      periodicoLinkIdsRef.current = grupo.ids;
       // Não consumir ASO genérico junto com o vínculo específico.
       creditoDecisionRef.current = "skip";
       setCreditoAsoEmUsoId(null);
@@ -3051,7 +3060,7 @@ export function useAgendamentosPage() {
         void executeSave(pending);
       }
     },
-    [auditarDecisaoPeriodico, executeSave, handleCancelarPeriodicoVinculo]
+    [auditarDecisaoPeriodico, executeSave, handleCancelarPeriodicoVinculo, periodicoVinculoList]
   );
 
   const closeDuplicidade90DiasModal = useCallback(() => {

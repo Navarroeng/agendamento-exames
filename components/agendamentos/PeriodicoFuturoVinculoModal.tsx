@@ -7,24 +7,28 @@ import {
   labelMotivoExameFuturo,
   labelOrigemPeriodico,
 } from "@/lib/contrato-programacao-futura";
+import {
+  labelExamesCicloVinculo,
+  textoQuantidadePeriodicosFuturos,
+  type PeriodicoFuturoGrupo,
+} from "@/lib/periodico-agrupamento";
 import { isAntecipacaoPeriodico } from "@/services/contrato-programacao-futura.service";
-import type { PeriodicoFuturoRecord } from "@/lib/types";
 
 interface PeriodicoFuturoVinculoModalProps {
   open: boolean;
-  periodicos: PeriodicoFuturoRecord[];
+  grupos: PeriodicoFuturoGrupo[];
   colaboradorNome: string;
   dataAgendamentoIso?: string | null;
   contratoNumeros?: Record<string, string>;
   saving?: boolean;
   onCancelar: () => void;
   onContinuarSemVincular: () => void;
-  onAnteciparEVincular: (periodicoId: string) => void;
+  onAnteciparEVincular: (grupoKey: string) => void;
 }
 
 export function PeriodicoFuturoVinculoModal({
   open,
-  periodicos,
+  grupos,
   colaboradorNome,
   dataAgendamentoIso,
   contratoNumeros = {},
@@ -33,44 +37,43 @@ export function PeriodicoFuturoVinculoModal({
   onContinuarSemVincular,
   onAnteciparEVincular,
 }: PeriodicoFuturoVinculoModalProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [confirmAntecipacao, setConfirmAntecipacao] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setSelectedId(null);
+      setSelectedKey(null);
       setConfirmAntecipacao(false);
       return;
     }
-    if (periodicos.length === 1) {
-      setSelectedId(periodicos[0]?.id ?? null);
+    if (grupos.length === 1) {
+      setSelectedKey(grupos[0]?.grupoKey ?? null);
     } else {
-      setSelectedId(null);
+      setSelectedKey(null);
     }
     setConfirmAntecipacao(false);
-  }, [open, periodicos]);
+  }, [open, grupos]);
 
   const selected =
-    periodicos.find((p) => p.id === selectedId) ??
-    (periodicos.length === 1 ? periodicos[0] : null);
+    grupos.find((g) => g.grupoKey === selectedKey) ??
+    (grupos.length === 1 ? grupos[0] : null);
 
   const dataPrevista =
     selected?.data_prevista_original?.slice(0, 10) ||
     selected?.proxima_data?.slice(0, 10) ||
     "";
   const dataPrevistaLabel = dataPrevista ? formatDateBR(dataPrevista) : "—";
-  const exameLabel =
-    selected?.tipo_aso || selected?.exame_nome || selected?.tipo_exame || "Periódico";
   const isAntecipacao = isAntecipacaoPeriodico(dataAgendamentoIso, dataPrevista);
-  const multiplo = periodicos.length > 1;
+  const multiplo = grupos.length > 1;
+  const examesCicloLabel = selected ? labelExamesCicloVinculo(selected) : "Periódico";
 
   const handleVincularClick = () => {
-    if (!selected?.id) return;
+    if (!selected?.grupoKey) return;
     if (isAntecipacao && !confirmAntecipacao) {
       setConfirmAntecipacao(true);
       return;
     }
-    onAnteciparEVincular(selected.id);
+    onAnteciparEVincular(selected.grupoKey);
   };
 
   return (
@@ -94,7 +97,7 @@ export function PeriodicoFuturoVinculoModal({
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
               onClick={handleVincularClick}
-              disabled={saving || !selected?.id}
+              disabled={saving || !selected?.grupoKey}
             >
               {saving ? "Salvando..." : "Confirmar antecipação"}
             </button>
@@ -121,7 +124,7 @@ export function PeriodicoFuturoVinculoModal({
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
               onClick={handleVincularClick}
-              disabled={saving || !selected?.id}
+              disabled={saving || !selected?.grupoKey}
             >
               {isAntecipacao
                 ? "Antecipar e vincular ao exame futuro"
@@ -134,8 +137,9 @@ export function PeriodicoFuturoVinculoModal({
       <div className="space-y-3 text-sm text-[#334155]">
         {confirmAntecipacao && selected ? (
           <p className="font-semibold text-navy">
-            Este exame estava previsto para {dataPrevistaLabel} e será antecipado
-            para a nova data informada no agendamento.
+            Este periódico ({examesCicloLabel}) estava previsto para{" "}
+            {dataPrevistaLabel} e será antecipado para a nova data informada no
+            agendamento.
             <br />
             Deseja confirmar a antecipação?
           </p>
@@ -143,82 +147,70 @@ export function PeriodicoFuturoVinculoModal({
           <>
             <p className="font-semibold text-navy">
               O colaborador {colaboradorNome || selected?.colaborador || "—"}{" "}
-              possui{" "}
-              {multiplo
-                ? `${periodicos.length} exames futuros programados.`
-                : `um exame ${exameLabel} programado para ${dataPrevistaLabel}.`}
+              possui {textoQuantidadePeriodicosFuturos(grupos.length)}.
             </p>
 
-            {multiplo ? (
+            {grupos.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#8b95a8]">
-                  Selecione o registro
-                </p>
-                {periodicos.map((p) => {
+                {multiplo ? (
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#8b95a8]">
+                    Selecione o periódico
+                  </p>
+                ) : null}
+                {grupos.map((grupo) => {
                   const prev =
-                    p.data_prevista_original?.slice(0, 10) ||
-                    p.proxima_data?.slice(0, 10) ||
+                    grupo.data_prevista_original?.slice(0, 10) ||
+                    grupo.proxima_data?.slice(0, 10) ||
                     "";
                   const contrato =
-                    (p.contrato_id && contratoNumeros[p.contrato_id]) ||
+                    (grupo.contrato_id && contratoNumeros[grupo.contrato_id]) ||
                     "—";
+                  const checked = selected?.grupoKey === grupo.grupoKey;
                   return (
                     <label
-                      key={p.id}
+                      key={grupo.grupoKey}
                       className={`flex cursor-pointer gap-3 rounded-xl border px-3 py-2 ${
-                        selectedId === p.id
+                        checked
                           ? "border-[#4354e8] bg-[#eef2ff]"
                           : "border-[#e2e8f0] bg-[#f8fafc]"
                       }`}
                     >
                       <input
                         type="radio"
-                        name="periodico-futuro"
+                        name="periodico-futuro-ciclo"
                         className="mt-1"
-                        checked={selectedId === p.id}
-                        onChange={() => setSelectedId(p.id)}
+                        checked={checked}
+                        onChange={() => setSelectedKey(grupo.grupoKey)}
                       />
                       <div className="text-xs text-[#475569]">
                         <p className="font-bold text-navy">
-                          {p.tipo_aso || p.exame_nome || "Exame"} ·{" "}
-                          {prev ? formatDateBR(prev) : "—"}
+                          {labelExamesCicloVinculo(grupo)}
                         </p>
-                        <p>{p.cliente_nome}</p>
+                        <p>{prev ? formatDateBR(prev) : "—"}</p>
+                        <p>{grupo.cliente_nome}</p>
                         <p>
-                          Origem: {labelOrigemPeriodico(p.origem)} · Motivo:{" "}
-                          {labelMotivoExameFuturo(p.motivo, p.motivo_detalhe)}
+                          Origem: {labelOrigemPeriodico(grupo.origem)} · Motivo:{" "}
+                          {labelMotivoExameFuturo(
+                            grupo.motivo,
+                            grupo.motivo_detalhe
+                          )}
                         </p>
                         <p>Contrato: {contrato}</p>
+                        {grupo.examesNomes.length > 1 ? (
+                          <p className="mt-1 text-[#64748b]">
+                            {grupo.examesNomes.join(" · ")}
+                          </p>
+                        ) : null}
                       </div>
                     </label>
                   );
                 })}
               </div>
-            ) : selected ? (
-              <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-xs text-[#475569]">
-                <p>
-                  <span className="font-bold text-navy">Origem:</span>{" "}
-                  {labelOrigemPeriodico(selected.origem)}
-                </p>
-                <p className="mt-1">
-                  <span className="font-bold text-navy">Motivo:</span>{" "}
-                  {labelMotivoExameFuturo(
-                    selected.motivo,
-                    selected.motivo_detalhe
-                  )}
-                </p>
-                <p className="mt-1">
-                  <span className="font-bold text-navy">Contrato:</span>{" "}
-                  {(selected.contrato_id &&
-                    contratoNumeros[selected.contrato_id]) ||
-                    "—"}
-                </p>
-              </div>
             ) : null}
 
             <p className="text-[13px] leading-relaxed text-[#64748b]">
               Deseja realmente{" "}
-              {isAntecipacao ? "antecipar" : "utilizar"} este exame?
+              {isAntecipacao ? "antecipar" : "utilizar"} este periódico?
             </p>
           </>
         )}

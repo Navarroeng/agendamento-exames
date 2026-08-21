@@ -318,7 +318,7 @@ export function AgendamentoPage() {
       />
       <PeriodicoFuturoVinculoModal
         open={periodicoVinculoOpen}
-        periodicos={periodicoVinculoList}
+        grupos={periodicoVinculoList}
         colaboradorNome={form.colaborador}
         dataAgendamentoIso={
           form.data_agendamento.trim().length >= 10

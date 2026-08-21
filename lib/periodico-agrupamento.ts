@@ -251,6 +251,57 @@ export function toPeriodicoGruposFromRecords(
   return agruparPeriodicosPorColaboradorCiclo(records.map(toPeriodicoFuturoRow));
 }
 
+function periodicoElegivelParaVinculo(
+  record: Pick<
+    PeriodicoFuturoRecord,
+    "status" | "cancelado_em" | "motivo_cancelamento"
+  >
+): boolean {
+  if (isPeriodicoCanceladoManualmente(record)) return false;
+  return record.status === "ativo";
+}
+
+/**
+ * Mesma regra da página Periódicos Futuros (colaborador + próxima data),
+ * restrita a obrigações ainda abertas para antecipação/vínculo no agendamento.
+ */
+export function agruparPeriodicosPendentesParaVinculo(
+  records: PeriodicoFuturoRecord[]
+): PeriodicoFuturoGrupo[] {
+  const elegiveis = records.filter(periodicoElegivelParaVinculo);
+  return toPeriodicoGruposFromRecords(elegiveis).filter(
+    (grupo) =>
+      grupo.ids.length > 0 &&
+      grupo.displayStatus !== "cancelado" &&
+      grupo.displayStatus !== "reagendado"
+  );
+}
+
+export function labelExamesCicloVinculo(
+  grupo: Pick<PeriodicoFuturoGrupo, "examesLabel" | "examesNomes">
+): string {
+  const extras = Math.max(0, grupo.examesNomes.length - 1);
+  if (extras <= 0) {
+    return grupo.examesNomes[0] || grupo.examesLabel || "Periódico";
+  }
+  return `${grupo.examesLabel} ${extras === 1 ? "exame" : "exames"}`;
+}
+
+export function textoQuantidadePeriodicosFuturos(quantidadeCiclos: number): string {
+  if (quantidadeCiclos <= 0) return "nenhum periódico futuro programado";
+  if (quantidadeCiclos === 1) return "1 periódico futuro programado";
+  return `${quantidadeCiclos} periódicos futuros programados`;
+}
+
+export function encontrarGrupoPeriodicoPorIds(
+  grupos: PeriodicoFuturoGrupo[],
+  ids: string[]
+): PeriodicoFuturoGrupo | null {
+  const set = new Set(ids.filter(Boolean));
+  if (set.size === 0) return null;
+  return grupos.find((grupo) => grupo.ids.some((id) => set.has(id))) ?? null;
+}
+
 export function nomesColaboradorEquivalentes(
   a: string | null | undefined,
   b: string | null | undefined
