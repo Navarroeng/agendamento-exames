@@ -2,12 +2,18 @@
 
 import { PENDENCIA_LABELS } from "@/lib/agendamentos-table";
 import {
+  AGENDAMENTO_STATUS_FILTER_OPTIONS,
   ESOCIAL_FILTER_OPTIONS,
   hasActiveFilters,
+  isAgendamentoStatusFiltroMarcado,
+  labelAgendamentoStatusFiltro,
   PENDENCIA_SITUACAO_OPTIONS,
+  toggleAgendamentoStatusFiltro,
   type AgendamentoFilters,
+  type AgendamentoStatusFiltro,
 } from "@/lib/agendamento-filters";
 import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
+import { CheckboxMultiSelect } from "@/components/ui/CheckboxMultiSelect";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 
 interface FilterOptions {
@@ -25,7 +31,10 @@ interface AgendamentosFiltersProps {
   totalFiltrados: number;
   expanded: boolean;
   onToggle: () => void;
-  onChange: (field: keyof AgendamentoFilters, value: string) => void;
+  onChange: <K extends keyof AgendamentoFilters>(
+    field: K,
+    value: AgendamentoFilters[K]
+  ) => void;
   onClear: () => void;
 }
 
@@ -220,17 +229,31 @@ export function AgendamentosFilters({
             </FilterField>
 
             <FilterField label="Status">
-              <select
+              <CheckboxMultiSelect
                 className={inputClass}
-                value={filters.status}
-                onChange={(e) => onChange("status", e.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="agendado">Agendado</option>
-                <option value="aso_retido">ASO Retido</option>
-                <option value="rascunho">Rascunho</option>
-                <option value="cancelado">Cancelado</option>
-              </select>
+                ariaLabel="Status"
+                closedLabel={labelAgendamentoStatusFiltro(filters.status)}
+                todosChecked={isAgendamentoStatusFiltroMarcado(
+                  filters.status,
+                  "todos"
+                )}
+                options={AGENDAMENTO_STATUS_FILTER_OPTIONS}
+                isOptionChecked={(value) =>
+                  isAgendamentoStatusFiltroMarcado(filters.status, value)
+                }
+                onToggleTodos={() =>
+                  onChange(
+                    "status",
+                    toggleAgendamentoStatusFiltro(filters.status, "todos")
+                  )
+                }
+                onToggleOption={(value: AgendamentoStatusFiltro) =>
+                  onChange(
+                    "status",
+                    toggleAgendamentoStatusFiltro(filters.status, value)
+                  )
+                }
+              />
             </FilterField>
 
             <FilterField label="Responsável">

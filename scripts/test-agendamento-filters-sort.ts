@@ -3,6 +3,7 @@
 import {
   compareAgendamentosPorDataExameAsc,
   filterAgendamentos,
+  type AgendamentoFilters,
 } from "../lib/agendamento-filters";
 import { applyDefaultAgendamentoTableOrder } from "../lib/agendamento-table-sort";
 import type { AgendamentoWithExames } from "../lib/types";
@@ -57,14 +58,14 @@ function agendamento(
   };
 }
 
-const filtersAtivos = {
+const filtersAtivos: AgendamentoFilters = {
   mesReferencia: "06/2026",
   cliente: "",
   colaborador: "",
   clinica: "",
   tipoExame: "",
   aso: "",
-  status: "agendado",
+  status: ["agendado"],
   responsavel: "",
   pendencia: "",
   pendenciaSituacao: "",
@@ -106,7 +107,7 @@ test("sem filtro ativo mantém ordem original", () => {
     clinica: "",
     tipoExame: "",
     aso: "",
-    status: "",
+    status: [],
     responsavel: "",
     pendencia: "",
     pendenciaSituacao: "",
@@ -128,7 +129,7 @@ test("filtra agendamentos pelo mês de referência", () => {
     clinica: "",
     tipoExame: "",
     aso: "",
-    status: "",
+    status: [],
     responsavel: "",
     pendencia: "",
     pendenciaSituacao: "",
@@ -150,7 +151,7 @@ test("sem mês de referência inclui todo o período", () => {
     clinica: "",
     tipoExame: "",
     aso: "",
-    status: "",
+    status: [],
     responsavel: "",
     pendencia: "",
     pendenciaSituacao: "",

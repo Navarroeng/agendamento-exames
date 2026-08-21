@@ -4,6 +4,7 @@ import {
   compareAgendamentosPorDataExameAsc,
   filterAgendamentos,
   hasActiveFilters,
+  type AgendamentoFilters,
 } from "../lib/agendamento-filters";
 import {
   applyDefaultAgendamentoTableOrder,
@@ -62,21 +63,21 @@ function agendamento(
   };
 }
 
-const emptyFilters = {
+const emptyFilters: AgendamentoFilters = {
   mesReferencia: "06/2026",
   cliente: "",
   colaborador: "",
   clinica: "",
   tipoExame: "",
   aso: "",
-  status: "",
+  status: [],
   responsavel: "",
   pendencia: "",
   pendenciaSituacao: "",
   esocial: "",
 };
 
-const filtersAtivos = { ...emptyFilters, status: "agendado" };
+const filtersAtivos: AgendamentoFilters = { ...emptyFilters, status: ["agendado"] };
 
 test("ordena por data do exame crescente", () => {
   const items = [

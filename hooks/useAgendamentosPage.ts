@@ -763,7 +763,10 @@ export function useAgendamentosPage() {
   }, []);
 
   const handleFilterChange = useCallback(
-    (field: keyof AgendamentoFilters, value: string) => {
+    <K extends keyof AgendamentoFilters>(
+      field: K,
+      value: AgendamentoFilters[K]
+    ) => {
       setFilters((prev) => ({ ...prev, [field]: value }));
     },
     []

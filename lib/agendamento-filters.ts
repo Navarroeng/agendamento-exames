@@ -2,9 +2,23 @@ import { textMatchesSearch } from "@/lib/text-normalize";
 import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
 import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
 import { buildPendencias } from "@/lib/agendamentos-table";
-import type { AgendamentoWithExames } from "@/lib/types";
+import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
 
 export const AGENDAMENTOS_PAGE_SIZE = 15;
+
+/** Ordem do filtro Status (não alterar significado dos status). */
+export const AGENDAMENTO_STATUS_FILTER_OPTIONS = [
+  { value: "agendado", label: "Agendado" },
+  { value: "aso_retido", label: "ASO Retido" },
+  { value: "rascunho", label: "Rascunho" },
+  { value: "cancelado", label: "Cancelado" },
+] as const;
+
+export type AgendamentoStatusFiltro =
+  (typeof AGENDAMENTO_STATUS_FILTER_OPTIONS)[number]["value"];
+
+export const AGENDAMENTO_STATUS_FILTRO_VALORES: readonly AgendamentoStatusFiltro[] =
+  AGENDAMENTO_STATUS_FILTER_OPTIONS.map((o) => o.value);
 
 export interface AgendamentoFilters {
   mesReferencia: string;
@@ -13,7 +27,8 @@ export interface AgendamentoFilters {
   clinica: string;
   tipoExame: string;
   aso: string;
-  status: string;
+  /** Vazio = Todos. Subconjunto = OR entre os status. */
+  status: AgendamentoStatusFiltro[];
   responsavel: string;
   pendencia: string;
   pendenciaSituacao: string;
@@ -39,7 +54,7 @@ export const EMPTY_AGENDAMENTO_FILTERS: AgendamentoFilters = {
   clinica: "",
   tipoExame: "",
   aso: "",
-  status: "",
+  status: [],
   responsavel: "",
   pendencia: "",
   pendenciaSituacao: "",
@@ -50,6 +65,7 @@ export function getDefaultAgendamentoFilters(): AgendamentoFilters {
   return {
     ...EMPTY_AGENDAMENTO_FILTERS,
     mesReferencia: getCurrentMonthReferenceBR(),
+    status: [],
   };
 }
 
@@ -97,8 +113,74 @@ function matchesText(value: string, query: string): boolean {
   return textMatchesSearch(value, query);
 }
 
+export function isAgendamentoStatusFiltroTodos(
+  selected: readonly string[] | null | undefined
+): boolean {
+  if (!selected || selected.length === 0) return true;
+  if (selected.length !== AGENDAMENTO_STATUS_FILTRO_VALORES.length) return false;
+  return AGENDAMENTO_STATUS_FILTRO_VALORES.every((value) =>
+    selected.includes(value)
+  );
+}
+
+export function normalizeAgendamentoStatusFiltro(
+  selected: readonly string[] | null | undefined
+): AgendamentoStatusFiltro[] {
+  const allowed = new Set<string>(AGENDAMENTO_STATUS_FILTRO_VALORES);
+  const unique = Array.from(new Set(selected ?? [])).filter(
+    (value): value is AgendamentoStatusFiltro => allowed.has(value)
+  );
+  if (isAgendamentoStatusFiltroTodos(unique)) return [];
+  return AGENDAMENTO_STATUS_FILTRO_VALORES.filter((value) =>
+    unique.includes(value)
+  );
+}
+
+export function toggleAgendamentoStatusFiltro(
+  current: readonly AgendamentoStatusFiltro[],
+  option: "todos" | AgendamentoStatusFiltro
+): AgendamentoStatusFiltro[] {
+  if (option === "todos") return [];
+  const expanded = isAgendamentoStatusFiltroTodos(current)
+    ? [...AGENDAMENTO_STATUS_FILTRO_VALORES]
+    : normalizeAgendamentoStatusFiltro(current);
+  const next = new Set(expanded);
+  if (next.has(option)) next.delete(option);
+  else next.add(option);
+  return normalizeAgendamentoStatusFiltro(Array.from(next));
+}
+
+export function isAgendamentoStatusFiltroMarcado(
+  current: readonly AgendamentoStatusFiltro[],
+  option: "todos" | AgendamentoStatusFiltro
+): boolean {
+  if (option === "todos") return isAgendamentoStatusFiltroTodos(current);
+  if (isAgendamentoStatusFiltroTodos(current)) return true;
+  return current.includes(option);
+}
+
+export function labelAgendamentoStatusFiltro(
+  selected: readonly AgendamentoStatusFiltro[]
+): string {
+  if (isAgendamentoStatusFiltroTodos(selected)) return "Todos";
+  const labels = AGENDAMENTO_STATUS_FILTER_OPTIONS.filter((opt) =>
+    selected.includes(opt.value)
+  ).map((opt) => opt.label);
+  if (labels.length <= 1) return labels[0] ?? "Todos";
+  return `${labels[0]} + ${labels.length - 1}`;
+}
+
+export function matchesAgendamentoStatusFiltro(
+  itemStatus: AgendamentoStatus | string,
+  selected: readonly AgendamentoStatusFiltro[]
+): boolean {
+  if (isAgendamentoStatusFiltroTodos(selected)) return true;
+  return selected.includes(itemStatus as AgendamentoStatusFiltro);
+}
+
 export function hasActiveFilters(filters: AgendamentoFilters): boolean {
-  const { mesReferencia: _mes, ...rest } = filters;
+  const { mesReferencia: _mes, status, ...rest } = filters;
+  if (!isAgendamentoStatusFiltroTodos(status)) return true;
   return Object.values(rest).some((v) => v.trim() !== "");
 }
 
@@ -132,7 +214,9 @@ export function filterAgendamentos(
     if (!matchesText(item.aso, filters.aso)) return false;
     if (!matchesText(item.responsavel, filters.responsavel)) return false;
 
-    if (filters.status && item.status !== filters.status) return false;
+    if (!matchesAgendamentoStatusFiltro(item.status, filters.status)) {
+      return false;
+    }
 
     if (filters.tipoExame.trim()) {
       const exames = item.agendamento_exames ?? [];
