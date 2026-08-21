@@ -378,7 +378,7 @@ export function RiscosPainelCards({
 
         {campanha ? (
           <div className="space-y-4">
-            <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
                   Status
@@ -400,14 +400,6 @@ export function RiscosPainelCards({
                     campanha.data_inicio,
                     campanha.data_encerramento
                   )}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-                  Responsável
-                </dt>
-                <dd className="mt-0.5 font-semibold text-navy">
-                  {processo.implantacao.orcamento.responsavel?.trim() || "—"}
                 </dd>
               </div>
             </dl>

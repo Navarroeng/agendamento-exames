@@ -1,6 +1,8 @@
 /** Smoke: etapas derivadas do fluxo Riscos (auto 6 / manual 5). */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { buildLaudosSstProcesso } from "../lib/laudos-sst";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
 import type { RiscosCampanhaRecord } from "../lib/riscos-campanha";
@@ -322,5 +324,15 @@ assert.equal(riscosAposSucessoGeracao.etapaAtual, "finalizado");
 assert.equal(riscosAposSucessoGeracao.progressoLabel, "6 de 6");
 assert.equal(riscosAposSucessoGeracao.progressoPercentual, 100);
 assert.equal(riscosAposSucessoGeracao.status, "concluido");
+
+const painelCards = readFileSync(
+  join(__dirname, "../components/riscos-psicossociais/RiscosPainelCards.tsx"),
+  "utf8"
+);
+assert.match(painelCards, /dl className="grid grid-cols-2/);
+assert.match(painelCards, />\s*Status\s*</);
+assert.match(painelCards, />\s*Período\s*</);
+assert.doesNotMatch(painelCards, /Responsável/);
+assert.doesNotMatch(painelCards, /orcamento\.responsavel/);
 
 console.log("test-riscos-psicossociais: OK");
