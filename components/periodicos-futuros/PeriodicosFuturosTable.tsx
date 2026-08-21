@@ -11,7 +11,7 @@ import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
 import type { PeriodicoFuturoGrupo } from "@/lib/periodico-agrupamento";
 import { ListagemMesAnoTabs } from "@/components/ui/ListagemMesAnoTabs";
-import type { YearMonth } from "@/lib/listagem-meses";
+import type { ListagemPeriodoSelecionado, YearMonth } from "@/lib/listagem-meses";
 import { PeriodicoRowActionsMenu } from "./PeriodicoRowActionsMenu";
 
 interface PeriodicosFuturosTableProps {
@@ -19,9 +19,10 @@ interface PeriodicosFuturosTableProps {
   loading: boolean;
   error: string | null;
   saving: boolean;
-  mesSelecionado: YearMonth;
+  mesSelecionado: ListagemPeriodoSelecionado;
   anosDisponiveis: number[];
   onMesChange: (mes: YearMonth) => void;
+  onSelectTodos: () => void;
   onYearChange: (year: number) => void;
   canActOnRecord: (record: PeriodicoFuturoGrupo) => boolean;
   onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
@@ -41,6 +42,7 @@ export function PeriodicosFuturosTable({
   mesSelecionado,
   anosDisponiveis,
   onMesChange,
+  onSelectTodos,
   onYearChange,
   canActOnRecord,
   onCriarAgendamento,
@@ -59,6 +61,9 @@ export function PeriodicosFuturosTable({
         onYearChange={onYearChange}
         years={anosDisponiveis}
         disableFutureMonths={false}
+        showAllMonthsTab
+        onSelectTodos={onSelectTodos}
+        todosTitle={`Periódicos de todos os meses de ${mesSelecionado.year}`}
         ariaLabel="Filtrar periódicos pela próxima data"
         monthTitlePrefix="Periódicos com próxima data em"
       />

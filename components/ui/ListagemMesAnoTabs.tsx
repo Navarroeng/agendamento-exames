@@ -7,11 +7,12 @@ import {
   formatMesLabel,
   listAnosDisponiveis,
   listMesAbasListagem,
+  type ListagemPeriodoSelecionado,
   type YearMonth,
 } from "@/lib/listagem-meses";
 
 export interface ListagemMesAnoTabsProps {
-  selected: YearMonth;
+  selected: ListagemPeriodoSelecionado;
   onSelect: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
   /** Ano mínimo do seletor (padrão 2026). */
@@ -38,6 +39,13 @@ export interface ListagemMesAnoTabsProps {
   monthTitle?: (mes: YearMonth, disponivel: boolean) => string;
   /** Extra na mesma linha do seletor de ano (não altera o filtro mês/ano). */
   yearRowExtra?: ReactNode;
+  /**
+   * Aba "Todos" antes de Janeiro (ausência do filtro mensal no ano).
+   * Usar só em Periódicos Futuros.
+   */
+  showAllMonthsTab?: boolean;
+  onSelectTodos?: () => void;
+  todosTitle?: string;
 }
 
 /**
@@ -57,6 +65,9 @@ export function ListagemMesAnoTabs({
   monthTitlePrefix,
   monthTitle,
   yearRowExtra,
+  showAllMonthsTab = false,
+  onSelectTodos,
+  todosTitle,
 }: ListagemMesAnoTabsProps) {
   const years = yearsProp ?? listAnosDisponiveis(startYear, now);
   const months = listMesAbasListagem(selected.year, {
@@ -75,6 +86,9 @@ export function ListagemMesAnoTabs({
       yearRowExtra={yearRowExtra}
       now={now}
       disableFutureMonths={disableFutureMonths}
+      showAllMonthsTab={showAllMonthsTab}
+      onSelectTodos={onSelectTodos}
+      todosTitle={todosTitle}
       ariaLabel={ariaLabel}
       monthTitle={
         monthTitle ??

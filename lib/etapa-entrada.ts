@@ -16,8 +16,8 @@
  */
 
 import {
-  belongsToYearMonth,
-  type YearMonth,
+  belongsToPeriodo,
+  type ListagemPeriodoSelecionado,
 } from "@/lib/listagem-meses";
 
 export const ETAPA_ENTRADA_CAMPOS = {
@@ -32,11 +32,14 @@ export const ETAPA_ENTRADA_CAMPOS = {
 
 export type EtapaOperacionalId = keyof typeof ETAPA_ENTRADA_CAMPOS;
 
-/** Filtra registros cuja data de entrada na etapa pertence ao mês. */
+/**
+ * Filtra registros cuja data de entrada pertence ao período.
+ * Com `month: null`, aplica só o ano (todos os meses).
+ */
 export function filterByEtapaEntradaMes<T>(
   items: T[],
   getEntradaIso: (item: T) => string | null | undefined,
-  mes: YearMonth
+  mes: ListagemPeriodoSelecionado
 ): T[] {
-  return items.filter((item) => belongsToYearMonth(getEntradaIso(item), mes));
+  return items.filter((item) => belongsToPeriodo(getEntradaIso(item), mes));
 }

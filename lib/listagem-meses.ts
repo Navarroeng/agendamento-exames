@@ -9,6 +9,21 @@ export type YearMonth = {
   month: number;
 };
 
+/**
+ * Período da listagem: um mês específico ou todos os meses do ano.
+ * `month: null` = ausência do filtro mensal (não é um mês sintético).
+ */
+export type ListagemPeriodoSelecionado = {
+  year: number;
+  month: number | null;
+};
+
+export function isPeriodoTodosMeses(
+  periodo: ListagemPeriodoSelecionado
+): boolean {
+  return periodo.month == null;
+}
+
 const MESES_PT_LABEL: ReadonlyArray<string> = [
   "Janeiro",
   "Fevereiro",
@@ -140,9 +155,22 @@ export function belongsToYearMonth(
   iso: string | null | undefined,
   mes: YearMonth
 ): boolean {
+  return belongsToPeriodo(iso, mes);
+}
+
+/**
+ * Pertence ao período: mês específico, ou qualquer mês do ano quando
+ * `month` é `null` (aba Todos).
+ */
+export function belongsToPeriodo(
+  iso: string | null | undefined,
+  periodo: ListagemPeriodoSelecionado
+): boolean {
   const ym = yearMonthFromIsoDate(iso);
   if (!ym) return false;
-  return isSameYearMonth(ym, mes);
+  if (ym.year !== periodo.year) return false;
+  if (periodo.month == null) return true;
+  return ym.month === periodo.month;
 }
 
 /** Anos disponíveis de `startYear` até o ano civil atual (inclusive). */
@@ -216,6 +244,25 @@ export function resolveMesParaAno(
   }
 
   return resolveInitialMes(now, abas);
+}
+
+/**
+ * Troca o ano preservando "Todos" (`month: null`) ou o mês específico.
+ */
+export function resolvePeriodoParaAno(
+  year: number,
+  prev: ListagemPeriodoSelecionado,
+  opts?: {
+    startYear?: number;
+    startMonthFirstYear?: number;
+    now?: Date;
+    allowFutureMonths?: boolean;
+  }
+): ListagemPeriodoSelecionado {
+  if (prev.month == null) {
+    return { year, month: null };
+  }
+  return resolveMesParaAno(year, prev.month, opts);
 }
 
 /** Une anos existentes nos registros com o ano civil atual (se ainda não houver dados). */

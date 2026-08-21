@@ -8,6 +8,7 @@ import {
   listMesAbasDoAno,
   mergeAnosComAtual,
   yearMonthFromIsoDate,
+  type ListagemPeriodoSelecionado,
   type YearMonth,
 } from "@/lib/listagem-meses";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
@@ -177,10 +178,13 @@ export function filterPeriodicosFuturos(
   });
 }
 
-/** Filtra pela Próxima Data do periódico (entrada/referência do módulo). */
+/**
+ * Filtra pela Próxima Data do periódico (entrada/referência do módulo).
+ * `month: null` = todos os meses do ano selecionado.
+ */
 export function filterPeriodicosFuturosPorMes(
   records: PeriodicoFuturoRow[],
-  mes: YearMonth
+  mes: ListagemPeriodoSelecionado
 ): PeriodicoFuturoRow[] {
   return filterByEtapaEntradaMes(records, (r) => r.proxima_data, mes);
 }

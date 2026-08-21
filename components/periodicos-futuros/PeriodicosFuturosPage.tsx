@@ -31,6 +31,7 @@ export function PeriodicosFuturosPage() {
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
+    handleSelectTodos,
     handleYearChange,
     handleCardClick,
     setPage,
@@ -85,6 +86,7 @@ export function PeriodicosFuturosPage() {
           mesSelecionado={mesSelecionado}
           anosDisponiveis={anosDisponiveis}
           onMesChange={handleMesChange}
+          onSelectTodos={handleSelectTodos}
           onYearChange={handleYearChange}
           canActOnRecord={canActOnRecord}
           onCriarAgendamento={handleCriarAgendamento}

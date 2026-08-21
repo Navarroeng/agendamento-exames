@@ -26,7 +26,8 @@ import {
 } from "@/lib/periodico-cancelamento";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
-  resolveMesParaAno,
+  resolvePeriodoParaAno,
+  type ListagemPeriodoSelecionado,
   type YearMonth,
 } from "@/lib/listagem-meses";
 import type {
@@ -63,9 +64,8 @@ export function usePeriodicosFuturosPage() {
   const [activeCard, setActiveCard] = useState<
     PeriodicoFuturoDisplayStatus | ""
   >("");
-  const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
-    resolveInitialMesPeriodicos([])
-  );
+  const [mesSelecionado, setMesSelecionado] =
+    useState<ListagemPeriodoSelecionado>(() => resolveInitialMesPeriodicos([]));
   const [editProximaDataRecord, setEditProximaDataRecord] =
     useState<PeriodicoFuturoGrupo | null>(null);
   const [adicionarCpfGrupo, setAdicionarCpfGrupo] =
@@ -108,7 +108,7 @@ export function usePeriodicosFuturosPage() {
     if (anosDisponiveis.length === 0) return;
     if (!anosDisponiveis.includes(mesSelecionado.year)) {
       setMesSelecionado((prev) =>
-        resolveMesParaAno(anosDisponiveis[0], prev.month, {
+        resolvePeriodoParaAno(anosDisponiveis[0], prev, {
           allowFutureMonths: true,
         })
       );
@@ -179,9 +179,13 @@ export function usePeriodicosFuturosPage() {
     setMesSelecionado(mes);
   }, []);
 
+  const handleSelectTodos = useCallback(() => {
+    setMesSelecionado((prev) => ({ year: prev.year, month: null }));
+  }, []);
+
   const handleYearChange = useCallback((year: number) => {
     setMesSelecionado((prev) =>
-      resolveMesParaAno(year, prev.month, { allowFutureMonths: true })
+      resolvePeriodoParaAno(year, prev, { allowFutureMonths: true })
     );
   }, []);
 
@@ -444,6 +448,7 @@ export function usePeriodicosFuturosPage() {
     handleFilterChange,
     handleClearFilters,
     handleMesChange,
+    handleSelectTodos,
     handleYearChange,
     handleCardClick,
     setPage,

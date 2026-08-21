@@ -4,14 +4,16 @@ import type { ReactNode } from "react";
 import {
   formatMesLabel,
   isMesDisponivel,
+  isPeriodoTodosMeses,
   isSameYearMonth,
   yearMonthKey,
+  type ListagemPeriodoSelecionado,
   type YearMonth,
 } from "@/lib/listagem-meses";
 
 interface MesAnoTabsProps {
   months: YearMonth[];
-  selected: YearMonth;
+  selected: ListagemPeriodoSelecionado;
   onSelect: (mes: YearMonth) => void;
   /** Quando informado com onYearChange, exibe o seletor de ano. */
   year?: number;
@@ -28,6 +30,13 @@ interface MesAnoTabsProps {
   disableFutureMonths?: boolean;
   ariaLabel?: string;
   monthTitle?: (mes: YearMonth, disponivel: boolean) => string;
+  /**
+   * Aba "Todos" à esquerda de Janeiro: ausência do filtro mensal no ano.
+   * Só Periódicos Futuros deve ligar isto.
+   */
+  showAllMonthsTab?: boolean;
+  onSelectTodos?: () => void;
+  todosTitle?: string;
 }
 
 export function MesAnoTabs({
@@ -42,8 +51,12 @@ export function MesAnoTabs({
   disableFutureMonths = true,
   ariaLabel = "Filtrar por mês",
   monthTitle,
+  showAllMonthsTab = false,
+  onSelectTodos,
+  todosTitle,
 }: MesAnoTabsProps) {
   const showYear = Boolean(years && onYearChange && year != null);
+  const todosAtivo = showAllMonthsTab && isPeriodoTodosMeses(selected);
 
   return (
     <div className="-mx-1 mb-3 space-y-2.5 px-1">
@@ -78,11 +91,37 @@ export function MesAnoTabs({
 
       <div className="overflow-x-auto" role="tablist" aria-label={ariaLabel}>
         <div className="flex w-max min-w-full items-center gap-1.5">
+          {showAllMonthsTab ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={todosAtivo}
+              title={
+                todosTitle ??
+                `Todos os meses de ${selected.year}`
+              }
+              onClick={() => onSelectTodos?.()}
+              className={[
+                "shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[11px] font-bold tracking-wide transition",
+                todosAtivo
+                  ? "border-brand-blue bg-brand-blue text-white shadow-[0_6px_14px_rgba(79,99,255,0.22)]"
+                  : "border-brand-blue/20 bg-brand-blue-soft text-brand-blue hover:border-brand-blue/40 hover:bg-[#e4e9ff]",
+              ].join(" ")}
+            >
+              Todos
+            </button>
+          ) : null}
           {months.map((mes) => {
             const disponivel = disableFutureMonths
               ? isMesDisponivel(mes, now)
               : true;
-            const ativo = isSameYearMonth(mes, selected);
+            const ativo =
+              !todosAtivo &&
+              selected.month != null &&
+              isSameYearMonth(mes, {
+                year: selected.year,
+                month: selected.month,
+              });
             const label = formatMesLabel(mes);
             const key = yearMonthKey(mes);
             const title =
