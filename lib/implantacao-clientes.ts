@@ -1,3 +1,4 @@
+import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 import {
   isContratoEtapaConcluida,
   isFinanceiroEtapaConcluida,
@@ -264,6 +265,10 @@ export interface ImplantacaoProcesso {
   examesProgramadosFuturos: number;
   /** ASOs contratuais em aberto (status disponivel). */
   asosContratuaisEmAberto: number;
+  /** Vagas ainda sem classificação (fonte da etapa Agendamentos). */
+  pendentesDefinicao?: number | null;
+  /** Vagas nomeadas ainda não agendadas/programadas/ASO. */
+  vagasComprometidas?: number | null;
   agendamentosIniciaisDispensados: boolean;
   /**
    * Concluído porque a previsão foi preenchida com pelo menos um exame
@@ -295,16 +300,49 @@ export function resolveQuantidadeContratadaImplantacao(
   return 0;
 }
 
+export type ImplantacaoAgendamentosClassificacao = {
+  pendentesDefinicao: number;
+  vagasComprometidas: number;
+};
+
+/**
+ * Etapa Agendamentos da lista: mesma regra da aba (classificação das vagas).
+ * Não usa percentual de progresso. Comprometida ainda não conclui.
+ */
 export function isAgendamentosImplantacaoConcluida(
   quantidadeContratada: number,
   agendamentosRealizados: number,
-  dispensado = false
+  dispensado = false,
+  classificacao?: ImplantacaoAgendamentosClassificacao | null
 ): boolean {
   if (dispensado) return true;
   const qtd = Math.max(0, quantidadeContratada);
-  const feitos = Math.max(0, agendamentosRealizados);
   if (qtd <= 0) return false;
+  if (classificacao) {
+    return isClassificacaoVagasContratoCompleta({
+      previstos: qtd,
+      pendentesDefinicao: classificacao.pendentesDefinicao,
+      vagasComprometidas: classificacao.vagasComprometidas,
+    });
+  }
+  const feitos = Math.max(0, agendamentosRealizados);
   return feitos >= qtd;
+}
+
+function classificacaoAgendamentosFromOpts(opts?: {
+  pendentesDefinicao?: number;
+  vagasComprometidas?: number;
+}): ImplantacaoAgendamentosClassificacao | null {
+  if (
+    opts?.pendentesDefinicao == null ||
+    opts?.vagasComprometidas == null
+  ) {
+    return null;
+  }
+  return {
+    pendentesDefinicao: opts.pendentesDefinicao,
+    vagasComprometidas: opts.vagasComprometidas,
+  };
 }
 
 export function resolveImplantacaoEtapaAtual(
@@ -313,6 +351,8 @@ export function resolveImplantacaoEtapaAtual(
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
     agendamentosDispensados?: boolean;
+    pendentesDefinicao?: number;
+    vagasComprometidas?: number;
     orcamentoStatus?: OrcamentoStatus;
     contratoStatus?: string | null;
     contratoEncerradoEm?: string | null;
@@ -357,7 +397,8 @@ export function resolveImplantacaoEtapaAtual(
   const agendamentosOk = isAgendamentosImplantacaoConcluida(
     qtd,
     feitos,
-    Boolean(opts?.agendamentosDispensados)
+    Boolean(opts?.agendamentosDispensados),
+    classificacaoAgendamentosFromOpts(opts)
   );
 
   if (fluxo === "combinado") {
@@ -380,6 +421,8 @@ export function countImplantacaoEtapasConcluidas(
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
     agendamentosDispensados?: boolean;
+    pendentesDefinicao?: number;
+    vagasComprometidas?: number;
     fluxo?: OrcamentoFluxoImplantacao;
     treinamento?: ImplantacaoTreinamentoRecord | null;
     /** Para fluxo somente_treinamentos: conta as 5 abas (inclui resumo/aprovado). */
@@ -413,7 +456,8 @@ export function countImplantacaoEtapasConcluidas(
     isAgendamentosImplantacaoConcluida(
       opts?.quantidadeContratada ?? 0,
       opts?.agendamentosRealizados ?? 0,
-      Boolean(opts?.agendamentosDispensados)
+      Boolean(opts?.agendamentosDispensados),
+      classificacaoAgendamentosFromOpts(opts)
     )
   ) {
     n += 1;
@@ -448,6 +492,8 @@ export function buildImplantacaoProcesso(params: {
   agendamentosRealizados?: number;
   examesProgramadosFuturos?: number;
   asosContratuaisEmAberto?: number;
+  pendentesDefinicao?: number;
+  vagasComprometidas?: number;
   fluxoImplantacao?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
   possuiPacoteCompletoSst?: boolean;
@@ -477,10 +523,16 @@ export function buildImplantacaoProcesso(params: {
   const agendamentosIniciaisDispensados = Boolean(
     contrato?.agendamentos_iniciais_dispensados
   );
+  const pendentesDefinicao = Math.max(0, params.pendentesDefinicao ?? 0);
+  const vagasComprometidas = Math.max(0, params.vagasComprometidas ?? 0);
+  const temClassificacaoVagas =
+    params.pendentesDefinicao != null && params.vagasComprometidas != null;
   const contagemOpts = {
     quantidadeContratada,
     agendamentosRealizados,
     agendamentosDispensados: agendamentosIniciaisDispensados,
+    pendentesDefinicao: temClassificacaoVagas ? pendentesDefinicao : undefined,
+    vagasComprometidas: temClassificacaoVagas ? vagasComprometidas : undefined,
     orcamentoStatus: orcamento.status,
     contratoStatus: contrato?.status ?? null,
     contratoEncerradoEm: contrato?.encerrado_em ?? null,
@@ -538,6 +590,8 @@ export function buildImplantacaoProcesso(params: {
     agendamentosRealizados,
     examesProgramadosFuturos,
     asosContratuaisEmAberto,
+    pendentesDefinicao: temClassificacaoVagas ? pendentesDefinicao : null,
+    vagasComprometidas: temClassificacaoVagas ? vagasComprometidas : null,
     agendamentosIniciaisDispensados,
     concluidoComExamesFuturos,
     fluxoImplantacao: fluxo,
@@ -770,13 +824,16 @@ export function resolveImplantacaoEtapaVisual(
     quantidadeContratada?: number;
     agendamentosRealizados?: number;
     agendamentosDispensados?: boolean;
+    pendentesDefinicao?: number;
+    vagasComprometidas?: number;
     treinamento?: ImplantacaoTreinamentoRecord | null;
   }
 ): ImplantacaoEtapaVisualEstado {
   const agendamentosDone = isAgendamentosImplantacaoConcluida(
     opts?.quantidadeContratada ?? 0,
     opts?.agendamentosRealizados ?? 0,
-    Boolean(opts?.agendamentosDispensados)
+    Boolean(opts?.agendamentosDispensados),
+    classificacaoAgendamentosFromOpts(opts)
   );
   const treinamentoDone = isTreinamentoEtapaConcluida(opts?.treinamento);
 

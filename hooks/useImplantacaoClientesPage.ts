@@ -103,8 +103,11 @@ export function useImplantacaoClientesPage() {
     ImplantacaoTreinamentoEventoRecord[]
   >([]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await listarProcessosImplantacao();
@@ -117,7 +120,9 @@ export function useImplantacaoClientesPage() {
           : "Erro ao carregar processos de implantação."
       );
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -270,7 +275,7 @@ export function useImplantacaoClientesPage() {
     setLogoPreviewUrl(null);
     setModalTreinamento(null);
     setModalTreinamentoEventos([]);
-    void refresh();
+    void refresh({ silent: true });
   }, [modalSaving, refresh]);
 
   const handleSalvarAprovacao = useCallback(
@@ -918,7 +923,7 @@ export function useImplantacaoClientesPage() {
   const handleAprovacaoAtualizada = useCallback(
     (saved: OrcamentoAprovacaoRecord) => {
       setModalAprovacao(saved);
-      void refresh();
+      void refresh({ silent: true });
     },
     [refresh]
   );

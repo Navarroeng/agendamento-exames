@@ -48,6 +48,8 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               quantidadeContratada: processo.quantidadeContratada,
               agendamentosRealizados: processo.agendamentosRealizados,
               agendamentosDispensados: processo.agendamentosIniciaisDispensados,
+              pendentesDefinicao: processo.pendentesDefinicao ?? undefined,
+              vagasComprometidas: processo.vagasComprometidas ?? undefined,
               treinamento: processo.treinamento,
             }
           );

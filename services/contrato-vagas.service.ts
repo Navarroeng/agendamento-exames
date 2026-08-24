@@ -113,6 +113,31 @@ export async function garantirVagasDoContrato(params: {
   return listarVagasDoContrato(params.contratoId);
 }
 
+export async function listarVagasPorContratos(
+  contratoIds: string[]
+): Promise<Map<string, ContratoVagaRecord[]>> {
+  const map = new Map<string, ContratoVagaRecord[]>();
+  const ids = Array.from(new Set(contratoIds.map((id) => String(id).trim()).filter(Boolean)));
+  for (const id of ids) map.set(id, []);
+  if (ids.length === 0) return map;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contrato_vagas")
+    .select(SELECT_VAGA)
+    .in("contrato_id", ids)
+    .order("indice", { ascending: true });
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    const vaga = mapVaga(row as Record<string, unknown>);
+    const list = map.get(vaga.contrato_id) ?? [];
+    list.push(vaga);
+    map.set(vaga.contrato_id, list);
+  }
+  return map;
+}
+
 export async function marcarEtapaListaVagas(aprovacaoId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

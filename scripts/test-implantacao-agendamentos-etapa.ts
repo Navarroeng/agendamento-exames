@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import {
+  buildImplantacaoProcesso,
   countImplantacaoEtapasConcluidas,
   resolveImplantacaoEtapaAtual,
 } from "../lib/implantacao-clientes";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
+import type { OrcamentoRecord } from "../lib/orcamento-types";
+import type { ClienteContratoRecord } from "../lib/types";
 
 function aprovacaoBase(
   overrides: Partial<OrcamentoAprovacaoRecord> = {}
@@ -97,6 +100,75 @@ assert.equal(
     agendamentosDispensados: true,
   }),
   7
+);
+
+const nepper = buildImplantacaoProcesso({
+  orcamento: {
+    id: "o-nepper",
+    numero: "ORC-2026-0007",
+    status: "aprovado",
+    cliente_nome: "NEPPER CONSTRUTORA",
+    cliente_cnpj: "00",
+    responsavel: "Admin",
+    origem_cliente: null,
+  } as OrcamentoRecord,
+  aprovacao: aprovacaoBase({ quantidade_colaboradores: 10 }),
+  contrato: {
+    id: "c-nepper",
+    numero: "CTR-NEPPER",
+    quantidade_colaboradores: 10,
+    status: "ativo",
+    agendamentos_iniciais_dispensados: false,
+  } as ClienteContratoRecord,
+  agendamentosRealizados: 5,
+  examesProgramadosFuturos: 4,
+  asosContratuaisEmAberto: 0,
+  pendentesDefinicao: 0,
+  vagasComprometidas: 0,
+});
+assert.equal(nepper.etapaAtual, "concluido");
+assert.equal(nepper.etapasConcluidas, 7);
+assert.equal(nepper.totalEtapas, 7);
+assert.equal(nepper.progressoLabel, "7 de 7");
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 2 }), {
+    quantidadeContratada: 2,
+    agendamentosRealizados: 1,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  "concluido"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 10 }), {
+    quantidadeContratada: 10,
+    agendamentosRealizados: 9,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  "concluido"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 2 }), {
+    quantidadeContratada: 2,
+    agendamentosRealizados: 1,
+    pendentesDefinicao: 1,
+    vagasComprometidas: 0,
+  }),
+  "aguardando_agendamentos"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 2 }), {
+    quantidadeContratada: 2,
+    agendamentosRealizados: 1,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 1,
+  }),
+  "aguardando_agendamentos"
 );
 
 console.log("ok: implantacao-agendamentos-etapa");

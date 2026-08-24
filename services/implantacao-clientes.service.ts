@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
 import type { ClienteContratoRecord } from "@/lib/types";
+import { buildContagemContratoComVagas } from "@/lib/contrato-agendamentos";
 import {
   buildImplantacaoProcesso,
+  resolveQuantidadeContratadaImplantacao,
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
 import {
@@ -18,6 +20,7 @@ import {
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
 import { contarCreditosDisponiveisPorContratos } from "@/services/contrato-creditos-aso.service";
 import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
+import { listarVagasPorContratos } from "@/services/contrato-vagas.service";
 import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
 
 function sortAprovacao(
@@ -172,6 +175,7 @@ export async function listarProcessosImplantacao(): Promise<
     await contarProgramacoesFuturasPorContratos(contratoIds);
   const creditosPorContrato =
     await contarCreditosDisponiveisPorContratos(contratoIds);
+  const vagasPorContrato = await listarVagasPorContratos(contratoIds);
 
   const processos: ImplantacaoProcesso[] = [];
 
@@ -206,6 +210,24 @@ export async function listarProcessosImplantacao(): Promise<
     const emAberto = contrato
       ? creditosPorContrato.get(contrato.id) ?? 0
       : 0;
+    const vagas = contrato ? vagasPorContrato.get(contrato.id) ?? [] : [];
+    const quantidadePrevista = resolveQuantidadeContratadaImplantacao(
+      aprovacao,
+      contrato
+    );
+    const vagasComprometidas = vagas.filter(
+      (vaga) => vaga.status === "comprometida"
+    ).length;
+    const contagem = buildContagemContratoComVagas({
+      quantidadePrevista,
+      vagas,
+      utilizadosAg: agendados,
+      programadosLegado: programados,
+      emAbertoLegado: emAberto,
+      vagasComprometidasLegado: vagasComprometidas,
+      adicionaisLegado: 0,
+      dispensado: Boolean(contrato?.agendamentos_iniciais_dispensados),
+    });
 
     const itens = resolveItensParaFluxoImplantacao({
       aprovacaoItens: itensByOrcamento.get(id) ?? [],
@@ -226,9 +248,11 @@ export async function listarProcessosImplantacao(): Promise<
         orcamento,
         aprovacao,
         contrato,
-        agendamentosRealizados: agendados,
-        examesProgramadosFuturos: programados,
-        asosContratuaisEmAberto: emAberto,
+        agendamentosRealizados: contagem.agendados,
+        examesProgramadosFuturos: contagem.programadosFuturos,
+        asosContratuaisEmAberto: contagem.emAberto,
+        pendentesDefinicao: contagem.pendentesDefinicao,
+        vagasComprometidas: contagem.vagasComprometidas,
         fluxoImplantacao,
         treinamento,
         possuiPacoteCompletoSst,
