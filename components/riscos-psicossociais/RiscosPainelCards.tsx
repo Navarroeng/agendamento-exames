@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  podeAbrirPesquisaRiscos,
+  RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
+} from "@/lib/riscos-abrir-pesquisa-permissao";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { RiscosCampanhaParticipantesSection } from "@/components/riscos-psicossociais/RiscosCampanhaParticipantesSection";
@@ -164,6 +169,11 @@ export function RiscosPainelCards({
   auditContext,
   onRelatorioAtualizado,
 }: RiscosPainelCardsProps) {
+  const { profile } = useAuth();
+  const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
+    perfil: profile?.perfil,
+    email: profile?.email,
+  });
   const campanha = processo.campanha;
 
   const [criarAberto, setCriarAberto] = useState(false);
@@ -270,6 +280,10 @@ export function RiscosPainelCards({
 
   function handleTentarAbrir() {
     if (!campanha) return;
+    if (!podeAutorizarAbrirPesquisa) {
+      toast.error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
+      return;
+    }
     if (preRequisitoAbrir) {
       toast.error(preRequisitoAbrir);
       return;
@@ -487,7 +501,8 @@ export function RiscosPainelCards({
               ) : null}
               {campanhaStatusSincronizado &&
               !processoCancelado &&
-              acoesConvite.exibirAbrir ? (
+              acoesConvite.exibirAbrir &&
+              podeAutorizarAbrirPesquisa ? (
                 <button
                   type="button"
                   className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"

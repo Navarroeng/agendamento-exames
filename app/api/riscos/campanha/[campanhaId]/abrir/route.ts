@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { isPerfilAdmin } from "@/lib/permissions";
+import {
+  podeAbrirPesquisaRiscos,
+  RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
+} from "@/lib/riscos-abrir-pesquisa-permissao";
 import { createClient } from "@/lib/supabase/server";
 import { abrirCampanhaRiscosNoServidor } from "@/services/riscos-campanha-abrir.server";
 
@@ -7,7 +10,8 @@ export const runtime = "nodejs";
 
 /**
  * Abre a pesquisa (status → aberta) com persistência confirmada no banco.
- * Autenticado + perfil admin. Usa service role apenas após checagem de sessão.
+ * Autenticado + admin, ou e-mail persistido de Bruna/Rafaela.
+ * Usa service role apenas após checagem de sessão.
  */
 export async function POST(
   request: Request,
@@ -30,9 +34,17 @@ export async function POST(
       .maybeSingle();
 
     if (perfilErr) throw perfilErr;
-    if (!perfil || perfil.ativo === false || !isPerfilAdmin(perfil.perfil)) {
+    const autorizado =
+      !!perfil &&
+      perfil.ativo !== false &&
+      podeAbrirPesquisaRiscos({
+        perfil: perfil.perfil,
+        email: typeof perfil.email === "string" ? perfil.email : null,
+        emailAuth: user.email,
+      });
+    if (!autorizado) {
       return NextResponse.json(
-        { error: "Somente administradores podem abrir a pesquisa." },
+        { error: RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG },
         { status: 403 }
       );
     }
@@ -45,7 +57,7 @@ export async function POST(
     let usuarioNome =
       (typeof perfil.nome === "string" && perfil.nome.trim()) ||
       user.email ||
-      "Administrador";
+      "Usuário";
     let usuarioEmail =
       (typeof perfil.email === "string" && perfil.email.trim()) ||
       user.email ||

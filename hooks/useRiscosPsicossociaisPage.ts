@@ -6,6 +6,10 @@ import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
+  podeAbrirPesquisaRiscos,
+  RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
+} from "@/lib/riscos-abrir-pesquisa-permissao";
+import {
   DEFAULT_RISCOS_LISTAGEM_STATUS,
   EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS,
   buildRiscosPsicossociaisProcesso,
@@ -81,6 +85,10 @@ export function useRiscosPsicossociaisPage() {
   const auditContext = useAuditoriaUsuario();
   const { profile } = useAuth();
   const isAdmin = isPerfilAdmin(profile?.perfil);
+  const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
+    perfil: profile?.perfil,
+    email: profile?.email,
+  });
   const [processos, setProcessos] = useState<RiscosPsicossociaisProcesso[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
@@ -893,6 +901,9 @@ export function useRiscosPsicossociaisPage() {
   const handleAbrirCampanha = useCallback(async () => {
     const campanhaId = modalProcesso?.campanha?.id;
     if (!campanhaId) return;
+    if (!podeAutorizarAbrirPesquisa) {
+      throw new Error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
+    }
     setSavingCampanha(true);
     try {
       const campanha = await abrirCampanhaRiscos(campanhaId, { auditContext });
@@ -923,7 +934,7 @@ export function useRiscosPsicossociaisPage() {
     } finally {
       setSavingCampanha(false);
     }
-  }, [modalProcesso, auditContext, refresh]);
+  }, [modalProcesso, auditContext, refresh, podeAutorizarAbrirPesquisa]);
 
   const handleEncerrarCampanha = useCallback(async () => {
     const campanhaId = modalProcesso?.campanha?.id;
@@ -1355,6 +1366,7 @@ export function useRiscosPsicossociaisPage() {
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
     isAdmin,
+    podeAutorizarAbrirPesquisa,
     processoParaRemover,
     openRemoverProcesso,
     closeRemoverProcesso,
