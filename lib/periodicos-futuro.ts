@@ -337,6 +337,55 @@ export function resolveInitialMesPeriodicos(
   return { year: getNowYearMonth(now).year, month: null };
 }
 
+const PERIODICO_STATUS_FILTRO: ReadonlyArray<PeriodicoFuturoDisplayStatus> = [
+  "vencido",
+  "vence_30_dias",
+  "em_dia",
+  "reagendado",
+  "cancelado",
+];
+
+function isPeriodicoDisplayStatus(
+  value: string
+): value is PeriodicoFuturoDisplayStatus {
+  return PERIODICO_STATUS_FILTRO.includes(
+    value as PeriodicoFuturoDisplayStatus
+  );
+}
+
+/** Hidrata mês/status já existentes a partir da query string (Dashboard). */
+export function periodicoViewFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get">,
+  now: Date = new Date()
+): {
+  mesSelecionado: ListagemPeriodoSelecionado;
+  activeCard: PeriodicoFuturoDisplayStatus | "";
+} {
+  const fallback = resolveInitialMesPeriodicos(now);
+  const anoRaw = searchParams.get("ano")?.trim() ?? "";
+  const mesRaw = searchParams.get("mes")?.trim() ?? "";
+  const ano = Number(anoRaw);
+
+  let mesSelecionado = fallback;
+  if (anoRaw && Number.isInteger(ano) && ano >= 1900 && ano <= 2100) {
+    if (!mesRaw || mesRaw === "todos") {
+      mesSelecionado = { year: ano, month: null };
+    } else {
+      const mes = Number(mesRaw);
+      if (Number.isInteger(mes) && mes >= 1 && mes <= 12) {
+        mesSelecionado = { year: ano, month: mes };
+      } else {
+        mesSelecionado = { year: ano, month: null };
+      }
+    }
+  }
+
+  const status = searchParams.get("status")?.trim() ?? "";
+  const activeCard = isPeriodicoDisplayStatus(status) ? status : "";
+
+  return { mesSelecionado, activeCard };
+}
+
 /** 12 meses do ano (sempre janeiro–dezembro neste módulo). */
 export function listPeriodicoMesAbas(year: number): YearMonth[] {
   return listMesAbasDoAno(year, 1);

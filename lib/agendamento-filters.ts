@@ -1,7 +1,7 @@
 import { textMatchesSearch } from "@/lib/text-normalize";
 import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
 import { getCurrentMonthReferenceBR } from "@/lib/month-reference-options";
-import { buildPendencias } from "@/lib/agendamentos-table";
+import { buildPendencias, PENDENCIA_LABELS } from "@/lib/agendamentos-table";
 import type { AgendamentoStatus, AgendamentoWithExames } from "@/lib/types";
 
 export const AGENDAMENTOS_PAGE_SIZE = 15;
@@ -74,6 +74,38 @@ export function getDefaultAgendamentoFilters(): AgendamentoFilters {
     mesReferencia: getCurrentMonthReferenceBR(),
     status: [...DEFAULT_AGENDAMENTO_STATUS_FILTRO],
   };
+}
+
+/** Hidrata filtros já existentes a partir da query string (Dashboard). */
+export function agendamentoFiltersFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get" | "has">
+): { filters: AgendamentoFilters; expanded: boolean } {
+  const filters = getDefaultAgendamentoFilters();
+
+  if (searchParams.has("mesReferencia")) {
+    filters.mesReferencia = searchParams.get("mesReferencia") ?? "";
+  }
+
+  const pendencia = searchParams.get("pendencia")?.trim() ?? "";
+  if (
+    pendencia &&
+    (PENDENCIA_LABELS as readonly string[]).includes(pendencia)
+  ) {
+    filters.pendencia = pendencia;
+  }
+
+  const situacao = searchParams.get("pendenciaSituacao")?.trim() ?? "";
+  if (situacao === "pendente" || situacao === "concluida") {
+    filters.pendenciaSituacao = situacao;
+  }
+
+  const expanded = Boolean(
+    filters.pendencia ||
+      filters.pendenciaSituacao ||
+      (searchParams.has("mesReferencia") && !filters.mesReferencia.trim())
+  );
+
+  return { filters, expanded };
 }
 
 function matchesEsocialFilter(

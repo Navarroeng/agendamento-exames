@@ -537,6 +537,7 @@ run("Limpar filtros e estado inicial usam o mesmo período Todos", () => {
     join(root, "hooks/usePeriodicosFuturosPage.ts"),
     "utf8"
   );
+  assert.match(hook, /periodicoViewFromSearchParams\(searchParams\)/);
   assert.match(hook, /resolveInitialMesPeriodicos\(\)/);
   assert.match(
     hook,

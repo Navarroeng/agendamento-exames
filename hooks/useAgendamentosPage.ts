@@ -203,6 +203,7 @@ import { mapAgendamentosToTableRows } from "@/lib/agendamentos-table";
 import {
   AGENDAMENTOS_PAGE_SIZE,
   getDefaultAgendamentoFilters,
+  agendamentoFiltersFromSearchParams,
   extractFilterOptions,
   filterAgendamentos,
   type AgendamentoFilters,
@@ -593,9 +594,11 @@ export function useAgendamentosPage() {
     useAgendamentosList();
 
   const [filters, setFilters] = useState<AgendamentoFilters>(() =>
-    getDefaultAgendamentoFilters()
+    agendamentoFiltersFromSearchParams(searchParams).filters
   );
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(
+    () => agendamentoFiltersFromSearchParams(searchParams).expanded
+  );
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<AgendamentoTableSortState | null>(
     null

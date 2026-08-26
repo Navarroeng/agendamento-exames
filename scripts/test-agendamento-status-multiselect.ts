@@ -459,8 +459,14 @@ test("página inicializa e limpa filtros pelo mesmo padrão", () => {
   );
   assert(
     hook.includes("useState<AgendamentoFilters>(() =>") &&
-      hook.includes("getDefaultAgendamentoFilters()"),
-    "estado inicial via getDefault"
+      hook.includes("agendamentoFiltersFromSearchParams(searchParams).filters"),
+    "estado inicial hidrata query existente (Dashboard) sobre o padrão"
+  );
+  assert(
+    filtersLib.includes(
+      "const filters = getDefaultAgendamentoFilters();"
+    ),
+    "hidratação parte do mesmo getDefault"
   );
   assert(
     hook.includes("setFilters(getDefaultAgendamentoFilters())"),

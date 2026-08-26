@@ -1,8 +1,13 @@
 import { textMatchesSearch } from "@/lib/text-normalize";
 import {
+  isValidDateBR,
   parseDateBRToIso,
   parseMonthYearBRToIsoRange,
 } from "@/lib/agendamento-datetime";
+import {
+  resolveInitialMesListagem,
+  yearMonthToMesReferenciaBR,
+} from "@/lib/listagem-meses";
 import type { AgendamentoWithExames } from "@/lib/types";
 
 export const ESOCIAL_PAGE_SIZE = 30;
@@ -50,6 +55,51 @@ export const EMPTY_ESOCIAL_FILTERS: ESocialFilters = {
   dataInicio: "",
   dataFim: "",
 };
+
+function isESocialStatusFilter(value: string): value is ESocialStatusFilter {
+  return ESOCIAL_STATUS_OPTIONS.some((opt) => opt.value === value);
+}
+
+export function getDefaultESocialFilters(): ESocialFilters {
+  return {
+    ...EMPTY_ESOCIAL_FILTERS,
+    mesReferencia: yearMonthToMesReferenciaBR(resolveInitialMesListagem()),
+  };
+}
+
+/** Hidrata filtros já existentes a partir da query string (Dashboard). */
+export function esocialFiltersFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get" | "has">
+): { filters: ESocialFilters; expanded: boolean } {
+  const filters = getDefaultESocialFilters();
+
+  const status = searchParams.get("statusEsocial")?.trim() ?? "";
+  if (status && isESocialStatusFilter(status)) {
+    filters.statusEsocial = status;
+  }
+
+  if (searchParams.has("mesReferencia")) {
+    filters.mesReferencia = searchParams.get("mesReferencia") ?? "";
+  }
+
+  const dataInicio = searchParams.get("dataInicio")?.trim() ?? "";
+  if (dataInicio && isValidDateBR(dataInicio)) {
+    filters.dataInicio = dataInicio;
+  }
+
+  const dataFim = searchParams.get("dataFim")?.trim() ?? "";
+  if (dataFim && isValidDateBR(dataFim)) {
+    filters.dataFim = dataFim;
+  }
+
+  const expanded = Boolean(
+    filters.dataInicio ||
+      filters.dataFim ||
+      (searchParams.has("mesReferencia") && !filters.mesReferencia.trim())
+  );
+
+  return { filters, expanded };
+}
 
 const URGENTE_DIAS = 30;
 

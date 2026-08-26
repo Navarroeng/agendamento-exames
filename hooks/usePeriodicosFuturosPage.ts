@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
@@ -10,6 +10,7 @@ import {
   extractPeriodicoFilterOptions,
   filterPeriodicosFuturosPorMes,
   listPeriodicoAnosDisponiveis,
+  periodicoViewFromSearchParams,
   resolveInitialMesPeriodicos,
   toPeriodicoFuturoRow,
 } from "@/lib/periodicos-futuro";
@@ -49,6 +50,7 @@ const PAGE_SIZE = 20;
 
 export function usePeriodicosFuturosPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
   const isAdmin = isPerfilAdmin(profile?.perfil);
   const auditContext = useAuditoriaUsuario();
@@ -63,9 +65,11 @@ export function usePeriodicosFuturosPage() {
   const [page, setPage] = useState(1);
   const [activeCard, setActiveCard] = useState<
     PeriodicoFuturoDisplayStatus | ""
-  >("");
+  >(() => periodicoViewFromSearchParams(searchParams).activeCard);
   const [mesSelecionado, setMesSelecionado] =
-    useState<ListagemPeriodoSelecionado>(() => resolveInitialMesPeriodicos());
+    useState<ListagemPeriodoSelecionado>(
+      () => periodicoViewFromSearchParams(searchParams).mesSelecionado
+    );
   const [editProximaDataRecord, setEditProximaDataRecord] =
     useState<PeriodicoFuturoGrupo | null>(null);
   const [adicionarCpfGrupo, setAdicionarCpfGrupo] =

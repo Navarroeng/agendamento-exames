@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
@@ -11,12 +12,13 @@ import {
 } from "@/lib/agendamento-datetime";
 import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import {
-  EMPTY_ESOCIAL_FILTERS,
   ESOCIAL_PAGE_SIZE,
   ESOCIAL_VISUAL_STATUS_LABELS,
   computeESocialSummary,
+  esocialFiltersFromSearchParams,
   extractESocialFilterOptions,
   filterAgendamentosESocial,
+  getDefaultESocialFilters,
   getESocialVisualStatusSemCancelamento,
   isEsocialEnvioCancelado,
   type ESocialFilters,
@@ -64,6 +66,7 @@ import { registrarHistorico } from "@/services/historico.service";
 import type { AgendamentoWithExames } from "@/lib/types";
 
 export function useESocialPage() {
+  const searchParams = useSearchParams();
   const usuario = useHistoricoUsuario();
   const auditContext = useAuditoriaUsuario();
   const {
@@ -77,11 +80,12 @@ export function useESocialPage() {
   } = useAgendamentosList();
   const { clientes } = useClientesList();
 
-  const [filters, setFilters] = useState<ESocialFilters>(() => ({
-    ...EMPTY_ESOCIAL_FILTERS,
-    mesReferencia: yearMonthToMesReferenciaBR(resolveInitialMesListagem()),
-  }));
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filters, setFilters] = useState<ESocialFilters>(
+    () => esocialFiltersFromSearchParams(searchParams).filters
+  );
+  const [filtersExpanded, setFiltersExpanded] = useState(
+    () => esocialFiltersFromSearchParams(searchParams).expanded
+  );
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<ESocialTableSortState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -204,10 +208,7 @@ export function useESocialPage() {
   );
 
   const handleClearFilters = useCallback(() => {
-    setFilters({
-      ...EMPTY_ESOCIAL_FILTERS,
-      mesReferencia: yearMonthToMesReferenciaBR(resolveInitialMesListagem()),
-    });
+    setFilters(getDefaultESocialFilters());
     setPage(1);
   }, []);
 
