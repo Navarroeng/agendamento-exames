@@ -26,7 +26,11 @@ import {
 import {
   acoesPesquisaPorCampanha,
   avisoCadastroParticipanteCampanha,
+  campanhaBloqueiaEdicaoDataInicio,
+  editarPeriodoExigeConfirmacaoPrazoEncerrado,
   labelStatusPesquisaExibido,
+  MSG_EDITAR_PERIODO_PRAZO_PASSADO,
+  validateEditarPeriodoCampanha,
   validateProrrogarPrazoCampanha,
   validateReabrirCampanha,
 } from "@/lib/riscos-campanha-ciclo";
@@ -60,6 +64,11 @@ interface RiscosPainelCardsProps {
   onEncerrarCampanha: () => Promise<void>;
   onProrrogarPrazo: (novaDataEncerramentoIso: string) => Promise<void>;
   onReabrirCampanha: (novaDataEncerramentoIso: string) => Promise<void>;
+  onEditarPeriodo: (input: {
+    novaDataInicioIso: string;
+    novaDataEncerramentoIso: string;
+    confirmarPrazoEncerrado?: boolean;
+  }) => Promise<void>;
   onCancelarProcesso: (motivo: string) => Promise<void>;
   onExcluirCampanha: (confirmacaoCodigo: string) => Promise<void>;
   exclusaoDefinitivaDisponivel?: boolean;
@@ -164,6 +173,7 @@ export function RiscosPainelCards({
   onEncerrarCampanha,
   onProrrogarPrazo,
   onReabrirCampanha,
+  onEditarPeriodo,
   onCancelarProcesso,
   onExcluirCampanha,
   exclusaoDefinitivaDisponivel = false,
@@ -190,7 +200,12 @@ export function RiscosPainelCards({
   const [confirmEncerrarOpen, setConfirmEncerrarOpen] = useState(false);
   const [confirmProrrogarOpen, setConfirmProrrogarOpen] = useState(false);
   const [confirmReabrirOpen, setConfirmReabrirOpen] = useState(false);
+  const [confirmEditarPeriodoOpen, setConfirmEditarPeriodoOpen] =
+    useState(false);
+  const [confirmarPassadoOpen, setConfirmarPassadoOpen] = useState(false);
   const [novaDataEncerramento, setNovaDataEncerramento] = useState("");
+  const [dataInicioEdicao, setDataInicioEdicao] = useState("");
+  const [dataEncerramentoEdicao, setDataEncerramentoEdicao] = useState("");
   const [erroPrazo, setErroPrazo] = useState<string | null>(null);
   const [confirmCancelarOpen, setConfirmCancelarOpen] = useState(false);
   const [confirmExcluirOpen, setConfirmExcluirOpen] = useState(false);
@@ -280,6 +295,9 @@ export function RiscosPainelCards({
           processo.etapaAtual === "finalizado",
       })
     : null;
+  const inicioBloqueado = campanhaBloqueiaEdicaoDataInicio({
+    participantes,
+  });
 
   async function handleCopiarLink() {
     if (!campanha || !permiteCopiarLink) return;
@@ -565,6 +583,30 @@ export function RiscosPainelCards({
               ) : null}
               {campanhaStatusSincronizado &&
               !processoCancelado &&
+              acoesPesquisa.exibirEditarPeriodo &&
+              podeAutorizarAbrirPesquisa ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => {
+                    setDataInicioEdicao(
+                      String(campanha?.data_inicio ?? "").slice(0, 10)
+                    );
+                    setDataEncerramentoEdicao(
+                      String(campanha?.data_encerramento ?? "").slice(0, 10)
+                    );
+                    setErroPrazo(null);
+                    setConfirmarPassadoOpen(false);
+                    setConfirmEditarPeriodoOpen(true);
+                  }}
+                  title="Altera o período da campanha existente sem criar outra"
+                >
+                  Editar período
+                </button>
+              ) : null}
+              {campanhaStatusSincronizado &&
+              !processoCancelado &&
               acoesPesquisa.exibirProrrogar &&
               podeAutorizarAbrirPesquisa ? (
                 <button
@@ -820,7 +862,175 @@ export function RiscosPainelCards({
           <br />
           <br />
           Após o encerramento, novos participantes não poderão responder.
-          Os dados, as respostas e o relatório permanecem preservados.
+        </p>
+      </Modal>
+
+      <Modal
+        open={confirmEditarPeriodoOpen}
+        onClose={() => {
+          if (!savingCampanha) {
+            setConfirmEditarPeriodoOpen(false);
+            setConfirmarPassadoOpen(false);
+          }
+        }}
+        title="Editar período da pesquisa"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => {
+                setConfirmEditarPeriodoOpen(false);
+                setConfirmarPassadoOpen(false);
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={
+                savingCampanha ||
+                !campanha ||
+                !dataInicioEdicao ||
+                !dataEncerramentoEdicao
+              }
+              onClick={() => {
+                void (async () => {
+                  if (!campanha) return;
+                  const erro = validateEditarPeriodoCampanha({
+                    campanha,
+                    novaDataInicioIso: dataInicioEdicao,
+                    novaDataEncerramentoIso: dataEncerramentoEdicao,
+                    inicioBloqueado,
+                  });
+                  if (erro) {
+                    setErroPrazo(erro);
+                    return;
+                  }
+                  if (
+                    editarPeriodoExigeConfirmacaoPrazoEncerrado({
+                      novaDataEncerramentoIso: dataEncerramentoEdicao,
+                    })
+                  ) {
+                    setConfirmarPassadoOpen(true);
+                    return;
+                  }
+                  try {
+                    await onEditarPeriodo({
+                      novaDataInicioIso: dataInicioEdicao,
+                      novaDataEncerramentoIso: dataEncerramentoEdicao,
+                    });
+                    setConfirmEditarPeriodoOpen(false);
+                  } catch {
+                    // mantém aberto
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Salvando…" : "Salvar período"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Data inicial">
+              <input
+                type="date"
+                className="field-input w-full"
+                value={dataInicioEdicao}
+                disabled={savingCampanha || inicioBloqueado}
+                onChange={(e) => {
+                  setDataInicioEdicao(e.target.value);
+                  setErroPrazo(null);
+                }}
+              />
+            </Field>
+            <Field label="Data final">
+              <input
+                type="date"
+                className="field-input w-full"
+                value={dataEncerramentoEdicao}
+                disabled={savingCampanha}
+                onChange={(e) => {
+                  setDataEncerramentoEdicao(e.target.value);
+                  setErroPrazo(null);
+                }}
+              />
+            </Field>
+          </div>
+          {inicioBloqueado ? (
+            <p className="text-xs text-[#64748b]">
+              A data inicial permanece bloqueada porque já existem respostas ou
+              sessões. Somente a data final pode ser alterada.
+            </p>
+          ) : null}
+          {erroPrazo ? (
+            <p className="text-xs font-medium text-brand-red">{erroPrazo}</p>
+          ) : (
+            <p className="text-xs text-[#64748b]">
+              Somente as datas desta campanha serão alteradas. O código, o
+              link, os participantes, as respostas e o relatório permanecem.
+            </p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmarPassadoOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmarPassadoOpen(false);
+        }}
+        title="Confirmar alteração"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmarPassadoOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha || !campanha}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await onEditarPeriodo({
+                      novaDataInicioIso: dataInicioEdicao,
+                      novaDataEncerramentoIso: dataEncerramentoEdicao,
+                      confirmarPrazoEncerrado: true,
+                    });
+                    setConfirmarPassadoOpen(false);
+                    setConfirmEditarPeriodoOpen(false);
+                  } catch {
+                    // mantém aberto
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Salvando…" : "Confirmar alteração"}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-relaxed text-[#475569]">
+          {MSG_EDITAR_PERIODO_PRAZO_PASSADO}
         </p>
       </Modal>
 

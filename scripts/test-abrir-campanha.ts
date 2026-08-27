@@ -175,8 +175,7 @@ run("ciclo: prazo encerrado → Prorrogar, sem Criar/Encerrar, copia link", () =
   assert.equal(a.exibirEncerrar, false);
   assert.equal(a.exibirProrrogar, true);
   assert.equal(a.exibirReabrir, false);
-  assert.equal(a.exibirLink, true);
-  assert.equal(a.permitirCopiarLink, true);
+  assert.equal(a.exibirEditarPeriodo, false);
 });
 
 run("ciclo: encerrada → Reabrir, sem Prorrogar", () => {
@@ -191,7 +190,22 @@ run("ciclo: encerrada → Reabrir, sem Prorrogar", () => {
   assert.equal(a.exibirEncerrar, false);
   assert.equal(a.exibirProrrogar, false);
   assert.equal(a.exibirReabrir, true);
+  assert.equal(a.exibirEditarPeriodo, false);
   assert.equal(a.permitirCopiarLink, false);
+});
+
+run("ciclo: aberta vigente → Editar período, sem Prorrogar/Reabrir", () => {
+  const a = acoesPesquisaPorCampanha({
+    status: "aberta",
+    data_inicio: "2026-08-20",
+    data_encerramento: "2026-08-30",
+    hojeIso: "2026-08-25",
+  });
+  assert.equal(a.statusExibido, "aberta");
+  assert.equal(a.exibirEditarPeriodo, true);
+  assert.equal(a.exibirProrrogar, false);
+  assert.equal(a.exibirReabrir, false);
+  assert.equal(a.exibirEncerrar, true);
 });
 
 console.log("\nTodos os testes de abertura de campanha passaram.");

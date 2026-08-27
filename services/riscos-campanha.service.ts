@@ -923,6 +923,46 @@ export async function reabrirCampanhaRiscos(
   return json.campanha;
 }
 
+export async function editarPeriodoCampanhaRiscos(
+  campanhaId: string,
+  input: {
+    novaDataInicioIso: string;
+    novaDataEncerramentoIso: string;
+    confirmarPrazoEncerrado?: boolean;
+  },
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/periodo`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        novaDataInicioIso: input.novaDataInicioIso,
+        novaDataEncerramentoIso: input.novaDataEncerramentoIso,
+        confirmarPrazoEncerrado: input.confirmarPrazoEncerrado === true,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível editar o período.");
+  }
+  if (json.campanha.id !== id) {
+    throw new Error("A edição do período não pode criar outra campanha.");
+  }
+  return json.campanha;
+}
+
 export async function garantirCodigoAcessoCampanha(
   campanhaId: string,
   options?: { regenerar?: boolean }

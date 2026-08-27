@@ -112,6 +112,13 @@ const reabrir = readFileSync(
 assert.match(reabrir, /podeAbrirPesquisaRiscos/);
 assert.doesNotMatch(reabrir, /isPerfilAdmin\(perfil\.perfil\)/);
 
+const periodo = readFileSync(
+  join(root, "app/api/riscos/campanha/[campanhaId]/periodo/route.ts"),
+  "utf8"
+);
+assert.match(periodo, /podeAbrirPesquisaRiscos/);
+assert.doesNotMatch(periodo, /isPerfilAdmin\(perfil\.perfil\)/);
+
 const painel = readFileSync(
   join(root, "components/riscos-psicossociais/RiscosPainelCards.tsx"),
   "utf8"

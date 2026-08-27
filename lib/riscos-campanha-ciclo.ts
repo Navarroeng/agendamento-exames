@@ -39,6 +39,12 @@ export const MSG_EXCLUSAO_FISICA_BLOQUEADA_USO =
 export const MSG_EXCLUSAO_FISICA_BLOQUEADA_ABERTA =
   "Não é possível excluir uma campanha que já foi aberta. Use Cancelar processo.";
 
+export const MSG_EDITAR_PERIODO_PRAZO_PASSADO =
+  "A nova data de encerramento já passou. Ao salvar, a pesquisa ficará com status efetivo “Prazo encerrado” e novos acessos serão bloqueados até nova prorrogação.";
+
+export const MSG_EDITAR_PERIODO_INICIO_BLOQUEADO =
+  "A data inicial não pode ser alterada porque já existem respostas ou sessões nesta pesquisa.";
+
 export type StatusPesquisaExibido =
   | "em_preparacao"
   | "aberta"
@@ -211,11 +217,88 @@ export function validateReabrirCampanha(input: {
   return null;
 }
 
+export function campanhaBloqueiaEdicaoDataInicio(input: {
+  sessoes?: number;
+  respostas?: number;
+  participantes?: ReadonlyArray<{ status: string }>;
+}): boolean {
+  if ((input.sessoes ?? 0) > 0) return true;
+  if ((input.respostas ?? 0) > 0) return true;
+  return (input.participantes ?? []).some((p) => {
+    const s = String(p.status ?? "");
+    return s === "respondido" || s === "iniciado";
+  });
+}
+
+export function editarPeriodoExigeConfirmacaoPrazoEncerrado(input: {
+  novaDataEncerramentoIso: string;
+  hojeIso?: string;
+}): boolean {
+  const nova = dataCivilIso(input.novaDataEncerramentoIso);
+  if (!isDataCivilIso(nova)) return false;
+  const hoje = (input.hojeIso ?? hojeCivilIso()).slice(0, 10);
+  return nova < hoje;
+}
+
+export function validateEditarPeriodoCampanha(input: {
+  campanha: CampanhaCicloDatas;
+  novaDataInicioIso: string;
+  novaDataEncerramentoIso: string;
+  hojeIso?: string;
+  inicioBloqueado?: boolean;
+}): string | null {
+  const status = String(input.campanha.status ?? "");
+  if (status === "cancelada") {
+    return "Não é possível editar o período de uma pesquisa cancelada.";
+  }
+  if (status === "em_preparacao") {
+    return "Abra a pesquisa antes de editar o período.";
+  }
+  if (status === "encerrada") {
+    return "Para voltar a receber respostas, use Reabrir pesquisa.";
+  }
+  if (status !== "aberta") {
+    return "Não é possível editar o período desta pesquisa.";
+  }
+  if (isPrazoEncerrado(input.campanha, input.hojeIso)) {
+    return "O prazo já encerrou. Use Prorrogar prazo.";
+  }
+
+  const inicio = dataCivilIso(input.novaDataInicioIso);
+  const fim = dataCivilIso(input.novaDataEncerramentoIso);
+  if (!isDataCivilIso(inicio)) {
+    return "Informe a data inicial.";
+  }
+  if (!isDataCivilIso(fim)) {
+    return "Informe a data de encerramento.";
+  }
+  if (fim < inicio) {
+    return "A data de encerramento deve ser igual ou posterior à data inicial.";
+  }
+
+  const inicioAtual = dataCivilIso(input.campanha.data_inicio);
+  if (
+    input.inicioBloqueado &&
+    isDataCivilIso(inicioAtual) &&
+    inicio !== inicioAtual
+  ) {
+    return MSG_EDITAR_PERIODO_INICIO_BLOQUEADO;
+  }
+
+  const fimAtual = dataCivilIso(input.campanha.data_encerramento);
+  if (inicio === inicioAtual && fim === fimAtual) {
+    return "Altere ao menos uma das datas do período.";
+  }
+
+  return null;
+}
+
 export type AcoesPesquisaCiclo = {
   statusExibido: StatusPesquisaExibido | null;
   statusLabel: string;
   exibirAbrir: boolean;
   exibirEncerrar: boolean;
+  exibirEditarPeriodo: boolean;
   exibirProrrogar: boolean;
   exibirReabrir: boolean;
   exibirLink: boolean;
@@ -245,6 +328,7 @@ export function acoesPesquisaPorCampanha(input: {
       statusLabel: cancelado ? "Cancelada" : label,
       exibirAbrir: false,
       exibirEncerrar: false,
+      exibirEditarPeriodo: false,
       exibirProrrogar: false,
       exibirReabrir: false,
       exibirLink: exibido === "aberta" || exibido === "prazo_encerrado" || exibido === "encerrada",
@@ -257,6 +341,7 @@ export function acoesPesquisaPorCampanha(input: {
     statusLabel: label,
     exibirAbrir: exibido === "em_preparacao",
     exibirEncerrar: exibido === "aberta",
+    exibirEditarPeriodo: exibido === "aberta",
     exibirProrrogar: exibido === "prazo_encerrado",
     exibirReabrir: exibido === "encerrada",
     exibirLink:

@@ -44,6 +44,7 @@ import {
   encerrarCampanhaRiscos,
   prorrogarPrazoCampanhaRiscos,
   reabrirCampanhaRiscos,
+  editarPeriodoCampanhaRiscos,
   garantirCodigoAcessoCampanha,
   removerProcessoRiscos,
 } from "@/services/riscos-campanha.service";
@@ -1060,6 +1061,47 @@ export function useRiscosPsicossociaisPage() {
     ]
   );
 
+  const handleEditarPeriodo = useCallback(
+    async (input: {
+      novaDataInicioIso: string;
+      novaDataEncerramentoIso: string;
+      confirmarPrazoEncerrado?: boolean;
+    }) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      if (!podeAutorizarAbrirPesquisa) {
+        throw new Error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
+      }
+      setSavingCampanha(true);
+      try {
+        const campanha = await editarPeriodoCampanhaRiscos(
+          campanhaId,
+          input,
+          { auditContext }
+        );
+        atualizarCampanhaNoEstado(campanha);
+        setCampanhaStatusSincronizado(true);
+        await refresh();
+        toast.success("Período atualizado. O link original permanece o mesmo.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao editar o período."
+        );
+        throw err;
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [
+      modalProcesso,
+      auditContext,
+      refresh,
+      podeAutorizarAbrirPesquisa,
+      atualizarCampanhaNoEstado,
+    ]
+  );
+
   const handleCancelarProcesso = useCallback(
     async (motivo: string, processoAlvo?: RiscosPsicossociaisProcesso) => {
       const alvo =
@@ -1448,6 +1490,7 @@ export function useRiscosPsicossociaisPage() {
     handleEncerrarCampanha,
     handleProrrogarPrazo,
     handleReabrirCampanha,
+    handleEditarPeriodo,
     handleCancelarProcesso,
     openCancelarProcesso,
     closeCancelarProcesso,

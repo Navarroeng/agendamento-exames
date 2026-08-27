@@ -32,6 +32,11 @@ interface RiscosPsicossociaisPainelProps {
   onEncerrarCampanha: () => Promise<void>;
   onProrrogarPrazo: (novaDataEncerramentoIso: string) => Promise<void>;
   onReabrirCampanha: (novaDataEncerramentoIso: string) => Promise<void>;
+  onEditarPeriodo: (input: {
+    novaDataInicioIso: string;
+    novaDataEncerramentoIso: string;
+    confirmarPrazoEncerrado?: boolean;
+  }) => Promise<void>;
   onCancelarProcesso: (motivo: string) => Promise<void>;
   onExcluirCampanha: (confirmacaoCodigo: string) => Promise<void>;
   exclusaoDefinitivaDisponivel?: boolean;
@@ -83,6 +88,7 @@ export function RiscosPsicossociaisPainel({
   onEncerrarCampanha,
   onProrrogarPrazo,
   onReabrirCampanha,
+  onEditarPeriodo,
   onCancelarProcesso,
   onExcluirCampanha,
   exclusaoDefinitivaDisponivel = false,
@@ -214,6 +220,7 @@ export function RiscosPsicossociaisPainel({
         onEncerrarCampanha={onEncerrarCampanha}
         onProrrogarPrazo={onProrrogarPrazo}
         onReabrirCampanha={onReabrirCampanha}
+        onEditarPeriodo={onEditarPeriodo}
         onCancelarProcesso={onCancelarProcesso}
         onExcluirCampanha={onExcluirCampanha}
         exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}

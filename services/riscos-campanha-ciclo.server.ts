@@ -11,6 +11,10 @@ import {
   CampanhaCicloExistenteError,
   MSG_CAMPANHA_CICLO_EXISTENTE,
   campanhaDoCicloJaExiste,
+  MSG_EDITAR_PERIODO_PRAZO_PASSADO,
+  campanhaBloqueiaEdicaoDataInicio,
+  editarPeriodoExigeConfirmacaoPrazoEncerrado,
+  validateEditarPeriodoCampanha,
   validateProrrogarPrazoCampanha,
   validateReabrirCampanha,
 } from "@/lib/riscos-campanha-ciclo";
@@ -339,6 +343,134 @@ export async function reabrirCampanhaRiscosNoServidor(
       data_encerramento: confirmed.data_encerramento,
       codigo_publico: confirmed.codigo_publico,
       campanha_id: confirmed.id,
+    },
+  });
+
+  return confirmed;
+}
+
+export async function editarPeriodoCampanhaNoServidor(
+  campanhaId: string,
+  input: {
+    novaDataInicioIso: string;
+    novaDataEncerramentoIso: string;
+    confirmarPrazoEncerrado?: boolean;
+  },
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const before = await selecionarCampanhaPorId(id);
+  if (!before) throw new Error("Campanha não encontrada.");
+
+  await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: before.orcamento_id,
+    campanhaId: before.id,
+  });
+
+  const admin = createAdminClient();
+  const [sess, resp, partUso] = await Promise.all([
+    admin
+      .from("riscos_avaliacao_sessoes")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", id),
+    admin
+      .from("riscos_avaliacao_respostas")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", id),
+    admin
+      .from("riscos_campanha_participantes")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", id)
+      .in("status", ["iniciado", "respondido"]),
+  ]);
+  if (sess.error) throw sess.error;
+  if (resp.error) throw resp.error;
+  if (partUso.error) throw partUso.error;
+
+  const inicioBloqueado = campanhaBloqueiaEdicaoDataInicio({
+    sessoes: sess.count ?? 0,
+    respostas: resp.count ?? 0,
+  }) || (partUso.count ?? 0) > 0;
+
+  const validacao = validateEditarPeriodoCampanha({
+    campanha: before,
+    novaDataInicioIso: input.novaDataInicioIso,
+    novaDataEncerramentoIso: input.novaDataEncerramentoIso,
+    inicioBloqueado,
+  });
+  if (validacao) throw new Error(validacao);
+
+  const novaInicio = input.novaDataInicioIso.slice(0, 10);
+  const novaFim = input.novaDataEncerramentoIso.slice(0, 10);
+
+  if (
+    editarPeriodoExigeConfirmacaoPrazoEncerrado({
+      novaDataEncerramentoIso: novaFim,
+    }) &&
+    !input.confirmarPrazoEncerrado
+  ) {
+    throw new Error(MSG_EDITAR_PERIODO_PRAZO_PASSADO);
+  }
+
+  const { error } = await admin
+    .from("riscos_campanhas")
+    .update({
+      data_inicio: novaInicio,
+      data_encerramento: novaFim,
+    })
+    .eq("id", id)
+    .eq("codigo_publico", before.codigo_publico);
+
+  if (error) throw error;
+
+  const confirmed = await selecionarCampanhaPorId(id);
+  if (!confirmed) {
+    throw new Error("Campanha não encontrada após a edição do período.");
+  }
+  if (confirmed.codigo_publico !== before.codigo_publico) {
+    throw new Error("O código da campanha não pode ser alterado na edição do período.");
+  }
+  if (confirmed.id !== before.id) {
+    throw new Error("A edição do período não pode criar outra campanha.");
+  }
+  if (dataCivil(confirmed.data_inicio) !== novaInicio) {
+    throw new Error("A nova data inicial não foi confirmada no banco.");
+  }
+  if (dataCivil(confirmed.data_encerramento) !== novaFim) {
+    throw new Error("A nova data de encerramento não foi confirmada no banco.");
+  }
+
+  const prazoEncerradoEfetivo = editarPeriodoExigeConfirmacaoPrazoEncerrado({
+    novaDataEncerramentoIso: confirmed.data_encerramento,
+  });
+  const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
+  await registrarAuditoria({
+    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
+    acao: AUDITORIA_ACOES.riscos_campanha_periodo_editado,
+    registroId: confirmed.id,
+    registroNome: confirmed.empresa_nome,
+    descricao: prazoEncerradoEfetivo
+      ? `${nome} editou o período da campanha ${confirmed.codigo_publico} de ${before.data_inicio} a ${before.data_encerramento} para ${confirmed.data_inicio} a ${confirmed.data_encerramento}. Status efetivo: Prazo encerrado.`
+      : `${nome} editou o período da campanha ${confirmed.codigo_publico} de ${before.data_inicio} a ${before.data_encerramento} para ${confirmed.data_inicio} a ${confirmed.data_encerramento}.`,
+    dadosAntes: {
+      data_inicio: before.data_inicio,
+      data_encerramento: before.data_encerramento,
+      codigo_publico: before.codigo_publico,
+      status: before.status,
+    },
+    dadosDepois: {
+      tipo: "periodo_editado",
+      data_inicio: confirmed.data_inicio,
+      data_encerramento: confirmed.data_encerramento,
+      codigo_publico: confirmed.codigo_publico,
+      status: confirmed.status,
+      campanha_id: confirmed.id,
+      prazo_encerrado_efetivo: prazoEncerradoEfetivo,
     },
   });
 

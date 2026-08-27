@@ -35,6 +35,11 @@ interface RiscosPsicossociaisModalProps {
   onEncerrarCampanha?: () => Promise<void>;
   onProrrogarPrazo?: (novaDataEncerramentoIso: string) => Promise<void>;
   onReabrirCampanha?: (novaDataEncerramentoIso: string) => Promise<void>;
+  onEditarPeriodo?: (input: {
+    novaDataInicioIso: string;
+    novaDataEncerramentoIso: string;
+    confirmarPrazoEncerrado?: boolean;
+  }) => Promise<void>;
   onCancelarProcesso?: (motivo: string) => Promise<void>;
   onExcluirCampanha?: (confirmacaoCodigo: string) => Promise<void>;
   exclusaoDefinitivaDisponivel?: boolean;
@@ -88,6 +93,7 @@ export function RiscosPsicossociaisModal({
   onEncerrarCampanha,
   onProrrogarPrazo,
   onReabrirCampanha,
+  onEditarPeriodo,
   onCancelarProcesso,
   onExcluirCampanha,
   exclusaoDefinitivaDisponivel = false,
@@ -174,6 +180,9 @@ export function RiscosPsicossociaisModal({
         }}
         onReabrirCampanha={async (novaDataEncerramentoIso) => {
           await onReabrirCampanha?.(novaDataEncerramentoIso);
+        }}
+        onEditarPeriodo={async (input) => {
+          await onEditarPeriodo?.(input);
         }}
         onCancelarProcesso={async (motivo) => {
           await onCancelarProcesso?.(motivo);

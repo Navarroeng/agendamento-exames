@@ -18,16 +18,21 @@ import {
   MSG_CADASTRO_APOS_PRAZO,
   MSG_CADASTRO_CAMPANHA_FINALIZADA,
   MSG_RELATORIO_NOVAS_RESPOSTAS,
+  MSG_EDITAR_PERIODO_INICIO_BLOQUEADO,
+  MSG_EDITAR_PERIODO_PRAZO_PASSADO,
   acoesPesquisaPorCampanha,
   avisoCadastroParticipanteCampanha,
+  campanhaBloqueiaEdicaoDataInicio,
   campanhaBloqueiaExclusaoFisica,
   campanhaDoCicloJaExiste,
   campanhaPermiteCadastroParticipantes,
+  editarPeriodoExigeConfirmacaoPrazoEncerrado,
   haRespostasAposRelatorio,
   isPrazoEncerrado,
   labelStatusPesquisaExibido,
   mesmoLinkAposProrrogacao,
   statusPesquisaExibido,
+  validateEditarPeriodoCampanha,
   validateNovaDataEncerramento,
   validateProrrogarPrazoCampanha,
   validateReabrirCampanha,
@@ -443,12 +448,259 @@ run("UI administrativa usa ações do ciclo (não só campanha ativa)", () => {
   assert.match(painel, /acoesPesquisaPorCampanha/);
   assert.match(painel, /Prorrogar prazo/);
   assert.match(painel, /Reabrir pesquisa/);
+  assert.match(painel, /Editar período/);
   assert.doesNotMatch(painel, /acoesConvitePorStatus/);
   const cancelar = readFileSync(
     join(__dirname, "../services/riscos-campanha-cancelar.server.ts"),
     "utf8"
   );
   assert.match(cancelar, /campanhaBloqueiaExclusaoFisica/);
+});
+
+run("editar período 1: campanha aberta vigente mostra Editar período", () => {
+  const a = acoesPesquisaPorCampanha({
+    ...abertaNoPrazo,
+    hojeIso: "2026-08-25",
+  });
+  assert.equal(a.statusExibido, "aberta");
+  assert.equal(a.exibirEditarPeriodo, true);
+  assert.equal(a.exibirProrrogar, false);
+  assert.equal(a.exibirReabrir, false);
+});
+
+run("editar período 2-5: estender data final na mesma campanha/código/link", () => {
+  const atual = {
+    id: "uuid-1",
+    codigo_publico: "LT4BJN",
+    ...abertaNoPrazo,
+  };
+  assert.equal(
+    validateEditarPeriodoCampanha({
+      campanha: atual,
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-09-05",
+      hojeIso: "2026-08-25",
+    }),
+    null
+  );
+  const depois = { ...atual, data_encerramento: "2026-09-05" };
+  assert.equal(depois.id, atual.id);
+  assert.equal(depois.codigo_publico, atual.codigo_publico);
+  assert.equal(
+    mesmoLinkAposProrrogacao(atual.codigo_publico, depois.codigo_publico),
+    true
+  );
+  assert.equal(pathAvaliacaoCampanha(depois.codigo_publico), "/avaliacao/LT4BJN");
+});
+
+run("editar período 6-7: respostas e participantes não mudam de estado", () => {
+  const r = validarAcessoAvaliacao({
+    codigoPublicoUrl: "LT4BJN",
+    dataNascimentoIso: "1990-05-15",
+    campanha: campanhaPortal({ data_encerramento: "2026-09-05" }),
+    participante: participantePortal({
+      status: "respondido",
+      concluiu_em: "2026-08-25T12:00:00Z",
+    }),
+    hojeIso: "2026-08-27",
+  });
+  assert.equal(r.ok, false);
+  if (!r.ok) assert.equal(r.motivo, "participante_ja_concluiu");
+  const pendente = validarAcessoAvaliacao({
+    codigoPublicoUrl: "LT4BJN",
+    dataNascimentoIso: "1990-05-15",
+    campanha: campanhaPortal({ data_encerramento: "2026-09-05" }),
+    participante: participantePortal({ status: "pendente" }),
+    hojeIso: "2026-08-27",
+  });
+  assert.equal(pendente.ok, true);
+});
+
+run("editar período 8: encurtar data final ainda futura", () => {
+  assert.equal(
+    validateEditarPeriodoCampanha({
+      campanha: abertaNoPrazo,
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-08-28",
+      hojeIso: "2026-08-25",
+    }),
+    null
+  );
+  assert.equal(
+    editarPeriodoExigeConfirmacaoPrazoEncerrado({
+      novaDataEncerramentoIso: "2026-08-28",
+      hojeIso: "2026-08-25",
+    }),
+    false
+  );
+});
+
+run("editar período 9: encurtar para data passada → Prazo encerrado", () => {
+  assert.equal(
+    validateEditarPeriodoCampanha({
+      campanha: abertaNoPrazo,
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-08-22",
+      hojeIso: "2026-08-25",
+    }),
+    null
+  );
+  assert.equal(
+    editarPeriodoExigeConfirmacaoPrazoEncerrado({
+      novaDataEncerramentoIso: "2026-08-22",
+      hojeIso: "2026-08-25",
+    }),
+    true
+  );
+  assert.equal(
+    statusPesquisaExibido(
+      { status: "aberta", data_inicio: "2026-08-20", data_encerramento: "2026-08-22" },
+      "2026-08-25"
+    ),
+    "prazo_encerrado"
+  );
+  assert.equal(MSG_EDITAR_PERIODO_PRAZO_PASSADO.includes("Prazo encerrado"), true);
+});
+
+run("editar período 10: Portal respeita a nova data", () => {
+  const ok = avaliarPeriodoCampanha(
+    campanhaPortal({ data_encerramento: "2026-09-05" }),
+    "2026-09-01"
+  );
+  assert.equal(ok, "ok");
+  const encerrado = avaliarPeriodoCampanha(
+    campanhaPortal({ data_encerramento: "2026-08-22" }),
+    "2026-08-25"
+  );
+  assert.equal(encerrado, "prazo_encerrado");
+  const acesso = validarAcessoAvaliacao({
+    codigoPublicoUrl: "LT4BJN",
+    dataNascimentoIso: "1990-05-15",
+    campanha: campanhaPortal({ data_encerramento: "2026-08-22" }),
+    participante: participantePortal(),
+    hojeIso: "2026-08-25",
+  });
+  assert.equal(acesso.ok, false);
+  if (!acesso.ok) assert.equal(acesso.motivo, "prazo_encerrado");
+});
+
+run("editar período 11: campanha vencida continua usando Prorrogar prazo", () => {
+  const a = acoesPesquisaPorCampanha({
+    ...abertaNoPrazo,
+    hojeIso: "2026-08-31",
+  });
+  assert.equal(a.exibirEditarPeriodo, false);
+  assert.equal(a.exibirProrrogar, true);
+  assert.match(
+    validateEditarPeriodoCampanha({
+      campanha: abertaNoPrazo,
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-09-05",
+      hojeIso: "2026-08-31",
+    }) ?? "",
+    /Prorrogar prazo/
+  );
+});
+
+run("editar período 12: campanha encerrada continua usando Reabrir", () => {
+  const a = acoesPesquisaPorCampanha({
+    status: "encerrada",
+    data_inicio: "2026-08-20",
+    data_encerramento: "2026-08-30",
+    hojeIso: "2026-09-01",
+  });
+  assert.equal(a.exibirEditarPeriodo, false);
+  assert.equal(a.exibirReabrir, true);
+  assert.match(
+    validateEditarPeriodoCampanha({
+      campanha: {
+        status: "encerrada",
+        data_inicio: "2026-08-20",
+        data_encerramento: "2026-08-30",
+      },
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-09-05",
+      hojeIso: "2026-09-01",
+    }) ?? "",
+    /Reabrir/
+  );
+});
+
+run("editar período 13: relatório existente permanece intacto", () => {
+  const server = readFileSync(
+    join(__dirname, "../services/riscos-campanha-ciclo.server.ts"),
+    "utf8"
+  );
+  assert.match(server, /editarPeriodoCampanhaNoServidor/);
+  assert.match(server, /data_inicio: novaInicio/);
+  assert.match(server, /data_encerramento: novaFim/);
+  assert.match(server, /riscos_campanha_periodo_editado/);
+  assert.doesNotMatch(
+    server.slice(server.indexOf("editarPeriodoCampanhaNoServidor")),
+    /\.from\("riscos_relatorios"\)\.delete/
+  );
+  assert.equal(
+    campanhaBloqueiaExclusaoFisica({
+      status: "aberta",
+      participantes: 5,
+      sessoes: 3,
+      respostas: 10,
+      temRelatorio: true,
+    }) != null,
+    true
+  );
+});
+
+run("editar período 14: nenhuma nova campanha é criada", () => {
+  const server = readFileSync(
+    join(__dirname, "../services/riscos-campanha-ciclo.server.ts"),
+    "utf8"
+  );
+  const fn = server.slice(server.indexOf("editarPeriodoCampanhaNoServidor"));
+  assert.match(fn, /\.update\(/);
+  assert.doesNotMatch(
+    fn.slice(0, fn.indexOf("function dataCivil")),
+    /\.insert\(/
+  );
+});
+
+run("editar período: data inicial bloqueada após respostas", () => {
+  assert.equal(
+    campanhaBloqueiaEdicaoDataInicio({
+      respostas: 1,
+      sessoes: 0,
+      participantes: [{ status: "pendente" }],
+    }),
+    true
+  );
+  assert.equal(
+    campanhaBloqueiaEdicaoDataInicio({
+      respostas: 0,
+      sessoes: 0,
+      participantes: [{ status: "pendente" }],
+    }),
+    false
+  );
+  assert.equal(
+    validateEditarPeriodoCampanha({
+      campanha: abertaNoPrazo,
+      novaDataInicioIso: "2026-08-18",
+      novaDataEncerramentoIso: "2026-08-30",
+      hojeIso: "2026-08-25",
+      inicioBloqueado: true,
+    }),
+    MSG_EDITAR_PERIODO_INICIO_BLOQUEADO
+  );
+  assert.equal(
+    validateEditarPeriodoCampanha({
+      campanha: abertaNoPrazo,
+      novaDataInicioIso: "2026-08-20",
+      novaDataEncerramentoIso: "2026-09-05",
+      hojeIso: "2026-08-25",
+      inicioBloqueado: true,
+    }),
+    null
+  );
 });
 
 console.log("\nTodos os testes do ciclo de campanha passaram.");
