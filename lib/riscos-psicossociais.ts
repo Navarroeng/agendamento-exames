@@ -26,6 +26,7 @@ import {
   isPesquisaEfetivamenteAberta,
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
+import { isPrazoEncerrado } from "@/lib/riscos-campanha-ciclo";
 import {
   resolverCancelamentoProcessoRiscos,
 } from "@/lib/riscos-processo-cancelamento";
@@ -360,7 +361,9 @@ export function isEtapaBarraProgressoAtual(
 }
 
 export function labelEtapaAtualProcessoRiscos(
-  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual">
+  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual"> & {
+    campanha?: RiscosPsicossociaisProcesso["campanha"];
+  }
 ): string {
   if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
     return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.cancelado;
@@ -368,7 +371,14 @@ export function labelEtapaAtualProcessoRiscos(
   if (processo.status === "concluido" || processo.etapaAtual === "finalizado") {
     return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado;
   }
-  return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual];
+  const base = RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[processo.etapaAtual];
+  if (
+    processo.etapaAtual === "aguardando_respostas" &&
+    isPrazoEncerrado(processo.campanha)
+  ) {
+    return "Aguardando respostas — prazo encerrado";
+  }
+  return base;
 }
 
 export function isRiscosEtapaAutomatica(

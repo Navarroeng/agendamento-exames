@@ -244,7 +244,7 @@ run("TESTE 6 campanha encerrada → negado", () => {
   if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
 });
 
-run("TESTE 6b campanha após data de encerramento → negado", () => {
+run("TESTE 6b campanha após data de encerramento → prazo encerrado", () => {
   const r = validarAcessoAvaliacao({
     codigoPublicoUrl: "5UA22W",
     dataNascimentoIso: "1990-05-15",
@@ -253,7 +253,8 @@ run("TESTE 6b campanha após data de encerramento → negado", () => {
     hojeIso: "2026-09-01",
   });
   assert.equal(r.ok, false);
-  if (!r.ok) assert.equal(r.motivo, "campanha_encerrada");
+  if (!r.ok) assert.equal(r.motivo, "prazo_encerrado");
+  assert.equal(codigoErroPublico("prazo_encerrado"), "prazo_encerrado");
 });
 
 run("TESTE 7 CPF com máscara e sem máscara", () => {

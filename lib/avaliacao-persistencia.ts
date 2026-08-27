@@ -110,7 +110,7 @@ export async function carregarContextoPortal(
         concluiu_em: string | null;
       };
     }
-  | { ok: false; codigo: "nao_apto" | "campanha_encerrada" | "ja_respondida" }
+  | { ok: false; codigo: "nao_apto" | "campanha_encerrada" | "prazo_encerrado" | "ja_respondida" }
 > {
   const { data: campanha } = await supabase
     .from("riscos_campanhas")
@@ -141,6 +141,9 @@ export async function carregarContextoPortal(
     data_inicio: String(campanha.data_inicio ?? ""),
     data_encerramento: String(campanha.data_encerramento ?? ""),
   });
+  if (periodo === "prazo_encerrado") {
+    return { ok: false, codigo: "prazo_encerrado" };
+  }
   if (periodo === "encerrada") {
     return { ok: false, codigo: "campanha_encerrada" };
   }

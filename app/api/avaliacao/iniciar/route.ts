@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     });
 
     if (!ctx.ok) {
-      if (ctx.codigo === "campanha_encerrada") {
+      if (ctx.codigo === "campanha_encerrada" || ctx.codigo === "prazo_encerrado") {
         await registrarAuditoriaPortal(supabase, {
           evento: "tentativa_apos_encerramento",
           campanhaId: portal.campanhaId,

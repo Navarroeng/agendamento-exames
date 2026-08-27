@@ -18,6 +18,10 @@ import {
   campanhaPermiteImportacaoParticipantes,
   type SituacaoImportacaoParticipante,
 } from "@/lib/riscos-participantes-excel";
+import {
+  avisoCadastroParticipanteCampanha,
+  isPrazoEncerrado,
+} from "@/lib/riscos-campanha-ciclo";
 import { parseDataNascimentoBr } from "@/lib/date-br";
 import {
   AUDITORIA_ACOES,
@@ -362,6 +366,8 @@ export async function criarParticipanteCampanhaNoServidor(
       campanha_id: record.campanha_id,
       cpf: record.cpf,
       status: record.status,
+      apos_prazo: isPrazoEncerrado(campanha),
+      aviso: avisoCadastroParticipanteCampanha({ campanha }),
     },
   });
 

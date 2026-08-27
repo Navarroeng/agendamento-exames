@@ -93,6 +93,15 @@ run("processo cancelado: bloqueia gerar relatório", () => {
   assert.match(String(msg), /cancelado/i);
 });
 
+run("prazo encerrado não entra no gate de relatório", () => {
+  const msg = validatePodeGerarRelatorioFinal({
+    campanhaStatus: "aberta",
+    participantesAtivos: [{ status: "respondido" }],
+    jaExisteRelatorio: false,
+  });
+  assert.equal(msg, null);
+});
+
 run("montarResultadoJsonRelatorio: snapshot com placeholders", () => {
   const consolidado = {
     previstos: 10,

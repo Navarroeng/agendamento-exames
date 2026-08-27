@@ -3,6 +3,7 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { campanhaBloqueiaExclusaoFisica } from "@/lib/riscos-campanha-ciclo";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import {
   MSG_PROCESSO_RISCOS_CANCELADO,
@@ -458,9 +459,10 @@ async function contarDadosCampanha(campanhaId: string): Promise<{
   participantes: number;
   sessoes: number;
   respostas: number;
+  temRelatorio: boolean;
 }> {
   const admin = createAdminClient();
-  const [part, sess, resp] = await Promise.all([
+  const [part, sess, resp, rel] = await Promise.all([
     admin
       .from("riscos_campanha_participantes")
       .select("id", { count: "exact", head: true })
@@ -473,14 +475,21 @@ async function contarDadosCampanha(campanhaId: string): Promise<{
       .from("riscos_avaliacao_respostas")
       .select("id", { count: "exact", head: true })
       .eq("campanha_id", campanhaId),
+    admin
+      .from("riscos_relatorios")
+      .select("id", { count: "exact", head: true })
+      .eq("campanha_id", campanhaId),
   ]);
   if (part.error) throw part.error;
   if (sess.error) throw sess.error;
   if (resp.error) throw resp.error;
+  const temRelatorio =
+    !rel.error && (rel.count ?? 0) > 0;
   return {
     participantes: part.count ?? 0,
     sessoes: sess.count ?? 0,
     respostas: resp.count ?? 0,
+    temRelatorio,
   };
 }
 
@@ -550,6 +559,14 @@ export async function excluirCampanhaRiscosNoServidor(
 
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
   const contagens = await contarDadosCampanha(id);
+  const bloqueioFisica = campanhaBloqueiaExclusaoFisica({
+    status: before.status,
+    participantes: contagens.participantes,
+    sessoes: contagens.sessoes,
+    respostas: contagens.respostas,
+    temRelatorio: contagens.temRelatorio,
+  });
+  if (bloqueioFisica) throw new Error(bloqueioFisica);
 
   await registrarAuditoria({
     usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
@@ -621,6 +638,14 @@ export async function removerProcessoRiscosNoServidor(
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
   const agora = new Date().toISOString();
   const contagens = await contarDadosCampanha(id);
+  const bloqueioFisica = campanhaBloqueiaExclusaoFisica({
+    status: before.status,
+    participantes: contagens.participantes,
+    sessoes: contagens.sessoes,
+    respostas: contagens.respostas,
+    temRelatorio: contagens.temRelatorio,
+  });
+  if (bloqueioFisica) throw new Error(bloqueioFisica);
 
   await registrarAuditoria({
     usuarioId: auditOptions?.auditContext?.usuarioId ?? null,

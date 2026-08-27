@@ -98,6 +98,20 @@ const encerrar = readFileSync(
 assert.match(encerrar, /isPerfilAdmin\(perfil\.perfil\)/);
 assert.doesNotMatch(encerrar, /podeAbrirPesquisaRiscos/);
 
+const prorrogar = readFileSync(
+  join(root, "app/api/riscos/campanha/[campanhaId]/prorrogar/route.ts"),
+  "utf8"
+);
+assert.match(prorrogar, /podeAbrirPesquisaRiscos/);
+assert.doesNotMatch(prorrogar, /isPerfilAdmin\(perfil\.perfil\)/);
+
+const reabrir = readFileSync(
+  join(root, "app/api/riscos/campanha/[campanhaId]/reabrir/route.ts"),
+  "utf8"
+);
+assert.match(reabrir, /podeAbrirPesquisaRiscos/);
+assert.doesNotMatch(reabrir, /isPerfilAdmin\(perfil\.perfil\)/);
+
 const painel = readFileSync(
   join(root, "components/riscos-psicossociais/RiscosPainelCards.tsx"),
   "utf8"

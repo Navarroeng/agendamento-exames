@@ -262,12 +262,11 @@ run("14. campanha cancelada", () => {
   assert.equal(av.avaliadas[0].situacao, "campanha_bloqueada");
 });
 
-run("15. campanha encerrada", () => {
-  const msg = campanhaPermiteImportacaoParticipantes("encerrada");
-  assert.ok(msg);
-  assert.match(String(msg), /encerrada/i);
+run("15. campanha encerrada permite cadastro no mesmo ciclo", () => {
+  assert.equal(campanhaPermiteImportacaoParticipantes("encerrada"), null);
   assert.equal(campanhaPermiteImportacaoParticipantes("em_preparacao"), null);
   assert.equal(campanhaPermiteImportacaoParticipantes("aberta"), null);
+  assert.ok(campanhaPermiteImportacaoParticipantes("cancelada"));
 });
 
 run("16. importação parcial (válidas + inválidas)", () => {

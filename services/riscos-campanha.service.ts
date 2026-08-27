@@ -27,6 +27,7 @@ import {
   escolherCampanhaParaProgresso,
   normalizeRiscosCampanhaOrigem,
 } from "@/lib/riscos-campanha-origem";
+import { CampanhaCicloExistenteError } from "@/lib/riscos-campanha-ciclo";
 import {
   CONTRATO_VIGENTE_RISCOS_ERROR_MESSAGE,
   clienteTemContratoVigente,
@@ -651,102 +652,37 @@ export async function criarCampanhaRiscos(
   const validationError = validateRiscosCampanhaCreateInput(input);
   if (validationError) throw new Error(validationError);
 
-  const existente = await buscarCampanhaAtivaPorOrcamento(input.orcamentoId);
-  if (existente) {
-    throw new Error("Já existe uma campanha ativa para este processo.");
-  }
+  const res = await fetch("/api/riscos/campanha", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orcamentoId: input.orcamentoId,
+      clienteId: input.clienteId,
+      cnpj: input.cnpj,
+      empresaNome: input.empresaNome,
+      dataInicioIso: input.dataInicioIso,
+      dataEncerramentoIso: input.dataEncerramentoIso,
+      usuarioNome: auditOptions?.auditContext?.usuarioNome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+    }),
+  });
 
-  const supabaseCheck = createClient();
-  const trackingCheck = await supabaseCheck
-    .from("orcamento_riscos_psicossociais")
-    .select("status")
-    .eq("orcamento_id", input.orcamentoId)
-    .maybeSingle();
-  if (String(trackingCheck.data?.status ?? "") === "cancelado") {
-    throw new Error(
-      "Este processo de Riscos Psicossociais está cancelado. O histórico permanece disponível somente para consulta."
-    );
-  }
-
-  const supabase = createClient();
-  const codigo = await gerarCodigoUnico(supabase);
-  const acesso = await gerarCodigoAcessoViaApi();
-  const cnpjDigits = input.cnpj.replace(/\D/g, "");
-  const usuarioNome = auditOptions?.auditContext?.usuarioNome?.trim() || null;
-
-  const payload = {
-    orcamento_id: input.orcamentoId,
-    cliente_id: input.clienteId,
-    cnpj: cnpjDigits,
-    empresa_nome: input.empresaNome.trim(),
-    data_inicio: input.dataInicioIso.slice(0, 10),
-    data_encerramento: input.dataEncerramentoIso.slice(0, 10),
-    // Coluna legada (check > 0). Quantidade oficial = participantes cadastrados.
-    quantidade_prevista: 1,
-    status: "em_preparacao" as const,
-    codigo_publico: codigo,
-    codigo_acesso_salt: acesso.salt,
-    codigo_acesso_hash: acesso.hash,
-    codigo_acesso_exibicao: acesso.exibicao,
-    origem: RISCOS_CAMPANHA_ORIGEM.orcamento,
-    criado_por: usuarioNome,
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    codigo?: string;
+    campanha?: RiscosCampanhaRecord;
   };
 
-  const { data, error } = await supabase
-    .from("riscos_campanhas")
-    .insert(payload)
-    .select(CAMPANHA_SELECT)
-    .maybeSingle();
-
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error("Já existe uma campanha para este processo.");
-    }
-    // Migration 100 ainda não aplicada: tenta sem colunas novas.
-    if (
-      /origem|responsavel|observacoes/i.test(error.message ?? "") ||
-      error.code === "42703"
-    ) {
-      const { origem: _o, ...legacyPayload } = payload;
-      void _o;
-      const fb = await supabase
-        .from("riscos_campanhas")
-        .insert(legacyPayload)
-        .select(CAMPANHA_SELECT_LEGACY)
-        .maybeSingle();
-      if (fb.error) {
-        if (fb.error.code === "23505") {
-          throw new Error("Já existe uma campanha para este processo.");
-        }
-        throw fb.error;
-      }
-      if (!fb.data) throw new Error("Não foi possível criar a campanha.");
-      const recordLegacy = mapCampanhaRow(fb.data as Record<string, unknown>);
-      const nomeLegacy = usuarioNome ?? "Sistema";
-      await registrarAuditoria({
-        usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-        usuarioNome: nomeLegacy,
-        usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-        modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-        acao: AUDITORIA_ACOES.riscos_campanha_criada,
-        registroId: recordLegacy.id,
-        registroNome: recordLegacy.empresa_nome,
-        descricao: `${nomeLegacy} criou a campanha ${recordLegacy.codigo_publico} para ${recordLegacy.empresa_nome}.`,
-        dadosDepois: {
-          codigo_publico: recordLegacy.codigo_publico,
-          origem: RISCOS_CAMPANHA_ORIGEM.orcamento,
-          orcamento_id: recordLegacy.orcamento_id,
-        },
-      });
-      return recordLegacy;
-    }
-    throw error;
-  }
-  if (!data) {
-    throw new Error("Não foi possível criar a campanha.");
+  if (res.status === 409 && json.campanha) {
+    throw new CampanhaCicloExistenteError(json.campanha);
   }
 
-  const record = mapCampanhaRow(data as Record<string, unknown>);
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível criar a campanha.");
+  }
+
+  const record = json.campanha;
   try {
     const { precarregarLogoEmpresaNaCampanha } = await import(
       "@/services/riscos-campanha-logo.service"
@@ -758,28 +694,6 @@ export async function criarCampanhaRiscos(
   } catch (err) {
     console.warn("pré-carga de logo da campanha:", err);
   }
-
-  const nome = usuarioNome ?? "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
-    modulo: AUDITORIA_MODULOS.riscos_psicossociais,
-    acao: AUDITORIA_ACOES.riscos_campanha_criada,
-    registroId: record.id,
-    registroNome: record.empresa_nome,
-    descricao: `${nome} criou a campanha ${record.codigo_publico} para ${record.empresa_nome}.`,
-    dadosDepois: {
-      codigo_publico: record.codigo_publico,
-      data_inicio: record.data_inicio,
-      data_encerramento: record.data_encerramento,
-      quantidade_prevista: record.quantidade_prevista,
-      status: record.status,
-      orcamento_id: record.orcamento_id,
-      origem: record.origem,
-      logo_origem: record.logo_origem,
-    },
-  });
 
   return record;
 }
@@ -933,6 +847,79 @@ export async function abrirCampanhaRiscos(
     );
   }
 
+  return json.campanha;
+}
+
+export { CampanhaCicloExistenteError };
+
+export async function prorrogarPrazoCampanhaRiscos(
+  campanhaId: string,
+  novaDataEncerramentoIso: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/prorrogar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        novaDataEncerramentoIso,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível prorrogar o prazo.");
+  }
+  if (json.campanha.id !== id) {
+    throw new Error("A prorrogação não pode criar outra campanha.");
+  }
+  return json.campanha;
+}
+
+export async function reabrirCampanhaRiscos(
+  campanhaId: string,
+  novaDataEncerramentoIso: string,
+  auditOptions?: CampanhaAuditOptions
+): Promise<RiscosCampanhaRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/reabrir`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        novaDataEncerramentoIso,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    campanha?: RiscosCampanhaRecord;
+  };
+  if (!res.ok || !json.ok || !json.campanha) {
+    throw new Error(json.error || "Não foi possível reabrir a pesquisa.");
+  }
+  if (json.campanha.id !== id) {
+    throw new Error("A reabertura não pode criar outra campanha.");
+  }
+  if (json.campanha.status !== "aberta") {
+    throw new Error("A reabertura não foi confirmada no banco.");
+  }
   return json.campanha;
 }
 

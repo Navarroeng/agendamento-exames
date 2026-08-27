@@ -17,14 +17,19 @@ import { RiscosQrCodeModal } from "@/components/riscos-psicossociais/RiscosQrCod
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
-  RISCOS_CAMPANHA_STATUS_LABELS,
-  acoesConvitePorStatus,
   formatPeriodoCampanha,
   pathAvaliacaoCampanha,
   urlPublicaPesquisaCampanha,
   validateAbrirCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "@/lib/riscos-campanha";
+import {
+  acoesPesquisaPorCampanha,
+  avisoCadastroParticipanteCampanha,
+  labelStatusPesquisaExibido,
+  validateProrrogarPrazoCampanha,
+  validateReabrirCampanha,
+} from "@/lib/riscos-campanha-ciclo";
 import {
   buildParticipantesResumo,
   type RiscosCampanhaParticipanteRecord,
@@ -53,6 +58,8 @@ interface RiscosPainelCardsProps {
   }) => Promise<void>;
   onAbrirCampanha: () => Promise<void>;
   onEncerrarCampanha: () => Promise<void>;
+  onProrrogarPrazo: (novaDataEncerramentoIso: string) => Promise<void>;
+  onReabrirCampanha: (novaDataEncerramentoIso: string) => Promise<void>;
   onCancelarProcesso: (motivo: string) => Promise<void>;
   onExcluirCampanha: (confirmacaoCodigo: string) => Promise<void>;
   exclusaoDefinitivaDisponivel?: boolean;
@@ -155,6 +162,8 @@ export function RiscosPainelCards({
   onCriarCampanha,
   onAbrirCampanha,
   onEncerrarCampanha,
+  onProrrogarPrazo,
+  onReabrirCampanha,
   onCancelarProcesso,
   onExcluirCampanha,
   exclusaoDefinitivaDisponivel = false,
@@ -179,6 +188,10 @@ export function RiscosPainelCards({
   const [criarAberto, setCriarAberto] = useState(false);
   const [confirmAbrirOpen, setConfirmAbrirOpen] = useState(false);
   const [confirmEncerrarOpen, setConfirmEncerrarOpen] = useState(false);
+  const [confirmProrrogarOpen, setConfirmProrrogarOpen] = useState(false);
+  const [confirmReabrirOpen, setConfirmReabrirOpen] = useState(false);
+  const [novaDataEncerramento, setNovaDataEncerramento] = useState("");
+  const [erroPrazo, setErroPrazo] = useState<string | null>(null);
   const [confirmCancelarOpen, setConfirmCancelarOpen] = useState(false);
   const [confirmExcluirOpen, setConfirmExcluirOpen] = useState(false);
   const [qrCodeOpen, setQrCodeOpen] = useState(false);
@@ -249,11 +262,24 @@ export function RiscosPainelCards({
     campanha?.status === "em_preparacao" &&
     !preRequisitoAbrir;
 
-  const acoesConvite = acoesConvitePorStatus(
-    campanhaStatusSincronizado ? campanha?.status : null
-  );
-  const exibeLinkConvite = acoesConvite.exibirLink;
-  const permiteCopiarLink = acoesConvite.permitirCopiarLink;
+  const acoesPesquisa = acoesPesquisaPorCampanha({
+    status: campanhaStatusSincronizado ? campanha?.status : null,
+    data_inicio: campanha?.data_inicio,
+    data_encerramento: campanha?.data_encerramento,
+    relatorioGerado: processo.relatorioGerado,
+    processoCancelado,
+  });
+  const exibeLinkConvite = acoesPesquisa.exibirLink;
+  const permiteCopiarLink = acoesPesquisa.permitirCopiarLink;
+  const avisoParticipante = campanha
+    ? avisoCadastroParticipanteCampanha({
+        campanha,
+        relatorioGerado: processo.relatorioGerado,
+        processoFinalizado:
+          processo.status === "concluido" ||
+          processo.etapaAtual === "finalizado",
+      })
+    : null;
 
   async function handleCopiarLink() {
     if (!campanha || !permiteCopiarLink) return;
@@ -400,7 +426,7 @@ export function RiscosPainelCards({
                 <dd className="mt-0.5">
                   <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-[11px] font-extrabold text-[#4338ca]">
                     {campanhaStatusSincronizado
-                      ? RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]
+                      ? acoesPesquisa.statusLabel
                       : "Sincronizando…"}
                   </span>
                 </dd>
@@ -458,10 +484,18 @@ export function RiscosPainelCards({
                       {campanha.codigo_publico}
                     </p>
                   </div>
-                  {campanha.status === "encerrada" ? (
+                  {acoesPesquisa.statusExibido === "encerrada" ? (
                     <p className="text-[11px] text-[#64748b]">
                       Pesquisa encerrada. O link permanece apenas como
-                      referência administrativa.
+                      referência administrativa. Use Reabrir pesquisa para
+                      voltar a receber respostas de pendentes.
+                    </p>
+                  ) : null}
+                  {acoesPesquisa.statusExibido === "prazo_encerrado" ? (
+                    <p className="text-[11px] text-[#64748b]">
+                      Prazo encerrado. A campanha e os dados permanecem. Use
+                      Prorrogar prazo para voltar a receber respostas dos
+                      participantes pendentes.
                     </p>
                   ) : null}
                 </div>
@@ -501,7 +535,7 @@ export function RiscosPainelCards({
               ) : null}
               {campanhaStatusSincronizado &&
               !processoCancelado &&
-              acoesConvite.exibirAbrir &&
+              acoesPesquisa.exibirAbrir &&
               podeAutorizarAbrirPesquisa ? (
                 <button
                   type="button"
@@ -518,7 +552,7 @@ export function RiscosPainelCards({
               ) : null}
               {campanhaStatusSincronizado &&
               !processoCancelado &&
-              acoesConvite.exibirEncerrar ? (
+              acoesPesquisa.exibirEncerrar ? (
                 <button
                   type="button"
                   className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -527,6 +561,42 @@ export function RiscosPainelCards({
                   title="Encerra a pesquisa e bloqueia novos acessos no portal"
                 >
                   Encerrar pesquisa
+                </button>
+              ) : null}
+              {campanhaStatusSincronizado &&
+              !processoCancelado &&
+              acoesPesquisa.exibirProrrogar &&
+              podeAutorizarAbrirPesquisa ? (
+                <button
+                  type="button"
+                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => {
+                    setNovaDataEncerramento("");
+                    setErroPrazo(null);
+                    setConfirmProrrogarOpen(true);
+                  }}
+                  title="Altera somente a data final da campanha existente"
+                >
+                  Prorrogar prazo
+                </button>
+              ) : null}
+              {campanhaStatusSincronizado &&
+              !processoCancelado &&
+              acoesPesquisa.exibirReabrir &&
+              podeAutorizarAbrirPesquisa ? (
+                <button
+                  type="button"
+                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  disabled={savingCampanha}
+                  onClick={() => {
+                    setNovaDataEncerramento("");
+                    setErroPrazo(null);
+                    setConfirmReabrirOpen(true);
+                  }}
+                  title="Reabre a pesquisa existente sem criar outra campanha"
+                >
+                  Reabrir pesquisa
                 </button>
               ) : null}
               {podeCancelarProcesso ? (
@@ -579,6 +649,7 @@ export function RiscosPainelCards({
             onRemover={onRemoverParticipante}
             podeGerenciarParticipante={podeGerenciarParticipante}
             somenteConsulta={processoCancelado}
+            avisoCadastro={avisoParticipante}
           />
         ) : (
           <PlaceholderNote>
@@ -749,7 +820,182 @@ export function RiscosPainelCards({
           <br />
           <br />
           Após o encerramento, novos participantes não poderão responder.
+          Os dados, as respostas e o relatório permanecem preservados.
         </p>
+      </Modal>
+
+      <Modal
+        open={confirmProrrogarOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmProrrogarOpen(false);
+        }}
+        title="Prorrogar prazo da pesquisa"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmProrrogarOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha || !campanha || !novaDataEncerramento}
+              onClick={() => {
+                void (async () => {
+                  if (!campanha) return;
+                  const erro = validateProrrogarPrazoCampanha({
+                    campanha,
+                    novaDataEncerramentoIso: novaDataEncerramento,
+                  });
+                  if (erro) {
+                    setErroPrazo(erro);
+                    return;
+                  }
+                  try {
+                    await onProrrogarPrazo(novaDataEncerramento);
+                    setConfirmProrrogarOpen(false);
+                  } catch {
+                    // mantém aberto
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Prorrogando…" : "Prorrogar prazo"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-[#475569]">
+            Período atual:{" "}
+            <span className="font-semibold text-navy">
+              {campanha
+                ? formatPeriodoCampanha(
+                    campanha.data_inicio,
+                    campanha.data_encerramento
+                  )
+                : "—"}
+            </span>
+          </p>
+          <Field label="Nova data de encerramento">
+            <input
+              type="date"
+              className="field-input w-full"
+              value={novaDataEncerramento}
+              disabled={savingCampanha}
+              onChange={(e) => {
+                setNovaDataEncerramento(e.target.value);
+                setErroPrazo(null);
+              }}
+            />
+          </Field>
+          {erroPrazo ? (
+            <p className="text-xs font-medium text-brand-red">{erroPrazo}</p>
+          ) : (
+            <p className="text-xs text-[#64748b]">
+              Somente a data final desta campanha será alterada. O código, o
+              link, os participantes, as respostas e o relatório permanecem.
+            </p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={confirmReabrirOpen}
+        onClose={() => {
+          if (!savingCampanha) setConfirmReabrirOpen(false);
+        }}
+        title="Reabrir pesquisa"
+        subtitle={
+          campanha
+            ? `${campanha.empresa_nome} · ${campanha.codigo_publico}`
+            : undefined
+        }
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+              disabled={savingCampanha}
+              onClick={() => setConfirmReabrirOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={savingCampanha || !campanha || !novaDataEncerramento}
+              onClick={() => {
+                void (async () => {
+                  if (!campanha) return;
+                  const erro = validateReabrirCampanha({
+                    campanha,
+                    novaDataEncerramentoIso: novaDataEncerramento,
+                  });
+                  if (erro) {
+                    setErroPrazo(erro);
+                    return;
+                  }
+                  try {
+                    await onReabrirCampanha(novaDataEncerramento);
+                    setConfirmReabrirOpen(false);
+                  } catch {
+                    // mantém aberto
+                  }
+                })();
+              }}
+            >
+              {savingCampanha ? "Reabrindo…" : "Reabrir pesquisa"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-[#475569]">
+            Esta ação permitirá novas respostas de participantes pendentes ou
+            adicionados posteriormente.
+            <br />
+            <br />
+            As respostas já concluídas serão preservadas.
+            <br />
+            O relatório existente não será apagado.
+          </p>
+          <p className="text-sm text-[#475569]">
+            Período atual:{" "}
+            <span className="font-semibold text-navy">
+              {campanha
+                ? formatPeriodoCampanha(
+                    campanha.data_inicio,
+                    campanha.data_encerramento
+                  )
+                : "—"}
+            </span>
+          </p>
+          <Field label="Nova data de encerramento">
+            <input
+              type="date"
+              className="field-input w-full"
+              value={novaDataEncerramento}
+              disabled={savingCampanha}
+              onChange={(e) => {
+                setNovaDataEncerramento(e.target.value);
+                setErroPrazo(null);
+              }}
+            />
+          </Field>
+          {erroPrazo ? (
+            <p className="text-xs font-medium text-brand-red">{erroPrazo}</p>
+          ) : null}
+        </div>
       </Modal>
 
       <Modal
@@ -1001,7 +1247,7 @@ function buildHistorico(
         ? `${formatPeriodoCampanha(
             campanha.data_inicio,
             campanha.data_encerramento
-          )} · ${RISCOS_CAMPANHA_STATUS_LABELS[campanha.status]}`
+          )} · ${labelStatusPesquisaExibido(campanha)}`
         : undefined,
       done: Boolean(campanha),
     },

@@ -23,6 +23,10 @@ import {
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
 import { mesclarCampanhaListagemModal } from "@/lib/riscos-campanha-origem";
+import {
+  CampanhaCicloExistenteError,
+  MSG_CAMPANHA_CICLO_EXISTENTE,
+} from "@/lib/riscos-campanha-ciclo";
 import { identidadeCancelamentoProcessoRiscos } from "@/lib/riscos-processo-cancelamento";
 import {
   resolveInitialMesListagem,
@@ -38,6 +42,8 @@ import {
   exclusaoDefinitivaDisponivelNoClient,
   excluirCampanhaRiscos,
   encerrarCampanhaRiscos,
+  prorrogarPrazoCampanhaRiscos,
+  reabrirCampanhaRiscos,
   garantirCodigoAcessoCampanha,
   removerProcessoRiscos,
 } from "@/services/riscos-campanha.service";
@@ -888,6 +894,13 @@ export function useRiscosPsicossociaisPage() {
         toast.success("Campanha criada com sucesso.");
       } catch (err) {
         console.error(err);
+        if (err instanceof CampanhaCicloExistenteError) {
+          atualizarCampanhaNoEstado(err.campanha);
+          setCampanhaStatusSincronizado(true);
+          await refresh();
+          toast.error(MSG_CAMPANHA_CICLO_EXISTENTE);
+          return;
+        }
         toast.error(
           err instanceof Error ? err.message : "Erro ao criar a campanha."
         );
@@ -895,7 +908,7 @@ export function useRiscosPsicossociaisPage() {
         setSavingCampanha(false);
       }
     },
-    [modalProcesso, auditContext, refresh]
+    [modalProcesso, auditContext, refresh, atualizarCampanhaNoEstado]
   );
 
   const handleAbrirCampanha = useCallback(async () => {
@@ -972,6 +985,80 @@ export function useRiscosPsicossociaisPage() {
       setSavingCampanha(false);
     }
   }, [modalProcesso, auditContext, refresh]);
+
+  const handleProrrogarPrazo = useCallback(
+    async (novaDataEncerramentoIso: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      if (!podeAutorizarAbrirPesquisa) {
+        throw new Error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
+      }
+      setSavingCampanha(true);
+      try {
+        const campanha = await prorrogarPrazoCampanhaRiscos(
+          campanhaId,
+          novaDataEncerramentoIso,
+          { auditContext }
+        );
+        atualizarCampanhaNoEstado(campanha);
+        setCampanhaStatusSincronizado(true);
+        await refresh();
+        toast.success("Prazo prorrogado. O link original permanece o mesmo.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao prorrogar o prazo."
+        );
+        throw err;
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [
+      modalProcesso,
+      auditContext,
+      refresh,
+      podeAutorizarAbrirPesquisa,
+      atualizarCampanhaNoEstado,
+    ]
+  );
+
+  const handleReabrirCampanha = useCallback(
+    async (novaDataEncerramentoIso: string) => {
+      const campanhaId = modalProcesso?.campanha?.id;
+      if (!campanhaId) return;
+      if (!podeAutorizarAbrirPesquisa) {
+        throw new Error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
+      }
+      setSavingCampanha(true);
+      try {
+        const campanha = await reabrirCampanhaRiscos(
+          campanhaId,
+          novaDataEncerramentoIso,
+          { auditContext }
+        );
+        atualizarCampanhaNoEstado(campanha);
+        setCampanhaStatusSincronizado(true);
+        await refresh();
+        toast.success("Pesquisa reaberta. Respostas já concluídas foram preservadas.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao reabrir a pesquisa."
+        );
+        throw err;
+      } finally {
+        setSavingCampanha(false);
+      }
+    },
+    [
+      modalProcesso,
+      auditContext,
+      refresh,
+      podeAutorizarAbrirPesquisa,
+      atualizarCampanhaNoEstado,
+    ]
+  );
 
   const handleCancelarProcesso = useCallback(
     async (motivo: string, processoAlvo?: RiscosPsicossociaisProcesso) => {
@@ -1359,6 +1446,8 @@ export function useRiscosPsicossociaisPage() {
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,
+    handleProrrogarPrazo,
+    handleReabrirCampanha,
     handleCancelarProcesso,
     openCancelarProcesso,
     closeCancelarProcesso,

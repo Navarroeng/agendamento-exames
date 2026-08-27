@@ -7,7 +7,9 @@ import {
 } from "@/lib/riscos-psicossociais";
 
 type RiscosEtapaAtualBadgeProps = {
-  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual">;
+  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual"> & {
+    campanha?: RiscosPsicossociaisProcesso["campanha"];
+  };
 };
 
 /** Badge da etapa atual — mesma variante na tabela e no modal. */

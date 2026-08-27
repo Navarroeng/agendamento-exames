@@ -11,6 +11,7 @@ import {
   validateRiscosParticipanteInput,
   type RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
+import { campanhaPermiteCadastroParticipantes } from "@/lib/riscos-campanha-ciclo";
 
 export const RISCOS_IMPORT_HEADERS = [
   "NOME COMPLETO",
@@ -461,15 +462,5 @@ export function downloadModeloImportacaoParticipantesExcel(): void {
 export function campanhaPermiteImportacaoParticipantes(
   status: string | null | undefined
 ): string | null {
-  const s = String(status ?? "");
-  if (s === "cancelada") {
-    return "Não é possível importar participantes em campanha cancelada.";
-  }
-  if (s === "encerrada") {
-    return "Não é possível importar participantes em campanha encerrada.";
-  }
-  if (s !== "em_preparacao" && s !== "aberta") {
-    return "A campanha não está disponível para importação.";
-  }
-  return null;
+  return campanhaPermiteCadastroParticipantes(status);
 }

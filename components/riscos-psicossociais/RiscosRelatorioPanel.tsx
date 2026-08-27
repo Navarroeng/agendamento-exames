@@ -9,6 +9,10 @@ import {
   validatePodeGerarRelatorioFinal,
   type RiscosRelatorioRecord,
 } from "@/lib/riscos-relatorio";
+import {
+  haRespostasAposRelatorio,
+  MSG_RELATORIO_NOVAS_RESPOSTAS,
+} from "@/lib/riscos-campanha-ciclo";
 import type { RiscosCampanhaParticipanteRecord } from "@/lib/riscos-campanha-participantes";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import {
@@ -64,6 +68,16 @@ export function RiscosRelatorioPanel({
       }),
     [campanha?.status, ativos, relatorio, processoCancelado]
   );
+
+  const novasRespostasAposRelatorio = useMemo(() => {
+    if (!relatorio) return false;
+    return haRespostasAposRelatorio({
+      relatorioRespondentes: relatorio.respondentes,
+      relatorioGeradoEm: relatorio.gerado_em,
+      participantesRespondidos: ativos.filter((p) => p.status === "respondido")
+        .length,
+    });
+  }, [relatorio, ativos]);
 
   useEffect(() => {
     if (!campanha?.id) {
@@ -221,6 +235,11 @@ export function RiscosRelatorioPanel({
           {relatorio.respondentes}/{relatorio.participantes} respondentes
         </p>
       </div>
+      {novasRespostasAposRelatorio ? (
+        <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs font-medium text-[#b45309]">
+          {MSG_RELATORIO_NOVAS_RESPOSTAS}
+        </p>
+      ) : null}
 
       <div className="mt-auto flex flex-wrap gap-2">
         <button

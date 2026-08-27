@@ -57,11 +57,13 @@ export async function GET(
 
     const disponivel = periodo === "ok";
     const codigoErro =
-      periodo === "encerrada"
-        ? "campanha_encerrada"
-        : periodo === "ok"
-          ? null
-          : "nao_apto";
+      periodo === "prazo_encerrado"
+        ? "prazo_encerrado"
+        : periodo === "encerrada"
+          ? "campanha_encerrada"
+          : periodo === "ok"
+            ? null
+            : "nao_apto";
 
     return NextResponse.json(
       {

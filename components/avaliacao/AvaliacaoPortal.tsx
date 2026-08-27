@@ -9,6 +9,8 @@ import {
   MENSAGEM_CAMPANHA_ENCERRADA_TITULO,
   MENSAGEM_JA_RESPONDIDA_CORPO,
   MENSAGEM_JA_RESPONDIDA_TITULO,
+  MENSAGEM_PRAZO_ENCERRADO_CORPO,
+  MENSAGEM_PRAZO_ENCERRADO_TITULO,
   MENSAGEM_VALIDACAO_GENERICA,
   type AvaliacaoErroCodigo,
 } from "@/lib/avaliacao-constantes";
@@ -47,7 +49,15 @@ type Step =
   | "questionario"
   | "final"
   | "ja_respondida"
-  | "campanha_encerrada";
+  | "campanha_encerrada"
+  | "prazo_encerrado";
+
+function stepPorCodigoErro(codigo?: string | null): Step | null {
+  if (codigo === "ja_respondida") return "ja_respondida";
+  if (codigo === "prazo_encerrado") return "prazo_encerrado";
+  if (codigo === "campanha_encerrada") return "campanha_encerrada";
+  return null;
+}
 
 interface AvaliacaoPortalProps {
   codigo: string;
@@ -147,9 +157,10 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
       setEmpresaNome(json.empresaNome || "—");
       setCampanhaNome(json.campanhaNome || "Pesquisa de Riscos Psicossociais");
       setDisponivel(Boolean(json.disponivel));
-      if (json.codigoErro === "campanha_encerrada") {
+      const stepErro = stepPorCodigoErro(json.codigoErro);
+      if (stepErro) {
         setInfoError(null);
-        setStep("campanha_encerrada");
+        setStep(stepErro);
         return;
       }
       setInfoError(
@@ -254,12 +265,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         setAutenticado(false);
         setRespostas({});
         setFlowIndex(0);
-        if (json.codigo === "ja_respondida") {
-          setStep("ja_respondida");
-          return;
-        }
-        if (json.codigo === "campanha_encerrada") {
-          setStep("campanha_encerrada");
+        const stepErro = stepPorCodigoErro(json.codigo);
+        if (stepErro) {
+          setStep(stepErro);
           return;
         }
         setErroIdentificacao(json.error || MENSAGEM_VALIDACAO_GENERICA);
@@ -313,12 +321,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
           respostas?: Record<string, string>;
         };
         if (!res.ok || !json.ok) {
-          if (json.codigo === "ja_respondida") {
-            setStep("ja_respondida");
-            return;
-          }
-          if (json.codigo === "campanha_encerrada") {
-            setStep("campanha_encerrada");
+          const stepErro = stepPorCodigoErro(json.codigo);
+          if (stepErro) {
+            setStep(stepErro);
             return;
           }
           setErroIdentificacao(MENSAGEM_VALIDACAO_GENERICA);
@@ -360,12 +365,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
           respostas?: Record<string, string>;
         };
         if (!res.ok || !json.ok) {
-          if (json.codigo === "ja_respondida") {
-            setStep("ja_respondida");
-            return;
-          }
-          if (json.codigo === "campanha_encerrada") {
-            setStep("campanha_encerrada");
+          const stepErro = stepPorCodigoErro(json.codigo);
+          if (stepErro) {
+            setStep(stepErro);
             return;
           }
           setInfoError(MENSAGEM_VALIDACAO_GENERICA);
@@ -425,12 +427,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         ok?: boolean;
         codigo?: AvaliacaoErroCodigo | "valor_invalido" | "incompleto";
       };
-      if (json.codigo === "ja_respondida") {
-        setStep("ja_respondida");
-        return false;
-      }
-      if (json.codigo === "campanha_encerrada") {
-        setStep("campanha_encerrada");
+      const stepErro = stepPorCodigoErro(json.codigo);
+      if (stepErro) {
+        setStep(stepErro);
         return false;
       }
       if (!res.ok || !json.ok) {
@@ -473,12 +472,9 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
         ok?: boolean;
         codigo?: AvaliacaoErroCodigo | "incompleto";
       };
-      if (json.codigo === "ja_respondida") {
-        setStep("ja_respondida");
-        return;
-      }
-      if (json.codigo === "campanha_encerrada") {
-        setStep("campanha_encerrada");
+      const stepErro = stepPorCodigoErro(json.codigo);
+      if (stepErro) {
+        setStep(stepErro);
         return;
       }
       if (json.codigo === "incompleto") {
@@ -719,6 +715,15 @@ export function AvaliacaoPortal({ codigo }: AvaliacaoPortalProps) {
             <StatusMessageStep
               titulo={MENSAGEM_CAMPANHA_ENCERRADA_TITULO}
               corpo={MENSAGEM_CAMPANHA_ENCERRADA_CORPO}
+              tom="encerrada"
+              onClose={() => void handleEncerrar()}
+            />
+          ) : null}
+
+          {step === "prazo_encerrado" ? (
+            <StatusMessageStep
+              titulo={MENSAGEM_PRAZO_ENCERRADO_TITULO}
+              corpo={MENSAGEM_PRAZO_ENCERRADO_CORPO}
               tom="encerrada"
               onClose={() => void handleEncerrar()}
             />

@@ -9,7 +9,13 @@ export const MENSAGEM_JA_RESPONDIDA_CORPO =
 export const MENSAGEM_CAMPANHA_ENCERRADA_TITULO = "Esta campanha foi encerrada.";
 
 export const MENSAGEM_CAMPANHA_ENCERRADA_CORPO =
-  "Infelizmente o período para participação nesta pesquisa foi finalizado.\n\nCaso necessário, entre em contato com sua empresa ou com a Navarro Engenharia.";
+  "Esta pesquisa foi encerrada e não está mais recebendo respostas.\n\nCaso necessário, entre em contato com sua empresa ou com a Navarro Engenharia.";
+
+export const MENSAGEM_PRAZO_ENCERRADO_TITULO =
+  "O prazo desta pesquisa foi encerrado.";
+
+export const MENSAGEM_PRAZO_ENCERRADO_CORPO =
+  "O período para participação nesta pesquisa foi finalizado.\n\nCaso necessário, entre em contato com sua empresa ou com a Navarro Engenharia.";
 
 export const AVALIACAO_SESSION_COOKIE = "avaliacao_sessao";
 
@@ -17,12 +23,14 @@ export const AVALIACAO_SESSION_COOKIE = "avaliacao_sessao";
 export type AvaliacaoErroCodigo =
   | "ja_respondida"
   | "campanha_encerrada"
+  | "prazo_encerrado"
   | "nao_apto";
 
 export function mensagemPorCodigoErro(
   codigo: AvaliacaoErroCodigo | string | undefined
 ): string {
   if (codigo === "ja_respondida") return MENSAGEM_JA_RESPONDIDA_CORPO;
+  if (codigo === "prazo_encerrado") return MENSAGEM_PRAZO_ENCERRADO_CORPO;
   if (codigo === "campanha_encerrada") return MENSAGEM_CAMPANHA_ENCERRADA_CORPO;
   return MENSAGEM_VALIDACAO_GENERICA;
 }

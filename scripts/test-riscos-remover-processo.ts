@@ -12,6 +12,7 @@ import {
 } from "../lib/riscos-campanha";
 import { RISCOS_CAMPANHA_STATUS_ATIVOS } from "../lib/riscos-campanha-origem";
 import { consolidarResultadosCampanha } from "../lib/riscos-resultados";
+import { campanhaBloqueiaExclusaoFisica } from "../lib/riscos-campanha-ciclo";
 
 function run(name: string, fn: () => void) {
   fn();
@@ -49,6 +50,34 @@ run("relatório final ainda não bloqueia (sem entidade)", () => {
   );
   assert.equal(
     validateRemoverProcessoRiscos({ id: "c1", status: "encerrada" }),
+    null
+  );
+});
+
+run("exclusão física bloqueada quando a campanha já teve uso", () => {
+  assert.ok(
+    campanhaBloqueiaExclusaoFisica({
+      status: "encerrada",
+      participantes: 5,
+      sessoes: 5,
+      respostas: 10,
+    })
+  );
+  assert.ok(
+    campanhaBloqueiaExclusaoFisica({
+      status: "aberta",
+      participantes: 0,
+      sessoes: 0,
+      respostas: 0,
+    })
+  );
+  assert.equal(
+    campanhaBloqueiaExclusaoFisica({
+      status: "em_preparacao",
+      participantes: 0,
+      sessoes: 0,
+      respostas: 0,
+    }),
     null
   );
 });

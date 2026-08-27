@@ -174,6 +174,14 @@ async function persistirRelatorio(params: {
     dataEncerramento: String(campanha.data_encerramento ?? "").slice(0, 10),
     consolidado,
   });
+  if (existente && params.substituir) {
+    resultado_json.geracaoAnterior = {
+      geradoEm: existente.gerado_em,
+      geradoPor: existente.gerado_por,
+      participantes: existente.participantes,
+      respondentes: existente.respondentes,
+    };
+  }
 
   const geradoPor =
     params.auditContext?.usuarioNome?.trim() ||
@@ -219,10 +227,20 @@ async function persistirRelatorio(params: {
       registroId: record.id,
       registroNome: record.codigo_publico,
       descricao: `${geradoPor} regenerou o relatório final da campanha ${record.codigo_publico}.`,
-      dadosDepois: {
+    dadosAntes: {
+      gerado_em: existente.gerado_em,
+      gerado_por: existente.gerado_por,
+      participantes: existente.participantes,
+      respondentes: existente.respondentes,
+      status: existente.status,
+    },
+    dadosDepois: {
         campanha_id: record.campanha_id,
         participantes: record.participantes,
         respondentes: record.respondentes,
+        gerado_em: record.gerado_em,
+        gerado_por: record.gerado_por,
+        geracao_anterior_em: existente.gerado_em,
       },
     });
     return record;

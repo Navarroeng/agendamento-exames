@@ -48,6 +48,8 @@ export function RiscosPsicossociaisPage() {
     handleCriarCampanha,
     handleAbrirCampanha,
     handleEncerrarCampanha,
+    handleProrrogarPrazo,
+    handleReabrirCampanha,
     handleCancelarProcesso,
     openCancelarProcesso,
     closeCancelarProcesso,
@@ -148,6 +150,8 @@ export function RiscosPsicossociaisPage() {
         onCriarCampanha={handleCriarCampanha}
         onAbrirCampanha={handleAbrirCampanha}
         onEncerrarCampanha={handleEncerrarCampanha}
+        onProrrogarPrazo={handleProrrogarPrazo}
+        onReabrirCampanha={handleReabrirCampanha}
         onCancelarProcesso={handleCancelarProcesso}
         onExcluirCampanha={handleExcluirCampanha}
         exclusaoDefinitivaDisponivel={exclusaoDefinitivaDisponivel}

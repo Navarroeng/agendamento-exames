@@ -8,6 +8,7 @@ import {
   validateEncerrarCampanhaRiscos,
   validatePreRequisitosAbrirCampanha,
 } from "../lib/riscos-campanha";
+import { acoesPesquisaPorCampanha } from "../lib/riscos-campanha-ciclo";
 import { assertStatusAbertaPersistido } from "../services/riscos-campanha-abrir.server";
 
 function run(name: string, fn: () => void) {
@@ -159,6 +160,37 @@ run("ações com status null (pré-sync) → nada de Abrir/Encerrar/link", () =>
   assert.equal(a.exibirAbrir, false);
   assert.equal(a.exibirEncerrar, false);
   assert.equal(a.exibirLink, false);
+  assert.equal(a.permitirCopiarLink, false);
+});
+
+run("ciclo: prazo encerrado → Prorrogar, sem Criar/Encerrar, copia link", () => {
+  const a = acoesPesquisaPorCampanha({
+    status: "aberta",
+    data_inicio: "2026-08-20",
+    data_encerramento: "2026-08-30",
+    hojeIso: "2026-08-31",
+  });
+  assert.equal(a.statusExibido, "prazo_encerrado");
+  assert.equal(a.exibirAbrir, false);
+  assert.equal(a.exibirEncerrar, false);
+  assert.equal(a.exibirProrrogar, true);
+  assert.equal(a.exibirReabrir, false);
+  assert.equal(a.exibirLink, true);
+  assert.equal(a.permitirCopiarLink, true);
+});
+
+run("ciclo: encerrada → Reabrir, sem Prorrogar", () => {
+  const a = acoesPesquisaPorCampanha({
+    status: "encerrada",
+    data_inicio: "2026-08-20",
+    data_encerramento: "2026-08-30",
+    hojeIso: "2026-09-01",
+  });
+  assert.equal(a.statusExibido, "encerrada");
+  assert.equal(a.exibirAbrir, false);
+  assert.equal(a.exibirEncerrar, false);
+  assert.equal(a.exibirProrrogar, false);
+  assert.equal(a.exibirReabrir, true);
   assert.equal(a.permitirCopiarLink, false);
 });
 

@@ -10,7 +10,6 @@ import {
   getClientIpFromRequest,
 } from "@/lib/avaliacao-rate-limit";
 import {
-  MENSAGEM_CAMPANHA_ENCERRADA_CORPO,
   MENSAGEM_JA_RESPONDIDA_CORPO,
   mensagemPorCodigoErro,
 } from "@/lib/avaliacao-constantes";
@@ -176,7 +175,11 @@ export async function POST(request: Request) {
         temConcluiuEm: Boolean(participante?.concluiu_em),
       });
 
-      if (resultado.motivo === "campanha_encerrada" && campanha?.id) {
+      if (
+        (resultado.motivo === "campanha_encerrada" ||
+          resultado.motivo === "prazo_encerrado") &&
+        campanha?.id
+      ) {
         await registrarAuditoriaPortal(supabase, {
           evento: "tentativa_apos_encerramento",
           campanhaId: String(campanha.id),
@@ -207,9 +210,7 @@ export async function POST(request: Request) {
       const error =
         codigo === "ja_respondida"
           ? MENSAGEM_JA_RESPONDIDA_CORPO
-          : codigo === "campanha_encerrada"
-            ? MENSAGEM_CAMPANHA_ENCERRADA_CORPO
-            : mensagemPorCodigoErro(codigo);
+          : mensagemPorCodigoErro(codigo);
 
       return NextResponse.json(
         { ok: false, codigo, error },

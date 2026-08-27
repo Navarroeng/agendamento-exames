@@ -37,6 +37,7 @@ export type AvaliacaoValidacaoMotivo =
   | "campanha_inexistente"
   | "codigo_publico_divergente"
   | "campanha_encerrada"
+  | "prazo_encerrado"
   | "campanha_indisponivel"
   | "participante_nao_encontrado"
   | "participante_campanha_divergente"
@@ -60,6 +61,7 @@ export type CampanhaPeriodoStatus =
   | "ok"
   | "inexistente"
   | "encerrada"
+  | "prazo_encerrado"
   | "indisponivel";
 
 /** Status de participante aceitos para iniciar/retomar a pesquisa. */
@@ -82,10 +84,13 @@ export function avaliarPeriodoCampanha(
   const fim = String(campanha.data_encerramento ?? "").slice(0, 10);
   const status = String(campanha.status ?? "");
 
-  if (status === "encerrada" || status === "cancelada" || (fim && hoje > fim)) {
+  if (status === "encerrada" || status === "cancelada") {
     return "encerrada";
   }
   if (status !== "aberta") return "indisponivel";
+  if (fim && hoje > fim) {
+    return "prazo_encerrado";
+  }
   if (!inicio || !fim) return "indisponivel";
   if (hoje < inicio) return "indisponivel";
   return "ok";
@@ -124,6 +129,9 @@ export function validarAcessoAvaliacao(input: {
   }
 
   const periodo = avaliarPeriodoCampanha(input.campanha, hoje);
+  if (periodo === "prazo_encerrado") {
+    return { ok: false, motivo: "prazo_encerrado" };
+  }
   if (periodo === "encerrada") {
     return { ok: false, motivo: "campanha_encerrada" };
   }
@@ -189,8 +197,9 @@ export function validarAcessoAvaliacao(input: {
 /** Mapeia motivo interno → código público seguro. */
 export function codigoErroPublico(
   motivo: AvaliacaoValidacaoMotivo
-): "ja_respondida" | "campanha_encerrada" | "nao_apto" {
+): "ja_respondida" | "campanha_encerrada" | "prazo_encerrado" | "nao_apto" {
   if (motivo === "participante_ja_concluiu") return "ja_respondida";
+  if (motivo === "prazo_encerrado") return "prazo_encerrado";
   if (motivo === "campanha_encerrada") return "campanha_encerrada";
   // removido / inválido / não encontrado → mensagem genérica
   return "nao_apto";

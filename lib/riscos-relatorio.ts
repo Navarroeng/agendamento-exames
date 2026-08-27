@@ -62,6 +62,12 @@ export type RiscosRelatorioResultadoJson = {
   comportamentosOfensivos: RiscosResultadosPublicos["comportamentosOfensivos"];
   conclusao: string | null;
   recomendacoes: string | null;
+  geracaoAnterior?: {
+    geradoEm: string;
+    geradoPor: string | null;
+    participantes: number;
+    respondentes: number;
+  };
 };
 
 export type RiscosRelatorioRecord = {

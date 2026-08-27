@@ -30,6 +30,7 @@ interface RiscosCampanhaParticipantesSectionProps {
   /** Somente admin vê/usa Editar e Remover participante. */
   podeGerenciarParticipante?: boolean;
   somenteConsulta?: boolean;
+  avisoCadastro?: string | null;
   onCriar: (input: RiscosParticipanteInput) => Promise<void>;
   onEditar: (
     participanteId: string,
@@ -61,6 +62,7 @@ export function RiscosCampanhaParticipantesSection({
   saving = false,
   podeGerenciarParticipante = false,
   somenteConsulta = false,
+  avisoCadastro = null,
   onCriar,
   onEditar,
   onRemover,
@@ -258,6 +260,12 @@ export function RiscosCampanhaParticipantesSection({
           + Cadastrar participante
         </button>
       </div>
+
+      {avisoCadastro ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-relaxed text-amber-900">
+          {avisoCadastro}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2">
         <ResumoCard label="Cadastrados" value={resumo.cadastrados} />
