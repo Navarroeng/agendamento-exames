@@ -3,11 +3,11 @@ import { isPerfilAdmin, type PerfilUsuarioTipo } from "@/lib/permissions";
 /**
  * E-mails persistidos em `perfis_usuarios.email` (único) das usuárias
  * operacionais autorizadas a abrir pesquisa. Não usar o nome exibido.
- * Fonte: seed oficial em `supabase/migrations/006_auth_usuarios.sql`.
  */
 export const RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS = [
   "bruna@navarro.com.br",
   "rafaela@navarro.com.br",
+  "assessoria@navarroeng.com.br",
 ] as const;
 
 export const RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG =
@@ -32,7 +32,7 @@ export function isEmailAutorizadoAbrirPesquisaRiscos(
 }
 
 /**
- * Abrir pesquisa: administradores (perfil) ou Bruna/Rafaela (e-mail persistido).
+ * Abrir pesquisa: administradores (perfil) ou e-mails da allowlist operacional.
  * Não libera outras ações administrativas.
  */
 export function podeAbrirPesquisaRiscos(input: {

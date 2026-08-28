@@ -6,7 +6,7 @@ export const CLINICAS = [
   "Seg&Med",
 ] as const;
 
-export const RESPONSAVEIS = ["Bruna", "Rafaela"] as const;
+export const RESPONSAVEIS = ["Bruna", "Rafaela", "Karoline"] as const;
 
 export const TIPOS_ASO = [
   "Admissional",

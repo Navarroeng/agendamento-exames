@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 /**
  * Abre a pesquisa (status → aberta) com persistência confirmada no banco.
- * Autenticado + admin, ou e-mail persistido de Bruna/Rafaela.
+ * Autenticado + admin, ou e-mail da allowlist operacional.
  * Usa service role apenas após checagem de sessão.
  */
 export async function POST(

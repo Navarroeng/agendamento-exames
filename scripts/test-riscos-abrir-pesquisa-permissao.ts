@@ -43,6 +43,27 @@ assert.equal(
   }),
   true
 );
+assert.equal(
+  podeAbrirPesquisaRiscos({
+    perfil: "operacional",
+    email: "assessoria@navarroeng.com.br",
+  }),
+  true
+);
+assert.equal(
+  podeAbrirPesquisaRiscos({
+    perfil: "operacional",
+    email: "  ASSESSORIA@NAVARROENG.COM.BR ",
+  }),
+  true
+);
+assert.equal(
+  podeAbrirPesquisaRiscos({
+    perfil: "operacional",
+    emailAuth: "assessoria@navarroeng.com.br",
+  }),
+  true
+);
 
 assert.equal(
   podeAbrirPesquisaRiscos({
@@ -64,10 +85,23 @@ assert.equal(
   isEmailAutorizadoAbrirPesquisaRiscos("bruna@navarro.com.br"),
   true
 );
+assert.equal(
+  isEmailAutorizadoAbrirPesquisaRiscos("rafaela@navarro.com.br"),
+  true
+);
+assert.equal(
+  isEmailAutorizadoAbrirPesquisaRiscos("assessoria@navarroeng.com.br"),
+  true
+);
+assert.equal(isEmailAutorizadoAbrirPesquisaRiscos("Karoline"), false);
 
 assert.deepEqual(
   [...RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS],
-  ["bruna@navarro.com.br", "rafaela@navarro.com.br"]
+  [
+    "bruna@navarro.com.br",
+    "rafaela@navarro.com.br",
+    "assessoria@navarroeng.com.br",
+  ]
 );
 
 assert.equal(
