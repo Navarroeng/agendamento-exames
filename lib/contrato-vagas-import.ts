@@ -11,10 +11,6 @@ import {
   type ContratoVagaDraft,
 } from "@/lib/contrato-vagas";
 
-export const CONTRATO_VAGAS_IMPORT_HEADERS = ["Nome", "CPF", "Cargo"] as const;
-export const CONTRATO_VAGAS_IMPORT_MODELO_FILENAME =
-  "modelo_lista_funcionarios_contrato.xlsx";
-
 export type ContratoVagaImportRow = {
   linha: number;
   nome: string;
@@ -315,15 +311,4 @@ export function aplicarImportacaoNasVagas(params: {
   }
 
   return { drafts, aplicados, excedentes, ignoradosPreenchidos };
-}
-
-export function gerarModeloListaFuncionariosXlsx(): ArrayBuffer {
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([
-    [...CONTRATO_VAGAS_IMPORT_HEADERS],
-    ["Natália Porfírio", "000.000.000-00", "Cozinheira"],
-  ]);
-  ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, ws, "Funcionários");
-  return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 }

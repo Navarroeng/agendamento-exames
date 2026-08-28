@@ -27,9 +27,7 @@ import {
   type ContratoVagaStatus,
 } from "@/lib/contrato-vagas";
 import {
-  CONTRATO_VAGAS_IMPORT_MODELO_FILENAME,
   aplicarImportacaoNasVagas,
-  gerarModeloListaFuncionariosXlsx,
   lerArquivoListaFuncionarios,
 } from "@/lib/contrato-vagas-import";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
@@ -307,19 +305,6 @@ export function OrcamentoAbaFuncionarios({
     );
   }
 
-  function handleBaixarModelo() {
-    const buffer = gerarModeloListaFuncionariosXlsx();
-    const blob = new Blob([new Uint8Array(buffer)], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = CONTRATO_VAGAS_IMPORT_MODELO_FILENAME;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function handleReplaceSelected(selected: File | null) {
     if (!selected) return;
     setActionSaving(true);
@@ -403,14 +388,6 @@ export function OrcamentoAbaFuncionarios({
           onClick={() => importInputRef.current?.click()}
         >
           Importar lista
-        </button>
-        <button
-          type="button"
-          className="btn btn-muted text-xs"
-          disabled={busy}
-          onClick={handleBaixarModelo}
-        >
-          Baixar modelo
         </button>
         <input
           ref={importInputRef}

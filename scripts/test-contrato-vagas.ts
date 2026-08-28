@@ -1,6 +1,8 @@
 /** Smoke: vagas contratuais — estados, CPF e drafts. */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   agendamentoOcupaVagaPrevista,
   buildVagaDraftsIniciais,
@@ -716,5 +718,24 @@ const vagaComIdCarregadoAvulso = resolverDadosExibicaoVagaContrato({
 assert.equal(vagaComIdCarregadoAvulso.dataExameIso, "2026-08-24");
 assert.equal(vagaComIdCarregadoAvulso.tipoAso, "Admissional");
 assert.equal(vagaComIdCarregadoAvulso.agendamentoIdVisualizar, "ag-natalia");
+
+const abaFuncionariosSrc = readFileSync(
+  join(process.cwd(), "components/orcamentos/OrcamentoAbaFuncionarios.tsx"),
+  "utf8"
+);
+assert.match(abaFuncionariosSrc, /Importar lista/);
+assert.doesNotMatch(abaFuncionariosSrc, /Baixar modelo/);
+assert.doesNotMatch(abaFuncionariosSrc, /gerarModeloListaFuncionariosXlsx/);
+assert.doesNotMatch(abaFuncionariosSrc, /handleBaixarModelo/);
+
+const importLibSrc = readFileSync(
+  join(process.cwd(), "lib/contrato-vagas-import.ts"),
+  "utf8"
+);
+assert.doesNotMatch(importLibSrc, /gerarModeloListaFuncionariosXlsx/);
+assert.doesNotMatch(importLibSrc, /CONTRATO_VAGAS_IMPORT_MODELO_FILENAME/);
+assert.match(importLibSrc, /export function parsePlanilhaListaFuncionarios/);
+assert.match(importLibSrc, /export async function lerArquivoListaFuncionarios/);
+assert.match(importLibSrc, /export function aplicarImportacaoNasVagas/);
 
 console.log("test-contrato-vagas: OK");
