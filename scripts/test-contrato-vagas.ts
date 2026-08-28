@@ -287,6 +287,30 @@ const caso2 = contarCardsPorVagasContrato(
 assert.equal(caso2.vagasComprometidas, 1);
 assert.equal(caso2.emAberto, 1);
 assert.equal(caso2.pendentesDefinicao, 0);
+const caso2Contagem = buildContratoAgendamentoContagem(2, 1, 0, caso2);
+assert.equal(caso2Contagem.percentual, 50);
+assert.equal(caso2Contagem.concluido, true);
+
+const jFerreiraCards = contarCardsPorVagasContrato(
+  [
+    vagaCard("aso_aberto"),
+    vagaCard("comprometida", { indice: 2 }),
+    vagaCard("programada", { indice: 3 }),
+  ],
+  3
+);
+assert.equal(jFerreiraCards.agendados, 0);
+assert.equal(jFerreiraCards.programadosFuturos, 1);
+assert.equal(jFerreiraCards.emAberto, 1);
+assert.equal(jFerreiraCards.vagasComprometidas, 1);
+assert.equal(jFerreiraCards.pendentesDefinicao, 0);
+const jFerreiraContagem = buildContratoAgendamentoContagem(3, 2, 0, jFerreiraCards);
+assert.equal(jFerreiraContagem.percentual, 67);
+assert.equal(jFerreiraContagem.concluido, true);
+assert.equal(
+  jFerreiraContagem.mensagem,
+  "A quantidade prevista do contrato foi totalmente classificada."
+);
 
 const caso3 = contarCardsPorVagasContrato(
   [vagaCard("agendada"), vagaCard("aberta", { indice: 2 })],
@@ -335,7 +359,7 @@ assert.equal(caso.vagasComprometidas, 1);
 assert.equal(caso.pendentesDefinicao, 0);
 assert.equal(caso.comprometidos, 2);
 assert.equal(caso.percentual, 50);
-assert.equal(caso.concluido, false);
+assert.equal(caso.concluido, true);
 
 const nataliaAgendadaMaisAso = buildContratoAgendamentoContagem(2, 2, 0, {
   agendados: 1,
@@ -362,6 +386,14 @@ assert.equal(
     previstos: 2,
     pendentesDefinicao: 0,
     vagasComprometidas: 1,
+  }),
+  true
+);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 2,
+    pendentesDefinicao: 1,
+    vagasComprometidas: 0,
   }),
   false
 );
@@ -556,7 +588,7 @@ assert.equal(
       vagasComprometidas: 1,
     }
   ),
-  false
+  true
 );
 
 const agNatalia = {

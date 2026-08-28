@@ -168,7 +168,82 @@ assert.equal(
     pendentesDefinicao: 0,
     vagasComprometidas: 1,
   }),
+  "concluido"
+);
+
+const jFerreira = buildImplantacaoProcesso({
+  orcamento: {
+    id: "o-jferreira",
+    numero: "ORC-2026-0019",
+    status: "aprovado",
+    cliente_nome: "J FERREIRA MARINHO REFRIGERAÇÃO LTDA",
+    cliente_cnpj: "00",
+    responsavel: "Admin",
+    origem_cliente: null,
+  } as OrcamentoRecord,
+  aprovacao: aprovacaoBase({ quantidade_colaboradores: 3 }),
+  contrato: {
+    id: "c-jferreira",
+    numero: "CTR-2026-0015",
+    quantidade_colaboradores: 3,
+    status: "ativo",
+    agendamentos_iniciais_dispensados: false,
+  } as ClienteContratoRecord,
+  agendamentosRealizados: 0,
+  examesProgramadosFuturos: 1,
+  asosContratuaisEmAberto: 1,
+  pendentesDefinicao: 0,
+  vagasComprometidas: 1,
+});
+assert.equal(jFerreira.etapaAtual, "concluido");
+assert.equal(jFerreira.etapasConcluidas, 7);
+assert.equal(jFerreira.totalEtapas, 7);
+assert.equal(jFerreira.progressoLabel, "7 de 7");
+assert.equal(jFerreira.pendentesDefinicao, 0);
+assert.equal(jFerreira.vagasComprometidas, 1);
+assert.equal(jFerreira.agendamentosRealizados, 2);
+
+assert.equal(
+  countImplantacaoEtapasConcluidas(
+    aprovacaoBase({ quantidade_colaboradores: 2 }),
+    {
+      quantidadeContratada: 2,
+      agendamentosRealizados: 1,
+      pendentesDefinicao: 0,
+      vagasComprometidas: 1,
+    }
+  ),
+  7
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 3 }), {
+    quantidadeContratada: 3,
+    agendamentosRealizados: 3,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  "concluido"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 3 }), {
+    quantidadeContratada: 3,
+    agendamentosRealizados: 1,
+    pendentesDefinicao: 1,
+    vagasComprometidas: 1,
+  }),
   "aguardando_agendamentos"
+);
+
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 3 }), {
+    quantidadeContratada: 3,
+    agendamentosRealizados: 2,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 1,
+  }),
+  "concluido"
 );
 
 console.log("ok: implantacao-agendamentos-etapa");

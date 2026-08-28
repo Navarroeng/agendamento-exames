@@ -213,17 +213,21 @@ export function vagaStatusEClassificacaoFinal(
 }
 
 /**
- * Etapa Agendamentos da Implantação: todas as vagas classificadas
- * (agendada / programada / ASO em aberto). Comprometida ainda não conclui.
+ * Fonte única da etapa Agendamentos da Implantação: classificação completa
+ * quando não há vagas pendentes de definição.
+ *
+ * Classificada = agendada, programada, ASO em aberto ou comprometida.
+ * Comprometida já entra em pendentesDefinicao (não é pendente).
  * Não usa percentual de progresso operacional.
  */
 export function isClassificacaoVagasContratoCompleta(input: {
   previstos: number;
   pendentesDefinicao: number;
-  vagasComprometidas: number;
+  /** Ignorado: comprometida já reduz pendentesDefinicao. */
+  vagasComprometidas?: number;
 }): boolean {
   if (input.previstos <= 0) return false;
-  return input.pendentesDefinicao === 0 && input.vagasComprometidas === 0;
+  return input.pendentesDefinicao === 0;
 }
 
 export type CardsVagasContrato = {

@@ -23,8 +23,8 @@ export type ContratoAgendamentoContagem = {
    */
   emAberto: number;
   /**
-   * Vagas ainda sem classificação (agendamento / futuro / ASO em aberto).
-   * Nunca negativo.
+   * Vagas ainda sem classificação (não agendada, programada, ASO em aberto
+   * nem comprometida). Nunca negativo.
    */
   pendentesDefinicao: number;
   /** Total comprometido (agendados + futuros + ASOs em aberto + vagas nomeadas). */

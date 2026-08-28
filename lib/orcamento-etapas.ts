@@ -167,14 +167,10 @@ export function isAgendamentosEtapaConcluida(
   if (contagem?.agendamentosDispensados) return true;
   const qtd = Math.max(0, contagem?.quantidadeContratada ?? 0);
   if (qtd <= 0) return false;
-  if (
-    contagem?.pendentesDefinicao != null &&
-    contagem?.vagasComprometidas != null
-  ) {
+  if (contagem?.pendentesDefinicao != null) {
     return isClassificacaoVagasContratoCompleta({
       previstos: qtd,
       pendentesDefinicao: contagem.pendentesDefinicao,
-      vagasComprometidas: contagem.vagasComprometidas,
     });
   }
   const feitos = Math.max(0, contagem?.agendamentosRealizados ?? 0);

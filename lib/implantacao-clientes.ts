@@ -306,8 +306,9 @@ export type ImplantacaoAgendamentosClassificacao = {
 };
 
 /**
- * Etapa Agendamentos da lista: mesma regra da aba (classificação das vagas).
- * Não usa percentual de progresso. Comprometida ainda não conclui.
+ * Etapa Agendamentos da lista: mesma regra da aba
+ * (`isClassificacaoVagasContratoCompleta` — pendentesDefinicao === 0).
+ * Dispensa dos agendamentos iniciais também conclui. Não usa progresso %.
  */
 export function isAgendamentosImplantacaoConcluida(
   quantidadeContratada: number,
@@ -322,7 +323,6 @@ export function isAgendamentosImplantacaoConcluida(
     return isClassificacaoVagasContratoCompleta({
       previstos: qtd,
       pendentesDefinicao: classificacao.pendentesDefinicao,
-      vagasComprometidas: classificacao.vagasComprometidas,
     });
   }
   const feitos = Math.max(0, agendamentosRealizados);
@@ -333,15 +333,12 @@ function classificacaoAgendamentosFromOpts(opts?: {
   pendentesDefinicao?: number;
   vagasComprometidas?: number;
 }): ImplantacaoAgendamentosClassificacao | null {
-  if (
-    opts?.pendentesDefinicao == null ||
-    opts?.vagasComprometidas == null
-  ) {
+  if (opts?.pendentesDefinicao == null) {
     return null;
   }
   return {
     pendentesDefinicao: opts.pendentesDefinicao,
-    vagasComprometidas: opts.vagasComprometidas,
+    vagasComprometidas: opts.vagasComprometidas ?? 0,
   };
 }
 
@@ -525,8 +522,7 @@ export function buildImplantacaoProcesso(params: {
   );
   const pendentesDefinicao = Math.max(0, params.pendentesDefinicao ?? 0);
   const vagasComprometidas = Math.max(0, params.vagasComprometidas ?? 0);
-  const temClassificacaoVagas =
-    params.pendentesDefinicao != null && params.vagasComprometidas != null;
+  const temClassificacaoVagas = params.pendentesDefinicao != null;
   const contagemOpts = {
     quantidadeContratada,
     agendamentosRealizados,
