@@ -1,13 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { IconShield } from "@/components/ui/icons/OutlineIcons";
+import { IconClipboard, IconShield } from "@/components/ui/icons/OutlineIcons";
 import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/RiscosPsicossociaisModal";
 import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
 import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
 import { RiscosCancelarProcessoModal } from "@/components/riscos-psicossociais/RiscosCancelarProcessoModal";
 import { RiscosRemoverProcessoModal } from "@/components/riscos-psicossociais/RiscosRemoverProcessoModal";
 import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
+import { RiscosMapaQuestionarioModal } from "@/components/riscos-psicossociais/RiscosMapaQuestionarioModal";
 import { useRiscosPsicossociaisPage } from "@/hooks/useRiscosPsicossociaisPage";
 
 export function RiscosPsicossociaisPage() {
@@ -73,6 +75,7 @@ export function RiscosPsicossociaisPage() {
     auditContext,
     handleRelatorioAtualizado,
   } = useRiscosPsicossociaisPage();
+  const [mapaQuestionarioAberto, setMapaQuestionarioAberto] = useState(false);
 
   return (
     <AppShell
@@ -88,6 +91,17 @@ export function RiscosPsicossociaisPage() {
           onChange={handleFilterChange}
           onClear={clearFilters}
         />
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setMapaQuestionarioAberto(true)}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#e4ebf4] bg-white px-3 py-2 text-[13px] font-semibold text-[#64748b] shadow-[0_4px_12px_rgba(15,23,42,0.03)] transition-colors hover:border-brand-blue/30 hover:text-navy"
+        >
+          <IconClipboard size={15} />
+          Ver perguntas por categoria
+        </button>
       </div>
 
       <RiscosPsicossociaisTable
@@ -106,6 +120,11 @@ export function RiscosPsicossociaisPage() {
         savingRemover={savingRemoverProcesso}
         onCancelarProcesso={openCancelarProcesso}
         savingCancelar={savingCampanha}
+      />
+
+      <RiscosMapaQuestionarioModal
+        open={mapaQuestionarioAberto}
+        onClose={() => setMapaQuestionarioAberto(false)}
       />
 
       <RiscosCancelarProcessoModal

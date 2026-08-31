@@ -27,6 +27,18 @@ export {
   getPerguntasOrdenadas,
 } from "@/lib/copsoq/instrument";
 export {
+  filtrarMapaQuestionario,
+  formatNumeroVisualQuestionario,
+  idsCategoriasVisiveis,
+  idsPerguntasQueCombinam,
+  montarMapaQuestionarioCopsoq,
+  normalizarBuscaMapa,
+  todasCategoriasDoMapa,
+  type MapaCategoriaCopsoq,
+  type MapaPerguntaCopsoq,
+  type MapaQuestionarioCopsoq,
+} from "@/lib/copsoq/mapa-questionario";
+export {
   classificarMediaDimensao,
   dimensoesParaMediaGeral,
   mediaGeralDimensao,
