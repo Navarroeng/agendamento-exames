@@ -511,10 +511,21 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 .relatorio-visao-metric-hint,
 .relatorio-visao-status-value,
 .relatorio-visao-status-hint {
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.relatorio-visao-metric-hint {
+  white-space: normal;
+}
+
+.relatorio-visao-status-value {
+  white-space: normal;
 }
 
 .relatorio-visao-status-hint {
+  white-space: normal;
   letter-spacing: -0.025em;
 }
 
@@ -1012,7 +1023,10 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-visao-metric-hint,
   body.riscos-relatorio-printing .relatorio-visao-status-value,
   body.riscos-relatorio-printing .relatorio-visao-status-hint {
-    white-space: nowrap !important;
+    min-width: 0 !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    white-space: normal !important;
   }
 
   body.riscos-relatorio-printing .relatorio-visao-status-value {

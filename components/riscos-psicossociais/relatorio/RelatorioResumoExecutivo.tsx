@@ -51,7 +51,7 @@ function CardMetric({
 
   return (
     <div
-      className={`relatorio-visao-metric flex h-full flex-col rounded-xl border px-3.5 py-2.5 ${tones[tone]}`}
+      className={`relatorio-visao-metric flex h-full min-w-0 flex-col rounded-xl border px-3.5 py-2.5 ${tones[tone]}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -75,7 +75,7 @@ function CardMetric({
         <p
           className={
             hintClassName ??
-            "relatorio-visao-metric-hint mt-1 whitespace-nowrap text-[10px] leading-none text-app-muted"
+            "relatorio-visao-metric-hint mt-1 min-w-0 break-words text-[10px] leading-snug text-app-muted"
           }
         >
           {hint}
@@ -221,7 +221,7 @@ export function RelatorioResumoExecutivo({
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-3 items-stretch gap-3">
         <CardMetric
           label="Participação"
           value={formatTaxaParticipacao(
@@ -245,7 +245,7 @@ export function RelatorioResumoExecutivo({
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-2 items-stretch gap-3">
         <CardMetric
           label="Categorias em atenção"
           value={emAtencao}
@@ -263,8 +263,8 @@ export function RelatorioResumoExecutivo({
           hint={status.mensagem}
           icon={<IconShield size={16} />}
           tone={statusTone}
-          valueClassName="relatorio-visao-status-value mt-1 whitespace-nowrap text-[15px] font-extrabold leading-none tracking-tight text-navy"
-          hintClassName="relatorio-visao-status-hint mt-1 whitespace-nowrap text-[9px] leading-none tracking-tight text-app-muted"
+          valueClassName="relatorio-visao-status-value mt-1 min-w-0 break-words text-[15px] font-extrabold leading-tight tracking-tight text-navy"
+          hintClassName="relatorio-visao-status-hint mt-1 min-w-0 break-words text-[9px] leading-snug tracking-tight text-app-muted"
         />
       </div>
 
