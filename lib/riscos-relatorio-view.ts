@@ -504,7 +504,7 @@ export function eixoMaxColunas(itens: readonly ColunaChartDatum[]): number {
  * Status geral do resumo executivo (somente apresentação).
  * - Favorável: nenhuma Moderada nem Desfavorável
  * - Atenção / Monitoramento: há Situação Moderada, sem Desfavorável
- * - Atenção Prioritária: há ao menos uma Situação Desfavorável
+ * - Requer atenção: há ao menos uma Situação Desfavorável
  */
 export function statusGeralResumo(input: {
   /** @deprecated Preferir contagens separadas. Mantido para compatibilidade. */
@@ -528,11 +528,11 @@ export function statusGeralResumo(input: {
 
   if (nSaude > 0) {
     return {
-      label: "Atenção prioritária",
+      label: "Requer atenção",
       tom: "critico",
       mensagem:
         input.statusGeralMensagem?.trim() ||
-        "Há categoria(s) em Situação Desfavorável — intervenção prioritária.",
+        "Há categoria(s) em Situação Desfavorável — recomenda-se atenção e acompanhamento.",
     };
   }
   if (nInter > 0) {

@@ -477,7 +477,21 @@ run("status geral respeita três faixas oficiais", () => {
       riscoIntermediarioCount: 0,
       riscoParaSaudeCount: 1,
     }).label,
-    "Atenção prioritária"
+    "Requer atenção"
+  );
+  assert.match(
+    statusGeralResumo({
+      riscoIntermediarioCount: 0,
+      riscoParaSaudeCount: 1,
+    }).mensagem,
+    /recomenda-se atenção e acompanhamento/
+  );
+  assert.doesNotMatch(
+    statusGeralResumo({
+      riscoIntermediarioCount: 0,
+      riscoParaSaudeCount: 1,
+    }).mensagem,
+    /intervenção|prioritár|imediat/i
   );
 });
 

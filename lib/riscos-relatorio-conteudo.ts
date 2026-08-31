@@ -128,8 +128,8 @@ export function textoResultadoEncontrado(
   }
   if (sev === "critico") {
     return risco
-      ? `${base} Trata-se de exposição elevada neste fator de risco, com potencial impacto à saúde ocupacional — prioridade de intervenção organizacional.`
-      : `${base} O fator de proteção encontra-se significativamente reduzido (Situação Desfavorável), exigindo reforço prioritário do ponto de vista psicossocial.`;
+      ? `${base} Trata-se de exposição elevada neste fator de risco, com potencial impacto à saúde ocupacional, o que requer atenção e recomenda-se avaliar as condições identificadas.`
+      : `${base} O fator de proteção encontra-se significativamente reduzido (Situação Desfavorável), o que requer atenção e recomenda-se o reforço deste fator do ponto de vista psicossocial.`;
   }
   return `${base} A classificação quantitativa não pôde ser definida plenamente para esta categoria.`;
 }
@@ -157,13 +157,13 @@ export function textoPossiveisImpactos(
   }
   if (sev === "critico") {
     return risco
-      ? `Em “${d.nome}”, o resultado em Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, exigindo resposta organizacional estruturada.`
-      : `Em “${d.nome}”, a fragilidade deste fator de proteção (Situação Desfavorável) pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores.`;
+      ? `Em “${d.nome}”, o resultado em Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, presenteísmo, conflitos e deterioração do clima. Pode comprometer a produtividade e aumentar a probabilidade de agravos à saúde ocupacional, recomendando-se avaliar as condições identificadas e adotar medidas de melhoria conforme a realidade da organização.`
+      : `Em “${d.nome}”, a fragilidade deste fator de proteção (Situação Desfavorável) pode reduzir suporte percebido, motivação e confiança institucional, com reflexos negativos sobre clima, retenção e saúde dos trabalhadores, o que requer atenção e acompanhamento.`;
   }
   return `Os impactos específicos de “${d.nome}” dependem de aprofundamento qualitativo complementar à análise quantitativa.`;
 }
 
-/** Ações oficiais das Orientações + recomendações práticas por dimensão. */
+/** Recomendações preventivas e orientativas por dimensão e classificação. */
 export function recomendacoesDimensao(
   d: Pick<
     RiscosRelatorioDimensaoSnapshot,
@@ -189,9 +189,9 @@ export function recomendacoesDimensao(
   }
   if (sev === "critico") {
     return [
-      "Priorizar intervenção imediata com revisão de processos e responsabilidades.",
-      "Estabelecer plano de ação com prazo, responsável e indicador de acompanhamento.",
-      "Avaliar necessidade de escuta estruturada (grupos focais) e suporte especializado.",
+      "Avaliar os processos e a distribuição de responsabilidades, identificando oportunidades de melhoria relacionadas aos fatores observados.",
+      "Definir medidas de melhoria e acompanhamento, com responsável e indicador, conforme aplicável.",
+      "Avaliar a necessidade de escuta estruturada (grupos focais) e suporte especializado.",
       ...especificas,
     ];
   }
@@ -326,8 +326,8 @@ function textoResultadoEncontradoRelatorio(
   }
   if (sev === "critico") {
     return risco
-      ? `${base}, com prioridade de intervenção organizacional.`
-      : `${base}, exigindo reforço prioritário do fator de proteção.`;
+      ? `${base}, o que requer atenção e recomenda-se avaliar as condições identificadas.`
+      : `${base}, o que requer atenção e recomenda-se o reforço deste fator de proteção.`;
   }
   return `${base}.`;
 }
@@ -349,8 +349,8 @@ function textoPossiveisImpactosRelatorio(
   }
   if (sev === "critico") {
     return risco
-      ? "A Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, conflitos e deterioração do clima, exigindo resposta organizacional estruturada."
-      : "A fragilidade deste fator de proteção pode reduzir suporte percebido, motivação e confiança institucional, com reflexos no clima e na saúde dos trabalhadores.";
+      ? "A Situação Desfavorável eleva o risco de estresse crônico, absenteísmo, conflitos e deterioração do clima, recomendando-se avaliar as condições identificadas e definir medidas de acompanhamento."
+      : "A fragilidade deste fator de proteção pode reduzir suporte percebido, motivação e confiança institucional, com reflexos no clima e na saúde dos trabalhadores, o que requer atenção e acompanhamento.";
   }
   return `Os impactos de “${d.nome}” dependem de aprofundamento qualitativo complementar.`;
 }
@@ -420,7 +420,9 @@ export function gerarConteudoExecutivo(
     `Do ponto de vista técnico, a campanha reuniu ${respondentes} resposta(s) válida(s) em um universo de ${participantes} participante(s) (${taxa} de participação), conferindo base empírica para leitura executiva dos riscos psicossociais em ${empresa}.`,
     `Das ${dimensoes.length} categorias no cálculo, ${favoraveis.length} em Situação Favorável, ${intermediarias.length} em Situação Moderada e ${criticasAltas.length} em Situação Desfavorável.`,
     criticasAltas.length > 0
-      ? `O panorama indica intervenção prioritária, com foco imediato em ${listarNomes(criticasAltas)}. A persistência desses fatores eleva impactos sobre saúde, clima e desempenho, devendo integrar o plano de ação organizacional.`
+      ? criticasAltas.length === 1
+        ? `O panorama indica a necessidade de atenção à categoria ${listarNomes(criticasAltas)}, recomendando-se a avaliação das condições identificadas e a adoção de medidas de melhoria conforme a realidade da organização.`
+        : `O panorama indica a necessidade de atenção às categorias ${listarNomes(criticasAltas)}, recomendando-se a avaliação das condições identificadas e a adoção de medidas de melhoria conforme a realidade da organização.`
       : intermediarias.length > 0
         ? `O panorama é de atenção/monitoramento: não há categorias em Situação Desfavorável, porém o conjunto em Situação Moderada (${listarNomes(intermediarias)}) recomenda prevenção ativa e acompanhamento.`
         : `O panorama é estável e favorável, com predominância de condições psicossociais positivas — o que não dispensa vigilância e reavaliação periódica.`,
@@ -432,13 +434,15 @@ export function gerarConteudoExecutivo(
   const recomendacoesGerais: string[] = [];
   if (criticasAltas.length > 0) {
     recomendacoesGerais.push(
-      `Instituir comitê curto (SST, RH e lideranças) para tratar, em até 30 dias, as categorias em Situação Desfavorável: ${listarNomes(criticasAltas)}.`
+      criticasAltas.length === 1
+        ? `Avaliar a categoria classificada como Situação Desfavorável (${listarNomes(criticasAltas)}), envolvendo SST, RH e lideranças na definição de medidas de melhoria e acompanhamento, conforme aplicável.`
+        : `Avaliar as categorias classificadas como Situação Desfavorável (${listarNomes(criticasAltas)}), envolvendo SST, RH e lideranças na definição de medidas de melhoria e acompanhamento, conforme aplicável.`
     );
     recomendacoesGerais.push(
-      "Revisar processos, jornadas e mecanismos de suporte nas áreas mais expostas, com indicadores de acompanhamento mensal."
+      "Avaliar processos, jornadas e mecanismos de suporte nas áreas mais expostas, definindo indicadores de acompanhamento conforme aplicável."
     );
     recomendacoesGerais.push(
-      "Avaliar ações de escuta estruturada e suporte psicossocial, priorizando prevenção de agravos e cumprimento das diretrizes de gerenciamento de riscos."
+      "Avaliar ações de escuta estruturada e suporte psicossocial, com foco na prevenção de agravos e no gerenciamento de riscos, conforme aplicável."
     );
   } else if (intermediarias.length > 0) {
     recomendacoesGerais.push(
@@ -463,7 +467,7 @@ export function gerarConteudoExecutivo(
   );
   if (criticas.length > 3) {
     recomendacoesGerais.push(
-      "Diante do volume de categorias que requerem atenção, priorizar as de maior severidade e impacto operacional, evitando dispersão de esforços."
+      "Diante do volume de categorias que requerem atenção, recomenda-se começar pelas de maior severidade e impacto operacional, evitando dispersão de esforços."
     );
   }
 
