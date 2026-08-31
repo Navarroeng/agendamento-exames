@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { IconSearch } from "@/components/ui/icons/OutlineIcons";
+import { IconFileText, IconSearch } from "@/components/ui/icons/OutlineIcons";
+import { toast } from "sonner";
+import { exportarPdfMapaQuestionarioCopsoq } from "@/lib/copsoq-mapa-pdf";
 import {
   filtrarMapaQuestionario,
   idsCategoriasVisiveis,
@@ -143,6 +145,7 @@ export function RiscosMapaQuestionarioModal({
   const mapa = useMemo(() => montarMapaQuestionarioCopsoq(), []);
   const [busca, setBusca] = useState("");
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
+  const [salvandoPdf, setSalvandoPdf] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -173,6 +176,20 @@ export function RiscosMapaQuestionarioModal({
     });
   }
 
+  async function handleSalvarPdf() {
+    if (salvandoPdf) return;
+    setSalvandoPdf(true);
+    try {
+      const out = await exportarPdfMapaQuestionarioCopsoq();
+      toast.success(`PDF salvo (${out.pageCount} páginas).`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível gerar o PDF do mapa.");
+    } finally {
+      setSalvandoPdf(false);
+    }
+  }
+
   const principais = filtrado.categoriasAvaliadas;
   const ofensivos = filtrado.comportamentosOfensivos;
   const vazio = principais.length === 0 && !ofensivos;
@@ -184,6 +201,17 @@ export function RiscosMapaQuestionarioModal({
       size="xl"
       title="Mapa do Questionário COPSOQ II"
       subtitle="Consulte quais perguntas compõem cada categoria utilizada na avaliação dos riscos psicossociais."
+      headerActions={
+        <button
+          type="button"
+          onClick={() => void handleSalvarPdf()}
+          disabled={salvandoPdf}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#e4ebf4] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#475569] transition-colors hover:border-brand-blue/30 hover:text-navy disabled:opacity-60"
+        >
+          <IconFileText size={14} />
+          {salvandoPdf ? "Gerando PDF…" : "Salvar em PDF"}
+        </button>
+      }
     >
       <div className="sticky -top-4 z-10 -mx-4 mb-4 border-b border-[#eef2f7] bg-white px-4 pb-3 pt-0 sm:-top-6 sm:-mx-6 sm:px-6">
         <p className="text-[11px] leading-relaxed text-app-muted">

@@ -23,6 +23,7 @@ interface ModalProps {
   extraWide?: boolean;
   /** Largura premium (~1320px) para formulários grandes. `xxl` ~1480px. */
   size?: ModalSize;
+  headerActions?: ReactNode;
   /** Quando false, clique no overlay não fecha (útil com formulário dirty). */
   closeOnOverlayClick?: boolean;
 }
@@ -50,6 +51,7 @@ export function Modal({
   wide = false,
   extraWide = false,
   size,
+  headerActions,
   closeOnOverlayClick = true,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -105,8 +107,8 @@ export function Modal({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-5 py-4 sm:px-6 sm:py-5 riscos-relatorio-print-hide">
-          <div className="min-w-0">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-app-line bg-gradient-to-b from-white to-[#fbfcff] px-5 py-4 sm:gap-4 sm:px-6 sm:py-5 riscos-relatorio-print-hide">
+          <div className="min-w-0 flex-1">
             <h3
               id="modal-title"
               className="text-lg font-extrabold tracking-[-0.2px] text-navy sm:text-xl"
@@ -116,15 +118,23 @@ export function Modal({
             {subtitle ? (
               <p className="mt-1 text-sm text-app-muted">{subtitle}</p>
             ) : null}
+            {headerActions ? (
+              <div className="mt-2.5 sm:hidden">{headerActions}</div>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-app-line text-lg text-app-muted transition-colors hover:bg-brand-blue-soft hover:text-brand-blue"
-            aria-label="Fechar"
-          >
-            ×
-          </button>
+          <div className="flex shrink-0 items-start gap-2">
+            {headerActions ? (
+              <div className="hidden sm:block">{headerActions}</div>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-app-line text-lg text-app-muted transition-colors hover:bg-brand-blue-soft hover:text-brand-blue"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div
           className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden riscos-relatorio-print-body ${bodyPadClass}`}
