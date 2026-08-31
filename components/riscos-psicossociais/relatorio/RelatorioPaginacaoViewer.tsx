@@ -3,6 +3,10 @@
 import { useLayoutEffect, useState } from "react";
 import { RISCOS_RELATORIO_PRINT_ROOT_ID } from "@/lib/riscos-relatorio-pdf";
 import {
+  calcularRodapesSecaoViewer,
+  CONFIG_SECOES_DOM_RELATORIO,
+} from "@/lib/riscos-relatorio-paginacao";
+import {
   RELATORIO_RODAPE_CONFIDENCIAL,
   RELATORIO_RODAPE_NAVARRO,
   RELATORIO_RODAPE_TITULO,
@@ -15,18 +19,9 @@ import {
  * counter(page) em elementos do DOM (origem do "Página 0").
  *
  * A capa não entra na numeração. Visão Executiva = Página 1.
- * Detalhamento COPSOQ pode ocupar várias folhas — fatiado pela altura A4.
+ * Seções com novaPaginaObrigatoria (lib/riscos-relatorio-paginacao) alinham
+ * ao início da próxima folha — ex.: indicadores-complementares após COPSOQ.
  */
-const SECOES: { sel: string; fluxo?: boolean }[] = [
-  { sel: ".relatorio-secao-visao-executiva" },
-  { sel: ".relatorio-secao-panorama" },
-  { sel: ".relatorio-secao-graficos" },
-  { sel: ".relatorio-secao-ranking" },
-  { sel: ".relatorio-secao-detalhamento", fluxo: true },
-  { sel: ".relatorio-secao-indicadores-complementares" },
-  { sel: ".relatorio-secao-conclusoes" },
-];
-
 type Folha = { top: number; pagina: number };
 
 function yRelativo(el: HTMLElement, root: HTMLElement): number {
@@ -52,24 +47,27 @@ export function RelatorioPaginacaoViewer() {
 
       const next: Folha[] = [];
       let pagina = 1;
+      let fimAnterior = 0;
 
-      for (const { sel, fluxo } of SECOES) {
-        const el = root.querySelector(sel);
+      for (const secao of CONFIG_SECOES_DOM_RELATORIO) {
+        const el = root.querySelector(secao.seletor);
         if (!(el instanceof HTMLElement)) continue;
-        const y = yRelativo(el, root);
-        const h = el.offsetHeight;
 
-        if (fluxo) {
-          const n = Math.max(1, Math.ceil(h / pageH - 0.04));
-          for (let i = 0; i < n; i++) {
-            next.push({
-              top: y + Math.min((i + 1) * pageH, h) - 1,
-              pagina: pagina++,
-            });
-          }
-        } else {
-          next.push({ top: y + h - 1, pagina: pagina++ });
+        const domY = yRelativo(el, root);
+        const h = el.offsetHeight;
+        const { rodapes, fimVirtual } = calcularRodapesSecaoViewer({
+          domY,
+          altura: h,
+          pageH,
+          novaPaginaObrigatoria: secao.novaPaginaObrigatoria,
+          fluxo: secao.fluxo,
+          fimAnterior,
+        });
+
+        for (const top of rodapes) {
+          next.push({ top, pagina: pagina++ });
         }
+        fimAnterior = fimVirtual;
       }
 
       setFolhas(next);
