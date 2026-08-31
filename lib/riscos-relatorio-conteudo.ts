@@ -6,6 +6,10 @@
  * + Orientações oficiais COPSOQ II-Br (faixas, ações e interpretação RISCO×PROTEÇÃO).
  */
 
+import {
+  indicadoresComplementaresDeRelatorio,
+  listarTemasIndicadoresConclusao,
+} from "@/lib/riscos-indicadores-complementares";
 import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
 import {
@@ -468,6 +472,17 @@ export function gerarConteudoExecutivo(
   if (criticas.length > 3) {
     recomendacoesGerais.push(
       "Diante do volume de categorias que requerem atenção, recomenda-se começar pelas de maior severidade e impacto operacional, evitando dispersão de esforços."
+    );
+  }
+
+  const indicadores = indicadoresComplementaresDeRelatorio(relatorio);
+  if (indicadores.algumRequerAtencao) {
+    const temas = listarTemasIndicadoresConclusao(indicadores.temasRequerAtencao);
+    conclusaoTecnica.push(
+      `Nos indicadores complementares, houve indicação de possível exposição relacionada a ${temas}. O achado requer atenção específica da organização e é analisado separadamente das 10 categorias COPSOQ.`
+    );
+    recomendacoesGerais.push(
+      "Avaliar os temas sinalizados nos indicadores de comportamentos ofensivos e revisar, conforme aplicável, as medidas de prevenção, orientação, acolhimento e canais internos disponíveis, preservando a confidencialidade dos participantes."
     );
   }
 

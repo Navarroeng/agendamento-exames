@@ -19,6 +19,7 @@ import {
   type PortalStatusHome,
 } from "@/lib/portal-cliente";
 import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
+import type { StatusGeralIndicadoresComplementares } from "@/lib/riscos-indicadores-complementares";
 
 const CARD = "rounded-2xl border border-[#e8edf5] bg-white";
 const PONTOS_INICIAIS = 6;
@@ -220,6 +221,25 @@ export function PortalAvaliacaoRiscos({
         )}
       </section>
 
+      {temResultados && resumo.indicadoresComplementaresDisponivel ? (
+        <section className={`${CARD} px-5 py-4`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
+                Indicadores complementares
+              </h2>
+              <p className="mt-0.5 text-xs text-[#64748b]">
+                Comportamentos ofensivos · separado das categorias COPSOQ
+              </p>
+            </div>
+            <IndicadoresComplementaresBadge
+              status={resumo.indicadoresComplementaresStatus}
+              label={resumo.indicadoresComplementaresLabel}
+            />
+          </div>
+        </section>
+      ) : null}
+
       {temResultados && pontos.length > 0 ? (
         <section className={`${CARD} px-5 py-4`}>
           <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
@@ -413,6 +433,29 @@ function PortalTimeline({ resumo }: { resumo: PortalResumo }) {
         );
       })}
     </ol>
+  );
+}
+
+function IndicadoresComplementaresBadge({
+  status,
+  label,
+}: {
+  status: StatusGeralIndicadoresComplementares;
+  label: string;
+}) {
+  const styles =
+    status === "requer_atencao"
+      ? "border-[#fde68a] bg-[#fffbeb] text-[#92400e]"
+      : status === "sem_dados" || status === "indisponivel"
+        ? "border-[#e2e8f0] bg-[#f8fafc] text-[#64748b]"
+        : "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]";
+
+  return (
+    <span
+      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${styles}`}
+    >
+      {label}
+    </span>
   );
 }
 

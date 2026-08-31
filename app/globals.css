@@ -533,7 +533,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
 .relatorio-secao-panorama,
 .relatorio-secao-graficos,
 .relatorio-secao-ranking,
-.relatorio-secao-detalhamento {
+.relatorio-secao-detalhamento,
+.relatorio-secao-indicadores-complementares {
   padding-bottom: 12mm;
 }
 
@@ -945,8 +946,16 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   body.riscos-relatorio-printing .relatorio-secao-graficos,
   body.riscos-relatorio-printing .relatorio-secao-ranking,
   body.riscos-relatorio-printing .relatorio-secao-detalhamento,
+  body.riscos-relatorio-printing .relatorio-secao-indicadores-complementares,
   body.riscos-relatorio-printing .relatorio-secao-conclusoes {
     padding-bottom: 2mm;
+  }
+
+  body.riscos-relatorio-printing .relatorio-indicadores-cabecalho,
+  body.riscos-relatorio-printing .relatorio-indicadores-lista > li,
+  body.riscos-relatorio-printing .relatorio-indicadores-orientacao {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   body.riscos-relatorio-printing .relatorio-sintese-cards {

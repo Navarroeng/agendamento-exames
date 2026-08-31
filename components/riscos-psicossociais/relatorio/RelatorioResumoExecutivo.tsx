@@ -17,6 +17,7 @@ import {
   corPorClassificacaoId,
   statusGeralResumo,
 } from "@/lib/riscos-relatorio-view";
+import { indicadoresComplementaresDeRelatorio } from "@/lib/riscos-indicadores-complementares";
 
 function labelCurtoClassificacao(label: string): string {
   return String(label ?? "")
@@ -177,6 +178,15 @@ export function RelatorioResumoExecutivo({
     (json?.dimensoes ?? []).map((d) => [d.id, d.classificacaoId])
   );
 
+  const indicadoresComplementares = indicadoresComplementaresDeRelatorio(relatorio);
+  const indicadoresTone =
+    indicadoresComplementares.statusGeral === "requer_atencao"
+      ? "warn"
+      : indicadoresComplementares.statusGeral === "sem_dados" ||
+          indicadoresComplementares.statusGeral === "indisponivel"
+        ? "neutral"
+        : "ok";
+
   return (
     <section className="relatorio-visao-executiva">
       <div className="mb-5">
@@ -267,6 +277,20 @@ export function RelatorioResumoExecutivo({
           hintClassName="relatorio-visao-status-hint mt-1 min-w-0 break-words text-[9px] leading-snug tracking-tight text-app-muted"
         />
       </div>
+
+      {indicadoresComplementares.disponivel ? (
+        <div className="mt-3">
+          <CardMetric
+            label="Indicadores complementares"
+            value={indicadoresComplementares.labelStatusGeral}
+            hint="Comportamentos ofensivos · separado das 10 categorias COPSOQ"
+            icon={<IconShield size={16} />}
+            tone={indicadoresTone}
+            valueClassName="mt-1 min-w-0 break-words text-[14px] font-extrabold leading-tight tracking-tight text-navy"
+            hintClassName="mt-1 min-w-0 break-words text-[9px] leading-snug tracking-tight text-app-muted"
+          />
+        </div>
+      ) : null}
 
       {criticas.length > 0 ? (
         <div className="riscos-relatorio-print-card mt-6 rounded-xl border border-[#e8edf5] bg-white px-5 py-4">

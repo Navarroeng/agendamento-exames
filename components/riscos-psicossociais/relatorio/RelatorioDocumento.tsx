@@ -7,6 +7,7 @@ import { RelatorioPanoramaCategorias } from "@/components/riscos-psicossociais/r
 import { RelatorioBarrasChart } from "@/components/riscos-psicossociais/relatorio/RelatorioBarrasChart";
 import { RelatorioRanking } from "@/components/riscos-psicossociais/relatorio/RelatorioRanking";
 import { RelatorioDimensoesCards } from "@/components/riscos-psicossociais/relatorio/RelatorioDimensoesCards";
+import { RelatorioIndicadoresComplementares } from "@/components/riscos-psicossociais/relatorio/RelatorioIndicadoresComplementares";
 import { RelatorioConclusoesExecutivas } from "@/components/riscos-psicossociais/relatorio/RelatorioConclusoesExecutivas";
 import { RelatorioCabecalhoInterno } from "@/components/riscos-psicossociais/relatorio/RelatorioCabecalhoInterno";
 import { RelatorioPaginacaoViewer } from "@/components/riscos-psicossociais/relatorio/RelatorioPaginacaoViewer";
@@ -95,6 +96,11 @@ export function RelatorioDocumento({
         */}
         <section className="relatorio-secao-detalhamento mt-8 print:mt-0">
           <RelatorioDimensoesCards dimensoes={dimensoes} cabecalho={cabecalho} />
+        </section>
+
+        <section className="relatorio-secao-indicadores-complementares mt-8 print:mt-0">
+          {cabecalho}
+          <RelatorioIndicadoresComplementares relatorio={relatorio} />
         </section>
 
         {/* Última seção — página exclusiva */}

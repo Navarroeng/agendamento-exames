@@ -11,6 +11,10 @@ import {
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosRelatorioResultadoJson } from "@/lib/riscos-relatorio";
+import {
+  indicadoresComplementaresDeRelatorio,
+  type StatusGeralIndicadoresComplementares,
+} from "@/lib/riscos-indicadores-complementares";
 
 export const PORTAL_DEV_CLIENTE_ID_ENV = "PORTAL_DEV_CLIENTE_ID";
 
@@ -91,6 +95,9 @@ export type PortalResumo = {
   categoriasDesfavoraveis: PortalCategoriaResumo[];
   pontosAtencao: PortalPontoAtencao[];
   historicoRiscos: PortalHistoricoCiclo[];
+  indicadoresComplementaresDisponivel: boolean;
+  indicadoresComplementaresStatus: StatusGeralIndicadoresComplementares;
+  indicadoresComplementaresLabel: string;
 };
 
 export type PortalHistoricoCategoriaPonto = {
@@ -191,6 +198,9 @@ export function portalResumoVazio(): PortalResumo {
     categoriasDesfavoraveis: [],
     pontosAtencao: [],
     historicoRiscos: [],
+    indicadoresComplementaresDisponivel: false,
+    indicadoresComplementaresStatus: "indisponivel",
+    indicadoresComplementaresLabel: "Indisponível",
   };
 }
 
@@ -434,6 +444,18 @@ export function montarPortalResumo(input: {
         pontosAtencao: [] as PortalPontoAtencao[],
       };
 
+  const indicadoresComplementares = temSnapshot
+    ? indicadoresComplementaresDeRelatorio({
+        resultado_json: input.snapshot?.resultado_json as
+          | RiscosRelatorioResultadoJson
+          | undefined,
+      })
+    : {
+        disponivel: false,
+        statusGeral: "indisponivel" as const,
+        labelStatusGeral: "Indisponível",
+      };
+
   const statusPortal = resolverStatusPortal({
     statusCampanha: input.campanha.status,
     respondidos: resumo.respondidos,
@@ -479,6 +501,9 @@ export function montarPortalResumo(input: {
     categoriasDesfavoraveis: extraido.desfavoraveis,
     pontosAtencao: extraido.pontosAtencao,
     historicoRiscos: input.historicoRiscos ?? [],
+    indicadoresComplementaresDisponivel: indicadoresComplementares.disponivel,
+    indicadoresComplementaresStatus: indicadoresComplementares.statusGeral,
+    indicadoresComplementaresLabel: indicadoresComplementares.labelStatusGeral,
   };
 }
 

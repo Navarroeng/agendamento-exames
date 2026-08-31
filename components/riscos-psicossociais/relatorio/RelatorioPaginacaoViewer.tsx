@@ -23,6 +23,7 @@ const SECOES: { sel: string; fluxo?: boolean }[] = [
   { sel: ".relatorio-secao-graficos" },
   { sel: ".relatorio-secao-ranking" },
   { sel: ".relatorio-secao-detalhamento", fluxo: true },
+  { sel: ".relatorio-secao-indicadores-complementares" },
   { sel: ".relatorio-secao-conclusoes" },
 ];
 
