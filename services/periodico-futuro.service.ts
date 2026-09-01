@@ -30,6 +30,7 @@ import {
 } from "@/lib/periodico-cpf-regularizacao";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { verificarContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
+import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 import {
   decidirOrigemPeriodicoFuturo,
   isAsoDemissional,
@@ -139,6 +140,7 @@ export async function criarPeriodicosDeAgendamento(
   params: CriarPeriodicosAgendamentoParams
 ): Promise<number> {
   if (isAsoDemissional(params.tipoAso)) return 0;
+  if (isAsoPontual(params.tipoAso)) return 0;
   if (params.cumprindoPeriodicoExistente) return 0;
 
   const supabase = createClient();

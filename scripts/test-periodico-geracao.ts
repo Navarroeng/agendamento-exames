@@ -126,6 +126,18 @@ for (const aso of ["Demissional", "demissional", " DEMISSIONAL "]) {
 }
 assert.ok(!TIPOS_ASO_PODEM_ORIGINAR_PERIODICO.includes("Demissional" as never));
 assert.ok(TIPOS_ASO.includes("Demissional"));
+assert.ok(TIPOS_ASO.includes("Pontual"));
+assert.ok(!TIPOS_ASO_PODEM_ORIGINAR_PERIODICO.includes("Pontual" as never));
+assert.deepEqual(
+  decidirOrigemPeriodicoFuturo({
+    tipoAso: "Pontual",
+    cumprindoPeriodicoExistente: false,
+    cargoGeraAlerta: true,
+    proximaDataIso: "2027-02-21",
+    contratoDataFim: "2028-12-31",
+  }),
+  { gerar: false, motivo: "aso_pontual" }
+);
 
 // --- Cenário 5: Claudia ---
 const claudiaOrigem = rec({ id: "pf-cli-1", exame_nome: "Clínico" });

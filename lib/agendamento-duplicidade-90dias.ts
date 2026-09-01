@@ -1,4 +1,5 @@
 import { normalizeCpfDigits } from "@/lib/cpf";
+import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 import type { AgendamentoStatus } from "@/lib/types";
 
 export const AGENDAMENTO_DUPLICIDADE_90_DIAS_MSG =
@@ -122,6 +123,9 @@ export function classificarDuplicidade90Dias(input: {
 
   const tipoNovo = normalizeTipoAso(input.tipoAsoNovo);
   if (!tipoNovo) return "permitir";
+
+  // Reavaliação extraordinária: não aplica intervalo temporal de 90 dias.
+  if (isAsoPontual(input.tipoAsoNovo)) return "permitir";
 
   const cpfNovo = normalizeCpfDigits(input.cpfNovo);
   const cpfExistente = normalizeCpfDigits(input.cpfExistente);

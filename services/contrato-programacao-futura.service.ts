@@ -9,6 +9,7 @@ import {
 } from "@/lib/contrato-programacao-futura";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { isAsoDemissional } from "@/lib/periodico-geracao";
+import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 import {
   agruparPeriodicosPendentesParaVinculo,
   chaveCicloPeriodico,
@@ -159,6 +160,9 @@ export async function criarExameFuturoImplantacao(
   if (!tipoAso) throw new Error("Informe o tipo de ASO.");
   if (isAsoDemissional(tipoAso)) {
     throw new Error("ASO Demissional não gera Periódico Futuro.");
+  }
+  if (isAsoPontual(tipoAso)) {
+    throw new Error("ASO Pontual não gera Periódico Futuro.");
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPrevista)) {
     throw new Error("Informe a data prevista.");

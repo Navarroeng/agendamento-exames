@@ -14,6 +14,7 @@ export const TIPOS_ASO = [
   "Demissional",
   "Retorno ao Trabalho",
   "Mudança de Função",
+  "Pontual",
 ] as const;
 
 export const TIPOS_EXAME = [

@@ -1,7 +1,9 @@
 import { cargoGeraAlertaPeriodico } from "@/lib/cargo-periodico";
+import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 
 export type PeriodicoGeracaoBloqueio =
   | "aso_demissional"
+  | "aso_pontual"
   | "cumprindo_existente"
   | "sem_periodicidade_alerta"
   | "obrigacao_equivalente"
@@ -32,6 +34,9 @@ export function decidirOrigemPeriodicoFuturo(input: {
 }): { gerar: boolean; motivo: PeriodicoGeracaoBloqueio | null } {
   if (isAsoDemissional(input.tipoAso)) {
     return { gerar: false, motivo: "aso_demissional" };
+  }
+  if (isAsoPontual(input.tipoAso)) {
+    return { gerar: false, motivo: "aso_pontual" };
   }
   if (input.cumprindoPeriodicoExistente) {
     return { gerar: false, motivo: "cumprindo_existente" };

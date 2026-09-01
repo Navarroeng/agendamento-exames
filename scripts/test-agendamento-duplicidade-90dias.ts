@@ -60,6 +60,21 @@ assert.equal(
   decisao({ tipoAsoNovo: "Demissional", tipoAsoExistente: "Admissional" }),
   "avisar"
 );
+
+// Pontual: novo agendamento isento do intervalo temporal
+assert.equal(
+  decisao({ tipoAsoNovo: "Pontual", tipoAsoExistente: "Periódico" }),
+  "permitir"
+);
+assert.equal(
+  decisao({ tipoAsoNovo: "Pontual", tipoAsoExistente: "Pontual" }),
+  "permitir"
+);
+// Periódico após Pontual existente: regra normal (avisar, não liberar bloqueio de mesmo tipo)
+assert.equal(
+  decisao({ tipoAsoNovo: "Periódico", tipoAsoExistente: "Pontual" }),
+  "avisar"
+);
 assert.equal(
   decisao({
     tipoAsoNovo: "Retorno ao Trabalho",
