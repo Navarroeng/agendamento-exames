@@ -117,15 +117,24 @@ const legrandLikeCancelado = processo({
 
 const todos = [zeroA, navarro, alAssessoria, zeroB, legrandLikeCancelado];
 
-run("padrão da listagem: Aberto + Relatório gerado + Concluído", () => {
+run("padrão da listagem: Aberto + Relatório gerado (sem Concluído/Cancelado)", () => {
   assert.deepEqual(DEFAULT_RISCOS_LISTAGEM_STATUS, [
     "aberto",
     "relatorio_gerado",
-    "concluido",
   ]);
   assert.equal(
     labelRiscosListagemStatusFiltro(DEFAULT_RISCOS_LISTAGEM_STATUS),
-    "Aberto, Relatório gerado, Concluído"
+    "Aberto, Relatório gerado"
+  );
+  const padrao = filterRiscosPsicossociaisProcessosPorStatus(
+    todos,
+    DEFAULT_RISCOS_LISTAGEM_STATUS
+  );
+  assert.ok(
+    !padrao.some((p) => p.implantacao.orcamento.cliente_nome === "NAVARRO ENGENHARIA")
+  );
+  assert.ok(
+    !padrao.some((p) => p.implantacao.orcamento.cliente_nome === "LEGRAND LIKE")
   );
 });
 
@@ -460,7 +469,7 @@ run("Status combina com filtro de mês", () => {
   );
 });
 
-run("UI: STATUS ao lado do ano, padrão Aberto, sem persistir no refresh", () => {
+run("UI: STATUS ao lado do ano, padrão operacional, sem persistir no refresh", () => {
   const hook = readFileSync(
     join(root, "hooks/useRiscosPsicossociaisPage.ts"),
     "utf8"

@@ -1145,7 +1145,7 @@ export const RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS: Array<{
 ];
 
 export const DEFAULT_RISCOS_LISTAGEM_STATUS: RiscosPsicossociaisListagemStatus[] =
-  ["aberto", "relatorio_gerado", "concluido"];
+  ["aberto", "relatorio_gerado"];
 
 export function classificarStatusListagemRiscos(
   processo: Pick<
