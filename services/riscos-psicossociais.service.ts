@@ -6,7 +6,6 @@ import {
   buildRiscosPsicossociaisProcesso,
   isProcessoElegivelRiscosPsicossociais,
   isProcessoVisivelRiscosAutomatico,
-  isRelatorioFinalGerado,
   sortRiscosPsicossociaisProcessos,
   type OrcamentoRiscosPsicossociaisRecord,
   type RiscosPsicossociaisProcesso,
@@ -60,12 +59,12 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
   ];
   const participantesPorCampanha =
     await listarStatusParticipantesPorCampanhas(campanhaIds);
-  const relatoriosMap =
-    await listarRelatoriosExistentesPorCampanhas(campanhaIds);
+  const relatoriosMap = await listarRelatoriosMetaPorCampanhas(campanhaIds);
 
   const processosNormais = visiveis.map((processo) => {
     const orcamentoId = processo.orcamento.id;
     const campanha = campanhasMap.get(orcamentoId) ?? null;
+    const relMeta = campanha ? relatoriosMap.get(campanha.id) : undefined;
     const laudos = buildLaudosSstProcesso(
       processo,
       laudosTracking.get(orcamentoId) ?? null
@@ -78,11 +77,9 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
         participantes: campanha
           ? participantesPorCampanha.get(campanha.id) ?? []
           : [],
-        relatorioGerado: campanha
-          ? isRelatorioFinalGerado({
-              existeRegistro: relatoriosMap.get(campanha.id) === true,
-            })
-          : false,
+        relatorioGerado: campanha ? Boolean(relMeta) : false,
+        relatorioGeradoEm: relMeta?.gerado_em ?? null,
+        relatorioEnviadoEm: relMeta?.relatorio_enviado_em ?? null,
       }
     );
   });
@@ -96,9 +93,10 @@ export async function listarProcessosRiscosPsicossociais(): Promise<
         campanha,
         tracking: fluxo,
         participantes: participantesPorCampanha.get(campanha.id) ?? [],
-        relatorioGerado: isRelatorioFinalGerado({
-          existeRegistro: relatoriosMap.get(campanha.id) === true,
-        }),
+        relatorioGerado: Boolean(relatoriosMap.get(campanha.id)),
+        relatorioGeradoEm: relatoriosMap.get(campanha.id)?.gerado_em ?? null,
+        relatorioEnviadoEm:
+          relatoriosMap.get(campanha.id)?.relatorio_enviado_em ?? null,
       })
     );
   }
@@ -160,19 +158,37 @@ async function listarStatusParticipantesPorCampanhas(
   return map;
 }
 
-/** Existência de relatório final por campanha (listagem). */
-async function listarRelatoriosExistentesPorCampanhas(
+/** Metadados de relatório final por campanha (listagem). */
+async function listarRelatoriosMetaPorCampanhas(
   campanhaIds: string[]
-): Promise<Map<string, boolean>> {
-  const map = new Map<string, boolean>();
+): Promise<
+  Map<string, { gerado_em: string; relatorio_enviado_em: string | null }>
+> {
+  const map = new Map<
+    string,
+    { gerado_em: string; relatorio_enviado_em: string | null }
+  >();
   const ids = Array.from(new Set(campanhaIds.filter(Boolean)));
   if (ids.length === 0) return map;
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("riscos_relatorios")
-    .select("campanha_id")
+    .select("campanha_id, gerado_em, relatorio_enviado_em")
     .in("campanha_id", ids);
+
+  if (
+    error &&
+    (/relatorio_enviado_em/i.test(error.message ?? "") ||
+      error.code === "42703")
+  ) {
+    const fb = await supabase
+      .from("riscos_relatorios")
+      .select("campanha_id, gerado_em")
+      .in("campanha_id", ids);
+    data = fb.data as typeof data;
+    error = fb.error;
+  }
 
   if (error) {
     if (error.code === "42P01" || error.message?.includes("does not exist")) {
@@ -184,7 +200,16 @@ async function listarRelatoriosExistentesPorCampanhas(
 
   for (const row of data ?? []) {
     const cid = String((row as { campanha_id?: string }).campanha_id ?? "");
-    if (cid) map.set(cid, true);
+    if (!cid) continue;
+    map.set(cid, {
+      gerado_em: String((row as { gerado_em?: string }).gerado_em ?? ""),
+      relatorio_enviado_em: (row as { relatorio_enviado_em?: string | null })
+        .relatorio_enviado_em
+        ? String(
+            (row as { relatorio_enviado_em: string }).relatorio_enviado_em
+          )
+        : null,
+    });
   }
   return map;
 }

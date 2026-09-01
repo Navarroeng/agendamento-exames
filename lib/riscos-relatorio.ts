@@ -86,8 +86,17 @@ export type RiscosRelatorioRecord = {
   resultado_json: RiscosRelatorioResultadoJson;
   status: RiscosRelatorioStatus;
   pdf_url: string | null;
+  relatorio_enviado_em?: string | null;
+  relatorio_enviado_email?: string | null;
+  relatorio_enviado_por?: string | null;
+  relatorio_enviado_por_user_id?: string | null;
   created_at?: string;
   updated_at?: string;
+};
+
+export type RiscosRelatorioListagemMeta = {
+  gerado_em: string;
+  relatorio_enviado_em: string | null;
 };
 
 /** Cor visual por classificação (UI do relatório). Verde / amarelo / vermelho. */

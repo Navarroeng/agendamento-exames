@@ -32,6 +32,7 @@ export function RiscosPsicossociaisPage() {
     handleMesChange,
     handleYearChange,
     handleStatusListagemChange,
+    toggleStatusListagem,
     openProcesso,
     openVisualizarRelatorio,
     closeVisualizarRelatorio,
@@ -113,6 +114,7 @@ export function RiscosPsicossociaisPage() {
         onYearChange={handleYearChange}
         statusListagem={statusListagem}
         onStatusListagemChange={handleStatusListagemChange}
+        onToggleStatusListagem={toggleStatusListagem}
         onVisualizar={openProcesso}
         onVisualizarRelatorio={(p) => void openVisualizarRelatorio(p)}
         podeRemoverProcesso={isAdmin}

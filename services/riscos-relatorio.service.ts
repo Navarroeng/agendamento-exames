@@ -79,3 +79,63 @@ export async function regenerarRelatorioCampanha(
   }
   return json.relatorio;
 }
+
+export async function confirmarEnvioRelatorioCampanha(
+  campanhaId: string,
+  email: string,
+  auditOptions?: AuditOptions
+): Promise<RiscosRelatorioRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/relatorio/envio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    relatorio?: RiscosRelatorioRecord;
+  };
+  if (!res.ok || !json.ok || !json.relatorio) {
+    throw new Error(json.error || "Não foi possível confirmar o envio.");
+  }
+  return json.relatorio;
+}
+
+export async function corrigirEnvioRelatorioCampanha(
+  campanhaId: string,
+  email: string,
+  auditOptions?: AuditOptions
+): Promise<RiscosRelatorioRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/relatorio/envio`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    relatorio?: RiscosRelatorioRecord;
+  };
+  if (!res.ok || !json.ok || !json.relatorio) {
+    throw new Error(json.error || "Não foi possível corrigir o envio.");
+  }
+  return json.relatorio;
+}

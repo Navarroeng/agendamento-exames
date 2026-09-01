@@ -16,9 +16,13 @@ import {
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
   indiceEtapaAtualRiscos,
+  isRiscosListagemStatusMarcado,
   isRiscosProcessoListagemCancelado,
   isRiscosProcessoListagemConcluido,
+  isRiscosProcessoListagemRelatorioGerado,
   labelEtapaAtualProcessoRiscos,
+  labelRiscosListagemStatusFiltro,
+  RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS,
   riscosPsicossociaisEtapaAtualBadgeClass,
   sortRiscosPsicossociaisProcessosListagem,
   type RiscosPsicossociaisProcesso,
@@ -113,8 +117,16 @@ const legrandLikeCancelado = processo({
 
 const todos = [zeroA, navarro, alAssessoria, zeroB, legrandLikeCancelado];
 
-run("padrão da listagem é Aberto", () => {
-  assert.equal(DEFAULT_RISCOS_LISTAGEM_STATUS, "aberto");
+run("padrão da listagem: Aberto + Relatório gerado + Concluído", () => {
+  assert.deepEqual(DEFAULT_RISCOS_LISTAGEM_STATUS, [
+    "aberto",
+    "relatorio_gerado",
+    "concluido",
+  ]);
+  assert.equal(
+    labelRiscosListagemStatusFiltro(DEFAULT_RISCOS_LISTAGEM_STATUS),
+    "Aberto, Relatório gerado, Concluído"
+  );
 });
 
 run("índice da etapa reutiliza a sequência oficial da UI", () => {
@@ -126,6 +138,7 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
       "cadastro_colaboradores",
       "link_enviado",
       "aguardando_respostas",
+      "relatorio_gerado",
       "finalizado",
     ]
   );
@@ -136,6 +149,7 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
     "abrir_pesquisa",
     "aguardando_respostas",
     "gerar_relatorio",
+    "relatorio_gerado",
     "finalizado",
   ]);
   assert.equal(indiceEtapaAtualRiscos("laudos_sst"), 0);
@@ -147,11 +161,14 @@ run("índice da etapa reutiliza a sequência oficial da UI", () => {
   assert.equal(indiceEtapaAtualRiscos("link_enviado"), 3);
   assert.equal(indiceEtapaAtualRiscos("aguardando_respostas"), 4);
   assert.equal(indiceEtapaAtualRiscos("gerar_relatorio"), 5);
-  assert.equal(indiceEtapaAtualRiscos("finalizado"), 6);
+  assert.equal(indiceEtapaAtualRiscos("relatorio_gerado"), 6);
+  assert.equal(indiceEtapaAtualRiscos("finalizado"), 7);
 });
 
 run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
-  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, "aberto");
+  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, [
+    "aberto",
+  ]);
   assert.deepEqual(
     abertos.map((p) => p.implantacao.orcamento.cliente_nome),
     ["ZERO A", "AL ASSESSORIA", "ZERO B"]
@@ -163,7 +180,7 @@ run("Aberto exclui Finalizado/100% e inclui 0–N etapas", () => {
 run("Concluído mostra somente processos finalizados", () => {
   const concluidos = filterRiscosPsicossociaisProcessosPorStatus(
     todos,
-    "concluido"
+    ["concluido"]
   );
   assert.deepEqual(
     concluidos.map((p) => p.implantacao.orcamento.cliente_nome),
@@ -174,7 +191,7 @@ run("Concluído mostra somente processos finalizados", () => {
 run("Cancelado mostra somente processos cancelados", () => {
   const cancelados = filterRiscosPsicossociaisProcessosPorStatus(
     todos,
-    "cancelado"
+    ["cancelado"]
   );
   assert.deepEqual(
     cancelados.map((p) => p.implantacao.orcamento.cliente_nome),
@@ -204,7 +221,7 @@ run("conclusão usa status/etapas reais, não texto de badge", () => {
 });
 
 run("Aberto: maior percentual primeiro; 60% antes de 0%", () => {
-  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, "aberto");
+  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, ["aberto"]);
   const ordenados = sortRiscosPsicossociaisProcessosListagem(abertos, "aberto");
   assert.deepEqual(
     ordenados.map((p) => p.implantacao.orcamento.cliente_nome),
@@ -429,10 +446,10 @@ run("Status combina com filtro de mês", () => {
     [...todos, julhoAberto],
     agosto
   );
-  const abertos = filterRiscosPsicossociaisProcessosPorStatus(porMes, "aberto");
+  const abertos = filterRiscosPsicossociaisProcessosPorStatus(porMes, ["aberto"]);
   const concluidos = filterRiscosPsicossociaisProcessosPorStatus(
     porMes,
-    "concluido"
+    ["concluido"]
   );
   assert.ok(!abertos.some((p) => p.implantacao.orcamento.cliente_nome === "Julho Aberto"));
   assert.ok(!abertos.some((p) => p.implantacao.orcamento.cliente_nome === "NAVARRO ENGENHARIA"));
@@ -458,12 +475,12 @@ run("UI: STATUS ao lado do ano, padrão Aberto, sem persistir no refresh", () =>
   );
 
   assert.match(hook, /DEFAULT_RISCOS_LISTAGEM_STATUS/);
-  assert.match(hook, /useState<RiscosPsicossociaisListagemStatus>\(DEFAULT_RISCOS_LISTAGEM_STATUS\)/);
+  assert.match(hook, /useState<\s*RiscosPsicossociaisListagemStatus\[\]/);
   assert.doesNotMatch(hook, /sessionStorage.*statusListagem/);
-  assert.match(table, /htmlFor="riscos-listagem-status"/);
-  assert.match(table, />Aberto</);
-  assert.match(table, />Concluído</);
-  assert.match(table, />Cancelado</);
+  assert.match(table, /htmlFor="riscos-listagem-status"|id="riscos-listagem-status"/);
+  assert.match(table, /CheckboxMultiSelect/);
+  assert.match(table, /RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS/);
+  assert.match(table, /onToggleStatusListagem/);
   assert.match(table, /yearRowExtra/);
   assert.match(table, /RiscosEtapaAtualBadge/);
   assert.match(page, /statusListagem=\{statusListagem\}/);
@@ -564,6 +581,8 @@ run("badges: cada etapa operacional tem tom próprio", () => {
   assert.equal(badge("link_enviado", "em_andamento"), roxo);
   assert.equal(badge("aguardando_respostas", "em_andamento"), azul);
   assert.equal(badge("gerar_relatorio", "em_andamento"), ambar);
+  const violeta = `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE.relatorio_gerado}`;
+  assert.equal(badge("relatorio_gerado", "em_andamento"), violeta);
   assert.equal(badge("finalizado", "concluido"), verde);
   assert.equal(badge("cancelado", "cancelado"), vermelho);
 
@@ -619,6 +638,7 @@ run("badges: cada etapa operacional tem tom próprio", () => {
     "link_enviado",
     "aguardando_respostas",
     "gerar_relatorio",
+    "relatorio_gerado",
     "finalizado",
     "cancelado",
   ];
@@ -641,37 +661,50 @@ run("badges: cada etapa operacional tem tom próprio", () => {
   assert.match(badgeComponent, /riscosPsicossociaisEtapaAtualBadgeClass/);
 });
 
-run("Gerar Relatório (5/6) fica em Aberto e fora de Concluído", () => {
+run("Gerar Relatório (5/7) fica em Aberto; Relatório gerado em categoria própria", () => {
   const gerar = processo({
     cliente: "ACS",
     status: "em_andamento",
     etapaAtual: "gerar_relatorio",
     etapasConcluidas: 5,
-    totalEtapas: 6,
-    progressoPercentual: 83,
+    totalEtapas: 7,
+    progressoPercentual: 71,
     dataEntrada: "2026-08-01T12:00:00Z",
   });
   assert.equal(isRiscosProcessoListagemConcluido(gerar), false);
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([gerar], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([gerar], ["aberto"]).length,
     1
   );
+  const relatorioGerado = processo({
+    cliente: "ACS RG",
+    status: "em_andamento",
+    etapaAtual: "relatorio_gerado",
+    etapasConcluidas: 6,
+    totalEtapas: 7,
+    progressoPercentual: 86,
+    relatorioGerado: true,
+    dataEntrada: "2026-08-01T12:00:00Z",
+  } as never);
+  assert.equal(isRiscosProcessoListagemRelatorioGerado(relatorioGerado), true);
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([gerar], "concluido").length,
-    0
+    filterRiscosPsicossociaisProcessosPorStatus([relatorioGerado], [
+      "relatorio_gerado",
+    ]).length,
+    1
   );
   const finalizado = processo({
     cliente: "ACS OK",
     status: "concluido",
     etapaAtual: "finalizado",
-    etapasConcluidas: 6,
-    totalEtapas: 6,
+    etapasConcluidas: 7,
+    totalEtapas: 7,
     progressoPercentual: 100,
     dataEntrada: "2026-08-01T12:00:00Z",
   });
   assert.equal(isRiscosProcessoListagemConcluido(finalizado), true);
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([finalizado], "concluido")
+    filterRiscosPsicossociaisProcessosPorStatus([finalizado], ["concluido"])
       .length,
     1
   );

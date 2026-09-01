@@ -9,10 +9,14 @@ import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
   getEtapasRiscosPorOrigem,
   isEtapaBarraProgressoAtual,
+  isRiscosListagemStatusMarcado,
+  labelRiscosListagemStatusFiltro,
+  RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS,
   RISCOS_PSICOSSOCIAIS_MES_VAZIO_MSG,
   type RiscosPsicossociaisListagemStatus,
   type RiscosPsicossociaisProcesso,
 } from "@/lib/riscos-psicossociais";
+import { CheckboxMultiSelect } from "@/components/ui/CheckboxMultiSelect";
 import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import type { YearMonth } from "@/lib/listagem-meses";
 import { RiscosEtapaAtualBadge } from "@/components/riscos-psicossociais/RiscosEtapaAtualBadge";
@@ -25,8 +29,9 @@ interface RiscosPsicossociaisTableProps {
   mesSelecionado: YearMonth;
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
-  statusListagem: RiscosPsicossociaisListagemStatus;
-  onStatusListagemChange: (status: RiscosPsicossociaisListagemStatus) => void;
+  statusListagem: RiscosPsicossociaisListagemStatus[];
+  onToggleStatusListagem: (status: RiscosPsicossociaisListagemStatus) => void;
+  onStatusListagemChange: (statuses: RiscosPsicossociaisListagemStatus[]) => void;
   onVisualizar: (processo: RiscosPsicossociaisProcesso) => void;
   onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
   /** Admin only — remoção definitiva. */
@@ -98,6 +103,7 @@ export function RiscosPsicossociaisTable({
   onMesChange,
   onYearChange,
   statusListagem,
+  onToggleStatusListagem,
   onStatusListagemChange,
   onVisualizar,
   onVisualizarRelatorio,
@@ -127,21 +133,32 @@ export function RiscosPsicossociaisTable({
             >
               Status
             </label>
-            <select
+            <CheckboxMultiSelect
               id="riscos-listagem-status"
-              className="field-input field-input-compact w-[128px] text-sm"
-              value={statusListagem}
-              onChange={(e) =>
+              className="field-input field-input-compact w-[min(100%,220px)] text-sm"
+              ariaLabel="Filtrar por status"
+              closedLabel={labelRiscosListagemStatusFiltro(statusListagem)}
+              todosLabel="Marcar todos"
+              todosChecked={RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS.every(
+                (o) => isRiscosListagemStatusMarcado(statusListagem, o.value)
+              )}
+              options={RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS}
+              isOptionChecked={(value) =>
+                isRiscosListagemStatusMarcado(statusListagem, value)
+              }
+              onToggleTodos={() =>
                 onStatusListagemChange(
-                  e.target.value as RiscosPsicossociaisListagemStatus
+                  RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS.every((o) =>
+                    isRiscosListagemStatusMarcado(statusListagem, o.value)
+                  )
+                    ? []
+                    : RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS.map(
+                        (o) => o.value
+                      )
                 )
               }
-              aria-label="Filtrar por status"
-            >
-              <option value="aberto">Aberto</option>
-              <option value="concluido">Concluído</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
+              onToggleOption={onToggleStatusListagem}
+            />
           </div>
         }
       />

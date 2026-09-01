@@ -259,14 +259,14 @@ run("7–8. cancelado sai de Aberto e entra no filtro Cancelado", () => {
   };
 
   const todos = [aberto, cancelado, concluido];
-  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, "aberto");
+  const abertos = filterRiscosPsicossociaisProcessosPorStatus(todos, ["aberto"]);
   const cancelados = filterRiscosPsicossociaisProcessosPorStatus(
     todos,
-    "cancelado"
+    ["cancelado"]
   );
   const concluidos = filterRiscosPsicossociaisProcessosPorStatus(
     todos,
-    "concluido"
+    ["concluido"]
   );
 
   assert.ok(abertos.every((p) => p.status !== "cancelado"));
@@ -299,7 +299,7 @@ run("9. inclusão manual persiste cancelamento no fluxo da campanha", () => {
   });
   assert.notEqual(aberto.status, "cancelado");
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([aberto], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([aberto], ["aberto"]).length,
     1
   );
 
@@ -315,11 +315,11 @@ run("9. inclusão manual persiste cancelamento no fluxo da campanha", () => {
   assert.equal(cancelado.status, "cancelado");
   assert.equal(cancelado.processoKey, "camp-manual-1");
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([cancelado], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([cancelado], ["aberto"]).length,
     0
   );
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([cancelado], "cancelado").length,
+    filterRiscosPsicossociaisProcessosPorStatus([cancelado], ["cancelado"]).length,
     1
   );
 
@@ -377,11 +377,11 @@ run("11. elegível cancelado NÃO reaparece no sync", () => {
   const processo = buildRiscosPsicossociaisProcesso(laudos, row, null);
   assert.equal(processo.status, "cancelado");
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([processo], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([processo], ["aberto"]).length,
     0
   );
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([processo], "cancelado").length,
+    filterRiscosPsicossociaisProcessosPorStatus([processo], ["cancelado"]).length,
     1
   );
 });
@@ -417,7 +417,7 @@ run("12. LEGRAND-like: automático antigo, sem pacote, sem campanha", () => {
     "Lista de presença solicitada"
   );
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([antes], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([antes], ["aberto"]).length,
     1
   );
 
@@ -444,11 +444,11 @@ run("12. LEGRAND-like: automático antigo, sem pacote, sem campanha", () => {
   assert.equal(depois.motivoCancelamento, MOTIVO_LEGRAND_LIKE);
   assert.equal(depois.campanha, null);
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([depois], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([depois], ["aberto"]).length,
     0
   );
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([depois], "cancelado").length,
+    filterRiscosPsicossociaisProcessosPorStatus([depois], ["cancelado"]).length,
     1
   );
   assert.equal(deveInserirTrackingRiscosNoSincronismo(false, rowDepois), false);
@@ -587,7 +587,7 @@ run("16. processos normais não mudam", () => {
   assert.notEqual(processo.etapaAtual, "cancelado");
   assert.equal(processo.canceladoEm, null);
   assert.equal(
-    filterRiscosPsicossociaisProcessosPorStatus([processo], "aberto").length,
+    filterRiscosPsicossociaisProcessosPorStatus([processo], ["aberto"]).length,
     1
   );
   assert.equal(deveInserirTrackingRiscosNoSincronismo(true, tracking("orc-normal")), false);
@@ -609,8 +609,9 @@ run("UI: menu Cancelar, filtro Cancelado, badge e faixa", () => {
     join(root, "components/riscos-psicossociais/RiscosPsicossociaisTable.tsx"),
     "utf8"
   );
-  assert.match(table, />Cancelado</);
-  assert.match(table, /value="cancelado"/);
+  assert.match(table, /CheckboxMultiSelect/);
+  assert.match(table, /RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS/);
+  assert.match(table, /onToggleStatusListagem/);
 
   const painel = readFileSync(
     join(root, "components/riscos-psicossociais/RiscosPsicossociaisPainel.tsx"),

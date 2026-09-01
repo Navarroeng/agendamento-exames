@@ -362,7 +362,7 @@ run("23. todos responderam depois da prorrogação → Gerar Relatório", () => 
   assert.equal(progresso.etapaAtual, "gerar_relatorio");
 });
 
-run("24. relatório gerado → processo Finalizado", () => {
+run("24. relatório gerado → etapa Relatório gerado (não concluído)", () => {
   const progresso = calcularProgressoEtapasRiscos({
     origem: RISCOS_CAMPANHA_ORIGEM.orcamento,
     laudosSstConcluido: true,
@@ -372,9 +372,13 @@ run("24. relatório gerado → processo Finalizado", () => {
     participantesRespondidos: 5,
     campanhaStatus: "aberta",
     relatorioGerado: true,
+    relatorioGeradoEm: "2026-09-02T10:00:00.000Z",
+    relatorioEnviadoEm: null,
   });
-  assert.equal(progresso.etapaAtual, "finalizado");
-  assert.equal(progresso.status, "concluido");
+  assert.equal(progresso.etapaAtual, "relatorio_gerado");
+  assert.equal(progresso.status, "em_andamento");
+  assert.equal(progresso.etapasConcluidas, 6);
+  assert.equal(progresso.totalEtapas, 7);
 });
 
 run("etapa aguardando respostas com prazo encerrado não volta para Abrir pesquisa", () => {

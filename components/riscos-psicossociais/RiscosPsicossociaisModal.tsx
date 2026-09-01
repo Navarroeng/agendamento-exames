@@ -70,7 +70,7 @@ interface RiscosPsicossociaisModalProps {
   podeGerenciarParticipante?: boolean;
   campanhaStatusSincronizado?: boolean;
   auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
-  onRelatorioAtualizado?: (relatorioGerado: boolean) => void;
+  onRelatorioAtualizado?: (relatorio: import("@/lib/riscos-relatorio").RiscosRelatorioRecord | null) => void;
 }
 
 export function RiscosPsicossociaisModal({

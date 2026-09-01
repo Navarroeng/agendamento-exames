@@ -17,9 +17,14 @@ import type { RiscosCampanhaParticipanteRecord } from "@/lib/riscos-campanha-par
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
 import {
   buscarRelatorioCampanha,
+  confirmarEnvioRelatorioCampanha,
+  corrigirEnvioRelatorioCampanha,
   gerarRelatorioCampanha,
   regenerarRelatorioCampanha,
 } from "@/services/riscos-relatorio.service";
+import { createClient } from "@/lib/supabase/client";
+import { isEmailValido } from "@/lib/email-validacao";
+import { isRelatorioEnvioExplicitamenteConfirmado } from "@/lib/riscos-relatorio-envio";
 import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-logo.service";
 import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
 
@@ -29,6 +34,7 @@ interface RiscosRelatorioPanelProps {
   isAdmin?: boolean;
   processoCancelado?: boolean;
   auditContext?: AuditoriaUsuarioContext;
+  emailEnvioSugerido?: string | null;
   onRelatorioChange?: (relatorio: RiscosRelatorioRecord | null) => void;
 }
 
@@ -38,6 +44,7 @@ export function RiscosRelatorioPanel({
   isAdmin = false,
   processoCancelado = false,
   auditContext,
+  emailEnvioSugerido,
   onRelatorioChange,
 }: RiscosRelatorioPanelProps) {
   const [relatorio, setRelatorio] = useState<RiscosRelatorioRecord | null>(
@@ -45,8 +52,11 @@ export function RiscosRelatorioPanel({
   );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingEnvio, setSavingEnvio] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [emailEnvio, setEmailEnvio] = useState("");
+  const [editandoEnvio, setEditandoEnvio] = useState(false);
   const onRelatorioChangeRef = useRef(onRelatorioChange);
   onRelatorioChangeRef.current = onRelatorioChange;
 
@@ -106,6 +116,104 @@ export function RiscosRelatorioPanel({
       cancelled = true;
     };
   }, [campanha?.id]);
+
+  const envioConfirmado = useMemo(
+    () =>
+      relatorio
+        ? isRelatorioEnvioExplicitamenteConfirmado({
+            relatorioEnviadoEm: relatorio.relatorio_enviado_em,
+          })
+        : false,
+    [relatorio]
+  );
+
+  useEffect(() => {
+    if (!campanha?.id || envioConfirmado) return;
+    const sugerido = String(emailEnvioSugerido ?? "").trim();
+    if (sugerido) {
+      setEmailEnvio(sugerido);
+      return;
+    }
+    if (!campanha.cliente_id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("clientes")
+          .select("email")
+          .eq("id", campanha.cliente_id)
+          .maybeSingle();
+        if (cancelled) return;
+        const email = String((data as { email?: string } | null)?.email ?? "")
+          .trim();
+        if (email) setEmailEnvio(email);
+      } catch {
+        /* campo permanece editável */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campanha?.id, campanha?.cliente_id, emailEnvioSugerido, envioConfirmado]);
+
+  useEffect(() => {
+    if (relatorio?.relatorio_enviado_email && envioConfirmado && !editandoEnvio) {
+      setEmailEnvio(relatorio.relatorio_enviado_email);
+    }
+  }, [relatorio, envioConfirmado, editandoEnvio]);
+
+  async function handleConfirmarEnvio() {
+    if (!campanha?.id || !relatorio) return;
+    if (!isEmailValido(emailEnvio)) {
+      toast.error("Informe um e-mail válido.");
+      return;
+    }
+    setSavingEnvio(true);
+    try {
+      const row = await confirmarEnvioRelatorioCampanha(
+        campanha.id,
+        emailEnvio.trim(),
+        { auditContext }
+      );
+      setRelatorio(row);
+      setEditandoEnvio(false);
+      onRelatorioChangeRef.current?.(row);
+      toast.success("Envio do relatório confirmado.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Falha ao confirmar o envio."
+      );
+    } finally {
+      setSavingEnvio(false);
+    }
+  }
+
+  async function handleCorrigirEnvio() {
+    if (!campanha?.id || !relatorio) return;
+    if (!isEmailValido(emailEnvio)) {
+      toast.error("Informe um e-mail válido.");
+      return;
+    }
+    setSavingEnvio(true);
+    try {
+      const row = await corrigirEnvioRelatorioCampanha(
+        campanha.id,
+        emailEnvio.trim(),
+        { auditContext }
+      );
+      setRelatorio(row);
+      setEditandoEnvio(false);
+      onRelatorioChangeRef.current?.(row);
+      toast.success("Registro de envio atualizado.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Falha ao corrigir o envio."
+      );
+    } finally {
+      setSavingEnvio(false);
+    }
+  }
 
   useEffect(() => {
     if (!campanha?.id) {
@@ -216,6 +324,9 @@ export function RiscosRelatorioPanel({
   }
 
   const { data, hora } = formatDataHoraRelatorio(relatorio.gerado_em);
+  const envioDataHora = relatorio.relatorio_enviado_em
+    ? formatDataHoraRelatorio(relatorio.relatorio_enviado_em)
+    : null;
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -296,6 +407,94 @@ export function RiscosRelatorioPanel({
             Regenerar
           </button>
         ) : null}
+      </div>
+
+      <div className="rounded-xl border border-[#e2e8f0] bg-white px-3 py-3">
+        <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#64748b]">
+          Confirmação de envio
+        </p>
+        {envioConfirmado && !editandoEnvio ? (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs font-extrabold text-brand-green">
+              Relatório enviado
+            </p>
+            <p className="text-xs text-navy">
+              Enviado para:{" "}
+              <span className="font-semibold">
+                {relatorio.relatorio_enviado_email || "—"}
+              </span>
+            </p>
+            {envioDataHora ? (
+              <p className="text-xs text-app-muted">
+                Confirmado em: {envioDataHora.data} às {envioDataHora.hora}
+              </p>
+            ) : null}
+            <p className="text-xs text-app-muted">
+              Confirmado por: {relatorio.relatorio_enviado_por || "—"}
+            </p>
+            <button
+              type="button"
+              className="mt-2 text-[11px] font-semibold text-brand-blue underline-offset-2 hover:underline"
+              onClick={() => setEditandoEnvio(true)}
+            >
+              Corrigir registro de envio
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-app-muted">
+              {envioConfirmado
+                ? "Corrija o e-mail registrado para esta versão do relatório."
+                : "Aguardando confirmação de envio"}
+            </p>
+            <p className="text-[11px] text-app-muted">
+              Confirme após o envio do relatório ao cliente. Esta ação não
+              envia e-mail — apenas registra que a equipe Navarro realizou o
+              envio externamente.
+            </p>
+            <label className="block text-[11px] font-semibold text-navy">
+              E-mail para o qual o relatório foi enviado
+              <input
+                type="email"
+                className="field-input mt-1 w-full text-sm"
+                value={emailEnvio}
+                onChange={(e) => setEmailEnvio(e.target.value)}
+                placeholder="cliente@empresa.com.br"
+                disabled={savingEnvio}
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                disabled={savingEnvio || processoCancelado}
+                onClick={() =>
+                  void (envioConfirmado || editandoEnvio
+                    ? handleCorrigirEnvio()
+                    : handleConfirmarEnvio())
+                }
+              >
+                {savingEnvio
+                  ? "Salvando…"
+                  : envioConfirmado || editandoEnvio
+                    ? "Salvar correção"
+                    : "Confirmar envio"}
+              </button>
+              {editandoEnvio ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+                  onClick={() => {
+                    setEditandoEnvio(false);
+                    setEmailEnvio(relatorio.relatorio_enviado_email ?? "");
+                  }}
+                >
+                  Cancelar
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
 
       <RiscosRelatorioViewerModal

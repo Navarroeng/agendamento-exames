@@ -98,6 +98,8 @@ export const AUDITORIA_ACOES = {
   riscos_participacao_invalidada: "riscos_participacao_invalidada",
   riscos_relatorio_gerado: "riscos_relatorio_gerado",
   riscos_relatorio_regenerado: "riscos_relatorio_regenerado",
+  riscos_relatorio_envio_confirmado: "riscos_relatorio_envio_confirmado",
+  riscos_relatorio_envio_corrigido: "riscos_relatorio_envio_corrigido",
   riscos_campanha_logo_atualizado: "riscos_campanha_logo_atualizado",
   riscos_campanha_logo_removido: "riscos_campanha_logo_removido",
 } as const;
@@ -204,6 +206,10 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   riscos_participacao_invalidada: "Participação da pesquisa invalidada",
   riscos_relatorio_gerado: "Relatório final de Riscos gerado",
   riscos_relatorio_regenerado: "Relatório final de Riscos regenerado",
+  riscos_relatorio_envio_confirmado:
+    "Envio do relatório de Riscos confirmado",
+  riscos_relatorio_envio_corrigido:
+    "Registro de envio do relatório de Riscos corrigido",
   riscos_campanha_logo_atualizado: "Logo da campanha de Riscos atualizado",
   riscos_campanha_logo_removido: "Logo da campanha de Riscos removido",
 };

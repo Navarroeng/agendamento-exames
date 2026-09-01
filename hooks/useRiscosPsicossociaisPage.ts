@@ -9,6 +9,7 @@ import {
   podeAbrirPesquisaRiscos,
   RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
 } from "@/lib/riscos-abrir-pesquisa-permissao";
+import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import {
   DEFAULT_RISCOS_LISTAGEM_STATUS,
   EMPTY_RISCOS_PSICOSSOCIAIS_FILTERS,
@@ -16,7 +17,11 @@ import {
   filterRiscosPsicossociaisProcessos,
   filterRiscosPsicossociaisProcessosPorMes,
   filterRiscosPsicossociaisProcessosPorStatus,
+  isRiscosListagemStatusMarcado,
+  labelRiscosListagemStatusFiltro,
+  resolverOrdenacaoListagemRiscos,
   sortRiscosPsicossociaisProcessosListagem,
+  toggleRiscosListagemStatusFiltro,
   withRiscosProgressoAtualizado,
   type RiscosPsicossociaisFilters,
   type RiscosPsicossociaisListagemStatus,
@@ -85,7 +90,6 @@ import {
   resolverUrlLogoCampanhaOuEmpresa,
 } from "@/services/riscos-campanha-logo.service";
 import { buscarRelatorioCampanha } from "@/services/riscos-relatorio.service";
-import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { listarProcessosRiscosPsicossociais } from "@/services/riscos-psicossociais.service";
 
 export function useRiscosPsicossociaisPage() {
@@ -117,8 +121,9 @@ export function useRiscosPsicossociaisPage() {
   const [mesSelecionado, setMesSelecionado] = useState<YearMonth>(() =>
     resolveInitialMesListagem()
   );
-  const [statusListagem, setStatusListagem] =
-    useState<RiscosPsicossociaisListagemStatus>(DEFAULT_RISCOS_LISTAGEM_STATUS);
+  const [statusListagem, setStatusListagem] = useState<
+    RiscosPsicossociaisListagemStatus[]
+  >(() => [...DEFAULT_RISCOS_LISTAGEM_STATUS]);
   const [modalProcesso, setModalProcesso] =
     useState<RiscosPsicossociaisProcesso | null>(null);
   /** false até o status da campanha ser relido do banco (não usar listagem stale). */
@@ -197,7 +202,10 @@ export function useRiscosPsicossociaisPage() {
       porBusca,
       statusListagem
     );
-    return sortRiscosPsicossociaisProcessosListagem(porStatus, statusListagem);
+    return sortRiscosPsicossociaisProcessosListagem(
+      porStatus,
+      resolverOrdenacaoListagemRiscos(statusListagem)
+    );
   }, [processos, filters, mesSelecionado, statusListagem]);
 
   const responsaveis = useMemo(() => {
@@ -290,8 +298,15 @@ export function useRiscosPsicossociaisPage() {
   }, []);
 
   const handleStatusListagemChange = useCallback(
-    (status: RiscosPsicossociaisListagemStatus) => {
-      setStatusListagem(status);
+    (statuses: RiscosPsicossociaisListagemStatus[]) => {
+      setStatusListagem(statuses);
+    },
+    []
+  );
+
+  const toggleStatusListagem = useCallback(
+    (value: RiscosPsicossociaisListagemStatus) => {
+      setStatusListagem((prev) => toggleRiscosListagemStatusFiltro(prev, value));
     },
     []
   );
@@ -1433,18 +1448,34 @@ export function useRiscosPsicossociaisPage() {
   );
 
   const handleRelatorioAtualizado = useCallback(
-    (relatorioGerado: boolean) => {
+    (relatorio: RiscosRelatorioRecord | null) => {
+      const patch = relatorio
+        ? {
+            relatorioGerado: true,
+            relatorioGeradoEm: relatorio.gerado_em,
+            relatorioEnviadoEm: relatorio.relatorio_enviado_em ?? null,
+          }
+        : {
+            relatorioGerado: false,
+            relatorioGeradoEm: null,
+            relatorioEnviadoEm: null,
+          };
       setModalProcesso((prev) =>
-        prev
-          ? withRiscosProgressoAtualizado(prev, { relatorioGerado })
-          : prev
+        prev ? withRiscosProgressoAtualizado(prev, patch) : prev
       );
       setProcessos((prev) =>
         prev.map((p) => {
           if (!modalProcesso || p.processoKey !== modalProcesso.processoKey) {
             return p;
           }
-          return withRiscosProgressoAtualizado(p, { relatorioGerado });
+          const next = withRiscosProgressoAtualizado(p, patch);
+          if (relatorio?.relatorio_enviado_em) {
+            return { ...next, concluidoEm: relatorio.relatorio_enviado_em };
+          }
+          if (!relatorio?.relatorio_enviado_em && relatorio) {
+            return { ...next, concluidoEm: null };
+          }
+          return next;
         })
       );
     },
@@ -1470,6 +1501,7 @@ export function useRiscosPsicossociaisPage() {
     handleMesChange,
     handleYearChange,
     handleStatusListagemChange,
+    toggleStatusListagem,
     openProcesso,
     openVisualizarRelatorio,
     closeVisualizarRelatorio,

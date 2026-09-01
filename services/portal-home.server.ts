@@ -25,7 +25,8 @@ const CAMPANHA_SELECT =
 
 const PARTICIPANTE_SELECT = "nome_completo, status, removido_em";
 
-const RELATORIO_SELECT = "campanha_id, cliente_id, gerado_em, resultado_json";
+const RELATORIO_SELECT =
+  "campanha_id, cliente_id, gerado_em, relatorio_enviado_em, resultado_json";
 
 const CAMPANHA_LISTA_SELECT = "cliente_id, empresa_nome, status";
 
@@ -160,6 +161,7 @@ export async function carregarPortalHome(
   const snapshot: PortalSnapshotFonte | null = snapshotAtual?.resultado_json
     ? {
         gerado_em: snapshotAtual.gerado_em ?? null,
+        relatorio_enviado_em: snapshotAtual.relatorio_enviado_em ?? null,
         resultado_json: snapshotAtual.resultado_json,
       }
     : null;
@@ -197,6 +199,10 @@ async function carregarSnapshotsPortal(
     cliente_id: (row as { cliente_id?: string | null }).cliente_id ?? null,
     gerado_em: (row as { gerado_em?: string | null }).gerado_em
       ? String((row as { gerado_em: string }).gerado_em)
+      : null,
+    relatorio_enviado_em: (row as { relatorio_enviado_em?: string | null })
+      .relatorio_enviado_em
+      ? String((row as { relatorio_enviado_em: string }).relatorio_enviado_em)
       : null,
     resultado_json: ((row as { resultado_json?: unknown }).resultado_json ??
       null) as RiscosRelatorioResultadoJson | null,

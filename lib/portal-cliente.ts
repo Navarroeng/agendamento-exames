@@ -11,6 +11,7 @@ import {
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosRelatorioResultadoJson } from "@/lib/riscos-relatorio";
+import { relatorioLiberadoAoClientePortal } from "@/lib/riscos-relatorio-envio";
 import {
   indicadoresComplementaresDeRelatorio,
   type StatusGeralIndicadoresComplementares,
@@ -122,6 +123,13 @@ export type PortalHistoricoSnapshotFonte = {
   campanha_id: string;
   cliente_id?: string | null;
   gerado_em?: string | null;
+  relatorio_enviado_em?: string | null;
+  resultado_json: RiscosRelatorioResultadoJson | Record<string, unknown> | null;
+};
+
+export type PortalSnapshotFonte = {
+  gerado_em: string | null;
+  relatorio_enviado_em?: string | null;
   resultado_json: RiscosRelatorioResultadoJson | Record<string, unknown> | null;
 };
 
@@ -139,11 +147,6 @@ export type PortalParticipanteFonte = {
   nome_completo: string;
   status: string;
   removido_em?: string | null;
-};
-
-export type PortalSnapshotFonte = {
-  gerado_em: string | null;
-  resultado_json: RiscosRelatorioResultadoJson | Record<string, unknown> | null;
 };
 
 export const PORTAL_TIMELINE_ETAPAS = [
@@ -435,6 +438,11 @@ export function montarPortalResumo(input: {
   );
 
   const temSnapshot = Boolean(input.snapshot?.resultado_json);
+  const relatorioLiberado = relatorioLiberadoAoClientePortal({
+    temSnapshot,
+    relatorioGeradoEm: input.snapshot?.gerado_em,
+    relatorioEnviadoEm: input.snapshot?.relatorio_enviado_em,
+  });
   const extraido = temSnapshot
     ? extrairCategoriasDoSnapshot(input.snapshot?.resultado_json)
     : {
@@ -464,7 +472,7 @@ export function montarPortalResumo(input: {
     respondidos: resumo.respondidos,
     pendentes: resumo.pendentes,
     cadastrados: resumo.cadastrados,
-    relatorioDisponivel: temSnapshot,
+    relatorioDisponivel: relatorioLiberado,
   });
 
   const participantes: PortalParticipanteStatus[] = [...ativos]
@@ -492,7 +500,7 @@ export function montarPortalResumo(input: {
     pendentes: resumo.pendentes,
     participacaoPercentual: participacao.percentual,
     participantes,
-    relatorioDisponivel: temSnapshot,
+    relatorioDisponivel: relatorioLiberado,
     relatorioGeradoEm: temSnapshot
       ? String(input.snapshot?.gerado_em ?? "").trim() || null
       : null,
@@ -564,6 +572,15 @@ export function montarHistoricoRiscosPortal(input: {
     const snapCliente = String(snap.cliente_id ?? "").trim();
     if (snapCliente && clienteId && snapCliente !== clienteId) continue;
     if (!snapshotTemResultadoConsolidado(snap.resultado_json)) continue;
+    if (
+      !relatorioLiberadoAoClientePortal({
+        temSnapshot: true,
+        relatorioGeradoEm: snap.gerado_em,
+        relatorioEnviadoEm: snap.relatorio_enviado_em,
+      })
+    ) {
+      continue;
+    }
     elegiveis.push({
       campanha,
       extraido: extrairCategoriasDoSnapshot(snap.resultado_json),

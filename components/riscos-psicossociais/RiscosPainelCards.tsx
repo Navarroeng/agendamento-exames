@@ -40,6 +40,7 @@ import {
   type RiscosParticipanteInput,
 } from "@/lib/riscos-campanha-participantes";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
+import { isOrigemManualCliente } from "@/lib/riscos-campanha-origem";
 import { resolverUrlLogoCampanhaOuEmpresa } from "@/services/riscos-campanha-logo.service";
 interface RiscosPainelCardsProps {
   processo: RiscosPsicossociaisProcesso;
@@ -101,7 +102,7 @@ interface RiscosPainelCardsProps {
   /** Só exibe ações de Convites após status confirmado no banco. */
   campanhaStatusSincronizado?: boolean;
   auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
-  onRelatorioAtualizado?: (relatorioGerado: boolean) => void;
+  onRelatorioAtualizado?: (relatorio: RiscosRelatorioRecord | null) => void;
 }
 
 function PanelCard({
@@ -716,9 +717,12 @@ export function RiscosPainelCards({
             isAdmin={podeGerenciarParticipante && !processoCancelado}
             processoCancelado={processoCancelado}
             auditContext={auditContext}
-            onRelatorioChange={(relatorio: RiscosRelatorioRecord | null) => {
-              onRelatorioAtualizado?.(Boolean(relatorio));
-            }}
+            emailEnvioSugerido={
+              isOrigemManualCliente(processo.origem)
+                ? null
+                : processo.implantacao.orcamento.email ?? null
+            }
+            onRelatorioChange={onRelatorioAtualizado}
           />
         </PanelCard>
       </div>
