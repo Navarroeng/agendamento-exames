@@ -7,8 +7,8 @@
  */
 
 import {
+  fraseConclusaoTemasIndicadores,
   indicadoresComplementaresDeRelatorio,
-  listarTemasIndicadoresConclusao,
 } from "@/lib/riscos-indicadores-complementares";
 import { COPSOQ_DIMENSOES } from "@/lib/copsoq/dimensoes";
 import type { CopsoqClassificacaoResultadoId } from "@/lib/copsoq-engine";
@@ -477,9 +477,8 @@ export function gerarConteudoExecutivo(
 
   const indicadores = indicadoresComplementaresDeRelatorio(relatorio);
   if (indicadores.algumRequerAtencao) {
-    const temas = listarTemasIndicadoresConclusao(indicadores.temasRequerAtencao);
     conclusaoTecnica.push(
-      `Nos indicadores complementares, houve indicação de possível exposição relacionada a ${temas}. O achado requer atenção específica da organização e é analisado separadamente das 10 categorias COPSOQ.`
+      fraseConclusaoTemasIndicadores(indicadores.temasRequerAtencao)
     );
     recomendacoesGerais.push(
       "Avaliar os temas sinalizados nos indicadores de comportamentos ofensivos e revisar, conforme aplicável, as medidas de prevenção, orientação, acolhimento e canais internos disponíveis, preservando a confidencialidade dos participantes."

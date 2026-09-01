@@ -449,6 +449,9 @@ export function montarPortalResumo(input: {
         resultado_json: input.snapshot?.resultado_json as
           | RiscosRelatorioResultadoJson
           | undefined,
+        respondentesValidos:
+          (input.snapshot?.resultado_json as RiscosRelatorioResultadoJson | null)
+            ?.capa?.respondentes ?? undefined,
       })
     : {
         disponivel: false,

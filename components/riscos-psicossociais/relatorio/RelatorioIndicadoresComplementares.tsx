@@ -3,6 +3,7 @@
 import {
   indicadoresComplementaresDeRelatorio,
   type IndicadorComplementarApresentacao,
+  type IndicadoresComplementaresApresentacao,
   type StatusIndicadorComplementar,
 } from "@/lib/riscos-indicadores-complementares";
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
@@ -29,22 +30,65 @@ function badgeClasses(status: StatusIndicadorComplementar): {
   };
 }
 
-function LinhaIndicador({ item }: { item: IndicadorComplementarApresentacao }) {
+function CardIndicador({ item }: { item: IndicadorComplementarApresentacao }) {
   const badge = badgeClasses(item.status);
   return (
-    <li
-      className="riscos-relatorio-print-card flex items-start justify-between gap-3 rounded-xl border border-[#e8edf5] bg-white px-3.5 py-2.5"
+    <article
+      className="relatorio-indicador-card riscos-relatorio-print-card rounded-xl border border-[#e8edf5] bg-white px-3.5 py-3"
       data-relatorio-item={item.id}
     >
-      <span className="min-w-0 flex-1 text-[12px] font-semibold leading-snug text-navy">
-        {item.tema}
-      </span>
-      <span
-        className={`relatorio-indicador-badge shrink-0 rounded-full border px-2.5 py-0.5 text-[9px] font-bold leading-none ${badge.wrap} ${badge.text}`}
-      >
-        {item.labelStatus}
-      </span>
-    </li>
+      <div className="flex items-start justify-between gap-3">
+        <h4 className="min-w-0 flex-1 text-[12px] font-extrabold uppercase leading-snug tracking-wide text-navy">
+          {item.tema}
+        </h4>
+        <span
+          className={`relatorio-indicador-badge shrink-0 rounded-full border px-2.5 py-0.5 text-[9px] font-bold leading-none ${badge.wrap} ${badge.text}`}
+        >
+          {item.labelStatus}
+        </span>
+      </div>
+      <p className="relatorio-indicador-texto mt-2 text-[11px] leading-relaxed text-navy">
+        {item.textoPrincipal}
+      </p>
+      {item.textoRecomendacao ? (
+        <p className="relatorio-indicador-recomendacao mt-2 text-[11px] leading-relaxed text-app-muted">
+          {item.textoRecomendacao}
+        </p>
+      ) : null}
+      {item.textoAvisoConfidencialidade ? (
+        <p className="relatorio-indicador-aviso mt-2 text-[10px] leading-relaxed text-[#64748b]">
+          {item.textoAvisoConfidencialidade}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function SinteseIndicadores({
+  sintese,
+}: {
+  sintese: NonNullable<IndicadoresComplementaresApresentacao["sintese"]>;
+}) {
+  return (
+    <aside
+      className="relatorio-indicadores-sintese riscos-relatorio-print-card mt-4 rounded-xl border border-[#e8edf5] bg-[#f8fafc] px-3.5 py-3"
+      data-relatorio-item="sintese"
+    >
+      <h4 className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+        {sintese.titulo}
+      </h4>
+      <p className="mt-2 text-[11px] leading-relaxed text-navy">
+        {sintese.textoIntro}
+      </p>
+      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+        {sintese.rotuloTemas}
+      </p>
+      <ul className="mt-1.5 space-y-1 text-[11px] leading-relaxed text-navy">
+        {sintese.temas.map((tema) => (
+          <li key={tema}>• {tema}</li>
+        ))}
+      </ul>
+    </aside>
   );
 }
 
@@ -55,12 +99,12 @@ export function RelatorioIndicadoresComplementares({
   relatorio,
   itemIds,
   mostrarCabecalho = true,
-  mostrarOrientacao = true,
+  mostrarSintese = true,
 }: {
   relatorio: RiscosRelatorioRecord;
   itemIds?: readonly string[];
   mostrarCabecalho?: boolean;
-  mostrarOrientacao?: boolean;
+  mostrarSintese?: boolean;
 }) {
   const dados = indicadoresComplementaresDeRelatorio(relatorio);
   const ids = itemIds ? new Set(itemIds) : null;
@@ -69,10 +113,10 @@ export function RelatorioIndicadoresComplementares({
     ? dados.indicadores.filter((i) => ids.has(i.id))
     : dados.indicadores;
 
-  const mostrarRodape =
-    mostrarOrientacao &&
-    dados.textoOrientacaoSecao &&
-    (!ids || ids.has("orientacao"));
+  const mostrarBlocoSintese =
+    mostrarSintese &&
+    dados.sintese &&
+    (!ids || ids.has("sintese"));
 
   if (!dados.disponivel && mostrarCabecalho) {
     return (
@@ -95,7 +139,7 @@ export function RelatorioIndicadoresComplementares({
     );
   }
 
-  if (indicadores.length === 0 && !mostrarRodape && !mostrarCabecalho) {
+  if (indicadores.length === 0 && !mostrarBlocoSintese && !mostrarCabecalho) {
     return null;
   }
 
@@ -116,20 +160,15 @@ export function RelatorioIndicadoresComplementares({
       ) : null}
 
       {indicadores.length > 0 ? (
-        <ul className="relatorio-indicadores-lista flex flex-col gap-2">
+        <div className="relatorio-indicadores-lista flex flex-col gap-3">
           {indicadores.map((item) => (
-            <LinhaIndicador key={item.id} item={item} />
+            <CardIndicador key={item.id} item={item} />
           ))}
-        </ul>
+        </div>
       ) : null}
 
-      {mostrarRodape ? (
-        <p
-          className="relatorio-indicadores-orientacao mt-3 text-[11px] leading-relaxed text-navy"
-          data-relatorio-item="orientacao"
-        >
-          {dados.textoOrientacaoSecao}
-        </p>
+      {mostrarBlocoSintese && dados.sintese ? (
+        <SinteseIndicadores sintese={dados.sintese} />
       ) : null}
     </section>
   );

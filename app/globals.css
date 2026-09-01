@@ -953,8 +953,8 @@ aside:hover .sidebar-nav-scroll::-webkit-scrollbar-thumb {
   }
 
   body.riscos-relatorio-printing .relatorio-indicadores-cabecalho,
-  body.riscos-relatorio-printing .relatorio-indicadores-lista > li,
-  body.riscos-relatorio-printing .relatorio-indicadores-orientacao {
+  body.riscos-relatorio-printing .relatorio-indicador-card,
+  body.riscos-relatorio-printing .relatorio-indicadores-sintese {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
