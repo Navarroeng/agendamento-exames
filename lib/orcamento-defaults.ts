@@ -13,6 +13,7 @@ export function createEmptyOrcamentoItem(): OrcamentoItemFormItem {
     quantidade: "1",
     valor_unitario: "",
     valor_total: "",
+    valor_manual: false,
   };
 }
 

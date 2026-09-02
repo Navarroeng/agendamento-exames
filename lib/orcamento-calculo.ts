@@ -63,24 +63,44 @@ export function isPacoteCompletoSstValorAutomatico(
   return calcValorPacoteCompletoSst(quantidade) != null;
 }
 
-/** Campo Valor bloqueado quando a tabela automática se aplica. */
+/** Campo Valor permanece editável; mantido para compatibilidade com testes legados. */
 export function isValorOrcamentoItemBloqueado(
-  servicoNome: string | null | undefined,
-  quantidade: string | number
+  _servicoNome: string | null | undefined,
+  _quantidade: string | number
 ): boolean {
-  const qtd =
-    typeof quantidade === "number"
-      ? quantidade
-      : parseQuantidadeColaboradores(quantidade);
-  return isPacoteCompletoSstValorAutomatico(servicoNome, qtd);
+  return false;
+}
+
+/** Valor persistido difere da tabela automática → tratar como negociado manualmente. */
+export function inferValorManualOrcamentoItem(
+  servicoNome: string | null | undefined,
+  quantidade: number,
+  valorPersistido: number
+): boolean {
+  if (!isPacoteCompletoSstValorAutomatico(servicoNome ?? "", quantidade)) {
+    return false;
+  }
+
+  const auto = calcValorPacoteCompletoSst(quantidade);
+  if (auto == null) return false;
+
+  if (valorPersistido <= 0) return false;
+  return Math.abs(valorPersistido - auto) > LEGACY_VALOR_TOLERANCE;
 }
 
 export function applyValorAutomaticoPacoteCompletoSstItem(
   item: Pick<
     OrcamentoItemFormItem,
     "servico_nome" | "quantidade" | "valor_unitario" | "valor_total"
-  >
+  > & { valor_manual?: boolean }
 ): Pick<OrcamentoItemFormItem, "valor_unitario" | "valor_total"> {
+  if (item.valor_manual) {
+    return {
+      valor_unitario: item.valor_unitario,
+      valor_total: item.valor_total,
+    };
+  }
+
   const isPacote =
     isPacoteCompletoSst(item.servico_nome) ||
     isPacoteCompletoNome(item.servico_nome);
@@ -122,9 +142,12 @@ export function applyPacoteCompletoSstPrecoItensPayload<
     quantidade: number;
     valor_unitario: number;
     valor_total: number;
+    valor_manual?: boolean;
   },
 >(itens: T[]): T[] {
   return itens.map((item) => {
+    if (item.valor_manual) return item;
+
     const auto = isPacoteCompletoSstValorAutomatico(
       item.servico_nome,
       item.quantidade
@@ -145,6 +168,7 @@ export function validateOrcamentoItensValores(
     servico_nome: string;
     quantidade: number;
     valor_unitario: number;
+    valor_manual?: boolean;
   }[]
 ): string | null {
   for (const item of itens) {
@@ -154,15 +178,31 @@ export function validateOrcamentoItensValores(
       return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
     }
 
-    if (isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd)) {
+    if (Number(item.valor_unitario) < 0) {
+      return "O valor do serviço não pode ser negativo.";
+    }
+
+    if (
+      isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd) &&
+      !item.valor_manual
+    ) {
       continue;
     }
 
     if (!(Number(item.valor_unitario) > 0)) {
-      return isPacoteCompletoSst(item.servico_nome) ||
-        isPacoteCompletoNome(item.servico_nome)
-        ? "Para mais de 20 colaboradores do Pacote completo - SST, informe o valor negociado."
-        : "Informe o valor de todos os serviços.";
+      const isPacote =
+        isPacoteCompletoSst(item.servico_nome) ||
+        isPacoteCompletoNome(item.servico_nome);
+      if (isPacote) {
+        if (
+          isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd) &&
+          item.valor_manual
+        ) {
+          return "Informe o valor negociado para o Pacote completo - SST.";
+        }
+        return "Para mais de 20 colaboradores do Pacote completo - SST, informe o valor negociado.";
+      }
+      return "Informe o valor de todos os serviços.";
     }
   }
   return null;

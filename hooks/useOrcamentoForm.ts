@@ -12,8 +12,8 @@ import {
   calcSubtotalItens,
   formatQuantidadeColaboradoresInput,
   formatValorOrcamentoInput,
+  inferValorManualOrcamentoItem,
   isPacoteCompletoSstValorAutomatico,
-  isValorOrcamentoItemBloqueado,
   parseQuantidadeColaboradores,
   resolveItemValorParaFormulario,
   resolveQuantidadeColaboradoresOrcamento,
@@ -50,6 +50,7 @@ function syncQuantidadeColaboradores(
 ): OrcamentoItemFormItem[] {
   return itens.map((item) => {
     const next = { ...item, quantidade };
+    if (next.valor_manual) return next;
     const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
     return { ...next, ...auto };
   });
@@ -119,19 +120,15 @@ export function useOrcamentoForm() {
 
             if (field === "servico_id" && servicoNome !== undefined) {
               next.servico_nome = servicoNome;
+              next.valor_manual = false;
               const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
               next.valor_unitario = auto.valor_unitario;
               next.valor_total = auto.valor_total;
             }
 
             if (field === "valor_unitario") {
-              if (isValorOrcamentoItemBloqueado(next.servico_nome, next.quantidade)) {
-                const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
-                next.valor_unitario = auto.valor_unitario;
-                next.valor_total = auto.valor_total;
-              } else {
-                next.valor_total = next.valor_unitario;
-              }
+              next.valor_manual = true;
+              next.valor_total = next.valor_unitario;
             }
 
             return next;
@@ -151,8 +148,11 @@ export function useOrcamentoForm() {
 
           const qtd = parseQuantidadeColaboradores(item.quantidade);
           if (isPacoteCompletoSstValorAutomatico(item.servico_nome, qtd)) {
-            const auto = applyValorAutomaticoPacoteCompletoSstItem(item);
-            return { ...item, ...auto };
+            const auto = applyValorAutomaticoPacoteCompletoSstItem({
+              ...item,
+              valor_manual: false,
+            });
+            return { ...item, ...auto, valor_manual: false };
           }
 
           if (valorSugerido == null || valorSugerido <= 0) return item;
@@ -161,6 +161,7 @@ export function useOrcamentoForm() {
             ...item,
             valor_unitario: masked,
             valor_total: String(valorSugerido),
+            valor_manual: false,
           };
         }),
       }));
@@ -229,6 +230,8 @@ export function useOrcamentoForm() {
         itensDb.length > 0
           ? itensDb.map((item) => {
               const valor = resolveItemValorParaFormulario(item);
+              const qtd =
+                parseQuantidadeColaboradores(quantidadeReferencia) || 1;
               return {
                 id: item.id,
                 servico_id: item.servico_id ?? "",
@@ -239,6 +242,11 @@ export function useOrcamentoForm() {
                     ? maskMoneyInput(String(Math.round(valor * 100)))
                     : "",
                 valor_total: valor > 0 ? String(valor) : "",
+                valor_manual: inferValorManualOrcamentoItem(
+                  item.servico_nome,
+                  qtd,
+                  valor
+                ),
               };
             })
           : [createEmptyOrcamentoItem()],
@@ -290,10 +298,13 @@ export function useOrcamentoForm() {
           valor_unitario: valor,
           valor_total: valor,
           ordem: index,
+          valor_manual: item.valor_manual,
         };
       });
 
-    const itens = applyPacoteCompletoSstPrecoItensPayload(itensRaw);
+    const itens = applyPacoteCompletoSstPrecoItensPayload(itensRaw).map(
+      ({ valor_manual: _manual, ...item }) => item
+    );
     const subtotal = itens.reduce((sum, item) => sum + item.valor_total, 0);
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
     const quantidadeParcelas = resolveQuantidadeParcelasEscolhida(
@@ -361,6 +372,7 @@ export function useOrcamentoForm() {
         servico_nome: item.servico_nome,
         quantidade: parseQuantidadeColaboradores(item.quantidade),
         valor_unitario: parseMoney(item.valor_unitario),
+        valor_manual: item.valor_manual,
       }))
     );
   }, [form]);

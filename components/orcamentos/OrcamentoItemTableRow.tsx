@@ -1,4 +1,9 @@
-import { isValorOrcamentoItemBloqueado } from "@/lib/orcamento-calculo";
+import {
+  calcValorPacoteCompletoSst,
+  isPacoteCompletoSstValorAutomatico,
+  parseQuantidadeColaboradores,
+} from "@/lib/orcamento-calculo";
+import { formatCurrency } from "@/lib/money";
 import type {
   OrcamentoItemFormItem,
   ServicoSstRecord,
@@ -43,17 +48,21 @@ export function OrcamentoItemTableRow({
     item.servico_nome
   );
   const showPacoteCard = itensInclusos.length > 0;
-  const valorBloqueado = isValorOrcamentoItemBloqueado(
+  const qtd = parseQuantidadeColaboradores(item.quantidade);
+  const valorAutomatico = isPacoteCompletoSstValorAutomatico(
     item.servico_nome,
-    item.quantidade
-  );
+    qtd
+  )
+    ? calcValorPacoteCompletoSst(qtd)
+    : null;
+  const showSugestaoAutomatica =
+    valorAutomatico != null && !item.valor_manual;
 
   function handleServicoChange(servicoId: string) {
     const servico = servicos.find((s) => s.id === servicoId);
     const nome = servico?.nome === "Outros" ? "" : servico?.nome ?? "";
     onUpdate("servico_id", servicoId, nome);
     if (isPacoteCompletoSst(nome)) {
-      // Tabela automática (1–20) é aplicada no updateItem.
       onApplyValorSugerido(null);
       return;
     }
@@ -109,14 +118,18 @@ export function OrcamentoItemTableRow({
           className={`${inputClass} max-w-[120px]`}
           placeholder="R$ 0,00"
           value={item.valor_unitario}
-          disabled={valorBloqueado}
-          title={
-            valorBloqueado
-              ? "Valor calculado automaticamente pela tabela do Pacote completo - SST"
-              : undefined
-          }
           onChange={(e) => onUpdate("valor_unitario", e.target.value)}
         />
+        {showSugestaoAutomatica ? (
+          <p className="mt-1 max-w-[160px] text-[10px] leading-snug text-app-muted">
+            Valor automático: {formatCurrency(valorAutomatico!)}
+          </p>
+        ) : item.valor_manual && valorAutomatico != null ? (
+          <p className="mt-1 max-w-[160px] text-[10px] leading-snug text-app-muted">
+            Valor negociado manualmente (tabela:{" "}
+            {formatCurrency(valorAutomatico)})
+          </p>
+        ) : null}
       </td>
       <td className={`${TD} w-10 text-center`}>
         <button

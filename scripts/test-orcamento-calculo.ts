@@ -8,6 +8,7 @@ import {
   calcValorTotalOrcamento,
   isLegacyItemValorMultiplicado,
   isPacoteCompletoSstValorAutomatico,
+  inferValorManualOrcamentoItem,
   isValorOrcamentoItemBloqueado,
   parseQuantidadeColaboradores,
   resolveItemValorForm,
@@ -31,6 +32,7 @@ function itemForm(
     quantidade: partial.quantidade ?? "1",
     valor_unitario: partial.valor_unitario ?? "",
     valor_total: partial.valor_total ?? "",
+    valor_manual: partial.valor_manual ?? false,
   };
 }
 
@@ -53,12 +55,62 @@ assert.equal(
   false
 );
 assert.equal(isPacoteCompletoSstValorAutomatico("Treinamento NR", 5), false);
-assert.equal(isValorOrcamentoItemBloqueado(PACOTE_COMPLETO_SST_NOME, "5"), true);
+assert.equal(isValorOrcamentoItemBloqueado(PACOTE_COMPLETO_SST_NOME, "5"), false);
 assert.equal(
   isValorOrcamentoItemBloqueado(PACOTE_COMPLETO_SST_NOME, "21"),
   false
 );
 assert.equal(isValorOrcamentoItemBloqueado("Treinamento NR", "5"), false);
+
+const formAutoManual = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: PACOTE_COMPLETO_SST_NOME,
+  quantidade: "5",
+  valor_unitario: "R$ 1.650,00",
+  valor_total: "1650",
+  valor_manual: true,
+});
+assert.equal(formAutoManual.valor_unitario, "R$ 1.650,00");
+assert.equal(formAutoManual.valor_total, "1650");
+
+assert.equal(inferValorManualOrcamentoItem(PACOTE_COMPLETO_SST_NOME, 6, 1650), true);
+assert.equal(inferValorManualOrcamentoItem(PACOTE_COMPLETO_SST_NOME, 6, 1800), false);
+assert.equal(inferValorManualOrcamentoItem("Treinamento NR", 5, 900), false);
+
+const payloadManualPacote = applyPacoteCompletoSstPrecoItensPayload([
+  {
+    servico_nome: PACOTE_COMPLETO_SST_NOME,
+    quantidade: 6,
+    valor_unitario: 1650,
+    valor_total: 1650,
+    valor_manual: true,
+  },
+]);
+assert.equal(payloadManualPacote[0].valor_unitario, 1650);
+assert.equal(payloadManualPacote[0].valor_total, 1650);
+
+assert.equal(
+  validateOrcamentoItensValores([
+    {
+      servico_nome: PACOTE_COMPLETO_SST_NOME,
+      quantidade: 6,
+      valor_unitario: 1650,
+      valor_manual: true,
+    },
+  ]),
+  null
+);
+
+assert.equal(
+  validateOrcamentoItensValores([
+    {
+      servico_nome: PACOTE_COMPLETO_SST_NOME,
+      quantidade: 6,
+      valor_unitario: 0,
+      valor_manual: true,
+    },
+  ]),
+  "Informe o valor negociado para o Pacote completo - SST."
+);
 
 const formAuto = applyValorAutomaticoPacoteCompletoSstItem({
   servico_nome: PACOTE_COMPLETO_SST_NOME,
@@ -206,6 +258,34 @@ const dezColaboradores = [
   }),
 ];
 assert.equal(calcSubtotalItens(dezColaboradores), 2200);
+
+const pacoteManualSubtotal = [
+  itemForm({
+    servico_nome: PACOTE_COMPLETO_SST_NOME,
+    quantidade: "6",
+    valor_unitario: "R$ 1.650,00",
+    valor_manual: true,
+  }),
+];
+assert.equal(calcSubtotalItens(pacoteManualSubtotal), 1650);
+
+const qtyChangePreservaManual = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: PACOTE_COMPLETO_SST_NOME,
+  quantidade: "7",
+  valor_unitario: "R$ 1.650,00",
+  valor_total: "1650",
+  valor_manual: true,
+});
+assert.equal(qtyChangePreservaManual.valor_unitario, "R$ 1.650,00");
+
+const qtyChangeRecalculaAuto = applyValorAutomaticoPacoteCompletoSstItem({
+  servico_nome: PACOTE_COMPLETO_SST_NOME,
+  quantidade: "7",
+  valor_unitario: "R$ 1.800,00",
+  valor_total: "1800",
+  valor_manual: false,
+});
+assert.equal(qtyChangeRecalculaAuto.valor_unitario, "R$ 1.900,00");
 
 const doisServicos = [
   itemForm({

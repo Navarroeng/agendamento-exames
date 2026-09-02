@@ -145,6 +145,8 @@ export interface OrcamentoItemFormItem {
   quantidade: string;
   valor_unitario: string;
   valor_total: string;
+  /** Valor editado manualmente — não sobrescrever com tabela automática. */
+  valor_manual: boolean;
 }
 
 export interface OrcamentoFormValues {
