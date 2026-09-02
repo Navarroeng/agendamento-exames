@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/Modal";
 import { FaturaPreviewContent } from "./FaturaPreviewContent";
 import { CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO } from "@/lib/custos-clinicas-conferencia";
 import type { FaturaPreviewState } from "@/lib/types";
+import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 
 interface FaturaPreviewModalProps {
   open: boolean;
@@ -13,6 +14,8 @@ interface FaturaPreviewModalProps {
   onSaveDraft: () => void | Promise<void>;
   onEmit: () => void | Promise<void>;
   onGeneratePdf: () => void | Promise<void>;
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext };
+  onFaturaAtualizada?: (preview: FaturaPreviewState) => void;
   onAbrirFaturaRelacionada?: (faturaId: string) => void;
   onVerFaturaClinica?: (faturaId: string) => void;
 }
@@ -25,6 +28,8 @@ export function FaturaPreviewModal({
   onSaveDraft,
   onEmit,
   onGeneratePdf,
+  auditOptions,
+  onFaturaAtualizada,
   onAbrirFaturaRelacionada,
   onVerFaturaClinica,
 }: FaturaPreviewModalProps) {
@@ -134,6 +139,9 @@ export function FaturaPreviewModal({
     >
       <FaturaPreviewContent
         preview={preview}
+        saving={saving}
+        auditOptions={auditOptions}
+        onFaturaAtualizada={onFaturaAtualizada}
         onAbrirFaturaRelacionada={onAbrirFaturaRelacionada}
         onVerFaturaClinica={onVerFaturaClinica}
       />

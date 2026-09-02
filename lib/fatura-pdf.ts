@@ -65,7 +65,7 @@ const LOGO_MAX_MM = 24;
 type JsPDF = import("jspdf").jsPDF;
 type RGB = [number, number, number];
 
-interface ClienteInfo {
+export interface ClienteInfo {
   empresa: string;
   cnpj: string;
   endereco: string;
@@ -117,35 +117,70 @@ const OBSERVACOES = [
 ] as const;
 
 /* ── Utilitários ─────────────────────────────────────────────────── */
+function logoAssetFromPngBytes(bytes: Uint8Array): LogoAsset {
+  const base64 = Buffer.from(bytes).toString("base64");
+  const dataUrl = `data:image/png;base64,${base64}`;
+  const w =
+    bytes[16]! * 0x1000000 +
+    bytes[17]! * 0x10000 +
+    bytes[18]! * 0x100 +
+    bytes[19]!;
+  const h =
+    bytes[20]! * 0x1000000 +
+    bytes[21]! * 0x10000 +
+    bytes[22]! * 0x100 +
+    bytes[23]!;
+  const ratio = w > 0 && h > 0 ? w / h : 280 / 64;
+  let width = LOGO_MAX_MM;
+  let height = width / ratio;
+  if (height > LOGO_MAX_MM) {
+    height = LOGO_MAX_MM;
+    width = height * ratio;
+  }
+  return { dataUrl, width, height };
+}
+
 async function loadLogoAsset(): Promise<LogoAsset | null> {
-  try {
-    const response = await fetch("/logo-navarro.png");
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+  if (typeof window !== "undefined") {
+    try {
+      const response = await fetch("/logo-navarro.png");
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
 
-    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
-      const img = new Image();
-      img.onload = () =>
-        resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => resolve({ w: 280, h: 64 });
-      img.src = dataUrl;
-    });
+      const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () =>
+          resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => resolve({ w: 280, h: 64 });
+        img.src = dataUrl;
+      });
 
-    const ratio = dims.w / dims.h;
-    let width = LOGO_MAX_MM;
-    let height = width / ratio;
-    if (height > LOGO_MAX_MM) {
-      height = LOGO_MAX_MM;
-      width = height * ratio;
+      const ratio = dims.w / dims.h;
+      let width = LOGO_MAX_MM;
+      let height = width / ratio;
+      if (height > LOGO_MAX_MM) {
+        height = LOGO_MAX_MM;
+        width = height * ratio;
+      }
+
+      return { dataUrl, width, height };
+    } catch {
+      return null;
     }
+  }
 
-    return { dataUrl, width, height };
+  try {
+    const fs = await import(/* webpackIgnore: true */ "node:fs");
+    const path = await import(/* webpackIgnore: true */ "node:path");
+    const file = path.join(process.cwd(), "public", "logo-navarro.png");
+    if (!fs.existsSync(file)) return null;
+    return logoAssetFromPngBytes(new Uint8Array(fs.readFileSync(file)));
   } catch {
     return null;
   }
@@ -250,6 +285,35 @@ function buildFaturaPdfFilename(
 
   const empresa = sanitizeEmpresaFilename(referenciaNome);
   return `Fatura-${mesAno}-${empresa}.pdf`;
+}
+
+/** Nome do arquivo PDF de fatura de cliente (download manual e anexo por e-mail). */
+export function nomeArquivoPdfFaturaCliente(
+  referenciaNome: string,
+  periodoInicioIso?: string | null,
+  periodoTexto?: string
+): string {
+  return buildFaturaPdfFilename(referenciaNome, periodoInicioIso, periodoTexto);
+}
+
+/** Nome do PDF anexado no e-mail: Fatura_[NUMERO]_[EMPRESA].pdf */
+export function nomeArquivoPdfFaturaClienteEmail(
+  numero: string,
+  referenciaNome: string
+): string {
+  const num = sanitizeFilenameToken(numero) || "Fatura";
+  const emp = sanitizeFilenameToken(referenciaNome) || "Empresa";
+  return `Fatura_${num}_${emp}.pdf`;
+}
+
+function sanitizeFilenameToken(value: string): string {
+  const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized.slice(0, 80);
 }
 
 function generateInvoiceNumber(prefix: string, destinatario: string): string {
@@ -866,10 +930,9 @@ function drawPremiumFooter(
   });
 }
 
-async function renderReferencePdf(
-  options: PdfLayoutOptions,
-  filename: string
-): Promise<void> {
+async function createReferencePdfDocument(
+  options: PdfLayoutOptions
+): Promise<JsPDF> {
   const { jsPDF, GState } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
 
@@ -1015,6 +1078,14 @@ async function renderReferencePdf(
     }
   }
 
+  return doc;
+}
+
+async function renderReferencePdf(
+  options: PdfLayoutOptions,
+  filename: string
+): Promise<void> {
+  const doc = await createReferencePdfDocument(options);
   doc.save(filename);
 }
 
@@ -1038,10 +1109,12 @@ const PDF_COLUMN_STYLES: Record<number, object> = {
   },
 };
 
-export async function gerarPdfFromFatura(fatura: FaturaComItens): Promise<void> {
-  if (fatura.tipo === "clinica") {
-    await gerarPdfCustosClinicasFromFatura(fatura);
-    return;
+export async function buildFaturaClientePdfLayoutOptions(
+  fatura: FaturaComItens,
+  clienteInfoOverride?: ClienteInfo
+): Promise<{ options: PdfLayoutOptions; filename: string }> {
+  if (fatura.tipo !== "cliente") {
+    throw new Error("PDF de fatura de cliente inválido para este tipo.");
   }
 
   const itens = fatura.fatura_itens ?? [];
@@ -1058,13 +1131,8 @@ export async function gerarPdfFromFatura(fatura: FaturaComItens): Promise<void> 
     mesReferenciaDisplay("", periodo);
 
   const clienteInfo =
-    fatura.tipo === "cliente"
-      ? await resolveClienteInfo(fatura.referencia_nome)
-      : {
-          empresa: fatura.referencia_nome,
-          cnpj: "—",
-          endereco: "—",
-        };
+    clienteInfoOverride ??
+    (await resolveClienteInfo(fatura.referencia_nome));
 
   const tableBody = itens.map((item) =>
     itemToPdfDisplayRow(
@@ -1084,17 +1152,19 @@ export async function gerarPdfFromFatura(fatura: FaturaComItens): Promise<void> 
     )
   );
 
-  const isCliente = fatura.tipo === "cliente";
+  const filename = buildFaturaPdfFilename(
+    fatura.referencia_nome,
+    fatura.periodo_inicio ?? fatura.periodo_fim
+  );
 
-  await renderReferencePdf(
-    {
-      titulo: isCliente
-        ? "FATURA DE EXAMES OCUPACIONAIS"
-        : "RELATÓRIO DE PAGAMENTO DA CLÍNICA",
+  return {
+    filename,
+    options: {
+      titulo: "FATURA DE EXAMES OCUPACIONAIS",
       numeroFatura: fatura.numero,
       emissao,
       mesReferencia: mesRef,
-      destinatarioTitulo: isCliente ? "Dados do cliente" : "Dados da clínica",
+      destinatarioTitulo: "Dados do cliente",
       clienteInfo,
       periodo,
       vencimento: vencLabel,
@@ -1114,11 +1184,31 @@ export async function gerarPdfFromFatura(fatura: FaturaComItens): Promise<void> 
       })),
       resumoTotalColumnLabel: "TOTAL FATURADO (R$)",
     },
-    buildFaturaPdfFilename(
-      fatura.referencia_nome,
-      fatura.periodo_inicio ?? fatura.periodo_fim
-    )
+  };
+}
+
+/** Gera Buffer do PDF de fatura de cliente (mesmo layout do download manual). */
+export async function gerarPdfFaturaClienteBuffer(
+  fatura: FaturaComItens,
+  clienteInfoOverride?: ClienteInfo
+): Promise<{ buffer: Buffer; filename: string }> {
+  const { options, filename } = await buildFaturaClientePdfLayoutOptions(
+    fatura,
+    clienteInfoOverride
   );
+  const doc = await createReferencePdfDocument(options);
+  const arrayBuffer = doc.output("arraybuffer") as ArrayBuffer;
+  return { buffer: Buffer.from(arrayBuffer), filename };
+}
+
+export async function gerarPdfFromFatura(fatura: FaturaComItens): Promise<void> {
+  if (fatura.tipo === "clinica") {
+    await gerarPdfCustosClinicasFromFatura(fatura);
+    return;
+  }
+
+  const { options, filename } = await buildFaturaClientePdfLayoutOptions(fatura);
+  await renderReferencePdf(options, filename);
 }
 
 export async function gerarPdfFaturaCliente(options: {

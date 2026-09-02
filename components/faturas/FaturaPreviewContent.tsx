@@ -13,6 +13,8 @@ import type { FaturaPreviewState, FaturaStatus } from "@/lib/types";
 
 import { FaturaPagamentoCard } from "./FaturaPagamentoCard";
 import { FaturaResumoPorTipoExame } from "./FaturaResumoPorTipoExame";
+import { FaturaEnvioEmailSection } from "./FaturaEnvioEmailSection";
+import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 
 function statusLabel(
   status: FaturaStatus | null,
@@ -50,12 +52,18 @@ function statusClass(status: FaturaStatus | null): string {
 
 interface FaturaPreviewContentProps {
   preview: FaturaPreviewState;
+  saving?: boolean;
+  auditOptions?: { auditContext?: AuditoriaUsuarioContext };
+  onFaturaAtualizada?: (preview: FaturaPreviewState) => void;
   onAbrirFaturaRelacionada?: (faturaId: string) => void;
   onVerFaturaClinica?: (faturaId: string) => void;
 }
 
 export function FaturaPreviewContent({
   preview,
+  saving = false,
+  auditOptions,
+  onFaturaAtualizada,
   onAbrirFaturaRelacionada,
   onVerFaturaClinica,
 }: FaturaPreviewContentProps) {
@@ -345,6 +353,15 @@ export function FaturaPreviewContent({
           <FaturaPagamentoCard />
         </div>
       )}
+
+      {isCliente && onFaturaAtualizada ? (
+        <FaturaEnvioEmailSection
+          preview={preview}
+          saving={saving}
+          auditOptions={auditOptions}
+          onFaturaAtualizada={onFaturaAtualizada}
+        />
+      ) : null}
     </div>
   );
 }

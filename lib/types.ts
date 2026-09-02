@@ -638,6 +638,12 @@ export interface FaturaRecord {
   conferencia_registrada_em: string | null;
   fatura_origem_id: string | null;
   fatura_substituta_id: string | null;
+  fatura_enviada_em?: string | null;
+  fatura_enviada_email?: string | null;
+  fatura_enviada_por?: string | null;
+  fatura_enviada_por_user_id?: string | null;
+  fatura_envio_resend_id?: string | null;
+  fatura_envio_reenvio_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -699,6 +705,13 @@ export interface FaturaPreviewState {
   fatura_clinica_tamanho?: number | null;
   observacao_conferencia?: string | null;
   conferencia_registrada_em?: string | null;
+  referencia_id?: string | null;
+  emailEnvioSugerido?: string | null;
+  fatura_enviada_em?: string | null;
+  fatura_enviada_email?: string | null;
+  fatura_enviada_por?: string | null;
+  fatura_envio_reenvio_count?: number;
+  pago?: boolean;
 }
 
 export interface AuditoriaRecord {

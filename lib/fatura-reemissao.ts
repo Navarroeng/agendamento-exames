@@ -45,6 +45,33 @@ export function mesReferenciaBRFromFatura(
   return `${match[2]}/${match[1]}`;
 }
 
+const MESES_COMPETENCIA_UPPER = [
+  "JANEIRO",
+  "FEVEREIRO",
+  "MARÇO",
+  "ABRIL",
+  "MAIO",
+  "JUNHO",
+  "JULHO",
+  "AGOSTO",
+  "SETEMBRO",
+  "OUTUBRO",
+  "NOVEMBRO",
+  "DEZEMBRO",
+] as const;
+
+/** Competência em MÊS/ANO maiúsculo (ex.: AGOSTO/2026) para e-mail e assunto. */
+export function competenciaLabelBRUpperFromFatura(
+  fatura: Pick<FaturaRecord, "mes_referencia" | "periodo_inicio">
+): string | null {
+  const br = mesReferenciaBRFromFatura(fatura);
+  if (!br) return null;
+  const [mm, yyyy] = br.split("/");
+  const monthIndex = parseInt(mm ?? "", 10) - 1;
+  if (monthIndex < 0 || monthIndex > 11) return null;
+  return `${MESES_COMPETENCIA_UPPER[monthIndex]}/${yyyy}`;
+}
+
 export function canReemitirFaturaCliente(fatura: FaturaRecord): boolean {
   if (fatura.tipo !== "cliente") return false;
   return (

@@ -6,6 +6,7 @@ import {
   IconWallet,
 } from "@/components/ui/icons/OutlineIcons";
 import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
+import { FaturaEnvioEmailModal } from "./FaturaEnvioEmailModal";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
 import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
@@ -47,6 +48,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     saving,
     previewOpen,
     preview,
+    auditOptions,
     handleFilterChange,
     handleMesChange,
     handleYearChange,
@@ -55,6 +57,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleEmit,
     handleGeneratePdf,
     handleVisualizar,
+    handleFaturaAtualizada,
     handleHistoricoPdf,
     handleCancelar,
     pagamentoOpen,
@@ -79,6 +82,13 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleEmitirReferencia,
     handleReabrirConferencia,
     handleReemitirFatura,
+    envioEmailModalOpen,
+    envioEmailFatura,
+    envioEmailSugerido,
+    envioEmailModalOrigem,
+    handleCloseEnvioEmailModal,
+    handleEnviarEmailMenu,
+    handleFaturaEnvioEmailEnviado,
   } = useFaturasPage(tipo);
 
   return (
@@ -117,6 +127,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onReabrirConferencia={
             tipo === "clinica" ? handleReabrirConferencia : undefined
           }
+          onEnviarEmail={
+            tipo === "cliente" ? handleEnviarEmailMenu : undefined
+          }
         />
       </div>
 
@@ -128,6 +141,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         onSaveDraft={handleSaveDraft}
         onEmit={handleEmit}
         onGeneratePdf={handleGeneratePdf}
+        auditOptions={auditOptions}
+        onFaturaAtualizada={handleFaturaAtualizada}
         onAbrirFaturaRelacionada={handleVisualizar}
         onVerFaturaClinica={
           tipo === "clinica" ? handleVerFaturaClinica : undefined
@@ -161,6 +176,19 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         tipo={faturaDuplicidadeTipo}
         onClose={handleCloseFaturaDuplicidade}
       />
+
+      {tipo === "cliente" && (
+        <FaturaEnvioEmailModal
+          open={envioEmailModalOpen}
+          fatura={envioEmailFatura}
+          emailSugerido={envioEmailSugerido}
+          origem={envioEmailModalOrigem}
+          saving={saving}
+          auditOptions={auditOptions}
+          onClose={handleCloseEnvioEmailModal}
+          onEnviado={handleFaturaEnvioEmailEnviado}
+        />
+      )}
     </AppShell>
   );
 }

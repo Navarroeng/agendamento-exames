@@ -9,6 +9,11 @@ export const RESEND_FROM_DEFAULT =
  */
 export const RESEND_REPLY_TO_DEFAULT = "contato@navarroeng.com.br";
 
+export const RESEND_FROM_FATURAS_DEFAULT =
+  "Navarro Engenharia <financeiro@docs.navarroeng.com.br>";
+
+export const RESEND_REPLY_TO_FATURAS_DEFAULT = "atendimento@navarroeng.com.br";
+
 export function getResendApiKey(): string {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) {
@@ -25,4 +30,15 @@ export function getResendFromAddress(): string {
 
 export function getResendReplyToAddress(): string {
   return process.env.RESEND_REPLY_TO?.trim() || RESEND_REPLY_TO_DEFAULT;
+}
+
+export function getResendFromAddressFaturas(): string {
+  return process.env.RESEND_FROM_FATURAS?.trim() || RESEND_FROM_FATURAS_DEFAULT;
+}
+
+export function getResendReplyToAddressFaturas(): string {
+  return (
+    process.env.RESEND_REPLY_TO_FATURAS?.trim() ||
+    RESEND_REPLY_TO_FATURAS_DEFAULT
+  );
 }

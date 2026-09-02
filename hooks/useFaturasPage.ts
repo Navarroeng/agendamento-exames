@@ -62,6 +62,7 @@ import {
   marcarConferenciaCustosClinica,
   marcarFaturaPendente,
   atualizarPagamentoFatura,
+  obterItensFaturaClienteAtualizados,
   registrarPagamentoFatura,
   reabrirConferenciaCustosClinica,
   reemitirFaturaClienteCancelada,
@@ -85,6 +86,8 @@ import type {
   FaturaTipo,
 } from "@/lib/types";
 import type { FaturaPagamentoModalMode } from "@/components/faturas/FaturaPagamentoModal";
+import type { FaturaEnvioEmailModalOrigem } from "@/components/faturas/FaturaEnvioEmailModal";
+import { obterEmailEnvioSugeridoCliente } from "@/lib/fatura-envio-sugestao";
 
 const NO_RECORDS_TOAST = FATURA_SEM_ELEGIVEIS_MSG;
 
@@ -200,6 +203,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     useState<FaturaExistenteInfo | null>(null);
   const [faturaDuplicidadeTipo, setFaturaDuplicidadeTipo] =
     useState<FaturaTipo>("cliente");
+  const [envioEmailModalOpen, setEnvioEmailModalOpen] = useState(false);
+  const [envioEmailFatura, setEnvioEmailFatura] = useState<FaturaRecord | null>(
+    null
+  );
+  const [envioEmailSugerido, setEnvioEmailSugerido] = useState<string | null>(
+    null
+  );
+  const [envioEmailModalOrigem, setEnvioEmailModalOrigem] =
+    useState<FaturaEnvioEmailModalOrigem>("pos-emissao");
 
   useEffect(() => {
     previewRef.current = preview;
@@ -219,14 +231,16 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     }
   }, []);
 
-  const reloadHistorico = useCallback(async () => {
+  const reloadHistorico = useCallback(async (): Promise<FaturaRecord[]> => {
     setHistoricoLoading(true);
     try {
       const data = await listarFaturas();
       setFaturas(data);
+      return data;
     } catch (err) {
       console.error("Erro ao carregar histórico de faturas:", err);
       toast.error("Erro ao carregar histórico de faturas.");
+      return [];
     } finally {
       setHistoricoLoading(false);
     }
@@ -765,6 +779,97 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [filters.mesReferencia, geradoPor, reloadAll]
   );
 
+  const abrirEnvioEmailModalCliente = useCallback(
+    (
+      fatura: FaturaRecord,
+      origem: FaturaEnvioEmailModalOrigem,
+      faturasFonte?: FaturaRecord[]
+    ) => {
+      const fonte = faturasFonte ?? faturas;
+      setEnvioEmailFatura(fatura);
+      setEnvioEmailSugerido(
+        obterEmailEnvioSugeridoCliente(
+          fonte,
+          fatura.referencia_id,
+          fatura.id
+        )
+      );
+      setEnvioEmailModalOrigem(origem);
+      setEnvioEmailModalOpen(true);
+    },
+    [faturas]
+  );
+
+  const handleCloseEnvioEmailModal = useCallback(() => {
+    setEnvioEmailModalOpen(false);
+    setEnvioEmailFatura(null);
+    setEnvioEmailSugerido(null);
+  }, []);
+
+  const handleEnviarEmailMenu = useCallback(
+    async (faturaId: string) => {
+      if (pageTipo !== "cliente") return;
+
+      let fatura = faturas.find((f) => f.id === faturaId);
+      if (!fatura) {
+        setSaving(true);
+        try {
+          const loaded = await buscarFaturaComItens(faturaId);
+          fatura = loaded ?? undefined;
+        } catch {
+          fatura = undefined;
+        } finally {
+          setSaving(false);
+        }
+      }
+
+      if (!fatura) {
+        toast.error("Fatura não encontrada.");
+        return;
+      }
+
+      abrirEnvioEmailModalCliente(fatura, "menu");
+    },
+    [abrirEnvioEmailModalCliente, faturas, pageTipo]
+  );
+
+  const handleFaturaEnvioEmailEnviado = useCallback(
+    (updated: FaturaRecord) => {
+      setFaturas((prev) =>
+        prev.map((f) =>
+          f.id === updated.id
+            ? {
+                ...f,
+                fatura_enviada_em:
+                  updated.fatura_enviada_em ?? f.fatura_enviada_em,
+                fatura_enviada_email:
+                  updated.fatura_enviada_email ?? f.fatura_enviada_email,
+                fatura_enviada_por:
+                  updated.fatura_enviada_por ?? f.fatura_enviada_por,
+                fatura_envio_reenvio_count:
+                  updated.fatura_envio_reenvio_count ??
+                  f.fatura_envio_reenvio_count,
+              }
+            : f
+        )
+      );
+
+      if (previewRef.current?.faturaId === updated.id) {
+        const nextPreview: FaturaPreviewState = {
+          ...previewRef.current,
+          fatura_enviada_em: updated.fatura_enviada_em,
+          fatura_enviada_email: updated.fatura_enviada_email,
+          fatura_enviada_por: updated.fatura_enviada_por,
+          fatura_envio_reenvio_count: updated.fatura_envio_reenvio_count,
+          emailEnvioSugerido: updated.fatura_enviada_email ?? null,
+        };
+        previewRef.current = nextPreview;
+        setPreview(nextPreview);
+      }
+    },
+    []
+  );
+
   const handleCloseFaturaDuplicidade = useCallback(() => {
     setFaturaDuplicidadeOpen(false);
     setFaturaDuplicidadeInfo(null);
@@ -802,8 +907,14 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       if (!syncClienteVencimentoNoPreview()) return;
       setSaving(true);
       try {
-        await persistPreview("emitida");
-        toast.success("Fatura emitida com sucesso!");
+        const saved = await persistPreview("emitida");
+        setPreviewOpen(false);
+        previewRef.current = null;
+        setPreview(null);
+        if (saved) {
+          const faturasAtualizadas = await reloadHistorico();
+          abrirEnvioEmailModalCliente(saved, "pos-emissao", faturasAtualizadas);
+        }
       } catch (err) {
         console.error(err);
         toast.error(
@@ -830,7 +941,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setSaving(false);
     }
-  }, [persistPreview, syncClienteVencimentoNoPreview]);
+  }, [
+    persistPreview,
+    syncClienteVencimentoNoPreview,
+    abrirEnvioEmailModalCliente,
+    reloadHistorico,
+  ]);
 
   const handleGeneratePdf = useCallback(async () => {
     const current = previewRef.current;
@@ -890,13 +1006,31 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         faturaSubstitutaNumero = substituta?.numero ?? null;
       }
 
+      const emailEnvioSugerido =
+        fatura.tipo === "cliente" && fatura.referencia_id
+          ? obterEmailEnvioSugeridoCliente(
+              faturas,
+              fatura.referencia_id,
+              fatura.id
+            )
+          : null;
+
       const nextPreview: FaturaPreviewState = {
         ...faturaComItensToPreview(fatura, true),
+        emailEnvioSugerido,
         faturaOrigemId: fatura.fatura_origem_id,
         faturaOrigemNumero,
         faturaSubstitutaId: fatura.fatura_substituta_id,
         faturaSubstitutaNumero,
       };
+
+      if (fatura.tipo === "cliente" && fatura.status === "rascunho") {
+        const itensAtualizados = await obterItensFaturaClienteAtualizados(
+          fatura
+        );
+        nextPreview.itens = itensAtualizados;
+      }
+
       previewRef.current = nextPreview;
       setPreview(nextPreview);
       setPreviewOpen(true);
@@ -906,6 +1040,27 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setSaving(false);
     }
+  }, [faturas]);
+
+  const handleFaturaAtualizada = useCallback((updated: FaturaPreviewState) => {
+    previewRef.current = updated;
+    setPreview(updated);
+    setFaturas((prev) =>
+      prev.map((f) =>
+        f.id === updated.faturaId
+          ? {
+              ...f,
+              fatura_enviada_em: updated.fatura_enviada_em ?? f.fatura_enviada_em,
+              fatura_enviada_email:
+                updated.fatura_enviada_email ?? f.fatura_enviada_email,
+              fatura_enviada_por:
+                updated.fatura_enviada_por ?? f.fatura_enviada_por,
+              fatura_envio_reenvio_count:
+                updated.fatura_envio_reenvio_count ?? f.fatura_envio_reenvio_count,
+            }
+          : f
+      )
+    );
   }, []);
 
   const handleHistoricoPdf = useCallback(async (id: string) => {
@@ -1291,8 +1446,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       try {
         if (isCliente) {
           if (!syncClienteVencimentoNoPreview()) return;
-          await persistPreview("emitida");
-          toast.success("Fatura emitida com sucesso!");
+          const saved = await persistPreview("emitida");
+          if (saved) {
+            const faturasAtualizadas = await reloadHistorico();
+            abrirEnvioEmailModalCliente(
+              saved,
+              "pos-emissao",
+              faturasAtualizadas
+            );
+          }
           return;
         }
 
@@ -1321,6 +1483,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       persistPreview,
       resumoMesBase?.rows,
       syncClienteVencimentoNoPreview,
+      abrirEnvioEmailModalCliente,
+      reloadHistorico,
     ]
   );
 
@@ -1465,8 +1629,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           },
           auditOptions
         );
-        toast.success(`Fatura ${nova.numero} emitida com sucesso!`);
-        await reloadAll();
+        const faturasAtualizadas = await reloadHistorico();
+        abrirEnvioEmailModalCliente(nova, "pos-emissao", faturasAtualizadas);
       } catch (err) {
         console.error(err);
         toast.error(
@@ -1486,6 +1650,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       geradoPor,
       pageTipo,
       reloadAll,
+      abrirEnvioEmailModalCliente,
+      reloadHistorico,
     ]
   );
 
@@ -1508,6 +1674,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     saving,
     previewOpen,
     preview,
+    auditOptions,
     handleFilterChange,
     handleMesChange,
     handleYearChange,
@@ -1521,6 +1688,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleEmit,
     handleGeneratePdf,
     handleVisualizar,
+    handleFaturaAtualizada,
     handleHistoricoPdf,
     handleCancelar,
     pagamentoOpen,
@@ -1545,5 +1713,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleEmitirReferencia,
     handleReabrirConferencia,
     handleReemitirFatura,
+    envioEmailModalOpen,
+    envioEmailFatura,
+    envioEmailSugerido,
+    envioEmailModalOrigem,
+    handleCloseEnvioEmailModal,
+    handleEnviarEmailMenu,
+    handleFaturaEnvioEmailEnviado,
   };
 }

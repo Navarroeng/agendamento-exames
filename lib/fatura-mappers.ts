@@ -240,5 +240,11 @@ export function faturaComItensToPreview(
     fatura_clinica_tamanho: fatura.fatura_clinica_tamanho,
     observacao_conferencia: fatura.observacao_conferencia,
     conferencia_registrada_em: fatura.conferencia_registrada_em,
+    referencia_id: fatura.referencia_id,
+    fatura_enviada_em: fatura.fatura_enviada_em,
+    fatura_enviada_email: fatura.fatura_enviada_email,
+    fatura_enviada_por: fatura.fatura_enviada_por,
+    fatura_envio_reenvio_count: fatura.fatura_envio_reenvio_count ?? 0,
+    pago: fatura.pago,
   };
 }

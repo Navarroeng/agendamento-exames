@@ -12,9 +12,6 @@ import {
 } from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/client";
 import {
-  filterAgendamentosDaReferenciaFatura,
-} from "@/lib/fatura-filters";
-import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
   FATURA_SEM_ELEGIVEIS_MSG,
   FATURA_SEM_VALOR_COMPETENCIA_MSG,
@@ -32,9 +29,14 @@ import {
   isComprovantePagamentoDbError,
 } from "@/lib/fatura-comprovante";
 import {
-  buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
 } from "@/lib/fatura-mappers";
+import {
+  faturaClienteBloqueiaSalvarAlteracao,
+  rebuildItensFaturaClienteFromAgendamentos,
+  shouldRebuildFaturaClienteItensFromAgendamentos,
+  type FaturaClienteItensSource,
+} from "@/lib/fatura-itens-rebuild";
 import { mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import { assertFaturaMesDisponivel } from "@/services/duplicidade.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
@@ -206,6 +208,40 @@ async function validarItensFaturaElegiveis(
   return itensFaturaveis;
 }
 
+async function listarClientesCatalogFatura(): Promise<ClienteCatalogItem[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id, nome, cnpj")
+    .limit(5000);
+  if (error) throw error;
+  return (data ?? []) as ClienteCatalogItem[];
+}
+
+/** Busca agendamentos atuais e reconstrói itens oficiais da fatura cliente. */
+export async function obterItensFaturaClienteAtualizados(
+  fatura: FaturaClienteItensSource
+): Promise<FaturaItemInsert[]> {
+  const mesBR = mesReferenciaBRFromFatura(fatura);
+  if (!mesBR) return [];
+
+  const [agendamentos, catalog] = await Promise.all([
+    listarAgendamentosParaFatura(),
+    listarClientesCatalogFatura(),
+  ]);
+
+  const referenciaId =
+    fatura.referencia_id ||
+    resolveClienteFromCatalog(catalog, fatura.referencia_nome)?.id ||
+    null;
+
+  return rebuildItensFaturaClienteFromAgendamentos(
+    { ...fatura, referencia_id: referenciaId },
+    agendamentos,
+    catalog
+  );
+}
+
 export async function salvarFatura(
   input: SalvarFaturaInput,
   auditOptions?: FaturaAuditOptions
@@ -216,33 +252,13 @@ export async function salvarFatura(
     );
   }
 
-  const itens = await validarItensFaturaElegiveis(input.itens);
-  const valorTotal = itens.reduce(
-    (sum, item) => sum + Number(item.valor_total),
-    0
-  );
-  if (input.tipo === "cliente" && !isValorTotalFaturavel(valorTotal)) {
-    throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
-  }
-  const totalExames = itens.length;
   const mesReferencia =
     input.mes_referencia ??
     mesReferenciaIsoFromPeriodoInicio(input.periodo_inicio);
 
-  if (mesReferencia) {
-    await assertFaturaMesDisponivel({
-      tipo: input.tipo,
-      referenciaNome: input.referencia_nome,
-      referenciaId: input.referencia_id,
-      mesReferenciaIso: mesReferencia,
-      ignorarFaturaId: input.ignorarFaturaId ?? input.faturaId,
-    });
-  }
-
-  const supabase = createClient();
-
+  let existing: FaturaComItens | null = null;
   if (input.faturaId) {
-    const existing = await buscarFaturaComItens(input.faturaId);
+    existing = await buscarFaturaComItens(input.faturaId);
     if (!existing) throw new Error("Fatura não encontrada.");
     if (
       existing.status === "cancelada" ||
@@ -258,7 +274,57 @@ export async function salvarFatura(
         "Fatura que necessita reemissão não pode ser editada. Reemitir a fatura."
       );
     }
+    if (faturaClienteBloqueiaSalvarAlteracao(existing)) {
+      throw new Error(
+        "Fatura emitida ou vencida não pode ser alterada. Reabra a emissão antes de editar."
+      );
+    }
+  }
 
+  let itensInput = input.itens;
+  if (
+    shouldRebuildFaturaClienteItensFromAgendamentos(
+      {
+        tipo: input.tipo,
+        status: input.status,
+        faturaId: input.faturaId,
+      },
+      existing
+    )
+  ) {
+    const source: FaturaClienteItensSource = existing ?? {
+      referencia_nome: input.referencia_nome,
+      referencia_id: input.referencia_id ?? null,
+      mes_referencia: mesReferencia,
+      periodo_inicio: input.periodo_inicio,
+    };
+    itensInput = await obterItensFaturaClienteAtualizados(source);
+  }
+
+  const itens = await validarItensFaturaElegiveis(itensInput);
+  const valorTotal = itens.reduce(
+    (sum, item) => sum + Number(item.valor_total),
+    0
+  );
+  if (input.tipo === "cliente" && !isValorTotalFaturavel(valorTotal)) {
+    throw new Error(FATURA_SEM_VALOR_COMPETENCIA_MSG);
+  }
+  const totalExames = itens.length;
+
+  if (mesReferencia) {
+    await assertFaturaMesDisponivel({
+      tipo: input.tipo,
+      referenciaNome: input.referencia_nome,
+      referenciaId: input.referencia_id,
+      mesReferenciaIso: mesReferencia,
+      ignorarFaturaId: input.ignorarFaturaId ?? input.faturaId,
+    });
+  }
+
+  const supabase = createClient();
+
+  if (input.faturaId) {
+    if (!existing) throw new Error("Fatura não encontrada.");
     const payload: Record<string, unknown> = {
       tipo: input.tipo,
       referencia_nome: input.referencia_nome,
@@ -777,27 +843,9 @@ export async function reabrirEmissaoFaturaCliente(
   }
 
   const mesBR = mesReferenciaBRFromFatura(existing);
-  let itens: FaturaItemInsert[] = [];
-  if (mesBR) {
-    const agendamentos = await listarAgendamentosParaFatura();
-    const supabaseClientes = createClient();
-    const { data: clientesRows } = await supabaseClientes
-      .from("clientes")
-      .select("id, nome, cnpj")
-      .limit(5000);
-    const catalog = (clientesRows ?? []) as ClienteCatalogItem[];
-    const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
-      mesReferencia: mesBR,
-      tipo: "cliente",
-      referenciaNome: existing.referencia_nome,
-      referenciaId:
-        existing.referencia_id ||
-        resolveClienteFromCatalog(catalog, existing.referencia_nome)?.id ||
-        null,
-      clientesCatalog: catalog,
-    });
-    itens = buildFaturaItensFromAgendamentos(agsReferencia, "cliente");
-  }
+  const itens = mesBR
+    ? await obterItensFaturaClienteAtualizados(existing)
+    : [];
   const valorTotal = calcTotalFaturaItens(itens);
   const comprovantePath =
     existing.comprovante_pagamento_path?.trim() || null;

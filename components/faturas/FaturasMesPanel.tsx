@@ -21,6 +21,7 @@ import { FATURA_ALTERACAO_POS_EMISSAO_MSG } from "@/lib/fatura-alteracao-pos-emi
 import type { YearMonth } from "@/lib/listagem-meses";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaTipo } from "@/lib/types";
+import { FaturaEnvioEmailIndicator } from "./FaturaEnvioEmailIndicator";
 import { FaturasMesRowActions } from "./FaturasMesRowActions";
 
 const PANEL_CONFIG: Record<
@@ -155,6 +156,7 @@ interface FaturasMesPanelProps {
   onVerFaturaClinica?: (id: string) => void;
   onReemitir?: (id: string) => void;
   onReabrirConferencia?: (id: string) => void;
+  onEnviarEmail?: (id: string) => void;
 }
 
 export function FaturasMesPanel({
@@ -182,6 +184,7 @@ export function FaturasMesPanel({
   onVerFaturaClinica,
   onReemitir,
   onReabrirConferencia,
+  onEnviarEmail,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
@@ -429,7 +432,12 @@ export function FaturasMesPanel({
                     </td>
                     <td className="px-2.5 py-2">
                       <div className="space-y-1">
-                        {statusBadge(row.status, config.statusLabels)}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {statusBadge(row.status, config.statusLabels)}
+                          {variant === "cliente" && row.fatura ? (
+                            <FaturaEnvioEmailIndicator fatura={row.fatura} />
+                          ) : null}
+                        </div>
                         {row.status === "necessita_reemissao" && (
                           <p className="max-w-[180px] text-[10px] font-medium leading-snug text-[#b45309]">
                             {FATURA_ALTERACAO_POS_EMISSAO_MSG}
@@ -454,6 +462,7 @@ export function FaturasMesPanel({
                         onVerFaturaClinica={onVerFaturaClinica}
                         onReemitir={onReemitir}
                         onReabrirConferencia={onReabrirConferencia}
+                        onEnviarEmail={onEnviarEmail}
                       />
                     </td>
                   </tr>

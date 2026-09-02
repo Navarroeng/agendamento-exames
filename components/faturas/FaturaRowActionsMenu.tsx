@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 import {
+  faturaStatusPermiteEnvioEmail,
+  isFaturaEnvioExplicitamenteConfirmado,
+} from "@/lib/fatura-envio";
+import {
   faturaStatusEmissaoAtiva,
   faturaStatusHistoricoReemissao,
 } from "@/lib/fatura-reemissao";
@@ -18,6 +22,7 @@ interface FaturaRowActionsMenuProps {
   onMarcarPendente: (id: string) => void;
   onVerComprovante?: (id: string) => void;
   onReemitir?: (id: string) => void;
+  onEnviarEmail?: (id: string) => void;
 }
 
 type MenuItem = {
@@ -38,6 +43,7 @@ export function FaturaRowActionsMenu({
   onMarcarPendente,
   onVerComprovante,
   onReemitir,
+  onEnviarEmail,
 }: FaturaRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -84,6 +90,20 @@ export function FaturaRowActionsMenu({
       key: "pdf",
       label: "Gerar PDF",
       onClick: () => onGerarPdf(fatura.id),
+    });
+  }
+
+  if (
+    variant === "cliente" &&
+    onEnviarEmail &&
+    faturaStatusPermiteEnvioEmail(fatura.status)
+  ) {
+    items.push({
+      key: "enviar-email",
+      label: isFaturaEnvioExplicitamenteConfirmado(fatura)
+        ? "Reenviar por e-mail"
+        : "Enviar por e-mail",
+      onClick: () => onEnviarEmail(fatura.id),
     });
   }
 

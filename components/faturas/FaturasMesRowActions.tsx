@@ -27,6 +27,7 @@ interface FaturasMesRowActionsProps {
   onVerFaturaClinica?: (id: string) => void;
   onReemitir?: (id: string) => void;
   onReabrirConferencia?: (id: string) => void;
+  onEnviarEmail?: (id: string) => void;
 }
 
 const EMIT_LABEL: Record<FaturaTipo, string> = {
@@ -57,6 +58,7 @@ export function FaturasMesRowActions({
   onReemitir,
   onReabrirConferencia,
   onVerFaturaClinica,
+  onEnviarEmail,
 }: FaturasMesRowActionsProps) {
   const fatura = row.fatura;
 
@@ -139,6 +141,7 @@ export function FaturasMesRowActions({
         onMarcarPendente={onMarcarPendente}
         onVerComprovante={onVerComprovante}
         onReemitir={onReemitir}
+        onEnviarEmail={onEnviarEmail}
       />
     );
   }
