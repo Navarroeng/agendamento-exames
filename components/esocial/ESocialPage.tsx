@@ -72,8 +72,8 @@ export function ESocialPage() {
           selected={mesSelecionado}
           onSelect={handleMesChange}
           onYearChange={handleYearChange}
-          ariaLabel="Filtrar e-Social pelo mês de entrada na etapa"
-          monthTitlePrefix="Entradas no e-Social de"
+          ariaLabel="Filtrar e-Social pelo mês do exame"
+          monthTitlePrefix="Exames de"
         />
 
         <ESocialSummaryCards stats={summary} />

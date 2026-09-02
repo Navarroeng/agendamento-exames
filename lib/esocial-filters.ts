@@ -1,5 +1,6 @@
 import { textMatchesSearch } from "@/lib/text-normalize";
 import {
+  dataAgendamentoIsoSaoPaulo,
   isValidDateBR,
   parseDateBRToIso,
   parseMonthYearBRToIsoRange,
@@ -167,18 +168,19 @@ function matchesText(value: string, query: string): boolean {
   return textMatchesSearch(value, query);
 }
 
+/** Data efetiva do exame usada em filtros/KPIs do e-Social (não created_at). */
+export function getDataReferenciaESocialIso(
+  agendamento: Pick<AgendamentoWithExames, "data_agendamento">
+): string | null {
+  return dataAgendamentoIsoSaoPaulo(agendamento.data_agendamento);
+}
+
 function matchesPeriodo(
-  agendamento: Pick<
-    AgendamentoWithExames,
-    "esocial_entrada_em" | "data_agendamento" | "created_at"
-  >,
+  agendamento: Pick<AgendamentoWithExames, "data_agendamento">,
   filters: ESocialFilters
 ): boolean {
-  const entradaIso =
-    agendamento.esocial_entrada_em ??
-    agendamento.created_at ??
-    agendamento.data_agendamento;
-  const data = String(entradaIso).split("T")[0];
+  const data = getDataReferenciaESocialIso(agendamento);
+  if (!data) return false;
 
   if (filters.mesReferencia.trim()) {
     const range = parseMonthYearBRToIsoRange(filters.mesReferencia);

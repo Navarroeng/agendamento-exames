@@ -121,12 +121,43 @@ export function parseHorarioToStorage(value: string): string | null {
 
 /** Data de hoje (AAAA-MM-DD) no fuso America/Sao_Paulo. */
 export function todayIsoSaoPaulo(now: Date = new Date()): string {
+  return formatDateIsoSaoPaulo(now);
+}
+
+/** Converte Date ou timestamp ISO para AAAA-MM-DD no fuso America/Sao_Paulo. */
+export function formatDateIsoSaoPaulo(value: Date | string): string {
+  const date =
+    typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    if (typeof value === "string") {
+      const base = value.trim().slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(base)) return base;
+    }
+    return "";
+  }
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  }).format(date);
+}
+
+/**
+ * Data civil do agendamento/exame (AAAA-MM-DD) no fuso America/Sao_Paulo.
+ * Valores somente data (coluna date) são preservados sem conversão UTC.
+ */
+export function dataAgendamentoIsoSaoPaulo(
+  iso: string | null | undefined
+): string | null {
+  if (!iso?.trim()) return null;
+  const trimmed = iso.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    return formatDateIsoSaoPaulo(trimmed) || null;
+  }
+  const base = trimmed.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(base) ? base : null;
 }
 
 export const DATA_AGENDAMENTO_PASSADA_MSG =
