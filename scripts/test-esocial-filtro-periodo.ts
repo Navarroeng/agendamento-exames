@@ -123,8 +123,9 @@ run("KPIs do mês usam a mesma regra da tabela", () => {
 
   assert.equal(lista.length, 1);
   assert.equal(lista[0].id, "ago");
-  assert.equal(summary.total, 1);
+  assert.equal(summary.totalElegivel, 1);
   assert.equal(summary.enviados, 1);
+  assert.equal(summary.cancelados, 0);
 });
 
 run("enviados e pendentes usam a mesma data de referência", () => {

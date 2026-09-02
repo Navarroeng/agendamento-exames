@@ -269,31 +269,42 @@ export function extractESocialFilterOptions(
 }
 
 export interface ESocialSummaryStats {
-  total: number;
+  /** Enviados + pendentes + urgentes (exclui cancelados no e-Social). */
+  totalElegivel: number;
   pendentes: number;
   enviarUrgente: number;
   enviados: number;
+  /** Cancelamento do controle de envio ao e-Social (informativo). */
+  cancelados: number;
   percentualEnviado: number;
 }
 
 export function computeESocialSummary(
   agendamentos: AgendamentoWithExames[]
 ): ESocialSummaryStats {
-  const total = agendamentos.length;
   let pendentes = 0;
   let enviarUrgente = 0;
   let enviados = 0;
+  let cancelados = 0;
 
   agendamentos.forEach((a) => {
     const visual = getESocialVisualStatus(a);
     if (visual === "enviado") enviados += 1;
     else if (visual === "urgente") enviarUrgente += 1;
     else if (visual === "pendente") pendentes += 1;
-    // cancelado: não entra em pendentes/urgente/enviados
+    else if (visual === "cancelado") cancelados += 1;
   });
 
+  const totalElegivel = enviados + pendentes + enviarUrgente;
   const percentualEnviado =
-    total > 0 ? Math.round((enviados / total) * 100) : 0;
+    totalElegivel > 0 ? Math.round((enviados / totalElegivel) * 100) : 0;
 
-  return { total, pendentes, enviarUrgente, enviados, percentualEnviado };
+  return {
+    totalElegivel,
+    pendentes,
+    enviarUrgente,
+    enviados,
+    cancelados,
+    percentualEnviado,
+  };
 }
