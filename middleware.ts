@@ -8,6 +8,10 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/avaliacao" || pathname.startsWith("/avaliacao/")) {
     return true;
   }
+  // Rota efêmera de impressão PDF (protegida por token HMAC).
+  if (pathname.startsWith("/riscos-relatorio-print/")) {
+    return true;
+  }
   // APIs públicas de validação/sessão do portal do colaborador.
   if (
     pathname === "/api/avaliacao" ||

@@ -400,6 +400,7 @@ async function persistirEnvioRelatorio(params: {
   campanhaId: string;
   email: string;
   substituir: boolean;
+  origem?: "manual" | "resend";
   auditContext?: AuditoriaUsuarioContext;
 }): Promise<RiscosRelatorioRecord> {
   const email = params.email.trim();
@@ -436,7 +437,7 @@ async function persistirEnvioRelatorio(params: {
   const agora = new Date().toISOString();
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let query = admin
     .from("riscos_relatorios")
     .update({
       relatorio_enviado_em: agora,
@@ -444,9 +445,13 @@ async function persistirEnvioRelatorio(params: {
       relatorio_enviado_por: confirmadoPor,
       relatorio_enviado_por_user_id: params.auditContext?.usuarioId ?? null,
     })
-    .eq("id", existente.id)
-    .select(RELATORIO_SELECT)
-    .maybeSingle();
+    .eq("id", existente.id);
+
+  if (!params.substituir) {
+    query = query.is("relatorio_enviado_em", null);
+  }
+
+  const { data, error } = await query.select(RELATORIO_SELECT).maybeSingle();
 
   if (error) {
     if (/relatorio_enviado_em/i.test(error.message ?? "")) {
@@ -456,7 +461,12 @@ async function persistirEnvioRelatorio(params: {
     }
     throw error;
   }
-  if (!data) throw new Error("Não foi possível registrar o envio do relatório.");
+  if (!data) {
+    if (!params.substituir) {
+      throw new Error("O envio desta versão já foi confirmado.");
+    }
+    throw new Error("Não foi possível registrar o envio do relatório.");
+  }
 
   const record = mapRelatorio(data as Record<string, unknown>);
   await marcarConclusaoProcessoRiscos(
@@ -472,12 +482,16 @@ async function persistirEnvioRelatorio(params: {
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: params.substituir
       ? AUDITORIA_ACOES.riscos_relatorio_envio_corrigido
-      : AUDITORIA_ACOES.riscos_relatorio_envio_confirmado,
+      : params.origem === "resend"
+        ? AUDITORIA_ACOES.riscos_relatorio_envio_resend
+        : AUDITORIA_ACOES.riscos_relatorio_envio_confirmado,
     registroId: record.id,
     registroNome: record.codigo_publico,
     descricao: params.substituir
       ? `${confirmadoPor} corrigiu o registro de envio do relatório ${record.codigo_publico}.`
-      : `${confirmadoPor} confirmou o envio do relatório ${record.codigo_publico}.`,
+      : params.origem === "resend"
+        ? `${confirmadoPor} enviou o relatório ${record.codigo_publico} por e-mail para ${email}.`
+        : `${confirmadoPor} confirmou o envio manual do relatório ${record.codigo_publico}.`,
     dadosAntes: params.substituir
       ? {
           relatorio_enviado_em: existente.relatorio_enviado_em,
@@ -498,12 +512,16 @@ async function persistirEnvioRelatorio(params: {
 export async function confirmarEnvioRelatorioNoServidor(
   campanhaId: string,
   email: string,
-  auditOptions?: { auditContext?: AuditoriaUsuarioContext }
+  auditOptions?: {
+    auditContext?: AuditoriaUsuarioContext;
+    origem?: "manual" | "resend";
+  }
 ): Promise<RiscosRelatorioRecord> {
   return persistirEnvioRelatorio({
     campanhaId: campanhaId.trim(),
     email,
     substituir: false,
+    origem: auditOptions?.origem ?? "manual",
     auditContext: auditOptions?.auditContext,
   });
 }

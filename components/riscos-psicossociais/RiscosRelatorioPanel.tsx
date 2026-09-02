@@ -19,7 +19,10 @@ import {
   buscarRelatorioCampanha,
   confirmarEnvioRelatorioCampanha,
   corrigirEnvioRelatorioCampanha,
+  enviarRelatorioPorEmailCampanha,
   gerarRelatorioCampanha,
+  prepararReenvioRelatorioCampanha,
+  reenviarRelatorioPorEmailCampanha,
   regenerarRelatorioCampanha,
 } from "@/services/riscos-relatorio.service";
 import { createClient } from "@/lib/supabase/client";
@@ -53,6 +56,7 @@ export function RiscosRelatorioPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingEnvio, setSavingEnvio] = useState(false);
+  const [savingReenvio, setSavingReenvio] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [emailEnvio, setEmailEnvio] = useState("");
@@ -163,7 +167,35 @@ export function RiscosRelatorioPanel({
     }
   }, [relatorio, envioConfirmado, editandoEnvio]);
 
-  async function handleConfirmarEnvio() {
+  async function handleEnviarPorEmail() {
+    if (!campanha?.id || !relatorio) return;
+    if (!isEmailValido(emailEnvio)) {
+      toast.error("Informe um e-mail válido.");
+      return;
+    }
+    setSavingEnvio(true);
+    try {
+      const row = await enviarRelatorioPorEmailCampanha(
+        campanha.id,
+        emailEnvio.trim(),
+        { auditContext }
+      );
+      setRelatorio(row);
+      setEditandoEnvio(false);
+      onRelatorioChangeRef.current?.(row);
+      toast.success("Relatório enviado com sucesso.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível enviar o relatório. Tente novamente."
+      );
+    } finally {
+      setSavingEnvio(false);
+    }
+  }
+
+  async function handleConfirmarEnvioManual() {
     if (!campanha?.id || !relatorio) return;
     if (!isEmailValido(emailEnvio)) {
       toast.error("Informe um e-mail válido.");
@@ -179,13 +211,50 @@ export function RiscosRelatorioPanel({
       setRelatorio(row);
       setEditandoEnvio(false);
       onRelatorioChangeRef.current?.(row);
-      toast.success("Envio do relatório confirmado.");
+      toast.success("Envio manual registrado.");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Falha ao confirmar o envio."
       );
     } finally {
       setSavingEnvio(false);
+    }
+  }
+
+  async function handleReenviarPorEmail() {
+    if (!campanha?.id || !relatorio) return;
+    if (!isEmailValido(emailEnvio)) {
+      toast.error("Informe um e-mail válido.");
+      return;
+    }
+    const destino = emailEnvio.trim();
+    const ok = window.confirm(
+      `Reenviar o relatório da versão atual para ${destino}?\n\nEsta ação não regenera o relatório nem altera o status do processo.`
+    );
+    if (!ok) return;
+
+    setSavingReenvio(true);
+    try {
+      const { reenvioIntentToken } = await prepararReenvioRelatorioCampanha(
+        campanha.id
+      );
+      const row = await reenviarRelatorioPorEmailCampanha(
+        campanha.id,
+        destino,
+        reenvioIntentToken,
+        { auditContext }
+      );
+      setRelatorio(row);
+      onRelatorioChangeRef.current?.(row);
+      toast.success("Relatório reenviado com sucesso.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível reenviar o relatório. Tente novamente."
+      );
+    } finally {
+      setSavingReenvio(false);
     }
   }
 
@@ -439,21 +508,48 @@ export function RiscosRelatorioPanel({
             >
               Corrigir registro de envio
             </button>
+            <div className="mt-3 space-y-2 border-t border-[#e2e8f0] pt-3">
+              <p className="text-[11px] text-app-muted">
+                Reenvie a mesma versão do relatório por e-mail, sem regenerar o
+                documento.
+              </p>
+              <label className="block text-[11px] font-semibold text-navy">
+                E-mail do destinatário (reenvio)
+                <input
+                  type="email"
+                  className="field-input mt-1 w-full text-sm"
+                  value={emailEnvio}
+                  onChange={(e) => setEmailEnvio(e.target.value)}
+                  placeholder="cliente@empresa.com.br"
+                  disabled={savingReenvio || savingEnvio}
+                />
+              </label>
+              <button
+                type="button"
+                className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                disabled={savingReenvio || savingEnvio || processoCancelado}
+                onClick={() => void handleReenviarPorEmail()}
+              >
+                {savingReenvio ? "Reenviando relatório…" : "Reenviar relatório"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="mt-2 space-y-2">
             <p className="text-xs text-app-muted">
               {envioConfirmado
                 ? "Corrija o e-mail registrado para esta versão do relatório."
-                : "Aguardando confirmação de envio"}
+                : "Aguardando envio ao cliente"}
             </p>
-            <p className="text-[11px] text-app-muted">
-              Confirme após o envio do relatório ao cliente. Esta ação não
-              envia e-mail — apenas registra que a equipe Navarro realizou o
-              envio externamente.
-            </p>
+            {!envioConfirmado && !editandoEnvio ? (
+              <p className="text-[11px] text-app-muted">
+                Informe o e-mail do destinatário e envie o relatório em anexo.
+                O processo só será concluído após confirmação de sucesso do
+                envio.
+              </p>
+            ) : null}
             <label className="block text-[11px] font-semibold text-navy">
-              E-mail para o qual o relatório foi enviado
+              E-mail do destinatário
               <input
                 type="email"
                 className="field-input mt-1 w-full text-sm"
@@ -464,22 +560,35 @@ export function RiscosRelatorioPanel({
               />
             </label>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-                disabled={savingEnvio || processoCancelado}
-                onClick={() =>
-                  void (envioConfirmado || editandoEnvio
-                    ? handleCorrigirEnvio()
-                    : handleConfirmarEnvio())
-                }
-              >
-                {savingEnvio
-                  ? "Salvando…"
-                  : envioConfirmado || editandoEnvio
-                    ? "Salvar correção"
-                    : "Confirmar envio"}
-              </button>
+              {!envioConfirmado || editandoEnvio ? (
+                <button
+                  type="button"
+                  className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  disabled={savingEnvio || processoCancelado}
+                  onClick={() =>
+                    void (envioConfirmado || editandoEnvio
+                      ? handleCorrigirEnvio()
+                      : handleEnviarPorEmail())
+                  }
+                >
+                  {savingEnvio
+                    ? "Enviando relatório…"
+                    : envioConfirmado || editandoEnvio
+                      ? "Salvar correção"
+                      : "Enviar relatório por e-mail"}
+                </button>
+              ) : null}
+              {!envioConfirmado && !editandoEnvio ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
+                  disabled={savingEnvio || processoCancelado}
+                  title="Registrar que o relatório foi enviado por canal externo, sem disparo automático"
+                  onClick={() => void handleConfirmarEnvioManual()}
+                >
+                  Registrar envio manual
+                </button>
+              ) : null}
               {editandoEnvio ? (
                 <button
                   type="button"

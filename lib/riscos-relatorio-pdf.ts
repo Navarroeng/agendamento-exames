@@ -36,6 +36,12 @@ export function nomeArquivoPdfRelatorioRiscos(
   return `Relatorio_Riscos_Psicossociais_${emp}_${formatDataArquivoPdf(safeDate)}.pdf`;
 }
 
+/** Nome do anexo no e-mail (sem data). */
+export function nomeArquivoPdfRelatorioRiscosEmail(empresaNome: string): string {
+  const emp = sanitizarNomeArquivoEmpresa(empresaNome);
+  return `Relatorio_Riscos_Psicossociais_${emp}.pdf`;
+}
+
 export const RISCOS_RELATORIO_PRINT_ROOT_ID = "riscos-relatorio-print-root";
 export const RISCOS_RELATORIO_PRINTING_CLASS = "riscos-relatorio-printing";
 

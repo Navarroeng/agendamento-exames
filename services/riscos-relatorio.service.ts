@@ -139,3 +139,89 @@ export async function corrigirEnvioRelatorioCampanha(
   }
   return json.relatorio;
 }
+
+export async function enviarRelatorioPorEmailCampanha(
+  campanhaId: string,
+  email: string,
+  auditOptions?: AuditOptions
+): Promise<RiscosRelatorioRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/relatorio/envio/enviar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    relatorio?: RiscosRelatorioRecord;
+  };
+  if (!res.ok || !json.ok || !json.relatorio) {
+    throw new Error(
+      json.error || "Não foi possível enviar o relatório. Tente novamente."
+    );
+  }
+  return json.relatorio;
+}
+
+export async function prepararReenvioRelatorioCampanha(
+  campanhaId: string
+): Promise<{ reenvioIntentToken: string }> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/relatorio/envio/reenviar/intent`,
+    { method: "POST" }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    reenvioIntentToken?: string;
+  };
+  if (!res.ok || !json.ok || !json.reenvioIntentToken) {
+    throw new Error(json.error || "Não foi possível preparar o reenvio.");
+  }
+  return { reenvioIntentToken: json.reenvioIntentToken };
+}
+
+export async function reenviarRelatorioPorEmailCampanha(
+  campanhaId: string,
+  email: string,
+  reenvioIntentToken: string,
+  auditOptions?: AuditOptions
+): Promise<RiscosRelatorioRecord> {
+  const id = campanhaId.trim();
+  if (!id) throw new Error("Campanha inválida.");
+  const res = await fetch(
+    `/api/riscos/campanha/${encodeURIComponent(id)}/relatorio/envio/reenviar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        reenvioIntentToken,
+        usuarioNome: auditOptions?.auditContext?.usuarioNome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    relatorio?: RiscosRelatorioRecord;
+  };
+  if (!res.ok || !json.ok || !json.relatorio) {
+    throw new Error(
+      json.error || "Não foi possível reenviar o relatório. Tente novamente."
+    );
+  }
+  return json.relatorio;
+}
