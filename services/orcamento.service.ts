@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import {
-  applyPacoteCompletoSstPrecoItensPayload,
+  normalizeOrcamentoItensParaPersistencia,
   validateOrcamentoItensValores,
 } from "@/lib/orcamento-calculo";
 import { calcValidadePropostaIso } from "@/lib/orcamento-validade";
@@ -18,7 +18,7 @@ const ORCAMENTO_SELECT = `
 function normalizeOrcamentoPayload(
   payload: OrcamentoInsertPayload
 ): OrcamentoInsertPayload {
-  const itens = applyPacoteCompletoSstPrecoItensPayload(payload.itens ?? []);
+  const itens = normalizeOrcamentoItensParaPersistencia(payload.itens ?? []);
   const validationError = validateOrcamentoItensValores(itens);
   if (validationError) {
     throw new Error(validationError);

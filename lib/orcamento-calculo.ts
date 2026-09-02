@@ -135,6 +135,27 @@ export function applyValorAutomaticoPacoteCompletoSstItem(
   };
 }
 
+/** Normaliza itens antes de persistir — respeita valores que divergem da tabela automática. */
+export function normalizeOrcamentoItensParaPersistencia<
+  T extends {
+    servico_nome: string;
+    quantidade: number;
+    valor_unitario: number;
+    valor_total: number;
+  },
+>(itens: T[]): T[] {
+  return applyPacoteCompletoSstPrecoItensPayload(
+    itens.map((item) => ({
+      ...item,
+      valor_manual: inferValorManualOrcamentoItem(
+        item.servico_nome,
+        item.quantidade,
+        Number(item.valor_unitario)
+      ),
+    }))
+  ).map(({ valor_manual: _manual, ...item }) => item as unknown as T);
+}
+
 /** Recalcula itens do pacote (1–20) no payload antes de persistir. */
 export function applyPacoteCompletoSstPrecoItensPayload<
   T extends {
