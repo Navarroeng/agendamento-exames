@@ -596,6 +596,8 @@ run("histórico: um ciclo, zeros e campanha sem relatório fora da comparação"
       {
         campanha_id: "camp-2026",
         cliente_id: cliente,
+        gerado_em: "2026-08-19T14:00:00.000Z",
+        relatorio_enviado_em: "2026-08-19T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
     ],
@@ -669,16 +671,22 @@ run("histórico: dois ciclos ordenados e da mesma empresa", () => {
       {
         campanha_id: "camp-2026",
         cliente_id: cliente,
+        gerado_em: "2026-08-19T14:00:00.000Z",
+        relatorio_enviado_em: "2026-08-19T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
       {
         campanha_id: "camp-2025",
         cliente_id: cliente,
+        gerado_em: "2025-03-11T14:00:00.000Z",
+        relatorio_enviado_em: "2025-03-11T15:00:00.000Z",
         resultado_json: snap2025,
       },
       {
         campanha_id: "camp-outra-empresa",
         cliente_id: outroCliente,
+        gerado_em: "2024-01-11T14:00:00.000Z",
+        relatorio_enviado_em: "2024-01-11T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
     ],
@@ -715,11 +723,15 @@ run("histórico: categoria ausente em um ciclo não quebra", () => {
       {
         campanha_id: "c-a",
         cliente_id: cliente,
+        gerado_em: "2025-01-11T14:00:00.000Z",
+        relatorio_enviado_em: "2025-01-11T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
       {
         campanha_id: "c-b",
         cliente_id: cliente,
+        gerado_em: "2026-01-11T14:00:00.000Z",
+        relatorio_enviado_em: "2026-01-11T15:00:00.000Z",
         resultado_json: {
           ...(snapshotFonte().resultado_json as RiscosRelatorioResultadoJson),
           dimensoes: [
@@ -772,11 +784,15 @@ run("histórico: zeros e dois ciclos no mesmo ano distinguíveis", () => {
       {
         campanha_id: "c-2026-a",
         cliente_id: cliente,
+        gerado_em: "2026-02-11T14:00:00.000Z",
+        relatorio_enviado_em: "2026-02-11T15:00:00.000Z",
         resultado_json: { dimensoes: [] },
       },
       {
         campanha_id: "c-2026-b",
         cliente_id: cliente,
+        gerado_em: "2026-08-19T14:00:00.000Z",
+        relatorio_enviado_em: "2026-08-19T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
     ],
@@ -814,6 +830,8 @@ run("troca de empresa substitui histórico anterior", () => {
       {
         campanha_id: "hist-a",
         cliente_id: clienteA,
+        gerado_em: "2026-01-11T14:00:00.000Z",
+        relatorio_enviado_em: "2026-01-11T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
     ],
@@ -825,6 +843,8 @@ run("troca de empresa substitui histórico anterior", () => {
       {
         campanha_id: "hist-b",
         cliente_id: clienteB,
+        gerado_em: "2025-01-11T14:00:00.000Z",
+        relatorio_enviado_em: "2025-01-11T15:00:00.000Z",
         resultado_json: snapshotFonte().resultado_json,
       },
     ],
@@ -914,6 +934,11 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(ui, /Visualizar portal de/);
   assert.match(modulos, /Ver avaliação/);
   assert.match(modulos, /Em preparação/);
+  assert.match(modulos, /Riscos Psicossociais/);
+  assert.match(modulos, /Contrato e acesso aos serviços/);
+  assert.doesNotMatch(modulos, /Exames Ocupacionais/);
+  assert.doesNotMatch(modulos, /Laudos SST/);
+  assert.doesNotMatch(modulos, /titulo="eSocial"/);
   assert.match(identidade, /object-contain/);
   assert.match(identidade, /iniciaisEmpresa/);
   assert.match(avaliacao, /pathPortalRelatorio/);

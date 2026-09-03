@@ -17,6 +17,12 @@ import {
   type PortalResumo,
   type PortalSnapshotFonte,
 } from "@/lib/portal-cliente";
+import {
+  montarPortalContratoResumo,
+  PORTAL_CONTRATO_SELECT,
+  type PortalClienteContratoFonte,
+  type PortalContratoFonte,
+} from "@/lib/portal-contrato";
 import type { RiscosRelatorioResultadoJson } from "@/lib/riscos-relatorio";
 import { resolverUrlLogoCampanhaAdmin } from "@/services/riscos-campanha-logo.server";
 
@@ -119,10 +125,12 @@ export async function carregarPortalHome(
     const nome = String(
       (cliente.data as { nome?: string } | null)?.nome ?? ""
     ).trim();
+    const contrato = await carregarPortalContrato(admin, clienteId);
     return {
       resumo: {
         ...vazio,
         empresaNome: nome || null,
+        contrato,
       },
     };
   }
@@ -167,14 +175,48 @@ export async function carregarPortalHome(
     : null;
 
   return {
-    resumo: montarPortalResumo({
-      campanha,
-      participantes,
-      snapshot,
-      logoUrl,
-      historicoRiscos,
-    }),
+    resumo: {
+      ...montarPortalResumo({
+        campanha,
+        participantes,
+        snapshot,
+        logoUrl,
+        historicoRiscos,
+      }),
+      contrato: await carregarPortalContrato(admin, clienteId),
+    },
   };
+}
+
+async function carregarPortalContrato(
+  admin: ReturnType<typeof createAdminClient>,
+  clienteId: string
+) {
+  const { data: clienteRaw, error: clienteError } = await admin
+    .from("clientes")
+    .select(
+      "id, procuracao, disponivel_agendamento, agendamento_bloqueio_manual"
+    )
+    .eq("id", clienteId)
+    .maybeSingle();
+
+  if (clienteError) throw clienteError;
+
+  const { data: contratosRaw, error: contratosError } = await admin
+    .from("cliente_contratos")
+    .select(PORTAL_CONTRATO_SELECT)
+    .eq("cliente_id", clienteId)
+    .order("aprovado_em", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .order("data_inicio", { ascending: false });
+
+  if (contratosError) throw contratosError;
+
+  return montarPortalContratoResumo({
+    clienteId,
+    cliente: (clienteRaw ?? null) as PortalClienteContratoFonte | null,
+    contratos: (contratosRaw ?? []) as unknown as PortalContratoFonte[],
+  });
 }
 
 async function carregarSnapshotsPortal(
