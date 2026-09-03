@@ -4,14 +4,16 @@ import {
   IconCalendar,
   IconEsocial,
   IconFileText,
+  IconReceipt,
   IconShield,
 } from "@/components/ui/icons/OutlineIcons";
 import {
   PORTAL_STATUS_LABELS,
   type PortalResumo,
 } from "@/lib/portal-cliente";
+import type { PortalFaturasResumo } from "@/lib/portal-faturas";
 
-type ModuloSstId = "riscos" | "exames" | "laudos" | "esocial";
+type ModuloSstId = "riscos" | "exames" | "laudos" | "esocial" | "faturas";
 
 function participacaoLabel(resumo: PortalResumo): string | null {
   if (resumo.participacaoPercentual == null) return null;
@@ -20,12 +22,39 @@ function participacaoLabel(resumo: PortalResumo): string | null {
 
 export function PortalModulosSst({
   resumo,
+  faturasResumo,
   onVerAvaliacao,
+  onVerFaturas,
 }: {
   resumo: PortalResumo;
+  faturasResumo: PortalFaturasResumo | null;
   onVerAvaliacao: () => void;
+  onVerFaturas: () => void;
 }) {
   const temAvaliacao = resumo.statusPortal !== "sem_avaliacao";
+
+  // Linhas do card Faturas
+  // faturasResumo === null → ainda carregando / não disponível
+  // faturasResumo definido, temFaturas false → empresa sem faturas (módulo funcional)
+  const linhasFaturas: string[] = faturasResumo
+    ? faturasResumo.temFaturas
+      ? [
+          faturasResumo.totalEmAberto > 0
+            ? `${faturasResumo.totalEmAberto} fatura${faturasResumo.totalEmAberto !== 1 ? "s" : ""} em aberto`
+            : null,
+          faturasResumo.valorEmAberto > 0
+            ? `${faturasResumo.valorEmAbertoFormatado} em aberto`
+            : null,
+          faturasResumo.totalVencidas > 0
+            ? `${faturasResumo.totalVencidas} vencida${faturasResumo.totalVencidas !== 1 ? "s" : ""}`
+            : null,
+        ].filter((l): l is string => Boolean(l))
+      : ["Nenhuma fatura disponível no momento."]
+    : ["Acompanhe suas faturas, vencimentos e pagamentos."];
+
+  // O módulo Faturas está "disponível" (carregado) sempre que temos o resumo —
+  // independentemente de haver faturas ou não.
+  const faturaModuloCarregado = faturasResumo !== null;
 
   return (
     <section>
@@ -35,7 +64,7 @@ export function PortalModulosSst({
       <p className="mt-1 text-sm text-[#64748b]">
         Acompanhe o andamento de cada módulo de SST.
       </p>
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <ModuloCard
           id="riscos"
           titulo="Riscos Psicossociais"
@@ -53,6 +82,18 @@ export function PortalModulosSst({
           acao={
             temAvaliacao
               ? { label: "Ver avaliação", onClick: onVerAvaliacao }
+              : null
+          }
+        />
+        <ModuloCard
+          id="faturas"
+          titulo="Faturas"
+          disponivel={faturaModuloCarregado}
+          linhas={linhasFaturas}
+          destaqueVencida={(faturasResumo?.totalVencidas ?? 0) > 0}
+          acao={
+            faturaModuloCarregado
+              ? { label: "Ver faturas", onClick: onVerFaturas }
               : null
           }
         />
@@ -88,6 +129,7 @@ function ModuloCard({
   linhas,
   acao,
   destaque,
+  destaqueVencida,
 }: {
   id: ModuloSstId;
   titulo: string;
@@ -95,15 +137,18 @@ function ModuloCard({
   linhas: string[];
   acao?: { label: string; onClick: () => void } | null;
   destaque?: boolean;
+  destaqueVencida?: boolean;
 }) {
   return (
     <article
       className={`flex flex-col rounded-2xl border px-4 py-3.5 ${
         destaque && disponivel
           ? "border-[#d7e0ee] bg-white"
-          : disponivel
-            ? "border-[#e8edf5] bg-white"
-            : "border-[#eef2f7] bg-[#f8fafc]"
+          : destaqueVencida && disponivel
+            ? "border-[#fca5a5] bg-white"
+            : disponivel
+              ? "border-[#e8edf5] bg-white"
+              : "border-[#eef2f7] bg-[#f8fafc]"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -164,5 +209,6 @@ function ModuloIcon({ id }: { id: ModuloSstId }) {
   if (id === "riscos") return <IconShield {...props} />;
   if (id === "exames") return <IconCalendar {...props} />;
   if (id === "laudos") return <IconFileText {...props} />;
+  if (id === "faturas") return <IconReceipt {...props} />;
   return <IconEsocial {...props} />;
 }

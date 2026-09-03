@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PortalAvaliacaoRiscos } from "@/components/portal-cliente/PortalAvaliacaoRiscos";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
+import { PortalFaturas } from "@/components/portal-cliente/PortalFaturas";
 import { PortalModulosSst } from "@/components/portal-cliente/PortalModulosSst";
 import {
   PORTAL_PREVIEW_INTERNO_LABEL,
@@ -13,6 +14,8 @@ import {
   type PortalResumo,
   portalResumoVazio,
 } from "@/lib/portal-cliente";
+import { calcPortalFaturasResumo } from "@/lib/portal-faturas";
+import type { PortalFaturaLinha, PortalFaturasResumo } from "@/lib/portal-faturas";
 
 type HomeResponse = {
   ok?: boolean;
@@ -26,27 +29,37 @@ type EmpresasResponse = {
   empresas?: PortalEmpresaOpcao[];
 };
 
+type FaturasResponse = {
+  ok?: boolean;
+  faturas?: PortalFaturaLinha[];
+  resumo?: PortalFaturasResumo;
+  error?: string;
+};
+
 export function PortalHome() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clienteId = (searchParams.get("cliente") ?? "").trim();
   const viewRiscos = searchParams.get("view") === "riscos";
+  const viewFaturas = searchParams.get("view") === "faturas";
 
   const [empresas, setEmpresas] = useState<PortalEmpresaOpcao[]>([]);
   const [resumo, setResumo] = useState<PortalResumo>(portalResumoVazio);
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(true);
   const [carregandoHome, setCarregandoHome] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [faturasResumo, setFaturasResumo] = useState<PortalFaturasResumo | null>(null);
 
   const atualizarQuery = useCallback(
-    (next: { cliente?: string; view?: "riscos" | null }) => {
+    (next: { cliente?: string; view?: "riscos" | "faturas" | null }) => {
       const params = new URLSearchParams(searchParams.toString());
       if (next.cliente !== undefined) {
         if (next.cliente) params.set("cliente", next.cliente);
         else params.delete("cliente");
       }
       if (next.view === "riscos") params.set("view", "riscos");
-      if (next.view === null) params.delete("view");
+      else if (next.view === "faturas") params.set("view", "faturas");
+      else if (next.view === null) params.delete("view");
       const qs = params.toString();
       router.replace(qs ? `/portal?${qs}` : "/portal");
     },
@@ -88,6 +101,7 @@ export function PortalHome() {
     let cancel = false;
     async function loadHome() {
       setResumo(portalResumoVazio());
+      setFaturasResumo(null);
       setErro(null);
       if (!clienteId) {
         setCarregandoHome(false);
@@ -95,26 +109,49 @@ export function PortalHome() {
       }
       setCarregandoHome(true);
       try {
-        const res = await fetch(
-          `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
-          { cache: "no-store" }
-        );
-        if (res.status === 401) {
+        // Carrega home (riscos) e faturas em paralelo
+        const empresaNome = empresas.find((e) => e.id === clienteId)?.nome ?? "";
+        const [resHome, resFaturas] = await Promise.all([
+          fetch(`/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`, {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/portal/faturas?cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`,
+            { cache: "no-store" }
+          ),
+        ]);
+
+        if (resHome.status === 401) {
           window.location.href = "/login";
           return;
         }
-        const json = (await res.json().catch(() => ({}))) as HomeResponse;
+        const jsonHome = (await resHome.json().catch(() => ({}))) as HomeResponse;
         if (cancel) return;
-        if (!res.ok) {
+        if (!resHome.ok) {
           setResumo(portalResumoVazio());
           setErro(PORTAL_SEM_AVALIACAO_MSG);
-          return;
+        } else {
+          setResumo(jsonHome.resumo ?? portalResumoVazio());
         }
-        setResumo(json.resumo ?? portalResumoVazio());
+
+        // Faturas: erro silencioso (não bloqueia home)
+        if (resFaturas.ok) {
+          const jsonFaturas = (await resFaturas
+            .json()
+            .catch(() => ({}))) as FaturasResponse;
+          if (!cancel && jsonFaturas.resumo) {
+            setFaturasResumo(jsonFaturas.resumo);
+          } else if (!cancel) {
+            setFaturasResumo(calcPortalFaturasResumo([]));
+          }
+        } else {
+          if (!cancel) setFaturasResumo(calcPortalFaturasResumo([]));
+        }
       } catch {
         if (!cancel) {
           setResumo(portalResumoVazio());
           setErro(PORTAL_SEM_AVALIACAO_MSG);
+          setFaturasResumo(calcPortalFaturasResumo([]));
         }
       } finally {
         if (!cancel) setCarregandoHome(false);
@@ -124,7 +161,7 @@ export function PortalHome() {
     return () => {
       cancel = true;
     };
-  }, [clienteId]);
+  }, [clienteId, empresas]);
 
   const mostrarPainel =
     Boolean(clienteId) &&
@@ -133,7 +170,13 @@ export function PortalHome() {
   const mostrarHomeSst =
     Boolean(clienteId) &&
     !carregandoHome &&
-    Boolean(resumo.empresaNome || mostrarPainel);
+    // Mostrar se tem campanha, ou se tem nome da empresa, ou se já carregou faturas
+    Boolean(resumo.empresaNome || mostrarPainel || faturasResumo !== null);
+
+  const empresaNomeSelecionada =
+    resumo.empresaNome ||
+    empresas.find((e) => e.id === clienteId)?.nome ||
+    "Empresa";
 
   return (
     <div className="mx-auto flex w-full max-w-[72rem] flex-col gap-5 text-[#0b1f4d]">
@@ -165,16 +208,27 @@ export function PortalHome() {
         />
       ) : null}
 
-      {mostrarHomeSst && !viewRiscos ? (
+      {mostrarHomeSst && viewFaturas ? (
+        <PortalFaturas
+          clienteId={clienteId}
+          clienteNome={empresaNomeSelecionada}
+          logoUrl={resumo.logoUrl}
+          onVoltar={() => atualizarQuery({ view: null })}
+        />
+      ) : null}
+
+      {mostrarHomeSst && !viewRiscos && !viewFaturas ? (
         <div className="flex flex-col gap-5">
           <PortalEmpresaIdentidade
-            nome={resumo.empresaNome || "Empresa"}
+            nome={empresaNomeSelecionada}
             logoUrl={resumo.logoUrl}
             variante="sst"
           />
           <PortalModulosSst
             resumo={resumo}
+            faturasResumo={faturasResumo}
             onVerAvaliacao={() => atualizarQuery({ view: "riscos" })}
+            onVerFaturas={() => atualizarQuery({ view: "faturas" })}
           />
         </div>
       ) : null}
