@@ -99,6 +99,7 @@ interface RiscosPainelCardsProps {
   onRemoverParticipante: (participanteId: string) => Promise<void>;
   /** Admin — editar (pendente) e remover participante. */
   podeGerenciarParticipante?: boolean;
+  isAdmin?: boolean;
   /** Só exibe ações de Convites após status confirmado no banco. */
   campanhaStatusSincronizado?: boolean;
   auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
@@ -185,6 +186,7 @@ export function RiscosPainelCards({
   onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
+  isAdmin = false,
   campanhaStatusSincronizado = false,
   auditContext,
   onRelatorioAtualizado,
@@ -706,6 +708,7 @@ export function RiscosPainelCards({
         <PanelCard title="Resultados">
           <RiscosResultadosPanel
             campanha={campanha}
+            isAdmin={isAdmin}
             refreshKey={participantes.map((p) => `${p.id}:${p.status}`).join("|")}
           />
         </PanelCard>
@@ -714,7 +717,7 @@ export function RiscosPainelCards({
           <RiscosRelatorioPanel
             campanha={campanha}
             participantes={participantes}
-            isAdmin={podeGerenciarParticipante && !processoCancelado}
+            isAdmin={isAdmin && !processoCancelado}
             processoCancelado={processoCancelado}
             auditContext={auditContext}
             emailEnvioSugerido={

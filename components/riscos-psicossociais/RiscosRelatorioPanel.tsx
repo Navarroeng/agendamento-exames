@@ -304,7 +304,7 @@ export function RiscosRelatorioPanel({
   }, [campanha]);
 
   async function handleGerar() {
-    if (!campanha?.id) return;
+    if (!campanha?.id || !isAdmin) return;
     if (relatorio) {
       setViewerOpen(true);
       return;
@@ -374,20 +374,28 @@ export function RiscosRelatorioPanel({
           O relatório final consolida as respostas COPSOQ e fica persistido para
           consulta e exportação.
         </p>
-        {motivoBloqueio &&
-        motivoBloqueio !==
-          "Já existe um relatório para esta campanha. Use Visualizar ou Regenerar (admin)." ? (
-          <p className="text-xs font-medium text-[#b45309]">{motivoBloqueio}</p>
-        ) : null}
-        <button
-          type="button"
-          className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-          disabled={saving || Boolean(motivoBloqueio)}
-          title={motivoBloqueio ?? "Gerar relatório final"}
-          onClick={() => void handleGerar()}
-        >
-          {saving ? "Gerando…" : "Gerar Relatório"}
-        </button>
+        {isAdmin ? (
+          <>
+            {motivoBloqueio &&
+            motivoBloqueio !==
+              "Já existe um relatório para esta campanha. Use Visualizar ou Regenerar (admin)." ? (
+              <p className="text-xs font-medium text-[#b45309]">{motivoBloqueio}</p>
+            ) : null}
+            <button
+              type="button"
+              className="w-fit rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+              disabled={saving || Boolean(motivoBloqueio)}
+              title={motivoBloqueio ?? "Gerar relatório final"}
+              onClick={() => void handleGerar()}
+            >
+              {saving ? "Gerando…" : "Gerar Relatório"}
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-[#64748b]">
+            Aguardando a conclusão da pesquisa e geração do relatório pelo administrador.
+          </p>
+        )}
       </div>
     );
   }
@@ -421,52 +429,52 @@ export function RiscosRelatorioPanel({
         </p>
       ) : null}
 
-      <div className="mt-auto flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
-          onClick={() => setViewerOpen(true)}
-        >
-          Visualizar relatório
-        </button>
-        <button
-          type="button"
-          className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
-          onClick={() => {
-            setViewerOpen(true);
-            window.setTimeout(() => {
-              void (async () => {
-                try {
-                  const empresa =
-                    relatorio.empresa_nome ||
-                    relatorio.resultado_json?.capa?.empresaNome ||
-                    "Empresa";
-                  const { exportarRelatorioRiscosPdf, nomeArquivoPdfRelatorioRiscos } =
-                    await import("@/lib/riscos-relatorio-pdf");
-                  toast.message("Abrindo impressão…", {
-                    description: `Use “Salvar como PDF”. Nome sugerido: ${nomeArquivoPdfRelatorioRiscos(
-                      empresa,
-                      relatorio.gerado_em
-                    )}`,
-                  });
-                  await exportarRelatorioRiscosPdf({
-                    empresaNome: empresa,
-                    geradoEm: relatorio.gerado_em,
-                  });
-                } catch (err) {
-                  toast.error(
-                    err instanceof Error
-                      ? err.message
-                      : "Falha ao exportar o PDF."
-                  );
-                }
-              })();
-            }, 400);
-          }}
-        >
-          Exportar PDF
-        </button>
-        {isAdmin ? (
+      {isAdmin ? (
+        <div className="mt-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-xl bg-brand-blue px-3 py-2 text-xs font-bold text-white"
+            onClick={() => setViewerOpen(true)}
+          >
+            Visualizar relatório
+          </button>
+          <button
+            type="button"
+            className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy"
+            onClick={() => {
+              setViewerOpen(true);
+              window.setTimeout(() => {
+                void (async () => {
+                  try {
+                    const empresa =
+                      relatorio.empresa_nome ||
+                      relatorio.resultado_json?.capa?.empresaNome ||
+                      "Empresa";
+                    const { exportarRelatorioRiscosPdf, nomeArquivoPdfRelatorioRiscos } =
+                      await import("@/lib/riscos-relatorio-pdf");
+                    toast.message("Abrindo impressão…", {
+                      description: `Use “Salvar como PDF”. Nome sugerido: ${nomeArquivoPdfRelatorioRiscos(
+                        empresa,
+                        relatorio.gerado_em
+                      )}`,
+                    });
+                    await exportarRelatorioRiscosPdf({
+                      empresaNome: empresa,
+                      geradoEm: relatorio.gerado_em,
+                    });
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Falha ao exportar o PDF."
+                    );
+                  }
+                })();
+              }, 400);
+            }}
+          >
+            Exportar PDF
+          </button>
           <button
             type="button"
             className="rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs font-bold text-navy disabled:opacity-40"
@@ -475,8 +483,8 @@ export function RiscosRelatorioPanel({
           >
             Regenerar
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-[#e2e8f0] bg-white px-3 py-3">
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#64748b]">
@@ -606,14 +614,17 @@ export function RiscosRelatorioPanel({
         )}
       </div>
 
-      <RiscosRelatorioViewerModal
-        open={viewerOpen}
-        relatorio={relatorio}
-        onClose={() => setViewerOpen(false)}
-        logoUrl={logoUrl}
-        empresaCnpj={campanha.cnpj}
-        campanhaStatus={campanha.status}
-      />
+      {isAdmin ? (
+        <RiscosRelatorioViewerModal
+          open={viewerOpen}
+          relatorio={relatorio}
+          isAdmin={isAdmin}
+          onClose={() => setViewerOpen(false)}
+          logoUrl={logoUrl}
+          empresaCnpj={campanha.cnpj}
+          campanhaStatus={campanha.status}
+        />
+      ) : null}
     </div>
   );
 }

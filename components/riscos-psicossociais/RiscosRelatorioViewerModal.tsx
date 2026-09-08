@@ -15,6 +15,7 @@ interface RiscosRelatorioViewerModalProps {
   open: boolean;
   relatorio: RiscosRelatorioRecord | null;
   onClose: () => void;
+  isAdmin?: boolean;
   /** Logo da empresa quando disponível (apenas visual). */
   logoUrl?: string | null;
   /** CNPJ da empresa avaliada (campanha) — só capa. */
@@ -31,13 +32,14 @@ export function RiscosRelatorioViewerModal({
   open,
   relatorio,
   onClose,
+  isAdmin = true,
   logoUrl,
   empresaCnpj,
   campanhaStatus,
 }: RiscosRelatorioViewerModalProps) {
   const [exporting, setExporting] = useState(false);
 
-  if (!open || !relatorio) return null;
+  if (!open || !relatorio || !relatorio.resultado_json || !isAdmin) return null;
 
   const empresa =
     relatorio.empresa_nome ||

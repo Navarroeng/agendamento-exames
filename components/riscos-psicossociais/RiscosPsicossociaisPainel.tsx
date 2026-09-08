@@ -65,6 +65,7 @@ interface RiscosPsicossociaisPainelProps {
   }>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
   podeGerenciarParticipante?: boolean;
+  isAdmin?: boolean;
   campanhaStatusSincronizado?: boolean;
   auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
   onRelatorioAtualizado?: (relatorio: import("@/lib/riscos-relatorio").RiscosRelatorioRecord | null) => void;
@@ -99,6 +100,7 @@ export function RiscosPsicossociaisPainel({
   onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
+  isAdmin = false,
   campanhaStatusSincronizado = false,
   auditContext,
   onRelatorioAtualizado,
@@ -205,6 +207,7 @@ export function RiscosPsicossociaisPainel({
       <RiscosPainelCards
         processo={processo}
         participantes={participantes}
+        isAdmin={isAdmin}
         savingLista={savingLista}
         savingLogo={savingLogo}
         savingCampanha={savingCampanha}

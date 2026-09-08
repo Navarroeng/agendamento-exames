@@ -1,49 +1,22 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireRiscosStaffApi } from "@/lib/riscos-api-auth.server";
 import {
   buscarRelatorioPorCampanhaId,
   gerarRelatorioFinalNoServidor,
 } from "@/services/riscos-relatorio.server";
+import { sanitizarRelatorioParaOperacional } from "@/lib/riscos-relatorio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function requireUser() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: perfil } = await supabase
-    .from("perfis_usuarios")
-    .select("perfil, ativo, nome, email")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!perfil || perfil.ativo === false) return null;
-
-  return {
-    user,
-    usuarioNome:
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Usuário",
-    usuarioEmail:
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "",
-  };
-}
 
 export async function GET(
   _request: Request,
   context: { params: { campanhaId: string } }
 ) {
   try {
-    const auth = await requireUser();
+    const auth = await requireRiscosStaffApi();
     if (!auth) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
     }
 
     const campanhaId = String(context.params.campanhaId ?? "").trim();
@@ -52,9 +25,13 @@ export async function GET(
     }
 
     const relatorio = await buscarRelatorioPorCampanhaId(campanhaId);
+    const relatorioRetorno = auth.isAdmin
+      ? relatorio
+      : sanitizarRelatorioParaOperacional(relatorio);
+
     return NextResponse.json({
       ok: true,
-      relatorio,
+      relatorio: relatorioRetorno,
       existe: Boolean(relatorio),
     });
   } catch (err) {
@@ -70,9 +47,16 @@ export async function POST(
   context: { params: { campanhaId: string } }
 ) {
   try {
-    const auth = await requireUser();
+    const auth = await requireRiscosStaffApi();
     if (!auth) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+      return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+    }
+
+    if (!auth.isAdmin) {
+      return NextResponse.json(
+        { error: "Somente administradores podem gerar o relatório." },
+        { status: 403 }
+      );
     }
 
     const campanhaId = String(context.params.campanhaId ?? "").trim();

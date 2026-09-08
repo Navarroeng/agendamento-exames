@@ -217,11 +217,13 @@ interface RiscosResultadosPanelProps {
   campanha: RiscosCampanhaRecord | null;
   /** Muda após invalidação/remoção para recarregar consolidação. */
   refreshKey?: string;
+  isAdmin?: boolean;
 }
 
 export function RiscosResultadosPanel({
   campanha,
   refreshKey = "",
+  isAdmin = false,
 }: RiscosResultadosPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,7 +303,7 @@ export function RiscosResultadosPanel({
     );
   }
 
-  const resumo = contarResumoGeral(data.dimensoes);
+  const resumo = contarResumoGeral(data.dimensoes ?? []);
 
   const statusLabel =
     RISCOS_CAMPANHA_STATUS_LABELS[
@@ -324,43 +326,57 @@ export function RiscosResultadosPanel({
         <StatChip label="Status" value={statusLabel} />
       </div>
 
-      <p className="text-[11px] text-[#64748b]">{data.riscoGeralMensagem}</p>
+      {isAdmin ? (
+        <>
+          {data.riscoGeralMensagem ? (
+            <p className="text-[11px] text-[#64748b]">{data.riscoGeralMensagem}</p>
+          ) : null}
 
-      <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
-          Resumo Geral
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          <ResumoSituacaoCard
-            label="Favoráveis"
-            value={resumo.favoraveis}
-            dotClass="bg-brand-green"
-            softClass="bg-[#f0fdf4]"
-          />
-          <ResumoSituacaoCard
-            label="Moderadas"
-            value={resumo.moderadas}
-            dotClass="bg-[#ca8a04]"
-            softClass="bg-[#fffbeb]"
-          />
-          <ResumoSituacaoCard
-            label="Desfavoráveis"
-            value={resumo.desfavoraveis}
-            dotClass="bg-[#dc2626]"
-            softClass="bg-[#fef2f2]"
-          />
-        </div>
-        <p className="text-[11px] text-[#64748b]">
-          {resumo.total}{" "}
-          {resumo.total === 1 ? "categoria avaliada" : "categorias avaliadas"}
-        </p>
-      </div>
+          {data.dimensoes && data.dimensoes.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
+                Resumo Geral
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <ResumoSituacaoCard
+                  label="Favoráveis"
+                  value={resumo.favoraveis}
+                  dotClass="bg-brand-green"
+                  softClass="bg-[#f0fdf4]"
+                />
+                <ResumoSituacaoCard
+                  label="Moderadas"
+                  value={resumo.moderadas}
+                  dotClass="bg-[#ca8a04]"
+                  softClass="bg-[#fffbeb]"
+                />
+                <ResumoSituacaoCard
+                  label="Desfavoráveis"
+                  value={resumo.desfavoraveis}
+                  dotClass="bg-[#dc2626]"
+                  softClass="bg-[#fef2f2]"
+                />
+              </div>
+              <p className="text-[11px] text-[#64748b]">
+                {resumo.total}{" "}
+                {resumo.total === 1 ? "categoria avaliada" : "categorias avaliadas"}
+              </p>
+            </div>
+          ) : null}
 
-      <ComportamentosOfensivosAccordion
-        data={data.comportamentosOfensivos}
-        aberto={ofensivosAberto}
-        onToggle={() => setOfensivosAberto((v) => !v)}
-      />
+          {data.comportamentosOfensivos ? (
+            <ComportamentosOfensivosAccordion
+              data={data.comportamentosOfensivos}
+              aberto={ofensivosAberto}
+              onToggle={() => setOfensivosAberto((v) => !v)}
+            />
+          ) : null}
+        </>
+      ) : (
+        <p className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5 text-xs text-[#64748b]">
+          Conteúdo técnico dos resultados e classificações restrito ao administrador.
+        </p>
+      )}
     </div>
   );
 }

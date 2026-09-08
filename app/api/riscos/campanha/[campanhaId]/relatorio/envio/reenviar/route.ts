@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRiscosStaffApi } from "@/lib/riscos-api-auth.server";
 import { reenviarRelatorioRiscosPorEmailResend } from "@/services/riscos-relatorio-reenvio-email.server";
+import { sanitizarRelatorioParaOperacional } from "@/lib/riscos-relatorio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,7 +54,9 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
-      relatorio: result.relatorio,
+      relatorio: auth.isAdmin
+        ? result.relatorio
+        : sanitizarRelatorioParaOperacional(result.relatorio),
       resendMessageId: result.resendMessageId,
     });
   } catch (err) {

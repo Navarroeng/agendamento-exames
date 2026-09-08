@@ -94,6 +94,22 @@ export type RiscosRelatorioRecord = {
   updated_at?: string;
 };
 
+/**
+ * Remove `resultado_json` e `pdf_url` para usuários com perfil operacional.
+ * Preserva estritamente os metadados operacionais do relatório:
+ * data da geração, responsável, taxas/contagens e dados de envio por e-mail.
+ */
+export function sanitizarRelatorioParaOperacional(
+  relatorio: RiscosRelatorioRecord | null | undefined
+): RiscosRelatorioRecord | null {
+  if (!relatorio) return null;
+  return {
+    ...relatorio,
+    resultado_json: null as unknown as RiscosRelatorioResultadoJson,
+    pdf_url: null,
+  };
+}
+
 export type RiscosRelatorioListagemMeta = {
   gerado_em: string;
   relatorio_enviado_em: string | null;

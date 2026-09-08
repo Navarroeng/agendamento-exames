@@ -1,8 +1,10 @@
-import { isPerfilStaffNavarro } from "@/lib/permissions";
+import { isPerfilAdmin, isPerfilStaffNavarro } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 
 export type RiscosStaffAuthContext = {
   user: { id: string; email?: string | null };
+  perfil: string;
+  isAdmin: boolean;
   usuarioNome: string;
   usuarioEmail: string;
 };
@@ -28,8 +30,12 @@ export async function requireRiscosStaffApi(): Promise<
     return null;
   }
 
+  const perfilStr = String(perfil.perfil ?? "");
+
   return {
     user,
+    perfil: perfilStr,
+    isAdmin: isPerfilAdmin(perfil.perfil),
     usuarioNome:
       (typeof perfil.nome === "string" && perfil.nome.trim()) ||
       user.email ||

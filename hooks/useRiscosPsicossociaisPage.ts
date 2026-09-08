@@ -440,9 +440,13 @@ export function useRiscosPsicossociaisPage() {
     setCampanhaStatusSincronizado(false);
   }, []);
 
-  /** Abre o Relatório Executivo sem passar pelo modal de detalhes. */
+  /** Abre o Relatório Executivo sem passar pelo modal de detalhes (somente admin). */
   const openVisualizarRelatorio = useCallback(
     async (processo: RiscosPsicossociaisProcesso) => {
+      if (!isAdmin) {
+        toast.error("Visualização do relatório restrita ao administrador.");
+        return;
+      }
       const campanha = processo.campanha;
       if (!campanha?.id) {
         toast.error("Campanha não encontrada para este processo.");
@@ -486,7 +490,7 @@ export function useRiscosPsicossociaisPage() {
         );
       }
     },
-    [openProcesso]
+    [isAdmin, openProcesso]
   );
 
   const closeVisualizarRelatorio = useCallback(() => {

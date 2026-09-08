@@ -148,6 +148,7 @@ export function RiscosPsicossociaisPage() {
       <RiscosRelatorioViewerModal
         open={relatorioViewerOpen}
         relatorio={relatorioViewer}
+        isAdmin={isAdmin}
         onClose={closeVisualizarRelatorio}
         logoUrl={relatorioViewerLogoUrl}
         empresaCnpj={relatorioViewerCnpj}
@@ -189,6 +190,7 @@ export function RiscosPsicossociaisPage() {
         }
         onRemoverParticipante={handleRemoverParticipante}
         podeGerenciarParticipante={isAdmin}
+        isAdmin={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
         auditContext={auditContext}
         onRelatorioAtualizado={handleRelatorioAtualizado}

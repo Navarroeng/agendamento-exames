@@ -125,27 +125,29 @@ export function RiscosProcessoRowActionsMenu({
             }
             onClick={() => void handleCopiarLink()}
           />
-          <MenuItem
-            label={
-              processo.relatorioGerado
-                ? "Visualizar relatório"
-                : "Gerar relatório"
-            }
-            disabled={!acoes.podeGerarRelatorio && !processo.relatorioGerado}
-            title={
-              processo.relatorioGerado
-                ? "Abrir o Relatório Executivo"
-                : acoes.gerarRelatorioMotivoDesabilitado
-            }
-            onClick={() => {
-              setOpen(false);
-              if (processo.relatorioGerado) {
-                onVisualizarRelatorio(processo);
-              } else {
-                onAbrir(processo);
+          {isAdmin ? (
+            <MenuItem
+              label={
+                processo.relatorioGerado
+                  ? "Visualizar relatório"
+                  : "Gerar relatório"
               }
-            }}
-          />
+              disabled={!acoes.podeGerarRelatorio && !processo.relatorioGerado}
+              title={
+                processo.relatorioGerado
+                  ? "Abrir o Relatório Executivo"
+                  : acoes.gerarRelatorioMotivoDesabilitado
+              }
+              onClick={() => {
+                setOpen(false);
+                if (processo.relatorioGerado) {
+                  onVisualizarRelatorio(processo);
+                } else {
+                  onAbrir(processo);
+                }
+              }}
+            />
+          ) : null}
           {acoes.mostrarCancelar ? (
             <>
               <div className="my-1 border-t border-[#eef2f7]" />

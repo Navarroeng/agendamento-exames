@@ -68,6 +68,7 @@ interface RiscosPsicossociaisModalProps {
   }>;
   onRemoverParticipante?: (participanteId: string) => Promise<void>;
   podeGerenciarParticipante?: boolean;
+  isAdmin?: boolean;
   campanhaStatusSincronizado?: boolean;
   auditContext?: import("@/lib/auditoria").AuditoriaUsuarioContext;
   onRelatorioAtualizado?: (relatorio: import("@/lib/riscos-relatorio").RiscosRelatorioRecord | null) => void;
@@ -104,6 +105,7 @@ export function RiscosPsicossociaisModal({
   onConfirmarImportacaoParticipantesExcel,
   onRemoverParticipante,
   podeGerenciarParticipante = false,
+  isAdmin = false,
   campanhaStatusSincronizado = false,
   auditContext,
   onRelatorioAtualizado,
@@ -216,6 +218,7 @@ export function RiscosPsicossociaisModal({
           await onRemoverParticipante?.(id);
         }}
         podeGerenciarParticipante={podeGerenciarParticipante}
+        isAdmin={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
         auditContext={auditContext}
         onRelatorioAtualizado={onRelatorioAtualizado}

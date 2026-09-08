@@ -4,6 +4,7 @@ import {
   confirmarEnvioRelatorioNoServidor,
   corrigirEnvioRelatorioNoServidor,
 } from "@/services/riscos-relatorio.server";
+import { sanitizarRelatorioParaOperacional } from "@/lib/riscos-relatorio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,12 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ ok: true, relatorio });
+    return NextResponse.json({
+      ok: true,
+      relatorio: auth.isAdmin
+        ? relatorio
+        : sanitizarRelatorioParaOperacional(relatorio),
+    });
   } catch (err) {
     console.error("[relatorio/envio POST]", err);
     return NextResponse.json(
@@ -88,7 +94,12 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ ok: true, relatorio });
+    return NextResponse.json({
+      ok: true,
+      relatorio: auth.isAdmin
+        ? relatorio
+        : sanitizarRelatorioParaOperacional(relatorio),
+    });
   } catch (err) {
     console.error("[relatorio/envio PATCH]", err);
     return NextResponse.json(

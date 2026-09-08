@@ -326,6 +326,7 @@ export function acoesMenuListagemProcessoRiscos(input: {
   copiarLinkMotivoDesabilitado: string;
   podeGerarRelatorio: boolean;
   gerarRelatorioMotivoDesabilitado: string;
+  mostrarVisualizarRelatorio: boolean;
   mostrarRemoverProcesso: boolean;
   mostrarCancelar: boolean;
 } {
@@ -342,7 +343,9 @@ export function acoesMenuListagemProcessoRiscos(input: {
   const status = String(input.campanhaStatus ?? "");
   let gerarMotivo = "";
   let podeGerar = false;
-  if (processoCancelado) {
+  if (!input.isAdmin) {
+    gerarMotivo = "Apenas administradores podem gerar relatório.";
+  } else if (processoCancelado) {
     gerarMotivo = "Não é possível gerar relatório de processo cancelado.";
   } else if (!input.hasCampanha) {
     gerarMotivo = "Crie a pesquisa antes de gerar o relatório.";
@@ -368,6 +371,7 @@ export function acoesMenuListagemProcessoRiscos(input: {
         : "Disponível após abrir a pesquisa.",
     podeGerarRelatorio: podeGerar,
     gerarRelatorioMotivoDesabilitado: gerarMotivo,
+    mostrarVisualizarRelatorio: input.isAdmin && input.relatorioGerado === true,
     mostrarRemoverProcesso:
       input.isAdmin && input.hasCampanha && Boolean(codigo) && !processoCancelado,
     mostrarCancelar: !processoCancelado && input.processoConcluido !== true,
