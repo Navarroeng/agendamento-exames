@@ -566,6 +566,115 @@ export async function reconciliarVagasComprometidasDoContrato(params: {
   }));
 
   let vinculados = 0;
+
+  // Reconcilia vagas associadas a periódicos futuros deste contrato
+  try {
+    const { data: periodicosContrato } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, status, agendamento_vinculado_id, agendamento_id, colaborador, colaborador_cpf, proxima_data"
+      )
+      .eq("contrato_id", contratoId)
+      .eq("consome_previsao_contrato", true);
+
+    for (const periodico of periodicosContrato ?? []) {
+      const agVinculadoId =
+        (periodico.agendamento_vinculado_id ?? "").trim() ||
+        (periodico.status === "reagendado"
+          ? (periodico.agendamento_id ?? "").trim()
+          : "");
+      if (!agVinculadoId) continue;
+
+      let agObj = agendamentos.find((item) => item.id === agVinculadoId);
+      if (!agObj) {
+        const { data: agDireto } = await supabase
+          .from("agendamentos")
+          .select(
+            "id, status, colaborador, colaborador_cpf, cargo_id, cargo_nome"
+          )
+          .eq("id", agVinculadoId)
+          .maybeSingle();
+        if (agDireto) {
+          agObj = {
+            id: String(agDireto.id),
+            status: String(agDireto.status ?? ""),
+            colaborador: String(agDireto.colaborador ?? ""),
+            colaborador_cpf: agDireto.colaborador_cpf
+              ? String(agDireto.colaborador_cpf)
+              : null,
+            contrato_id: null,
+            cliente_id: null,
+            data_agendamento: null,
+            cargo_id: agDireto.cargo_id ? String(agDireto.cargo_id) : null,
+            cargo_nome: agDireto.cargo_nome ? String(agDireto.cargo_nome) : null,
+          };
+          agendamentos.push(agObj);
+        }
+      }
+
+      const agCancelado =
+        !agObj || String(agObj.status).trim().toLowerCase() === "cancelado";
+
+      const vaga =
+        vagas.find((v) => v.periodico_futuro_id === periodico.id) ||
+        (periodico.colaborador_cpf
+          ? vagas.find(
+              (v) =>
+                (v.status === "programada" || v.status === "comprometida") &&
+                cpfVagaIguais(v.colaborador_cpf, periodico.colaborador_cpf)
+            )
+          : undefined);
+
+      if (!vaga) continue;
+
+      if (agCancelado) {
+        if (
+          vaga.status === "agendada" &&
+          vaga.agendamento_id === agVinculadoId
+        ) {
+          await supabase
+            .from("contrato_vagas")
+            .update({
+              status: "programada",
+              agendamento_id: null,
+              periodico_futuro_id: periodico.id,
+            })
+            .eq("id", vaga.id);
+          vaga.status = "programada";
+          vaga.agendamento_id = null;
+        }
+      } else if (agObj) {
+        if (vaga.status !== "agendada" || vaga.agendamento_id !== agObj.id) {
+          await supabase
+            .from("contrato_vagas")
+            .update({
+              status: "agendada",
+              agendamento_id: agObj.id,
+              periodico_futuro_id: periodico.id,
+              colaborador:
+                agObj.colaborador || vaga.colaborador || periodico.colaborador,
+              colaborador_cpf:
+                agObj.colaborador_cpf ??
+                vaga.colaborador_cpf ??
+                periodico.colaborador_cpf,
+              cargo_id: agObj.cargo_id ?? vaga.cargo_id,
+              cargo_nome: agObj.cargo_nome ?? vaga.cargo_nome,
+            })
+            .eq("id", vaga.id);
+          vaga.status = "agendada";
+          vaga.agendamento_id = agObj.id;
+          idsJaVinculados.add(agObj.id);
+          vinculados += 1;
+        }
+      }
+    }
+  } catch (reconcilePerErr) {
+    console.error(
+      "Erro ao reconciliar vagas com periódicos do contrato:",
+      reconcilePerErr
+    );
+  }
+
   for (const vaga of vagas) {
     if (!vagaPrecisaReconciliarAgendamento(vaga)) continue;
     const escolhido = escolherAgendamentoValidoParaVaga({
@@ -717,6 +826,17 @@ export async function reverterVagaPorCancelamentoAgendamento(
         agendamento_id: null,
         colaborador: null,
         colaborador_cpf: null,
+      })
+      .eq("id", mapped.id);
+    return;
+  }
+
+  if (mapped.periodico_futuro_id) {
+    await supabase
+      .from("contrato_vagas")
+      .update({
+        status: "programada",
+        agendamento_id: null,
       })
       .eq("id", mapped.id);
     return;

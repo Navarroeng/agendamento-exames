@@ -4,8 +4,10 @@ import {
 } from "@/lib/auditoria";
 import {
   ORIGEM_PERIODICO_IMPLANTACAO,
+  determinarStatusProgramacaoFutura,
   type ColaboradorSugestao,
   type CriarExameFuturoInput,
+  type StatusExameFuturoImplantacao,
 } from "@/lib/contrato-programacao-futura";
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { isAsoDemissional } from "@/lib/periodico-geracao";
@@ -38,7 +40,18 @@ export type PeriodicoProgramadoContrato = Pick<
   | "status"
   | "contrato_id"
   | "consome_previsao_contrato"
->;
+  | "agendamento_vinculado_id"
+  | "agendamento_id"
+  | "data_prevista_original"
+  | "data_realizada"
+  | "cancelado_em"
+  | "motivo_cancelamento"
+> & {
+  data_agendada?: string | null;
+  agendamento_status?: string | null;
+  agendamento_cumprido?: boolean | null;
+  statusExibicao?: StatusExameFuturoImplantacao;
+};
 
 /** Contagem de programações futuras que ainda consomem previsão por contrato. */
 export async function contarProgramacoesFuturasPorContratos(
@@ -73,7 +86,7 @@ export async function listarProgramacoesFuturasDoContrato(
   const { data, error } = await supabase
     .from("periodicos_futuros")
     .select(
-      "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato"
+      "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
     )
     .eq("contrato_id", contratoId)
     .eq("consome_previsao_contrato", true)
@@ -81,7 +94,82 @@ export async function listarProgramacoesFuturasDoContrato(
     .order("proxima_data", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as PeriodicoProgramadoContrato[];
+  const rows = (data ?? []) as PeriodicoProgramadoContrato[];
+  if (rows.length === 0) return [];
+
+  const agIds = Array.from(
+    new Set(
+      rows
+        .flatMap((r) => [
+          r.agendamento_vinculado_id,
+          r.status === "reagendado" ? r.agendamento_id : null,
+        ])
+        .map((id) => (id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const agMap = new Map<
+    string,
+    {
+      data: string;
+      status: string;
+      cumprido: boolean;
+    }
+  >();
+
+  if (agIds.length > 0) {
+    const { data: agsData } = await supabase
+      .from("agendamentos")
+      .select("id, data_agendamento, status, aso_assinado, data_aso_assinado")
+      .in("id", agIds);
+
+    for (const ag of agsData ?? []) {
+      const dataIso = String(ag.data_agendamento ?? "").slice(0, 10);
+      const st = String(ag.status ?? "");
+      const assinado =
+        String(ag.aso_assinado ?? "").trim().toLowerCase() === "sim" ||
+        Boolean(ag.data_aso_assinado);
+      agMap.set(String(ag.id), {
+        data: dataIso,
+        status: st,
+        cumprido: assinado,
+      });
+    }
+  }
+
+  return rows.map((row) => {
+    const vinculoId =
+      (row.agendamento_vinculado_id ?? "").trim() ||
+      (row.status === "reagendado" ? (row.agendamento_id ?? "").trim() : "");
+    const agInfo = vinculoId ? agMap.get(vinculoId) : undefined;
+    const agCancelado =
+      !agInfo || String(agInfo.status).trim().toLowerCase() === "cancelado";
+
+    const statusExibicao = determinarStatusProgramacaoFutura({
+      status: row.status,
+      canceladoManualmente: isPeriodicoCanceladoManualmente(
+        row as unknown as PeriodicoFuturoRecord
+      ),
+      agendamentoVinculadoId: vinculoId || null,
+      agendamentoStatus: agInfo?.status ?? null,
+      agendamentoCumprido: agInfo?.cumprido,
+      dataRealizada: row.data_realizada,
+    });
+
+    const dataAgendada =
+      !agCancelado && agInfo?.data && /^\d{4}-\d{2}-\d{2}$/.test(agInfo.data)
+        ? agInfo.data
+        : null;
+
+    return {
+      ...row,
+      data_agendada: dataAgendada,
+      agendamento_status: agInfo?.status ?? null,
+      agendamento_cumprido: agInfo?.cumprido ?? false,
+      statusExibicao,
+    };
+  });
 }
 
 export async function listarSugestoesColaboradoresContrato(params: {
@@ -487,6 +575,59 @@ export async function vincularPeriodicoAoAgendamento(params: {
     .in("id", idsDoCiclo)
     .eq("status", "ativo");
   if (error) throw error;
+
+  const contratoId =
+    representante.contrato_id ||
+    doCiclo.find((r) => r.contrato_id)?.contrato_id;
+  if (contratoId) {
+    try {
+      const { data: vagasAfetadas } = await supabase
+        .from("contrato_vagas")
+        .select("id, status, periodico_futuro_id, colaborador_cpf")
+        .eq("contrato_id", contratoId)
+        .in("periodico_futuro_id", idsDoCiclo);
+
+      if ((vagasAfetadas ?? []).length > 0) {
+        await supabase
+          .from("contrato_vagas")
+          .update({
+            status: "agendada",
+            agendamento_id: params.agendamentoId,
+            colaborador: representante.colaborador,
+            colaborador_cpf: representante.colaborador_cpf || null,
+          })
+          .in("id", (vagasAfetadas ?? []).map((v) => v.id));
+      } else if (representante.colaborador_cpf) {
+        const normCpf = normalizeCpfDigits(representante.colaborador_cpf);
+        const { data: vagasCpf } = await supabase
+          .from("contrato_vagas")
+          .select("id, status, periodico_futuro_id, colaborador_cpf")
+          .eq("contrato_id", contratoId)
+          .in("status", ["programada", "comprometida"]);
+
+        const vagaMatch = (vagasCpf ?? []).find(
+          (v) => normalizeCpfDigits(v.colaborador_cpf) === normCpf
+        );
+        if (vagaMatch) {
+          await supabase
+            .from("contrato_vagas")
+            .update({
+              status: "agendada",
+              agendamento_id: params.agendamentoId,
+              colaborador: representante.colaborador,
+              colaborador_cpf: representante.colaborador_cpf || null,
+              periodico_futuro_id: idsDoCiclo[0] ?? null,
+            })
+            .eq("id", vagaMatch.id);
+        }
+      }
+    } catch (vagaSyncErr) {
+      console.error(
+        "Erro ao sincronizar vaga com periódico vinculado:",
+        vagaSyncErr
+      );
+    }
+  }
 
   const examesLabel = grupo
     ? labelExamesCicloVinculo(grupo)

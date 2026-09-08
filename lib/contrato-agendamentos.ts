@@ -50,10 +50,16 @@ export type ContratoAgendamentoContagem = {
 
 export type AgendamentoClassificacao = "contrato" | "adicional" | "cancelado";
 
-export function isAgendamentoSelecionavel(
-  status: AgendamentoStatus | string
+export function isAgendamentoCancelado(
+  status: AgendamentoStatus | string | null | undefined
 ): boolean {
-  return status !== "cancelado";
+  return String(status ?? "").trim().toLowerCase() === "cancelado";
+}
+
+export function isAgendamentoSelecionavel(
+  status: AgendamentoStatus | string | null | undefined
+): boolean {
+  return !isAgendamentoCancelado(status);
 }
 
 export type AgendamentoVigenciaParaExibicao = {
@@ -273,13 +279,14 @@ export function buildContagemContratoComVagas(input: {
 }
 
 export function resolveClassificacaoAgendamento(params: {
-  status: AgendamentoStatus | string;
+  status: AgendamentoStatus | string | null | undefined;
   selecionado: boolean;
   dispensado?: boolean;
+  vinculadoAPeriodicoContrato?: boolean;
 }): AgendamentoClassificacao {
-  if (params.status === "cancelado") return "cancelado";
+  if (isAgendamentoCancelado(params.status)) return "cancelado";
   if (params.dispensado) return "adicional";
-  if (params.selecionado) return "contrato";
+  if (params.selecionado || params.vinculadoAPeriodicoContrato) return "contrato";
   return "adicional";
 }
 
@@ -329,6 +336,7 @@ export function agendamentoEVinculadoAoContrato(params: {
   agendamento: { id: string; contrato_id?: string | null };
   contratoId: string;
   idsAgendamentoDasVagas: Iterable<string>;
+  idsAgendamentoDosPeriodicos?: Iterable<string>;
 }): boolean {
   const contratoId = params.contratoId.trim();
   if (contratoId && (params.agendamento.contrato_id ?? "").trim() === contratoId) {
@@ -338,7 +346,17 @@ export function agendamentoEVinculadoAoContrato(params: {
     params.idsAgendamentoDasVagas instanceof Set
       ? params.idsAgendamentoDasVagas
       : new Set(Array.from(params.idsAgendamentoDasVagas));
-  return ids.has(params.agendamento.id);
+  if (ids.has(params.agendamento.id)) return true;
+
+  if (params.idsAgendamentoDosPeriodicos) {
+    const idsPeriodicos =
+      params.idsAgendamentoDosPeriodicos instanceof Set
+        ? params.idsAgendamentoDosPeriodicos
+        : new Set(Array.from(params.idsAgendamentoDosPeriodicos));
+    if (idsPeriodicos.has(params.agendamento.id)) return true;
+  }
+
+  return false;
 }
 
 /** Mantém na aba o que já está na vaga/contrato, mesmo fora do recorte de vigência. */
@@ -351,6 +369,7 @@ export function agendamentoVisivelNaAbaContrato(params: {
   };
   contratoId: string;
   idsAgendamentoDasVagas: Iterable<string>;
+  idsAgendamentoDosPeriodicos?: Iterable<string>;
   cliente: {
     id: string | null | undefined;
     nome?: string | null;
@@ -363,6 +382,7 @@ export function agendamentoVisivelNaAbaContrato(params: {
       agendamento: params.agendamento,
       contratoId: params.contratoId,
       idsAgendamentoDasVagas: params.idsAgendamentoDasVagas,
+      idsAgendamentoDosPeriodicos: params.idsAgendamentoDosPeriodicos,
     })
   ) {
     return true;

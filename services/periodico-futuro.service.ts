@@ -341,6 +341,24 @@ export async function cancelarPeriodicosPorAgendamento(
       .eq("id", row.id)
       .eq("status", "reagendado");
     if (restoreErr) throw restoreErr;
+
+    try {
+      await supabase
+        .from("contrato_vagas")
+        .update({
+          status: "programada",
+          agendamento_id: null,
+          periodico_futuro_id: row.id,
+        })
+        .or(
+          `agendamento_id.eq.${agendamentoId},periodico_futuro_id.eq.${row.id}`
+        );
+    } catch (vagaErr) {
+      console.error(
+        "Erro ao reverter vaga de periódico por cancelamento de agendamento:",
+        vagaErr
+      );
+    }
   }
 }
 

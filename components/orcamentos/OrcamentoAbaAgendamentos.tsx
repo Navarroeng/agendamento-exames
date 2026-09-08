@@ -34,6 +34,7 @@ import {
   formatMesAnoPrevisto,
   labelMotivoExameFuturo,
   labelOrigemPeriodico,
+  statusExameFuturoImplantacaoClass,
   type ColaboradorSugestao,
 } from "@/lib/contrato-programacao-futura";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
@@ -359,11 +360,21 @@ export function OrcamentoAbaAgendamentos({
             .map((vaga) => (vaga.agendamento_id ?? "").trim())
             .filter(Boolean)
         );
+        const idsPeriodicos = new Set(
+          progs
+            .flatMap((p) => [
+              p.agendamento_vinculado_id,
+              p.status === "reagendado" ? p.agendamento_id : null,
+            ])
+            .map((id) => (id ?? "").trim())
+            .filter(Boolean)
+        );
         const itensDoCliente = resumo.itens.filter((i) =>
           agendamentoVisivelNaAbaContrato({
             agendamento: i.agendamento,
             contratoId: contratoRow.id,
             idsAgendamentoDasVagas: idsVagas,
+            idsAgendamentoDosPeriodicos: idsPeriodicos,
             cliente: {
               id: contratoRow.cliente_id,
               nome: clienteNome,
@@ -1284,8 +1295,26 @@ export function OrcamentoAbaAgendamentos({
                   </p>
                   <p>
                     <span className="font-bold text-navy">Status:</span>{" "}
-                    {p.status === "reagendado" ? "Atendido" : "Programado"}
+                    <span
+                      className={statusExameFuturoImplantacaoClass(
+                        p.statusExibicao ??
+                          (p.status === "reagendado" ? "Agendado" : "Programado")
+                      )}
+                    >
+                      {p.statusExibicao ??
+                        (p.status === "reagendado" ? "Agendado" : "Programado")}
+                    </span>
                   </p>
+                  {p.data_agendada &&
+                  (p.statusExibicao === "Agendado" ||
+                    (!p.statusExibicao && p.status === "reagendado")) ? (
+                    <p>
+                      <span className="font-bold text-navy">
+                        Agendado para:
+                      </span>{" "}
+                      {formatDateIsoToBR(p.data_agendada)}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             ))}

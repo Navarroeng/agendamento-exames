@@ -153,8 +153,33 @@ export async function carregarAgendamentosVigenciaContrato(params: {
     ? []
     : await listarVagasDoContrato(contrato.id).catch(() => []);
   const idsVagas = idsAgendamentoDasVagas(vagas);
-  const idsVagasSet = new Set(idsVagas);
   const podeBuscarVigencia = Boolean(clienteId && inicio && fim);
+
+  // Periódicos futuros do contrato que consomem previsão
+  const { data: periodicosContratoData } = await supabase
+    .from("periodicos_futuros")
+    .select("id, status, agendamento_vinculado_id, agendamento_id")
+    .eq("contrato_id", contrato.id)
+    .eq("consome_previsao_contrato", true)
+    .in("status", ["ativo", "reagendado"]);
+
+  const idsAgendamentosPeriodicos = Array.from(
+    new Set(
+      (periodicosContratoData ?? [])
+        .flatMap((p) => [
+          p.agendamento_vinculado_id,
+          p.status === "reagendado" ? p.agendamento_id : null,
+        ])
+        .map((id) => (id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+  const idsAgendamentosPeriodicosSet = new Set(idsAgendamentosPeriodicos);
+
+  const idsContratoParaBuscar = Array.from(
+    new Set([...idsVagas, ...idsAgendamentosPeriodicos])
+  );
+  const idsVagasSet = new Set(idsVagas);
 
   const emptyAg = {
     data: [] as AgendamentoWithExames[],
@@ -198,11 +223,11 @@ export async function carregarAgendamentosVigenciaContrato(params: {
         .select(AGENDAMENTO_SELECT)
         .eq("contrato_id", contrato.id)
         .limit(2000),
-      idsVagas.length > 0
+      idsContratoParaBuscar.length > 0
         ? supabase
             .from("agendamentos")
             .select(AGENDAMENTO_SELECT)
-            .in("id", idsVagas)
+            .in("id", idsContratoParaBuscar)
         : Promise.resolve(emptyAg),
     ]);
 
@@ -237,6 +262,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
         agendamento: ag,
         contratoId: contrato.id,
         idsAgendamentoDasVagas: idsVagasSet,
+        idsAgendamentoDosPeriodicos: idsAgendamentosPeriodicosSet,
         cliente,
         catalog,
       })
@@ -246,6 +272,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
           agendamento: ag,
           contratoId: contrato.id,
           idsAgendamentoDasVagas: idsVagasSet,
+          idsAgendamentoDosPeriodicos: idsAgendamentosPeriodicosSet,
         })
       ) {
         return true;
@@ -300,10 +327,11 @@ export async function carregarAgendamentosVigenciaContrato(params: {
 
   const itens: AgendamentoNaVigenciaItem[] = agendamentos.map((ag) => {
     const vinculadoAVaga = idsVagasSet.has(ag.id);
+    const vinculadoAPeriodico = idsAgendamentosPeriodicosSet.has(ag.id);
     const selecionado =
       !dispensado &&
       isAgendamentoSelecionavel(ag.status) &&
-      (selecionadosDeste.has(ag.id) || vinculadoAVaga);
+      (selecionadosDeste.has(ag.id) || vinculadoAVaga || vinculadoAPeriodico);
     const outro = emOutroContrato.get(ag.id) ?? null;
     const selecionavel =
       !dispensado &&
@@ -332,14 +360,16 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   let programados = 0;
   let emAberto = 0;
   if (!dispensado) {
-    const { count, error: pErr } = await supabase
-      .from("periodicos_futuros")
-      .select("id", { count: "exact", head: true })
-      .eq("contrato_id", contrato.id)
-      .eq("consome_previsao_contrato", true)
-      .in("status", ["ativo", "reagendado"]);
-    if (pErr) throw pErr;
-    programados = count ?? 0;
+    const agsAtivosIds = new Set(
+      itens
+        .filter((i) => isAgendamentoSelecionavel(i.agendamento.status))
+        .map((i) => i.agendamento.id)
+    );
+    // No modo legado: programados que ainda não possuem agendamento ativo vinculado
+    programados = (periodicosContratoData ?? []).filter((p) => {
+      const vid = (p.agendamento_vinculado_id ?? "").trim();
+      return !vid || !agsAtivosIds.has(vid);
+    }).length;
 
     const { count: credCount, error: cErr } = await supabase
       .from("contrato_creditos_aso")
@@ -348,7 +378,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       .eq("status", "disponivel");
     if (cErr) throw cErr;
     emAberto = credCount ?? 0;
-    }
+  }
 
   let vagasComprometidas = 0;
   if (!dispensado) {

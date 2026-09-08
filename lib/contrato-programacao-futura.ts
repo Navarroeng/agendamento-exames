@@ -90,3 +90,71 @@ export type ColaboradorSugestao = {
   colaborador: string;
   colaborador_cpf: string | null;
 };
+
+export type StatusExameFuturoImplantacao =
+  | "Programado"
+  | "Agendado"
+  | "Atendido"
+  | "Cancelado";
+
+/**
+ * Determina o status operacional da programação futura na Implantação.
+ *
+ * Regra:
+ * - Periódico cancelado manualmente ou com status cancelado → Cancelado
+ * - Periódico efetivamente cumprido (exame realizado / ASO concluído) → Atendido
+ * - Periódico com agendamento ativo vinculado → Agendado
+ * - Agendamento vinculado cancelado (ou sem vínculo ativo) → Programado
+ */
+export function determinarStatusProgramacaoFutura(params: {
+  status?: string | null;
+  canceladoManualmente?: boolean;
+  agendamentoVinculadoId?: string | null;
+  agendamentoStatus?: string | null;
+  agendamentoCumprido?: boolean;
+  dataRealizada?: string | null;
+}): StatusExameFuturoImplantacao {
+  if (params.canceladoManualmente || params.status === "cancelado") {
+    return "Cancelado";
+  }
+
+  const rawAgStatus = String(params.agendamentoStatus ?? "").trim().toLowerCase();
+  const agCancelado = rawAgStatus === "cancelado";
+  const temVinculoAtivo = Boolean(
+    params.agendamentoVinculadoId &&
+      rawAgStatus &&
+      !agCancelado
+  );
+
+  if (
+    params.dataRealizada ||
+    params.agendamentoCumprido ||
+    rawAgStatus === "atendido" ||
+    rawAgStatus === "concluido"
+  ) {
+    return "Atendido";
+  }
+
+  if (temVinculoAtivo || (params.status === "reagendado" && !agCancelado && params.agendamentoVinculadoId)) {
+    return "Agendado";
+  }
+
+  return "Programado";
+}
+
+export function statusExameFuturoImplantacaoClass(
+  status: StatusExameFuturoImplantacao
+): string {
+  switch (status) {
+    case "Agendado":
+      return "text-brand-blue font-semibold";
+    case "Atendido":
+      return "text-brand-green font-semibold";
+    case "Cancelado":
+      return "text-[#64748b]";
+    case "Programado":
+    default:
+      return "text-navy font-semibold";
+  }
+}
+
