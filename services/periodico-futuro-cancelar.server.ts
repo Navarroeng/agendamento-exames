@@ -140,6 +140,23 @@ export async function cancelarPeriodicoFuturoNoServidor(params: {
     throw error;
   }
 
+  // Programado p/ futuro → Comprometido (obrigação contratual sem definição).
+  const { error: vagaErr } = await admin
+    .from("contrato_vagas")
+    .update({
+      status: "comprometida",
+      periodico_futuro_id: null,
+      agendamento_id: null,
+    })
+    .in("periodico_futuro_id", ids)
+    .eq("status", "programada");
+  if (vagaErr) {
+    console.error(
+      "Erro ao reverter vagas programadas após cancelar periódico:",
+      vagaErr
+    );
+  }
+
   const representante = pendentes[0];
   await registrarAuditoriaServer({
     contexto: {

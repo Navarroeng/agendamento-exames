@@ -3,7 +3,9 @@ import {
   AUDITORIA_MODULOS,
 } from "@/lib/auditoria";
 import {
+  EXAME_FUTURO_FORA_VIGENCIA_MSG,
   ORIGEM_PERIODICO_IMPLANTACAO,
+  dataPrevistaDentroDaVigenciaContrato,
   determinarStatusProgramacaoFutura,
   type ColaboradorSugestao,
   type CriarExameFuturoInput,
@@ -243,6 +245,7 @@ export async function criarExameFuturoImplantacao(
   const cpfDigits = input.colaboradorCpf
     ? normalizeCpfDigits(input.colaboradorCpf)
     : "";
+  const vagaId = (input.vagaId ?? "").trim();
 
   if (!colaborador) throw new Error("Informe o colaborador.");
   if (!tipoAso) throw new Error("Informe o tipo de ASO.");
@@ -258,6 +261,100 @@ export async function criarExameFuturoImplantacao(
   if (!input.motivo) throw new Error("Informe o motivo.");
   if (input.motivo === "Outro" && !(input.motivoDetalhe ?? "").trim()) {
     throw new Error("Descreva o motivo (Outro).");
+  }
+
+  const { data: contrato, error: cErr } = await supabase
+    .from("cliente_contratos")
+    .select(
+      "id, numero, quantidade_colaboradores, orcamento_id, data_inicio, data_fim"
+    )
+    .eq("id", input.contratoId)
+    .maybeSingle();
+  if (cErr) throw cErr;
+  if (!contrato) throw new Error("Contrato não encontrado.");
+
+  const dataInicio = String(contrato.data_inicio ?? "").slice(0, 10);
+  const dataFim = String(contrato.data_fim ?? "").slice(0, 10);
+  if (!dataInicio || !dataFim) {
+    throw new Error("Contrato sem vigência definida.");
+  }
+  if (
+    !dataPrevistaDentroDaVigenciaContrato({
+      dataPrevistaIso: dataPrevista,
+      dataInicio,
+      dataFim,
+    })
+  ) {
+    throw new Error(EXAME_FUTURO_FORA_VIGENCIA_MSG);
+  }
+
+  let cargoId = (input.cargoId ?? "").trim() || null;
+  let cargoNome = (input.cargoNome ?? "").trim() || null;
+
+  if (vagaId) {
+    const { data: vagaRow, error: vagaErr } = await supabase
+      .from("contrato_vagas")
+      .select(
+        "id, contrato_id, status, colaborador, colaborador_cpf, cargo_id, cargo_nome, periodico_futuro_id"
+      )
+      .eq("id", vagaId)
+      .maybeSingle();
+    if (vagaErr) throw vagaErr;
+    if (!vagaRow || String(vagaRow.contrato_id) !== input.contratoId) {
+      throw new Error("Vaga contratual não encontrada neste contrato.");
+    }
+    if (String(vagaRow.status) !== "comprometida") {
+      throw new Error(
+        "Só é possível programar para o futuro uma vaga ainda Comprometida."
+      );
+    }
+    if (!cargoId) cargoId = vagaRow.cargo_id ? String(vagaRow.cargo_id) : null;
+    if (!cargoNome) {
+      cargoNome = vagaRow.cargo_nome ? String(vagaRow.cargo_nome) : null;
+    }
+  }
+
+  // Evita duplicar periódico ativo do mesmo CPF + contrato (consome previsão).
+  if (cpfDigits && isValidCPF(cpfDigits)) {
+    const masked = maskCPFInput(cpfDigits);
+    const { data: existentes, error: dupErr } = await supabase
+      .from("periodicos_futuros")
+      .select("*")
+      .eq("contrato_id", input.contratoId)
+      .eq("consome_previsao_contrato", true)
+      .in("status", ["ativo", "reagendado"])
+      .or(`colaborador_cpf.eq.${cpfDigits},colaborador_cpf.eq."${masked}"`);
+    if (dupErr) throw dupErr;
+
+    const candidato = (existentes ?? []).find(
+      (r) => normalizeCpfDigits(r.colaborador_cpf) === cpfDigits
+    ) as PeriodicoFuturoRecord | undefined;
+
+    if (candidato) {
+      const { data: vagaLigada } = await supabase
+        .from("contrato_vagas")
+        .select("id, status")
+        .eq("periodico_futuro_id", candidato.id)
+        .maybeSingle();
+      if (vagaLigada && (!vagaId || String(vagaLigada.id) !== vagaId)) {
+        throw new Error(
+          "Já existe um periódico futuro ativo para este colaborador neste contrato."
+        );
+      }
+      const { ocuparVagaComExameFuturo } = await import(
+        "@/services/contrato-vagas.service"
+      );
+      await ocuparVagaComExameFuturo({
+        contratoId: input.contratoId,
+        periodicoFuturoId: candidato.id,
+        colaborador,
+        colaboradorCpf: cpfDigits,
+        cargoId,
+        cargoNome,
+        vagaId: vagaId || null,
+      });
+      return candidato;
+    }
   }
 
   // Garante que ainda há vaga (agendamentos + programações).
@@ -295,14 +392,6 @@ export async function criarExameFuturoImplantacao(
     .eq("status", "disponivel");
   if (creditoErr) throw creditoErr;
 
-  const { data: contrato, error: cErr } = await supabase
-    .from("cliente_contratos")
-    .select("id, numero, quantidade_colaboradores, orcamento_id")
-    .eq("id", input.contratoId)
-    .maybeSingle();
-  if (cErr) throw cErr;
-  if (!contrato) throw new Error("Contrato não encontrado.");
-
   let previstos = Number(contrato.quantidade_colaboradores) || 0;
   if (contrato.orcamento_id) {
     const { data: aprov } = await supabase
@@ -316,6 +405,8 @@ export async function criarExameFuturoImplantacao(
 
   const utilizados =
     utilizadosAg + (progCount ?? 0) + (creditoCount ?? 0);
+  // Converter Comprometido → Programado já possui slot classificado; ainda assim
+  // não pode ultrapassar a previsão com periódicos/agendamentos/créditos.
   if (previstos > 0 && utilizados >= previstos) {
     throw new Error(
       "Não há vagas disponíveis neste contrato para programar exame futuro."
@@ -326,8 +417,8 @@ export async function criarExameFuturoImplantacao(
     agendamento_id: null,
     cliente_nome: input.clienteNome.trim(),
     colaborador,
-    cargo_id: null,
-    cargo_nome: null,
+    cargo_id: cargoId,
+    cargo_nome: cargoNome,
     exame_id: null,
     tipo_exame: tipoAso,
     exame_nome: tipoAso,
@@ -374,6 +465,9 @@ export async function criarExameFuturoImplantacao(
     periodicoFuturoId: record.id,
     colaborador,
     colaboradorCpf: cpfDigits || null,
+    cargoId,
+    cargoNome,
+    vagaId: vagaId || null,
   });
 
   return record;

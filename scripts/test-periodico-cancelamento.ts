@@ -17,6 +17,7 @@ import {
   podeExibirCancelarPeriodicoGrupo,
   validarMotivoCancelamentoPeriodico,
 } from "../lib/periodico-cancelamento";
+import { deveReverterVagaAposCancelamentoPeriodico } from "../lib/contrato-programacao-futura";
 import {
   computePeriodicoDisplayStatus,
   toPeriodicoFuturoRow,
@@ -311,6 +312,25 @@ run("19. status do grupo legado volta a obrigação ativa", () => {
   const counts = countPeriodicoGruposByDisplayStatus(grupos);
   assert.equal(counts.cancelado, 0);
   assert.equal(counts.em_dia, 1);
+});
+
+run("20. periódico cancelado reverte vaga programada para Comprometido", () => {
+  assert.equal(
+    deveReverterVagaAposCancelamentoPeriodico({
+      vagaStatus: "programada",
+      periodicoFuturoId: "pf-1",
+      periodicoCancelado: true,
+    }),
+    true
+  );
+  assert.equal(
+    deveReverterVagaAposCancelamentoPeriodico({
+      vagaStatus: "comprometida",
+      periodicoFuturoId: null,
+      periodicoCancelado: true,
+    }),
+    false
+  );
 });
 
 console.log("\nTodos os testes de cancelamento de periódico futuro passaram.");

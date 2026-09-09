@@ -73,6 +73,39 @@ export function formatMesAnoPrevisto(isoDate: string | null | undefined): string
   return `${mes}/${y}`;
 }
 
+export const EXAME_FUTURO_FORA_VIGENCIA_MSG =
+  "A data informada está fora da vigência deste contrato.";
+
+/** Data prevista (YYYY-MM-DD) deve estar entre data_inicio e data_fim do contrato. */
+export function dataPrevistaDentroDaVigenciaContrato(params: {
+  dataPrevistaIso: string;
+  dataInicio?: string | null;
+  dataFim?: string | null;
+}): boolean {
+  const data = (params.dataPrevistaIso ?? "").trim().slice(0, 10);
+  const inicio = (params.dataInicio ?? "").trim().slice(0, 10);
+  const fim = (params.dataFim ?? "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fim)) {
+    return false;
+  }
+  return data >= inicio && data <= fim;
+}
+
+/**
+ * Vaga programada cujo periódico foi cancelado deve voltar a Comprometido
+ * (obrigação contratual ainda sem definição operacional).
+ */
+export function deveReverterVagaAposCancelamentoPeriodico(params: {
+  vagaStatus?: string | null;
+  periodicoFuturoId?: string | null;
+  periodicoCancelado?: boolean;
+}): boolean {
+  if (!params.periodicoCancelado) return false;
+  if ((params.vagaStatus ?? "").trim() !== "programada") return false;
+  return Boolean((params.periodicoFuturoId ?? "").trim());
+}
+
 export type CriarExameFuturoInput = {
   contratoId: string;
   clienteNome: string;
@@ -84,6 +117,10 @@ export type CriarExameFuturoInput = {
   motivoDetalhe: string | null;
   observacoes: string | null;
   criadoPor: string;
+  /** Quando informado, ocupa esta vaga comprometida (não a primeira aberta). */
+  vagaId?: string | null;
+  cargoId?: string | null;
+  cargoNome?: string | null;
 };
 
 export type ColaboradorSugestao = {

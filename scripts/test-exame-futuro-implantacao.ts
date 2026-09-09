@@ -5,6 +5,9 @@ import {
   buildContratoAgendamentoContagem,
 } from "../lib/contrato-agendamentos";
 import {
+  EXAME_FUTURO_FORA_VIGENCIA_MSG,
+  dataPrevistaDentroDaVigenciaContrato,
+  deveReverterVagaAposCancelamentoPeriodico,
   formatMesAnoPrevisto,
   labelMotivoExameFuturo,
   labelOrigemPeriodico,
@@ -12,6 +15,7 @@ import {
   ORIGEM_PERIODICO_IMPLANTACAO,
   TIPOS_ASO_EXAME_FUTURO,
 } from "../lib/contrato-programacao-futura";
+import { isClassificacaoVagasContratoCompleta } from "../lib/contrato-vagas";
 import {
   buildImplantacaoProcesso,
   isAgendamentosImplantacaoConcluida,
@@ -32,6 +36,86 @@ assert.equal(
   "Outro — Exame especial"
 );
 assert.equal(formatMesAnoPrevisto("2027-01-15"), "Janeiro/2027");
+
+assert.equal(
+  dataPrevistaDentroDaVigenciaContrato({
+    dataPrevistaIso: "2026-12-01",
+    dataInicio: "2026-08-28",
+    dataFim: "2027-08-28",
+  }),
+  true
+);
+assert.equal(
+  dataPrevistaDentroDaVigenciaContrato({
+    dataPrevistaIso: "2026-08-01",
+    dataInicio: "2026-08-28",
+    dataFim: "2027-08-28",
+  }),
+  false
+);
+assert.equal(
+  dataPrevistaDentroDaVigenciaContrato({
+    dataPrevistaIso: "2027-08-29",
+    dataInicio: "2026-08-28",
+    dataFim: "2027-08-28",
+  }),
+  false
+);
+assert.ok(EXAME_FUTURO_FORA_VIGENCIA_MSG.includes("vigência"));
+
+assert.equal(
+  deveReverterVagaAposCancelamentoPeriodico({
+    vagaStatus: "programada",
+    periodicoFuturoId: "pf-1",
+    periodicoCancelado: true,
+  }),
+  true
+);
+assert.equal(
+  deveReverterVagaAposCancelamentoPeriodico({
+    vagaStatus: "agendada",
+    periodicoFuturoId: "pf-1",
+    periodicoCancelado: true,
+  }),
+  false
+);
+assert.equal(
+  deveReverterVagaAposCancelamentoPeriodico({
+    vagaStatus: "programada",
+    periodicoFuturoId: "pf-1",
+    periodicoCancelado: false,
+  }),
+  false
+);
+
+// Comprometido → 1 Programado: progresso 33%, etapa não concluída
+const sucosParcial = buildContratoAgendamentoContagem(3, 1, 0, {
+  agendados: 0,
+  programadosFuturos: 1,
+  emAberto: 0,
+  vagasComprometidas: 2,
+});
+assert.equal(sucosParcial.percentual, 33);
+assert.equal(sucosParcial.concluido, false);
+assert.equal(sucosParcial.programadosFuturos, 1);
+assert.equal(sucosParcial.vagasComprometidas, 2);
+
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 3,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  true
+);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 3,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 1,
+  }),
+  false
+);
 
 // Cenário: 2 agendados + 1 programado = concluído
 assert.equal(isAgendamentosImplantacaoConcluida(3, 3, false), true);

@@ -9,6 +9,10 @@ import {
   InformarExameFuturoModal,
   type InformarExameFuturoFormResult,
 } from "@/components/orcamentos/InformarExameFuturoModal";
+import {
+  ProgramarVagaFuturoModal,
+  type ProgramarVagaFuturoContext,
+} from "@/components/orcamentos/ProgramarVagaFuturoModal";
 import { AsosContratuaisEmAbertoSection } from "@/components/orcamentos/AsosContratuaisEmAbertoSection";
 import {
   RegistrarAsoEmAbertoModal,
@@ -276,6 +280,8 @@ export function OrcamentoAbaAgendamentos({
   const [reabrirModalOpen, setReabrirModalOpen] = useState(false);
   const [exameFuturoModalOpen, setExameFuturoModalOpen] = useState(false);
   const [exameFuturoSaving, setExameFuturoSaving] = useState(false);
+  const [programarVagaContext, setProgramarVagaContext] =
+    useState<ProgramarVagaFuturoContext | null>(null);
   const [asoAbertoModalOpen, setAsoAbertoModalOpen] = useState(false);
   const [asoAbertoSaving, setAsoAbertoSaving] = useState(false);
   const [creditosAso, setCreditosAso] = useState<ContratoCreditoAsoRecord[]>(
@@ -585,9 +591,17 @@ export function OrcamentoAbaAgendamentos({
         motivoDetalhe: data.motivoDetalhe,
         observacoes: data.observacoes,
         criadoPor: usuarioNome,
+        vagaId: programarVagaContext?.vagaId ?? null,
+        cargoId: programarVagaContext?.cargoId ?? null,
+        cargoNome: programarVagaContext?.cargoNome ?? null,
       });
-      toast.success("Exame futuro programado e vaga do contrato consumida.");
+      toast.success(
+        programarVagaContext
+          ? "Vaga programada para o futuro. Registro criado em Periódicos Futuros."
+          : "Exame futuro programado e vaga do contrato consumida."
+      );
       setExameFuturoModalOpen(false);
+      setProgramarVagaContext(null);
       await load({ silent: true });
     } catch (err) {
       console.error(err);
@@ -599,6 +613,29 @@ export function OrcamentoAbaAgendamentos({
     } finally {
       setExameFuturoSaving(false);
     }
+  }
+
+  function handleAbrirProgramarVaga(vaga: ContratoVagaRecord) {
+    if (!isNomeFuncionarioReal(vaga.colaborador)) {
+      toast.error(
+        "Preencha o funcionário na Lista de funcionários antes de programar."
+      );
+      return;
+    }
+    const cpf = normalizeCpfDigits(vaga.colaborador_cpf);
+    if (cpf.length !== 11) {
+      toast.error(
+        "Informe um CPF válido na Lista de funcionários antes de programar."
+      );
+      return;
+    }
+    setProgramarVagaContext({
+      vagaId: vaga.id,
+      colaborador: (vaga.colaborador ?? "").trim(),
+      colaboradorCpf: cpf,
+      cargoNome: vaga.cargo_nome ?? null,
+      cargoId: vaga.cargo_id ?? null,
+    });
   }
 
   async function handleConfirmarAsoEmAberto(
@@ -1084,7 +1121,10 @@ export function OrcamentoAbaAgendamentos({
                   type="button"
                   className="btn btn-muted text-xs"
                   disabled={saving || loading || !contrato || exameFuturoSaving}
-                  onClick={() => setExameFuturoModalOpen(true)}
+                  onClick={() => {
+                    setProgramarVagaContext(null);
+                    setExameFuturoModalOpen(true);
+                  }}
                 >
                   Informar exame futuro
                 </button>
@@ -1185,13 +1225,22 @@ export function OrcamentoAbaAgendamentos({
                       </td>
                       <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5">
                         {vaga.status === "comprometida" ? (
-                          <button
-                            type="button"
-                            className="text-[11px] font-semibold text-brand-blue hover:underline"
-                            onClick={() => handleAgendarVaga(vaga)}
-                          >
-                            Agendar
-                          </button>
+                          <div className="flex flex-col items-start gap-1">
+                            <button
+                              type="button"
+                              className="text-[11px] font-semibold text-brand-blue hover:underline"
+                              onClick={() => handleAgendarVaga(vaga)}
+                            >
+                              Agendar
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] font-semibold text-brand-blue hover:underline"
+                              onClick={() => handleAbrirProgramarVaga(vaga)}
+                            >
+                              Programar para o futuro
+                            </button>
+                          </div>
                         ) : vaga.status === "aberta" ||
                           vaga.status === "aso_aberto" ? (
                           <button
@@ -1367,6 +1416,19 @@ export function OrcamentoAbaAgendamentos({
         numeroContrato={contrato?.numero ?? null}
         sugestoes={sugestoesColaboradores}
         onClose={() => setExameFuturoModalOpen(false)}
+        onConfirm={(data) => void handleConfirmarExameFuturo(data)}
+      />
+
+      <ProgramarVagaFuturoModal
+        open={Boolean(programarVagaContext)}
+        saving={exameFuturoSaving}
+        numeroContrato={contrato?.numero ?? null}
+        vigenciaInicio={contrato?.data_inicio ?? null}
+        vigenciaFim={contrato?.data_fim ?? null}
+        context={programarVagaContext}
+        onClose={() => {
+          if (!exameFuturoSaving) setProgramarVagaContext(null);
+        }}
         onConfirm={(data) => void handleConfirmarExameFuturo(data)}
       />
 

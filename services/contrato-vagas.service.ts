@@ -578,6 +578,34 @@ export async function reconciliarVagasComprometidasDoContrato(params: {
       .eq("consome_previsao_contrato", true);
 
     for (const periodico of periodicosContrato ?? []) {
+      const periodicoCancelado =
+        String(periodico.status ?? "").trim().toLowerCase() === "cancelado";
+
+      const vagaPorPeriodico = vagas.find(
+        (v) => v.periodico_futuro_id === periodico.id
+      );
+
+      if (periodicoCancelado) {
+        if (
+          vagaPorPeriodico &&
+          vagaPorPeriodico.status === "programada" &&
+          !vagaPorPeriodico.agendamento_id
+        ) {
+          await supabase
+            .from("contrato_vagas")
+            .update({
+              status: "comprometida",
+              periodico_futuro_id: null,
+              agendamento_id: null,
+            })
+            .eq("id", vagaPorPeriodico.id)
+            .eq("status", "programada");
+          vagaPorPeriodico.status = "comprometida";
+          vagaPorPeriodico.periodico_futuro_id = null;
+        }
+        continue;
+      }
+
       const agVinculadoId =
         (periodico.agendamento_vinculado_id ?? "").trim() ||
         (periodico.status === "reagendado"
@@ -616,7 +644,7 @@ export async function reconciliarVagasComprometidasDoContrato(params: {
         !agObj || String(agObj.status).trim().toLowerCase() === "cancelado";
 
       const vaga =
-        vagas.find((v) => v.periodico_futuro_id === periodico.id) ||
+        vagaPorPeriodico ||
         (periodico.colaborador_cpf
           ? vagas.find(
               (v) =>
@@ -861,19 +889,33 @@ export async function ocuparVagaComExameFuturo(params: {
   colaboradorCpf: string | null;
   cargoId?: string | null;
   cargoNome?: string | null;
+  /** Preferência: vaga comprometida específica (ação Programar para o futuro). */
+  vagaId?: string | null;
 }): Promise<void> {
   const vagas = await listarVagasDoContrato(params.contratoId);
   const cpf = normalizeCpfDigits(params.colaboradorCpf);
+  const vagaId = (params.vagaId ?? "").trim();
+  const porId = vagaId
+    ? vagas.find((v) => v.id === vagaId && v.status === "comprometida")
+    : undefined;
   const alvo =
+    porId ||
     (cpf &&
       vagas.find(
         (v) => v.status === "comprometida" && cpfVagaIguais(v.colaborador_cpf, cpf)
       )) ||
     vagas.find((v) => v.status === "aberta");
-  if (!alvo) return;
+  if (!alvo) {
+    if (vagaId) {
+      throw new Error(
+        "A vaga selecionada não está mais comprometida ou não pertence a este contrato."
+      );
+    }
+    return;
+  }
 
   const supabase = createClient();
-  await supabase
+  const { error } = await supabase
     .from("contrato_vagas")
     .update({
       status: "programada",
@@ -884,6 +926,45 @@ export async function ocuparVagaComExameFuturo(params: {
       cargo_nome: params.cargoNome ?? alvo.cargo_nome,
     })
     .eq("id", alvo.id);
+  if (error) throw error;
+}
+
+/**
+ * Periódico cancelado → vaga programada volta para Comprometido (mantém colaborador).
+ * Usado no cancelamento manual e na reconciliação ao abrir a Implantação.
+ */
+export async function reverterVagasProgramadasPorPeriodicosCancelados(params: {
+  periodicoIds: string[];
+}): Promise<number> {
+  const ids = Array.from(
+    new Set(params.periodicoIds.map((id) => id.trim()).filter(Boolean))
+  );
+  if (ids.length === 0) return 0;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contrato_vagas")
+    .select(SELECT_VAGA)
+    .in("periodico_futuro_id", ids)
+    .eq("status", "programada");
+  if (error) throw error;
+
+  let atualizados = 0;
+  for (const row of data ?? []) {
+    const mapped = mapVaga(row as Record<string, unknown>);
+    const { error: updErr } = await supabase
+      .from("contrato_vagas")
+      .update({
+        status: "comprometida",
+        periodico_futuro_id: null,
+        agendamento_id: null,
+      })
+      .eq("id", mapped.id)
+      .eq("status", "programada");
+    if (updErr) throw updErr;
+    atualizados += 1;
+  }
+  return atualizados;
 }
 
 export async function marcarVagaUtilizadaPorCredito(params: {
