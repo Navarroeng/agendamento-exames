@@ -250,7 +250,7 @@ export async function salvarListaVagasContrato(params: {
   await marcarEtapaListaVagas(params.aprovacaoId);
 
   await registrarAuditoria({
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.contrato_vagas_salvas,
     registroId: params.contratoId,
     registroNome: params.numeroContrato ?? params.contratoId,
@@ -320,7 +320,7 @@ export async function liberarFuncionarioDaVagaComprometida(params: {
   });
 
   await registrarAuditoria({
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.contrato_vaga_funcionario_removido,
     registroId: vaga.id,
     registroNome: params.numeroContrato ?? vaga.contrato_id,

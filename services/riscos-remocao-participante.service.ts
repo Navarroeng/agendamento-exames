@@ -9,6 +9,7 @@ import {
   participanteEstaRemovido,
 } from "@/lib/riscos-remocao-participante";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 type AuditOptions = { auditContext?: AuditoriaUsuarioContext };
@@ -116,22 +117,24 @@ export async function removerParticipanteCampanhaSoft(
     throw new Error("Não foi possível remover o participante.");
   }
 
-  const { error: auditErr } = await supabase.from("auditoria_sistema").insert({
-    usuario_id: usuarioId,
-    usuario_nome: nome,
-    usuario_email: email,
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: email,
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_participante_removido,
-    registro_id: String(participante.id),
-    registro_nome: String(participante.nome_completo),
-    descricao: `${nome} removeu o participante ${participante.nome_completo} da campanha.`,
-    dados_antes: {
+    registroId: String(participante.id),
+    registroNome: String(participante.nome_completo),
+    descricao: `${nome} removeu o participante ${participante.nome_completo} da pesquisa de Riscos Psicossociais. Motivo: ${motivo}`,
+    dadosAntes: {
       campanha_id: participante.campanha_id,
       participante_id: participante.id,
       status: statusAntes,
       sessao_id: sessaoId,
     },
-    dados_depois: {
+    dadosDepois: {
       campanha_id: participante.campanha_id,
       participante_id: participante.id,
       status: "removido",
@@ -141,9 +144,6 @@ export async function removerParticipanteCampanhaSoft(
       sessao_valida: false,
     },
   });
-  if (auditErr) {
-    console.error("[removerParticipanteCampanhaSoft] auditoria:", auditErr);
-  }
 
   return {
     participanteId: String(participante.id),

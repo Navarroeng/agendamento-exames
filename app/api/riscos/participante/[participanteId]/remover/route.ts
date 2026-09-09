@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { removerParticipanteCampanhaSoft } from "@/services/riscos-remocao-participante.service";
@@ -46,14 +47,6 @@ export async function POST(
     }
 
     let motivo: string | undefined;
-    let usuarioNome =
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Administrador";
-    let usuarioEmail =
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
     try {
       const body = (await request.json()) as {
         motivo?: string;
@@ -61,8 +54,6 @@ export async function POST(
         usuarioEmail?: string;
       };
       if (body?.motivo?.trim()) motivo = body.motivo.trim();
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
       // corpo opcional
     }
@@ -70,11 +61,7 @@ export async function POST(
     const result = await removerParticipanteCampanhaSoft(
       { participanteId, motivo },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

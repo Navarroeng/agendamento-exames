@@ -29,7 +29,7 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 const PARTICIPANTE_SELECT =
@@ -353,15 +353,17 @@ export async function criarParticipanteCampanhaNoServidor(
 
   const record = mapParticipante(data as Record<string, unknown>);
   const nome = usuarioNome ?? "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_participante_criado,
     registroId: record.id,
     registroNome: record.nome_completo,
-    descricao: `${nome} cadastrou o participante ${record.nome_completo} na pesquisa ${campanha.codigo_publico}.`,
+    descricao: `${nome} cadastrou o participante ${record.nome_completo} na pesquisa da empresa ${campanha.empresa_nome} (Código: ${campanha.codigo_publico}).`,
     dadosDepois: {
       campanha_id: record.campanha_id,
       cpf: record.cpf,
@@ -449,15 +451,17 @@ export async function atualizarParticipanteCampanhaNoServidor(
 
   const record = mapParticipante(data as Record<string, unknown>);
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_participante_editado,
     registroId: record.id,
     registroNome: record.nome_completo,
-    descricao: `${nome} editou o participante ${record.nome_completo}.`,
+    descricao: `${nome} editou os dados do participante ${record.nome_completo} na pesquisa de Riscos Psicossociais.`,
     dadosAntes: {
       nome_completo: before.nome_completo,
       cpf: before.cpf,
@@ -789,15 +793,17 @@ export async function importarParticipantesCampanhaNoServidor(
 
   if (importados > 0) {
     const nome = usuarioNome ?? "Sistema";
-    await registrarAuditoria({
-      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-      usuarioNome: nome,
-      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    await registrarAuditoriaServer({
+      contexto: {
+        usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+        usuarioNome: nome,
+        usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+      },
       modulo: AUDITORIA_MODULOS.riscos_psicossociais,
       acao: AUDITORIA_ACOES.riscos_participante_criado,
       registroId: campanha.id,
-      registroNome: campanha.codigo_publico,
-      descricao: `${nome} importou ${importados} participante(s) na pesquisa ${campanha.codigo_publico}.`,
+      registroNome: campanha.empresa_nome || campanha.codigo_publico,
+      descricao: `${nome} importou ${importados} participante(s) na pesquisa de Riscos Psicossociais da empresa ${campanha.empresa_nome}.`,
       dadosDepois: {
         campanha_id: campanha.id,
         importados,

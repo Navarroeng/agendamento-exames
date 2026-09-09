@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { createClient } from "@/lib/supabase/server";
 import { removerParticipanteCampanhaSoft } from "@/services/riscos-remocao-participante.service";
 
@@ -21,6 +22,16 @@ export async function POST(
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
+    const { data: perfil } = await supabase
+      .from("perfis_usuarios")
+      .select("perfil, ativo, nome, email")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!perfil || perfil.ativo === false) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
     const participanteId = String(context.params.participanteId ?? "").trim();
     if (!participanteId) {
       return NextResponse.json(
@@ -30,8 +41,6 @@ export async function POST(
     }
 
     let motivo: string | undefined;
-    let usuarioNome = user.email || "Administrador";
-    let usuarioEmail = user.email || "";
     try {
       const body = (await request.json()) as {
         motivo?: string;
@@ -39,8 +48,6 @@ export async function POST(
         usuarioEmail?: string;
       };
       if (body?.motivo?.trim()) motivo = body.motivo.trim();
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
       // corpo opcional
     }
@@ -48,11 +55,7 @@ export async function POST(
     const result = await removerParticipanteCampanhaSoft(
       { participanteId, motivo },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

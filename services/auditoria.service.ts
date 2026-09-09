@@ -15,6 +15,30 @@ export async function registrarAuditoria(
   input: RegistrarAuditoriaInput
 ): Promise<void> {
   try {
+    if (typeof window === "undefined") {
+      // Ambiente Node.js server-side: utiliza service role com admin client
+      // para evitar bloqueio indevido por RLS em rotas de API.
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const admin = createAdminClient();
+      const { error } = await admin.from("auditoria_sistema").insert({
+        usuario_id: input.usuarioId ?? null,
+        usuario_nome: input.usuarioNome.trim(),
+        usuario_email: input.usuarioEmail.trim(),
+        modulo: input.modulo,
+        acao: input.acao,
+        registro_id: input.registroId ?? null,
+        registro_nome: input.registroNome?.trim() || null,
+        descricao: input.descricao.trim(),
+        dados_antes: input.dadosAntes ?? null,
+        dados_depois: input.dadosDepois ?? null,
+      });
+
+      if (error) {
+        console.error("[auditoria] Falha ao registrar evento (server):", error);
+      }
+      return;
+    }
+
     const supabase = createClient();
     const { error } = await supabase.from("auditoria_sistema").insert({
       usuario_id: input.usuarioId ?? null,
@@ -30,7 +54,7 @@ export async function registrarAuditoria(
     });
 
     if (error) {
-      console.error("[auditoria] Falha ao registrar evento:", error);
+      console.error("[auditoria] Falha ao registrar evento (client):", error);
     }
   } catch (err) {
     console.error("[auditoria] Falha ao registrar evento:", err);
@@ -113,6 +137,12 @@ export async function listarAuditoriaPaginada(
   if (filters.acao) {
     query = query.eq("acao", filters.acao);
   }
+  if (filters.busca?.trim()) {
+    const safe = filters.busca.trim().replace(/[%,\\]/g, "");
+    if (safe) {
+      query = query.or(`registro_nome.ilike.%${safe}%,descricao.ilike.%${safe}%`);
+    }
+  }
 
   const { data, error, count } = await query;
   if (error) throw error;
@@ -133,6 +163,30 @@ export async function listarAuditoriaUsuariosFiltro(
   limit = 100
 ): Promise<Array<{ email: string; nome: string }>> {
   const supabase = createClient();
+
+  try {
+    const { data: perfis, error: perfilErr } = await supabase
+      .from("perfis_usuarios")
+      .select("email, nome")
+      .eq("ativo", true)
+      .in("perfil", ["admin", "operacional"])
+      .order("nome", { ascending: true });
+
+    if (!perfilErr && Array.isArray(perfis) && perfis.length > 0) {
+      const map = new Map<string, string>();
+      for (const p of perfis) {
+        const email = String(p.email ?? "").trim();
+        const nome = String(p.nome ?? "").trim();
+        if (email && !map.has(email)) map.set(email, nome || email);
+      }
+      return Array.from(map.entries())
+        .map(([email, nome]) => ({ email, nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    }
+  } catch (err) {
+    console.warn("[auditoria] Falha ao listar de perfis_usuarios, tentando auditoria_sistema:", err);
+  }
+
   const { data, error } = await supabase
     .from("auditoria_sistema")
     .select("usuario_email, usuario_nome")

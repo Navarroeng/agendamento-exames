@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { CpfCampanhaAtivaError } from "@/lib/riscos-cpf-campanha-ativa";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -68,11 +69,11 @@ export async function POST(
       }>;
     };
 
-    const auditContext = {
-      usuarioId: auth.user.id,
+    const auditContext = auditoriaActorFromAuth({
+      user: auth.user,
       usuarioNome: auth.usuarioNome,
       usuarioEmail: auth.usuarioEmail,
-    };
+    });
 
     if (Array.isArray(body.importacao)) {
       const linhas = body.importacao.map((l, idx) => ({

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireRiscosStaffApi } from "@/lib/riscos-api-auth.server";
 import { reenviarRelatorioRiscosPorEmailResend } from "@/services/riscos-relatorio-reenvio-email.server";
 import { sanitizarRelatorioParaOperacional } from "@/lib/riscos-relatorio";
@@ -45,11 +46,7 @@ export async function POST(
       email,
       reenvioIntentToken,
       request,
-      auditContext: {
-        usuarioId: auth.user.id,
-        usuarioNome: body.usuarioNome?.trim() || auth.usuarioNome,
-        usuarioEmail: body.usuarioEmail?.trim() || auth.usuarioEmail,
-      },
+      auditContext: auditoriaActorFromAuth(auth),
     });
 
     return NextResponse.json({

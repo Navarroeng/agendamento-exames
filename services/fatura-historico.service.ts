@@ -10,6 +10,7 @@ import {
   AUDITORIA_ACOES,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { formatCurrency } from "@/lib/money";
 import { createClient } from "@/lib/supabase/client";
 import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
@@ -144,6 +145,8 @@ async function auditarFatura(
     registroId: string;
     registroNome: string;
     descricao: string;
+    dadosAntes?: Record<string, unknown> | null;
+    dadosDepois?: Record<string, unknown> | null;
   }
 ): Promise<void> {
   const nome =
@@ -158,6 +161,8 @@ async function auditarFatura(
     registroId: input.registroId,
     registroNome: input.registroNome,
     descricao: input.descricao,
+    dadosAntes: input.dadosAntes,
+    dadosDepois: input.dadosDepois,
   });
 }
 
@@ -372,12 +377,27 @@ export async function salvarFatura(
     const usuario =
       auditOptions?.auditContext?.usuarioNome?.trim() || input.gerado_por;
 
+    const acaoAtualizacao = input.status === "emitida" && existing.status !== "emitida"
+      ? AUDITORIA_ACOES.fatura_emitida
+      : AUDITORIA_ACOES.fatura_recalculada;
+
     await auditarFatura(auditOptions, {
       tipo: input.tipo,
-      acao: AUDITORIA_ACOES.edicao,
+      acao: acaoAtualizacao,
       registroId: updated.id,
       registroNome: updated.numero,
-      descricao: `${usuario} editou a fatura ${updated.numero} (${updated.referencia_nome}).`,
+      descricao:
+        acaoAtualizacao === AUDITORIA_ACOES.fatura_emitida
+          ? `${usuario} emitiu a fatura ${updated.numero} da empresa ${updated.referencia_nome} no valor de ${formatCurrency(updated.valor_total)}.`
+          : `${usuario} recalculou e atualizou a fatura ${updated.numero} da empresa ${updated.referencia_nome} (${formatCurrency(updated.valor_total)}).`,
+      dadosAntes: {
+        valor_total: existing.valor_total,
+        status: existing.status,
+      },
+      dadosDepois: {
+        valor_total: updated.valor_total,
+        status: updated.status,
+      },
     });
 
     return updated;
@@ -440,12 +460,20 @@ export async function salvarFatura(
         `(marcada como reemitida). Mês de referência: ${mesLabel}.`,
     });
   } else {
+    const acaoCriacao =
+      input.status === "emitida"
+        ? AUDITORIA_ACOES.fatura_emitida
+        : AUDITORIA_ACOES.fatura_criada;
     await auditarFatura(auditOptions, {
       tipo: input.tipo,
-      acao: AUDITORIA_ACOES.criacao,
+      acao: acaoCriacao,
       registroId: created.id,
       registroNome: created.numero,
-      descricao: `${usuario} criou a fatura ${created.numero} (${created.referencia_nome}).`,
+      descricao: `${usuario} ${input.status === "emitida" ? "emitiu" : "criou"} a fatura ${created.numero} da empresa ${created.referencia_nome} (${formatCurrency(created.valor_total)}).`,
+      dadosDepois: {
+        valor_total: created.valor_total,
+        status: created.status,
+      },
     });
   }
 
@@ -991,12 +1019,18 @@ export async function registrarPagamentoFatura(
   }
 
   if (existing) {
+    const usuarioNome = auditOptions?.auditContext?.usuarioNome ?? "Sistema";
+    const valorFmt = formatCurrency(existing.valor_total);
     await auditarFatura(auditOptions, {
       tipo: existing.tipo,
-      acao: AUDITORIA_ACOES.edicao,
+      acao: AUDITORIA_ACOES.fatura_pagamento_registrado,
       registroId: existing.id,
       registroNome: existing.numero,
-      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} registrou pagamento da fatura ${existing.numero}.`,
+      descricao: `${usuarioNome} registrou o pagamento da fatura ${existing.numero} da empresa ${existing.referencia_nome} no valor de ${valorFmt}.`,
+      dadosDepois: {
+        valor: existing.valor_total,
+        data_pagamento: input.data_pagamento,
+      },
     });
   }
 }
@@ -1053,12 +1087,18 @@ export async function atualizarPagamentoFatura(
   }
 
   if (existing) {
+    const usuarioNome = auditOptions?.auditContext?.usuarioNome ?? "Sistema";
+    const valorFmt = formatCurrency(existing.valor_total);
     await auditarFatura(auditOptions, {
       tipo: existing.tipo,
-      acao: AUDITORIA_ACOES.edicao,
+      acao: AUDITORIA_ACOES.fatura_pagamento_atualizado,
       registroId: existing.id,
       registroNome: existing.numero,
-      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} atualizou o pagamento da fatura ${existing.numero}.`,
+      descricao: `${usuarioNome} atualizou o registro de pagamento da fatura ${existing.numero} da empresa ${existing.referencia_nome} (${valorFmt}).`,
+      dadosDepois: {
+        valor: existing.valor_total,
+        data_pagamento: input.data_pagamento,
+      },
     });
   }
 }
@@ -1090,12 +1130,13 @@ export async function marcarFaturaPendente(
   }
 
   if (existing) {
+    const usuarioNome = auditOptions?.auditContext?.usuarioNome ?? "Sistema";
     await auditarFatura(auditOptions, {
       tipo: existing.tipo,
-      acao: AUDITORIA_ACOES.edicao,
+      acao: AUDITORIA_ACOES.fatura_pagamento_revertido,
       registroId: existing.id,
       registroNome: existing.numero,
-      descricao: `${auditOptions?.auditContext?.usuarioNome ?? "Sistema"} marcou a fatura ${existing.numero} como pagamento pendente.`,
+      descricao: `${usuarioNome} reverteu o pagamento da fatura ${existing.numero} da empresa ${existing.referencia_nome} para pendente.`,
     });
   }
 }

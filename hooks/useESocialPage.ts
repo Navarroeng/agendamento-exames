@@ -361,16 +361,27 @@ export function useESocialPage() {
             : numeroMatricula,
       });
       const matriculaLabel = numeroMatricula?.trim() || "—";
+      await registrarAuditoria({
+        usuarioId: auditContext.usuarioId,
+        usuarioNome: usuario,
+        usuarioEmail: auditContext.usuarioEmail,
+        modulo: AUDITORIA_MODULOS.esocial,
+        acao: AUDITORIA_ACOES.esocial_marcado_enviado,
+        registroId: marcarEnviadoId,
+        registroNome: getById(marcarEnviadoId)?.colaborador,
+        descricao: `${usuario} registrou envio ao e-Social de ${getById(marcarEnviadoId)?.colaborador || "colaborador"}. Recibo: ${recibo}.`,
+        dadosDepois: {
+          data_envio: dataEnvioInput,
+          recibo,
+          matricula: matriculaLabel,
+        },
+      });
       await registrarHistorico(marcarEnviadoId, usuario, [
         {
           acao: "Alteração",
           detalhes: `${usuario} marcou o agendamento como enviado ao eSocial. Data: ${dataEnvioInput}. Recibo: ${recibo}. Matrícula: ${matriculaLabel}.`,
         },
-      ], {
-        auditContext,
-        auditModulo: AUDITORIA_MODULOS.esocial,
-        registroNome: getById(marcarEnviadoId)?.colaborador,
-      });
+      ]);
       await reloadAgendamentos();
       toast.success("e-Social marcado como enviado.");
       setMarcarEnviadoOpen(false);
@@ -434,16 +445,22 @@ export function useESocialPage() {
           data_envio_esocial: updated.data_envio_esocial,
           esocial_recibo: updated.esocial_recibo,
         });
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: usuario,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.esocial,
+          acao: AUDITORIA_ACOES.esocial_marcado_pendente,
+          registroId: id,
+          registroNome: ag.colaborador,
+          descricao: `${usuario} retornou o envio de ${ag.colaborador} ao e-Social para pendente.`,
+        });
         await registrarHistorico(id, usuario, [
           {
             acao: "Alteração",
             detalhes: `${usuario} marcou o envio ao e-Social como Pendente`,
           },
-        ], {
-          auditContext,
-          auditModulo: AUDITORIA_MODULOS.esocial,
-          registroNome: ag.colaborador,
-        });
+        ]);
         await reloadAgendamentos();
         toast.success("e-Social marcado como pendente.");
       } catch (err) {
@@ -522,10 +539,10 @@ export function useESocialPage() {
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.esocial,
-          acao: AUDITORIA_ACOES.cancelamento,
+          acao: AUDITORIA_ACOES.esocial_envio_cancelado,
           registroId: cancelTarget.id,
           registroNome: cancelTarget.colaborador,
-          descricao: `${auditContext.usuarioNome} cancelou o controle de envio ao eSocial do agendamento de ${cancelTarget.colaborador}. Status anterior: ${statusLabel}. Motivo: ${motivo}`,
+          descricao: `${auditContext.usuarioNome} cancelou o envio ao e-Social de ${cancelTarget.colaborador}. Motivo: ${motivo}`,
           dadosAntes: {
             status_visual: statusAnterior,
             envio_esocial: cancelTarget.envio_esocial,

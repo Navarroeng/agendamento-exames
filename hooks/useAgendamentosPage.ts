@@ -1095,13 +1095,6 @@ export function useAgendamentosPage() {
           if (cancelled) return;
           const nomes = examesObrigatorios.map((exame) => exame.nome);
           await replaceExamesFromCargo(nomes);
-          if (nomes.length > 0 && cargoPendente.cargoNome) {
-            await registrarExamesCarregadosPorCargo(auditContext, {
-              cargoNome: cargoPendente.cargoNome,
-              exames: nomes,
-              colaborador: staged.colaborador,
-            });
-          }
         } catch (err) {
           console.error("Erro ao carregar exames do cargo (prefill):", err);
         }
@@ -1521,14 +1514,6 @@ export function useAgendamentosPage() {
           );
           const nomes = examesObrigatorios.map((exame) => exame.nome);
           await replaceExamesFromCargo(nomes);
-          if (nomes.length > 0 && cargoPendente.cargoNome) {
-            await registrarExamesCarregadosPorCargo(auditContext, {
-              cargoNome: cargoPendente.cargoNome,
-              exames: nomes,
-              colaborador: form.colaborador,
-              agendamentoId: editingId,
-            });
-          }
         } catch (err) {
           console.error("Erro ao carregar exames do cargo (prefill):", err);
         }
@@ -1712,18 +1697,12 @@ export function useAgendamentosPage() {
         if (
           previousCargoId &&
           previousCargoId !== nextCargoId &&
-          cargoAnteriorNome
+          cargoAnteriorNome &&
+          editingId
         ) {
           await registrarCargoAlteradoExamesRecalculados(auditContext, {
             cargoAnterior: cargoAnteriorNome,
             cargoNovo: cargoNovoNome,
-            exames: examesAudit,
-            colaborador: form.colaborador,
-            agendamentoId: editingId,
-          });
-        } else if (cargoNovoNome) {
-          await registrarExamesCarregadosPorCargo(auditContext, {
-            cargoNome: cargoNovoNome,
             exames: examesAudit,
             colaborador: form.colaborador,
             agendamentoId: editingId,

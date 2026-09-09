@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
   PERIODICO_CANCELAR_SEM_PERMISSAO_MSG,
@@ -44,25 +45,10 @@ export async function POST(request: Request) {
       usuarioEmail?: string;
     };
 
-    const usuarioNome =
-      (typeof body?.usuarioNome === "string" && body.usuarioNome.trim()) ||
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Administrador";
-    const usuarioEmail =
-      (typeof body?.usuarioEmail === "string" && body.usuarioEmail.trim()) ||
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
-
     const result = await cancelarPeriodicoFuturoNoServidor({
       ids: Array.isArray(body?.ids) ? body.ids : [],
       motivo: typeof body?.motivo === "string" ? body.motivo : "",
-      auditContext: {
-        usuarioId: user.id,
-        usuarioNome,
-        usuarioEmail,
-      },
+      auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
     });
 
     return NextResponse.json(result);

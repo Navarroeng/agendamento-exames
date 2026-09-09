@@ -13,6 +13,8 @@ export const AUDITORIA_MODULOS = {
   usuarios: "usuarios",
   orcamentos: "orcamentos",
   riscos_psicossociais: "riscos_psicossociais",
+  laudos_sst: "laudos_sst",
+  implantacao_clientes: "implantacao_clientes",
 } as const;
 
 export type AuditoriaModulo =
@@ -107,6 +109,51 @@ export const AUDITORIA_ACOES = {
   riscos_relatorio_envio_reenviado: "riscos_relatorio_envio_reenviado",
   riscos_campanha_logo_atualizado: "riscos_campanha_logo_atualizado",
   riscos_campanha_logo_removido: "riscos_campanha_logo_removido",
+  laudos_processo_iniciado: "laudos_processo_iniciado",
+  laudos_epis_salvos: "laudos_epis_salvos",
+  laudos_cadastro_concluido: "laudos_cadastro_concluido",
+  laudos_cronograma_concluido: "laudos_cronograma_concluido",
+  laudos_pgr_concluido: "laudos_pgr_concluido",
+  laudos_pcmso_concluido: "laudos_pcmso_concluido",
+  laudos_ltcat_concluido: "laudos_ltcat_concluido",
+  laudos_enviado_aprovacao: "laudos_enviado_aprovacao",
+  laudos_aprovado_tecnico: "laudos_aprovado_tecnico",
+  laudos_reprovado_tecnico: "laudos_reprovado_tecnico",
+  laudos_enviado_cliente: "laudos_enviado_cliente",
+  laudos_processo_concluido: "laudos_processo_concluido",
+  implantacao_iniciada: "implantacao_iniciada",
+  implantacao_etapa_concluida: "implantacao_etapa_concluida",
+  implantacao_etapa_reaberta: "implantacao_etapa_reaberta",
+  implantacao_vagas_salvas: "implantacao_vagas_salvas",
+  implantacao_agendamento_vinculado: "implantacao_agendamento_vinculado",
+  implantacao_agendamentos_iniciais_dispensados:
+    "implantacao_agendamentos_iniciais_dispensados",
+  implantacao_agendamentos_iniciais_reabertos:
+    "implantacao_agendamentos_iniciais_reabertos",
+  implantacao_treinamento_agendado: "implantacao_treinamento_agendado",
+  implantacao_treinamento_confirmado: "implantacao_treinamento_confirmado",
+  implantacao_treinamento_reagendado: "implantacao_treinamento_reagendado",
+  implantacao_treinamento_realizado: "implantacao_treinamento_realizado",
+  implantacao_treinamento_cancelado: "implantacao_treinamento_cancelado",
+  implantacao_concluida: "implantacao_concluida",
+  fatura_criada: "fatura_criada",
+  fatura_emitida: "fatura_emitida",
+  fatura_pagamento_registrado: "fatura_pagamento_registrado",
+  fatura_pagamento_atualizado: "fatura_pagamento_atualizado",
+  fatura_pagamento_revertido: "fatura_pagamento_revertido",
+  fatura_recalculada: "fatura_recalculada",
+  esocial_marcado_enviado: "esocial_marcado_enviado",
+  esocial_marcado_pendente: "esocial_marcado_pendente",
+  esocial_envio_cancelado: "esocial_envio_cancelado",
+  esocial_recibo_alterado: "esocial_recibo_alterado",
+  orcamento_criado: "orcamento_criado",
+  orcamento_editado: "orcamento_editado",
+  orcamento_aprovado: "orcamento_aprovado",
+  orcamento_cancelado: "orcamento_cancelado",
+  orcamento_valor_alterado: "orcamento_valor_alterado",
+  orcamento_responsavel_alterado: "orcamento_responsavel_alterado",
+  agendamento_periodico_vinculado: "agendamento_periodico_vinculado",
+  agendamento_valores_alterados: "agendamento_valores_alterados",
 } as const;
 
 export type AuditoriaAcao =
@@ -125,6 +172,8 @@ export const AUDITORIA_MODULO_LABELS: Record<AuditoriaModulo, string> = {
   usuarios: "Usuários",
   orcamentos: "Orçamentos",
   riscos_psicossociais: "Riscos Psicossociais",
+  laudos_sst: "Laudos SST",
+  implantacao_clientes: "Implantação de Clientes",
 };
 
 export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
@@ -224,12 +273,118 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
     "Relatório de Riscos reenviado por e-mail (Resend)",
   riscos_campanha_logo_atualizado: "Logo da campanha de Riscos atualizado",
   riscos_campanha_logo_removido: "Logo da campanha de Riscos removido",
+  laudos_processo_iniciado: "Processo de Laudos SST iniciado",
+  laudos_epis_salvos: "Questionário de EPIs salvo",
+  laudos_cadastro_concluido: "Etapa de cadastro de laudos concluída",
+  laudos_cronograma_concluido: "Cronograma de ações de laudos elaborado",
+  laudos_pgr_concluido: "Elaboração do PGR concluída",
+  laudos_pcmso_concluido: "Elaboração do PCMSO concluída",
+  laudos_ltcat_concluido: "Elaboração do LTCAT concluída",
+  laudos_enviado_aprovacao: "Laudos enviados para aprovação técnica",
+  laudos_aprovado_tecnico: "Laudos aprovados tecnicamente",
+  laudos_reprovado_tecnico: "Laudos devolvidos na aprovação técnica",
+  laudos_enviado_cliente: "Laudos enviados ao cliente",
+  laudos_processo_concluido: "Processo de Laudos SST concluído",
+  implantacao_iniciada: "Implantação de cliente iniciada",
+  implantacao_etapa_concluida: "Etapa da implantação concluída",
+  implantacao_etapa_reaberta: "Etapa da implantação reaberta",
+  implantacao_vagas_salvas: "Relação de vagas/funcionários salva",
+  implantacao_agendamento_vinculado: "Agendamento vinculado à vaga contratual",
+  implantacao_agendamentos_iniciais_dispensados:
+    "Agendamentos iniciais dispensados",
+  implantacao_agendamentos_iniciais_reabertos:
+    "Agendamentos iniciais reabertos",
+  implantacao_treinamento_agendado: "Treinamento do portal agendado",
+  implantacao_treinamento_confirmado: "Treinamento do portal confirmado",
+  implantacao_treinamento_reagendado: "Treinamento do portal reagendado",
+  implantacao_treinamento_realizado: "Treinamento do portal realizado",
+  implantacao_treinamento_cancelado: "Treinamento do portal cancelado",
+  implantacao_concluida: "Processo de implantação concluído",
+  fatura_criada: "Fatura criada",
+  fatura_emitida: "Fatura emitida",
+  fatura_pagamento_registrado: "Pagamento de fatura registrado",
+  fatura_pagamento_atualizado: "Pagamento de fatura atualizado",
+  fatura_pagamento_revertido: "Pagamento de fatura revertido para pendente",
+  fatura_recalculada: "Itens da fatura recalculados dos agendamentos",
+  esocial_marcado_enviado: "Marcado como enviado ao e-Social",
+  esocial_marcado_pendente: "Retornado para pendente de e-Social",
+  esocial_envio_cancelado: "Envio ao e-Social cancelado",
+  esocial_recibo_alterado: "Recibo do e-Social alterado",
+  orcamento_criado: "Orçamento criado",
+  orcamento_editado: "Orçamento editado",
+  orcamento_aprovado: "Orçamento aprovado",
+  orcamento_cancelado: "Orçamento cancelado",
+  orcamento_valor_alterado: "Valor do orçamento alterado",
+  orcamento_responsavel_alterado: "Responsável do processo alterado",
+  agendamento_periodico_vinculado: "Agendamento vinculado a periódico futuro",
+  agendamento_valores_alterados: "Exames e valores do agendamento alterados",
 };
 
 export interface AuditoriaUsuarioContext {
   usuarioId: string | null;
   usuarioNome: string;
   usuarioEmail: string;
+}
+
+/**
+ * Monta o ator da auditoria a partir do contexto autenticado no servidor.
+ * Não aceita campos do body/query/headers — qualquer claim do cliente deve
+ * ser ignorada pelo chamador antes de passar aqui.
+ */
+export function auditoriaActorFromAuth(auth: {
+  user: { id: string };
+  usuarioNome: string;
+  usuarioEmail: string;
+}): AuditoriaUsuarioContext {
+  return {
+    usuarioId: auth.user.id,
+    usuarioNome: auth.usuarioNome.trim() || "Sistema",
+    usuarioEmail: auth.usuarioEmail.trim() || "",
+  };
+}
+
+/**
+ * Variante para rotas que carregam `perfis_usuarios` + `auth.getUser()`
+ * localmente. Ignora qualquer identidade enviada pelo frontend.
+ */
+export function auditoriaActorFromSessionPerfil(params: {
+  user: { id: string; email?: string | null };
+  perfil: { nome?: string | null; email?: string | null } | null | undefined;
+}): AuditoriaUsuarioContext {
+  const usuarioNome =
+    (typeof params.perfil?.nome === "string" && params.perfil.nome.trim()) ||
+    params.user.email ||
+    "Usuário";
+  const usuarioEmail =
+    (typeof params.perfil?.email === "string" && params.perfil.email.trim()) ||
+    params.user.email ||
+    "";
+  return auditoriaActorFromAuth({
+    user: params.user,
+    usuarioNome,
+    usuarioEmail,
+  });
+}
+
+/**
+ * Prova que claims do body nunca entram na identidade gravada.
+ * Usado por testes e como contrato explícito das rotas API.
+ */
+export function resolveAuditoriaActorIgnoringClientClaims(params: {
+  auth: {
+    user: { id: string };
+    usuarioNome: string;
+    usuarioEmail: string;
+  };
+  body?: {
+    usuarioNome?: string;
+    usuarioEmail?: string;
+    usuario_id?: string;
+    usuarioId?: string;
+  } | null;
+}): AuditoriaUsuarioContext {
+  void params.body;
+  return auditoriaActorFromAuth(params.auth);
 }
 
 export interface RegistrarAuditoriaInput {
@@ -251,6 +406,7 @@ export interface AuditoriaFilters {
   usuarioEmail: string;
   modulo: "" | AuditoriaModulo;
   acao: "" | AuditoriaAcao;
+  busca: string;
 }
 
 export const EMPTY_AUDITORIA_FILTERS: AuditoriaFilters = {
@@ -259,6 +415,7 @@ export const EMPTY_AUDITORIA_FILTERS: AuditoriaFilters = {
   usuarioEmail: "",
   modulo: "",
   acao: "",
+  busca: "",
 };
 
 export function mapHistoricoAcaoToAuditoria(acao: string): AuditoriaAcao {
@@ -268,12 +425,21 @@ export function mapHistoricoAcaoToAuditoria(acao: string): AuditoriaAcao {
   if (value.includes("cancel")) return "cancelamento";
   if (value.includes("desativ")) return "desativacao";
   if (value.includes("ativ")) return "ativacao";
+  if (
+    value.includes("exame") &&
+    (value.includes("adicion") || value.includes("remov") || value.includes("alter") || value.includes("recalcul"))
+  ) {
+    return "agendamento_valores_alterados";
+  }
   if (value.includes("valor") || value.includes("preço") || value.includes("preco")) {
     return "alteracao_preco";
   }
   if (value.includes("envio") || value.includes("enviado")) return "envio";
   if (value.includes("reagend")) return "reagendamento";
   if (value.includes("exclu") || value.includes("remov")) return "exclusao";
+  if (value.includes("vínculo") || value.includes("vinculo") || value.includes("periódico") || value.includes("periodico")) {
+    return "agendamento_periodico_vinculado";
+  }
 
   return "edicao";
 }

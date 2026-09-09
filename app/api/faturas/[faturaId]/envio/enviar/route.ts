@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireFaturasStaffApi } from "@/lib/faturas-api-auth.server";
 import { enviarFaturaClientePorEmailResend } from "@/services/fatura-envio-email.server";
 
@@ -34,11 +35,7 @@ export async function POST(
       faturaId,
       email,
       request,
-      auditContext: {
-        usuarioId: auth.user.id,
-        usuarioNome: body.usuarioNome?.trim() || auth.usuarioNome,
-        usuarioEmail: body.usuarioEmail?.trim() || auth.usuarioEmail,
-      },
+      auditContext: auditoriaActorFromAuth(auth),
     });
 
     return NextResponse.json({

@@ -21,6 +21,13 @@ import {
   resolverEtapaAtualLaudos,
   type LaudosSstWorkflow,
 } from "@/lib/laudos-sst-etapas";
+import {
+  AUDITORIA_ACOES,
+  AUDITORIA_MODULOS,
+  type AuditoriaAcao,
+  type AuditoriaUsuarioContext,
+} from "@/lib/auditoria";
+import { registrarAuditoria } from "@/services/auditoria.service";
 
 const LAUDOS_TRACKING_SELECT = [
   "orcamento_id",
@@ -244,6 +251,8 @@ export interface SalvarLaudosSstEtapaInput {
   workflow: LaudosSstWorkflow;
   atual: OrcamentoLaudosSstRecord | null;
   aprovador?: { userId: string | null; nome: string | null };
+  clienteNome?: string;
+  auditContext?: AuditoriaUsuarioContext;
 }
 
 export interface SalvarLaudosSstEtapaResult {
@@ -337,6 +346,93 @@ export async function salvarEtapaLaudosSst(
       );
     }
     throw new Error(msg || "Não foi possível salvar a etapa.");
+  }
+
+  const usuarioNome =
+    input.auditContext?.usuarioNome?.trim() ||
+    input.aprovador?.nome?.trim() ||
+    "Sistema";
+  const usuarioEmail = input.auditContext?.usuarioEmail?.trim() || "";
+  const usuarioId =
+    input.auditContext?.usuarioId ?? input.aprovador?.userId ?? null;
+  const cliente = input.clienteNome?.trim() || "empresa";
+
+  let acaoAudit: AuditoriaAcao = AUDITORIA_ACOES.edicao;
+  let descAudit = `${usuarioNome} atualizou a etapa de Laudos SST da empresa ${cliente}.`;
+
+  if (input.etapa === "epis") {
+    acaoAudit = AUDITORIA_ACOES.laudos_epis_salvos;
+    descAudit = `${usuarioNome} salvou o questionário de EPIs de Laudos SST da empresa ${cliente}.`;
+  } else if (input.etapa === "processo_inicial") {
+    acaoAudit = AUDITORIA_ACOES.laudos_cadastro_concluido;
+    descAudit = `${usuarioNome} concluiu o cadastro inicial de Laudos SST da empresa ${cliente}.`;
+  } else if (input.etapa === "cronograma_acoes") {
+    acaoAudit = AUDITORIA_ACOES.laudos_cronograma_concluido;
+    descAudit = `${usuarioNome} elaborou o cronograma de ações de Laudos SST da empresa ${cliente}.`;
+  } else if (input.etapa === "pgr_pcmso_ltcat") {
+    if (w.pgrRealizado && !atual?.pgr_realizado) {
+      acaoAudit = AUDITORIA_ACOES.laudos_pgr_concluido;
+      descAudit = `${usuarioNome} concluiu a elaboração do PGR da empresa ${cliente}.`;
+    } else if (w.pcmsoRealizado && !atual?.pcmso_realizado) {
+      acaoAudit = AUDITORIA_ACOES.laudos_pcmso_concluido;
+      descAudit = `${usuarioNome} concluiu a elaboração do PCMSO da empresa ${cliente}.`;
+    } else if (w.ltcatRealizado && !atual?.ltcat_realizado) {
+      acaoAudit = AUDITORIA_ACOES.laudos_ltcat_concluido;
+      descAudit = `${usuarioNome} concluiu a elaboração do LTCAT da empresa ${cliente}.`;
+    } else {
+      acaoAudit = AUDITORIA_ACOES.laudos_pgr_concluido;
+      descAudit = `${usuarioNome} atualizou os documentos de Laudos SST da empresa ${cliente}.`;
+    }
+  } else if (input.etapa === "autorizacao_pedro") {
+    if (w.enviadoPedro === true && !atual?.enviado_pedro) {
+      acaoAudit = AUDITORIA_ACOES.laudos_enviado_aprovacao;
+      descAudit = `${usuarioNome} enviou os laudos da empresa ${cliente} para aprovação técnica.`;
+    } else if (w.aprovacaoPedro === true && !atual?.aprovacao_pedro) {
+      acaoAudit = AUDITORIA_ACOES.laudos_aprovado_tecnico;
+      descAudit = `${usuarioNome} aprovou tecnicamente os laudos da empresa ${cliente}.`;
+    } else if (w.aprovacaoPedro === false && atual?.aprovacao_pedro !== false) {
+      acaoAudit = AUDITORIA_ACOES.laudos_reprovado_tecnico;
+      descAudit = `${usuarioNome} devolveu os laudos da empresa ${cliente} na aprovação técnica.`;
+    }
+  } else if (input.etapa === "envio_cliente") {
+    acaoAudit = AUDITORIA_ACOES.laudos_enviado_cliente;
+    descAudit = `${usuarioNome} registrou o envio dos laudos da empresa ${cliente}${
+      w.enviadoClienteEmail ? ` para ${w.enviadoClienteEmail}` : ""
+    }.`;
+  }
+
+  await registrarAuditoria({
+    usuarioId,
+    usuarioNome,
+    usuarioEmail,
+    modulo: AUDITORIA_MODULOS.laudos_sst,
+    acao: acaoAudit,
+    registroId: input.orcamentoId,
+    registroNome: cliente,
+    descricao: descAudit,
+    dadosDepois: {
+      etapa: input.etapa,
+      etapa_concluida: etapaConcluida,
+      etapas_concluidas: etapasConcluidas,
+      concluido,
+    },
+  });
+
+  if (concluido && atual?.status !== "concluido") {
+    await registrarAuditoria({
+      usuarioId,
+      usuarioNome,
+      usuarioEmail,
+      modulo: AUDITORIA_MODULOS.laudos_sst,
+      acao: AUDITORIA_ACOES.laudos_processo_concluido,
+      registroId: input.orcamentoId,
+      registroNome: cliente,
+      descricao: `${usuarioNome} concluiu o processo de Laudos SST da empresa ${cliente}.`,
+      dadosDepois: {
+        etapas_concluidas: etapasConcluidas,
+        concluido_em: agora,
+      },
+    });
   }
 
   return {

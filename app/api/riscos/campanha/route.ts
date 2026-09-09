@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { CampanhaCicloExistenteError } from "@/lib/riscos-campanha-ciclo";
 import { createClient } from "@/lib/supabase/server";
 import { criarCampanhaRiscosNoServidor } from "@/services/riscos-campanha-ciclo.server";
@@ -42,17 +43,6 @@ export async function POST(request: Request) {
       usuarioEmail?: string;
     };
 
-    const usuarioNome =
-      body.usuarioNome?.trim() ||
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Usuário";
-    const usuarioEmail =
-      body.usuarioEmail?.trim() ||
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
-
     const campanha = await criarCampanhaRiscosNoServidor(
       {
         orcamentoId: String(body.orcamentoId ?? ""),
@@ -63,11 +53,7 @@ export async function POST(request: Request) {
         dataEncerramentoIso: String(body.dataEncerramentoIso ?? ""),
       },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

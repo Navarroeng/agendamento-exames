@@ -28,7 +28,7 @@ import { gerarPdfFaturaClienteBufferServer } from "@/lib/fatura-pdf-server";
 import { nomeArquivoPdfFaturaClienteEmail } from "@/lib/fatura-pdf";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FaturaComItens } from "@/lib/types";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import {
   buscarFaturaComItensAdmin,
   type EnviarFaturaClienteEmailDeps,
@@ -121,10 +121,12 @@ const defaultDeps: ReenviarFaturaClienteEmailDeps = {
       a.data_agendamento.localeCompare(b.data_agendamento)
     );
 
-    await registrarAuditoria({
-      usuarioId: auditContext?.usuarioId ?? null,
-      usuarioNome,
-      usuarioEmail: auditContext?.usuarioEmail ?? "",
+    await registrarAuditoriaServer({
+      contexto: {
+        usuarioId: auditContext?.usuarioId ?? null,
+        usuarioNome,
+        usuarioEmail: auditContext?.usuarioEmail ?? "",
+      },
       modulo: AUDITORIA_MODULOS.faturas_clientes,
       acao: AUDITORIA_ACOES.fatura_envio_email_reenviado,
       registroId: atualizada.id,
@@ -148,10 +150,12 @@ const defaultDeps: ReenviarFaturaClienteEmailDeps = {
       auditContext?.usuarioNome?.trim() ||
       auditContext?.usuarioEmail?.trim() ||
       "Sistema";
-    await registrarAuditoria({
-      usuarioId: auditContext?.usuarioId ?? null,
-      usuarioNome,
-      usuarioEmail: auditContext?.usuarioEmail ?? "",
+    await registrarAuditoriaServer({
+      contexto: {
+        usuarioId: auditContext?.usuarioId ?? null,
+        usuarioNome,
+        usuarioEmail: auditContext?.usuarioEmail ?? "",
+      },
       modulo: AUDITORIA_MODULOS.faturas_clientes,
       acao: AUDITORIA_ACOES.fatura_envio_email_falhou,
       registroId: fatura.id,

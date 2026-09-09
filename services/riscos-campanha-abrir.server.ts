@@ -11,7 +11,7 @@ import {
   type RiscosCampanhaRecord,
 } from "@/lib/riscos-campanha";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
@@ -138,15 +138,17 @@ export async function abrirCampanhaRiscosNoServidor(
   }
 
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_aberta,
     registroId: confirmed.id,
     registroNome: confirmed.empresa_nome,
-    descricao: `${nome} abriu a campanha ${confirmed.codigo_publico} para respostas.`,
+    descricao: `${nome} abriu a pesquisa de Riscos Psicossociais da empresa ${confirmed.empresa_nome} (Código: ${confirmed.codigo_publico}).`,
     dadosAntes: {
       status: before.status,
       codigo_publico: before.codigo_publico,

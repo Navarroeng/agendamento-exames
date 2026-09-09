@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import {
   podeAbrirPesquisaRiscos,
   RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
@@ -57,17 +58,6 @@ export async function POST(
       usuarioEmail?: string;
     };
 
-    const usuarioNome =
-      body.usuarioNome?.trim() ||
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Usuário";
-    const usuarioEmail =
-      body.usuarioEmail?.trim() ||
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
-
     const campanha = await editarPeriodoCampanhaNoServidor(
       campanhaId,
       {
@@ -76,11 +66,7 @@ export async function POST(
         confirmarPrazoEncerrado: body.confirmarPrazoEncerrado === true,
       },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

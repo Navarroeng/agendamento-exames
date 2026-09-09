@@ -8,6 +8,7 @@ import {
   podeInvalidarParticipacao,
 } from "@/lib/riscos-invalidacao";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 
 type AuditOptions = { auditContext?: AuditoriaUsuarioContext };
 
@@ -135,22 +136,24 @@ export async function invalidarParticipacaoCampanha(
     throw new Error("Não foi possível atualizar o status do participante.");
   }
 
-  const { error: auditErr } = await supabase.from("auditoria_sistema").insert({
-    usuario_id: usuarioId,
-    usuario_nome: nome,
-    usuario_email: email,
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: email,
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_participacao_invalidada,
-    registro_id: String(participante.id),
-    registro_nome: String(participante.nome_completo),
-    descricao: `${nome} invalidou a participação de ${participante.nome_completo} na campanha.`,
-    dados_antes: {
+    registroId: String(participante.id),
+    registroNome: String(participante.nome_completo),
+    descricao: `${nome} invalidou a participação de ${participante.nome_completo} na pesquisa de Riscos Psicossociais. Motivo: ${motivo}`,
+    dadosAntes: {
       campanha_id: participante.campanha_id,
       participante_id: participante.id,
       status: participante.status,
       sessao_id: sessao.id,
     },
-    dados_depois: {
+    dadosDepois: {
       campanha_id: participante.campanha_id,
       participante_id: participante.id,
       status: "invalidado",
@@ -159,9 +162,6 @@ export async function invalidarParticipacaoCampanha(
       motivo_invalidacao: motivo,
     },
   });
-  if (auditErr) {
-    console.error("[invalidarParticipacao] auditoria:", auditErr);
-  }
 
   return {
     participanteId: String(participante.id),

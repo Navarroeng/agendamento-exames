@@ -12,7 +12,7 @@ import {
 } from "@/lib/periodico-cancelamento";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 
 export type CancelarPeriodicoFuturoResult = {
   ids: string[];
@@ -141,10 +141,12 @@ export async function cancelarPeriodicoFuturoNoServidor(params: {
   }
 
   const representante = pendentes[0];
-  await registrarAuditoria({
-    usuarioId: canceladoPorId,
-    usuarioNome: canceladoPor,
-    usuarioEmail: params.auditContext.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: canceladoPorId,
+      usuarioNome: canceladoPor,
+      usuarioEmail: params.auditContext.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.periodicos_futuros,
     acao: AUDITORIA_ACOES.periodico_futuro_cancelado,
     registroId: representante.id,

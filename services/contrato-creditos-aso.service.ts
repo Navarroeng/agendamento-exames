@@ -218,7 +218,7 @@ export async function registrarCreditosAsoEmAberto(params: {
   );
 
   await registrarAuditoria({
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.credito_aso_registrado,
     registroId: params.contratoId,
     registroNome: params.numeroContrato ?? params.contratoId,
@@ -244,7 +244,7 @@ export async function atualizarObservacaoCreditoAso(params: {
   if (error) throw error;
 
   await registrarAuditoria({
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.credito_aso_observacao_editada,
     registroId: params.creditoId,
     registroNome: params.creditoId,
@@ -281,7 +281,7 @@ export async function removerCreditoAsoEmAberto(params: {
   }
 
   await registrarAuditoria({
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.credito_aso_removido,
     registroId: params.creditoId,
     registroNome: params.numeroContrato ?? params.creditoId,
@@ -511,7 +511,7 @@ export async function marcarCreditosExpiradosDoContrato(
   const qtd = data?.length ?? 0;
   if (qtd > 0) {
     await registrarAuditoria({
-      modulo: AUDITORIA_MODULOS.orcamentos,
+      modulo: AUDITORIA_MODULOS.implantacao_clientes,
       acao: AUDITORIA_ACOES.credito_aso_expirado,
       registroId: contratoId,
       registroNome: contratoId,

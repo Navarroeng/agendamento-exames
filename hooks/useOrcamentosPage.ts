@@ -446,12 +446,12 @@ export function useOrcamentosPage() {
       await registrarAuditoria({
         ...auditContext,
         modulo: AUDITORIA_MODULOS.orcamentos,
-        acao: isEditing ? AUDITORIA_ACOES.edicao : AUDITORIA_ACOES.criacao,
+        acao: isEditing ? AUDITORIA_ACOES.orcamento_editado : AUDITORIA_ACOES.orcamento_criado,
         registroId: saved.id,
-        registroNome: saved.numero,
+        registroNome: saved.cliente_nome || saved.numero,
         descricao: isEditing
-          ? `Orçamento ${saved.numero} atualizado.`
-          : `Orçamento ${saved.numero} criado com origem ${origemDepois}.`,
+          ? `${auditContext.usuarioNome} editou o orçamento ${saved.numero} da empresa ${saved.cliente_nome}.`
+          : `${auditContext.usuarioNome} criou o orçamento ${saved.numero} da empresa ${saved.cliente_nome} (${origemDepois}).`,
         dadosDepois: {
           cliente: saved.cliente_nome,
           valor_total: saved.valor_total,
@@ -744,10 +744,10 @@ export function useOrcamentosPage() {
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
-          acao: AUDITORIA_ACOES.cancelamento,
+          acao: AUDITORIA_ACOES.orcamento_cancelado,
           registroId: cancelTarget.id,
-          registroNome: cancelTarget.numero,
-          descricao: `${auditContext.usuarioNome} cancelou o orçamento ${cancelTarget.numero}. Motivo: ${motivo}.`,
+          registroNome: cancelTarget.cliente_nome || cancelTarget.numero,
+          descricao: `${auditContext.usuarioNome} cancelou o orçamento ${cancelTarget.numero} da empresa ${cancelTarget.cliente_nome}. Motivo: ${motivo}.`,
           dadosDepois: {
             status: "cancelado",
             motivo_cancelamento: motivo,
@@ -891,12 +891,12 @@ export function useOrcamentosPage() {
         await registrarAuditoria({
           ...auditContext,
           modulo: AUDITORIA_MODULOS.orcamentos,
-          acao: AUDITORIA_ACOES.edicao,
+          acao: AUDITORIA_ACOES.orcamento_aprovado,
           registroId: aprovarOrcamento.id,
-          registroNome: aprovarOrcamento.numero,
+          registroNome: aprovarOrcamento.cliente_nome || aprovarOrcamento.numero,
           descricao: formValues.condicoes_iguais
-            ? `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero} conforme as condições originais.`
-            : `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero}.`,
+            ? `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero} da empresa ${aprovarOrcamento.cliente_nome} conforme as condições originais.`
+            : `${auditContext.usuarioNome} aprovou o orçamento ${aprovarOrcamento.numero} da empresa ${aprovarOrcamento.cliente_nome}.`,
           dadosDepois: {
             status: "aprovado",
             valor_final: payload.valor_final,

@@ -25,7 +25,7 @@ import {
 import { MOTIVO_INVALIDACAO_CANCELAMENTO_PROCESSO } from "@/lib/riscos-invalidacao";
 import { RISCOS_LISTA_PRESENCA_BUCKET } from "@/lib/riscos-lista-presenca";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
 const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
@@ -407,17 +407,17 @@ export async function cancelarProcessoListagemRiscosNoServidor(
     campanha?.empresa_nome || trackingOrcamentoId || campanha?.id || "processo";
   const registroId = campanha?.id || trackingOrcamentoId;
 
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_processo_cancelado,
     registroId,
     registroNome: empresaNome,
-    descricao: `${nome} cancelou o processo de Riscos Psicossociais${
-      campanha?.codigo_publico ? ` (${campanha.codigo_publico})` : ""
-    }. Motivo: ${motivoTrim}`,
+    descricao: `${nome} cancelou o processo de Riscos Psicossociais da empresa ${empresaNome}. Motivo: ${motivoTrim}`,
     dadosAntes: {
       campanha_status: campanha?.status ?? null,
       orcamento_id: trackingOrcamentoId || null,
@@ -568,15 +568,17 @@ export async function excluirCampanhaRiscosNoServidor(
   });
   if (bloqueioFisica) throw new Error(bloqueioFisica);
 
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_excluida,
     registroId: before.id,
     registroNome: before.empresa_nome,
-    descricao: `${nome} excluiu definitivamente a campanha ${before.codigo_publico}.`,
+    descricao: `${nome} excluiu a pesquisa de Riscos Psicossociais da empresa ${before.empresa_nome} (Código: ${before.codigo_publico}).`,
     dadosAntes: {
       id: before.id,
       codigo_publico: before.codigo_publico,
@@ -647,15 +649,17 @@ export async function removerProcessoRiscosNoServidor(
   });
   if (bloqueioFisica) throw new Error(bloqueioFisica);
 
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_processo_removido,
     registroId: before.id,
     registroNome: before.empresa_nome,
-    descricao: `${nome} removeu definitivamente o processo ${before.codigo_publico}. Motivo: ${motivoTexto}`,
+    descricao: `${nome} removeu definitivamente o processo de Riscos Psicossociais da empresa ${before.empresa_nome}. Motivo: ${motivoTexto}`,
     dadosAntes: {
       campanha_id: before.id,
       codigo_publico: before.codigo_publico,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilStaffNavarro } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { cancelarProcessoListagemRiscosNoServidor } from "@/services/riscos-campanha-cancelar.server";
@@ -38,14 +39,6 @@ export async function POST(
       return NextResponse.json({ error: "Campanha inválida." }, { status: 400 });
     }
 
-    let usuarioNome =
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Administrador";
-    let usuarioEmail =
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
     let motivo = "";
 
     try {
@@ -55,8 +48,6 @@ export async function POST(
         usuarioEmail?: string;
       };
       if (body?.motivo != null) motivo = String(body.motivo);
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
       // body obrigatório para motivo
     }
@@ -64,11 +55,7 @@ export async function POST(
     const result = await cancelarProcessoListagemRiscosNoServidor(
       { campanhaId, motivo },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

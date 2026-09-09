@@ -300,7 +300,7 @@ export function useImplantacaoClientesPage() {
 
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.edicao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -364,7 +364,7 @@ export function useImplantacaoClientesPage() {
         ) {
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.envio,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -379,7 +379,7 @@ export function useImplantacaoClientesPage() {
         ) {
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -393,7 +393,7 @@ export function useImplantacaoClientesPage() {
         ) {
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -465,7 +465,7 @@ export function useImplantacaoClientesPage() {
         ) {
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -476,7 +476,7 @@ export function useImplantacaoClientesPage() {
         if (!before.boleto_pago && saved.boleto_pago) {
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -548,7 +548,7 @@ export function useImplantacaoClientesPage() {
 
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.procuracao_alterada,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -612,7 +612,7 @@ export function useImplantacaoClientesPage() {
         }
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.edicao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -656,7 +656,7 @@ export function useImplantacaoClientesPage() {
         await removerArquivoOrcamentoOnboarding(oldPath);
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.exclusao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -689,7 +689,7 @@ export function useImplantacaoClientesPage() {
           setModalAprovacao(saved);
           await registrarAuditoria({
             ...auditContext,
-            modulo: AUDITORIA_MODULOS.orcamentos,
+            modulo: AUDITORIA_MODULOS.implantacao_clientes,
             acao: AUDITORIA_ACOES.edicao,
             registroId: modalOrcamento.id,
             registroNome: modalOrcamento.numero,
@@ -725,7 +725,7 @@ export function useImplantacaoClientesPage() {
         }
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.edicao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -769,7 +769,7 @@ export function useImplantacaoClientesPage() {
         await removerArquivoOrcamentoOnboarding(oldPath);
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.exclusao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -810,7 +810,7 @@ export function useImplantacaoClientesPage() {
         setModalAprovacao(saved);
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao: AUDITORIA_ACOES.edicao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,
@@ -875,7 +875,7 @@ export function useImplantacaoClientesPage() {
 
         await registrarAuditoria({
           ...auditContext,
-          modulo: AUDITORIA_MODULOS.orcamentos,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
           acao,
           registroId: modalOrcamento.id,
           registroNome: modalOrcamento.numero,

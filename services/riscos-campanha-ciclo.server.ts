@@ -34,7 +34,7 @@ import {
   RISCOS_CAMPANHA_ORIGEM,
 } from "@/lib/riscos-campanha-origem";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 
 type CampanhaAuditOptions = {
@@ -169,15 +169,17 @@ export async function criarCampanhaRiscosNoServidor(
 
   const record = mapRiscosCampanhaRow(data as Record<string, unknown>);
   const nome = usuarioNome ?? "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_criada,
     registroId: record.id,
     registroNome: record.empresa_nome,
-    descricao: `${nome} criou a campanha ${record.codigo_publico} para ${record.empresa_nome}.`,
+    descricao: `${nome} criou a pesquisa de Riscos Psicossociais da empresa ${record.empresa_nome} (Código: ${record.codigo_publico}).`,
     dadosDepois: {
       codigo_publico: record.codigo_publico,
       data_inicio: record.data_inicio,
@@ -255,15 +257,17 @@ export async function prorrogarPrazoCampanhaNoServidor(
   }
 
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_prazo_prorrogado,
     registroId: confirmed.id,
     registroNome: confirmed.empresa_nome,
-    descricao: `${nome} prorrogou o prazo da campanha ${confirmed.codigo_publico} de ${before.data_encerramento} para ${confirmed.data_encerramento}.`,
+    descricao: `${nome} prorrogou o prazo da pesquisa de Riscos Psicossociais da empresa ${confirmed.empresa_nome} para ${confirmed.data_encerramento}.`,
     dadosAntes: {
       data_encerramento: before.data_encerramento,
       codigo_publico: before.codigo_publico,
@@ -324,15 +328,17 @@ export async function reabrirCampanhaRiscosNoServidor(
   }
 
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_reaberta,
     registroId: confirmed.id,
     registroNome: confirmed.empresa_nome,
-    descricao: `${nome} reabriu a campanha ${confirmed.codigo_publico} (prazo até ${confirmed.data_encerramento}).`,
+    descricao: `${nome} reabriu a pesquisa de Riscos Psicossociais da empresa ${confirmed.empresa_nome} (prazo até ${confirmed.data_encerramento}).`,
     dadosAntes: {
       status: before.status,
       data_encerramento: before.data_encerramento,
@@ -446,17 +452,19 @@ export async function editarPeriodoCampanhaNoServidor(
     novaDataEncerramentoIso: confirmed.data_encerramento,
   });
   const nome = auditOptions?.auditContext?.usuarioNome?.trim() || "Sistema";
-  await registrarAuditoria({
-    usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
-    usuarioNome: nome,
-    usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: auditOptions?.auditContext?.usuarioId ?? null,
+      usuarioNome: nome,
+      usuarioEmail: auditOptions?.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_campanha_periodo_editado,
     registroId: confirmed.id,
     registroNome: confirmed.empresa_nome,
     descricao: prazoEncerradoEfetivo
-      ? `${nome} editou o período da campanha ${confirmed.codigo_publico} de ${before.data_inicio} a ${before.data_encerramento} para ${confirmed.data_inicio} a ${confirmed.data_encerramento}. Status efetivo: Prazo encerrado.`
-      : `${nome} editou o período da campanha ${confirmed.codigo_publico} de ${before.data_inicio} a ${before.data_encerramento} para ${confirmed.data_inicio} a ${confirmed.data_encerramento}.`,
+      ? `${nome} editou o período da pesquisa de Riscos Psicossociais da empresa ${confirmed.empresa_nome} para ${confirmed.data_inicio} a ${confirmed.data_encerramento} (Prazo encerrado).`
+      : `${nome} editou o período da pesquisa de Riscos Psicossociais da empresa ${confirmed.empresa_nome} para ${confirmed.data_inicio} a ${confirmed.data_encerramento}.`,
     dadosAntes: {
       data_inicio: before.data_inicio,
       data_encerramento: before.data_encerramento,

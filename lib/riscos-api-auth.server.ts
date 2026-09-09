@@ -1,5 +1,8 @@
 import { isPerfilAdmin, isPerfilStaffNavarro } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
+
+export { auditoriaActorFromAuth };
 
 export type RiscosStaffAuthContext = {
   user: { id: string; email?: string | null };

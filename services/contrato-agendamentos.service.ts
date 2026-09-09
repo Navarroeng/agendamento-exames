@@ -663,7 +663,7 @@ export async function salvarSelecaoAgendamentosContrato(params: {
     await registrarAuditoria({
       usuarioNome,
       usuarioEmail: "",
-      modulo: AUDITORIA_MODULOS.orcamentos,
+      modulo: AUDITORIA_MODULOS.implantacao_clientes,
       acao: AUDITORIA_ACOES.vinculo_contrato_implantacao,
       registroId: contratoId,
       registroNome: contratoNumero,
@@ -676,7 +676,7 @@ export async function salvarSelecaoAgendamentosContrato(params: {
     await registrarAuditoria({
       usuarioNome,
       usuarioEmail: "",
-      modulo: AUDITORIA_MODULOS.orcamentos,
+      modulo: AUDITORIA_MODULOS.implantacao_clientes,
       acao: AUDITORIA_ACOES.sem_vinculo_contrato_implantacao,
       registroId: contratoId,
       registroNome: contratoNumero,
@@ -693,7 +693,7 @@ export async function salvarSelecaoAgendamentosContrato(params: {
     await registrarAuditoria({
       usuarioNome,
       usuarioEmail: "",
-      modulo: AUDITORIA_MODULOS.orcamentos,
+      modulo: AUDITORIA_MODULOS.implantacao_clientes,
       acao: AUDITORIA_ACOES.edicao,
       registroId: contratoId,
       registroNome: contratoNumero,
@@ -907,7 +907,7 @@ export async function dispensarAgendamentosIniciaisContrato(params: {
   await registrarAuditoria({
     usuarioNome: params.usuarioNome,
     usuarioEmail: "",
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.dispensa_agendamentos_iniciais,
     registroId: params.contratoId,
     registroNome: numero,
@@ -976,7 +976,7 @@ export async function reabrirAgendamentosIniciaisContrato(params: {
   await registrarAuditoria({
     usuarioNome: params.usuarioNome,
     usuarioEmail: "",
-    modulo: AUDITORIA_MODULOS.orcamentos,
+    modulo: AUDITORIA_MODULOS.implantacao_clientes,
     acao: AUDITORIA_ACOES.reabertura_agendamentos_iniciais,
     registroId: params.contratoId,
     registroNome: numero,

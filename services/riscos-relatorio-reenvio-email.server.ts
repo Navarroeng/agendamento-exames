@@ -31,7 +31,7 @@ import {
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import { buscarRelatorioPorCampanhaId } from "@/services/riscos-relatorio.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ReenviarRelatorioRiscosResult = {
@@ -114,15 +114,17 @@ const defaultDeps: ReenviarRelatorioRiscosDeps = {
       auditContext?.usuarioNome?.trim() ||
       auditContext?.usuarioEmail?.trim() ||
       "Sistema";
-    await registrarAuditoria({
-      usuarioId: auditContext?.usuarioId ?? null,
-      usuarioNome,
-      usuarioEmail: auditContext?.usuarioEmail ?? "",
+    await registrarAuditoriaServer({
+      contexto: {
+        usuarioId: auditContext?.usuarioId ?? null,
+        usuarioNome,
+        usuarioEmail: auditContext?.usuarioEmail ?? "",
+      },
       modulo: AUDITORIA_MODULOS.riscos_psicossociais,
       acao: AUDITORIA_ACOES.riscos_relatorio_envio_reenviado,
       registroId: relatorio.id,
-      registroNome: relatorio.codigo_publico,
-      descricao: `${usuarioNome} reenviou o relatório ${relatorio.codigo_publico} por e-mail para ${email}.`,
+      registroNome: relatorio.empresa_nome || relatorio.codigo_publico,
+      descricao: `${usuarioNome} reenviou o relatório de Riscos Psicossociais da empresa ${relatorio.empresa_nome} por e-mail para ${email}.`,
       dadosDepois: {
         email_destinatario: email,
         resend_message_id: resendMessageId,

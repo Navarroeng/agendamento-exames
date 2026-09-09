@@ -167,6 +167,12 @@ export function LaudosSstModal({
           userId: aprovador.usuarioId,
           nome: aprovador.usuarioNome,
         },
+        clienteNome: orcamento.cliente_nome || orcamento.numero,
+        auditContext: {
+          usuarioId: aprovador.usuarioId,
+          usuarioNome: aprovador.usuarioNome,
+          usuarioEmail: aprovador.usuarioEmail,
+        },
       });
       const atualizado = buildLaudosSstProcesso(
         processo.implantacao,

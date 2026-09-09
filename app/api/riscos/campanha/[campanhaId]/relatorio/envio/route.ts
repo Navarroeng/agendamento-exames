@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireRiscosStaffApi } from "@/lib/riscos-api-auth.server";
 import {
   confirmarEnvioRelatorioNoServidor,
@@ -35,11 +36,7 @@ export async function POST(
 
     const relatorio = await confirmarEnvioRelatorioNoServidor(campanhaId, email, {
       origem: "manual",
-      auditContext: {
-        usuarioId: auth.user.id,
-        usuarioNome: body.usuarioNome?.trim() || auth.usuarioNome,
-        usuarioEmail: body.usuarioEmail?.trim() || auth.usuarioEmail,
-      },
+      auditContext: auditoriaActorFromAuth(auth),
     });
 
     return NextResponse.json({
@@ -87,11 +84,7 @@ export async function PATCH(
     }
 
     const relatorio = await corrigirEnvioRelatorioNoServidor(campanhaId, email, {
-      auditContext: {
-        usuarioId: auth.user.id,
-        usuarioNome: body.usuarioNome?.trim() || auth.usuarioNome,
-        usuarioEmail: body.usuarioEmail?.trim() || auth.usuarioEmail,
-      },
+      auditContext: auditoriaActorFromAuth(auth),
     });
 
     return NextResponse.json({

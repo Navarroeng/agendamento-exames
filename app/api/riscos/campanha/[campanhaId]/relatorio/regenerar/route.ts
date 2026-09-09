@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { regenerarRelatorioFinalNoServidor } from "@/services/riscos-relatorio.server";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
  * Regenera o relatório final (somente administrador).
  */
 export async function POST(
-  request: Request,
+  _request: Request,
   context: { params: { campanhaId: string } }
 ) {
   try {
@@ -42,32 +43,8 @@ export async function POST(
       return NextResponse.json({ error: "Campanha inválida." }, { status: 400 });
     }
 
-    let usuarioNome =
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Administrador";
-    let usuarioEmail =
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
-
-    try {
-      const body = (await request.json()) as {
-        usuarioNome?: string;
-        usuarioEmail?: string;
-      };
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
-    } catch {
-      // opcional
-    }
-
     const relatorio = await regenerarRelatorioFinalNoServidor(campanhaId, {
-      auditContext: {
-        usuarioId: user.id,
-        usuarioNome,
-        usuarioEmail,
-      },
+      auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
     });
 
     return NextResponse.json({ ok: true, relatorio });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -51,14 +52,6 @@ export async function POST(
       return NextResponse.json({ error: "Campanha inválida." }, { status: 400 });
     }
 
-    let usuarioNome =
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Administrador";
-    let usuarioEmail =
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
     let confirmacaoCodigo = "";
 
     try {
@@ -70,8 +63,6 @@ export async function POST(
       if (body?.confirmacaoCodigo != null) {
         confirmacaoCodigo = String(body.confirmacaoCodigo);
       }
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
       //
     }
@@ -80,11 +71,7 @@ export async function POST(
       campanhaId,
       confirmacaoCodigo,
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

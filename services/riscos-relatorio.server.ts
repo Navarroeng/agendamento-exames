@@ -14,7 +14,7 @@ import {
 import { isEmailValido } from "@/lib/email-validacao";
 import { isRelatorioEnvioExplicitamenteConfirmado } from "@/lib/riscos-relatorio-envio";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { registrarAuditoria } from "@/services/auditoria.service";
+import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
 import { obterResultadosCampanhaRiscos } from "@/services/riscos-resultados.service";
 
@@ -286,26 +286,28 @@ async function persistirRelatorio(params: {
     if (error) throw error;
     if (!data) throw new Error("Não foi possível regenerar o relatório.");
     const record = mapRelatorio(data as Record<string, unknown>);
-    await registrarAuditoria({
-      usuarioId: params.auditContext?.usuarioId ?? null,
-      usuarioNome: geradoPor,
-      usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+    await registrarAuditoriaServer({
+      contexto: {
+        usuarioId: params.auditContext?.usuarioId ?? null,
+        usuarioNome: geradoPor,
+        usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+      },
       modulo: AUDITORIA_MODULOS.riscos_psicossociais,
       acao: AUDITORIA_ACOES.riscos_relatorio_regenerado,
       registroId: record.id,
-      registroNome: record.codigo_publico,
-      descricao: `${geradoPor} regenerou o relatório final da campanha ${record.codigo_publico}.`,
-    dadosAntes: {
-      gerado_em: existente.gerado_em,
-      gerado_por: existente.gerado_por,
-      participantes: existente.participantes,
-      respondentes: existente.respondentes,
-      status: existente.status,
-      relatorio_enviado_em: existente.relatorio_enviado_em,
-      relatorio_enviado_email: existente.relatorio_enviado_email,
-      relatorio_enviado_por: existente.relatorio_enviado_por,
-    },
-    dadosDepois: {
+      registroNome: campanha.empresa_nome || record.codigo_publico,
+      descricao: `${geradoPor} regenerou o relatório de Riscos Psicossociais da empresa ${campanha.empresa_nome}.`,
+      dadosAntes: {
+        gerado_em: existente.gerado_em,
+        gerado_por: existente.gerado_por,
+        participantes: existente.participantes,
+        respondentes: existente.respondentes,
+        status: existente.status,
+        relatorio_enviado_em: existente.relatorio_enviado_em,
+        relatorio_enviado_email: existente.relatorio_enviado_email,
+        relatorio_enviado_por: existente.relatorio_enviado_por,
+      },
+      dadosDepois: {
         campanha_id: record.campanha_id,
         participantes: record.participantes,
         respondentes: record.respondentes,
@@ -336,15 +338,17 @@ async function persistirRelatorio(params: {
   if (!data) throw new Error("Não foi possível gerar o relatório.");
 
   const record = mapRelatorio(data as Record<string, unknown>);
-  await registrarAuditoria({
-    usuarioId: params.auditContext?.usuarioId ?? null,
-    usuarioNome: geradoPor,
-    usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: params.auditContext?.usuarioId ?? null,
+      usuarioNome: geradoPor,
+      usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: AUDITORIA_ACOES.riscos_relatorio_gerado,
     registroId: record.id,
-    registroNome: record.codigo_publico,
-    descricao: `${geradoPor} gerou o relatório final da campanha ${record.codigo_publico}.`,
+    registroNome: campanha.empresa_nome || record.codigo_publico,
+    descricao: `${geradoPor} gerou o relatório de Riscos Psicossociais da empresa ${campanha.empresa_nome}.`,
     dadosDepois: {
       campanha_id: record.campanha_id,
       participantes: record.participantes,
@@ -475,10 +479,12 @@ async function persistirEnvioRelatorio(params: {
     agora
   );
 
-  await registrarAuditoria({
-    usuarioId: params.auditContext?.usuarioId ?? null,
-    usuarioNome: confirmadoPor,
-    usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+  await registrarAuditoriaServer({
+    contexto: {
+      usuarioId: params.auditContext?.usuarioId ?? null,
+      usuarioNome: confirmadoPor,
+      usuarioEmail: params.auditContext?.usuarioEmail ?? "",
+    },
     modulo: AUDITORIA_MODULOS.riscos_psicossociais,
     acao: params.substituir
       ? AUDITORIA_ACOES.riscos_relatorio_envio_corrigido
@@ -486,12 +492,12 @@ async function persistirEnvioRelatorio(params: {
         ? AUDITORIA_ACOES.riscos_relatorio_envio_resend
         : AUDITORIA_ACOES.riscos_relatorio_envio_confirmado,
     registroId: record.id,
-    registroNome: record.codigo_publico,
+    registroNome: campanha.empresa_nome || record.codigo_publico,
     descricao: params.substituir
-      ? `${confirmadoPor} corrigiu o registro de envio do relatório ${record.codigo_publico}.`
+      ? `${confirmadoPor} corrigiu o registro de envio do relatório de Riscos Psicossociais da empresa ${campanha.empresa_nome}.`
       : params.origem === "resend"
-        ? `${confirmadoPor} enviou o relatório ${record.codigo_publico} por e-mail para ${email}.`
-        : `${confirmadoPor} confirmou o envio manual do relatório ${record.codigo_publico}.`,
+        ? `${confirmadoPor} enviou o relatório de Riscos Psicossociais da empresa ${campanha.empresa_nome} por e-mail para ${email}.`
+        : `${confirmadoPor} confirmou o envio manual do relatório de Riscos Psicossociais da empresa ${campanha.empresa_nome} para ${email}.`,
     dadosAntes: params.substituir
       ? {
           relatorio_enviado_em: existente.relatorio_enviado_em,

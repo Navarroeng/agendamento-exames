@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireRiscosStaffApi } from "@/lib/riscos-api-auth.server";
 import {
   buscarRelatorioPorCampanhaId,
@@ -64,25 +65,16 @@ export async function POST(
       return NextResponse.json({ error: "Campanha inválida." }, { status: 400 });
     }
 
-    let usuarioNome = auth.usuarioNome;
-    let usuarioEmail = auth.usuarioEmail;
+    // Body opcional pode existir para compatibilidade; identidade da auditoria
+    // vem exclusivamente da sessão/perfil autenticados.
     try {
-      const body = (await request.json()) as {
-        usuarioNome?: string;
-        usuarioEmail?: string;
-      };
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
+      await request.json();
     } catch {
       // corpo opcional
     }
 
     const relatorio = await gerarRelatorioFinalNoServidor(campanhaId, {
-      auditContext: {
-        usuarioId: auth.user.id,
-        usuarioNome,
-        usuarioEmail,
-      },
+      auditContext: auditoriaActorFromAuth(auth),
     });
 
     return NextResponse.json({ ok: true, relatorio });

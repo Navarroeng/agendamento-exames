@@ -518,6 +518,9 @@ export function useRiscosPsicossociaisPage() {
           usuarioNome: auditContext.usuarioNome,
         });
         applyTrackingToModal(tracking);
+        const empresaNome =
+          modalProcesso.implantacao.orcamento.cliente_nome ||
+          modalProcesso.implantacao.orcamento.numero;
         await registrarAuditoria({
           usuarioId: auditContext.usuarioId,
           usuarioNome: auditContext.usuarioNome,
@@ -525,10 +528,8 @@ export function useRiscosPsicossociaisPage() {
           modulo: AUDITORIA_MODULOS.riscos_psicossociais,
           acao: AUDITORIA_ACOES.riscos_lista_solicitada,
           registroId,
-          registroNome:
-            modalProcesso.implantacao.orcamento.cliente_nome ||
-            modalProcesso.implantacao.orcamento.numero,
-          descricao: `Lista de presença solicitada para ${modalProcesso.implantacao.orcamento.cliente_nome}.`,
+          registroNome: empresaNome,
+          descricao: `${auditContext.usuarioNome} solicitou a lista de presença da empresa ${empresaNome}.`,
           dadosAntes: { ...antes },
           dadosDepois: {
             lista_solicitada: true,
@@ -683,6 +684,9 @@ export function useRiscosPsicossociaisPage() {
           usuarioNome: auditContext.usuarioNome,
         });
         applyTrackingToModal(tracking);
+        const empresaNome =
+          modalProcesso.implantacao.orcamento.cliente_nome ||
+          modalProcesso.implantacao.orcamento.numero;
         await registrarAuditoria({
           usuarioId: auditContext.usuarioId,
           usuarioNome: auditContext.usuarioNome,
@@ -692,14 +696,12 @@ export function useRiscosPsicossociaisPage() {
             ? AUDITORIA_ACOES.riscos_lista_anexo_substituido
             : AUDITORIA_ACOES.riscos_lista_recebida,
           registroId,
-          registroNome:
-            modalProcesso.implantacao.orcamento.cliente_nome ||
-            modalProcesso.implantacao.orcamento.numero,
+          registroNome: empresaNome,
           descricao: substituindo
-            ? `Anexo da lista de presença substituído por ${file.name}.`
+            ? `${auditContext.usuarioNome} substituiu o anexo da lista de presença da empresa ${empresaNome} por ${file.name}.`
             : ehExcel
-              ? `Lista de presença recebida em Excel (${file.name}). ${importados} participante(s) importado(s).`
-              : `Lista de presença recebida e anexada (${file.name}).`,
+              ? `${auditContext.usuarioNome} importou lista de presença em Excel (${file.name}) com ${importados} participante(s) para a empresa ${empresaNome}.`
+              : `${auditContext.usuarioNome} registrou o recebimento da lista de presença (${file.name}) da empresa ${empresaNome}.`,
           dadosAntes: { ...antes },
           dadosDepois: {
             lista_recebida: true,
@@ -769,6 +771,9 @@ export function useRiscosPsicossociaisPage() {
         usuarioNome: auditContext.usuarioNome,
       });
       applyTrackingToModal(tracking);
+      const empresaNome =
+        modalProcesso.implantacao.orcamento.cliente_nome ||
+        modalProcesso.implantacao.orcamento.numero;
       await registrarAuditoria({
         usuarioId: auditContext.usuarioId,
         usuarioNome: auditContext.usuarioNome,
@@ -776,10 +781,8 @@ export function useRiscosPsicossociaisPage() {
         modulo: AUDITORIA_MODULOS.riscos_psicossociais,
         acao: AUDITORIA_ACOES.riscos_lista_anexo_removido,
         registroId,
-        registroNome:
-          modalProcesso.implantacao.orcamento.cliente_nome ||
-          modalProcesso.implantacao.orcamento.numero,
-        descricao: `Anexo da lista de presença removido (${antes.lista_anexo_nome ?? "arquivo"}).`,
+        registroNome: empresaNome,
+        descricao: `${auditContext.usuarioNome} removeu o anexo da lista de presença da empresa ${empresaNome} (${antes.lista_anexo_nome ?? "arquivo"}).`,
         dadosAntes: { ...antes },
         dadosDepois: {
           lista_recebida: false,

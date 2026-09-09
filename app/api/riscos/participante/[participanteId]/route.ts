@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { CpfCampanhaAtivaError } from "@/lib/riscos-cpf-campanha-ativa";
 import { createClient } from "@/lib/supabase/server";
@@ -65,17 +66,7 @@ export async function PATCH(
         },
       },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome:
-            (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-            user.email ||
-            "Usuário",
-          usuarioEmail:
-            (typeof perfil.email === "string" && perfil.email.trim()) ||
-            user.email ||
-            "",
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

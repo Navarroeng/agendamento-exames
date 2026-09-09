@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
 import { isPerfilStaffNavarro } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { cancelarProcessoListagemRiscosNoServidor } from "@/services/riscos-campanha-cancelar.server";
@@ -30,14 +31,6 @@ export async function POST(request: Request) {
       );
     }
 
-    let usuarioNome =
-      (typeof perfil.nome === "string" && perfil.nome.trim()) ||
-      user.email ||
-      "Usuário";
-    let usuarioEmail =
-      (typeof perfil.email === "string" && perfil.email.trim()) ||
-      user.email ||
-      "";
     let motivo = "";
     let orcamentoId = "";
     let campanhaId = "";
@@ -53,8 +46,6 @@ export async function POST(request: Request) {
       if (body?.motivo != null) motivo = String(body.motivo);
       if (body?.orcamentoId?.trim()) orcamentoId = body.orcamentoId.trim();
       if (body?.campanhaId?.trim()) campanhaId = body.campanhaId.trim();
-      if (body?.usuarioNome?.trim()) usuarioNome = body.usuarioNome.trim();
-      if (body?.usuarioEmail?.trim()) usuarioEmail = body.usuarioEmail.trim();
     } catch {
       // body obrigatório
     }
@@ -62,11 +53,7 @@ export async function POST(request: Request) {
     const result = await cancelarProcessoListagemRiscosNoServidor(
       { orcamentoId, campanhaId, motivo },
       {
-        auditContext: {
-          usuarioId: user.id,
-          usuarioNome,
-          usuarioEmail,
-        },
+        auditContext: auditoriaActorFromSessionPerfil({ user, perfil }),
       }
     );
 

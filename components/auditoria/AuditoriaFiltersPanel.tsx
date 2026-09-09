@@ -42,6 +42,18 @@ export function AuditoriaFiltersPanel({
       </div>
 
       <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="sm:col-span-2 xl:col-span-3">
+          <Field label="Buscar por empresa, colaborador ou termo">
+            <input
+              type="text"
+              placeholder="Digite o nome da empresa, colaborador ou termo da ação..."
+              className="field-input"
+              value={filters.busca ?? ""}
+              disabled={loading}
+              onChange={(e) => onChange("busca", e.target.value)}
+            />
+          </Field>
+        </div>
         <Field label="Data inicial">
           <input
             type="date"
