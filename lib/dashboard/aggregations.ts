@@ -146,7 +146,6 @@ export function buildDashboardAgenda(
       const data = toIsoDate(a.data_agendamento);
       if (filter === "hoje") return data === hojeIso;
       if (filter === "amanha") return data === amanha;
-      if (filter === "atrasados") return data < hojeIso;
       return data >= semana.inicio && data <= semana.fim;
     })
     .map((a) => {
@@ -164,9 +163,6 @@ export function buildDashboardAgenda(
       };
     })
     .sort((a, b) => {
-      if (filter === "atrasados") {
-        return b.dataIso.localeCompare(a.dataIso);
-      }
       const dateCmp = a.dataIso.localeCompare(b.dataIso);
       if (dateCmp !== 0) return dateCmp;
       return (a.horario ?? "").localeCompare(b.horario ?? "");

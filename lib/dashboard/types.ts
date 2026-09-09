@@ -1,8 +1,4 @@
-export type DashboardAgendaFilter =
-  | "hoje"
-  | "amanha"
-  | "semana"
-  | "atrasados";
+export type DashboardAgendaFilter = "hoje" | "amanha" | "semana";
 
 export interface DashboardKpis {
   pendenciasEsocial: number;

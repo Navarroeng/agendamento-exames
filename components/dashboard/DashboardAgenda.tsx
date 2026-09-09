@@ -15,7 +15,6 @@ const FILTERS: { key: DashboardAgendaFilter; label: string }[] = [
   { key: "hoje", label: "Hoje" },
   { key: "amanha", label: "Amanhã" },
   { key: "semana", label: "Semana" },
-  { key: "atrasados", label: "Atrasados" },
 ];
 
 function statusClass(tone: DashboardAgendaRow["statusTone"]): string {
