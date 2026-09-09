@@ -206,28 +206,60 @@ export function cpfVagaIguais(
   return isValidCPF(da) && da === db;
 }
 
+/**
+ * Vaga com definição operacional concluída para a etapa Agendamentos.
+ * Comprometido NÃO entra: ainda exige Agendar / programar / ASO em aberto.
+ */
+export function isVagaAgendamentoResolvida(
+  status: ContratoVagaStatus | string | null | undefined
+): boolean {
+  return (
+    status === "agendada" ||
+    status === "programada" ||
+    status === "aso_aberto"
+  );
+}
+
+/** @deprecated Preferir isVagaAgendamentoResolvida — mesmo critério. */
 export function vagaStatusEClassificacaoFinal(
   status: ContratoVagaStatus
 ): boolean {
-  return status === "agendada" || status === "programada" || status === "aso_aberto";
+  return isVagaAgendamentoResolvida(status);
 }
 
 /**
- * Fonte única da etapa Agendamentos da Implantação: classificação completa
- * quando não há vagas pendentes de definição.
+ * Etapa Agendamentos concluída somente quando todas as vagas previstas
+ * estão operacionalmente resolvidas (Agendado | Programado | ASO em aberto).
  *
- * Classificada = agendada, programada, ASO em aberto ou comprometida.
- * Comprometida já entra em pendentesDefinicao (não é pendente).
- * Não usa percentual de progresso operacional.
+ * Comprometido classifica a vaga, mas NÃO conclui a etapa.
+ * `pendentesDefinicao === 0` sozinho não basta se ainda houver comprometidos.
  */
 export function isClassificacaoVagasContratoCompleta(input: {
   previstos: number;
   pendentesDefinicao: number;
-  /** Ignorado: comprometida já reduz pendentesDefinicao. */
   vagasComprometidas?: number;
 }): boolean {
   if (input.previstos <= 0) return false;
-  return input.pendentesDefinicao === 0;
+  const comprometidas = Math.max(0, input.vagasComprometidas ?? 0);
+  return input.pendentesDefinicao === 0 && comprometidas === 0;
+}
+
+/**
+ * Atalho: resolvidas >= previstas.
+ * Preferir quando já se tem o breakdown agendados/programados/ASO.
+ */
+export function isAgendamentosVagasOperacionalmenteCompleta(input: {
+  previstos: number;
+  agendados: number;
+  programadosFuturos: number;
+  emAberto: number;
+}): boolean {
+  if (input.previstos <= 0) return false;
+  const resolvidas =
+    Math.max(0, input.agendados) +
+    Math.max(0, input.programadosFuturos) +
+    Math.max(0, input.emAberto);
+  return resolvidas >= input.previstos;
 }
 
 export type CardsVagasContrato = {

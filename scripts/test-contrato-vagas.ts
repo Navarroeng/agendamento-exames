@@ -297,7 +297,11 @@ assert.equal(caso2.emAberto, 1);
 assert.equal(caso2.pendentesDefinicao, 0);
 const caso2Contagem = buildContratoAgendamentoContagem(2, 1, 0, caso2);
 assert.equal(caso2Contagem.percentual, 50);
-assert.equal(caso2Contagem.concluido, true);
+assert.equal(caso2Contagem.concluido, false);
+assert.match(
+  caso2Contagem.mensagemComplemento ?? "",
+  /1 vaga comprometida ainda pendente/
+);
 
 const jFerreiraCards = contarCardsPorVagasContrato(
   [
@@ -314,10 +318,14 @@ assert.equal(jFerreiraCards.vagasComprometidas, 1);
 assert.equal(jFerreiraCards.pendentesDefinicao, 0);
 const jFerreiraContagem = buildContratoAgendamentoContagem(3, 2, 0, jFerreiraCards);
 assert.equal(jFerreiraContagem.percentual, 67);
-assert.equal(jFerreiraContagem.concluido, true);
+assert.equal(jFerreiraContagem.concluido, false);
 assert.equal(
   jFerreiraContagem.mensagem,
   "A quantidade prevista do contrato foi totalmente classificada."
+);
+assert.match(
+  jFerreiraContagem.mensagemComplemento ?? "",
+  /1 vaga comprometida ainda pendente/
 );
 
 const caso3 = contarCardsPorVagasContrato(
@@ -367,7 +375,11 @@ assert.equal(caso.vagasComprometidas, 1);
 assert.equal(caso.pendentesDefinicao, 0);
 assert.equal(caso.comprometidos, 2);
 assert.equal(caso.percentual, 50);
-assert.equal(caso.concluido, true);
+assert.equal(caso.concluido, false);
+assert.match(
+  caso.mensagemComplemento ?? "",
+  /1 vaga comprometida ainda pendente/
+);
 
 const nataliaAgendadaMaisAso = buildContratoAgendamentoContagem(2, 2, 0, {
   agendados: 1,
@@ -395,7 +407,7 @@ assert.equal(
     pendentesDefinicao: 0,
     vagasComprometidas: 1,
   }),
-  true
+  false
 );
 assert.equal(
   isClassificacaoVagasContratoCompleta({
@@ -404,6 +416,21 @@ assert.equal(
     vagasComprometidas: 0,
   }),
   false
+);
+
+// 4 Comprometidos → classificado, mas NÃO concluído
+const quatroComprometidos = buildContratoAgendamentoContagem(4, 0, 0, {
+  agendados: 0,
+  programadosFuturos: 0,
+  emAberto: 0,
+  vagasComprometidas: 4,
+});
+assert.equal(quatroComprometidos.pendentesDefinicao, 0);
+assert.equal(quatroComprometidos.vagasComprometidas, 4);
+assert.equal(quatroComprometidos.concluido, false);
+assert.match(
+  quatroComprometidos.mensagemComplemento ?? "",
+  /4 vagas comprometidas ainda pendentes/
 );
 
 const vagaNatalia = existentes[0];
@@ -723,12 +750,27 @@ assert.equal(
     }),
     {
       quantidadeContratada: 2,
-      agendamentosRealizados: 2,
+      agendamentosRealizados: 1,
       pendentesDefinicao: 0,
       vagasComprometidas: 1,
     }
   ),
-  true
+  false
+);
+assert.equal(
+  isAgendamentosEtapaConcluida(
+    aprovacao({
+      visita_tecnica_necessaria: false,
+      visita_tecnica_salva_em: "2026-01-05",
+    }),
+    {
+      quantidadeContratada: 4,
+      agendamentosRealizados: 0,
+      pendentesDefinicao: 0,
+      vagasComprometidas: 4,
+    }
+  ),
+  false
 );
 
 const agNatalia = {

@@ -185,6 +185,13 @@ export function buildContratoAgendamentoContagem(
     mensagem = `Faltam definir ${pendentesDefinicao} vagas para atingir a quantidade prevista no contrato.`;
     mensagemComplemento =
       "Você pode vincular novos agendamentos, informar exames futuros ou manter essas vagas como ASOs em aberto.";
+  } else if (vagasComprometidas > 0) {
+    // Classificação completa, mas execução operacional ainda pendente.
+    mensagem = "A quantidade prevista do contrato foi totalmente classificada.";
+    mensagemComplemento =
+      vagasComprometidas === 1
+        ? "Existe 1 vaga comprometida ainda pendente de agendamento, programação para o futuro ou ASO em aberto."
+        : `Existem ${vagasComprometidas} vagas comprometidas ainda pendentes de agendamento, programação para o futuro ou ASO em aberto.`;
   } else {
     mensagem = "A quantidade prevista do contrato foi totalmente classificada.";
     if (emAberto === 1) {

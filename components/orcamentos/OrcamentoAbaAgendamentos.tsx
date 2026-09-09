@@ -1029,7 +1029,11 @@ export function OrcamentoAbaAgendamentos({
           <Card
             label="Comprometidos"
             value={String(contagemPreview.vagasComprometidas)}
-            title="Funcionários já identificados na lista, ainda sem agendamento."
+            alert={
+              contagemPreview.vagasComprometidas > 0 &&
+              !contagemPreview.concluido
+            }
+            title="Funcionários já identificados na lista, ainda sem agendamento, programação futura ou ASO em aberto. Não concluem a etapa Agendamentos."
           />
           {dispensado ? (
             <Card

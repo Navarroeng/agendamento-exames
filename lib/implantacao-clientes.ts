@@ -307,7 +307,7 @@ export type ImplantacaoAgendamentosClassificacao = {
 
 /**
  * Etapa Agendamentos da lista: mesma regra da aba
- * (`isClassificacaoVagasContratoCompleta` — pendentesDefinicao === 0).
+ * (`isClassificacaoVagasContratoCompleta` — sem pendentes e sem comprometidos).
  * Dispensa dos agendamentos iniciais também conclui. Não usa progresso %.
  */
 export function isAgendamentosImplantacaoConcluida(
@@ -323,6 +323,7 @@ export function isAgendamentosImplantacaoConcluida(
     return isClassificacaoVagasContratoCompleta({
       previstos: qtd,
       pendentesDefinicao: classificacao.pendentesDefinicao,
+      vagasComprometidas: classificacao.vagasComprometidas ?? 0,
     });
   }
   const feitos = Math.max(0, agendamentosRealizados);

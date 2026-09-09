@@ -168,8 +168,39 @@ assert.equal(
     pendentesDefinicao: 0,
     vagasComprometidas: 1,
   }),
-  "concluido"
+  "aguardando_agendamentos"
 );
+
+// ORC-2026-0015: 4 Comprometidos → NÃO concluído
+const tfSaoPaulo = buildImplantacaoProcesso({
+  orcamento: {
+    id: "o-tf",
+    numero: "ORC-2026-0015",
+    status: "aprovado",
+    cliente_nome: "TF DE SAO PAULO LTDA",
+    cliente_cnpj: "00",
+    responsavel: "Admin",
+    origem_cliente: null,
+  } as OrcamentoRecord,
+  aprovacao: aprovacaoBase({ quantidade_colaboradores: 4 }),
+  contrato: {
+    id: "c-tf",
+    numero: "CTR-TF",
+    quantidade_colaboradores: 4,
+    status: "ativo",
+    agendamentos_iniciais_dispensados: false,
+  } as ClienteContratoRecord,
+  agendamentosRealizados: 0,
+  examesProgramadosFuturos: 0,
+  asosContratuaisEmAberto: 0,
+  pendentesDefinicao: 0,
+  vagasComprometidas: 4,
+});
+assert.equal(tfSaoPaulo.etapaAtual, "aguardando_agendamentos");
+assert.notEqual(tfSaoPaulo.etapaAtual, "concluido");
+assert.ok(tfSaoPaulo.etapasConcluidas < tfSaoPaulo.totalEtapas);
+assert.equal(tfSaoPaulo.vagasComprometidas, 4);
+assert.equal(tfSaoPaulo.pendentesDefinicao, 0);
 
 const jFerreira = buildImplantacaoProcesso({
   orcamento: {
@@ -195,10 +226,8 @@ const jFerreira = buildImplantacaoProcesso({
   pendentesDefinicao: 0,
   vagasComprometidas: 1,
 });
-assert.equal(jFerreira.etapaAtual, "concluido");
-assert.equal(jFerreira.etapasConcluidas, 7);
-assert.equal(jFerreira.totalEtapas, 7);
-assert.equal(jFerreira.progressoLabel, "7 de 7");
+assert.equal(jFerreira.etapaAtual, "aguardando_agendamentos");
+assert.ok(jFerreira.etapasConcluidas < jFerreira.totalEtapas);
 assert.equal(jFerreira.pendentesDefinicao, 0);
 assert.equal(jFerreira.vagasComprometidas, 1);
 assert.equal(jFerreira.agendamentosRealizados, 2);
@@ -213,7 +242,7 @@ assert.equal(
       vagasComprometidas: 1,
     }
   ),
-  7
+  6
 );
 
 assert.equal(
@@ -236,6 +265,17 @@ assert.equal(
   "aguardando_agendamentos"
 );
 
+// 2 Agendados + 1 Programado + 1 ASO → concluído
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 4 }), {
+    quantidadeContratada: 4,
+    agendamentosRealizados: 3,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  "concluido"
+);
+
 assert.equal(
   resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 3 }), {
     quantidadeContratada: 3,
@@ -243,7 +283,7 @@ assert.equal(
     pendentesDefinicao: 0,
     vagasComprometidas: 1,
   }),
-  "concluido"
+  "aguardando_agendamentos"
 );
 
 console.log("ok: implantacao-agendamentos-etapa");
