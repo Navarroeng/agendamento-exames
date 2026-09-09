@@ -21,6 +21,57 @@ export function formatCPF(value: string | null | undefined): string {
   return maskCPFInput(value);
 }
 
+function formatIntegerSemNotacaoCientifica(n: number): string {
+  const truncated = Math.trunc(Math.abs(n));
+  return truncated.toLocaleString("en-US", {
+    useGrouping: false,
+    maximumFractionDigits: 0,
+  });
+}
+
+/**
+ * Normaliza CPF vindo de célula Excel/CSV.
+ * Trata number, string mascarada, ".0", notação científica e perda de
+ * um zero à esquerda quando a recuperação for inequívoca (CPF válido).
+ */
+export function normalizarCpfDeCelulaExcel(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "boolean") return "";
+
+  let candidate = "";
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    candidate = formatIntegerSemNotacaoCientifica(value);
+  } else {
+    let text = String(value).trim();
+    if (!text) return "";
+
+    const sciProbe = text.replace(/\s/g, "").replace(",", ".");
+    if (/^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/.test(sciProbe)) {
+      const n = Number(sciProbe);
+      if (Number.isFinite(n)) {
+        candidate = formatIntegerSemNotacaoCientifica(n);
+      } else {
+        candidate = text;
+      }
+    } else {
+      // Excel às vezes formata inteiro como "52998224725.0" / "52998224725,0"
+      text = text.replace(/[.,]0+$/, "");
+      candidate = text;
+    }
+  }
+
+  const digits = onlyDigits(candidate);
+
+  // Excel removeu 1 zero à esquerda → 10 dígitos. Só completa se o CPF padded for válido.
+  if (digits.length === 10) {
+    const padded = `0${digits}`;
+    if (isValidCPF(padded)) return padded;
+  }
+
+  return digits;
+}
+
 export function isValidCPF(value: string | null | undefined): boolean {
   const digits = normalizeCpfDigits(value);
   if (digits.length !== 11) return false;

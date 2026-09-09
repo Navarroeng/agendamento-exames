@@ -37,7 +37,9 @@ import {
   mensagemExcessoVagasListaFuncionarios,
   nomeArquivoModeloListaFuncionarios,
   parsePlanilhaListaFuncionarios,
+  resumirErrosImportacaoListaFuncionarios,
 } from "../lib/contrato-vagas-import";
+import { isValidCPF, normalizarCpfDeCelulaExcel } from "../lib/cpf";
 import * as XLSX from "xlsx";
 import { resolverProximoAvisoBeneficio } from "../lib/agendamento-beneficios-contratuais";
 import {
@@ -508,6 +510,30 @@ assert.equal(parsed.rows.length, 2);
 assert.equal(parsed.rows[0].cpfDigits, "52998224725");
 assert.equal(parsed.rows[1].cpfDigits, "39053344705");
 
+// Normalização Excel: máscara, dígitos, number, .0, científica, zero à esquerda
+assert.equal(normalizarCpfDeCelulaExcel("529.982.247-25"), "52998224725");
+assert.equal(normalizarCpfDeCelulaExcel("52998224725"), "52998224725");
+assert.equal(normalizarCpfDeCelulaExcel(52998224725), "52998224725");
+assert.equal(normalizarCpfDeCelulaExcel("52998224725.0"), "52998224725");
+assert.equal(normalizarCpfDeCelulaExcel("5.2998224725E+10"), "52998224725");
+assert.equal(normalizarCpfDeCelulaExcel("  529.982.247-25  "), "52998224725");
+assert.equal(isValidCPF("01000000028"), true);
+assert.equal(normalizarCpfDeCelulaExcel("01000000028"), "01000000028");
+assert.equal(normalizarCpfDeCelulaExcel(1000000028), "01000000028"); // Excel perdeu o zero
+assert.equal(normalizarCpfDeCelulaExcel("123.456.789-00"), "12345678900");
+assert.equal(isValidCPF(normalizarCpfDeCelulaExcel("123.456.789-00")), false);
+
+const parseNumberCells = parsePlanilhaListaFuncionarios([
+  ["Nome do funcionário", "CPF", "Cargo"],
+  ["Natalia", 52998224725, "Cozinheira"],
+  ["Joao", "39053344705.0", "Auxiliar"],
+  ["Zero", 1000000028, "Assistente"],
+]);
+assert.equal(parseNumberCells.ok, true);
+assert.equal(parseNumberCells.rows[0].cpfDigits, "52998224725");
+assert.equal(parseNumberCells.rows[1].cpfDigits, "39053344705");
+assert.equal(parseNumberCells.rows[2].cpfDigits, "01000000028");
+
 const aplicados = aplicarImportacaoNasVagas({
   atuais: [emptyVagaDraft(1), emptyVagaDraft(2)],
   importados: parsed.rows,
@@ -546,21 +572,31 @@ const cpfDup = parsePlanilhaListaFuncionarios([
 assert.equal(cpfDup.ok, false);
 assert.match(cpfDup.errosLinha.join("\n"), /duplicado/i);
 
+// Toast resumido para muitos CPFs inválidos
+const muitosErros = Array.from({ length: 8 }, (_, i) => `Linha ${i + 2}: CPF inválido.`);
+assert.match(
+  resumirErrosImportacaoListaFuncionarios(muitosErros),
+  /Foram encontrados 8 CPFs inválidos/
+);
+
 // Excesso de vagas — mensagem oficial (UI bloqueia antes de aplicar)
 assert.match(
   mensagemExcessoVagasListaFuncionarios(10, 12),
   /O contrato possui 10 vagas, mas o arquivo contém 12 funcionários/
 );
 
-// Modelo Excel: aba Funcionários + Instruções + N linhas
+// Modelo Excel: aba Funcionários + Instruções + N linhas + CPF como texto
 const modeloBuf = gerarModeloListaFuncionariosXlsx({ quantidadePrevista: 3 });
-const modeloWb = XLSX.read(modeloBuf, { type: "array" });
+const modeloWb = XLSX.read(modeloBuf, { type: "array", cellStyles: true });
 assert.ok(modeloWb.SheetNames.includes("Funcionários"));
 assert.ok(modeloWb.SheetNames.includes("Instruções"));
-const modeloRows = XLSX.utils.sheet_to_json<unknown[]>(
-  modeloWb.Sheets["Funcionários"],
-  { header: 1, defval: "" }
-);
+const modeloSheet = modeloWb.Sheets["Funcionários"];
+assert.equal(modeloSheet["B2"]?.t, "s");
+assert.equal(modeloSheet["B2"]?.z, "@");
+const modeloRows = XLSX.utils.sheet_to_json<unknown[]>(modeloSheet, {
+  header: 1,
+  defval: "",
+});
 assert.equal(modeloRows.length, 4); // header + 3 linhas
 assert.deepEqual(modeloRows[0], [
   "Nome do funcionário",
@@ -571,6 +607,24 @@ assert.equal(
   nomeArquivoModeloListaFuncionarios("ORC-2026-0037"),
   "modelo_lista_funcionarios_ORC-2026-0037.xlsx"
 );
+
+// Round-trip: modelo → preencher (texto + número) → parse
+modeloSheet["A2"] = { t: "s", v: "Maria Souza" };
+modeloSheet["B2"] = { t: "s", v: "529.982.247-25", z: "@" };
+modeloSheet["C2"] = { t: "s", v: "Recepcionista" };
+modeloSheet["A3"] = { t: "s", v: "Joao Silva" };
+modeloSheet["B3"] = { t: "n", v: 39053344705 };
+modeloSheet["C3"] = { t: "s", v: "Motorista" };
+const roundTripRows = XLSX.utils.sheet_to_json<unknown[]>(modeloSheet, {
+  header: 1,
+  defval: "",
+  raw: true,
+});
+const roundTrip = parsePlanilhaListaFuncionarios(roundTripRows);
+assert.equal(roundTrip.ok, true);
+assert.equal(roundTrip.rows.length, 2);
+assert.equal(roundTrip.rows[0].cpfDigits, "52998224725");
+assert.equal(roundTrip.rows[1].cpfDigits, "39053344705");
 
 // Importação lê apenas aba Funcionários (Instruções ignorada)
 assert.equal(

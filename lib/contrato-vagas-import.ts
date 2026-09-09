@@ -4,7 +4,12 @@
  */
 
 import * as XLSX from "xlsx";
-import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  isValidCPF,
+  maskCPFInput,
+  normalizarCpfDeCelulaExcel,
+  normalizeCpfDigits,
+} from "@/lib/cpf";
 import {
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
@@ -145,17 +150,24 @@ export function gerarModeloListaFuncionariosXlsx(params: {
   const sheetFuncionarios = XLSX.utils.aoa_to_sheet(aoa);
   sheetFuncionarios["!cols"] = [{ wch: 36 }, { wch: 18 }, { wch: 28 }];
 
+  // Coluna CPF (índice 1) como texto — evita perda de zeros e notação científica.
+  for (let i = 0; i < n; i += 1) {
+    const ref = XLSX.utils.encode_cell({ r: i + 1, c: 1 });
+    sheetFuncionarios[ref] = { t: "s", v: "", z: "@" };
+  }
+
   const instrucoes = XLSX.utils.aoa_to_sheet([
     ["Instruções para preenchimento da lista de funcionários"],
     [""],
     ["1. Preencha somente a aba Funcionários."],
     ["2. Não altere o nome das colunas (Nome do funcionário, CPF, Cargo)."],
-    ["3. CPF pode ser digitado com ou sem máscara."],
-    ["4. Nome do funcionário é obrigatório quando a vaga for preenchida."],
-    ["5. CPF é obrigatório para identificar corretamente o colaborador."],
-    ["6. Cargo deve corresponder ao cargo informado para aquela pessoa."],
-    ["7. Linhas totalmente vazias são ignoradas na importação."],
-    ["8. Após importar, revise a tabela e clique em Salvar lista."],
+    ["3. A coluna CPF está formatada como texto — preserve os 11 dígitos."],
+    ["4. CPF pode ser digitado com ou sem máscara."],
+    ["5. Nome do funcionário é obrigatório quando a vaga for preenchida."],
+    ["6. CPF é obrigatório para identificar corretamente o colaborador."],
+    ["7. Cargo deve corresponder ao cargo informado para aquela pessoa."],
+    ["8. Linhas totalmente vazias são ignoradas na importação."],
+    ["9. Após importar, revise a tabela e clique em Salvar lista."],
   ]);
   instrucoes["!cols"] = [{ wch: 90 }];
 
@@ -171,7 +183,11 @@ export function gerarModeloListaFuncionariosXlsx(params: {
     CONTRATO_VAGAS_SHEET_INSTRUCOES
   );
 
-  const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  const out = XLSX.write(wb, {
+    type: "array",
+    bookType: "xlsx",
+    cellStyles: true,
+  });
   if (out instanceof ArrayBuffer) return out;
   if (out instanceof Uint8Array) {
     return out.buffer.slice(
@@ -200,8 +216,25 @@ export function downloadModeloListaFuncionariosXlsx(params: {
   URL.revokeObjectURL(url);
 }
 
+export function resumirErrosImportacaoListaFuncionarios(
+  errosLinha: string[]
+): string {
+  const cpfInvalidos = errosLinha.filter((e) => /CPF inválido/i.test(e));
+  if (cpfInvalidos.length >= 3) {
+    return `Não foi possível importar. Foram encontrados ${cpfInvalidos.length} CPFs inválidos. Revise os dados da planilha.`;
+  }
+  if (errosLinha.length > 6) {
+    return (
+      `Não foi possível importar a lista. ${errosLinha.length} erros encontrados.\n` +
+      errosLinha.slice(0, 5).join("\n") +
+      "\n…"
+    );
+  }
+  return errosLinha.join("\n");
+}
+
 export function parsePlanilhaListaFuncionarios(
-  rows: string[][]
+  rows: unknown[][]
 ): ContratoVagaImportResult {
   if (!rows.length) {
     return failResult("Arquivo vazio ou sem dados.");
@@ -213,8 +246,9 @@ export function parsePlanilhaListaFuncionarios(
 
   for (let i = 0; i < Math.min(rows.length, 10); i += 1) {
     const candidate: Partial<Record<MappedField, number>> = {};
-    for (let c = 0; c < rows[i].length; c += 1) {
-      const key = mapHeaderKey(rows[i][c] ?? "");
+    const headerRow = rows[i] ?? [];
+    for (let c = 0; c < headerRow.length; c += 1) {
+      const key = mapHeaderKey(cellStr(headerRow[c]));
       if (key && candidate[key] == null) candidate[key] = c;
     }
     if (
@@ -243,9 +277,15 @@ export function parsePlanilhaListaFuncionarios(
   for (let i = dataStart; i < rows.length; i += 1) {
     const raw = rows[i] ?? [];
     const nome = normalizeNomeOcupante(cellStr(raw[mapped.nome ?? 0]));
-    const cpfRaw = cellStr(raw[mapped.cpf ?? 1]);
+    const cpfCell = raw[mapped.cpf ?? 1];
     const cargo = normalizeNomeOcupante(cellStr(raw[mapped.cargo ?? 2]));
-    const cpfDigits = normalizeCpfDigits(cpfRaw);
+    const cpfDigits = normalizarCpfDeCelulaExcel(cpfCell);
+    const cpfRaw =
+      typeof cpfCell === "string" && cpfCell.trim()
+        ? cpfCell.trim()
+        : cpfDigits
+          ? maskCPFInput(cpfDigits)
+          : cellStr(cpfCell);
     const row: ContratoVagaImportRow = {
       linha: i + 1,
       nome,
@@ -299,7 +339,7 @@ export function parsePlanilhaListaFuncionarios(
     const uniqueDup = Array.from(new Set(duplicados));
     return {
       ok: false,
-      error: errosLinha.join("\n"),
+      error: resumirErrosImportacaoListaFuncionarios(errosLinha),
       rows: parsed,
       excedentes: [],
       duplicados: uniqueDup,
@@ -356,7 +396,7 @@ export async function lerArquivoListaFuncionarios(
   }
 
   try {
-    let matrix: string[][] = [];
+    let matrix: unknown[][] = [];
     if (isCsv) {
       const text = await file.text();
       matrix = text
@@ -364,7 +404,12 @@ export async function lerArquivoListaFuncionarios(
         .map((line) => line.split(/[;,]/).map((c) => c.trim()));
     } else {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
+      const workbook = XLSX.read(buffer, {
+        type: "array",
+        // Mantém números como number para evitar formatação "E+10" / ".0"
+        cellText: false,
+        cellDates: false,
+      });
       const sheetName = escolherAbaFuncionarios(workbook.SheetNames);
       if (!sheetName) {
         return failResult("A planilha não possui abas.");
@@ -373,11 +418,9 @@ export async function lerArquivoListaFuncionarios(
       const json = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
         header: 1,
         defval: "",
-        raw: false,
+        raw: true,
       });
-      matrix = json.map((r) =>
-        (Array.isArray(r) ? r : []).map((c) => cellStr(c))
-      );
+      matrix = json.map((r) => (Array.isArray(r) ? [...r] : []));
     }
     return parsePlanilhaListaFuncionarios(matrix);
   } catch {

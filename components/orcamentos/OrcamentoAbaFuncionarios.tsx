@@ -32,6 +32,7 @@ import {
   downloadModeloListaFuncionariosXlsx,
   lerArquivoListaFuncionarios,
   mensagemExcessoVagasListaFuncionarios,
+  resumirErrosImportacaoListaFuncionarios,
 } from "@/lib/contrato-vagas-import";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
@@ -238,10 +239,7 @@ export function OrcamentoAbaFuncionarios({
     if (!parsed.ok) {
       const detalhe =
         parsed.errosLinha.length > 0
-          ? parsed.errosLinha.slice(0, 8).join("\n") +
-            (parsed.errosLinha.length > 8
-              ? `\n… e mais ${parsed.errosLinha.length - 8} erro(s).`
-              : "")
+          ? resumirErrosImportacaoListaFuncionarios(parsed.errosLinha)
           : parsed.error || "Não foi possível importar a lista.";
       toast.error(detalhe);
       return;
