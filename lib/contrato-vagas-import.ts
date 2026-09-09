@@ -1,6 +1,6 @@
 /**
- * Importação da lista de funcionários do contrato (XLSX/XLS/CSV).
- * Reutiliza SheetJS já presente no projeto.
+ * Importação / modelo Excel da lista de funcionários do contrato (XLSX/XLS/CSV).
+ * Reutiliza SheetJS (`xlsx`) já presente no projeto.
  */
 
 import * as XLSX from "xlsx";
@@ -10,6 +10,15 @@ import {
   normalizeNomeOcupante,
   type ContratoVagaDraft,
 } from "@/lib/contrato-vagas";
+
+export const CONTRATO_VAGAS_IMPORT_HEADERS = [
+  "Nome do funcionário",
+  "CPF",
+  "Cargo",
+] as const;
+
+export const CONTRATO_VAGAS_SHEET_FUNCIONARIOS = "Funcionários";
+export const CONTRATO_VAGAS_SHEET_INSTRUCOES = "Instruções";
 
 export type ContratoVagaImportRow = {
   linha: number;
@@ -26,6 +35,7 @@ export type ContratoVagaImportResult = {
   excedentes: ContratoVagaImportRow[];
   duplicados: string[];
   incompletos: number;
+  errosLinha: string[];
 };
 
 function normalizeHeader(h: string): string {
@@ -76,18 +86,125 @@ function isRowVazia(row: ContratoVagaImportRow): boolean {
   return !row.nome && !row.cpf && !row.cargo;
 }
 
+function failResult(error: string): ContratoVagaImportResult {
+  return {
+    ok: false,
+    error,
+    rows: [],
+    excedentes: [],
+    duplicados: [],
+    incompletos: 0,
+    errosLinha: [],
+  };
+}
+
+export function mensagemColunasEsperadasListaFuncionarios(): string {
+  return (
+    "O arquivo não contém as colunas esperadas:\n" +
+    "Nome do funcionário, CPF e Cargo."
+  );
+}
+
+export function mensagemExcessoVagasListaFuncionarios(
+  quantidadePrevista: number,
+  quantidadeArquivo: number
+): string {
+  return (
+    `O contrato possui ${quantidadePrevista} vagas, mas o arquivo contém ${quantidadeArquivo} funcionários.\n` +
+    "Revise a planilha antes de continuar."
+  );
+}
+
+export function sanitizeNumeroOrcamentoParaArquivo(
+  numero: string | null | undefined
+): string {
+  const raw = String(numero ?? "")
+    .trim()
+    .replace(/[^\w\-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return raw || "orcamento";
+}
+
+export function nomeArquivoModeloListaFuncionarios(
+  numeroOrcamento?: string | null
+): string {
+  return `modelo_lista_funcionarios_${sanitizeNumeroOrcamentoParaArquivo(numeroOrcamento)}.xlsx`;
+}
+
+/** Gera ArrayBuffer do modelo oficial (.xlsx). */
+export function gerarModeloListaFuncionariosXlsx(params: {
+  quantidadePrevista: number;
+}): ArrayBuffer {
+  const n = Math.max(0, Math.floor(Number(params.quantidadePrevista) || 0));
+  const aoa: string[][] = [[...CONTRATO_VAGAS_IMPORT_HEADERS]];
+  for (let i = 0; i < n; i += 1) {
+    aoa.push(["", "", ""]);
+  }
+
+  const sheetFuncionarios = XLSX.utils.aoa_to_sheet(aoa);
+  sheetFuncionarios["!cols"] = [{ wch: 36 }, { wch: 18 }, { wch: 28 }];
+
+  const instrucoes = XLSX.utils.aoa_to_sheet([
+    ["Instruções para preenchimento da lista de funcionários"],
+    [""],
+    ["1. Preencha somente a aba Funcionários."],
+    ["2. Não altere o nome das colunas (Nome do funcionário, CPF, Cargo)."],
+    ["3. CPF pode ser digitado com ou sem máscara."],
+    ["4. Nome do funcionário é obrigatório quando a vaga for preenchida."],
+    ["5. CPF é obrigatório para identificar corretamente o colaborador."],
+    ["6. Cargo deve corresponder ao cargo informado para aquela pessoa."],
+    ["7. Linhas totalmente vazias são ignoradas na importação."],
+    ["8. Após importar, revise a tabela e clique em Salvar lista."],
+  ]);
+  instrucoes["!cols"] = [{ wch: 90 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    wb,
+    sheetFuncionarios,
+    CONTRATO_VAGAS_SHEET_FUNCIONARIOS
+  );
+  XLSX.utils.book_append_sheet(
+    wb,
+    instrucoes,
+    CONTRATO_VAGAS_SHEET_INSTRUCOES
+  );
+
+  const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  if (out instanceof ArrayBuffer) return out;
+  if (out instanceof Uint8Array) {
+    return out.buffer.slice(
+      out.byteOffset,
+      out.byteOffset + out.byteLength
+    ) as ArrayBuffer;
+  }
+  return new Uint8Array(out as ArrayLike<number>).buffer;
+}
+
+export function downloadModeloListaFuncionariosXlsx(params: {
+  quantidadePrevista: number;
+  numeroOrcamento?: string | null;
+}): void {
+  const buffer = gerarModeloListaFuncionariosXlsx({
+    quantidadePrevista: params.quantidadePrevista,
+  });
+  const blob = new Blob([new Uint8Array(buffer)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivoModeloListaFuncionarios(params.numeroOrcamento);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function parsePlanilhaListaFuncionarios(
   rows: string[][]
 ): ContratoVagaImportResult {
   if (!rows.length) {
-    return {
-      ok: false,
-      error: "Arquivo vazio ou sem dados.",
-      rows: [],
-      excedentes: [],
-      duplicados: [],
-      incompletos: 0,
-    };
+    return failResult("Arquivo vazio ou sem dados.");
   }
 
   let headerIndex = 0;
@@ -100,7 +217,11 @@ export function parsePlanilhaListaFuncionarios(
       const key = mapHeaderKey(rows[i][c] ?? "");
       if (key && candidate[key] == null) candidate[key] = c;
     }
-    if (candidate.nome != null && candidate.cpf != null) {
+    if (
+      candidate.nome != null &&
+      candidate.cpf != null &&
+      candidate.cargo != null
+    ) {
       mapped = candidate;
       headerIndex = i;
       foundHeader = true;
@@ -109,14 +230,14 @@ export function parsePlanilhaListaFuncionarios(
   }
 
   if (!foundHeader) {
-    mapped = { nome: 0, cpf: 1, cargo: 2 };
-    headerIndex = -1;
+    return failResult(mensagemColunasEsperadasListaFuncionarios());
   }
 
-  const dataStart = foundHeader ? headerIndex + 1 : 0;
+  const dataStart = headerIndex + 1;
   const parsed: ContratoVagaImportRow[] = [];
   const cpfLinha = new Map<string, number>();
   const duplicados: string[] = [];
+  const errosLinha: string[] = [];
   let incompletos = 0;
 
   for (let i = dataStart; i < rows.length; i += 1) {
@@ -135,13 +256,33 @@ export function parsePlanilhaListaFuncionarios(
     if (isRowVazia(row)) continue;
 
     const nomeOk = isNomeFuncionarioReal(nome);
-    const cpfOk = isValidCPF(cpfDigits);
-    if (!nomeOk || !cpfOk) incompletos += 1;
+    const cpfOk = cpfDigits.length === 11 && isValidCPF(cpfDigits);
+    const cargoOk = cargo.length > 0;
+
+    if (!nomeOk) {
+      errosLinha.push(`Linha ${row.linha}: Nome do funcionário é obrigatório.`);
+      incompletos += 1;
+    }
+    if (!cpfDigits) {
+      errosLinha.push(`Linha ${row.linha}: CPF é obrigatório.`);
+      incompletos += 1;
+    } else if (!cpfOk) {
+      errosLinha.push(`Linha ${row.linha}: CPF inválido.`);
+      incompletos += 1;
+    }
+    if (!cargoOk) {
+      errosLinha.push(`Linha ${row.linha}: Cargo é obrigatório.`);
+      incompletos += 1;
+    }
 
     if (cpfOk) {
       const prev = cpfLinha.get(cpfDigits);
       if (prev) {
-        duplicados.push(maskCPFInput(cpfDigits));
+        const masked = maskCPFInput(cpfDigits);
+        duplicados.push(masked);
+        errosLinha.push(
+          `Linha ${row.linha}: CPF ${masked} duplicado (já informado na linha ${prev}).`
+        );
       } else {
         cpfLinha.set(cpfDigits, row.linha);
       }
@@ -151,13 +292,19 @@ export function parsePlanilhaListaFuncionarios(
   }
 
   if (parsed.length === 0) {
+    return failResult("Não foi possível encontrar funcionários na planilha.");
+  }
+
+  if (errosLinha.length > 0 || duplicados.length > 0) {
+    const uniqueDup = Array.from(new Set(duplicados));
     return {
       ok: false,
-      error: "Não foi possível encontrar funcionários na planilha.",
-      rows: [],
+      error: errosLinha.join("\n"),
+      rows: parsed,
       excedentes: [],
-      duplicados: [],
-      incompletos: 0,
+      duplicados: uniqueDup,
+      incompletos,
+      errosLinha,
     };
   }
 
@@ -166,9 +313,29 @@ export function parsePlanilhaListaFuncionarios(
     error: null,
     rows: parsed,
     excedentes: [],
-    duplicados: Array.from(new Set(duplicados)),
-    incompletos,
+    duplicados: [],
+    incompletos: 0,
+    errosLinha: [],
   };
+}
+
+function escolherAbaFuncionarios(sheetNames: string[]): string | null {
+  if (!sheetNames.length) return null;
+  const preferida = sheetNames.find(
+    (n) => normalizeHeader(n) === "funcionarios"
+  );
+  if (preferida) return preferida;
+  const naoInstrucoes = sheetNames.find(
+    (n) => normalizeHeader(n) !== "instrucoes"
+  );
+  return naoInstrucoes ?? sheetNames[0] ?? null;
+}
+
+/** Preferência de aba na planilha (testável). */
+export function escolherAbaListaFuncionarios(
+  sheetNames: string[]
+): string | null {
+  return escolherAbaFuncionarios(sheetNames);
 }
 
 export async function lerArquivoListaFuncionarios(
@@ -183,14 +350,9 @@ export async function lerArquivoListaFuncionarios(
     file.type.includes("excel");
 
   if (!isCsv && !isExcel) {
-    return {
-      ok: false,
-      error: "Use um arquivo XLS, XLSX ou CSV para importar a lista.",
-      rows: [],
-      excedentes: [],
-      duplicados: [],
-      incompletos: 0,
-    };
+    return failResult(
+      "Use um arquivo XLS, XLSX ou CSV para importar a lista."
+    );
   }
 
   try {
@@ -203,16 +365,9 @@ export async function lerArquivoListaFuncionarios(
     } else {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
+      const sheetName = escolherAbaFuncionarios(workbook.SheetNames);
       if (!sheetName) {
-        return {
-          ok: false,
-          error: "A planilha não possui abas.",
-          rows: [],
-          excedentes: [],
-          duplicados: [],
-          incompletos: 0,
-        };
+        return failResult("A planilha não possui abas.");
       }
       const sheet = workbook.Sheets[sheetName];
       const json = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -226,14 +381,9 @@ export async function lerArquivoListaFuncionarios(
     }
     return parsePlanilhaListaFuncionarios(matrix);
   } catch {
-    return {
-      ok: false,
-      error: "Não foi possível ler o arquivo. Verifique se está em XLS, XLSX ou CSV.",
-      rows: [],
-      excedentes: [],
-      duplicados: [],
-      incompletos: 0,
-    };
+    return failResult(
+      "Não foi possível ler o arquivo. Verifique se está em XLS, XLSX ou CSV."
+    );
   }
 }
 
@@ -299,6 +449,8 @@ export function aplicarImportacaoNasVagas(params: {
           : item.cpf,
         cargoNome: item.cargo,
         cargoId: cargoMatch?.id ?? null,
+        // Preenche apenas dados da vaga; ASO em aberto deixa de aplicar
+        // quando a vaga recebe funcionário nomeado.
         manterAsoAberto: false,
       };
       aplicados += 1;

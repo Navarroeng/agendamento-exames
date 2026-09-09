@@ -1468,6 +1468,7 @@ export function OrcamentoAprovarModal({
           ) ? (
             <OrcamentoAbaFuncionarios
               orcamentoId={orcamento.id}
+              orcamentoNumero={orcamento.numero}
               aprovacao={aprovacao}
               usuarioNome={usuarioNome}
               clienteNome={orcamento.cliente_nome}

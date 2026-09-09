@@ -31,8 +31,14 @@ import {
 } from "../lib/contrato-agendamentos";
 import {
   aplicarImportacaoNasVagas,
+  escolherAbaListaFuncionarios,
+  gerarModeloListaFuncionariosXlsx,
+  mensagemColunasEsperadasListaFuncionarios,
+  mensagemExcessoVagasListaFuncionarios,
+  nomeArquivoModeloListaFuncionarios,
   parsePlanilhaListaFuncionarios,
 } from "../lib/contrato-vagas-import";
+import * as XLSX from "xlsx";
 import { resolverProximoAvisoBeneficio } from "../lib/agendamento-beneficios-contratuais";
 import {
   isAgendamentosEtapaConcluida,
@@ -492,14 +498,15 @@ assert.equal(
 );
 
 const parsed = parsePlanilhaListaFuncionarios([
-  ["Nome", "CPF", "Cargo"],
+  ["Nome do funcionário", "CPF", "Cargo"],
   ["Natália Porfírio", "529.982.247-25", "Cozinheira"],
   ["", "", ""],
   ["João Silva", "39053344705", "Auxiliar"],
-  ["Excedente", "11144477735", "Garçom"],
 ]);
 assert.equal(parsed.ok, true);
-assert.equal(parsed.rows.length, 3);
+assert.equal(parsed.rows.length, 2);
+assert.equal(parsed.rows[0].cpfDigits, "52998224725");
+assert.equal(parsed.rows[1].cpfDigits, "39053344705");
 
 const aplicados = aplicarImportacaoNasVagas({
   atuais: [emptyVagaDraft(1), emptyVagaDraft(2)],
@@ -508,8 +515,87 @@ const aplicados = aplicarImportacaoNasVagas({
   sobrescreverPreenchidas: true,
 });
 assert.equal(aplicados.aplicados, 2);
-assert.equal(aplicados.excedentes.length, 1);
+assert.equal(aplicados.excedentes.length, 0);
 assert.equal(aplicados.drafts[0].colaborador, "Natália Porfírio");
+assert.equal(aplicados.drafts[0].manterAsoAberto, false);
+
+// Cabeçalho sem Cargo
+const semCargo = parsePlanilhaListaFuncionarios([
+  ["Nome", "CPF"],
+  ["João", "529.982.247-25"],
+]);
+assert.equal(semCargo.ok, false);
+assert.match(semCargo.error ?? "", /colunas esperadas/i);
+assert.equal(semCargo.error, mensagemColunasEsperadasListaFuncionarios());
+
+// CPF inválido — não importa parcialmente
+const cpfInvalido = parsePlanilhaListaFuncionarios([
+  ["Nome do funcionário", "CPF", "Cargo"],
+  ["Ok", "529.982.247-25", "Cargo A"],
+  ["Ruim", "123.456.789-00", "Cargo B"],
+]);
+assert.equal(cpfInvalido.ok, false);
+assert.match(cpfInvalido.errosLinha.join("\n"), /Linha 3: CPF inválido/);
+
+// CPF duplicado no arquivo
+const cpfDup = parsePlanilhaListaFuncionarios([
+  ["Nome do funcionário", "CPF", "Cargo"],
+  ["A", "529.982.247-25", "Cargo"],
+  ["B", "52998224725", "Outro"],
+]);
+assert.equal(cpfDup.ok, false);
+assert.match(cpfDup.errosLinha.join("\n"), /duplicado/i);
+
+// Excesso de vagas — mensagem oficial (UI bloqueia antes de aplicar)
+assert.match(
+  mensagemExcessoVagasListaFuncionarios(10, 12),
+  /O contrato possui 10 vagas, mas o arquivo contém 12 funcionários/
+);
+
+// Modelo Excel: aba Funcionários + Instruções + N linhas
+const modeloBuf = gerarModeloListaFuncionariosXlsx({ quantidadePrevista: 3 });
+const modeloWb = XLSX.read(modeloBuf, { type: "array" });
+assert.ok(modeloWb.SheetNames.includes("Funcionários"));
+assert.ok(modeloWb.SheetNames.includes("Instruções"));
+const modeloRows = XLSX.utils.sheet_to_json<unknown[]>(
+  modeloWb.Sheets["Funcionários"],
+  { header: 1, defval: "" }
+);
+assert.equal(modeloRows.length, 4); // header + 3 linhas
+assert.deepEqual(modeloRows[0], [
+  "Nome do funcionário",
+  "CPF",
+  "Cargo",
+]);
+assert.equal(
+  nomeArquivoModeloListaFuncionarios("ORC-2026-0037"),
+  "modelo_lista_funcionarios_ORC-2026-0037.xlsx"
+);
+
+// Importação lê apenas aba Funcionários (Instruções ignorada)
+assert.equal(
+  escolherAbaListaFuncionarios(["Instruções", "Funcionários"]),
+  "Funcionários"
+);
+assert.equal(
+  escolherAbaListaFuncionarios(["funcionarios", "Instruções"]),
+  "funcionarios"
+);
+assert.equal(escolherAbaListaFuncionarios(["Instruções"]), "Instruções");
+
+// Manter ASO em aberto: vaga com ASO não é sobrescrita se sobrescrever=false
+const comAso = aplicarImportacaoNasVagas({
+  atuais: [
+    { ...emptyVagaDraft(1), manterAsoAberto: true },
+    emptyVagaDraft(2),
+  ],
+  importados: parsed.rows,
+  quantidadePrevista: 2,
+  sobrescreverPreenchidas: false,
+});
+assert.equal(comAso.drafts[0].manterAsoAberto, true);
+assert.equal(comAso.drafts[0].colaborador, "");
+assert.equal(comAso.drafts[1].colaborador, "Natália Porfírio");
 
 function aprovacao(
   partial: Partial<OrcamentoAprovacaoRecord>
@@ -756,18 +842,28 @@ const abaFuncionariosSrc = readFileSync(
   "utf8"
 );
 assert.match(abaFuncionariosSrc, /Importar lista/);
-assert.doesNotMatch(abaFuncionariosSrc, /Baixar modelo/);
-assert.doesNotMatch(abaFuncionariosSrc, /gerarModeloListaFuncionariosXlsx/);
-assert.doesNotMatch(abaFuncionariosSrc, /handleBaixarModelo/);
+assert.match(abaFuncionariosSrc, /Baixar modelo Excel/);
+assert.match(abaFuncionariosSrc, /gerarModeloListaFuncionariosXlsx|downloadModeloListaFuncionariosXlsx/);
+assert.match(abaFuncionariosSrc, /handleBaixarModelo/);
+assert.match(abaFuncionariosSrc, /mensagemExcessoVagasListaFuncionarios/);
+assert.match(abaFuncionariosSrc, /Salvar lista/);
+assert.doesNotMatch(
+  abaFuncionariosSrc.slice(
+    abaFuncionariosSrc.indexOf("handleImportar"),
+    abaFuncionariosSrc.indexOf("handleReplaceSelected")
+  ),
+  /salvarListaVagasContrato/
+);
 
 const importLibSrc = readFileSync(
   join(process.cwd(), "lib/contrato-vagas-import.ts"),
   "utf8"
 );
-assert.doesNotMatch(importLibSrc, /gerarModeloListaFuncionariosXlsx/);
-assert.doesNotMatch(importLibSrc, /CONTRATO_VAGAS_IMPORT_MODELO_FILENAME/);
+assert.match(importLibSrc, /gerarModeloListaFuncionariosXlsx/);
+assert.match(importLibSrc, /nomeArquivoModeloListaFuncionarios/);
 assert.match(importLibSrc, /export function parsePlanilhaListaFuncionarios/);
 assert.match(importLibSrc, /export async function lerArquivoListaFuncionarios/);
 assert.match(importLibSrc, /export function aplicarImportacaoNasVagas/);
+assert.match(importLibSrc, /CONTRATO_VAGAS_SHEET_FUNCIONARIOS/);
 
 console.log("test-contrato-vagas: OK");

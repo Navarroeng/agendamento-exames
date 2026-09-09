@@ -7,6 +7,7 @@ import {
   OrcamentoArquivoPreview,
 } from "@/components/orcamentos/OrcamentoEtapasExtras";
 import {
+  IconDownload,
   IconRefresh,
   IconTrash,
 } from "@/components/ui/icons/OutlineIcons";
@@ -28,7 +29,9 @@ import {
 } from "@/lib/contrato-vagas";
 import {
   aplicarImportacaoNasVagas,
+  downloadModeloListaFuncionariosXlsx,
   lerArquivoListaFuncionarios,
+  mensagemExcessoVagasListaFuncionarios,
 } from "@/lib/contrato-vagas-import";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
@@ -44,6 +47,7 @@ import type { CargoRecord, ClienteContratoRecord } from "@/lib/types";
 
 interface OrcamentoAbaFuncionariosProps {
   orcamentoId: string;
+  orcamentoNumero?: string | null;
   aprovacao: OrcamentoAprovacaoRecord;
   usuarioNome: string;
   clienteNome?: string | null;
@@ -86,6 +90,7 @@ function focusCell(row: number, col: number) {
 
 export function OrcamentoAbaFuncionarios({
   orcamentoId,
+  orcamentoNumero,
   aprovacao,
   usuarioNome,
   clienteCnpj,
@@ -231,17 +236,25 @@ export function OrcamentoAbaFuncionarios({
     if (!selected) return;
     const parsed = await lerArquivoListaFuncionarios(selected);
     if (!parsed.ok) {
-      toast.error(parsed.error || "Não foi possível importar a lista.");
-      return;
-    }
-    if (parsed.duplicados.length > 0) {
-      toast.error(
-        `A planilha possui CPF duplicado: ${parsed.duplicados.join(", ")}.`
-      );
+      const detalhe =
+        parsed.errosLinha.length > 0
+          ? parsed.errosLinha.slice(0, 8).join("\n") +
+            (parsed.errosLinha.length > 8
+              ? `\n… e mais ${parsed.errosLinha.length - 8} erro(s).`
+              : "")
+          : parsed.error || "Não foi possível importar a lista.";
+      toast.error(detalhe);
       return;
     }
 
     const qtd = quantidadePrevista;
+    if (parsed.rows.length > qtd) {
+      toast.error(
+        mensagemExcessoVagasListaFuncionarios(qtd, parsed.rows.length)
+      );
+      return;
+    }
+
     const temPreenchido = drafts.slice(0, qtd).some(
       (row) =>
         isNomeFuncionarioReal(row.colaborador) ||
@@ -264,16 +277,6 @@ export function OrcamentoAbaFuncionarios({
       }
     }
 
-    if (parsed.rows.length > qtd) {
-      const extras = parsed.rows
-        .slice(qtd)
-        .map((r) => r.nome || `linha ${r.linha}`)
-        .join(", ");
-      toast.error(
-        `A lista possui mais funcionários do que a quantidade prevista no contrato (${qtd}). Os registros excedentes não foram transformados em vagas adicionais: ${extras}.`
-      );
-    }
-
     const locked = new Set(
       vagas
         .filter((v) => vagaStatusBloqueiaEdicao(v.status))
@@ -287,7 +290,14 @@ export function OrcamentoAbaFuncionarios({
         locked.has(row.indice)
           ? row
           : sobrescrever
-            ? { ...row, colaborador: "", colaboradorCpf: "", cargoNome: "", cargoId: null, manterAsoAberto: false }
+            ? {
+                ...row,
+                colaborador: "",
+                colaboradorCpf: "",
+                cargoNome: "",
+                cargoId: null,
+                manterAsoAberto: false,
+              }
             : row
       ),
       importados: parsed.rows,
@@ -296,13 +306,29 @@ export function OrcamentoAbaFuncionarios({
       cargos,
     });
     setDrafts(
-      result.drafts.map((row) => (locked.has(row.indice) ? drafts.find((d) => d.indice === row.indice) ?? row : row))
+      result.drafts.map((row) =>
+        locked.has(row.indice)
+          ? drafts.find((d) => d.indice === row.indice) ?? row
+          : row
+      )
     );
     toast.success(
       result.aplicados === 1
-        ? "1 funcionário importado para a tabela."
-        : `${result.aplicados} funcionários importados para a tabela.`
+        ? "1 funcionário importado para a tabela. Revise e clique em Salvar lista."
+        : `${result.aplicados} funcionários importados para a tabela. Revise e clique em Salvar lista.`
     );
+  }
+
+  function handleBaixarModelo() {
+    try {
+      downloadModeloListaFuncionariosXlsx({
+        quantidadePrevista,
+        numeroOrcamento: orcamentoNumero ?? contrato?.numero ?? null,
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível baixar o modelo Excel.");
+    }
   }
 
   async function handleReplaceSelected(selected: File | null) {
@@ -381,6 +407,16 @@ export function OrcamentoAbaFuncionarios({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="btn btn-muted inline-flex items-center gap-1.5 text-xs"
+          disabled={busy || loading || quantidadePrevista <= 0}
+          title="Baixar planilha modelo para preencher e importar"
+          onClick={handleBaixarModelo}
+        >
+          <IconDownload size={14} />
+          Baixar modelo Excel
+        </button>
         <button
           type="button"
           className="btn btn-muted text-xs"
