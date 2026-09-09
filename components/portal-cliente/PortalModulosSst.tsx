@@ -2,6 +2,7 @@
 
 import {
   IconBriefcase,
+  IconCalendar,
   IconReceipt,
   IconShield,
 } from "@/components/ui/icons/OutlineIcons";
@@ -14,8 +15,12 @@ import type {
   PortalContratoResumo,
 } from "@/lib/portal-contrato";
 import type { PortalFaturasResumo } from "@/lib/portal-faturas";
+import {
+  linhasResumoAgendamentosHome,
+  type PortalAgendamentosResumo,
+} from "@/lib/portal-agendamentos";
 
-type ModuloSstId = "riscos" | "faturas" | "contrato";
+type ModuloSstId = "riscos" | "faturas" | "agendamentos" | "contrato";
 
 function participacaoLabel(resumo: PortalResumo): string | null {
   if (resumo.participacaoPercentual == null) return null;
@@ -25,13 +30,17 @@ function participacaoLabel(resumo: PortalResumo): string | null {
 export function PortalModulosSst({
   resumo,
   faturasResumo,
+  agendamentosResumo,
   onVerAvaliacao,
   onVerFaturas,
+  onVerAgendamentos,
 }: {
   resumo: PortalResumo;
   faturasResumo: PortalFaturasResumo | null;
+  agendamentosResumo: PortalAgendamentosResumo | null;
   onVerAvaliacao: () => void;
   onVerFaturas: () => void;
+  onVerAgendamentos: () => void;
 }) {
   const temAvaliacao = resumo.statusPortal !== "sem_avaliacao";
 
@@ -52,6 +61,10 @@ export function PortalModulosSst({
     : ["Acompanhe suas faturas, vencimentos e pagamentos."];
 
   const faturaModuloCarregado = faturasResumo !== null;
+  const agendamentosModuloCarregado = agendamentosResumo !== null;
+  const linhasAgendamentos = agendamentosResumo
+    ? linhasResumoAgendamentosHome(agendamentosResumo)
+    : ["Acompanhe os agendamentos ocupacionais da sua empresa."];
 
   return (
     <section>
@@ -61,7 +74,7 @@ export function PortalModulosSst({
       <p className="mt-1 text-sm text-[#64748b]">
         Acompanhe o andamento de cada módulo de SST.
       </p>
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ModuloCard
           id="riscos"
           titulo="Riscos Psicossociais"
@@ -91,6 +104,18 @@ export function PortalModulosSst({
           acao={
             faturaModuloCarregado
               ? { label: "Ver faturas", onClick: onVerFaturas }
+              : null
+          }
+        />
+        <ModuloCard
+          id="agendamentos"
+          titulo="Agendamentos"
+          disponivel={agendamentosModuloCarregado}
+          linhas={linhasAgendamentos}
+          ocultarBadgeEmPreparacao
+          acao={
+            agendamentosModuloCarregado
+              ? { label: "Ver agendamentos", onClick: onVerAgendamentos }
               : null
           }
         />
@@ -186,6 +211,7 @@ function ModuloCard({
   acao,
   destaque,
   destaqueVencida,
+  ocultarBadgeEmPreparacao,
 }: {
   id: ModuloSstId;
   titulo: string;
@@ -194,6 +220,7 @@ function ModuloCard({
   acao?: { label: string; onClick: () => void } | null;
   destaque?: boolean;
   destaqueVencida?: boolean;
+  ocultarBadgeEmPreparacao?: boolean;
 }) {
   return (
     <article
@@ -224,7 +251,7 @@ function ModuloCard({
           <span className="shrink-0 rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#334155]">
             Disponível
           </span>
-        ) : (
+        ) : ocultarBadgeEmPreparacao ? null : (
           <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
             Em preparação
           </span>
@@ -264,5 +291,6 @@ function ModuloIcon({ id }: { id: ModuloSstId }) {
   const props = { size: 16 };
   if (id === "riscos") return <IconShield {...props} />;
   if (id === "faturas") return <IconReceipt {...props} />;
+  if (id === "agendamentos") return <IconCalendar {...props} />;
   return <IconBriefcase {...props} />;
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PortalAvaliacaoRiscos } from "@/components/portal-cliente/PortalAvaliacaoRiscos";
+import { PortalAgendamentos } from "@/components/portal-cliente/PortalAgendamentos";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
 import { PortalFaturas } from "@/components/portal-cliente/PortalFaturas";
 import { PortalModulosSst } from "@/components/portal-cliente/PortalModulosSst";
@@ -16,6 +17,11 @@ import {
 } from "@/lib/portal-cliente";
 import { calcPortalFaturasResumo } from "@/lib/portal-faturas";
 import type { PortalFaturaLinha, PortalFaturasResumo } from "@/lib/portal-faturas";
+import { calcPortalAgendamentosResumo } from "@/lib/portal-agendamentos";
+import type {
+  PortalAgendamentoLinha,
+  PortalAgendamentosResumo,
+} from "@/lib/portal-agendamentos";
 
 type HomeResponse = {
   ok?: boolean;
@@ -36,22 +42,36 @@ type FaturasResponse = {
   error?: string;
 };
 
+type AgendamentosResponse = {
+  ok?: boolean;
+  agendamentos?: PortalAgendamentoLinha[];
+  resumo?: PortalAgendamentosResumo;
+  error?: string;
+};
+
+type PortalView = "riscos" | "faturas" | "agendamentos" | null;
+
 export function PortalHome() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clienteId = (searchParams.get("cliente") ?? "").trim();
-  const viewRiscos = searchParams.get("view") === "riscos";
-  const viewFaturas = searchParams.get("view") === "faturas";
+  const viewParam = searchParams.get("view");
+  const viewRiscos = viewParam === "riscos";
+  const viewFaturas = viewParam === "faturas";
+  const viewAgendamentos = viewParam === "agendamentos";
 
   const [empresas, setEmpresas] = useState<PortalEmpresaOpcao[]>([]);
   const [resumo, setResumo] = useState<PortalResumo>(portalResumoVazio);
   const [carregandoEmpresas, setCarregandoEmpresas] = useState(true);
   const [carregandoHome, setCarregandoHome] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [faturasResumo, setFaturasResumo] = useState<PortalFaturasResumo | null>(null);
+  const [faturasResumo, setFaturasResumo] =
+    useState<PortalFaturasResumo | null>(null);
+  const [agendamentosResumo, setAgendamentosResumo] =
+    useState<PortalAgendamentosResumo | null>(null);
 
   const atualizarQuery = useCallback(
-    (next: { cliente?: string; view?: "riscos" | "faturas" | null }) => {
+    (next: { cliente?: string; view?: PortalView }) => {
       const params = new URLSearchParams(searchParams.toString());
       if (next.cliente !== undefined) {
         if (next.cliente) params.set("cliente", next.cliente);
@@ -59,6 +79,7 @@ export function PortalHome() {
       }
       if (next.view === "riscos") params.set("view", "riscos");
       else if (next.view === "faturas") params.set("view", "faturas");
+      else if (next.view === "agendamentos") params.set("view", "agendamentos");
       else if (next.view === null) params.delete("view");
       const qs = params.toString();
       router.replace(qs ? `/portal?${qs}` : "/portal");
@@ -102,6 +123,7 @@ export function PortalHome() {
     async function loadHome() {
       setResumo(portalResumoVazio());
       setFaturasResumo(null);
+      setAgendamentosResumo(null);
       setErro(null);
       if (!clienteId) {
         setCarregandoHome(false);
@@ -109,23 +131,26 @@ export function PortalHome() {
       }
       setCarregandoHome(true);
       try {
-        // Carrega home (riscos) e faturas em paralelo
-        const empresaNome = empresas.find((e) => e.id === clienteId)?.nome ?? "";
-        const [resHome, resFaturas] = await Promise.all([
+        const empresaNome =
+          empresas.find((e) => e.id === clienteId)?.nome ?? "";
+        const qsCliente = `cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`;
+        const [resHome, resFaturas, resAgendamentos] = await Promise.all([
           fetch(`/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`, {
             cache: "no-store",
           }),
-          fetch(
-            `/api/portal/faturas?cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`,
-            { cache: "no-store" }
-          ),
+          fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
+          fetch(`/api/portal/agendamentos?${qsCliente}`, {
+            cache: "no-store",
+          }),
         ]);
 
         if (resHome.status === 401) {
           window.location.href = "/login";
           return;
         }
-        const jsonHome = (await resHome.json().catch(() => ({}))) as HomeResponse;
+        const jsonHome = (await resHome
+          .json()
+          .catch(() => ({}))) as HomeResponse;
         if (cancel) return;
         if (!resHome.ok) {
           setResumo(portalResumoVazio());
@@ -134,7 +159,6 @@ export function PortalHome() {
           setResumo(jsonHome.resumo ?? portalResumoVazio());
         }
 
-        // Faturas: erro silencioso (não bloqueia home)
         if (resFaturas.ok) {
           const jsonFaturas = (await resFaturas
             .json()
@@ -144,14 +168,28 @@ export function PortalHome() {
           } else if (!cancel) {
             setFaturasResumo(calcPortalFaturasResumo([]));
           }
-        } else {
-          if (!cancel) setFaturasResumo(calcPortalFaturasResumo([]));
+        } else if (!cancel) {
+          setFaturasResumo(calcPortalFaturasResumo([]));
+        }
+
+        if (resAgendamentos.ok) {
+          const jsonAg = (await resAgendamentos
+            .json()
+            .catch(() => ({}))) as AgendamentosResponse;
+          if (!cancel && jsonAg.resumo) {
+            setAgendamentosResumo(jsonAg.resumo);
+          } else if (!cancel) {
+            setAgendamentosResumo(calcPortalAgendamentosResumo([]));
+          }
+        } else if (!cancel) {
+          setAgendamentosResumo(calcPortalAgendamentosResumo([]));
         }
       } catch {
         if (!cancel) {
           setResumo(portalResumoVazio());
           setErro(PORTAL_SEM_AVALIACAO_MSG);
           setFaturasResumo(calcPortalFaturasResumo([]));
+          setAgendamentosResumo(calcPortalAgendamentosResumo([]));
         }
       } finally {
         if (!cancel) setCarregandoHome(false);
@@ -170,8 +208,12 @@ export function PortalHome() {
   const mostrarHomeSst =
     Boolean(clienteId) &&
     !carregandoHome &&
-    // Mostrar se tem campanha, ou se tem nome da empresa, ou se já carregou faturas
-    Boolean(resumo.empresaNome || mostrarPainel || faturasResumo !== null);
+    Boolean(
+      resumo.empresaNome ||
+        mostrarPainel ||
+        faturasResumo !== null ||
+        agendamentosResumo !== null
+    );
 
   const empresaNomeSelecionada =
     resumo.empresaNome ||
@@ -217,7 +259,16 @@ export function PortalHome() {
         />
       ) : null}
 
-      {mostrarHomeSst && !viewRiscos && !viewFaturas ? (
+      {mostrarHomeSst && viewAgendamentos ? (
+        <PortalAgendamentos
+          clienteId={clienteId}
+          clienteNome={empresaNomeSelecionada}
+          logoUrl={resumo.logoUrl}
+          onVoltar={() => atualizarQuery({ view: null })}
+        />
+      ) : null}
+
+      {mostrarHomeSst && !viewRiscos && !viewFaturas && !viewAgendamentos ? (
         <div className="flex flex-col gap-5">
           <PortalEmpresaIdentidade
             nome={empresaNomeSelecionada}
@@ -227,8 +278,10 @@ export function PortalHome() {
           <PortalModulosSst
             resumo={resumo}
             faturasResumo={faturasResumo}
+            agendamentosResumo={agendamentosResumo}
             onVerAvaliacao={() => atualizarQuery({ view: "riscos" })}
             onVerFaturas={() => atualizarQuery({ view: "faturas" })}
+            onVerAgendamentos={() => atualizarQuery({ view: "agendamentos" })}
           />
         </div>
       ) : null}

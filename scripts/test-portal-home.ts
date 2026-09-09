@@ -935,6 +935,8 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(modulos, /Ver avaliação/);
   assert.match(modulos, /Em preparação/);
   assert.match(modulos, /Riscos Psicossociais/);
+  assert.match(modulos, /Agendamentos/);
+  assert.match(modulos, /Ver agendamentos/);
   assert.match(modulos, /Contrato e acesso aos serviços/);
   assert.doesNotMatch(modulos, /Exames Ocupacionais/);
   assert.doesNotMatch(modulos, /Laudos SST/);
