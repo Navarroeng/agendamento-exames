@@ -179,13 +179,20 @@ export function PortalAgendamentos({
                 <>
                   {/* Desktop table */}
                   <div className="hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
-                    <table className="w-full min-w-[640px] text-left text-sm">
+                    <table className="w-full table-fixed text-left text-sm">
+                      <colgroup>
+                        <col className="w-[12%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[34%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[12%]" />
+                      </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
                           <th className="px-4 py-3">Data</th>
                           <th className="px-4 py-3">Horário</th>
                           <th className="px-4 py-3">Colaborador</th>
-                          <th className="px-4 py-3">Clínica</th>
                           <th className="px-4 py-3">Tipo</th>
                           <th className="px-4 py-3">Status</th>
                           <th className="px-4 py-3 text-right">Ação</th>
@@ -197,17 +204,16 @@ export function PortalAgendamentos({
                             key={row.id}
                             className="border-t border-[#eef2f7] odd:bg-white even:bg-[#fbfdff]"
                           >
-                            <td className="px-4 py-3 font-medium text-[#0b1f4d]">
+                            <td className="whitespace-nowrap px-4 py-3 font-medium text-[#0b1f4d]">
                               {row.dataLabel}
                             </td>
-                            <td className="px-4 py-3 text-[#475569]">
+                            <td className="whitespace-nowrap px-4 py-3 text-[#475569]">
                               {row.horarioLabel}
                             </td>
-                            <td className="px-4 py-3 text-[#0b1f4d]">
-                              {row.colaborador}
-                            </td>
-                            <td className="px-4 py-3 text-[#475569]">
-                              {row.clinicaNome}
+                            <td className="px-4 py-3 font-medium text-[#0b1f4d]">
+                              <span className="line-clamp-2 break-words">
+                                {row.colaborador}
+                              </span>
                             </td>
                             <td className="px-4 py-3 text-[#475569]">
                               {row.tipoAso}
@@ -242,7 +248,7 @@ export function PortalAgendamentos({
                         className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[15px] font-semibold text-[#0b1f4d]">
                               {row.colaborador}
                             </p>
@@ -256,13 +262,7 @@ export function PortalAgendamentos({
                             {row.statusLabel}
                           </span>
                         </div>
-                        <dl className="mt-3 space-y-1 text-sm">
-                          <div className="flex justify-between gap-2">
-                            <dt className="text-[#94a3b8]">Clínica</dt>
-                            <dd className="text-right text-[#475569]">
-                              {row.clinicaNome}
-                            </dd>
-                          </div>
+                        <dl className="mt-3 text-sm">
                           <div className="flex justify-between gap-2">
                             <dt className="text-[#94a3b8]">Tipo</dt>
                             <dd className="text-right text-[#475569]">
