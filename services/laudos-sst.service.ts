@@ -21,6 +21,10 @@ import {
   resolverEtapaAtualLaudos,
   type LaudosSstWorkflow,
 } from "@/lib/laudos-sst-etapas";
+import type {
+  LaudosSstAnexoMeta,
+  LaudosSstAnexoTipo,
+} from "@/lib/laudos-sst-anexos";
 import {
   AUDITORIA_ACOES,
   AUDITORIA_MODULOS,
@@ -28,6 +32,10 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import {
+  removerArquivoLaudosSstAnexo,
+  uploadLaudosSstAnexo,
+} from "@/services/laudos-sst-anexos-storage.service";
 
 const LAUDOS_TRACKING_SELECT = [
   "orcamento_id",
@@ -46,10 +54,22 @@ const LAUDOS_TRACKING_SELECT = [
   "cronograma_epi_respostas",
   "pgr_realizado",
   "pgr_data",
+  "pgr_anexo_path",
+  "pgr_anexo_nome",
+  "pgr_anexo_tipo",
+  "pgr_anexo_tamanho",
   "pcmso_realizado",
   "pcmso_data",
+  "pcmso_anexo_path",
+  "pcmso_anexo_nome",
+  "pcmso_anexo_tipo",
+  "pcmso_anexo_tamanho",
   "ltcat_realizado",
   "ltcat_data",
+  "ltcat_anexo_path",
+  "ltcat_anexo_nome",
+  "ltcat_anexo_tipo",
+  "ltcat_anexo_tamanho",
   "enviado_pedro",
   "enviado_pedro_em",
   "aprovacao_pedro",
@@ -441,4 +461,102 @@ export async function salvarEtapaLaudosSst(
     proximaEtapa:
       etapaConcluida ? proximaEtapaLaudos(input.etapa, ordem) : null,
   };
+}
+
+function anexoColumnPrefix(tipo: LaudosSstAnexoTipo): "pgr" | "pcmso" | "ltcat" {
+  return tipo;
+}
+
+function anexoDbPayload(
+  tipo: LaudosSstAnexoTipo,
+  meta: LaudosSstAnexoMeta | null
+): Record<string, string | number | null> {
+  const prefix = anexoColumnPrefix(tipo);
+  if (!meta) {
+    return {
+      [`${prefix}_anexo_path`]: null,
+      [`${prefix}_anexo_nome`]: null,
+      [`${prefix}_anexo_tipo`]: null,
+      [`${prefix}_anexo_tamanho`]: null,
+    };
+  }
+  return {
+    [`${prefix}_anexo_path`]: meta.path,
+    [`${prefix}_anexo_nome`]: meta.nome,
+    [`${prefix}_anexo_tipo`]: meta.tipo,
+    [`${prefix}_anexo_tamanho`]: meta.tamanho,
+  };
+}
+
+function pathAtualDoAnexo(
+  tracking: OrcamentoLaudosSstRecord | null | undefined,
+  tipo: LaudosSstAnexoTipo
+): string | null {
+  if (!tracking) return null;
+  if (tipo === "pgr") return tracking.pgr_anexo_path ?? null;
+  if (tipo === "pcmso") return tracking.pcmso_anexo_path ?? null;
+  return tracking.ltcat_anexo_path ?? null;
+}
+
+/** Upload + persiste metadados do anexo (um arquivo por tipo de laudo). */
+export async function salvarAnexoLaudoSst(input: {
+  orcamentoId: string;
+  tipo: LaudosSstAnexoTipo;
+  file: File;
+  trackingAtual?: OrcamentoLaudosSstRecord | null;
+}): Promise<OrcamentoLaudosSstRecord> {
+  const antigoPath = pathAtualDoAnexo(input.trackingAtual, input.tipo);
+  const meta = await uploadLaudosSstAnexo(
+    input.orcamentoId,
+    input.tipo,
+    input.file
+  );
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_laudos_sst")
+    .update(anexoDbPayload(input.tipo, meta))
+    .eq("orcamento_id", input.orcamentoId)
+    .select(LAUDOS_TRACKING_SELECT)
+    .maybeSingle();
+
+  if (error || !data) {
+    await removerArquivoLaudosSstAnexo(meta.path);
+    const msg = error?.message ?? "";
+    if (/does not exist|schema cache|pgr_anexo/i.test(msg)) {
+      throw new Error(
+        "A estrutura do banco ainda não foi atualizada. Execute a migration 118_laudos_sst_anexos_pgr_pcmso_ltcat.sql no Supabase."
+      );
+    }
+    throw new Error(msg || "Não foi possível salvar o anexo.");
+  }
+
+  if (antigoPath && antigoPath !== meta.path) {
+    await removerArquivoLaudosSstAnexo(antigoPath);
+  }
+
+  return data as unknown as OrcamentoLaudosSstRecord;
+}
+
+/** Remove metadados e arquivo do storage. */
+export async function removerAnexoLaudoSst(input: {
+  orcamentoId: string;
+  tipo: LaudosSstAnexoTipo;
+  trackingAtual?: OrcamentoLaudosSstRecord | null;
+}): Promise<OrcamentoLaudosSstRecord> {
+  const path = pathAtualDoAnexo(input.trackingAtual, input.tipo);
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_laudos_sst")
+    .update(anexoDbPayload(input.tipo, null))
+    .eq("orcamento_id", input.orcamentoId)
+    .select(LAUDOS_TRACKING_SELECT)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(error?.message || "Não foi possível remover o anexo.");
+  }
+
+  await removerArquivoLaudosSstAnexo(path);
+  return data as unknown as OrcamentoLaudosSstRecord;
 }

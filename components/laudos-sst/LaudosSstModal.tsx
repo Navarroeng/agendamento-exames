@@ -11,6 +11,7 @@ import {
   buildLaudosSstProcesso,
   type LaudosSstEtapaId,
   type LaudosSstProcesso,
+  type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
 import {
   isEmailLaudosValido,
@@ -20,8 +21,13 @@ import {
   LAUDOS_CRONOGRAMA_PERGUNTAS_EPI,
   type LaudosSstWorkflow,
 } from "@/lib/laudos-sst-etapas";
-import { salvarEtapaLaudosSst } from "@/services/laudos-sst.service";
+import { salvarEtapaLaudosSst, removerAnexoLaudoSst } from "@/services/laudos-sst.service";
 import { LaudosSstSimNao } from "@/components/laudos-sst/LaudosSstSimNao";
+import {
+  LaudosSstAnexoField,
+  workflowAnexosFromTracking,
+} from "@/components/laudos-sst/LaudosSstAnexoField";
+import type { LaudosSstAnexoTipo } from "@/lib/laudos-sst-anexos";
 
 interface LaudosSstModalProps {
   open: boolean;
@@ -97,17 +103,21 @@ export function LaudosSstModal({
 }: LaudosSstModalProps) {
   const aprovador = useAuditoriaUsuario();
   const [draft, setDraft] = useState<LaudosSstWorkflow | null>(null);
+  const [trackingLocal, setTrackingLocal] =
+    useState<OrcamentoLaudosSstRecord | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open || !processo) {
       setDraft(null);
+      setTrackingLocal(null);
       return;
     }
     setDraft({
       ...processo.workflow,
       cronogramaEpiRespostas: { ...processo.workflow.cronogramaEpiRespostas },
     });
+    setTrackingLocal(processo.tracking);
   }, [open, processo]);
 
   const ordem = useMemo(() => LAUDOS_SST_ETAPAS.map((e) => e.id), []);
@@ -162,7 +172,7 @@ export function LaudosSstModal({
         orcamentoId: orcamento.id,
         etapa: tab,
         workflow,
-        atual: processo.tracking,
+        atual: trackingLocal ?? processo.tracking,
         aprovador: {
           userId: aprovador.usuarioId,
           nome: aprovador.usuarioNome,
@@ -174,6 +184,7 @@ export function LaudosSstModal({
           usuarioEmail: aprovador.usuarioEmail,
         },
       });
+      setTrackingLocal(result.tracking);
       const atualizado = buildLaudosSstProcesso(
         processo.implantacao,
         result.tracking
@@ -365,57 +376,140 @@ export function LaudosSstModal({
                     "PGR realizado?",
                     workflow.pgrRealizado,
                     workflow.pgrData,
+                    workflow.pgrAnexo,
                     "pgrRealizado",
                     "pgrData",
+                    "pgrAnexo",
                   ],
                   [
                     "pcmso",
                     "PCMSO realizado?",
                     workflow.pcmsoRealizado,
                     workflow.pcmsoData,
+                    workflow.pcmsoAnexo,
                     "pcmsoRealizado",
                     "pcmsoData",
+                    "pcmsoAnexo",
                   ],
                   [
                     "ltcat",
                     "LTCAT realizado?",
                     workflow.ltcatRealizado,
                     workflow.ltcatData,
+                    workflow.ltcatAnexo,
                     "ltcatRealizado",
                     "ltcatData",
+                    "ltcatAnexo",
                   ],
                 ] as const
-              ).map(([id, pergunta, realizado, data, keySim, keyData]) => (
-                <div
-                  key={id}
-                  className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-4"
-                >
-                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-[#94a3b8]">
-                    {id.toUpperCase()}
-                  </p>
-                  <p className="mb-3 text-sm font-semibold text-navy">{pergunta}</p>
-                  <LaudosSstSimNao
-                    name={id}
-                    value={realizado}
-                    disabled={disabled}
-                    onChange={(v) =>
-                      patch({ [keySim]: v } as Partial<LaudosSstWorkflow>)
-                    }
-                  />
-                  {realizado === true ? (
-                    <div className="mt-4 max-w-xs">
-                      <FieldDate
-                        label="Data de realização"
-                        value={data ?? ""}
-                        disabled={disabled}
-                        onChange={(v) =>
-                          patch({ [keyData]: v || null } as Partial<LaudosSstWorkflow>)
+              ).map(
+                ([
+                  id,
+                  pergunta,
+                  realizado,
+                  data,
+                  anexo,
+                  keySim,
+                  keyData,
+                  keyAnexo,
+                ]) => (
+                  <div
+                    key={id}
+                    className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-4"
+                  >
+                    <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-[#94a3b8]">
+                      {id.toUpperCase()}
+                    </p>
+                    <p className="mb-3 text-sm font-semibold text-navy">
+                      {pergunta}
+                    </p>
+                    <LaudosSstSimNao
+                      name={id}
+                      value={realizado}
+                      disabled={disabled}
+                      onChange={(v) => {
+                        if (
+                          v === false &&
+                          realizado === true &&
+                          anexo?.path
+                        ) {
+                          const ok = window.confirm(
+                            `Este laudo possui um arquivo anexado (${anexo.nome}). Deseja realmente alterar para Não realizado?\n\nO anexo será removido.`
+                          );
+                          if (!ok) return;
+                          setBusy(true);
+                          void (async () => {
+                            try {
+                              const next = await removerAnexoLaudoSst({
+                                orcamentoId: orcamento.id,
+                                tipo: id as LaudosSstAnexoTipo,
+                                trackingAtual: trackingLocal,
+                              });
+                              setTrackingLocal(next);
+                              patch({
+                                [keySim]: false,
+                                [keyAnexo]: null,
+                              } as Partial<LaudosSstWorkflow>);
+                              onSaved(
+                                buildLaudosSstProcesso(
+                                  processo.implantacao,
+                                  next
+                                )
+                              );
+                              toast.success("Alterado para Não realizado.");
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Não foi possível alterar o laudo."
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                          return;
                         }
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+                        patch({
+                          [keySim]: v,
+                        } as Partial<LaudosSstWorkflow>);
+                      }}
+                    />
+                    {realizado === true ? (
+                      <div className="mt-4 space-y-1">
+                        <div className="max-w-xs">
+                          <FieldDate
+                            label="Data de realização"
+                            value={data ?? ""}
+                            disabled={disabled}
+                            onChange={(v) =>
+                              patch({
+                                [keyData]: v || null,
+                              } as Partial<LaudosSstWorkflow>)
+                            }
+                          />
+                        </div>
+                        <LaudosSstAnexoField
+                          orcamentoId={orcamento.id}
+                          tipo={id as LaudosSstAnexoTipo}
+                          anexo={anexo}
+                          tracking={trackingLocal}
+                          disabled={disabled}
+                          onTrackingChange={(next) => {
+                            setTrackingLocal(next);
+                            patch(workflowAnexosFromTracking(next));
+                            onSaved(
+                              buildLaudosSstProcesso(
+                                processo.implantacao,
+                                next
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              )}
               {isPgrPcmsoLtcatDocumentosProntos(workflow) ? (
                 <div className="rounded-2xl border border-[#dbeafe] bg-white px-4 py-4">
                   <p className="mb-3 text-sm font-semibold text-navy">
@@ -430,8 +524,8 @@ export function LaudosSstModal({
                 </div>
               ) : (
                 <p className="text-[12px] text-app-muted">
-                  A confirmação de envio ao Pedro aparece quando PGR, PCMSO e LTCAT
-                  estiverem com Sim e data.
+                  A confirmação de envio ao Pedro aparece quando PGR, PCMSO e
+                  LTCAT estiverem com Sim e data.
                 </p>
               )}
             </div>

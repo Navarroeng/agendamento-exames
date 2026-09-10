@@ -1,4 +1,5 @@
 import type { LaudosSstEtapaId } from "@/lib/laudos-sst";
+import type { LaudosSstAnexoMeta } from "@/lib/laudos-sst-anexos";
 
 /** Perguntas extras do Cronograma quando a empresa disponibiliza EPIs. */
 export const LAUDOS_CRONOGRAMA_PERGUNTAS_EPI = [
@@ -22,10 +23,13 @@ export interface LaudosSstWorkflow {
   cronogramaEpiRespostas: LaudosEpiRespostas;
   pgrRealizado: boolean | null;
   pgrData: string | null;
+  pgrAnexo: LaudosSstAnexoMeta | null;
   pcmsoRealizado: boolean | null;
   pcmsoData: string | null;
+  pcmsoAnexo: LaudosSstAnexoMeta | null;
   ltcatRealizado: boolean | null;
   ltcatData: string | null;
+  ltcatAnexo: LaudosSstAnexoMeta | null;
   enviadoPedro: boolean | null;
   enviadoPedroEm: string | null;
   aprovacaoPedro: boolean | null;
@@ -45,10 +49,13 @@ export const EMPTY_LAUDOS_WORKFLOW: LaudosSstWorkflow = {
   cronogramaEpiRespostas: {},
   pgrRealizado: null,
   pgrData: null,
+  pgrAnexo: null,
   pcmsoRealizado: null,
   pcmsoData: null,
+  pcmsoAnexo: null,
   ltcatRealizado: null,
   ltcatData: null,
+  ltcatAnexo: null,
   enviadoPedro: null,
   enviadoPedroEm: null,
   aprovacaoPedro: null,

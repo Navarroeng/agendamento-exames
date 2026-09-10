@@ -2,6 +2,7 @@ import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
+import { anexoMetaFromColumns } from "@/lib/laudos-sst-anexos";
 import {
   contarEtapasConsecutivasConcluidas,
   EMPTY_LAUDOS_WORKFLOW,
@@ -75,10 +76,22 @@ export interface OrcamentoLaudosSstRecord {
   cronograma_epi_respostas?: Record<string, boolean | null> | null;
   pgr_realizado?: boolean | null;
   pgr_data?: string | null;
+  pgr_anexo_path?: string | null;
+  pgr_anexo_nome?: string | null;
+  pgr_anexo_tipo?: string | null;
+  pgr_anexo_tamanho?: number | null;
   pcmso_realizado?: boolean | null;
   pcmso_data?: string | null;
+  pcmso_anexo_path?: string | null;
+  pcmso_anexo_nome?: string | null;
+  pcmso_anexo_tipo?: string | null;
+  pcmso_anexo_tamanho?: number | null;
   ltcat_realizado?: boolean | null;
   ltcat_data?: string | null;
+  ltcat_anexo_path?: string | null;
+  ltcat_anexo_nome?: string | null;
+  ltcat_anexo_tipo?: string | null;
+  ltcat_anexo_tamanho?: number | null;
   enviado_pedro?: boolean | null;
   enviado_pedro_em?: string | null;
   aprovacao_pedro?: boolean | null;
@@ -221,10 +234,28 @@ export function mapLaudosWorkflowFromRecord(
         : {},
     pgrRealizado: tracking.pgr_realizado ?? null,
     pgrData: dateOnly(tracking.pgr_data),
+    pgrAnexo: anexoMetaFromColumns(
+      tracking.pgr_anexo_path,
+      tracking.pgr_anexo_nome,
+      tracking.pgr_anexo_tipo,
+      tracking.pgr_anexo_tamanho
+    ),
     pcmsoRealizado: tracking.pcmso_realizado ?? null,
     pcmsoData: dateOnly(tracking.pcmso_data),
+    pcmsoAnexo: anexoMetaFromColumns(
+      tracking.pcmso_anexo_path,
+      tracking.pcmso_anexo_nome,
+      tracking.pcmso_anexo_tipo,
+      tracking.pcmso_anexo_tamanho
+    ),
     ltcatRealizado: tracking.ltcat_realizado ?? null,
     ltcatData: dateOnly(tracking.ltcat_data),
+    ltcatAnexo: anexoMetaFromColumns(
+      tracking.ltcat_anexo_path,
+      tracking.ltcat_anexo_nome,
+      tracking.ltcat_anexo_tipo,
+      tracking.ltcat_anexo_tamanho
+    ),
     enviadoPedro: tracking.enviado_pedro ?? null,
     enviadoPedroEm: tracking.enviado_pedro_em ?? null,
     aprovacaoPedro: tracking.aprovacao_pedro ?? null,
