@@ -140,6 +140,7 @@ export function FaturaPreviewModal({
       <FaturaPreviewContent
         preview={preview}
         saving={saving}
+        showClinica={preview.tipo === "cliente"}
         auditOptions={auditOptions}
         onFaturaAtualizada={onFaturaAtualizada}
         onAbrirFaturaRelacionada={onAbrirFaturaRelacionada}

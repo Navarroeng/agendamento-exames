@@ -53,15 +53,26 @@ function statusClass(status: FaturaStatus | null): string {
 interface FaturaPreviewContentProps {
   preview: FaturaPreviewState;
   saving?: boolean;
+  /**
+   * Coluna Clínica só no modal interno (conferência Navarro).
+   * Nunca habilitar em caminhos de PDF — o PDF não usa este componente.
+   */
+  showClinica?: boolean;
   auditOptions?: { auditContext?: AuditoriaUsuarioContext };
   onFaturaAtualizada?: (preview: FaturaPreviewState) => void;
   onAbrirFaturaRelacionada?: (faturaId: string) => void;
   onVerFaturaClinica?: (faturaId: string) => void;
 }
 
+function clinicaNomeLabel(value: string | null | undefined): string {
+  const nome = value?.trim();
+  return nome ? nome : "—";
+}
+
 export function FaturaPreviewContent({
   preview,
   saving = false,
+  showClinica = false,
   auditOptions,
   onFaturaAtualizada,
   onAbrirFaturaRelacionada,
@@ -70,9 +81,22 @@ export function FaturaPreviewContent({
   const total = calcTotalFaturaItens(preview.itens);
   const colaboradores = countColaboradoresItens(preview.itens);
   const isCliente = preview.tipo === "cliente";
+  /** Clínica: exclusiva do modal de fatura do cliente (nunca no PDF). */
+  const withClinica = isCliente && showClinica;
 
   const headers = isCliente
-    ? ["Data", "Colaborador", "ASO", "Exame", "V. Unit.", "Qtd", "Total"]
+    ? withClinica
+      ? [
+          "Data",
+          "Colaborador",
+          "ASO",
+          "Exame",
+          "Clínica",
+          "V. Unit.",
+          "Qtd",
+          "Total",
+        ]
+      : ["Data", "Colaborador", "ASO", "Exame", "V. Unit.", "Qtd", "Total"]
     : [
         "Data",
         "Colaborador",
@@ -207,11 +231,20 @@ export function FaturaPreviewContent({
       </div>
 
       <div className="overflow-x-auto px-5 py-4">
-        <table className="w-full min-w-[640px] border-collapse text-left">
+        <table
+          className={`w-full border-collapse text-left ${
+            withClinica ? "min-w-[760px]" : "min-w-[640px]"
+          }`}
+        >
           <thead>
             <tr className="bg-[#1e2660] text-[10px] font-bold uppercase tracking-wide text-white">
               {headers.map((h) => (
-                <th key={h} className="px-2 py-2 first:rounded-tl-lg last:rounded-tr-lg">
+                <th
+                  key={h}
+                  className={`px-2 py-2 first:rounded-tl-lg last:rounded-tr-lg ${
+                    h === "Clínica" ? "min-w-[9rem] max-w-[14rem]" : ""
+                  }`}
+                >
                   {h}
                 </th>
               ))}
@@ -220,15 +253,26 @@ export function FaturaPreviewContent({
           <tbody>
             {preview.itens.map((item, idx) => {
               const row = isCliente
-                ? [
-                    formatDateBR(item.data_agendamento),
-                    item.colaborador,
-                    item.tipo_aso,
-                    item.exame_nome,
-                    formatCurrency(item.valor_unitario),
-                    String(item.quantidade),
-                    formatCurrency(item.valor_total),
-                  ]
+                ? withClinica
+                  ? [
+                      formatDateBR(item.data_agendamento),
+                      item.colaborador,
+                      item.tipo_aso,
+                      item.exame_nome,
+                      clinicaNomeLabel(item.clinica_nome),
+                      formatCurrency(item.valor_unitario),
+                      String(item.quantidade),
+                      formatCurrency(item.valor_total),
+                    ]
+                  : [
+                      formatDateBR(item.data_agendamento),
+                      item.colaborador,
+                      item.tipo_aso,
+                      item.exame_nome,
+                      formatCurrency(item.valor_unitario),
+                      String(item.quantidade),
+                      formatCurrency(item.valor_total),
+                    ]
                 : [
                     formatDateBR(item.data_agendamento),
                     item.colaborador,
@@ -240,6 +284,8 @@ export function FaturaPreviewContent({
                     formatCurrency(item.valor_total),
                   ];
 
+              const clinicaColIndex = withClinica ? 4 : -1;
+
               return (
                 <tr
                   key={`${item.agendamento_id}-${item.exame_nome}-${idx}`}
@@ -248,7 +294,11 @@ export function FaturaPreviewContent({
                   {row.map((cell, ci) => (
                     <td
                       key={ci}
-                      className="border-b border-[#eef2f7] px-2 py-1.5 text-[11px] text-[#334155]"
+                      className={`border-b border-[#eef2f7] px-2 py-1.5 text-[11px] text-[#334155] ${
+                        ci === clinicaColIndex
+                          ? "max-w-[14rem] whitespace-normal break-words font-medium"
+                          : ""
+                      }`}
                     >
                       {cell}
                     </td>
