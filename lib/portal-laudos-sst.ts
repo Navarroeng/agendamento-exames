@@ -32,7 +32,11 @@ export type PortalLaudosSstResumo = {
   totalDocumentos: number;
   temDocumentos: boolean;
   linhaResumo: string;
+  /** Labels únicos dos tipos presentes (ex.: PGR, PCMSO), na ordem canônica. */
+  tiposDisponiveis: string[];
 };
+
+const ORDEM_TIPOS_PORTAL: PortalLaudoDocumentoTipo[] = ["pgr", "pcmso", "ltcat"];
 
 export function laudosSstLiberadoAoPortal(
   tracking: OrcamentoLaudosSstRecord | null | undefined
@@ -46,6 +50,10 @@ export function calcPortalLaudosSstResumo(
   documentos: PortalLaudoDocumento[]
 ): PortalLaudosSstResumo {
   const total = documentos.length;
+  const presentes = new Set(documentos.map((d) => d.tipo));
+  const tiposDisponiveis = ORDEM_TIPOS_PORTAL.filter((t) => presentes.has(t)).map(
+    (t) => laudoAnexoLabel(t)
+  );
   return {
     totalDocumentos: total,
     temDocumentos: total > 0,
@@ -55,6 +63,7 @@ export function calcPortalLaudosSstResumo(
         : total === 1
           ? "1 documento disponível"
           : `${total} documentos disponíveis`,
+    tiposDisponiveis,
   };
 }
 

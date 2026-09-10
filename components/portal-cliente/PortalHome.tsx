@@ -260,7 +260,7 @@ export function PortalHome() {
     "Empresa";
 
   return (
-    <div className="mx-auto flex w-full max-w-[72rem] flex-col gap-5 text-[#0b1f4d]">
+    <div className="mx-auto flex w-full max-w-[72rem] flex-col gap-6 text-[#0b1f4d]">
       <PreviewBar
         empresas={empresas}
         clienteId={clienteId}
@@ -321,7 +321,7 @@ export function PortalHome() {
       !viewFaturas &&
       !viewAgendamentos &&
       !viewLaudos ? (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6 sm:gap-7">
           <PortalEmpresaIdentidade
             nome={empresaNomeSelecionada}
             logoUrl={resumo.logoUrl}

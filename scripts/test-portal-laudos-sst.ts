@@ -59,5 +59,6 @@ const resumo = calcPortalLaudosSstResumo(docs);
 assert.equal(resumo.temDocumentos, true);
 assert.equal(resumo.totalDocumentos, 3);
 assert.match(resumo.linhaResumo, /3 documentos/);
+assert.deepEqual(resumo.tiposDisponiveis, ["PGR", "PCMSO", "LTCAT"]);
 
 console.log("test-portal-laudos-sst: ok");
