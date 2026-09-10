@@ -3,6 +3,7 @@
 import {
   IconBriefcase,
   IconCalendar,
+  IconFileText,
   IconReceipt,
   IconShield,
 } from "@/components/ui/icons/OutlineIcons";
@@ -19,8 +20,17 @@ import {
   linhasResumoAgendamentosHome,
   type PortalAgendamentosResumo,
 } from "@/lib/portal-agendamentos";
+import {
+  linhasResumoLaudosSstHome,
+  type PortalLaudosSstResumo,
+} from "@/lib/portal-laudos-sst";
 
-type ModuloSstId = "riscos" | "faturas" | "agendamentos" | "contrato";
+type ModuloSstId =
+  | "riscos"
+  | "faturas"
+  | "agendamentos"
+  | "laudos"
+  | "contrato";
 
 function participacaoLabel(resumo: PortalResumo): string | null {
   if (resumo.participacaoPercentual == null) return null;
@@ -31,16 +41,20 @@ export function PortalModulosSst({
   resumo,
   faturasResumo,
   agendamentosResumo,
+  laudosResumo,
   onVerAvaliacao,
   onVerFaturas,
   onVerAgendamentos,
+  onVerLaudos,
 }: {
   resumo: PortalResumo;
   faturasResumo: PortalFaturasResumo | null;
   agendamentosResumo: PortalAgendamentosResumo | null;
+  laudosResumo: PortalLaudosSstResumo | null;
   onVerAvaliacao: () => void;
   onVerFaturas: () => void;
   onVerAgendamentos: () => void;
+  onVerLaudos: () => void;
 }) {
   const temAvaliacao = resumo.statusPortal !== "sem_avaliacao";
 
@@ -62,9 +76,12 @@ export function PortalModulosSst({
 
   const faturaModuloCarregado = faturasResumo !== null;
   const agendamentosModuloCarregado = agendamentosResumo !== null;
+  const laudosModuloCarregado = laudosResumo !== null;
   const linhasAgendamentos = agendamentosResumo
     ? linhasResumoAgendamentosHome(agendamentosResumo)
     : ["Acompanhe os agendamentos ocupacionais da sua empresa."];
+  const linhasLaudos = linhasResumoLaudosSstHome(laudosResumo);
+  const laudosDisponivel = Boolean(laudosResumo?.temDocumentos);
 
   return (
     <section>
@@ -116,6 +133,18 @@ export function PortalModulosSst({
           acao={
             agendamentosModuloCarregado
               ? { label: "Ver agendamentos", onClick: onVerAgendamentos }
+              : null
+          }
+        />
+        <ModuloCard
+          id="laudos"
+          titulo="Laudos SST"
+          disponivel={laudosDisponivel}
+          linhas={linhasLaudos}
+          ocultarBadgeEmPreparacao={!laudosModuloCarregado}
+          acao={
+            laudosModuloCarregado
+              ? { label: "Ver laudos", onClick: onVerLaudos }
               : null
           }
         />
@@ -253,7 +282,7 @@ function ModuloCard({
           </span>
         ) : ocultarBadgeEmPreparacao ? null : (
           <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
-            Em preparação
+            {id === "laudos" ? "Em andamento" : "Em preparação"}
           </span>
         )}
       </div>
@@ -292,5 +321,6 @@ function ModuloIcon({ id }: { id: ModuloSstId }) {
   if (id === "riscos") return <IconShield {...props} />;
   if (id === "faturas") return <IconReceipt {...props} />;
   if (id === "agendamentos") return <IconCalendar {...props} />;
+  if (id === "laudos") return <IconFileText {...props} />;
   return <IconBriefcase {...props} />;
 }

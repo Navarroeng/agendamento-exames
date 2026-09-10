@@ -6,6 +6,7 @@ import { PortalAvaliacaoRiscos } from "@/components/portal-cliente/PortalAvaliac
 import { PortalAgendamentos } from "@/components/portal-cliente/PortalAgendamentos";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
 import { PortalFaturas } from "@/components/portal-cliente/PortalFaturas";
+import { PortalLaudosSst } from "@/components/portal-cliente/PortalLaudosSst";
 import { PortalModulosSst } from "@/components/portal-cliente/PortalModulosSst";
 import {
   PORTAL_PREVIEW_INTERNO_LABEL,
@@ -22,6 +23,11 @@ import type {
   PortalAgendamentoLinha,
   PortalAgendamentosResumo,
 } from "@/lib/portal-agendamentos";
+import { calcPortalLaudosSstResumo } from "@/lib/portal-laudos-sst";
+import type {
+  PortalLaudoDocumento,
+  PortalLaudosSstResumo,
+} from "@/lib/portal-laudos-sst";
 
 type HomeResponse = {
   ok?: boolean;
@@ -49,7 +55,14 @@ type AgendamentosResponse = {
   error?: string;
 };
 
-type PortalView = "riscos" | "faturas" | "agendamentos" | null;
+type LaudosResponse = {
+  ok?: boolean;
+  documentos?: PortalLaudoDocumento[];
+  resumo?: PortalLaudosSstResumo;
+  error?: string;
+};
+
+type PortalView = "riscos" | "faturas" | "agendamentos" | "laudos" | null;
 
 export function PortalHome() {
   const router = useRouter();
@@ -59,6 +72,7 @@ export function PortalHome() {
   const viewRiscos = viewParam === "riscos";
   const viewFaturas = viewParam === "faturas";
   const viewAgendamentos = viewParam === "agendamentos";
+  const viewLaudos = viewParam === "laudos";
 
   const [empresas, setEmpresas] = useState<PortalEmpresaOpcao[]>([]);
   const [resumo, setResumo] = useState<PortalResumo>(portalResumoVazio);
@@ -69,6 +83,8 @@ export function PortalHome() {
     useState<PortalFaturasResumo | null>(null);
   const [agendamentosResumo, setAgendamentosResumo] =
     useState<PortalAgendamentosResumo | null>(null);
+  const [laudosResumo, setLaudosResumo] =
+    useState<PortalLaudosSstResumo | null>(null);
 
   const atualizarQuery = useCallback(
     (next: { cliente?: string; view?: PortalView }) => {
@@ -80,6 +96,7 @@ export function PortalHome() {
       if (next.view === "riscos") params.set("view", "riscos");
       else if (next.view === "faturas") params.set("view", "faturas");
       else if (next.view === "agendamentos") params.set("view", "agendamentos");
+      else if (next.view === "laudos") params.set("view", "laudos");
       else if (next.view === null) params.delete("view");
       const qs = params.toString();
       router.replace(qs ? `/portal?${qs}` : "/portal");
@@ -124,6 +141,7 @@ export function PortalHome() {
       setResumo(portalResumoVazio());
       setFaturasResumo(null);
       setAgendamentosResumo(null);
+      setLaudosResumo(null);
       setErro(null);
       if (!clienteId) {
         setCarregandoHome(false);
@@ -134,15 +152,21 @@ export function PortalHome() {
         const empresaNome =
           empresas.find((e) => e.id === clienteId)?.nome ?? "";
         const qsCliente = `cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`;
-        const [resHome, resFaturas, resAgendamentos] = await Promise.all([
-          fetch(`/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`, {
-            cache: "no-store",
-          }),
-          fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
-          fetch(`/api/portal/agendamentos?${qsCliente}`, {
-            cache: "no-store",
-          }),
-        ]);
+        const [resHome, resFaturas, resAgendamentos, resLaudos] =
+          await Promise.all([
+            fetch(
+              `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
+              { cache: "no-store" }
+            ),
+            fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
+            fetch(`/api/portal/agendamentos?${qsCliente}`, {
+              cache: "no-store",
+            }),
+            fetch(
+              `/api/portal/laudos-sst?cliente_id=${encodeURIComponent(clienteId)}`,
+              { cache: "no-store" }
+            ),
+          ]);
 
         if (resHome.status === 401) {
           window.location.href = "/login";
@@ -184,12 +208,26 @@ export function PortalHome() {
         } else if (!cancel) {
           setAgendamentosResumo(calcPortalAgendamentosResumo([]));
         }
+
+        if (resLaudos.ok) {
+          const jsonLaudos = (await resLaudos
+            .json()
+            .catch(() => ({}))) as LaudosResponse;
+          if (!cancel && jsonLaudos.resumo) {
+            setLaudosResumo(jsonLaudos.resumo);
+          } else if (!cancel) {
+            setLaudosResumo(calcPortalLaudosSstResumo([]));
+          }
+        } else if (!cancel) {
+          setLaudosResumo(calcPortalLaudosSstResumo([]));
+        }
       } catch {
         if (!cancel) {
           setResumo(portalResumoVazio());
           setErro(PORTAL_SEM_AVALIACAO_MSG);
           setFaturasResumo(calcPortalFaturasResumo([]));
           setAgendamentosResumo(calcPortalAgendamentosResumo([]));
+          setLaudosResumo(calcPortalLaudosSstResumo([]));
         }
       } finally {
         if (!cancel) setCarregandoHome(false);
@@ -212,7 +250,8 @@ export function PortalHome() {
       resumo.empresaNome ||
         mostrarPainel ||
         faturasResumo !== null ||
-        agendamentosResumo !== null
+        agendamentosResumo !== null ||
+        laudosResumo !== null
     );
 
   const empresaNomeSelecionada =
@@ -268,7 +307,20 @@ export function PortalHome() {
         />
       ) : null}
 
-      {mostrarHomeSst && !viewRiscos && !viewFaturas && !viewAgendamentos ? (
+      {mostrarHomeSst && viewLaudos ? (
+        <PortalLaudosSst
+          clienteId={clienteId}
+          clienteNome={empresaNomeSelecionada}
+          logoUrl={resumo.logoUrl}
+          onVoltar={() => atualizarQuery({ view: null })}
+        />
+      ) : null}
+
+      {mostrarHomeSst &&
+      !viewRiscos &&
+      !viewFaturas &&
+      !viewAgendamentos &&
+      !viewLaudos ? (
         <div className="flex flex-col gap-5">
           <PortalEmpresaIdentidade
             nome={empresaNomeSelecionada}
@@ -279,9 +331,11 @@ export function PortalHome() {
             resumo={resumo}
             faturasResumo={faturasResumo}
             agendamentosResumo={agendamentosResumo}
+            laudosResumo={laudosResumo}
             onVerAvaliacao={() => atualizarQuery({ view: "riscos" })}
             onVerFaturas={() => atualizarQuery({ view: "faturas" })}
             onVerAgendamentos={() => atualizarQuery({ view: "agendamentos" })}
+            onVerLaudos={() => atualizarQuery({ view: "laudos" })}
           />
         </div>
       ) : null}
