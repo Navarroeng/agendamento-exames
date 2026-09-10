@@ -89,6 +89,7 @@ const FINANCEIRO_FIELDS: { key: keyof ClinicaInsert; label: string }[] = [
   { key: "forma_pagamento", label: "forma de pagamento" },
   { key: "prazo_pagamento", label: "prazo de pagamento" },
   { key: "observacoes_financeiras", label: "observações financeiras" },
+  { key: "dia_vencimento_fatura", label: "dia do vencimento da fatura" },
 ];
 
 export function buildHistoricoCriacaoClinica(
@@ -165,6 +166,16 @@ export function buildHistoricoAlteracoesClinica(
   });
 
   FINANCEIRO_FIELDS.forEach(({ key, label }) => {
+    if (key === "dia_vencimento_fatura") {
+      const fmt = (v: unknown) => {
+        if (v == null || v === "") return null;
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 1 || n > 31) return null;
+        return String(n).padStart(2, "0");
+      };
+      compareField(changes, usuario, label, fmt(anterior[key]), fmt(novo[key]));
+      return;
+    }
     compareField(
       changes,
       usuario,

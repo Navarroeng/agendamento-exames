@@ -475,6 +475,7 @@ export interface ClinicaFormValues {
   exames_atendidos: string;
   observacoes: string;
   status: string;
+  dia_vencimento_fatura: string;
   tipo_atendimento: string;
   dias_atendimento: string;
   horario_padrao_inicio: string;
@@ -512,6 +513,7 @@ export interface ClinicaInsert {
   exames_atendidos: string | null;
   observacoes: string | null;
   status: ClinicaStatus;
+  dia_vencimento_fatura: number | null;
   tipo_atendimento: ClinicaTipoAtendimento;
   dias_atendimento: number[] | null;
   horario_padrao_inicio: string | null;

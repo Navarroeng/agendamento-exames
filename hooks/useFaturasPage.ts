@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
-import { calcVencimentoFaturaCliente } from "@/lib/fatura-vencimento";
+import { calcVencimentoFaturaCliente, calcDataVencimentoClinicaCompetencia } from "@/lib/fatura-vencimento";
+import { useClinicasList } from "@/hooks/useClinicasList";
 import { canReemitirFaturaCliente, faturaStatusPermitePagamento, mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import {
   EMPTY_FATURA_FILTERS,
@@ -120,17 +121,26 @@ function buildPreviewFromAgendamentos(
     numero?: string | null;
     status?: FaturaStatus | null;
     readonly?: boolean;
+    diaVencimentoClinica?: number | null;
   }
 ): FaturaPreviewState {
   const itens = buildFaturaItensFromAgendamentos(agendamentos, tipo);
   const { periodo_inicio, periodo_fim } = parsePeriodoIso(filters.mesReferencia);
   const vencimento =
     tipo === "clinica"
-      ? {
-          iso:
-            periodo_fim ?? new Date().toISOString().split("T")[0],
-          label: "",
-        }
+      ? (() => {
+          const porDia = calcDataVencimentoClinicaCompetencia(
+            extras?.diaVencimentoClinica,
+            filters.mesReferencia
+          );
+          if (porDia) {
+            return { iso: porDia.iso, label: porDia.label };
+          }
+          return {
+            iso: periodo_fim ?? new Date().toISOString().split("T")[0],
+            label: "",
+          };
+        })()
       : (() => {
           const auto = calcVencimentoFaturaCliente(filters.mesReferencia);
           if (auto) return auto;
@@ -158,6 +168,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const auditContext = useAuditoriaUsuario();
   const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const { clientes } = useClientesList();
+  const { clinicas } = useClinicasList();
   const clientesCatalog = useMemo<ClienteCatalogItem[]>(
     () =>
       clientes.map((c) => ({
@@ -166,6 +177,27 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         cnpj: c.cnpj,
       })),
     [clientes]
+  );
+
+  const diaVencimentoPorClinica = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const c of clinicas) {
+      const dia = c.dia_vencimento_fatura ?? null;
+      for (const nome of [c.nome_fantasia, c.razao_social]) {
+        const key = nome.trim().toLowerCase();
+        if (key) map.set(key, dia);
+      }
+    }
+    return map;
+  }, [clinicas]);
+
+  const resolveDiaVencimentoClinica = useCallback(
+    (referenciaNome: string): number | null => {
+      return (
+        diaVencimentoPorClinica.get(referenciaNome.trim().toLowerCase()) ?? null
+      );
+    },
+    [diaVencimentoPorClinica]
   );
 
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>(
@@ -641,6 +673,10 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         agsReferencia,
         {
           readonly: options?.readonly ?? false,
+          diaVencimentoClinica:
+            tipo === "clinica"
+              ? resolveDiaVencimentoClinica(referencia)
+              : null,
           ...(faturaExistente?.status === "rascunho"
             ? {
                 faturaId: faturaExistente.id,
@@ -654,7 +690,14 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       setPreview(nextPreview);
       setPreviewOpen(true);
     },
-    [agendamentos, bloquearFaturaDuplicada, clientesCatalog, filters, resumoMesBase?.rows]
+    [
+      agendamentos,
+      bloquearFaturaDuplicada,
+      clientesCatalog,
+      filters,
+      resolveDiaVencimentoClinica,
+      resumoMesBase?.rows,
+    ]
   );
 
   const openPreviewForTipo = useCallback(
@@ -699,7 +742,13 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         tipo,
         referencia,
         filters,
-        agsReferencia
+        agsReferencia,
+        {
+          diaVencimentoClinica:
+            tipo === "clinica"
+              ? resolveDiaVencimentoClinica(referencia)
+              : null,
+        }
       );
       previewRef.current = nextPreview;
       setPreview(nextPreview);
@@ -710,6 +759,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       bloquearFaturaDuplicada,
       clientesCatalog,
       filters,
+      resolveDiaVencimentoClinica,
     ]
   );
 
@@ -1432,13 +1482,19 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         referencia,
         mesFilters,
         agsReferencia,
-        faturaExistente?.status === "rascunho"
-          ? {
-              faturaId: faturaExistente.id,
-              numero: faturaExistente.numero,
-              status: faturaExistente.status,
-            }
-          : undefined
+        {
+          diaVencimentoClinica:
+            pageTipo === "clinica"
+              ? resolveDiaVencimentoClinica(referencia)
+              : null,
+          ...(faturaExistente?.status === "rascunho"
+            ? {
+                faturaId: faturaExistente.id,
+                numero: faturaExistente.numero,
+                status: faturaExistente.status,
+              }
+            : {}),
+        }
       );
 
       previewRef.current = nextPreview;
@@ -1481,6 +1537,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       filters,
       pageTipo,
       persistPreview,
+      resolveDiaVencimentoClinica,
       resumoMesBase?.rows,
       syncClienteVencimentoNoPreview,
       abrirEnvioEmailModalCliente,
@@ -1664,6 +1721,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     agendamentosFiltrados,
     mesReferenciaValido,
     resumoMes,
+    diaVencimentoPorClinica,
     faturas: faturasDoTipo,
     faturasFiltradas,
     faturasPaginadas,

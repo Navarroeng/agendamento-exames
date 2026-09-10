@@ -78,6 +78,25 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
                 <option value="Inativa">Inativa</option>
               </select>
             </Field>
+            <Field label="Dia do vencimento da fatura">
+              <select
+                className="field-input"
+                value={form.dia_vencimento_fatura}
+                onChange={(e) =>
+                  onChange("dia_vencimento_fatura", e.target.value)
+                }
+              >
+                <option value="">Não informado</option>
+                {Array.from({ length: 31 }, (_, i) => {
+                  const dia = String(i + 1).padStart(2, "0");
+                  return (
+                    <option key={dia} value={dia}>
+                      {dia}
+                    </option>
+                  );
+                })}
+              </select>
+            </Field>
           </div>
         </ClinicaFormCard>
 

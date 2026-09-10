@@ -25,6 +25,7 @@ export function getEmptyClinicaForm(): ClinicaFormValues {
     exames_atendidos: "",
     observacoes: "",
     status: "Ativa",
+    dia_vencimento_fatura: "",
     tipo_atendimento: "Horário agendado",
     dias_atendimento: "",
     horario_padrao_inicio: "",

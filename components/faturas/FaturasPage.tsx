@@ -44,6 +44,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     filterOptions,
     mesReferenciaValido,
     resumoMes,
+    diaVencimentoPorClinica,
     loading,
     saving,
     previewOpen,
@@ -108,6 +109,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           mesValido={mesReferenciaValido}
           loading={loading}
           saving={saving}
+          diaVencimentoPorClinica={diaVencimentoPorClinica}
           onChange={handleFilterChange}
           onMesChange={handleMesChange}
           onYearChange={handleYearChange}
