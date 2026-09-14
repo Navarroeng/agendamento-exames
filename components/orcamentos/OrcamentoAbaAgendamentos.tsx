@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { EditarProgramacaoFuturaModal } from "@/components/periodicos-futuros/EditarProgramacaoFuturaModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { DispensaAgendamentosIniciaisModal } from "@/components/orcamentos/DispensaAgendamentosIniciaisModal";
 import {
@@ -20,6 +21,7 @@ import {
 } from "@/components/orcamentos/RegistrarAsoEmAbertoModal";
 import { ReabrirAgendamentosIniciaisModal } from "@/components/orcamentos/ReabrirAgendamentosIniciaisModal";
 import { IconEye } from "@/components/ui/icons/OutlineIcons";
+import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { formatDateIsoToBR, formatHorarioForForm } from "@/lib/agendamento-datetime";
 import { statusAgendamentoLabel } from "@/lib/agendamentos-table";
 import {
@@ -38,6 +40,8 @@ import {
   formatMesAnoPrevisto,
   labelMotivoExameFuturo,
   labelOrigemPeriodico,
+  motivoBloqueioEdicaoProgramacaoFutura,
+  PROGRAMACAO_FUTURA_ATUALIZADA_MSG,
   statusExameFuturoImplantacaoClass,
   type ColaboradorSugestao,
 } from "@/lib/contrato-programacao-futura";
@@ -75,6 +79,7 @@ import {
   reconciliarVagasComprometidasDoContrato,
 } from "@/services/contrato-vagas.service";
 import {
+  atualizarProgramacaoFutura,
   criarExameFuturoImplantacao,
   listarProgramacoesFuturasDoContrato,
   listarSugestoesColaboradoresContrato,
@@ -265,6 +270,7 @@ export function OrcamentoAbaAgendamentos({
   onIrParaListaFuncionarios,
 }: OrcamentoAbaAgendamentosProps) {
   const router = useRouter();
+  const auditContext = useAuditoriaUsuario();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -282,6 +288,8 @@ export function OrcamentoAbaAgendamentos({
   const [exameFuturoSaving, setExameFuturoSaving] = useState(false);
   const [programarVagaContext, setProgramarVagaContext] =
     useState<ProgramarVagaFuturoContext | null>(null);
+  const [editProgramacao, setEditProgramacao] =
+    useState<PeriodicoProgramadoContrato | null>(null);
   const [asoAbertoModalOpen, setAsoAbertoModalOpen] = useState(false);
   const [asoAbertoSaving, setAsoAbertoSaving] = useState(false);
   const [creditosAso, setCreditosAso] = useState<ContratoCreditoAsoRecord[]>(
@@ -636,6 +644,50 @@ export function OrcamentoAbaAgendamentos({
       cargoNome: vaga.cargo_nome ?? null,
       cargoId: vaga.cargo_id ?? null,
     });
+  }
+
+  function handleAbrirEditarProgramacao(vaga: ContratoVagaRecord) {
+    const periodicoId = (vaga.periodico_futuro_id ?? "").trim();
+    const programacao = periodicoId
+      ? programacoes.find((item) => item.id === periodicoId) ?? null
+      : null;
+    const bloqueio = motivoBloqueioEdicaoProgramacaoFutura(programacao);
+    if (!programacao || bloqueio) {
+      toast.error(
+        bloqueio || "Não foi possível abrir a programação futura desta vaga."
+      );
+      return;
+    }
+    setEditProgramacao(programacao);
+  }
+
+  async function handleSalvarProgramacaoFutura(
+    id: string,
+    data: { dataPrevistaIso: string; tipoAso: string }
+  ) {
+    setExameFuturoSaving(true);
+    try {
+      await atualizarProgramacaoFutura({
+        periodicoId: id,
+        tipoAso: data.tipoAso,
+        dataPrevistaIso: data.dataPrevistaIso,
+        usuarioNome: auditContext.usuarioNome || usuarioNome,
+        usuarioEmail: auditContext.usuarioEmail,
+        usuarioId: auditContext.usuarioId,
+      });
+      toast.success(PROGRAMACAO_FUTURA_ATUALIZADA_MSG);
+      setEditProgramacao(null);
+      await load({ silent: true });
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível atualizar a programação futura."
+      );
+    } finally {
+      setExameFuturoSaving(false);
+    }
   }
 
   async function handleConfirmarAsoEmAberto(
@@ -1250,6 +1302,15 @@ export function OrcamentoAbaAgendamentos({
                           >
                             Definir funcionário
                           </button>
+                        ) : vaga.status === "programada" ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-brand-blue hover:underline disabled:opacity-40"
+                            disabled={exameFuturoSaving}
+                            onClick={() => handleAbrirEditarProgramacao(vaga)}
+                          >
+                            Editar
+                          </button>
                         ) : (
                           "—"
                         )}
@@ -1430,6 +1491,18 @@ export function OrcamentoAbaAgendamentos({
           if (!exameFuturoSaving) setProgramarVagaContext(null);
         }}
         onConfirm={(data) => void handleConfirmarExameFuturo(data)}
+      />
+
+      <EditarProgramacaoFuturaModal
+        open={Boolean(editProgramacao)}
+        record={editProgramacao}
+        saving={exameFuturoSaving}
+        vigenciaInicio={contrato?.data_inicio ?? null}
+        vigenciaFim={contrato?.data_fim ?? null}
+        onClose={() => {
+          if (!exameFuturoSaving) setEditProgramacao(null);
+        }}
+        onSave={(id, data) => handleSalvarProgramacaoFutura(id, data)}
       />
 
       <RegistrarAsoEmAbertoModal

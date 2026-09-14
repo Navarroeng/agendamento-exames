@@ -26,6 +26,7 @@ interface PeriodicosFuturosTableProps {
   canActOnRecord: (record: PeriodicoFuturoGrupo) => boolean;
   onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
   onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
+  onEditarProgramacao: (record: PeriodicoFuturoGrupo) => void;
   onAdicionarCpf: (record: PeriodicoFuturoGrupo) => void;
   onMarcarReagendado: (ids: string[]) => void;
   onCancelarPeriodico?: (record: PeriodicoFuturoGrupo) => void;
@@ -46,6 +47,7 @@ export function PeriodicosFuturosTable({
   canActOnRecord,
   onCriarAgendamento,
   onEditarProximaData,
+  onEditarProgramacao,
   onAdicionarCpf,
   onMarcarReagendado,
   onCancelarPeriodico,
@@ -199,6 +201,7 @@ export function PeriodicosFuturosTable({
                         onCriarAgendamento={onCriarAgendamento}
                         onVisualizarAgendamento={onVisualizarAgendamento}
                         onEditarProximaData={onEditarProximaData}
+                        onEditarProgramacao={onEditarProgramacao}
                         onAdicionarCpf={onAdicionarCpf}
                         onReagendar={onMarcarReagendado}
                         onCancelarPeriodico={onCancelarPeriodico}

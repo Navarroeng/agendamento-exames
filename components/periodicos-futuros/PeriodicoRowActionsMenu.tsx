@@ -11,6 +11,7 @@ interface PeriodicoRowActionsMenuProps {
   onCriarAgendamento: (record: PeriodicoFuturoGrupo) => void;
   onVisualizarAgendamento?: (agendamentoId: string) => void;
   onEditarProximaData: (record: PeriodicoFuturoGrupo) => void;
+  onEditarProgramacao?: (record: PeriodicoFuturoGrupo) => void;
   onAdicionarCpf?: (record: PeriodicoFuturoGrupo) => void;
   onReagendar: (ids: string[]) => void;
   onCancelarPeriodico?: (record: PeriodicoFuturoGrupo) => void;
@@ -30,6 +31,7 @@ export function PeriodicoRowActionsMenu({
   onCriarAgendamento,
   onVisualizarAgendamento,
   onEditarProximaData,
+  onEditarProgramacao,
   onAdicionarCpf,
   onReagendar,
   onCancelarPeriodico,
@@ -59,7 +61,11 @@ export function PeriodicoRowActionsMenu({
     Boolean(agendamentoParaVer) &&
     Boolean(onVisualizarAgendamento);
 
-  const podeEditarProximaData = record.podeEditarProximaData;
+  const podeEditarProgramacao = Boolean(
+    onEditarProgramacao && record.podeEditarProgramacao
+  );
+  const podeEditarProximaData =
+    record.podeEditarProximaData && !podeEditarProgramacao;
   const periodicoCancelado = record.displayStatus === "cancelado";
 
   const items: MenuItem[] = [];
@@ -77,7 +83,9 @@ export function PeriodicoRowActionsMenu({
   }
 
   if (canAct) {
-    if (podeEditarProximaData) {
+    if (podeEditarProgramacao) {
+      items.push({ key: "editar_programacao", label: "Editar" });
+    } else if (podeEditarProximaData) {
       items.push({ key: "editar_data", label: "Editar próxima data" });
     }
     items.push({ key: "reagendar", label: "Reagendar" });
@@ -102,6 +110,10 @@ export function PeriodicoRowActionsMenu({
         if (agendamentoParaVer) {
           onVisualizarAgendamento?.(agendamentoParaVer);
         }
+        break;
+      case "editar_programacao":
+        if (!record.podeEditarProgramacao) return;
+        onEditarProgramacao?.(record);
         break;
       case "editar_data":
         if (!record.podeEditarProximaData) return;

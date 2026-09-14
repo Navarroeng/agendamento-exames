@@ -25,6 +25,10 @@ import {
   podeExibirCancelarPeriodicoGrupo,
   validarMotivoCancelamentoPeriodico,
 } from "@/lib/periodico-cancelamento";
+import {
+  motivoBloqueioEdicaoProgramacaoFutura,
+  PROGRAMACAO_FUTURA_ATUALIZADA_MSG,
+} from "@/lib/contrato-programacao-futura";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
   resolvePeriodoParaAno,
@@ -44,6 +48,7 @@ import {
   periodicoTemAgendamentoAtivoVinculado,
   regularizarCpfPeriodicosFuturos,
 } from "@/services/periodico-futuro.service";
+import { atualizarProgramacaoFutura } from "@/services/contrato-programacao-futura.service";
 import { PeriodicoCpfConflitoError } from "@/lib/periodico-cpf-regularizacao";
 
 const PAGE_SIZE = 20;
@@ -71,6 +76,8 @@ export function usePeriodicosFuturosPage() {
       () => periodicoViewFromSearchParams(searchParams).mesSelecionado
     );
   const [editProximaDataRecord, setEditProximaDataRecord] =
+    useState<PeriodicoFuturoGrupo | null>(null);
+  const [editProgramacaoRecord, setEditProgramacaoRecord] =
     useState<PeriodicoFuturoGrupo | null>(null);
   const [adicionarCpfGrupo, setAdicionarCpfGrupo] =
     useState<PeriodicoFuturoGrupo | null>(null);
@@ -340,6 +347,15 @@ export function usePeriodicosFuturosPage() {
 
   const handleAbrirEditarProximaData = useCallback(
     (record: PeriodicoFuturoGrupo) => {
+      if (record.podeEditarProgramacao) {
+        const bloqueio = motivoBloqueioEdicaoProgramacaoFutura(record);
+        if (bloqueio) {
+          toast.error(bloqueio);
+          return;
+        }
+        setEditProgramacaoRecord(record);
+        return;
+      }
       if (!record.podeEditarProximaData) {
         toast.error(
           "Não é possível editar a próxima data de um periódico já realizado."
@@ -385,6 +401,62 @@ export function usePeriodicosFuturosPage() {
       }
     },
     [refresh, auditOptions, editProximaDataRecord]
+  );
+
+  const handleAbrirEditarProgramacao = useCallback(
+    (record: PeriodicoFuturoGrupo) => {
+      const bloqueio = motivoBloqueioEdicaoProgramacaoFutura(record);
+      if (bloqueio || !record.podeEditarProgramacao) {
+        toast.error(
+          bloqueio || "Não é possível editar esta programação futura."
+        );
+        return;
+      }
+      setEditProgramacaoRecord(record);
+    },
+    []
+  );
+
+  const handleFecharEditarProgramacao = useCallback(() => {
+    if (saving) return;
+    setEditProgramacaoRecord(null);
+  }, [saving]);
+
+  const handleSalvarProgramacao = useCallback(
+    async (
+      id: string,
+      data: { dataPrevistaIso: string; tipoAso: string }
+    ) => {
+      const ids = editProgramacaoRecord?.ids?.length
+        ? editProgramacaoRecord.ids
+        : [id];
+      setSaving(true);
+      try {
+        for (const periodicoId of ids) {
+          await atualizarProgramacaoFutura({
+            periodicoId,
+            tipoAso: data.tipoAso,
+            dataPrevistaIso: data.dataPrevistaIso,
+            usuarioNome: auditContext.usuarioNome,
+            usuarioEmail: auditContext.usuarioEmail,
+            usuarioId: auditContext.usuarioId,
+          });
+        }
+        toast.success(PROGRAMACAO_FUTURA_ATUALIZADA_MSG);
+        setEditProgramacaoRecord(null);
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Erro ao atualizar a programação futura.";
+        toast.error(message);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [refresh, auditContext, editProgramacaoRecord]
   );
 
   const handleAbrirAdicionarCpf = useCallback((grupo: PeriodicoFuturoGrupo) => {
@@ -450,6 +522,7 @@ export function usePeriodicosFuturosPage() {
     totalPages,
     activeCard,
     editProximaDataRecord,
+    editProgramacaoRecord,
     adicionarCpfGrupo,
     adicionarCpfError,
     cancelarGrupo,
@@ -472,6 +545,9 @@ export function usePeriodicosFuturosPage() {
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
+    handleAbrirEditarProgramacao,
+    handleFecharEditarProgramacao,
+    handleSalvarProgramacao,
     handleAbrirAdicionarCpf,
     handleFecharAdicionarCpf,
     handleSalvarCpf,

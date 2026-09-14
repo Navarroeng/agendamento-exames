@@ -5,8 +5,12 @@ import {
 import {
   EXAME_FUTURO_FORA_VIGENCIA_MSG,
   ORIGEM_PERIODICO_IMPLANTACAO,
+  PROGRAMACAO_FUTURA_NAO_EDITAVEL_AGENDADA_MSG,
   dataPrevistaDentroDaVigenciaContrato,
   determinarStatusProgramacaoFutura,
+  descreverAlteracaoProgramacaoFutura,
+  motivoBloqueioEdicaoProgramacaoFutura,
+  validarEdicaoProgramacaoFutura,
   type ColaboradorSugestao,
   type CriarExameFuturoInput,
   type StatusExameFuturoImplantacao,
@@ -471,6 +475,147 @@ export async function criarExameFuturoImplantacao(
   });
 
   return record;
+}
+
+/**
+ * Corrige data e tipo de ASO da programação futura existente.
+ * Sempre UPDATE do mesmo `periodicos_futuros.id`. Nunca INSERT.
+ */
+export async function atualizarProgramacaoFutura(params: {
+  periodicoId: string;
+  tipoAso: string;
+  dataPrevistaIso: string;
+  usuarioNome: string;
+  usuarioEmail?: string;
+  usuarioId?: string | null;
+}): Promise<PeriodicoFuturoRecord> {
+  const supabase = createClient();
+  const periodicoId = params.periodicoId.trim();
+  if (!periodicoId) {
+    throw new Error("Programação futura não encontrada.");
+  }
+
+  const { data: atual, error: findErr } = await supabase
+    .from("periodicos_futuros")
+    .select("*")
+    .eq("id", periodicoId)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (!atual) {
+    throw new Error("Programação futura não encontrada.");
+  }
+
+  const record = atual as PeriodicoFuturoRecord;
+  const bloqueio = motivoBloqueioEdicaoProgramacaoFutura(record);
+  if (bloqueio) throw new Error(bloqueio);
+
+  const vinculoId = (record.agendamento_vinculado_id ?? "").trim();
+  if (vinculoId) {
+    const { data: ag } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .eq("id", vinculoId)
+      .maybeSingle();
+    const agStatus = String(ag?.status ?? "").trim().toLowerCase();
+    if (ag && agStatus !== "cancelado") {
+      throw new Error(PROGRAMACAO_FUTURA_NAO_EDITAVEL_AGENDADA_MSG);
+    }
+  }
+
+  let dataInicio: string | null = null;
+  let dataFim: string | null = null;
+  const contratoId = (record.contrato_id ?? "").trim();
+  if (contratoId) {
+    const { data: contrato, error: cErr } = await supabase
+      .from("cliente_contratos")
+      .select("id, data_inicio, data_fim")
+      .eq("id", contratoId)
+      .maybeSingle();
+    if (cErr) throw cErr;
+    if (!contrato) throw new Error("Contrato não encontrado.");
+    dataInicio = String(contrato.data_inicio ?? "").slice(0, 10) || null;
+    dataFim = String(contrato.data_fim ?? "").slice(0, 10) || null;
+    if (!dataInicio || !dataFim) {
+      throw new Error("Contrato sem vigência definida.");
+    }
+  }
+
+  const validado = validarEdicaoProgramacaoFutura({
+    tipoAso: params.tipoAso,
+    dataPrevistaIso: params.dataPrevistaIso,
+    dataInicioContrato: dataInicio,
+    dataFimContrato: dataFim,
+  });
+  if (!validado.ok) throw new Error(validado.message);
+
+  const { data: updated, error: updErr } = await supabase
+    .from("periodicos_futuros")
+    .update({
+      proxima_data: validado.patch.proxima_data,
+      data_prevista_original: validado.patch.data_prevista_original,
+      tipo_aso: validado.patch.tipo_aso,
+      tipo_exame: validado.patch.tipo_exame,
+      exame_nome: validado.patch.exame_nome,
+      antecipado: false,
+    })
+    .eq("id", periodicoId)
+    .eq("status", "ativo")
+    .eq("origem", ORIGEM_PERIODICO_IMPLANTACAO)
+    .is("data_realizada", null)
+    .is("agendamento_vinculado_id", null)
+    .select("*")
+    .maybeSingle();
+
+  if (updErr) throw updErr;
+  if (!updated) {
+    throw new Error("Não foi possível atualizar a programação futura.");
+  }
+
+  const tipoAntes = String(record.tipo_aso || record.exame_nome || "").trim();
+  const tipoDepois = validado.patch.tipo_aso;
+  const dataAntes = String(record.proxima_data ?? "").slice(0, 10);
+  const dataDepois = validado.patch.proxima_data;
+  const alteracao = descreverAlteracaoProgramacaoFutura({
+    tipoAsoAntes: tipoAntes,
+    tipoAsoDepois: tipoDepois,
+    dataAntes,
+    dataDepois,
+  });
+  const nome = params.usuarioNome.trim() || "Sistema";
+  const detalhe = alteracao ? ` — ${alteracao}` : "";
+
+  await registrarAuditoria({
+    usuarioId: params.usuarioId ?? null,
+    usuarioNome: nome,
+    usuarioEmail: params.usuarioEmail ?? "",
+    modulo: AUDITORIA_MODULOS.periodicos_futuros,
+    acao: AUDITORIA_ACOES.edicao,
+    registroId: record.id,
+    registroNome: record.colaborador,
+    descricao: `${nome} editou a programação futura de ${record.colaborador} (${record.cliente_nome})${detalhe}.`,
+    dadosAntes: {
+      proxima_data: dataAntes,
+      data_prevista_original: String(record.data_prevista_original ?? "").slice(0, 10),
+      tipo_aso: record.tipo_aso ?? null,
+      tipo_exame: record.tipo_exame,
+      exame_nome: record.exame_nome,
+      antecipado: record.antecipado ?? false,
+      origem: record.origem ?? null,
+      colaborador: record.colaborador,
+    },
+    dadosDepois: {
+      proxima_data: dataDepois,
+      data_prevista_original: validado.patch.data_prevista_original,
+      tipo_aso: validado.patch.tipo_aso,
+      tipo_exame: validado.patch.tipo_exame,
+      exame_nome: validado.patch.exame_nome,
+      antecipado: false,
+      origem: record.origem ?? null,
+      colaborador: record.colaborador,
+    },
+  });
+
+  return updated as PeriodicoFuturoRecord;
 }
 
 /**

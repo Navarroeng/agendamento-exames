@@ -13,6 +13,7 @@ import {
   labelOrigemPeriodico,
   MOTIVOS_EXAME_FUTURO,
   ORIGEM_PERIODICO_IMPLANTACAO,
+  podeEditarProgramacaoFutura,
   TIPOS_ASO_EXAME_FUTURO,
 } from "../lib/contrato-programacao-futura";
 import { isClassificacaoVagasContratoCompleta } from "../lib/contrato-vagas";
@@ -30,6 +31,23 @@ assert.ok(MOTIVOS_EXAME_FUTURO.includes("Outro"));
 assert.ok(!TIPOS_ASO_EXAME_FUTURO.includes("Demissional" as never));
 assert.ok(TIPOS_ASO_EXAME_FUTURO.includes("Admissional"));
 assert.equal(labelOrigemPeriodico(ORIGEM_PERIODICO_IMPLANTACAO), "Implantação Inicial");
+assert.equal(
+  podeEditarProgramacaoFutura({
+    origem: ORIGEM_PERIODICO_IMPLANTACAO,
+    status: "ativo",
+    data_realizada: null,
+    agendamento_vinculado_id: null,
+  }),
+  true
+);
+assert.equal(
+  podeEditarProgramacaoFutura({
+    origem: ORIGEM_PERIODICO_IMPLANTACAO,
+    status: "reagendado",
+    agendamento_vinculado_id: "ag-1",
+  }),
+  false
+);
 assert.equal(labelOrigemPeriodico("agendamento"), "Agendamento");
 assert.equal(
   labelMotivoExameFuturo("Outro", "Exame especial"),

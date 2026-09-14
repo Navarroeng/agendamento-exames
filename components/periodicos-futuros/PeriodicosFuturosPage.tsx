@@ -6,6 +6,7 @@ import { usePeriodicosFuturosPage } from "@/hooks/usePeriodicosFuturosPage";
 import { PeriodicoAdicionarCpfModal } from "./PeriodicoAdicionarCpfModal";
 import { PeriodicoCancelarModal } from "./PeriodicoCancelarModal";
 import { PeriodicoEditarProximaDataModal } from "./PeriodicoEditarProximaDataModal";
+import { EditarProgramacaoFuturaModal } from "./EditarProgramacaoFuturaModal";
 import { PeriodicosFuturosCards } from "./PeriodicosFuturosCards";
 import { PeriodicosFuturosFilters } from "./PeriodicosFuturosFilters";
 import { PeriodicosFuturosTable } from "./PeriodicosFuturosTable";
@@ -26,6 +27,7 @@ export function PeriodicosFuturosPage() {
     totalPages,
     activeCard,
     editProximaDataRecord,
+    editProgramacaoRecord,
     adicionarCpfGrupo,
     adicionarCpfError,
     handleFilterChange,
@@ -42,6 +44,9 @@ export function PeriodicosFuturosPage() {
     handleAbrirEditarProximaData,
     handleFecharEditarProximaData,
     handleSalvarProximaData,
+    handleAbrirEditarProgramacao,
+    handleFecharEditarProgramacao,
+    handleSalvarProgramacao,
     handleAbrirAdicionarCpf,
     handleFecharAdicionarCpf,
     handleSalvarCpf,
@@ -91,6 +96,7 @@ export function PeriodicosFuturosPage() {
           canActOnRecord={canActOnRecord}
           onCriarAgendamento={handleCriarAgendamento}
           onEditarProximaData={handleAbrirEditarProximaData}
+          onEditarProgramacao={handleAbrirEditarProgramacao}
           onMarcarReagendado={handleMarcarReagendado}
           onCancelarPeriodico={handleAbrirCancelarPeriodico}
           canCancelarPeriodico={canCancelarPeriodico}
@@ -129,6 +135,13 @@ export function PeriodicosFuturosPage() {
         saving={saving}
         onClose={handleFecharEditarProximaData}
         onSave={handleSalvarProximaData}
+      />
+      <EditarProgramacaoFuturaModal
+        open={Boolean(editProgramacaoRecord)}
+        record={editProgramacaoRecord}
+        saving={saving}
+        onClose={handleFecharEditarProgramacao}
+        onSave={handleSalvarProgramacao}
       />
       <PeriodicoAdicionarCpfModal
         open={Boolean(adicionarCpfGrupo)}

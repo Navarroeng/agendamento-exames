@@ -1,4 +1,10 @@
-import { TIPOS_ASO_PODEM_ORIGINAR_PERIODICO } from "@/lib/periodico-geracao";
+import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
+import { formatDateBR } from "@/lib/format";
+import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
+import {
+  isAsoDemissional,
+  TIPOS_ASO_PODEM_ORIGINAR_PERIODICO,
+} from "@/lib/periodico-geracao";
 
 /** Motivos disponíveis no modal “Informar exame futuro”. */
 export const MOTIVOS_EXAME_FUTURO = [
@@ -193,5 +199,190 @@ export function statusExameFuturoImplantacaoClass(
     default:
       return "text-navy font-semibold";
   }
+}
+
+export const PROGRAMACAO_FUTURA_ATUALIZADA_MSG =
+  "Programação futura atualizada com sucesso.";
+
+export const PROGRAMACAO_FUTURA_NAO_EDITAVEL_ORIGEM_MSG =
+  "Só é possível editar programações futuras originadas na Implantação.";
+
+export const PROGRAMACAO_FUTURA_NAO_EDITAVEL_STATUS_MSG =
+  "Só é possível editar programações futuras ainda ativas e não realizadas.";
+
+export const PROGRAMACAO_FUTURA_NAO_EDITAVEL_AGENDADA_MSG =
+  "Não é possível editar uma programação que já possui agendamento.";
+
+export const PROGRAMACAO_FUTURA_TIPO_ASO_INVALIDO_MSG =
+  "Selecione um tipo de ASO válido para a programação futura.";
+
+/** Campos gravados no UPDATE da programação. Nada além disto é alterado. */
+export const CAMPOS_UPDATE_PROGRAMACAO_FUTURA = [
+  "proxima_data",
+  "data_prevista_original",
+  "tipo_aso",
+  "tipo_exame",
+  "exame_nome",
+  "antecipado",
+] as const;
+
+export type PatchProgramacaoFutura = {
+  proxima_data: string;
+  data_prevista_original: string;
+  tipo_aso: string;
+  tipo_exame: string;
+  exame_nome: string;
+  antecipado: false;
+};
+
+export type RegistroEdicaoProgramacaoFutura = {
+  origem?: string | null;
+  status?: string | null;
+  data_realizada?: string | null;
+  agendamento_vinculado_id?: string | null;
+  agendamento_id?: string | null;
+  agendamento_status?: string | null;
+  cancelado_em?: string | null;
+  motivo_cancelamento?: string | null;
+};
+
+export function isOrigemImplantacaoInicial(
+  origem: string | null | undefined
+): boolean {
+  const key = (origem ?? "").trim().toLowerCase();
+  return key === ORIGEM_PERIODICO_IMPLANTACAO || key === "implantação inicial";
+}
+
+export function isTipoAsoExameFuturo(value: string): boolean {
+  return (TIPOS_ASO_EXAME_FUTURO as readonly string[]).includes(value);
+}
+
+function temVinculoAgendamentoAtivo(
+  record: RegistroEdicaoProgramacaoFutura
+): boolean {
+  if ((record.status ?? "").trim() === "reagendado") return true;
+  const vinculo = (record.agendamento_vinculado_id ?? "").trim();
+  if (vinculo) {
+    const st = String(record.agendamento_status ?? "")
+      .trim()
+      .toLowerCase();
+    return st !== "cancelado";
+  }
+  return false;
+}
+
+export function motivoBloqueioEdicaoProgramacaoFutura(
+  record: RegistroEdicaoProgramacaoFutura | null | undefined
+): string | null {
+  if (!record) {
+    return "Programação futura não encontrada.";
+  }
+  if (!isOrigemImplantacaoInicial(record.origem)) {
+    return PROGRAMACAO_FUTURA_NAO_EDITAVEL_ORIGEM_MSG;
+  }
+  if (
+    isPeriodicoCanceladoManualmente({
+      status: (record.status ?? "ativo") as "ativo" | "reagendado" | "cancelado",
+      cancelado_em: record.cancelado_em ?? null,
+      motivo_cancelamento: record.motivo_cancelamento ?? null,
+    }) ||
+    record.status === "cancelado"
+  ) {
+    return PROGRAMACAO_FUTURA_NAO_EDITAVEL_STATUS_MSG;
+  }
+  if (record.status !== "ativo") {
+    return PROGRAMACAO_FUTURA_NAO_EDITAVEL_AGENDADA_MSG;
+  }
+  if ((record.data_realizada ?? "").toString().trim()) {
+    return PROGRAMACAO_FUTURA_NAO_EDITAVEL_STATUS_MSG;
+  }
+  if (temVinculoAgendamentoAtivo(record)) {
+    return PROGRAMACAO_FUTURA_NAO_EDITAVEL_AGENDADA_MSG;
+  }
+  return null;
+}
+
+export function podeEditarProgramacaoFutura(
+  record: RegistroEdicaoProgramacaoFutura | null | undefined
+): boolean {
+  return motivoBloqueioEdicaoProgramacaoFutura(record) == null;
+}
+
+export function validarEdicaoProgramacaoFutura(input: {
+  tipoAso: string;
+  dataPrevistaIso: string;
+  dataInicioContrato?: string | null;
+  dataFimContrato?: string | null;
+}): { ok: true; patch: PatchProgramacaoFutura } | { ok: false; message: string } {
+  const tipoAso = input.tipoAso.trim();
+  const dataPrevista = input.dataPrevistaIso.trim().slice(0, 10);
+
+  if (!tipoAso) {
+    return { ok: false, message: "Informe o tipo de ASO." };
+  }
+  if (isAsoDemissional(tipoAso) || isAsoPontual(tipoAso) || !isTipoAsoExameFuturo(tipoAso)) {
+    return { ok: false, message: PROGRAMACAO_FUTURA_TIPO_ASO_INVALIDO_MSG };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPrevista)) {
+    return { ok: false, message: "Informe a data programada." };
+  }
+
+  const inicio = (input.dataInicioContrato ?? "").trim().slice(0, 10);
+  const fim = (input.dataFimContrato ?? "").trim().slice(0, 10);
+  if (inicio || fim) {
+    if (!inicio || !fim) {
+      return { ok: false, message: "Contrato sem vigência definida." };
+    }
+    if (
+      !dataPrevistaDentroDaVigenciaContrato({
+        dataPrevistaIso: dataPrevista,
+        dataInicio: inicio,
+        dataFim: fim,
+      })
+    ) {
+      return { ok: false, message: EXAME_FUTURO_FORA_VIGENCIA_MSG };
+    }
+  }
+
+  return {
+    ok: true,
+    patch: {
+      proxima_data: dataPrevista,
+      data_prevista_original: dataPrevista,
+      tipo_aso: tipoAso,
+      tipo_exame: tipoAso,
+      exame_nome: tipoAso,
+      antecipado: false,
+    },
+  };
+}
+
+/** Aplica o patch no mesmo objeto. Não cria registro novo. */
+export function aplicarPatchProgramacaoFutura<T extends object>(
+  record: T,
+  patch: PatchProgramacaoFutura
+): T {
+  return {
+    ...record,
+    ...patch,
+  };
+}
+
+export function descreverAlteracaoProgramacaoFutura(params: {
+  tipoAsoAntes: string;
+  tipoAsoDepois: string;
+  dataAntes: string;
+  dataDepois: string;
+}): string {
+  const partes: string[] = [];
+  if (params.tipoAsoAntes !== params.tipoAsoDepois) {
+    partes.push(`Tipo de ASO: ${params.tipoAsoAntes} → ${params.tipoAsoDepois}`);
+  }
+  if (params.dataAntes !== params.dataDepois) {
+    partes.push(
+      `Data programada: ${formatDateBR(params.dataAntes)} → ${formatDateBR(params.dataDepois)}`
+    );
+  }
+  return partes.join("; ");
 }
 

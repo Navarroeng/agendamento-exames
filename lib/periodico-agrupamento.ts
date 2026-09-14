@@ -1,4 +1,4 @@
-import { labelOrigemPeriodico } from "@/lib/contrato-programacao-futura";
+import { labelOrigemPeriodico, podeEditarProgramacaoFutura } from "@/lib/contrato-programacao-futura";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
@@ -28,6 +28,7 @@ export type PeriodicoFuturoGrupo = PeriodicoFuturoRow & {
   temAcaoAtiva: boolean;
   temPeriodicoCancelavel: boolean;
   podeEditarProximaData: boolean;
+  podeEditarProgramacao: boolean;
 };
 
 const STATUS_URGENCIA: Record<PeriodicoFuturoDisplayStatus, number> = {
@@ -226,6 +227,7 @@ export function agruparPeriodicosPorColaboradorCiclo(
         (item) => !isPeriodicoCanceladoManualmente(item)
       ),
       podeEditarProximaData: ordenados.every(canEditarProximaDataPeriodico),
+      podeEditarProgramacao: ordenados.every(podeEditarProgramacaoFutura),
     });
   });
 
