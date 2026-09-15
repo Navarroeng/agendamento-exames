@@ -1,4 +1,9 @@
-import { isPerfilAdmin, type PerfilUsuarioTipo } from "@/lib/permissions";
+import { RESPONSAVEIS } from "@/lib/constants";
+import {
+  isPerfilAdmin,
+  isPerfilStaffNavarro,
+  type PerfilUsuarioTipo,
+} from "@/lib/permissions";
 import { normalizePerfilUsuario } from "@/lib/contrato-permissoes";
 import type { OrcamentoStatus } from "@/lib/orcamento-types";
 import { formatUppercaseDisplay } from "@/lib/text-normalize";
@@ -23,10 +28,34 @@ function normalizeNome(value: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * Admin ou trio operacional cadastrado (`RESPONSAVEIS`).
+ * Não depende de e-mail, criador do orçamento nem responsável atual.
+ */
+export function isGrupoOperacionalAlterarResponsavel(
+  perfil: PerfilUsuarioTipo | null | undefined,
+  nome: string | null | undefined
+): boolean {
+  if (
+    normalizePerfilUsuario(perfil) === "admin" ||
+    isPerfilAdmin(perfil)
+  ) {
+    return true;
+  }
+  if (!isPerfilStaffNavarro(perfil)) return false;
+  const normalized = normalizeNome(nome);
+  if (!normalized) return false;
+  const primeiro = normalized.split(/\s+/)[0] ?? "";
+  return (RESPONSAVEIS as readonly string[]).some((permitido) => {
+    const alvo = normalizeNome(permitido);
+    return normalized === alvo || primeiro === alvo;
+  });
+}
+
 /** Quem pode abrir/confirmar a transferência do processo. */
 export function podeAlterarResponsavelProcesso(params: {
   perfil: PerfilUsuarioTipo | null | undefined;
-  usuarioId: string | null | undefined;
+  usuarioId?: string | null | undefined;
   usuarioNome: string | null | undefined;
   orcamento: {
     status: OrcamentoStatus;
@@ -37,21 +66,9 @@ export function podeAlterarResponsavelProcesso(params: {
   if (!statusPermiteAlterarResponsavel(params.orcamento.status)) {
     return false;
   }
-  if (
-    normalizePerfilUsuario(params.perfil) === "admin" ||
-    isPerfilAdmin(params.perfil)
-  ) {
-    return true;
-  }
-
-  const responsavelUserId = params.orcamento.responsavel_user_id ?? null;
-  if (responsavelUserId && params.usuarioId) {
-    return responsavelUserId === params.usuarioId;
-  }
-
-  return (
-    normalizeNome(params.orcamento.responsavel) ===
-    normalizeNome(params.usuarioNome)
+  return isGrupoOperacionalAlterarResponsavel(
+    params.perfil,
+    params.usuarioNome
   );
 }
 
