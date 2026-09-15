@@ -91,6 +91,10 @@ import {
   buildClienteFilterOptionsHistorico,
   resolveClienteIdByNome,
 } from "@/lib/cliente-display";
+import {
+  buildClinicaFilterOptionsHistorico,
+  filterClinicasParaNovoAgendamento,
+} from "@/lib/clinica-filters";
 import { clienteProcuracaoRequerAtencao } from "@/lib/cliente-procuracao";
 import {
   CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
@@ -375,7 +379,7 @@ export function useAgendamentosPage() {
   );
   const contratoInvalido = contratoVigencia.status === "invalid";
   const clinicasAtivas = useMemo(
-    () => clinicasList.filter((c) => c.status === "ativa"),
+    () => filterClinicasParaNovoAgendamento(clinicasList),
     [clinicasList]
   );
   const selectedClinica = useMemo(() => {
@@ -689,8 +693,12 @@ export function useAgendamentosPage() {
         clientes,
         agendamentos.map((ag) => ag.cliente_nome)
       ),
+      clinicas: buildClinicaFilterOptionsHistorico(
+        clinicasList,
+        agendamentos.map((ag) => ag.clinica_nome)
+      ),
     };
-  }, [agendamentos, clientes]);
+  }, [agendamentos, clientes, clinicasList]);
 
   const filteredAgendamentos = useMemo(
     () => filterAgendamentos(agendamentos, filters),

@@ -14,12 +14,14 @@ import {
 } from "@/lib/agendamento-filters";
 import { MonthReferenceSelect } from "@/components/ui/MonthReferenceSelect";
 import { CheckboxMultiSelect } from "@/components/ui/CheckboxMultiSelect";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
+import type { ClinicaFilterOption } from "@/lib/clinica-filters";
 
 interface FilterOptions {
   clientes: ClienteFilterOption[];
   colaboradores: string[];
-  clinicas: string[];
+  clinicas: ClinicaFilterOption[];
   asos: string[];
   tiposExame: string[];
   responsaveis: string[];
@@ -184,18 +186,16 @@ export function AgendamentosFilters({
             </FilterField>
 
             <FilterField label="Clínica">
-              <input
+              <SearchableSelect
                 className={inputClass}
-                list="filtro-clinicas"
+                ariaLabel="Clínica"
                 placeholder="Buscar clínica..."
+                emptyLabel="Nenhuma clínica encontrada"
+                clearLabel="Limpar clínica"
                 value={filters.clinica}
-                onChange={(e) => onChange("clinica", e.target.value)}
+                options={options.clinicas}
+                onChange={(value) => onChange("clinica", value)}
               />
-              <datalist id="filtro-clinicas">
-                {options.clinicas.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </FilterField>
 
             <FilterField label="Tipo de exame">
