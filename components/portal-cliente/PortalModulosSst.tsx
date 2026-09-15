@@ -7,6 +7,7 @@ import {
   IconFileText,
   IconReceipt,
   IconShield,
+  IconUsers,
 } from "@/components/ui/icons/OutlineIcons";
 import {
   PORTAL_STATUS_LABELS,
@@ -19,12 +20,14 @@ import type {
 import type { PortalFaturasResumo } from "@/lib/portal-faturas";
 import type { PortalAgendamentosResumo } from "@/lib/portal-agendamentos";
 import type { PortalLaudosSstResumo } from "@/lib/portal-laudos-sst";
+import type { PortalColaboradoresResumo } from "@/lib/portal-colaboradores";
 
 type ModuloSstId =
   | "riscos"
   | "faturas"
   | "agendamentos"
   | "laudos"
+  | "colaboradores"
   | "contrato";
 
 function participacaoLabel(resumo: PortalResumo): string | null {
@@ -37,25 +40,33 @@ export function PortalModulosSst({
   faturasResumo,
   agendamentosResumo,
   laudosResumo,
+  colaboradoresResumo,
   onVerAvaliacao,
   onVerFaturas,
   onVerAgendamentos,
   onVerLaudos,
+  onVerColaboradores,
 }: {
   resumo: PortalResumo;
   faturasResumo: PortalFaturasResumo | null;
   agendamentosResumo: PortalAgendamentosResumo | null;
   laudosResumo: PortalLaudosSstResumo | null;
+  colaboradoresResumo: PortalColaboradoresResumo | null;
   onVerAvaliacao: () => void;
   onVerFaturas: () => void;
   onVerAgendamentos: () => void;
   onVerLaudos: () => void;
+  onVerColaboradores: () => void;
 }) {
   const temAvaliacao = resumo.statusPortal !== "sem_avaliacao";
   const faturaModuloCarregado = faturasResumo !== null;
   const agendamentosModuloCarregado = agendamentosResumo !== null;
   const laudosModuloCarregado = laudosResumo !== null;
   const laudosDisponivel = Boolean(laudosResumo?.temDocumentos);
+  const colaboradoresModuloCarregado = colaboradoresResumo !== null;
+  const colaboradoresDisponivel = Boolean(
+    colaboradoresResumo && colaboradoresResumo.totalAtivos > 0
+  );
 
   return (
     <section className="flex flex-col gap-6">
@@ -143,6 +154,20 @@ export function PortalModulosSst({
           }
         >
           <LaudosConteudo resumo={laudosResumo} />
+        </ModuloShell>
+
+        <ModuloShell
+          id="colaboradores"
+          titulo="Colaboradores"
+          disponivel={colaboradoresDisponivel}
+          ocultarBadgeEmPreparacao={!colaboradoresModuloCarregado}
+          acao={
+            colaboradoresModuloCarregado
+              ? { label: "Ver colaboradores", onClick: onVerColaboradores }
+              : null
+          }
+        >
+          <ColaboradoresConteudo resumo={colaboradoresResumo} />
         </ModuloShell>
       </div>
 
@@ -292,6 +317,34 @@ function LaudosConteudo({ resumo }: { resumo: PortalLaudosSstResumo | null }) {
   );
 }
 
+function ColaboradoresConteudo({
+  resumo,
+}: {
+  resumo: PortalColaboradoresResumo | null;
+}) {
+  if (!resumo) {
+    return (
+      <p className="text-sm leading-relaxed text-[#94a3b8]">
+        Equipe vinculada ao contrato e aos exames ocupacionais.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[22px] font-bold leading-tight tracking-tight text-[#0b1f4d]">
+        {resumo.linhaResumo}
+      </p>
+      {resumo.totalDemitidos > 0 ? (
+        <p className="text-sm text-[#64748b]">
+          {resumo.totalDemitidos} demitido
+          {resumo.totalDemitidos !== 1 ? "s" : ""} no histórico
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ContratoCardHorizontal({
   contrato,
 }: {
@@ -309,14 +362,13 @@ function ContratoCardHorizontal({
       tone: contrato.procuracaoTone,
     },
     {
-      label: "Disponível para agendamento",
-      valor: contrato.disponivelAgendamentoLabel,
-      tone: contrato.disponivelAgendamentoTone,
+      label: "Colaboradores contratados",
+      valor: contrato.colaboradoresContratadosLabel,
     },
     {
-      label: "Agendamento liberado",
-      valor: contrato.agendamentoLiberadoLabel,
-      tone: contrato.agendamentoLiberadoTone,
+      label: "Agendamento",
+      valor: contrato.agendamentoLabel,
+      tone: contrato.agendamentoTone,
     },
   ];
 
@@ -460,5 +512,6 @@ function ModuloIcon({ id }: { id: ModuloSstId }) {
   if (id === "faturas") return <IconReceipt {...props} />;
   if (id === "agendamentos") return <IconCalendar {...props} />;
   if (id === "laudos") return <IconFileText {...props} />;
+  if (id === "colaboradores") return <IconUsers {...props} />;
   return <IconBriefcase {...props} />;
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PortalAvaliacaoRiscos } from "@/components/portal-cliente/PortalAvaliacaoRiscos";
 import { PortalAgendamentos } from "@/components/portal-cliente/PortalAgendamentos";
+import { PortalColaboradores } from "@/components/portal-cliente/PortalColaboradores";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
 import { PortalFaturas } from "@/components/portal-cliente/PortalFaturas";
 import { PortalLaudosSst } from "@/components/portal-cliente/PortalLaudosSst";
@@ -28,6 +29,11 @@ import type {
   PortalLaudoDocumento,
   PortalLaudosSstResumo,
 } from "@/lib/portal-laudos-sst";
+import { calcPortalColaboradoresResumo } from "@/lib/portal-colaboradores";
+import type {
+  PortalColaboradorLinha,
+  PortalColaboradoresResumo,
+} from "@/lib/portal-colaboradores";
 
 type HomeResponse = {
   ok?: boolean;
@@ -62,7 +68,20 @@ type LaudosResponse = {
   error?: string;
 };
 
-type PortalView = "riscos" | "faturas" | "agendamentos" | "laudos" | null;
+type ColaboradoresResponse = {
+  ok?: boolean;
+  colaboradores?: PortalColaboradorLinha[];
+  resumo?: PortalColaboradoresResumo;
+  error?: string;
+};
+
+type PortalView =
+  | "riscos"
+  | "faturas"
+  | "agendamentos"
+  | "laudos"
+  | "colaboradores"
+  | null;
 
 export function PortalHome() {
   const router = useRouter();
@@ -73,6 +92,7 @@ export function PortalHome() {
   const viewFaturas = viewParam === "faturas";
   const viewAgendamentos = viewParam === "agendamentos";
   const viewLaudos = viewParam === "laudos";
+  const viewColaboradores = viewParam === "colaboradores";
 
   const [empresas, setEmpresas] = useState<PortalEmpresaOpcao[]>([]);
   const [resumo, setResumo] = useState<PortalResumo>(portalResumoVazio);
@@ -85,6 +105,8 @@ export function PortalHome() {
     useState<PortalAgendamentosResumo | null>(null);
   const [laudosResumo, setLaudosResumo] =
     useState<PortalLaudosSstResumo | null>(null);
+  const [colaboradoresResumo, setColaboradoresResumo] =
+    useState<PortalColaboradoresResumo | null>(null);
 
   const atualizarQuery = useCallback(
     (next: { cliente?: string; view?: PortalView }) => {
@@ -97,6 +119,8 @@ export function PortalHome() {
       else if (next.view === "faturas") params.set("view", "faturas");
       else if (next.view === "agendamentos") params.set("view", "agendamentos");
       else if (next.view === "laudos") params.set("view", "laudos");
+      else if (next.view === "colaboradores")
+        params.set("view", "colaboradores");
       else if (next.view === null) params.delete("view");
       const qs = params.toString();
       router.replace(qs ? `/portal?${qs}` : "/portal");
@@ -142,6 +166,7 @@ export function PortalHome() {
       setFaturasResumo(null);
       setAgendamentosResumo(null);
       setLaudosResumo(null);
+      setColaboradoresResumo(null);
       setErro(null);
       if (!clienteId) {
         setCarregandoHome(false);
@@ -152,21 +177,30 @@ export function PortalHome() {
         const empresaNome =
           empresas.find((e) => e.id === clienteId)?.nome ?? "";
         const qsCliente = `cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`;
-        const [resHome, resFaturas, resAgendamentos, resLaudos] =
-          await Promise.all([
-            fetch(
-              `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
-              { cache: "no-store" }
-            ),
-            fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
-            fetch(`/api/portal/agendamentos?${qsCliente}`, {
-              cache: "no-store",
-            }),
-            fetch(
-              `/api/portal/laudos-sst?cliente_id=${encodeURIComponent(clienteId)}`,
-              { cache: "no-store" }
-            ),
-          ]);
+        const [
+          resHome,
+          resFaturas,
+          resAgendamentos,
+          resLaudos,
+          resColaboradores,
+        ] = await Promise.all([
+          fetch(
+            `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
+            { cache: "no-store" }
+          ),
+          fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
+          fetch(`/api/portal/agendamentos?${qsCliente}`, {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/portal/laudos-sst?cliente_id=${encodeURIComponent(clienteId)}`,
+            { cache: "no-store" }
+          ),
+          fetch(
+            `/api/portal/colaboradores?cliente_id=${encodeURIComponent(clienteId)}`,
+            { cache: "no-store" }
+          ),
+        ]);
 
         if (resHome.status === 401) {
           window.location.href = "/login";
@@ -221,6 +255,19 @@ export function PortalHome() {
         } else if (!cancel) {
           setLaudosResumo(calcPortalLaudosSstResumo([]));
         }
+
+        if (resColaboradores.ok) {
+          const jsonColab = (await resColaboradores
+            .json()
+            .catch(() => ({}))) as ColaboradoresResponse;
+          if (!cancel && jsonColab.resumo) {
+            setColaboradoresResumo(jsonColab.resumo);
+          } else if (!cancel) {
+            setColaboradoresResumo(calcPortalColaboradoresResumo([]));
+          }
+        } else if (!cancel) {
+          setColaboradoresResumo(calcPortalColaboradoresResumo([]));
+        }
       } catch {
         if (!cancel) {
           setResumo(portalResumoVazio());
@@ -228,6 +275,7 @@ export function PortalHome() {
           setFaturasResumo(calcPortalFaturasResumo([]));
           setAgendamentosResumo(calcPortalAgendamentosResumo([]));
           setLaudosResumo(calcPortalLaudosSstResumo([]));
+          setColaboradoresResumo(calcPortalColaboradoresResumo([]));
         }
       } finally {
         if (!cancel) setCarregandoHome(false);
@@ -251,7 +299,8 @@ export function PortalHome() {
         mostrarPainel ||
         faturasResumo !== null ||
         agendamentosResumo !== null ||
-        laudosResumo !== null
+        laudosResumo !== null ||
+        colaboradoresResumo !== null
     );
 
   const empresaNomeSelecionada =
@@ -316,11 +365,21 @@ export function PortalHome() {
         />
       ) : null}
 
+      {mostrarHomeSst && viewColaboradores ? (
+        <PortalColaboradores
+          clienteId={clienteId}
+          clienteNome={empresaNomeSelecionada}
+          logoUrl={resumo.logoUrl}
+          onVoltar={() => atualizarQuery({ view: null })}
+        />
+      ) : null}
+
       {mostrarHomeSst &&
       !viewRiscos &&
       !viewFaturas &&
       !viewAgendamentos &&
-      !viewLaudos ? (
+      !viewLaudos &&
+      !viewColaboradores ? (
         <div className="flex flex-col gap-6 sm:gap-7">
           <PortalEmpresaIdentidade
             nome={empresaNomeSelecionada}
@@ -332,10 +391,14 @@ export function PortalHome() {
             faturasResumo={faturasResumo}
             agendamentosResumo={agendamentosResumo}
             laudosResumo={laudosResumo}
+            colaboradoresResumo={colaboradoresResumo}
             onVerAvaliacao={() => atualizarQuery({ view: "riscos" })}
             onVerFaturas={() => atualizarQuery({ view: "faturas" })}
             onVerAgendamentos={() => atualizarQuery({ view: "agendamentos" })}
             onVerLaudos={() => atualizarQuery({ view: "laudos" })}
+            onVerColaboradores={() =>
+              atualizarQuery({ view: "colaboradores" })
+            }
           />
         </div>
       ) : null}

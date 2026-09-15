@@ -51,6 +51,7 @@ function contrato(
     orcamento_id: "orc-1",
     boleto_pago: true,
     liberado_para_agendamento: true,
+    quantidade_colaboradores: 7,
     encerrado_em: null,
     aprovado_em: "2026-01-01T00:00:00Z",
     created_at: "2026-01-01T00:00:00Z",
@@ -60,14 +61,15 @@ function contrato(
 
 console.log("\n== Home — cards visíveis ==");
 
-run("Exames, Laudos e eSocial não aparecem na Home", () => {
+run("Exames e eSocial não aparecem na Home; Laudos e Colaboradores sim", () => {
   const src = readFileSync(
     join(process.cwd(), "components/portal-cliente/PortalModulosSst.tsx"),
     "utf8"
   );
   assert.doesNotMatch(src, /Exames Ocupacionais/);
-  assert.doesNotMatch(src, /Laudos SST/);
   assert.doesNotMatch(src, /titulo="eSocial"/);
+  assert.match(src, /Laudos SST/);
+  assert.match(src, /titulo="Colaboradores"/);
 });
 
 run("Riscos, Faturas e Contrato aparecem na Home", () => {
@@ -78,6 +80,9 @@ run("Riscos, Faturas e Contrato aparecem na Home", () => {
   assert.match(src, /Riscos Psicossociais/);
   assert.match(src, /titulo="Faturas"/);
   assert.match(src, /Contrato e acesso aos serviços/);
+  assert.match(src, /Colaboradores contratados/);
+  assert.match(src, /label: "Agendamento"/);
+  assert.doesNotMatch(src, /Disponível para agendamento/);
 });
 
 console.log("\n== Vigência ==");
@@ -152,31 +157,34 @@ run("cliente sem procuração → Não informado", () => {
   assert.equal(r.procuracaoLabel, PORTAL_CONTRATO_FALLBACK);
 });
 
-console.log("\n== Disponível para agendamento ==");
+console.log("\n== Disponível para agendamento (interno) ==");
 
-run("flag true → Disponível", () => {
+run("flag true → Disponível (interno) e Liberado no card", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: cliente({ id: "cli-a", disponivel_agendamento: true }),
-    contratos: [],
+    contratos: [contrato({ id: "c1", cliente_id: "cli-a" })],
   });
   assert.equal(r.disponivelAgendamentoLabel, "Disponível");
   assert.equal(r.disponivelAgendamento, true);
+  assert.equal(r.agendamentoLabel, "Liberado");
+  assert.equal(r.agendamentoTone, "ok");
 });
 
-run("flag false → Indisponível", () => {
+run("flag false → Indisponível (interno) e Não liberado no card", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: cliente({
       id: "cli-a",
       disponivel_agendamento: false,
     }),
-    contratos: [],
+    contratos: [contrato({ id: "c1", cliente_id: "cli-a" })],
   });
   assert.equal(r.disponivelAgendamentoLabel, "Indisponível");
+  assert.equal(r.agendamentoLabel, "Não liberado");
 });
 
-run("bloqueio manual + indisponível → tom de bloqueio", () => {
+run("bloqueio manual + indisponível → tom de bloqueio no card Agendamento", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: cliente({
@@ -187,6 +195,8 @@ run("bloqueio manual + indisponível → tom de bloqueio", () => {
     contratos: [],
   });
   assert.equal(r.disponivelAgendamentoTone, "bloqueio");
+  assert.equal(r.agendamentoTone, "bloqueio");
+  assert.equal(r.agendamentoLabel, "Não liberado");
 });
 
 run("disponivel_agendamento ausente → Não informado", () => {
@@ -201,9 +211,44 @@ run("disponivel_agendamento ausente → Não informado", () => {
     contratos: [],
   });
   assert.equal(r.disponivelAgendamentoLabel, PORTAL_CONTRATO_FALLBACK);
+  assert.equal(r.agendamentoLabel, PORTAL_CONTRATO_FALLBACK);
 });
 
-console.log("\n== Agendamento liberado ==");
+console.log("\n== Colaboradores contratados ==");
+
+run("quantidade_colaboradores do contrato atual → label comercial", () => {
+  const r = montarPortalContratoResumo({
+    clienteId: "cli-a",
+    cliente: cliente({ id: "cli-a" }),
+    contratos: [
+      contrato({
+        id: "c1",
+        cliente_id: "cli-a",
+        quantidade_colaboradores: 7,
+      }),
+    ],
+  });
+  assert.equal(r.colaboradoresContratados, 7);
+  assert.equal(r.colaboradoresContratadosLabel, "7 colaboradores");
+});
+
+run("sem quantidade → Não informado", () => {
+  const r = montarPortalContratoResumo({
+    clienteId: "cli-a",
+    cliente: cliente({ id: "cli-a" }),
+    contratos: [
+      contrato({
+        id: "c1",
+        cliente_id: "cli-a",
+        quantidade_colaboradores: null,
+      }),
+    ],
+  });
+  assert.equal(r.colaboradoresContratados, null);
+  assert.equal(r.colaboradoresContratadosLabel, PORTAL_CONTRATO_FALLBACK);
+});
+
+console.log("\n== Agendamento liberado (interno financeiro) ==");
 
 run("boleto pago em contrato de orçamento → Liberado", () => {
   const r = montarPortalContratoResumo({

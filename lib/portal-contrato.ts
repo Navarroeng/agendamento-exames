@@ -1,6 +1,10 @@
 /**
  * Portal do Cliente — card Contrato e acesso aos serviços.
  * Reutiliza regras já existentes; não cria lógica financeira/contratual paralela.
+ *
+ * Apresentação simplificada no Portal:
+ * Vigência | Procuração | Colaboradores contratados | Agendamento
+ * (Agendamento = cache disponivel_agendamento, mesma regra do admin “pode agendar”)
  */
 
 import { getContratoAtual } from "@/lib/cliente-contrato-mappers";
@@ -24,6 +28,16 @@ export type PortalContratoResumo = {
   procuracaoStatus: ProcuracaoStatus;
   procuracaoLabel: string;
   procuracaoTone: PortalContratoBadgeTone;
+  /** Quantidade comercial do contrato atual (não roster ativo). */
+  colaboradoresContratados: number | null;
+  colaboradoresContratadosLabel: string;
+  /**
+   * Label único do card: Liberado / Não liberado.
+   * Fonte: clientes.disponivel_agendamento (inclui bloqueio manual via cache admin).
+   */
+  agendamentoLabel: string;
+  agendamentoTone: PortalContratoBadgeTone;
+  /** Campos internos preservados (não são o foco do card). */
   disponivelAgendamento: boolean | null;
   disponivelAgendamentoLabel: string;
   disponivelAgendamentoTone: PortalContratoBadgeTone;
@@ -41,6 +55,7 @@ const CONTRATO_SELECT_FIELDS = [
   "orcamento_id",
   "boleto_pago",
   "liberado_para_agendamento",
+  "quantidade_colaboradores",
   "encerrado_em",
   "aprovado_em",
   "created_at",
@@ -60,6 +75,18 @@ export type PortalClienteContratoFonte = Pick<
   disponivel_agendamento?: boolean | null;
 };
 
+export function formatColaboradoresContratadosLabel(
+  quantidade: number | null | undefined
+): string {
+  if (quantidade == null || !Number.isFinite(quantidade) || quantidade < 0) {
+    return PORTAL_CONTRATO_FALLBACK;
+  }
+  const n = Math.floor(quantidade);
+  if (n === 0) return "0 colaboradores";
+  if (n === 1) return "1 colaborador";
+  return `${n} colaboradores`;
+}
+
 export function portalContratoResumoVazio(): PortalContratoResumo {
   return {
     temContrato: false,
@@ -67,6 +94,10 @@ export function portalContratoResumoVazio(): PortalContratoResumo {
     procuracaoStatus: "pendente",
     procuracaoLabel: PORTAL_CONTRATO_FALLBACK,
     procuracaoTone: "neutro",
+    colaboradoresContratados: null,
+    colaboradoresContratadosLabel: PORTAL_CONTRATO_FALLBACK,
+    agendamentoLabel: PORTAL_CONTRATO_FALLBACK,
+    agendamentoTone: "neutro",
     disponivelAgendamento: null,
     disponivelAgendamentoLabel: PORTAL_CONTRATO_FALLBACK,
     disponivelAgendamentoTone: "neutro",
@@ -163,6 +194,16 @@ export function montarPortalContratoResumo(input: {
     ? contratoLiberaAgendamento(contratoAtual)
     : null;
 
+  const qtdRaw = contratoAtual?.quantidade_colaboradores;
+  const colaboradoresContratados =
+    qtdRaw == null || !Number.isFinite(Number(qtdRaw))
+      ? null
+      : Math.max(0, Math.floor(Number(qtdRaw)));
+
+  const disponivelTone = toneBool(disponivel, {
+    bloqueioImportante: bloqueioManual && disponivel === false,
+  });
+
   return {
     temContrato,
     vigenciaLabel: contratoAtual
@@ -178,6 +219,18 @@ export function montarPortalContratoResumo(input: {
     procuracaoTone: procuracaoInformada
       ? toneProcuracao(procuracaoStatus)
       : "neutro",
+    colaboradoresContratados,
+    colaboradoresContratadosLabel: formatColaboradoresContratadosLabel(
+      colaboradoresContratados
+    ),
+    // Card Portal: mesma regra do admin (cache disponivel_agendamento)
+    agendamentoLabel:
+      disponivel == null
+        ? PORTAL_CONTRATO_FALLBACK
+        : disponivel
+          ? "Liberado"
+          : "Não liberado",
+    agendamentoTone: disponivelTone,
     disponivelAgendamento: disponivel,
     disponivelAgendamentoLabel:
       disponivel == null
@@ -185,9 +238,7 @@ export function montarPortalContratoResumo(input: {
         : disponivel
           ? "Disponível"
           : "Indisponível",
-    disponivelAgendamentoTone: toneBool(disponivel, {
-      bloqueioImportante: bloqueioManual && disponivel === false,
-    }),
+    disponivelAgendamentoTone: disponivelTone,
     agendamentoLiberado: liberado,
     agendamentoLiberadoLabel:
       liberado == null
