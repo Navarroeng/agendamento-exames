@@ -1,3 +1,7 @@
+import {
+  GESTAO_COMPLETA_SST_ITENS,
+  isGestaoCompletaSstNome,
+} from "@/lib/orcamento-modalidade";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const PACOTE_COMPLETO_SST_NOME = "Pacote completo - SST";
@@ -96,6 +100,9 @@ export function resolveItensInclusosServico(
   const nome = servico?.nome ?? servicoNome ?? "";
   if (isPacoteCompletoSst(nome)) {
     return [...PACOTE_COMPLETO_SST_ITENS];
+  }
+  if (isGestaoCompletaSstNome(nome)) {
+    return [...GESTAO_COMPLETA_SST_ITENS];
   }
 
   return [];

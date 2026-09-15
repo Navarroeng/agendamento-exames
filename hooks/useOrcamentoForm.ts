@@ -33,6 +33,12 @@ import {
 } from "@/lib/orcamento-defaults";
 import { emptyToNull, maskMoneyInput, parseMoney } from "@/lib/money";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+import {
+  GESTAO_COMPLETA_SST_NOME,
+  isGestaoCompletaSstNome,
+  isOrcamentoMensalidade,
+  resolveOrcamentoModalidade,
+} from "@/lib/orcamento-modalidade";
 import type {
   OrcamentoComItens,
   OrcamentoFormValues,
@@ -64,11 +70,35 @@ export function useOrcamentoForm() {
     const nextValue = isUppercaseField("orcamento", field)
       ? formatUppercaseInput(value)
       : value;
-    setForm((prev) => ({ ...prev, [field]: nextValue }));
+    setForm((prev) => {
+      if (field !== "modalidade") {
+        return { ...prev, [field]: nextValue };
+      }
+      const modalidade = resolveOrcamentoModalidade(nextValue);
+      if (modalidade === prev.modalidade) {
+        return prev;
+      }
+      if (isOrcamentoMensalidade(modalidade)) {
+        return {
+          ...prev,
+          modalidade,
+          quantidade_parcelas: "",
+          itens: [createEmptyOrcamentoItem()],
+        };
+      }
+      const itensPontual = prev.itens.every(
+        (item) =>
+          !item.servico_id.trim() || isGestaoCompletaSstNome(item.servico_nome)
+      )
+        ? [createEmptyOrcamentoItem()]
+        : prev.itens;
+      return { ...prev, modalidade, itens: itensPontual };
+    });
   }, []);
 
   const addItem = useCallback(() => {
     setForm((prev) => {
+      if (isOrcamentoMensalidade(prev.modalidade)) return prev;
       const quantidadeReferencia =
         prev.itens.find((item) => item.quantidade.trim())?.quantidade ?? "1";
       return {
@@ -215,6 +245,7 @@ export function useOrcamentoForm() {
       origem_cliente: isOrcamentoOrigemCliente(orcamento.origem_cliente)
         ? orcamento.origem_cliente
         : "",
+      modalidade: resolveOrcamentoModalidade(orcamento.modalidade),
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
       quantidade_parcelas:
@@ -271,6 +302,7 @@ export function useOrcamentoForm() {
   }, [form.data_proposta, form.itens, form.quantidade_parcelas]);
 
   useEffect(() => {
+    if (isOrcamentoMensalidade(form.modalidade)) return;
     const max = totals.condicoesPagamento.maxParcelas;
     const raw = form.quantidade_parcelas.trim();
     if (raw === "") return;
@@ -281,7 +313,11 @@ export function useOrcamentoForm() {
         quantidade_parcelas: String(max),
       }));
     }
-  }, [form.quantidade_parcelas, totals.condicoesPagamento.maxParcelas]);
+  }, [
+    form.modalidade,
+    form.quantidade_parcelas,
+    totals.condicoesPagamento.maxParcelas,
+  ]);
 
   const buildPayload = useCallback(
     (responsavel: string): OrcamentoInsertPayload => {
@@ -307,12 +343,15 @@ export function useOrcamentoForm() {
     );
     const subtotal = itens.reduce((sum, item) => sum + item.valor_total, 0);
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
-    const quantidadeParcelas = resolveQuantidadeParcelasEscolhida(
-      subtotal,
-      form.quantidade_parcelas.trim() === ""
-        ? null
-        : Number(form.quantidade_parcelas)
-    );
+    const modalidade = resolveOrcamentoModalidade(form.modalidade);
+    const quantidadeParcelas = isOrcamentoMensalidade(modalidade)
+      ? null
+      : resolveQuantidadeParcelasEscolhida(
+          subtotal,
+          form.quantidade_parcelas.trim() === ""
+            ? null
+            : Number(form.quantidade_parcelas)
+        );
 
     if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
       throw new Error("Informe a origem do cliente.");
@@ -333,6 +372,7 @@ export function useOrcamentoForm() {
       telefone: emptyToNull(form.telefone),
       responsavel: normalizeUppercaseField(responsavel),
       origem_cliente: form.origem_cliente,
+      modalidade,
       observacoes: emptyToNull(form.observacoes),
       desconto_percentual: 0,
       forma_pagamento: null,
@@ -365,6 +405,14 @@ export function useOrcamentoForm() {
     );
     if (itensValidos.length === 0) {
       return "Adicione ao menos um serviço.";
+    }
+    if (isOrcamentoMensalidade(form.modalidade)) {
+      if (
+        itensValidos.length !== 1 ||
+        !isGestaoCompletaSstNome(itensValidos[0]?.servico_nome)
+      ) {
+        return `Selecione o serviço ${GESTAO_COMPLETA_SST_NOME}.`;
+      }
     }
 
     return validateOrcamentoItensValores(

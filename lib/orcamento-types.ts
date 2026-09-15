@@ -1,4 +1,5 @@
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+import type { OrcamentoModalidade } from "@/lib/orcamento-modalidade";
 
 export type OrcamentoStatus =
   | "em_elaboracao"
@@ -10,6 +11,7 @@ export type OrcamentoStatus =
   | "contrato_encerrado";
 
 export type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
+export type { OrcamentoModalidade } from "@/lib/orcamento-modalidade";
 export {
   ORCAMENTO_ORIGEM_LABELS,
   ORCAMENTO_ORIGEM_NAO_INFORMADO,
@@ -99,6 +101,8 @@ export interface OrcamentoRecord {
   /** user_id do responsável atual pelo processo. */
   responsavel_user_id?: string | null;
   origem_cliente: OrcamentoOrigemCliente | null;
+  /** pontual (padrão legado) ou mensalidade. Ausente = pontual. */
+  modalidade?: OrcamentoModalidade | null;
   observacoes: string | null;
   motivo_cancelamento: string | null;
   observacao_cancelamento: string | null;
@@ -161,6 +165,7 @@ export interface OrcamentoFormValues {
   email: string;
   telefone: string;
   origem_cliente: "" | OrcamentoOrigemCliente;
+  modalidade: OrcamentoModalidade;
   observacoes: string;
   forma_pagamento: string;
   /** Quantidade de parcelas escolhida (string do Select). Vazio = máximo permitido. */
@@ -193,6 +198,7 @@ export interface OrcamentoInsertPayload {
   criado_por_user_id?: string | null;
   responsavel_user_id?: string | null;
   origem_cliente: OrcamentoOrigemCliente | null;
+  modalidade: OrcamentoModalidade;
   observacoes: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;

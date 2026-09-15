@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import { RequiredMark } from "@/components/ui/Field";
 import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
@@ -12,6 +13,16 @@ import {
   type OrcamentoFormValues,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import {
+  ORCAMENTO_MODALIDADE_OPTIONS,
+  ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+  ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL,
+  ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL,
+  filterServicosPorModalidade,
+  formatValorMensalidade,
+  isOrcamentoMensalidade,
+  resolveGestaoCompletaSstServico,
+} from "@/lib/orcamento-modalidade";
 import type { ClienteRecord } from "@/lib/types";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { OrcamentoItensSection } from "./OrcamentoItensSection";
@@ -61,12 +72,26 @@ export function OrcamentoForm({
   onUpdateItem,
   onApplyValorSugerido,
 }: OrcamentoFormProps) {
+  const isMensalidade = isOrcamentoMensalidade(form.modalidade);
+  const servicosFiltrados = useMemo(
+    () => filterServicosPorModalidade(servicos, form.modalidade),
+    [servicos, form.modalidade]
+  );
   const clienteBloqueado = Boolean(form.cliente_id.trim());
   const headerTitle = embeddedInModal
     ? "Dados do orçamento"
     : isEditing
       ? "Editar orçamento"
       : "Novo orçamento";
+
+  useEffect(() => {
+    if (!isMensalidade) return;
+    const gestao = resolveGestaoCompletaSstServico(servicosFiltrados);
+    if (!gestao) return;
+    const item = form.itens[0];
+    if (!item || item.servico_id === gestao.id) return;
+    onUpdateItem(item.id, "servico_id", gestao.id, gestao.nome);
+  }, [isMensalidade, servicosFiltrados, form.itens, onUpdateItem]);
 
   return (
     <>
@@ -108,6 +133,22 @@ export function OrcamentoForm({
             >
               <option value="">Selecionar origem...</option>
               {ORCAMENTO_ORIGEM_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Modalidade <RequiredMark />
+            </label>
+            <select
+              className="field-input"
+              value={form.modalidade}
+              onChange={(e) => onChange("modalidade", e.target.value)}
+            >
+              {ORCAMENTO_MODALIDADE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -237,11 +278,12 @@ export function OrcamentoForm({
       <div className={embeddedInModal ? "mt-4" : "mt-[18px]"}>
         <OrcamentoItensSection
           itens={form.itens}
-          servicos={servicos}
+          servicos={servicosFiltrados}
           servicosLoading={servicosLoading}
           servicosError={servicosError}
           subtotal={subtotal}
           valorTotal={valorTotal}
+          modalidade={form.modalidade}
           onAdd={onAddItem}
           onRemove={onRemoveItem}
           onUpdate={onUpdateItem}
@@ -266,6 +308,33 @@ export function OrcamentoForm({
           ) : null}
         </p>
 
+        {isMensalidade ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+                Condição de pagamento
+              </p>
+              <p className="mt-2 text-sm font-extrabold text-navy">
+                {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
+              </p>
+              <p className="mt-1 text-base font-extrabold text-navy">
+                {formatValorMensalidade(valorTotal)}
+              </p>
+            </div>
+            <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+                Vigência e renovação
+              </p>
+              <p className="mt-2 text-sm font-bold text-navy">
+                Vigência contratual: {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
+              </p>
+              <p className="mt-1 text-[12px] text-[#475569]">
+                Renovação:{" "}
+                {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL.toLocaleLowerCase("pt-BR")}
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
@@ -315,6 +384,7 @@ export function OrcamentoForm({
             </p>
           </div>
         </div>
+        )}
         </Panel>
       </div>
     </>

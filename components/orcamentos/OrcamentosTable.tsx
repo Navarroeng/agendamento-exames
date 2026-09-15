@@ -1,7 +1,7 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { formatCurrency } from "@/lib/money";
 import { Panel } from "@/components/ui/Panel";
 import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { formatValorOrcamentoExibicao } from "@/lib/orcamento-modalidade";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
@@ -83,7 +83,7 @@ export function OrcamentosTable({
                 <th>Cliente</th>
                 <th>Origem</th>
                 <th>Responsável</th>
-                <th>Valor total</th>
+                <th>Valor</th>
                 <th>Status</th>
                 <th className="w-[88px] text-center">Visualizar</th>
                 <th className="w-[72px] text-center">Ações</th>
@@ -106,7 +106,7 @@ export function OrcamentosTable({
                       {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
                     </td>
                     <td className="font-semibold text-navy">
-                      {formatCurrency(Number(orcamento.valor_total))}
+                      {formatValorOrcamentoExibicao(orcamento)}
                     </td>
                     <td>
                       <span

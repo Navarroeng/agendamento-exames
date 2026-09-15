@@ -1,4 +1,5 @@
 import { formatDateIsoToBR, maskDateBR } from "@/lib/agendamento-datetime";
+import { ORCAMENTO_MODALIDADE_PONTUAL } from "@/lib/orcamento-modalidade";
 import type {
   OrcamentoFormValues,
   OrcamentoItemFormItem,
@@ -31,6 +32,7 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     email: "",
     telefone: "",
     origem_cliente: "",
+    modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
     observacoes: "",
     forma_pagamento: "",
     quantidade_parcelas: "",

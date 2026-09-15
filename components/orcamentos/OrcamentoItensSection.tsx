@@ -5,6 +5,11 @@ import type {
   OrcamentoItemFormItem,
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import {
+  formatValorMensalidade,
+  isOrcamentoMensalidade,
+  labelValorColunaOrcamento,
+} from "@/lib/orcamento-modalidade";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -14,6 +19,7 @@ interface OrcamentoItensSectionProps {
   servicosError: string | null;
   subtotal: number;
   valorTotal: number;
+  modalidade?: string | null;
   onAdd: () => void;
   onRemove: (id: string) => void;
   onUpdate: (
@@ -35,20 +41,24 @@ export function OrcamentoItensSection({
   servicosError,
   subtotal,
   valorTotal,
+  modalidade,
   onAdd,
   onRemove,
   onUpdate,
   onApplyValorSugerido,
 }: OrcamentoItensSectionProps) {
+  const isMensalidade = isOrcamentoMensalidade(modalidade);
   return (
     <Panel
       title="Itens do orçamento"
       icon={<IconClipboard />}
       iconTone="purple"
       action={
+        isMensalidade ? undefined : (
         <button type="button" className="btn btn-primary text-xs" onClick={onAdd}>
           + Adicionar Serviço
         </button>
+        )
       }
     >
       {servicosError && (
@@ -69,7 +79,7 @@ export function OrcamentoItensSection({
             <tr>
               <th className={TH}>Serviço</th>
               <th className={TH}>Quantidade de colaboradores</th>
-              <th className={TH}>Valor</th>
+              <th className={TH}>{labelValorColunaOrcamento(modalidade)}</th>
               <th className={`${TH} w-10 text-center`}>Ação</th>
             </tr>
           </thead>
@@ -80,7 +90,7 @@ export function OrcamentoItensSection({
                 item={item}
                 servicos={servicos}
                 servicosLoading={servicosLoading}
-                canRemove={itens.length > 1}
+                canRemove={!isMensalidade && itens.length > 1}
                 onRemove={() => onRemove(item.id)}
                 onUpdate={(field, value, servicoNome) =>
                   onUpdate(item.id, field, value, servicoNome)
@@ -88,10 +98,26 @@ export function OrcamentoItensSection({
                 onApplyValorSugerido={(valor) =>
                   onApplyValorSugerido(item.id, valor)
                 }
+                isMensalidade={isMensalidade}
               />
             ))}
           </tbody>
           <tfoot>
+            {isMensalidade ? (
+              <tr className="bg-brand-blue-soft/40">
+                <td
+                  colSpan={2}
+                  className="border-t border-[#eef2f7] px-2.5 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wide text-navy"
+                >
+                  Mensalidade
+                </td>
+                <td className="border-t border-[#eef2f7] px-2.5 py-2.5 text-sm font-extrabold text-navy">
+                  {formatValorMensalidade(valorTotal)}
+                </td>
+                <td className="border-t border-[#eef2f7]" />
+              </tr>
+            ) : (
+              <>
             <tr className="bg-[#f8fafc]">
               <td
                 colSpan={2}
@@ -116,6 +142,8 @@ export function OrcamentoItensSection({
               </td>
               <td className="border-t border-[#eef2f7]" />
             </tr>
+              </>
+            )}
           </tfoot>
         </table>
       </div>

@@ -12,6 +12,13 @@ import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import { resolveValidadePropostaIso } from "@/lib/orcamento-validade";
 import { formatCurrency } from "@/lib/money";
 import {
+  buildResumoMensalidadeLinhas,
+  formatValorMensalidade,
+  isOrcamentoMensalidade,
+  labelItensInclusosServico,
+  labelValorColunaOrcamento,
+} from "@/lib/orcamento-modalidade";
+import {
   formatOrcamentoOrigemCliente,
   type OrcamentoComItens,
   type ServicoSstRecord,
@@ -76,6 +83,11 @@ export function OrcamentoViewBody({
   );
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
+  const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
+  const valorServico = Number(orcamento.valor_total) || 0;
+  const linhasMensalidade = isMensalidade
+    ? buildResumoMensalidadeLinhas(valorServico)
+    : [];
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -128,7 +140,7 @@ export function OrcamentoViewBody({
                   Quantidade de colaboradores
                 </th>
                 <th className="px-4 py-3 text-right font-semibold sm:px-5">
-                  Valor
+                  {labelValorColunaOrcamento(orcamento.modalidade)}
                 </th>
               </tr>
             </thead>
@@ -152,7 +164,11 @@ export function OrcamentoViewBody({
                     <td className="px-4 py-3.5 align-top sm:px-5">
                       <p className="font-bold text-navy">{item.servico_nome}</p>
                       {itensInclusos.length > 0 ? (
-                        <ul className="mt-1.5 space-y-0.5 text-[11px] leading-snug text-[#64748b]">
+                        <div className="mt-1.5">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">
+                            {labelItensInclusosServico(item.servico_nome)}
+                          </p>
+                        <ul className="mt-1 space-y-0.5 text-[11px] leading-snug text-[#64748b]">
                           {itensInclusos.map((incluso) => (
                             <li key={incluso} className="flex gap-1.5">
                               <span className="text-[#c9972b]">•</span>
@@ -160,13 +176,16 @@ export function OrcamentoViewBody({
                             </li>
                           ))}
                         </ul>
+                        </div>
                       ) : null}
                     </td>
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
                       {item.quantidade}
                     </td>
                     <td className="px-4 py-3.5 text-right align-top font-extrabold text-navy sm:px-5">
-                      {formatCurrency(resolveItemValorServico(item))}
+                      {isMensalidade
+                        ? formatValorMensalidade(resolveItemValorServico(item))
+                        : formatCurrency(resolveItemValorServico(item))}
                     </td>
                   </tr>
                 );
@@ -214,6 +233,24 @@ export function OrcamentoViewBody({
           </h4>
         </div>
         <div className="divide-y divide-[#f1e4c0] px-4 py-1 sm:px-5">
+          {isMensalidade ? (
+            linhasMensalidade.map((linha) => (
+              <div key={linha.label} className="flex items-start gap-3 py-4">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#082b63]/10 text-[#082b63]">
+                  <IconWallet size={16} />
+                </span>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+                    {linha.label}
+                  </p>
+                  <p className="mt-0.5 text-xl font-extrabold tracking-[-0.3px] text-[#082b63]">
+                    {linha.value}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <>
           <div className="flex items-start gap-3 py-4">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#082b63]/10 text-[#082b63]">
               <IconWallet size={16} />
@@ -253,6 +290,8 @@ export function OrcamentoViewBody({
               </p>
             </div>
           </div>
+            </>
+          )}
         </div>
         {validadeLabel ? (
           <div className="border-t border-[#f1e4c0] bg-[#fff8e8]/80 px-4 py-2.5 sm:px-5">

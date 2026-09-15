@@ -1,4 +1,5 @@
 import type { ServicoSstRecord } from "@/lib/orcamento-types";
+import { labelItensInclusosServico } from "@/lib/orcamento-modalidade";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 
 interface OrcamentoPacoteInclusosCardProps {
@@ -24,7 +25,7 @@ export function OrcamentoPacoteInclusosCard({
       <p
         className={`font-bold text-navy ${compact ? "text-[10px]" : "text-[11px]"}`}
       >
-        Este pacote inclui:
+        {labelItensInclusosServico(servico?.nome ?? servicoNome)}
       </p>
       <ul
         className={`mt-1.5 space-y-1 text-[#475569] ${

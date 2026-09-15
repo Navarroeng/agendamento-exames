@@ -291,7 +291,11 @@ export function useImplantacaoClientesPage() {
       setModalSaving(true);
       try {
         const before = modalAprovacao;
-        const payload = buildCondicoesComerciaisFromForm(formValues, parseMoney);
+        const payload = buildCondicoesComerciaisFromForm(
+          formValues,
+          parseMoney,
+          modalOrcamento.modalidade
+        );
         const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
           modalAprovacao.id,
           payload,

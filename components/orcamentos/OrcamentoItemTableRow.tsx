@@ -26,6 +26,7 @@ interface OrcamentoItemTableRowProps {
     servicoNome?: string
   ) => void;
   onApplyValorSugerido: (valor: number | null) => void;
+  isMensalidade?: boolean;
 }
 
 const inputClass = "field-input field-input-compact min-w-0 w-full";
@@ -40,6 +41,7 @@ export function OrcamentoItemTableRow({
   onRemove,
   onUpdate,
   onApplyValorSugerido,
+  isMensalidade = false,
 }: OrcamentoItemTableRowProps) {
   const selectedServico = servicos.find((s) => s.id === item.servico_id);
   const isOutros = selectedServico?.nome === "Outros";
@@ -120,6 +122,11 @@ export function OrcamentoItemTableRow({
           value={item.valor_unitario}
           onChange={(e) => onUpdate("valor_unitario", e.target.value)}
         />
+        {isMensalidade ? (
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+            / mês
+          </p>
+        ) : null}
         {showSugestaoAutomatica ? (
           <p className="mt-1 max-w-[160px] text-[10px] leading-snug text-app-muted">
             Valor automático: {formatCurrency(valorAutomatico!)}

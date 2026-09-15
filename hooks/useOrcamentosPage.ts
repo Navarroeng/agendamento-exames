@@ -993,7 +993,11 @@ export function useOrcamentosPage() {
       setAprovarSaving(true);
       try {
         const before = aprovarAprovacao;
-        const payload = buildCondicoesComerciaisFromForm(formValues, parseMoney);
+        const payload = buildCondicoesComerciaisFromForm(
+          formValues,
+          parseMoney,
+          aprovarOrcamento.modalidade
+        );
         const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
           aprovarAprovacao.id,
           payload,

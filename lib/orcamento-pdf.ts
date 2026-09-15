@@ -11,6 +11,14 @@ import {
 } from "@/lib/orcamento-calculo";
 import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
+import {
+  buildResumoMensalidadeLinhas,
+  formatValorMensalidade,
+  isGestaoCompletaSstNome,
+  isOrcamentoMensalidade,
+  labelItensInclusosServico,
+  labelValorColunaOrcamento,
+} from "@/lib/orcamento-modalidade";
 import type {
   OrcamentoComItens,
   OrcamentoItemRecord,
@@ -136,6 +144,16 @@ function isPacoteCompletoNome(nome: string | null | undefined): boolean {
   return (
     normalizeServicoNome(nome ?? "") ===
     normalizeServicoNome(PACOTE_COMPLETO_SST_NOME)
+  );
+}
+
+function servicoListaInclusosNaTabela(
+  nome: string | null | undefined
+): boolean {
+  return (
+    isPacoteCompletoSst(nome) ||
+    isPacoteCompletoNome(nome) ||
+    isGestaoCompletaSstNome(nome)
   );
 }
 
@@ -662,7 +680,10 @@ function drawFinancialRowIcon(
   doc.circle(x + 0.75, y - 1.95, 0.32, "S");
 }
 
-function measureFinancialCardContentHeight(): number {
+function measureFinancialCardContentHeight(isMensalidade = false): number {
+  const extraMensalidadeRow = isMensalidade
+    ? FINANCIAL_DIVIDER_PAD + FINANCIAL_ROW_SPACING + 5
+    : 0;
   return (
     FINANCIAL_CARD_BODY_PAD +
     6.5 +
@@ -672,6 +693,7 @@ function measureFinancialCardContentHeight(): number {
     FINANCIAL_DIVIDER_PAD +
     FINANCIAL_ROW_SPACING +
     5 +
+    extraMensalidadeRow +
     FINANCIAL_VALIDADE_GAP +
     1.2 +
     3.5 +
@@ -750,7 +772,7 @@ function collectAllInclusos(
   for (const item of itens) {
     const servico = resolveCatalogoServico(item, catalogo);
     const nome = servico?.nome ?? item.servico_nome;
-    if (isPacoteCompletoSst(nome) || isPacoteCompletoNome(nome)) continue;
+    if (servicoListaInclusosNaTabela(nome)) continue;
 
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
     for (const line of inclusos) {
@@ -808,8 +830,8 @@ function drawChecklistItem(
   return y + lines.length * CHECKLIST_LINE_HEIGHT + CHECKLIST_ITEM_GAP;
 }
 
-function measureResumoFinanceiroCardHeight(): number {
-  return FINANCIAL_CARD_HEADER_H + measureFinancialCardContentHeight();
+function measureResumoFinanceiroCardHeight(isMensalidade = false): number {
+  return FINANCIAL_CARD_HEADER_H + measureFinancialCardContentHeight(isMensalidade);
 }
 
 function drawResumoFinanceiroCard(
@@ -825,67 +847,90 @@ function drawResumoFinanceiroCard(
   const innerX = x + CARD_PAD_X;
   const innerW = w - CARD_PAD_X * 2;
   let lineY = bodyY + FINANCIAL_CARD_BODY_PAD;
-
+  const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const valorTotal = Number(orcamento.valor_total);
-  const pagamento = calcCondicoesPagamentoProposta(
-    valorTotal,
-    orcamento.quantidade_parcelas
-  );
 
-  lineY = drawFinancialPremiumRow(
-    doc,
-    x,
-    w,
-    lineY,
-    "total",
-    "Valor Total",
-    formatCurrency(valorTotal),
-    {
-      labelFont: 8.5,
-      valueFont: 12,
-      labelBold: true,
-      iconColor: GOLD,
-      rowHeight: 6.5,
-    }
-  );
-  lineY += FINANCIAL_DIVIDER_PAD;
-  drawFinancialRowDivider(doc, innerX, lineY, innerW);
-  lineY += FINANCIAL_ROW_SPACING;
+  const drawRow = (
+    icon: "total" | "parcel" | "avista",
+    label: string,
+    value: string,
+    options: {
+      labelFont?: number;
+      valueFont?: number;
+      valueColor?: RGB;
+      iconColor?: RGB;
+      labelBold?: boolean;
+      rowHeight?: number;
+    },
+    withDividerAfter: boolean
+  ) => {
+    lineY = drawFinancialPremiumRow(doc, x, w, lineY, icon, label, value, options);
+    if (!withDividerAfter) return;
+    lineY += FINANCIAL_DIVIDER_PAD;
+    drawFinancialRowDivider(doc, innerX, lineY, innerW);
+    lineY += FINANCIAL_ROW_SPACING;
+  };
 
-  lineY = drawFinancialPremiumRow(
-    doc,
-    x,
-    w,
-    lineY,
-    "parcel",
-    "Pagamento parcelado",
-    pagamento.textoParcelado,
-    {
-      labelFont: 7.5,
-      valueFont: 9.5,
-      rowHeight: 5.5,
-    }
-  );
-  lineY += FINANCIAL_DIVIDER_PAD;
-  drawFinancialRowDivider(doc, innerX, lineY, innerW);
-  lineY += FINANCIAL_ROW_SPACING;
-
-  lineY = drawFinancialPremiumRow(
-    doc,
-    x,
-    w,
-    lineY,
-    "avista",
-    "À vista (5% de desconto)",
-    pagamento.textoAVista,
-    {
-      labelFont: 7.5,
-      valueFont: 10.5,
-      valueColor: GOLD_STRONG,
-      iconColor: GOLD_STRONG,
-      rowHeight: 5,
-    }
-  );
+  if (isMensalidade) {
+    const linhas = buildResumoMensalidadeLinhas(valorTotal);
+    linhas.forEach((linha, index) => {
+      drawRow(
+        index === 0 ? "total" : "parcel",
+        linha.label,
+        linha.value,
+        {
+          labelFont: index === 0 ? 8.5 : 7.5,
+          valueFont: index === 0 ? 11 : 9.5,
+          labelBold: index === 0,
+          iconColor: GOLD,
+          rowHeight: index === 0 ? 6.5 : 5,
+        },
+        index < linhas.length - 1
+      );
+    });
+  } else {
+    const pagamento = calcCondicoesPagamentoProposta(
+      valorTotal,
+      orcamento.quantidade_parcelas
+    );
+    drawRow(
+      "total",
+      "Valor Total",
+      formatCurrency(valorTotal),
+      {
+        labelFont: 8.5,
+        valueFont: 12,
+        labelBold: true,
+        iconColor: GOLD,
+        rowHeight: 6.5,
+      },
+      true
+    );
+    drawRow(
+      "parcel",
+      "Pagamento parcelado",
+      pagamento.textoParcelado,
+      {
+        labelFont: 7.5,
+        valueFont: 9.5,
+        rowHeight: 5.5,
+      },
+      true
+    );
+    drawRow(
+      "avista",
+      "À vista (5% de desconto)",
+      pagamento.textoAVista,
+      {
+        labelFont: 7.5,
+        valueFont: 10.5,
+        valueColor: GOLD_STRONG,
+        iconColor: GOLD_STRONG,
+        rowHeight: 5,
+      },
+      false
+    );
+  }
 
   lineY += FINANCIAL_VALIDADE_GAP;
   drawFinancialRowDivider(doc, innerX, lineY, innerW);
@@ -1289,7 +1334,8 @@ function measureDesiredCardsRowHeight(
   checklistW: number,
   hasPacote: boolean,
   pacoteItens: string[],
-  inclusos: string[]
+  inclusos: string[],
+  isMensalidade = false
 ): number {
   let inclusosH = 0;
   if (hasPacote) {
@@ -1302,7 +1348,7 @@ function measureDesiredCardsRowHeight(
     inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
   }
 
-  const financeiroH = measureResumoFinanceiroCardHeight();
+  const financeiroH = measureResumoFinanceiroCardHeight(isMensalidade);
   const hasInclusosCard = hasPacote || inclusos.length > 0;
   return hasInclusosCard ? Math.max(inclusosH, financeiroH) : financeiroH;
 }
@@ -1389,11 +1435,11 @@ function estimateServiceRowHeight(
   serviceColWidth: number
 ): number {
   const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-  const isPacote =
-    isPacoteCompletoSst(servico?.nome ?? item.servico_nome) ||
-    isPacoteCompletoNome(servico?.nome ?? item.servico_nome);
+  const listaInclusos = servicoListaInclusosNaTabela(
+    servico?.nome ?? item.servico_nome
+  );
 
-  if (isPacote && inclusos.length > 0) {
+  if (listaInclusos && inclusos.length > 0) {
     return (
       TABLE_ROW_TOP +
       TABLE_SERVICE_LINE_H +
@@ -1428,7 +1474,11 @@ function drawServicesTable(
     MARGIN + colWidths[0],
     MARGIN + colWidths[0] + colWidths[1],
   ];
-  const headers = ["Serviço", "Quantidade de Colaboradores", "Valor"];
+  const headers = [
+    "Serviço",
+    "Quantidade de Colaboradores",
+    labelValorColunaOrcamento(orcamento.modalidade),
+  ];
   const tableHeadH = 12;
 
   const drawTableHead = (startY: number) => {
@@ -1465,9 +1515,9 @@ function drawServicesTable(
   itens.forEach((item, index) => {
     const servico = resolveCatalogoServico(item, catalogo);
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-    const isPacote =
-      isPacoteCompletoSst(servico?.nome ?? item.servico_nome) ||
-      isPacoteCompletoNome(servico?.nome ?? item.servico_nome);
+    const listaInclusos = servicoListaInclusosNaTabela(
+      servico?.nome ?? item.servico_nome
+    );
     const rowH = estimateServiceRowHeight(
       doc,
       item,
@@ -1491,11 +1541,15 @@ function drawServicesTable(
     doc.text(item.servico_nome, colStarts[0] + 3, y + TABLE_ROW_TOP);
 
     let detailY = y + TABLE_ROW_TOP + TABLE_SERVICE_LINE_H + TABLE_NAME_INCLUI_GAP;
-    if (isPacote && inclusos.length > 0) {
+    if (listaInclusos && inclusos.length > 0) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(TABLE_DETAIL_FONT);
       doc.setTextColor(...SLATE_500);
-      doc.text("Inclui:", colStarts[0] + 3, detailY);
+      doc.text(
+        labelItensInclusosServico(servico?.nome ?? item.servico_nome),
+        colStarts[0] + 3,
+        detailY
+      );
       detailY += TABLE_INCLUI_LABEL_H + TABLE_INCLUI_LIST_GAP;
 
       doc.setFont("helvetica", "normal");
@@ -1529,7 +1583,9 @@ function drawServicesTable(
     );
     doc.setFont("helvetica", "bold");
     doc.text(
-      formatCurrency(resolveItemValorServico(item)),
+      isOrcamentoMensalidade(orcamento.modalidade)
+        ? formatValorMensalidade(resolveItemValorServico(item))
+        : formatCurrency(resolveItemValorServico(item)),
       colStarts[2] + colWidths[2] / 2,
       valueY,
       { align: "center" }
@@ -1570,7 +1626,8 @@ function drawFinancialAndInclusosRow(
     checklistW,
     hasPacote,
     pacoteInclusosItens,
-    inclusos
+    inclusos,
+    isOrcamentoMensalidade(orcamento.modalidade)
   );
   const { cardY, cardH } = resolveFirstPageCardsRow(y, desiredH);
 

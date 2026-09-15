@@ -31,6 +31,13 @@ import {
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { calcValorParcela } from "@/lib/orcamento-pagamento";
 import {
+  ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+  ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL,
+  ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL,
+  formatValorMensalidade,
+  isOrcamentoMensalidade,
+} from "@/lib/orcamento-modalidade";
+import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
   type OrcamentoComItens,
@@ -444,10 +451,15 @@ export function OrcamentoAprovarModal({
       return;
     }
     if (parseMoney(form.valor_final) <= 0) {
-      toast.error("Informe o valor total fechado.");
+      toast.error(
+        isOrcamentoMensalidade(orcamento?.modalidade)
+          ? "Informe o valor da mensalidade."
+          : "Informe o valor total fechado."
+      );
       return;
     }
     if (
+      !isOrcamentoMensalidade(orcamento?.modalidade) &&
       form.forma_pagamento === "parcelado" &&
       (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
     ) {
@@ -485,10 +497,15 @@ export function OrcamentoAprovarModal({
         return;
       }
       if (parseMoney(form.valor_final) <= 0) {
-        toast.error("Informe o valor total fechado.");
+        toast.error(
+          isOrcamentoMensalidade(orcamento.modalidade)
+            ? "Informe o valor da mensalidade."
+            : "Informe o valor total fechado."
+        );
         return;
       }
       if (
+        !isOrcamentoMensalidade(orcamento.modalidade) &&
         form.forma_pagamento === "parcelado" &&
         (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
       ) {
@@ -702,6 +719,7 @@ export function OrcamentoAprovarModal({
   if (!open || !orcamento || !mounted || !form) return null;
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
+  const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
@@ -818,9 +836,34 @@ export function OrcamentoAprovarModal({
                     value={String(resumoComercial.quantidadeColaboradores)}
                   />
                   <ResumoItem
-                    label="Valor do orçamento"
-                    value={formatCurrency(resumoComercial.valorTotal)}
+                    label={
+                      isMensalidade
+                        ? "Valor da mensalidade"
+                        : "Valor do orçamento"
+                    }
+                    value={
+                      isMensalidade
+                        ? formatValorMensalidade(resumoComercial.valorTotal)
+                        : formatCurrency(resumoComercial.valorTotal)
+                    }
                   />
+                  {isMensalidade ? (
+                    <>
+                      <ResumoItem
+                        label="Condição de pagamento"
+                        value={ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
+                      />
+                      <ResumoItem
+                        label="Vigência contratual"
+                        value={ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
+                      />
+                      <ResumoItem
+                        label="Renovação"
+                        value={ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL}
+                      />
+                    </>
+                  ) : (
+                    <>
                   <ResumoItem
                     label="À vista"
                     value={
@@ -833,6 +876,8 @@ export function OrcamentoAprovarModal({
                     label="Parcelado"
                     value={resumoComercial.textoParcelado || "—"}
                   />
+                    </>
+                  )}
                 </div>
                 <p className="border-t border-[#eef2f7] px-4 py-3 text-[11px] text-[#64748b]">
                   Referência do orçamento original. Estes dados não serão
@@ -880,7 +925,14 @@ export function OrcamentoAprovarModal({
                             }
                           />
                         </Field>
-                        <Field label="Valor total fechado" required>
+                        <Field
+                          label={
+                            isMensalidade
+                              ? "Valor da mensalidade"
+                              : "Valor total fechado"
+                          }
+                          required
+                        >
                           <input
                             className="field-input"
                             value={form.valor_final}
@@ -895,6 +947,29 @@ export function OrcamentoAprovarModal({
                         </Field>
                       </div>
 
+                      {isMensalidade ? (
+                        <div className="rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+                            Condição de pagamento
+                          </p>
+                          <p className="mt-1 text-sm font-extrabold text-navy">
+                            {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-navy">
+                            {valorFinalEditado > 0
+                              ? formatValorMensalidade(valorFinalEditado)
+                              : "—"}
+                          </p>
+                          <p className="mt-2 text-[12px] text-[#475569]">
+                            Vigência contratual:{" "}
+                            {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
+                          </p>
+                          <p className="text-[12px] text-[#475569]">
+                            Renovação: {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL}
+                          </p>
+                        </div>
+                      ) : (
+                      <>
                       <div>
                         <p className="mb-2 text-xs font-bold text-navy">
                           Forma de pagamento <RequiredMark />
@@ -959,6 +1034,8 @@ export function OrcamentoAprovarModal({
                           />
                         </div>
                       )}
+                      </>
+                      )}
 
                       <Field label="Observações da negociação">
                         <textarea
@@ -988,8 +1065,16 @@ export function OrcamentoAprovarModal({
                         value={String(aprovacao.quantidade_colaboradores)}
                       />
                       <ResumoItem
-                        label="Valor total fechado"
-                        value={formatCurrency(Number(aprovacao.valor_final))}
+                        label={
+                          isMensalidade
+                            ? "Valor da mensalidade"
+                            : "Valor total fechado"
+                        }
+                        value={
+                          isMensalidade
+                            ? formatValorMensalidade(Number(aprovacao.valor_final))
+                            : formatCurrency(Number(aprovacao.valor_final))
+                        }
                       />
                       <ResumoItem
                         label="Pagamento"
@@ -1071,7 +1156,14 @@ export function OrcamentoAprovarModal({
                               }
                             />
                           </Field>
-                          <Field label="Valor total fechado" required>
+                          <Field
+                            label={
+                              isMensalidade
+                                ? "Valor da mensalidade"
+                                : "Valor total fechado"
+                            }
+                            required
+                          >
                             <input
                               className="field-input"
                               value={form.valor_final}
@@ -1086,6 +1178,29 @@ export function OrcamentoAprovarModal({
                           </Field>
                         </div>
 
+                        {isMensalidade ? (
+                          <div className="rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+                              Condição de pagamento
+                            </p>
+                            <p className="mt-1 text-sm font-extrabold text-navy">
+                              {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
+                            </p>
+                            <p className="mt-1 text-sm font-bold text-navy">
+                              {valorFinalEditado > 0
+                                ? formatValorMensalidade(valorFinalEditado)
+                                : "—"}
+                            </p>
+                            <p className="mt-2 text-[12px] text-[#475569]">
+                              Vigência contratual:{" "}
+                              {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
+                            </p>
+                            <p className="text-[12px] text-[#475569]">
+                              Renovação: {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL}
+                            </p>
+                          </div>
+                        ) : (
+                        <>
                         <div>
                           <p className="mb-2 text-xs font-bold text-navy">
                             Forma de pagamento <RequiredMark />
@@ -1152,6 +1267,8 @@ export function OrcamentoAprovarModal({
                               value={textoParcelasCalculado}
                             />
                           </div>
+                        )}
+                        </>
                         )}
 
                         <Field label="Observações da negociação">
@@ -1228,9 +1345,15 @@ export function OrcamentoAprovarModal({
                             </span>
                           </p>
                           <p className="text-[#64748b]">
-                            Valor: {formatCurrency(Number(row.valor_anterior))} →{" "}
+                            Valor:{" "}
+                            {isMensalidade
+                              ? formatValorMensalidade(Number(row.valor_anterior))
+                              : formatCurrency(Number(row.valor_anterior))}{" "}
+                            →{" "}
                             <span className="font-semibold text-[#334155]">
-                              {formatCurrency(Number(row.valor_novo))}
+                              {isMensalidade
+                                ? formatValorMensalidade(Number(row.valor_novo))
+                                : formatCurrency(Number(row.valor_novo))}
                             </span>
                           </p>
                           <p className="text-[#64748b] sm:col-span-2">

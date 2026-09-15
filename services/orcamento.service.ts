@@ -3,6 +3,10 @@ import {
   normalizeOrcamentoItensParaPersistencia,
   validateOrcamentoItensValores,
 } from "@/lib/orcamento-calculo";
+import {
+  isOrcamentoMensalidade,
+  resolveOrcamentoModalidade,
+} from "@/lib/orcamento-modalidade";
 import { calcValidadePropostaIso } from "@/lib/orcamento-validade";
 import type {
   OrcamentoComItens,
@@ -28,11 +32,16 @@ function normalizeOrcamentoPayload(
     (sum, item) => sum + Number(item.valor_total),
     0
   );
+  const modalidade = resolveOrcamentoModalidade(payload.modalidade);
 
   return {
     ...payload,
     itens,
+    modalidade,
     desconto_percentual: 0,
+    quantidade_parcelas: isOrcamentoMensalidade(modalidade)
+      ? null
+      : payload.quantidade_parcelas,
     validade_proposta: calcValidadePropostaIso(payload.data_proposta),
     subtotal,
     valor_total: subtotal,
@@ -131,6 +140,7 @@ export async function criarOrcamento(
         normalized.criado_por_user_id ?? normalized.responsavel_user_id ?? null,
       responsavel_user_id: normalized.responsavel_user_id ?? null,
       origem_cliente: normalized.origem_cliente,
+      modalidade: normalized.modalidade,
       observacoes: normalized.observacoes,
       desconto_percentual: normalized.desconto_percentual,
       forma_pagamento: normalized.forma_pagamento,
@@ -173,6 +183,7 @@ export async function atualizarOrcamento(
       email: normalized.email,
       telefone: normalized.telefone,
       origem_cliente: normalized.origem_cliente,
+      modalidade: normalized.modalidade,
       observacoes: normalized.observacoes,
       desconto_percentual: normalized.desconto_percentual,
       forma_pagamento: normalized.forma_pagamento,
@@ -222,6 +233,7 @@ export async function duplicarOrcamento(
     telefone: original.telefone,
     responsavel,
     origem_cliente: original.origem_cliente,
+    modalidade: resolveOrcamentoModalidade(original.modalidade),
     observacoes: original.observacoes,
     desconto_percentual: 0,
     forma_pagamento: original.forma_pagamento,

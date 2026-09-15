@@ -4,6 +4,11 @@ import {
   calcValorParcela,
 } from "@/lib/orcamento-pagamento";
 import {
+  ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+  formatValorMensalidade,
+  isOrcamentoMensalidade,
+} from "@/lib/orcamento-modalidade";
+import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
@@ -278,6 +283,17 @@ export function buildResumoComercialOrcamento(
 ): OrcamentoResumoComercial {
   const quantidade = resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
   const valorTotal = Number(orcamento.valor_total) || 0;
+  if (isOrcamentoMensalidade(orcamento.modalidade)) {
+    return {
+      quantidadeColaboradores: quantidade,
+      valorTotal,
+      valorAVista: 0,
+      parcelas: 0,
+      valorParcela: 0,
+      textoParcelado: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+      textoAVista: "",
+    };
+  }
   const pagamento = calcCondicoesPagamentoProposta(
     valorTotal,
     orcamento.quantidade_parcelas
@@ -393,6 +409,20 @@ export function buildAprovacaoInsertPayload(
   const resumo = buildResumoComercialOrcamento(orcamento);
 
   if (form.condicoes_iguais) {
+    if (isOrcamentoMensalidade(orcamento.modalidade)) {
+      return {
+        quantidade_colaboradores: resumo.quantidadeColaboradores,
+        valor_final: resumo.valorTotal,
+        condicao_pagamento: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+        quantidade_parcelas: null,
+        valor_parcela: null,
+        desconto_percentual: 0,
+        valor_avista: null,
+        observacoes: form.observacoes.trim() || null,
+        aprovado_por: aprovadoPor.trim(),
+        itens,
+      };
+    }
     return {
       quantidade_colaboradores: resumo.quantidadeColaboradores,
       valor_final: resumo.valorTotal,
@@ -409,6 +439,21 @@ export function buildAprovacaoInsertPayload(
 
   const quantidade = Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);
+
+  if (isOrcamentoMensalidade(orcamento.modalidade)) {
+    return {
+      quantidade_colaboradores: quantidade,
+      valor_final: valorFinal,
+      condicao_pagamento: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+      quantidade_parcelas: null,
+      valor_parcela: null,
+      desconto_percentual: 0,
+      valor_avista: null,
+      observacoes: form.observacoes.trim() || null,
+      aprovado_por: aprovadoPor.trim(),
+      itens,
+    };
+  }
 
   if (form.forma_pagamento === "avista") {
     return {
@@ -453,10 +498,12 @@ export function buildAprovacaoDiffs(
   const resumo = buildResumoComercialOrcamento(orcamento);
   const qtdAprovada = Number(form.quantidade_colaboradores) || 0;
   const valorAprovado = parseMoneyFn(form.valor_final);
+  const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const parcelasAprovadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
   const valorParcelaAprovado = calcValorParcela(valorAprovado, parcelasAprovadas);
-  const pagamentoAprovado =
-    form.forma_pagamento === "avista"
+  const pagamentoAprovado = isMensalidade
+    ? `${ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO} · ${formatValorMensalidade(valorAprovado)}`
+    : form.forma_pagamento === "avista"
       ? `À vista · ${formatCurrency(valorAprovado)}`
       : `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`;
 
@@ -468,14 +515,20 @@ export function buildAprovacaoDiffs(
       changed: resumo.quantidadeColaboradores !== qtdAprovada,
     },
     {
-      label: "Valor",
-      original: formatCurrency(resumo.valorTotal),
-      aprovado: formatCurrency(valorAprovado),
+      label: isMensalidade ? "Valor da mensalidade" : "Valor",
+      original: isMensalidade
+        ? formatValorMensalidade(resumo.valorTotal)
+        : formatCurrency(resumo.valorTotal),
+      aprovado: isMensalidade
+        ? formatValorMensalidade(valorAprovado)
+        : formatCurrency(valorAprovado),
       changed: Math.abs(resumo.valorTotal - valorAprovado) > 0.009,
     },
     {
       label: "Pagamento",
-      original: `Parcelado · ${resumo.textoParcelado} · À vista ${resumo.textoAVista}`,
+      original: isMensalidade
+        ? ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO
+        : `Parcelado · ${resumo.textoParcelado} · À vista ${resumo.textoAVista}`,
       aprovado: pagamentoAprovado,
       changed: true,
     },
@@ -485,6 +538,10 @@ export function buildAprovacaoDiffs(
 export function formatCondicaoAprovada(
   aprovacao: OrcamentoAprovacaoRecord
 ): string {
+  const condicao = (aprovacao.condicao_pagamento ?? "").trim();
+  if (/mensalidade/i.test(condicao)) {
+    return condicao;
+  }
   const forma = resolveFormaPagamentoFromRecord(aprovacao);
   if (forma === "avista") {
     const valor =
@@ -510,10 +567,24 @@ export function formatCondicaoAprovada(
  */
 export function buildCondicoesComerciaisFromForm(
   form: OrcamentoAprovacaoFormValues,
-  parseMoneyFn: (value: string) => number
+  parseMoneyFn: (value: string) => number,
+  modalidade?: string | null
 ): OrcamentoCondicoesComerciaisPayload {
   const quantidade = Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);
+
+  if (isOrcamentoMensalidade(modalidade)) {
+    return {
+      quantidade_colaboradores: quantidade,
+      valor_final: valorFinal,
+      condicao_pagamento: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+      quantidade_parcelas: null,
+      valor_parcela: null,
+      desconto_percentual: 0,
+      valor_avista: null,
+      observacoes: form.observacoes.trim() || null,
+    };
+  }
 
   if (form.forma_pagamento === "avista") {
     return {
