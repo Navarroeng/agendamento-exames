@@ -41,6 +41,7 @@ export async function POST(
         perfil: perfil.perfil,
         email: typeof perfil.email === "string" ? perfil.email : null,
         emailAuth: user.email,
+        nome: typeof perfil.nome === "string" ? perfil.nome : null,
       });
     if (!autorizado) {
       return NextResponse.json(

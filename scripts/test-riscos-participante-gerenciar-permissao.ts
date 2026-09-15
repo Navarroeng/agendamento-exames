@@ -96,6 +96,42 @@ assertPodeGerenciar(
   false
 );
 
+const rafaelaReal = {
+  email: "nao-esta-na-allowlist@empresa.com",
+  perfil: "operacional" as const,
+  ativo: true,
+  nome: "Rafaela",
+};
+assertPodeGerenciar(
+  "identidade real por nome do perfil — Rafaela",
+  rafaelaReal,
+  true
+);
+assertPodeGerenciar(
+  "identidade real por nome do perfil — Bruna",
+  { perfil: "operacional", nome: "Bruna", email: "bruna.desconhecida@empresa.com" },
+  true
+);
+assertPodeGerenciar(
+  "identidade real por nome do perfil — Karoline",
+  {
+    perfil: "operacional",
+    nome: "Karoline",
+    email: "karoline.desconhecida@empresa.com",
+  },
+  true
+);
+assertPodeGerenciar(
+  "nome operacional fora do trio não gerencia",
+  { perfil: "operacional", nome: "João", email: "joao@navarro.com.br" },
+  false
+);
+assertPodeGerenciar(
+  "nome Rafaela em perfil cliente não gerencia",
+  { perfil: "cliente", nome: "Rafaela" },
+  false
+);
+
 assert.deepEqual(
   [...RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS],
   [BRUNA, RAFAELA, KAROLINE]
@@ -173,6 +209,10 @@ assert.match(section, /coluna\.mostraMenu/);
 assert.match(section, /window\.confirm/);
 assert.match(painelCards, /podeGerenciarParticipanteRiscos/);
 assert.match(painelCards, /podeGerenciarParticipanteAuth/);
+assert.match(painelCards, /nome:\s*profile\?\.nome/);
+assert.match(hook, /nome:\s*profile\?\.nome/);
+assert.match(editApi, /nome:\s*typeof perfil\.nome/);
+assert.match(removeApi, /nome:\s*typeof perfil\.nome/);
 assert.match(perfilService, /user\.email/);
 
 assert.match(encerrar, /isPerfilAdmin\(perfil\.perfil\)/);
@@ -259,9 +299,18 @@ assertMenuCompleto("UI Bruna navarroeng", {
   perfil: "operacional",
   email: "bruna@navarroeng.com.br",
 });
+assertMenuCompleto("UI Rafaela real por nome", rafaelaReal);
+assertMenuCompleto("UI Bruna por nome", {
+  perfil: "operacional",
+  nome: "Bruna",
+});
+assertMenuCompleto("UI Karoline por nome", {
+  perfil: "operacional",
+  nome: "Karoline",
+});
 
 const operacionalFora = colunaAcoes(
-  { perfil: "operacional", email: "outro@navarro.com.br" },
+  { perfil: "operacional", email: "outro@navarro.com.br", nome: "João" },
   "pendente"
 );
 assert.equal(operacionalFora.mostraMenu, false, "UI outro operacional → —");

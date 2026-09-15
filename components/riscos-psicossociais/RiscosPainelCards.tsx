@@ -196,10 +196,12 @@ export function RiscosPainelCards({
   const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
+    nome: profile?.nome,
   });
   const podeGerenciarParticipanteAuth = podeGerenciarParticipanteRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
+    nome: profile?.nome,
   });
   const campanha = processo.campanha;
 

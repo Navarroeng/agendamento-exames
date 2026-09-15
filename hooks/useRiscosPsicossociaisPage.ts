@@ -101,10 +101,12 @@ export function useRiscosPsicossociaisPage() {
   const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
+    nome: profile?.nome,
   });
   const podeGerenciarParticipante = podeGerenciarParticipanteRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
+    nome: profile?.nome,
   });
   const [processos, setProcessos] = useState<RiscosPsicossociaisProcesso[]>([]);
   const [loading, setLoading] = useState(true);

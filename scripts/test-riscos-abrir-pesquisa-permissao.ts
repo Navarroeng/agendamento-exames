@@ -80,6 +80,22 @@ assert.equal(
   podeAbrirPesquisaRiscos({ perfil: "operacional" }),
   false
 );
+assert.equal(
+  podeAbrirPesquisaRiscos({
+    perfil: "operacional",
+    nome: "Rafaela",
+    email: "nao-esta-na-allowlist@empresa.com",
+  }),
+  true
+);
+assert.equal(
+  podeAbrirPesquisaRiscos({
+    perfil: "operacional",
+    nome: "João",
+    email: "joao@navarro.com.br",
+  }),
+  false
+);
 assert.equal(isEmailAutorizadoAbrirPesquisaRiscos("Bruna"), false);
 assert.equal(
   isEmailAutorizadoAbrirPesquisaRiscos("bruna@navarro.com.br"),
@@ -159,6 +175,11 @@ const painel = readFileSync(
 );
 assert.match(painel, /podeAbrirPesquisaRiscos/);
 assert.match(painel, /RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG/);
+assert.match(painel, /nome:\s*profile\?\.nome/);
+assert.match(api, /nome:\s*typeof perfil\.nome/);
+assert.match(prorrogar, /nome:\s*typeof perfil\.nome/);
+assert.match(reabrir, /nome:\s*typeof perfil\.nome/);
+assert.match(periodo, /nome:\s*typeof perfil\.nome/);
 
 const hook = readFileSync(
   join(root, "hooks/useRiscosPsicossociaisPage.ts"),

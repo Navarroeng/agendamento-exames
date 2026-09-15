@@ -1,9 +1,13 @@
-import { isPerfilAdmin, type PerfilUsuarioTipo } from "@/lib/permissions";
+import { RESPONSAVEIS } from "@/lib/constants";
+import {
+  isPerfilAdmin,
+  isPerfilStaffNavarro,
+  type PerfilUsuarioTipo,
+} from "@/lib/permissions";
 
 /**
- * E-mails persistidos em `perfis_usuarios.email` (único) das usuárias
- * operacionais autorizadas a abrir pesquisa e a gerenciar participantes.
- * Não usar o nome exibido. Fonte única — não duplicar esta lista.
+ * E-mails da allowlist operacional (legado). A autorização ativa do trio
+ * Bruna/Rafaela/Karoline também usa `perfis_usuarios.nome` via `RESPONSAVEIS`.
  */
 export const RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS = [
   "bruna@navarro.com.br",
@@ -65,13 +69,47 @@ type RiscosOperacionalAuthInput = {
   perfil?: PerfilUsuarioTipo | null;
   email?: string | null;
   emailAuth?: string | null;
+  /** Nome persistido em `perfis_usuarios.nome` (Bruna, Rafaela, Karoline). */
+  nome?: string | null;
 };
+
+function normalizeNomeOperacionalRiscos(
+  value: string | null | undefined
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Trio operacional já cadastrado no produto (`RESPONSAVEIS`).
+ * Compara o nome do perfil, não o e-mail de login.
+ */
+export function isNomeAutorizadoOperacionalRiscos(
+  nome: string | null | undefined
+): boolean {
+  const normalized = normalizeNomeOperacionalRiscos(nome);
+  if (!normalized) return false;
+  const primeiro = normalized.split(/\s+/)[0] ?? "";
+  return (RESPONSAVEIS as readonly string[]).some((permitido) => {
+    const alvo = normalizeNomeOperacionalRiscos(permitido);
+    return normalized === alvo || primeiro === alvo;
+  });
+}
 
 function isAutorizadoOperacionalRiscos(input: RiscosOperacionalAuthInput): boolean {
   if (isPerfilAdmin(input.perfil)) return true;
-  return (
+  if (
     isEmailAutorizadoAbrirPesquisaRiscos(input.email) ||
     isEmailAutorizadoAbrirPesquisaRiscos(input.emailAuth)
+  ) {
+    return true;
+  }
+  return (
+    isPerfilStaffNavarro(input.perfil) &&
+    isNomeAutorizadoOperacionalRiscos(input.nome)
   );
 }
 
