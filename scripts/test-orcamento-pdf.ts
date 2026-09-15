@@ -23,6 +23,12 @@ import { calcPdfContentBottomY } from "../lib/pdf-navarro-footer";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens, ServicoSstRecord } from "../lib/orcamento-types";
 import {
+  GESTAO_COMPLETA_SST_ITENS,
+  GESTAO_SST_MENSAL_NOME,
+  ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+  formatValorMensalidade,
+} from "../lib/orcamento-modalidade";
+import {
   PACOTE_COMPLETO_SST_ITENS,
   PACOTE_COMPLETO_SST_NOME,
   isPacoteCompletoSst,
@@ -154,6 +160,8 @@ function buildOrcamento(params: {
   numero: string;
   itens: Array<{ nome: string; quantidade: number; valor: number; id?: string }>;
   observacoes?: string | null;
+  modalidade?: "pontual" | "mensalidade";
+  quantidade_parcelas?: number | null;
 }): OrcamentoComItens {
   const itens = params.itens.map((item, index) => ({
     id: item.id ?? `i${index}`,
@@ -180,7 +188,7 @@ function buildOrcamento(params: {
     telefone: "(11) 99999-0000",
     responsavel: "Agatha",
     origem_cliente: null,
-    modalidade: "pontual",
+    modalidade: params.modalidade ?? "pontual",
     observacoes: params.observacoes ?? null,
     motivo_cancelamento: null,
     observacao_cancelamento: null,
@@ -188,7 +196,8 @@ function buildOrcamento(params: {
     cancelado_por: null,
     desconto_percentual: 0,
     forma_pagamento: "pix",
-    quantidade_parcelas: 3,
+    quantidade_parcelas:
+      params.quantidade_parcelas === undefined ? 3 : params.quantidade_parcelas,
     validade_proposta: null,
     subtotal: total,
     valor_total: total,
@@ -219,7 +228,9 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
     itens_inclusos:
       item.servico_nome === PACOTE_COMPLETO_SST_NOME
         ? [...PACOTE_COMPLETO_SST_ITENS]
-        : null,
+        : item.servico_nome === GESTAO_SST_MENSAL_NOME
+          ? [...GESTAO_COMPLETA_SST_ITENS]
+          : null,
   }));
 }
 
@@ -233,6 +244,16 @@ function renderPdf(orcamento: OrcamentoComItens) {
 
 function pdfLatin1(doc: InstanceType<typeof jsPDF>): string {
   return Buffer.from(doc.output("arraybuffer")).toString("latin1");
+}
+
+function pdfVisibleText(raw: string): string {
+  const chunks: string[] = [];
+  const re = /\(((?:\\.|[^\\)])*)\)\s*Tj/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(raw))) {
+    chunks.push(match[1].replace(/\\([()\\])/g, "$1"));
+  }
+  return chunks.join("\n");
 }
 
 const layoutDummy = {
@@ -385,4 +406,98 @@ assert.ok(buffer.length > 500, "PDF gerado deve ter conteúdo");
 assert.equal(buffer.subarray(0, 4).toString(), "%PDF", "deve ser PDF válido");
 
 fs.unlinkSync(outPath);
+
+const pontualPacote = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0300",
+    itens: [{ nome: PACOTE_COMPLETO_SST_NOME, quantidade: 10, valor: 2800 }],
+  })
+);
+const pontualRaw = pdfVisibleText(pdfLatin1(pontualPacote));
+assert.match(pontualRaw, /O que est[áa] incluso/i);
+assert.match(pontualRaw, /Este pacote inclui/i);
+assert.match(pontualRaw, /PGR/);
+assert.match(pontualRaw, /LTCAT/);
+assert.match(pontualRaw, /PCMSO/);
+assert.match(pontualRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
+assert.match(pontualRaw, /CAT -/);
+assert.match(pontualRaw, /Cortesia/);
+assert.match(pontualRaw, /Valor Total/i);
+assert.match(pontualRaw, /5%/);
+assert.doesNotMatch(pontualRaw, /Essa gest[aã]o inclui/i);
+assert.doesNotMatch(pontualRaw, /12 mensalidades/);
+
+const VALOR_MENSAL_PDF = 350;
+const mensalidadeOrc = buildOrcamento({
+  numero: "ORC-2026-0301",
+  modalidade: "mensalidade",
+  quantidade_parcelas: null,
+  itens: [
+    {
+      nome: GESTAO_SST_MENSAL_NOME,
+      quantidade: 23,
+      valor: VALOR_MENSAL_PDF,
+    },
+  ],
+});
+const mensalPdf = renderPdf(mensalidadeOrc);
+const mensalRaw = pdfVisibleText(pdfLatin1(mensalPdf));
+assert.match(mensalRaw, /Essa gest[aã]o inclui/i);
+assert.match(mensalRaw, /PGR/);
+assert.match(mensalRaw, /LTCAT/);
+assert.match(mensalRaw, /PCMSO/);
+assert.match(mensalRaw, /ASO/);
+assert.match(mensalRaw, /Riscos Psicossociais/i);
+assert.match(mensalRaw, /O que est[áa] incluso/i);
+assert.match(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
+assert.match(mensalRaw, /Gest[aã]o completa e envio ao eSocial/i);
+assert.match(mensalRaw, /Exames Cl[ií]nicos:/);
+assert.match(mensalRaw, /23/);
+assert.match(mensalRaw, /CAT -/);
+assert.match(mensalRaw, /Cortesia/);
+assert.match(mensalRaw, new RegExp(ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO));
+assert.match(mensalRaw, /12 meses/);
+assert.match(mensalRaw, /Autom[aá]tica ao final da vig[eê]ncia/i);
+assert.match(mensalRaw, /R\$ 350,00/);
+assert.match(mensalRaw, /\/ m[eê]s|\/ mês/);
+assert.equal(formatValorMensalidade(VALOR_MENSAL_PDF), "R$ 350,00 / mês");
+assert.doesNotMatch(mensalRaw, /Valor Total/i);
+assert.doesNotMatch(mensalRaw, /4\.200|4200/);
+assert.doesNotMatch(mensalRaw, /vista/i);
+assert.doesNotMatch(mensalRaw, /5%/);
+assert.doesNotMatch(mensalRaw, /Este pacote inclui/i);
+
+const mensalPaginado = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0302",
+    modalidade: "mensalidade",
+    quantidade_parcelas: null,
+    observacoes: Array.from({ length: 40 }, (_, i) =>
+      `Observação complementar ${i + 1} para forçar quebra de página no PDF mensal.`
+    ).join(" "),
+    itens: [
+      {
+        nome: GESTAO_SST_MENSAL_NOME,
+        quantidade: 23,
+        valor: VALOR_MENSAL_PDF,
+      },
+    ],
+  })
+);
+assert.ok(
+  mensalPaginado.getNumberOfPages() >= 2,
+  "observações longas na mensalidade devem gerar 2+ páginas"
+);
+const mensalPagBinary = pdfLatin1(mensalPaginado);
+const mensalPagRaw = pdfVisibleText(mensalPagBinary);
+const mensalPages = mensalPaginado.getNumberOfPages();
+assert.match(mensalPagRaw, /O que est[áa] incluso/i);
+assert.match(mensalPagBinary, new RegExp(`P[áa]gina 1 de ${mensalPages}`));
+assert.match(
+  mensalPagBinary,
+  new RegExp(`P[áa]gina ${mensalPages} de ${mensalPages}`)
+);
+assert.doesNotMatch(mensalPagRaw, /Valor Total/i);
+assert.doesNotMatch(mensalPagRaw, /4\.200|4200/);
+
 console.log("test-orcamento-pdf: OK");

@@ -15,6 +15,7 @@ import {
   buildResumoMensalidadeLinhas,
   formatValorMensalidade,
   isGestaoCompletaSstNome,
+  isGestaoMensalSstNome,
   isOrcamentoMensalidade,
   labelItensInclusosServico,
   labelValorColunaOrcamento,
@@ -817,6 +818,29 @@ function orcamentoHasPacoteCompleto(
     const nome = servico?.nome ?? item.servico_nome;
     return isPacoteCompletoSst(nome) || isPacoteCompletoNome(nome);
   });
+}
+
+function orcamentoHasGestaoMensal(
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
+): boolean {
+  return (orcamento.orcamento_itens ?? []).some((item) => {
+    const servico = resolveCatalogoServico(item, catalogo);
+    const nome = servico?.nome ?? item.servico_nome;
+    return isGestaoMensalSstNome(nome);
+  });
+}
+
+/** Mesmo card estruturado de “O que está incluso?” do Pacote completo - SST. */
+function orcamentoUsaCardInclusosEstruturado(
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[]
+): boolean {
+  if (orcamentoHasPacoteCompleto(orcamento, catalogo)) return true;
+  return (
+    isOrcamentoMensalidade(orcamento.modalidade) &&
+    orcamentoHasGestaoMensal(orcamento, catalogo)
+  );
 }
 
 function drawPremiumCardShell(
@@ -1651,20 +1675,23 @@ function drawFinancialAndInclusosRow(
   inclusos: string[],
   layout: OrcamentoPdfLayout
 ): number {
-  const hasPacote = orcamentoHasPacoteCompleto(orcamento, catalogo);
+  const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
+    orcamento,
+    catalogo
+  );
   const boxW = 88;
   const gap = 5;
   const checklistW = CONTENT_W - boxW - gap;
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  const pacoteInclusosItens = hasPacote
+  const pacoteInclusosItens = usaCardInclusosEstruturado
     ? buildPacoteCompletoInclusosItens(orcamento)
     : [];
 
   const desiredH = measureDesiredCardsRowHeight(
     doc,
     checklistW,
-    hasPacote,
+    usaCardInclusosEstruturado,
     pacoteInclusosItens,
     inclusos,
     isOrcamentoMensalidade(orcamento.modalidade)
@@ -1672,7 +1699,7 @@ function drawFinancialAndInclusosRow(
   const { cardH } = resolveCardsBlockPlacement(y, desiredH);
   y = ensureSpace(doc, y, cardH, layout);
 
-  if (hasPacote) {
+  if (usaCardInclusosEstruturado) {
     drawPacoteCompletoInclusosBlock(
       doc,
       MARGIN,
