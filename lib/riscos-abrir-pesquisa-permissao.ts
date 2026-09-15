@@ -2,7 +2,8 @@ import { isPerfilAdmin, type PerfilUsuarioTipo } from "@/lib/permissions";
 
 /**
  * E-mails persistidos em `perfis_usuarios.email` (único) das usuárias
- * operacionais autorizadas a abrir pesquisa. Não usar o nome exibido.
+ * operacionais autorizadas a abrir pesquisa e a gerenciar participantes.
+ * Não usar o nome exibido. Fonte única — não duplicar esta lista.
  */
 export const RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS = [
   "bruna@navarro.com.br",
@@ -12,6 +13,9 @@ export const RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS = [
 
 export const RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG =
   "Você não possui permissão para abrir esta pesquisa.";
+
+export const RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG =
+  "Você não possui permissão para gerenciar participantes desta pesquisa.";
 
 export function normalizeEmailPermissao(
   email: string | null | undefined
@@ -31,18 +35,36 @@ export function isEmailAutorizadoAbrirPesquisaRiscos(
   );
 }
 
-/**
- * Abrir pesquisa: administradores (perfil) ou e-mails da allowlist operacional.
- * Não libera outras ações administrativas.
- */
-export function podeAbrirPesquisaRiscos(input: {
+type RiscosOperacionalAuthInput = {
   perfil?: PerfilUsuarioTipo | null;
   email?: string | null;
   emailAuth?: string | null;
-}): boolean {
+};
+
+function isAutorizadoOperacionalRiscos(input: RiscosOperacionalAuthInput): boolean {
   if (isPerfilAdmin(input.perfil)) return true;
   return (
     isEmailAutorizadoAbrirPesquisaRiscos(input.email) ||
     isEmailAutorizadoAbrirPesquisaRiscos(input.emailAuth)
   );
+}
+
+/**
+ * Abrir pesquisa: administradores (perfil) ou e-mails da allowlist operacional.
+ * Não libera outras ações administrativas (relatório, exclusão, encerrar, etc.).
+ */
+export function podeAbrirPesquisaRiscos(
+  input: RiscosOperacionalAuthInput
+): boolean {
+  return isAutorizadoOperacionalRiscos(input);
+}
+
+/**
+ * Editar/remover participante: o mesmo grupo de abrir/prorrogar/reabrir/período.
+ * Não promove a admin e não altera PROFILE_PERMISSIONS.
+ */
+export function podeGerenciarParticipanteRiscos(
+  input: RiscosOperacionalAuthInput
+): boolean {
+  return isAutorizadoOperacionalRiscos(input);
 }

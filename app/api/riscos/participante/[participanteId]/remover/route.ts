@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
-import { isPerfilAdmin } from "@/lib/permissions";
+import {
+  podeGerenciarParticipanteRiscos,
+  RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG,
+} from "@/lib/riscos-abrir-pesquisa-permissao";
 import { createClient } from "@/lib/supabase/server";
 import { removerParticipanteCampanhaSoft } from "@/services/riscos-remocao-participante.service";
 
 export const runtime = "nodejs";
 
 /**
- * Soft-delete administrativo do participante (com invalidação de sessão se houver).
- * Não retorna respostas individuais. Somente admin.
+ * Soft-delete do participante (com invalidação de sessão se houver).
+ * Não retorna respostas individuais. Admin ou allowlist operacional.
  */
 export async function POST(
   request: Request,
@@ -31,9 +34,17 @@ export async function POST(
       .maybeSingle();
 
     if (perfilErr) throw perfilErr;
-    if (!perfil || perfil.ativo === false || !isPerfilAdmin(perfil.perfil)) {
+    const autorizado =
+      !!perfil &&
+      perfil.ativo !== false &&
+      podeGerenciarParticipanteRiscos({
+        perfil: perfil.perfil,
+        email: typeof perfil.email === "string" ? perfil.email : null,
+        emailAuth: user.email,
+      });
+    if (!autorizado) {
       return NextResponse.json(
-        { error: "Somente administradores podem remover participantes." },
+        { error: RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG },
         { status: 403 }
       );
     }

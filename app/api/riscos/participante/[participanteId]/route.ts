@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auditoriaActorFromSessionPerfil } from "@/lib/auditoria";
-import { isPerfilAdmin } from "@/lib/permissions";
+import {
+  podeGerenciarParticipanteRiscos,
+  RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG,
+} from "@/lib/riscos-abrir-pesquisa-permissao";
 import { CpfCampanhaAtivaError } from "@/lib/riscos-cpf-campanha-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { atualizarParticipanteCampanhaNoServidor } from "@/services/riscos-campanha-participantes.server";
@@ -10,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Atualiza dados cadastrais do participante.
- * Somente admin; somente status Pendente.
+ * Admin ou allowlist operacional (Bruna, Rafaela, Karoline); somente status Pendente.
  */
 export async function PATCH(
   request: Request,
@@ -31,12 +34,17 @@ export async function PATCH(
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!perfil || perfil.ativo === false) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-    }
-    if (!isPerfilAdmin(perfil.perfil)) {
+    const autorizado =
+      !!perfil &&
+      perfil.ativo !== false &&
+      podeGerenciarParticipanteRiscos({
+        perfil: perfil.perfil,
+        email: typeof perfil.email === "string" ? perfil.email : null,
+        emailAuth: user.email,
+      });
+    if (!autorizado) {
       return NextResponse.json(
-        { error: "Somente administradores podem editar participantes." },
+        { error: RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG },
         { status: 403 }
       );
     }

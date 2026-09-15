@@ -97,7 +97,7 @@ interface RiscosPainelCardsProps {
     erros: Array<{ linha?: number; cpf: string; motivo: string }>;
   }>;
   onRemoverParticipante: (participanteId: string) => Promise<void>;
-  /** Admin — editar (pendente) e remover participante. */
+  /** Admin ou allowlist operacional — editar (pendente) e remover participante. */
   podeGerenciarParticipante?: boolean;
   isAdmin?: boolean;
   /** Só exibe ações de Convites após status confirmado no banco. */

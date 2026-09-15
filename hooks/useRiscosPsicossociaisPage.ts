@@ -7,7 +7,9 @@ import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { isPerfilAdmin } from "@/lib/permissions";
 import {
   podeAbrirPesquisaRiscos,
+  podeGerenciarParticipanteRiscos,
   RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
+  RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG,
 } from "@/lib/riscos-abrir-pesquisa-permissao";
 import type { RiscosRelatorioRecord } from "@/lib/riscos-relatorio";
 import {
@@ -97,6 +99,10 @@ export function useRiscosPsicossociaisPage() {
   const { profile } = useAuth();
   const isAdmin = isPerfilAdmin(profile?.perfil);
   const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
+    perfil: profile?.perfil,
+    email: profile?.email,
+  });
+  const podeGerenciarParticipante = podeGerenciarParticipanteRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
   });
@@ -1355,9 +1361,9 @@ export function useRiscosPsicossociaisPage() {
       if (!campanhaId) {
         throw new Error("Pesquisa não encontrada.");
       }
-      if (!isAdmin) {
-        toast.error("Somente administradores podem editar participantes.");
-        throw new Error("Somente administradores podem editar participantes.");
+      if (!podeGerenciarParticipante) {
+        toast.error(RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG);
+        throw new Error(RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG);
       }
       setSavingParticipante(true);
       try {
@@ -1376,7 +1382,7 @@ export function useRiscosPsicossociaisPage() {
         setSavingParticipante(false);
       }
     },
-    [modalProcesso, auditContext, carregarParticipantes, isAdmin]
+    [modalProcesso, auditContext, carregarParticipantes, podeGerenciarParticipante]
   );
 
   const handleConfirmarImportacaoParticipantesExcel = useCallback(
@@ -1417,8 +1423,8 @@ export function useRiscosPsicossociaisPage() {
     async (participanteId: string) => {
       const campanhaId = modalProcesso?.campanha?.id;
       if (!campanhaId) return;
-      if (!isAdmin) {
-        toast.error("Somente administradores podem remover participantes.");
+      if (!podeGerenciarParticipante) {
+        toast.error(RISCOS_GERENCIAR_PARTICIPANTE_SEM_PERMISSAO_MSG);
         return;
       }
       setSavingParticipante(true);
@@ -1451,7 +1457,7 @@ export function useRiscosPsicossociaisPage() {
         setSavingParticipante(false);
       }
     },
-    [modalProcesso, auditContext, carregarParticipantes, isAdmin]
+    [modalProcesso, auditContext, carregarParticipantes, podeGerenciarParticipante]
   );
 
   const handleRelatorioAtualizado = useCallback(
@@ -1538,6 +1544,7 @@ export function useRiscosPsicossociaisPage() {
     exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
     isAdmin,
     podeAutorizarAbrirPesquisa,
+    podeGerenciarParticipante,
     processoParaRemover,
     openRemoverProcesso,
     closeRemoverProcesso,

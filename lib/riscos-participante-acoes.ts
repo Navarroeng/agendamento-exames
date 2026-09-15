@@ -1,6 +1,7 @@
 /**
  * Regras do menu ⋮ de ações do participante (Riscos Psicossociais).
- * Somente Admin enxerga o menu; esta camada define o que aparece por status.
+ * Quem vê o menu é definido por `podeGerenciarParticipanteRiscos`.
+ * Esta camada define o que aparece por status.
  */
 
 export type RiscosParticipanteAcoesMenu = {

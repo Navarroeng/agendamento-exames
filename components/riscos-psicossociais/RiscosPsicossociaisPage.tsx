@@ -61,6 +61,7 @@ export function RiscosPsicossociaisPage() {
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel,
     isAdmin,
+    podeGerenciarParticipante,
     processoParaRemover,
     openRemoverProcesso,
     closeRemoverProcesso,
@@ -189,7 +190,7 @@ export function RiscosPsicossociaisPage() {
           handleConfirmarImportacaoParticipantesExcel
         }
         onRemoverParticipante={handleRemoverParticipante}
-        podeGerenciarParticipante={isAdmin}
+        podeGerenciarParticipante={podeGerenciarParticipante}
         isAdmin={isAdmin}
         campanhaStatusSincronizado={campanhaStatusSincronizado}
         auditContext={auditContext}

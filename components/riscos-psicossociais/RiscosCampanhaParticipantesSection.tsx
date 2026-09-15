@@ -27,7 +27,7 @@ interface RiscosCampanhaParticipantesSectionProps {
   campanha: RiscosCampanhaRecord;
   participantes: RiscosCampanhaParticipanteRecord[];
   saving?: boolean;
-  /** Somente admin vê/usa Editar e Remover participante. */
+  /** Admin ou allowlist operacional — editar (pendente) e remover participante. */
   podeGerenciarParticipante?: boolean;
   somenteConsulta?: boolean;
   avisoCadastro?: string | null;

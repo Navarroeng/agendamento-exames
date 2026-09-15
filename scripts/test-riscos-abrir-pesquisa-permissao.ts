@@ -165,6 +165,7 @@ const hook = readFileSync(
   "utf8"
 );
 assert.match(hook, /podeAbrirPesquisaRiscos/);
+assert.match(hook, /podeGerenciarParticipanteRiscos/);
 assert.match(hook, /handleRemoverProcesso/);
 assert.match(hook, /if \(!isAdmin\)/);
 
