@@ -22,7 +22,14 @@ export async function buscarPerfilUsuarioLogado(): Promise<PerfilUsuario | null>
 
   if (!data.ativo) return null;
 
-  return data as PerfilUsuario;
+  const emailPerfil =
+    typeof data.email === "string" ? data.email.trim() : "";
+  const emailAuth = typeof user.email === "string" ? user.email.trim() : "";
+
+  return {
+    ...(data as PerfilUsuario),
+    email: emailPerfil || emailAuth || (data as PerfilUsuario).email,
+  };
 }
 
 export async function listarPerfisUsuarios(): Promise<PerfilUsuario[]> {

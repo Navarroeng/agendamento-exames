@@ -13,6 +13,7 @@ import {
 import {
   acoesMenuParticipantePorStatus,
   podeEditarDadosParticipante,
+  resolveColunaAcoesParticipante,
 } from "../lib/riscos-participante-acoes";
 import { validateRiscosParticipanteInput } from "../lib/riscos-campanha-participantes";
 import { precisaConfirmacaoForteRemocao } from "../lib/riscos-remocao-participante";
@@ -79,6 +80,21 @@ assertPodeGerenciar(
   { perfil: "operacional" },
   false
 );
+assertPodeGerenciar(
+  "domínio corporativo equivalente — Bruna @navarroeng.com.br",
+  { perfil: "operacional", email: "bruna@navarroeng.com.br" },
+  true
+);
+assertPodeGerenciar(
+  "domínio corporativo equivalente — Rafaela @navarroeng.com.br",
+  { perfil: "operacional", email: "RAFAELA@NAVARROENG.COM.BR" },
+  true
+);
+assertPodeGerenciar(
+  "domínio equivalente não libera outro operacional",
+  { perfil: "operacional", email: "outro@navarroeng.com.br" },
+  false
+);
 
 assert.deepEqual(
   [...RISCOS_ABRIR_PESQUISA_EMAILS_PERMITIDOS],
@@ -118,6 +134,14 @@ const excluir = readFileSync(
   join(root, "app/api/riscos/campanha/[campanhaId]/excluir/route.ts"),
   "utf8"
 );
+const painelCards = readFileSync(
+  join(root, "components/riscos-psicossociais/RiscosPainelCards.tsx"),
+  "utf8"
+);
+const perfilService = readFileSync(
+  join(root, "services/perfil.service.ts"),
+  "utf8"
+);
 const permissions = readFileSync(join(root, "lib/permissions.ts"), "utf8");
 
 assert.match(editApi, /podeGerenciarParticipanteRiscos/);
@@ -144,8 +168,12 @@ assert.doesNotMatch(hook, /Somente administradores podem editar participantes/);
 assert.doesNotMatch(hook, /Somente administradores podem remover participantes/);
 assert.match(page, /podeGerenciarParticipante=\{podeGerenciarParticipante\}/);
 assert.doesNotMatch(page, /podeGerenciarParticipante=\{isAdmin\}/);
-assert.match(section, /podeGerenciarParticipante &&/);
+assert.match(section, /resolveColunaAcoesParticipante/);
+assert.match(section, /coluna\.mostraMenu/);
 assert.match(section, /window\.confirm/);
+assert.match(painelCards, /podeGerenciarParticipanteRiscos/);
+assert.match(painelCards, /podeGerenciarParticipanteAuth/);
+assert.match(perfilService, /user\.email/);
 
 assert.match(encerrar, /isPerfilAdmin\(perfil\.perfil\)/);
 assert.doesNotMatch(encerrar, /podeGerenciarParticipanteRiscos/);
@@ -193,6 +221,60 @@ const actor = auditoriaActorFromSessionPerfil({
 assert.equal(actor.usuarioId, "sessao-real");
 assert.equal(actor.usuarioNome, "Rafaela");
 assert.equal(actor.usuarioEmail, RAFAELA);
+function colunaAcoes(
+  usuario: Parameters<typeof podeGerenciarParticipanteRiscos>[0],
+  status: string,
+  processoCancelado = false
+) {
+  return resolveColunaAcoesParticipante({
+    usuarioAutorizado: podeGerenciarParticipanteRiscos(usuario),
+    processoCancelado,
+    status,
+  });
+}
+
+function assertMenuCompleto(
+  label: string,
+  usuario: Parameters<typeof podeGerenciarParticipanteRiscos>[0]
+) {
+  const pendente = colunaAcoes(usuario, "pendente");
+  assert.equal(pendente.mostraMenu, true, `${label} pendente mostra ⋮`);
+  assert.equal(pendente.exibirEditar, true, `${label} pendente Editar`);
+  assert.equal(pendente.exibirRemover, true, `${label} pendente Remover`);
+  const concluido = colunaAcoes(usuario, "respondido");
+  assert.equal(concluido.mostraMenu, true, `${label} concluído mostra ⋮`);
+  assert.equal(concluido.exibirEditar, false, `${label} concluído sem Editar`);
+  assert.equal(concluido.exibirRemover, true, `${label} concluído Remover`);
+}
+
+assertMenuCompleto("UI Admin", { perfil: "admin" });
+assertMenuCompleto("UI Bruna", { perfil: "operacional", email: BRUNA });
+assertMenuCompleto("UI Rafaela", { perfil: "operacional", email: RAFAELA });
+assertMenuCompleto("UI Rafaela navarroeng", {
+  perfil: "operacional",
+  email: "rafaela@navarroeng.com.br",
+});
+assertMenuCompleto("UI Karoline", { perfil: "operacional", email: KAROLINE });
+assertMenuCompleto("UI Bruna navarroeng", {
+  perfil: "operacional",
+  email: "bruna@navarroeng.com.br",
+});
+
+const operacionalFora = colunaAcoes(
+  { perfil: "operacional", email: "outro@navarro.com.br" },
+  "pendente"
+);
+assert.equal(operacionalFora.mostraMenu, false, "UI outro operacional → —");
+assert.equal(operacionalFora.exibirEditar, false);
+assert.equal(operacionalFora.exibirRemover, false);
+
+assert.equal(
+  colunaAcoes({ perfil: "operacional", email: RAFAELA }, "pendente", true)
+    .mostraMenu,
+  false,
+  "processo cancelado → — mesmo autorizada"
+);
+
 assert.notEqual(actor.usuarioNome, "Hacker");
 
 console.log("test-riscos-participante-gerenciar-permissao: ok");

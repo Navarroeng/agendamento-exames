@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   podeAbrirPesquisaRiscos,
+  podeGerenciarParticipanteRiscos,
   RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG,
 } from "@/lib/riscos-abrir-pesquisa-permissao";
 import { Field, RequiredMark } from "@/components/ui/Field";
@@ -193,6 +194,10 @@ export function RiscosPainelCards({
 }: RiscosPainelCardsProps) {
   const { profile } = useAuth();
   const podeAutorizarAbrirPesquisa = podeAbrirPesquisaRiscos({
+    perfil: profile?.perfil,
+    email: profile?.email,
+  });
+  const podeGerenciarParticipanteAuth = podeGerenciarParticipanteRiscos({
     perfil: profile?.perfil,
     email: profile?.email,
   });
@@ -692,7 +697,10 @@ export function RiscosPainelCards({
             onPrepararImportacaoExcel={onPrepararImportacaoParticipantesExcel}
             onConfirmarImportacaoExcel={onConfirmarImportacaoParticipantesExcel}
             onRemover={onRemoverParticipante}
-            podeGerenciarParticipante={podeGerenciarParticipante}
+            podeGerenciarParticipante={
+              (podeGerenciarParticipante || podeGerenciarParticipanteAuth) &&
+              !processoCancelado
+            }
             somenteConsulta={processoCancelado}
             avisoCadastro={avisoParticipante}
           />

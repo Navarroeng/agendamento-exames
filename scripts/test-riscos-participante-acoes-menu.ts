@@ -44,7 +44,8 @@ assert.match(menuSrc, /removeEventListener\("keydown", onKey, true\)/);
 assert.match(menuSrc, /e\.key !== "Escape"/);
 assert.match(menuSrc, /stopPropagation\(\)/);
 assert.match(menuSrc, /setMenuOpenId\(\(id\) => \(id === p\.id \? null : p\.id\)\)/);
-assert.match(menuSrc, /podeGerenciarParticipante &&/);
+assert.match(menuSrc, /resolveColunaAcoesParticipante/);
+assert.match(menuSrc, /coluna\.mostraMenu/);
 assert.match(menuSrc, /window\.confirm/);
 
 console.log("test-riscos-participante-acoes-menu: OK");

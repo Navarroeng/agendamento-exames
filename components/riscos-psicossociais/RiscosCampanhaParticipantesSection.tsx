@@ -11,7 +11,7 @@ import {
   type RiscosParticipanteInput,
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
-import { acoesMenuParticipantePorStatus } from "@/lib/riscos-participante-acoes";
+import { resolveColunaAcoesParticipante } from "@/lib/riscos-participante-acoes";
 import { precisaConfirmacaoForteRemocao } from "@/lib/riscos-remocao-participante";
 import {
   campanhaPermiteImportacaoParticipantes,
@@ -115,9 +115,11 @@ export function RiscosCampanhaParticipantesSection({
   }
 
   function handleAbrirEditar(p: RiscosCampanhaParticipanteRecord) {
-    if (!podeGerenciarParticipante) return;
-    const acoes = acoesMenuParticipantePorStatus(p.status);
-    if (!acoes.exibirEditar) {
+    const coluna = resolveColunaAcoesParticipante({
+      usuarioAutorizado: podeGerenciarParticipante,
+      status: p.status,
+    });
+    if (!coluna.exibirEditar) {
       toast.error(
         "Só é possível editar participantes com status Pendente."
       );
@@ -292,10 +294,10 @@ export function RiscosCampanhaParticipantesSection({
             </thead>
             <tbody>
               {participantes.map((p) => {
-                const acoes = acoesMenuParticipantePorStatus(p.status);
-                const mostraMenu =
-                  podeGerenciarParticipante &&
-                  (acoes.exibirEditar || acoes.exibirRemover);
+                const coluna = resolveColunaAcoesParticipante({
+                  usuarioAutorizado: podeGerenciarParticipante,
+                  status: p.status,
+                });
                 return (
                   <tr
                     key={p.id}
@@ -323,12 +325,12 @@ export function RiscosCampanhaParticipantesSection({
                         : "-"}
                     </td>
                     <td className="relative px-3 py-2.5 text-center">
-                      {mostraMenu ? (
+                      {coluna.mostraMenu ? (
                         <ParticipanteActionsMenu
                           open={menuOpenId === p.id}
                           disabled={saving}
-                          exibirEditar={acoes.exibirEditar}
-                          exibirRemover={acoes.exibirRemover}
+                          exibirEditar={coluna.exibirEditar}
+                          exibirRemover={coluna.exibirRemover}
                           onToggle={() =>
                             setMenuOpenId((id) => (id === p.id ? null : p.id))
                           }

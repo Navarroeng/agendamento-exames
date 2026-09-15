@@ -33,3 +33,27 @@ export function podeEditarDadosParticipante(
 ): boolean {
   return String(status ?? "") === "pendente";
 }
+
+export type ColunaAcoesParticipante = RiscosParticipanteAcoesMenu & {
+  mostraMenu: boolean;
+};
+
+/**
+ * Condição real da coluna Ações na tabela Participantes.
+ * Usuário autorizado + processo não cancelado + status com alguma ação.
+ * Caso contrário a célula renderiza "—".
+ */
+export function resolveColunaAcoesParticipante(input: {
+  usuarioAutorizado: boolean;
+  processoCancelado?: boolean;
+  status: string | null | undefined;
+}): ColunaAcoesParticipante {
+  if (!input.usuarioAutorizado || input.processoCancelado) {
+    return { mostraMenu: false, exibirEditar: false, exibirRemover: false };
+  }
+  const acoes = acoesMenuParticipantePorStatus(input.status);
+  return {
+    ...acoes,
+    mostraMenu: acoes.exibirEditar || acoes.exibirRemover,
+  };
+}
