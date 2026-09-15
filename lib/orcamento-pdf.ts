@@ -78,7 +78,9 @@ const MARGIN = 12;
 const PAGE_W = 210;
 const PAGE_H = 297;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(PAGE_H);
+/** Limite inferior da área útil (acima do rodapé + margem de segurança). */
+const CONTENT_BOTTOM_Y = calcPdfContentBottomY(PAGE_H);
+export const ORCAMENTO_PDF_CONTENT_BOTTOM_Y = CONTENT_BOTTOM_Y;
 
 /** Opacidade da marca d'água sobreposta (4–8%). */
 export const ORCAMENTO_WATERMARK_OPACITY = 0.06;
@@ -444,12 +446,29 @@ function displayValue(value: string | null | undefined, fallback = "—"): strin
   return trimmed ? trimmed : fallback;
 }
 
-function ensureSpace(doc: JsPDF, y: number, needed: number): number {
-  if (y + needed > FIRST_PAGE_CONTENT_BOTTOM) {
-    doc.addPage();
-    return MARGIN + 4;
-  }
-  return y;
+export type OrcamentoPdfLayout = {
+  logo: LogoAsset | null;
+  orcamento: OrcamentoComItens;
+};
+
+export function blockFitsOnPage(y: number, needed: number): boolean {
+  return y + needed <= CONTENT_BOTTOM_Y;
+}
+
+function addOrcamentoPage(doc: JsPDF, layout: OrcamentoPdfLayout): number {
+  doc.addPage();
+  return drawHeader(doc, layout.logo, layout.orcamento);
+}
+
+/** Garante altura contínua na área útil; se não couber, nova página com cabeçalho. */
+export function ensureSpace(
+  doc: JsPDF,
+  y: number,
+  needed: number,
+  layout: OrcamentoPdfLayout
+): number {
+  if (blockFitsOnPage(y, needed)) return y;
+  return addOrcamentoPage(doc, layout);
 }
 
 function drawCard(
@@ -739,13 +758,15 @@ function drawFinancialPremiumRow(
   return y + rowHeight;
 }
 
-export function resolveFirstPageCardsRow(
+/** Cards finais nunca encolhem: ou cabem inteiros, ou vão juntos para a próxima página. */
+export function resolveCardsBlockPlacement(
   y: number,
   desiredH: number
-): { cardY: number; cardH: number } {
-  const available = FIRST_PAGE_CONTENT_BOTTOM - y;
-  const cardH = Math.min(desiredH, Math.max(available, 0));
-  return { cardY: y, cardH };
+): { needsNewPage: boolean; cardH: number } {
+  return {
+    needsNewPage: !blockFitsOnPage(y, desiredH),
+    cardH: desiredH,
+  };
 }
 
 function resolveCatalogoServico(
@@ -1379,11 +1400,17 @@ function measureDescricaoPropostaHeight(
 function drawDescricaoProposta(
   doc: JsPDF,
   y: number,
-  paragrafos: readonly string[]
+  paragrafos: readonly string[],
+  layout: OrcamentoPdfLayout
 ): number {
   if (paragrafos.length === 0) return y;
 
-  y = ensureSpace(doc, y, measureDescricaoPropostaHeight(doc, paragrafos) + 10);
+  y = ensureSpace(
+    doc,
+    y,
+    measureDescricaoPropostaHeight(doc, paragrafos) + 10,
+    layout
+  );
   y = drawSectionTitle(doc, y, "Descrição da proposta");
 
   const blockH = measureDescricaoPropostaHeight(doc, paragrafos);
@@ -1461,7 +1488,8 @@ function drawServicesTable(
   doc: JsPDF,
   y: number,
   orcamento: OrcamentoComItens,
-  catalogo: ServicoSstRecord[]
+  catalogo: ServicoSstRecord[],
+  layout: OrcamentoPdfLayout
 ): number {
   const itens = [...(orcamento.orcamento_itens ?? [])].sort(
     (a, b) => a.ordem - b.ordem
@@ -1510,6 +1538,16 @@ function drawServicesTable(
     return startY + tableHeadH;
   };
 
+  const firstRowH =
+    itens.length > 0
+      ? estimateServiceRowHeight(
+          doc,
+          itens[0],
+          resolveCatalogoServico(itens[0], catalogo),
+          colWidths[0]
+        )
+      : 0;
+  y = ensureSpace(doc, y, tableHeadH + firstRowH + 2, layout);
   y = drawTableHead(y);
 
   itens.forEach((item, index) => {
@@ -1525,8 +1563,9 @@ function drawServicesTable(
       colWidths[0]
     );
 
-    y = ensureSpace(doc, y, rowH + 2);
-    if (y <= MARGIN + 10) {
+    const pagesBefore = doc.getNumberOfPages();
+    y = ensureSpace(doc, y, rowH + 2, layout);
+    if (doc.getNumberOfPages() !== pagesBefore) {
       y = drawTableHead(y);
     }
 
@@ -1609,7 +1648,8 @@ function drawFinancialAndInclusosRow(
   y: number,
   orcamento: OrcamentoComItens,
   catalogo: ServicoSstRecord[],
-  inclusos: string[]
+  inclusos: string[],
+  layout: OrcamentoPdfLayout
 ): number {
   const hasPacote = orcamentoHasPacoteCompleto(orcamento, catalogo);
   const boxW = 88;
@@ -1629,28 +1669,34 @@ function drawFinancialAndInclusosRow(
     inclusos,
     isOrcamentoMensalidade(orcamento.modalidade)
   );
-  const { cardY, cardH } = resolveFirstPageCardsRow(y, desiredH);
+  const { cardH } = resolveCardsBlockPlacement(y, desiredH);
+  y = ensureSpace(doc, y, cardH, layout);
 
   if (hasPacote) {
     drawPacoteCompletoInclusosBlock(
       doc,
       MARGIN,
-      cardY,
+      y,
       checklistW,
       cardH,
       pacoteInclusosItens
     );
   } else if (inclusos.length > 0) {
-    drawGenericInclusosCard(doc, MARGIN, cardY, checklistW, cardH, inclusos);
+    drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);
   }
 
-  drawResumoFinanceiroCard(doc, boxX, cardY, boxW, cardH, orcamento);
+  drawResumoFinanceiroCard(doc, boxX, y, boxW, cardH, orcamento);
 
-  return cardY + cardH + SECTION_AFTER_CARD_GAP;
+  return y + cardH + SECTION_AFTER_CARD_GAP;
 }
 
 /* ── Observações ───────────────────────────────────────────────── */
-function drawObservacoesCard(doc: JsPDF, y: number, texto: string): number {
+function drawObservacoesCard(
+  doc: JsPDF,
+  y: number,
+  texto: string,
+  layout: OrcamentoPdfLayout
+): number {
   const trimmed = texto.trim();
   if (!trimmed) return y;
 
@@ -1658,7 +1704,7 @@ function drawObservacoesCard(doc: JsPDF, y: number, texto: string): number {
   const lines = doc.splitTextToSize(trimmed, CONTENT_W - 12);
   const blockH = lines.length * 3.8 + 10;
 
-  y = ensureSpace(doc, y, blockH + 6);
+  y = ensureSpace(doc, y, blockH + 6, layout);
   y = drawSectionTitle(doc, y, "Observações");
 
   drawCard(doc, MARGIN, y, CONTENT_W, blockH, {
@@ -1698,6 +1744,70 @@ function buildFilename(orcamento: OrcamentoComItens): string {
 }
 
 /* ── Export ──────────────────────────────────────────────────────── */
+export function drawOrcamentoPdfDocument(
+  doc: JsPDF,
+  orcamento: OrcamentoComItens,
+  options: {
+    catalogo: ServicoSstRecord[];
+    clienteInfo?: ClientePdfInfo;
+    logo?: LogoAsset | null;
+    symbolWatermark?: LogoAsset | null;
+    GState?: new (opts: { opacity: number }) => object;
+  }
+): void {
+  const layout: OrcamentoPdfLayout = {
+    logo: options.logo ?? null,
+    orcamento,
+  };
+  const clienteInfo = options.clienteInfo ?? {
+    cnpj: displayValue(orcamento.cliente_cnpj),
+    endereco: displayValue(orcamento.cliente_endereco),
+    setor: displayValue(orcamento.cliente_setor),
+  };
+  const inclusos = collectAllInclusos(orcamento, options.catalogo);
+  const startPage = doc.getNumberOfPages();
+
+  let y = drawHeader(doc, layout.logo, orcamento);
+  y = drawClientCard(doc, y, orcamento, clienteInfo);
+
+  const watermarkYTop = y;
+  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS, layout);
+  y = drawServicesTable(doc, y, orcamento, options.catalogo, layout);
+  const afterTablePage = doc.getNumberOfPages();
+  const afterTableY = y;
+
+  y = drawFinancialAndInclusosRow(
+    doc,
+    y,
+    orcamento,
+    options.catalogo,
+    inclusos,
+    layout
+  );
+  drawObservacoesCard(doc, y, orcamento.observacoes ?? "", layout);
+
+  if (options.symbolWatermark && options.GState) {
+    doc.setPage(startPage);
+    const watermarkBottom =
+      afterTablePage === startPage
+        ? Math.min(afterTableY, CONTENT_BOTTOM_Y)
+        : CONTENT_BOTTOM_Y;
+    drawNavarroWatermarkOverlay(
+      doc,
+      options.symbolWatermark,
+      watermarkYTop,
+      watermarkBottom,
+      options.GState
+    );
+  }
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page += 1) {
+    doc.setPage(page);
+    drawFooter(doc, page, totalPages);
+  }
+}
+
 export async function gerarPdfOrcamento(
   orcamento: OrcamentoComItens
 ): Promise<void> {
@@ -1711,35 +1821,13 @@ export async function gerarPdfOrcamento(
     resolveClientePdfInfo(orcamento),
   ]);
 
-  const inclusos = collectAllInclusos(orcamento, catalogo);
-
-  let y = drawHeader(doc, logo, orcamento);
-  y = drawClientCard(doc, y, orcamento, clienteInfo);
-
-  const watermarkYTop = y;
-  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS);
-  y = drawServicesTable(doc, y, orcamento, catalogo);
-  y = drawFinancialAndInclusosRow(doc, y, orcamento, catalogo, inclusos);
-  const watermarkYBottom = y;
-
-  if (symbolWatermark) {
-    doc.setPage(1);
-    drawNavarroWatermarkOverlay(
-      doc,
-      symbolWatermark,
-      watermarkYTop,
-      watermarkYBottom,
-      GState
-    );
-  }
-
-  y = drawObservacoesCard(doc, y, orcamento.observacoes ?? "");
-
-  const totalPages = doc.getNumberOfPages();
-  for (let page = 1; page <= totalPages; page += 1) {
-    doc.setPage(page);
-    drawFooter(doc, page, totalPages);
-  }
+  drawOrcamentoPdfDocument(doc, orcamento, {
+    catalogo,
+    clienteInfo,
+    logo,
+    symbolWatermark,
+    GState,
+  });
 
   doc.save(buildFilename(orcamento));
 }

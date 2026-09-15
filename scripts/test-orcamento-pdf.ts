@@ -10,14 +10,18 @@ import {
   resolveQuantidadeColaboradoresOrcamento,
 } from "../lib/orcamento-calculo";
 import {
+  ORCAMENTO_PDF_CONTENT_BOTTOM_Y,
   ORCAMENTO_WATERMARK_OPACITY,
   ORCAMENTO_WATERMARK_WIDTH_RATIO,
+  blockFitsOnPage,
   calcOrcamentoWatermarkLayout,
-  resolveFirstPageCardsRow,
+  drawOrcamentoPdfDocument,
+  ensureSpace,
+  resolveCardsBlockPlacement,
 } from "../lib/orcamento-pdf";
 import { calcPdfContentBottomY } from "../lib/pdf-navarro-footer";
 import { formatCurrency } from "../lib/money";
-import type { OrcamentoComItens } from "../lib/orcamento-types";
+import type { OrcamentoComItens, ServicoSstRecord } from "../lib/orcamento-types";
 import {
   PACOTE_COMPLETO_SST_ITENS,
   PACOTE_COMPLETO_SST_NOME,
@@ -133,10 +137,187 @@ assert.ok(watermark.h <= (265 - 95) * 0.92 + 0.1);
 assert.ok(watermark.y >= 95);
 
 const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(297);
-const cardsRow = resolveFirstPageCardsRow(248, 58);
-assert.equal(cardsRow.cardY, 248);
-assert.equal(cardsRow.cardH, 26);
-assert.ok(cardsRow.cardY + cardsRow.cardH <= FIRST_PAGE_CONTENT_BOTTOM);
+assert.equal(ORCAMENTO_PDF_CONTENT_BOTTOM_Y, FIRST_PAGE_CONTENT_BOTTOM);
+
+const cardsFit = resolveCardsBlockPlacement(180, 58);
+assert.equal(cardsFit.cardH, 58);
+assert.equal(cardsFit.needsNewPage, false);
+assert.equal(blockFitsOnPage(180, 58), true);
+
+const cardsOverflow = resolveCardsBlockPlacement(248, 58);
+assert.equal(cardsOverflow.cardH, 58);
+assert.equal(cardsOverflow.needsNewPage, true);
+assert.equal(blockFitsOnPage(248, 58), false);
+assert.ok(248 + 58 > FIRST_PAGE_CONTENT_BOTTOM);
+
+function buildOrcamento(params: {
+  numero: string;
+  itens: Array<{ nome: string; quantidade: number; valor: number; id?: string }>;
+  observacoes?: string | null;
+}): OrcamentoComItens {
+  const itens = params.itens.map((item, index) => ({
+    id: item.id ?? `i${index}`,
+    orcamento_id: "o1",
+    servico_id: `s-${index}`,
+    servico_nome: item.nome,
+    quantidade: item.quantidade,
+    valor_unitario: item.valor,
+    valor_total: item.valor,
+    ordem: index,
+  }));
+  const total = itens.reduce((sum, item) => sum + item.valor_total, 0);
+  return {
+    id: "o1",
+    numero: params.numero,
+    data_proposta: "2026-09-15",
+    cliente_id: "c1",
+    cliente_nome: "Empresa Teste Ltda",
+    cliente_cnpj: "12.345.678/0001-90",
+    cliente_endereco: "Rua A, 100",
+    cliente_setor: "Comercio",
+    contato: "Maria",
+    email: "maria@teste.com",
+    telefone: "(11) 99999-0000",
+    responsavel: "Agatha",
+    origem_cliente: null,
+    modalidade: "pontual",
+    observacoes: params.observacoes ?? null,
+    motivo_cancelamento: null,
+    observacao_cancelamento: null,
+    cancelado_em: null,
+    cancelado_por: null,
+    desconto_percentual: 0,
+    forma_pagamento: "pix",
+    quantidade_parcelas: 3,
+    validade_proposta: null,
+    subtotal: total,
+    valor_total: total,
+    status: "em_elaboracao",
+    assinatura_status: "nao_aplicavel",
+    assinatura_token: null,
+    aceite_em: null,
+    aceite_ip: null,
+    aceite_usuario_nome: null,
+    link_aceite_expira_em: null,
+    created_at: "2026-09-15T12:00:00Z",
+    updated_at: "2026-09-15T12:00:00Z",
+    orcamento_itens: itens,
+  };
+}
+
+function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstRecord[] {
+  return itens.map((item, index) => ({
+    id: item.servico_id ?? `s-${index}`,
+    nome: item.servico_nome,
+    descricao:
+      item.servico_nome === PACOTE_COMPLETO_SST_NOME
+        ? null
+        : "Exame complementar ocupacional.",
+    valor_sugerido: item.valor_unitario,
+    ativo: true,
+    ordem: index,
+    itens_inclusos:
+      item.servico_nome === PACOTE_COMPLETO_SST_NOME
+        ? [...PACOTE_COMPLETO_SST_ITENS]
+        : null,
+  }));
+}
+
+function renderPdf(orcamento: OrcamentoComItens) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  drawOrcamentoPdfDocument(doc, orcamento, {
+    catalogo: catalogoDe(orcamento.orcamento_itens),
+  });
+  return doc;
+}
+
+function pdfLatin1(doc: InstanceType<typeof jsPDF>): string {
+  return Buffer.from(doc.output("arraybuffer")).toString("latin1");
+}
+
+const layoutDummy = {
+  logo: null,
+  orcamento: buildOrcamento({
+    numero: "ORC-2026-0001",
+    itens: [{ nome: "Visita tecnica", quantidade: 1, valor: 400 }],
+  }),
+};
+
+const spaceDoc = new jsPDF({ unit: "mm", format: "a4" });
+assert.equal(ensureSpace(spaceDoc, 180, 50, layoutDummy), 180);
+assert.equal(spaceDoc.getNumberOfPages(), 1);
+const yAfterBreak = ensureSpace(spaceDoc, 248, 58, layoutDummy);
+assert.equal(spaceDoc.getNumberOfPages(), 2);
+assert.ok(yAfterBreak < 80, "nova pagina deve recomecar apos o cabecalho");
+assert.ok(
+  blockFitsOnPage(yAfterBreak, 58),
+  "os cards devem caber inteiros na pagina nova"
+);
+
+const pequeno = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0001",
+    itens: [{ nome: "Visita tecnica", quantidade: 1, valor: 400 }],
+  })
+);
+assert.equal(pequeno.getNumberOfPages(), 1);
+const pequenoRaw = pdfLatin1(pequeno);
+assert.match(pequenoRaw, /Página 1 de 1|Pagina 1 de 1/);
+
+const casoImagem = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0019",
+    itens: [
+      { nome: PACOTE_COMPLETO_SST_NOME, quantidade: 10, valor: 2800 },
+      { nome: "Exames Complementares - Audiometria", quantidade: 10, valor: 450 },
+    ],
+  })
+);
+assert.ok(
+  casoImagem.getNumberOfPages() >= 2,
+  "Pacote SST + Audiometria nao deve comprimir os cards na pagina 1"
+);
+const casoRaw = pdfLatin1(casoImagem);
+assert.match(casoRaw, /Página 1 de 2|Pagina 1 de 2/);
+assert.match(casoRaw, /Página 2 de 2|Pagina 2 de 2/);
+assert.doesNotMatch(casoRaw, /Página 1 de 1|Pagina 1 de 1/);
+
+const maior = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0100",
+    itens: Array.from({ length: 8 }, (_, i) => ({
+      nome: i === 0 ? PACOTE_COMPLETO_SST_NOME : `Servico complementar ${i}`,
+      quantidade: 5,
+      valor: 300 + i * 20,
+    })),
+  })
+);
+assert.ok(maior.getNumberOfPages() >= 2);
+
+const muitoMaior = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0200",
+    itens: Array.from({ length: 24 }, (_, i) => ({
+      nome: i === 0 ? PACOTE_COMPLETO_SST_NOME : `Item de servico ${i + 1}`,
+      quantidade: 3,
+      valor: 200,
+    })),
+  })
+);
+assert.ok(
+  muitoMaior.getNumberOfPages() >= 3,
+  "orcamento grande deve gerar 3+ paginas"
+);
+const muitoRaw = pdfLatin1(muitoMaior);
+const totalPages = muitoMaior.getNumberOfPages();
+assert.match(
+  muitoRaw,
+  new RegExp(`P[áa]gina 1 de ${totalPages}`)
+);
+assert.match(
+  muitoRaw,
+  new RegExp(`P[áa]gina ${totalPages} de ${totalPages}`)
+);
 
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 const MARGIN = 12;
