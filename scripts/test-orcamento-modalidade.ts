@@ -5,7 +5,7 @@ import { getEmptyOrcamentoForm } from "../lib/orcamento-defaults";
 import { formatCurrency, parseMoney } from "../lib/money";
 import {
   GESTAO_COMPLETA_SST_ITENS,
-  GESTAO_COMPLETA_SST_NOME,
+  GESTAO_SST_MENSAL_NOME,
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
   ORCAMENTO_MENSALIDADE_MESES,
   ORCAMENTO_MODALIDADE_MENSALIDADE,
@@ -14,9 +14,11 @@ import {
   filterServicosPorModalidade,
   formatValorMensalidade,
   formatValorOrcamentoExibicao,
-  isGestaoCompletaSstNome,
+  isGestaoMensalSstNome,
   isOrcamentoMensalidade,
   labelItensInclusosServico,
+  labelValorColunaOrcamento,
+  resolveModalidadePorServicoNome,
   resolveOrcamentoModalidade,
 } from "../lib/orcamento-modalidade";
 import {
@@ -58,35 +60,55 @@ assert.equal(isOrcamentoMensalidade("mensalidade"), true);
 
 assert.equal(getEmptyOrcamentoForm().modalidade, ORCAMENTO_MODALIDADE_PONTUAL);
 
+assert.equal(isGestaoMensalSstNome("Gestão SST - Mensal"), true);
+assert.equal(isGestaoMensalSstNome("Gestão SST Mensal"), true);
+assert.equal(isGestaoMensalSstNome("Gestão Completa SST"), true);
+assert.equal(isGestaoMensalSstNome("Pacote completo - SST"), false);
+assert.equal(
+  resolveModalidadePorServicoNome("Gestão SST - Mensal"),
+  ORCAMENTO_MODALIDADE_MENSALIDADE
+);
+assert.equal(
+  resolveModalidadePorServicoNome("Pacote completo - SST"),
+  ORCAMENTO_MODALIDADE_PONTUAL
+);
+
 const servicos = [
   { id: "1", nome: "Pacote completo - SST" },
-  { id: "2", nome: GESTAO_COMPLETA_SST_NOME },
+  { id: "2", nome: GESTAO_SST_MENSAL_NOME },
   { id: "3", nome: "PCMSO" },
+  { id: "4", nome: "Gestão Completa SST" },
 ];
 assert.deepEqual(
   filterServicosPorModalidade(servicos, "pontual").map((s) => s.nome),
-  ["Pacote completo - SST", "PCMSO"]
+  ["Pacote completo - SST", GESTAO_SST_MENSAL_NOME, "PCMSO"]
 );
 assert.deepEqual(
   filterServicosPorModalidade(servicos, "mensalidade").map((s) => s.nome),
-  [GESTAO_COMPLETA_SST_NOME]
+  ["Pacote completo - SST", GESTAO_SST_MENSAL_NOME, "PCMSO"]
 );
 
-assert.equal(isGestaoCompletaSstNome(GESTAO_COMPLETA_SST_NOME), true);
-assert.equal(isGestaoCompletaSstNome("Pacote completo - SST"), false);
-assert.deepEqual(resolveItensInclusosServico({ nome: GESTAO_COMPLETA_SST_NOME }), [
-  ...GESTAO_COMPLETA_SST_ITENS,
-]);
+assert.deepEqual(
+  resolveItensInclusosServico({ nome: "Gestão SST - Mensal" }),
+  [...GESTAO_COMPLETA_SST_ITENS]
+);
 assert.equal(
-  labelItensInclusosServico(GESTAO_COMPLETA_SST_NOME),
+  labelItensInclusosServico("Gestão SST - Mensal"),
   "Essa gestão inclui:"
 );
+assert.equal(labelValorColunaOrcamento("mensalidade"), "Valor mensal");
+assert.equal(labelValorColunaOrcamento("pontual"), "Valor");
 assert.equal(
   labelItensInclusosServico("Pacote completo - SST"),
   "Este pacote inclui:"
 );
 
 assert.equal(formatValorMensalidade(VALOR_MENSAL), "R$ 180,00 / mês");
+assert.equal(formatValorMensalidade(4200), "R$ 4.200,00 / mês");
+assert.ok(
+  !formatValorMensalidade(4200).includes("350"),
+  "não converter valor sugerido anual em mensalidade por divisão automática"
+);
 assert.equal(
   formatValorOrcamentoExibicao({
     modalidade: "mensalidade",
@@ -154,7 +176,7 @@ const orcamentoMensalidade = {
       id: "i1",
       orcamento_id: "m1",
       servico_id: "2",
-      servico_nome: GESTAO_COMPLETA_SST_NOME,
+      servico_nome: GESTAO_SST_MENSAL_NOME,
       quantidade: 8,
       valor_unitario: VALOR_MENSAL,
       valor_total: VALOR_MENSAL,

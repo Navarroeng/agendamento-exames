@@ -9,6 +9,7 @@ import type {
   ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { OrcamentoPacoteInclusosCard } from "./OrcamentoPacoteInclusosCard";
+import { isGestaoMensalSstNome } from "@/lib/orcamento-modalidade";
 import {
   isPacoteCompletoSst,
   resolveItensInclusosServico,
@@ -64,7 +65,7 @@ export function OrcamentoItemTableRow({
     const servico = servicos.find((s) => s.id === servicoId);
     const nome = servico?.nome === "Outros" ? "" : servico?.nome ?? "";
     onUpdate("servico_id", servicoId, nome);
-    if (isPacoteCompletoSst(nome)) {
+    if (isPacoteCompletoSst(nome) || isGestaoMensalSstNome(nome)) {
       onApplyValorSugerido(null);
       return;
     }

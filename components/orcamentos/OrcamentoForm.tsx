@@ -16,7 +16,6 @@ import {
 import {
   ORCAMENTO_MODALIDADE_OPTIONS,
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
-  ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL,
   ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL,
   filterServicosPorModalidade,
   formatValorMensalidade,
@@ -309,30 +308,22 @@ export function OrcamentoForm({
         </p>
 
         {isMensalidade ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-                Condição de pagamento
-              </p>
-              <p className="mt-2 text-sm font-extrabold text-navy">
-                {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
-              </p>
-              <p className="mt-1 text-base font-extrabold text-navy">
-                {formatValorMensalidade(valorTotal)}
-              </p>
-            </div>
-            <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-                Vigência e renovação
-              </p>
-              <p className="mt-2 text-sm font-bold text-navy">
-                Vigência contratual: {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
-              </p>
-              <p className="mt-1 text-[12px] text-[#475569]">
-                Renovação:{" "}
-                {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL.toLocaleLowerCase("pt-BR")}
-              </p>
-            </div>
+          <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+              Condição de pagamento
+            </p>
+            <p className="mt-2 text-sm font-extrabold text-navy">
+              {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
+            </p>
+            <p className="mt-1 text-base font-extrabold text-navy">
+              {formatValorMensalidade(valorTotal)}
+            </p>
+            <p className="mt-3 text-sm font-bold text-navy">
+              Vigência contratual: {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
+            </p>
+            <p className="mt-1 text-[12px] text-[#475569]">
+              Renovação automática ao final da vigência.
+            </p>
           </div>
         ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

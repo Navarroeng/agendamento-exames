@@ -34,8 +34,10 @@ import {
 import { emptyToNull, maskMoneyInput, parseMoney } from "@/lib/money";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import {
-  GESTAO_COMPLETA_SST_NOME,
-  isGestaoCompletaSstNome,
+  GESTAO_SST_MENSAL_NOME,
+  ORCAMENTO_MODALIDADE_MENSALIDADE,
+  ORCAMENTO_MODALIDADE_PONTUAL,
+  isGestaoMensalSstNome,
   isOrcamentoMensalidade,
   resolveOrcamentoModalidade,
 } from "@/lib/orcamento-modalidade";
@@ -88,7 +90,7 @@ export function useOrcamentoForm() {
       }
       const itensPontual = prev.itens.every(
         (item) =>
-          !item.servico_id.trim() || isGestaoCompletaSstNome(item.servico_nome)
+          !item.servico_id.trim() || isGestaoMensalSstNome(item.servico_nome)
       )
         ? [createEmptyOrcamentoItem()]
         : prev.itens;
@@ -137,33 +139,58 @@ export function useOrcamentoForm() {
           };
         }
 
-        return {
-          ...prev,
-          itens: prev.itens.map((item) => {
-            if (item.id !== id) return item;
+        const itens = prev.itens.map((item) => {
+          if (item.id !== id) return item;
 
-            const next: OrcamentoItemFormItem = {
-              ...item,
-              [field]:
-                field === "valor_unitario" ? maskMoneyInput(value) : value,
-            };
+          const next: OrcamentoItemFormItem = {
+            ...item,
+            [field]:
+              field === "valor_unitario" ? maskMoneyInput(value) : value,
+          };
 
-            if (field === "servico_id" && servicoNome !== undefined) {
-              next.servico_nome = servicoNome;
-              next.valor_manual = false;
+          if (field === "servico_id" && servicoNome !== undefined) {
+            next.servico_nome = servicoNome;
+            next.valor_manual = false;
+            if (isGestaoMensalSstNome(servicoNome)) {
+              next.valor_unitario = "";
+              next.valor_total = "";
+            } else {
               const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
               next.valor_unitario = auto.valor_unitario;
               next.valor_total = auto.valor_total;
             }
+          }
 
-            if (field === "valor_unitario") {
-              next.valor_manual = true;
-              next.valor_total = next.valor_unitario;
-            }
+          if (field === "valor_unitario") {
+            next.valor_manual = true;
+            next.valor_total = next.valor_unitario;
+          }
 
-            return next;
-          }),
-        };
+          return next;
+        });
+
+        if (field !== "servico_id") {
+          return { ...prev, itens };
+        }
+
+        const changed = itens.find((item) => item.id === id);
+        const nome = changed?.servico_nome ?? servicoNome ?? "";
+        if (isGestaoMensalSstNome(nome) && changed) {
+          return {
+            ...prev,
+            modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
+            quantidade_parcelas: "",
+            itens: [changed],
+          };
+        }
+        if (nome.trim() !== "" && isOrcamentoMensalidade(prev.modalidade)) {
+          return {
+            ...prev,
+            modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+            itens,
+          };
+        }
+        return { ...prev, itens };
       });
     },
     []
@@ -183,6 +210,10 @@ export function useOrcamentoForm() {
               valor_manual: false,
             });
             return { ...item, ...auto, valor_manual: false };
+          }
+
+          if (isGestaoMensalSstNome(item.servico_nome)) {
+            return item;
           }
 
           if (valorSugerido == null || valorSugerido <= 0) return item;
@@ -409,9 +440,9 @@ export function useOrcamentoForm() {
     if (isOrcamentoMensalidade(form.modalidade)) {
       if (
         itensValidos.length !== 1 ||
-        !isGestaoCompletaSstNome(itensValidos[0]?.servico_nome)
+        !isGestaoMensalSstNome(itensValidos[0]?.servico_nome)
       ) {
-        return `Selecione o serviço ${GESTAO_COMPLETA_SST_NOME}.`;
+        return `Selecione o serviço ${GESTAO_SST_MENSAL_NOME}.`;
       }
     }
 

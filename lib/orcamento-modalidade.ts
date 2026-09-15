@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/money";
+import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const ORCAMENTO_MODALIDADE_PONTUAL = "pontual";
 export const ORCAMENTO_MODALIDADE_MENSALIDADE = "mensalidade";
@@ -15,7 +16,10 @@ export const ORCAMENTO_MODALIDADE_OPTIONS: readonly {
   { value: ORCAMENTO_MODALIDADE_MENSALIDADE, label: "Mensalidade" },
 ] as const;
 
-export const GESTAO_COMPLETA_SST_NOME = "Gestão Completa SST";
+/** Nome canônico no catálogo de produção. */
+export const GESTAO_SST_MENSAL_NOME = "Gestão SST - Mensal";
+/** Alias legado (migration 120 / seeds). */
+export const GESTAO_COMPLETA_SST_NOME = GESTAO_SST_MENSAL_NOME;
 
 export const GESTAO_COMPLETA_SST_ITENS: readonly string[] = [
   "PGR - Programa de gerenciamento de riscos.",
@@ -54,27 +58,62 @@ export function isOrcamentoMensalidade(
   return resolveOrcamentoModalidade(value) === ORCAMENTO_MODALIDADE_MENSALIDADE;
 }
 
+const GESTAO_MENSAL_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("Gestão SST - Mensal"),
+  normalizeServicoNome("Gestão SST Mensal"),
+  normalizeServicoNome("Gestão Completa SST"),
+]);
+
+const GESTAO_COMPLETA_LEGADO_NORMALIZADO = normalizeServicoNome(
+  "Gestão Completa SST"
+);
+
+export function isGestaoMensalSstNome(
+  nome: string | null | undefined
+): boolean {
+  return GESTAO_MENSAL_NOMES_NORMALIZADOS.has(normalizeServicoNome(nome));
+}
+
+/** @deprecated Prefer isGestaoMensalSstNome. Mantido para call sites existentes. */
 export function isGestaoCompletaSstNome(
   nome: string | null | undefined
 ): boolean {
-  return String(nome ?? "").trim() === GESTAO_COMPLETA_SST_NOME;
+  return isGestaoMensalSstNome(nome);
+}
+
+export function resolveModalidadePorServicoNome(
+  nome: string | null | undefined
+): OrcamentoModalidade {
+  return isGestaoMensalSstNome(nome)
+    ? ORCAMENTO_MODALIDADE_MENSALIDADE
+    : ORCAMENTO_MODALIDADE_PONTUAL;
 }
 
 export function resolveGestaoCompletaSstServico(
   servicos: Array<{ id: string; nome: string }>
 ): { id: string; nome: string } | null {
-  const found = servicos.find((s) => isGestaoCompletaSstNome(s.nome));
+  const canonico = servicos.find(
+    (s) =>
+      normalizeServicoNome(s.nome) ===
+      normalizeServicoNome(GESTAO_SST_MENSAL_NOME)
+  );
+  const found = canonico ?? servicos.find((s) => isGestaoMensalSstNome(s.nome));
   if (!found?.id) return null;
   return found;
 }
 
 export function filterServicosPorModalidade<
   T extends { nome: string },
->(servicos: T[], modalidade: string | null | undefined): T[] {
-  if (isOrcamentoMensalidade(modalidade)) {
-    return servicos.filter((s) => isGestaoCompletaSstNome(s.nome));
-  }
-  return servicos.filter((s) => !isGestaoCompletaSstNome(s.nome));
+>(servicos: T[], _modalidade?: string | null): T[] {
+  const temCanonico = servicos.some(
+    (s) =>
+      normalizeServicoNome(s.nome) ===
+      normalizeServicoNome(GESTAO_SST_MENSAL_NOME)
+  );
+  if (!temCanonico) return servicos;
+  return servicos.filter(
+    (s) => normalizeServicoNome(s.nome) !== GESTAO_COMPLETA_LEGADO_NORMALIZADO
+  );
 }
 
 /** Valor mensal formatado. Nunca multiplica por 12. */
@@ -104,9 +143,7 @@ export function labelItensInclusosServico(
 export function labelValorColunaOrcamento(
   modalidade: string | null | undefined
 ): string {
-  return isOrcamentoMensalidade(modalidade)
-    ? "Valor da mensalidade"
-    : "Valor";
+  return isOrcamentoMensalidade(modalidade) ? "Valor mensal" : "Valor";
 }
 
 export type ResumoMensalidadeLinha = {
