@@ -783,6 +783,119 @@ function drawFinancialPremiumRow(
   return y + rowHeight;
 }
 
+function drawMensalidadeFinancialRow(
+  doc: JsPDF,
+  x: number,
+  w: number,
+  rowTop: number,
+  rowH: number,
+  icon: FinancialRowIcon,
+  label: string,
+  value: string,
+  options: {
+    labelFont: number;
+    valueFont: number;
+    valueColor?: RGB;
+    iconColor?: RGB;
+    labelBold?: boolean;
+    valueBold?: boolean;
+  }
+): void {
+  const valueFont = options.valueFont;
+  const baseline = rowTop + rowH / 2 + valueFont * 0.12;
+  drawFinancialPremiumRow(doc, x, w, baseline, icon, label, value, {
+    ...options,
+    rowHeight: 0,
+  });
+}
+
+function drawMensalidadeResumoFinanceiroBody(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  bodyY: number,
+  orcamento: OrcamentoComItens
+): void {
+  const linhas = buildResumoMensalidadeLinhas(Number(orcamento.valor_total));
+  const innerX = x + CARD_PAD_X;
+  const innerW = w - CARD_PAD_X * 2;
+  const n = linhas.length;
+  const topPad = 3.4;
+  const bottomPad = 3.2;
+  const validadeBlock = 8.4;
+  const dividerGap = 2.15;
+  const interRow = dividerGap * 2;
+
+  const rowsTop = bodyY + topPad;
+  const rowsBottom = y + h - bottomPad - validadeBlock;
+  const rowsArea = Math.max(rowsBottom - rowsTop, n * 5.5);
+  const rowH = (rowsArea - interRow * (n - 1)) / n;
+
+  let cursor = rowsTop;
+  linhas.forEach((linha, index) => {
+    const isValor = index === 0;
+    const isRenovacao = index === n - 1;
+    drawMensalidadeFinancialRow(
+      doc,
+      x,
+      w,
+      cursor,
+      rowH,
+      isValor ? "total" : "parcel",
+      linha.label,
+      linha.value,
+      isValor
+        ? {
+            labelFont: 7.5,
+            valueFont: 11,
+            labelBold: true,
+            iconColor: GOLD,
+          }
+        : isRenovacao
+          ? {
+              labelFont: 7,
+              valueFont: 7,
+              labelBold: false,
+              valueBold: false,
+              valueColor: SLATE_500,
+              iconColor: SLATE_500,
+            }
+          : {
+              labelFont: 7.5,
+              valueFont: 9,
+              labelBold: false,
+              iconColor: GOLD,
+            }
+    );
+    cursor += rowH;
+    if (index < n - 1) {
+      cursor += dividerGap;
+      doc.setDrawColor(...SLATE_200);
+      doc.setLineWidth(0.12);
+      doc.line(innerX, cursor, innerX + innerW, cursor);
+      cursor += dividerGap;
+    }
+  });
+
+  const validadeY = y + h - bottomPad - 1.2;
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.12);
+  doc.line(innerX, validadeY - 5.2, innerX + innerW, validadeY - 5.2);
+
+  const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
+  const validadeLabel = formatDateIsoToBR(validadeIso);
+  if (validadeLabel) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(FINANCIAL_VALIDADE_FONT);
+    doc.setTextColor(...FINANCIAL_VALIDADE_COLOR);
+    doc.text(`Proposta válida até ${validadeLabel}`, x + w / 2, validadeY, {
+      align: "center",
+    });
+  }
+}
+
 /** Cards finais nunca encolhem: ou cabem inteiros, ou vão juntos para a próxima página. */
 export function resolveCardsBlockPlacement(
   y: number,
@@ -916,20 +1029,14 @@ function drawResumoFinanceiroCard(
   const innerX = x + CARD_PAD_X;
   const innerW = w - CARD_PAD_X * 2;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const bodyPad = isMensalidade
-    ? FINANCIAL_CARD_BODY_PAD_MENSAL
-    : FINANCIAL_CARD_BODY_PAD;
-  const dividerPad = isMensalidade
-    ? FINANCIAL_DIVIDER_PAD_MENSAL
-    : FINANCIAL_DIVIDER_PAD;
-  const rowSpacing = isMensalidade
-    ? FINANCIAL_ROW_SPACING_MENSAL
-    : FINANCIAL_ROW_SPACING;
-  const validadeGap = isMensalidade
-    ? FINANCIAL_VALIDADE_GAP_MENSAL
-    : FINANCIAL_VALIDADE_GAP;
-  let lineY = bodyY + bodyPad;
   const valorTotal = Number(orcamento.valor_total);
+
+  if (isMensalidade) {
+    drawMensalidadeResumoFinanceiroBody(doc, x, y, w, h, bodyY, orcamento);
+    return;
+  }
+
+  let lineY = bodyY + FINANCIAL_CARD_BODY_PAD;
 
   const drawRow = (
     icon: "total" | "parcel" | "avista",
@@ -948,93 +1055,54 @@ function drawResumoFinanceiroCard(
   ) => {
     lineY = drawFinancialPremiumRow(doc, x, w, lineY, icon, label, value, options);
     if (!withDividerAfter) return;
-    lineY += dividerPad;
+    lineY += FINANCIAL_DIVIDER_PAD;
     drawFinancialRowDivider(doc, innerX, lineY, innerW);
-    lineY += rowSpacing;
+    lineY += FINANCIAL_ROW_SPACING;
   };
 
-  if (isMensalidade) {
-    const linhas = buildResumoMensalidadeLinhas(valorTotal);
-    linhas.forEach((linha, index) => {
-      const isValor = index === 0;
-      const isRenovacao = index === linhas.length - 1;
-      drawRow(
-        isValor ? "total" : "parcel",
-        linha.label,
-        linha.value,
-        isValor
-          ? {
-              labelFont: 7.5,
-              valueFont: 11,
-              labelBold: true,
-              iconColor: GOLD,
-              rowHeight: 6.5,
-            }
-          : isRenovacao
-            ? {
-                labelFont: 7,
-                valueFont: 7,
-                labelBold: false,
-                valueBold: false,
-                valueColor: SLATE_500,
-                iconColor: SLATE_500,
-                rowHeight: 4,
-              }
-            : {
-                labelFont: 7.5,
-                valueFont: 9,
-                labelBold: false,
-                iconColor: GOLD,
-                rowHeight: 4.5,
-              },
-        index < linhas.length - 1
-      );
-    });
-  } else {
-    const pagamento = calcCondicoesPagamentoProposta(
-      valorTotal,
-      orcamento.quantidade_parcelas
-    );
-    drawRow(
-      "total",
-      "Valor Total",
-      formatCurrency(valorTotal),
-      {
-        labelFont: 8.5,
-        valueFont: 12,
-        labelBold: true,
-        iconColor: GOLD,
-        rowHeight: 6.5,
-      },
-      true
-    );
-    drawRow(
-      "parcel",
-      "Pagamento parcelado",
-      pagamento.textoParcelado,
-      {
-        labelFont: 7.5,
-        valueFont: 9.5,
-        rowHeight: 5.5,
-      },
-      true
-    );
-    drawRow(
-      "avista",
-      "À vista (5% de desconto)",
-      pagamento.textoAVista,
-      {
-        labelFont: 7.5,
-        valueFont: 10.5,
-        valueColor: GOLD_STRONG,
-        iconColor: GOLD_STRONG,
-        rowHeight: 5,
-      },
-      false
-    );
-  }
+  const pagamento = calcCondicoesPagamentoProposta(
+    valorTotal,
+    orcamento.quantidade_parcelas
+  );
+  drawRow(
+    "total",
+    "Valor Total",
+    formatCurrency(valorTotal),
+    {
+      labelFont: 8.5,
+      valueFont: 12,
+      labelBold: true,
+      iconColor: GOLD,
+      rowHeight: 6.5,
+    },
+    true
+  );
+  drawRow(
+    "parcel",
+    "Pagamento parcelado",
+    pagamento.textoParcelado,
+    {
+      labelFont: 7.5,
+      valueFont: 9.5,
+      rowHeight: 5.5,
+    },
+    true
+  );
+  drawRow(
+    "avista",
+    "À vista (5% de desconto)",
+    pagamento.textoAVista,
+    {
+      labelFont: 7.5,
+      valueFont: 10.5,
+      valueColor: GOLD_STRONG,
+      iconColor: GOLD_STRONG,
+      rowHeight: 5,
+    },
+    false
+  );
 
-  lineY += validadeGap;
+  lineY += FINANCIAL_VALIDADE_GAP;
   drawFinancialRowDivider(doc, innerX, lineY, innerW);
   lineY += 3.2;
 
