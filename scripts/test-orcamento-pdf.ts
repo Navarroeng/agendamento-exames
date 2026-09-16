@@ -58,7 +58,6 @@ function buildPacoteCompletoInclusosItens(
     itens.push(`Exames Clínicos: ${quantidadeColaboradores}`);
   }
 
-  itens.push("CAT - Cortesia.");
   return itens;
 }
 
@@ -107,6 +106,7 @@ const semExames = buildPacoteCompletoInclusosItens(orcamentoDoisColaboradores);
 assert.ok(semExames.includes("Exames Clínicos: 2"));
 assert.match(semExames[0], /listados acima/);
 assert.ok(!semExames.some((item) => /PGR/.test(item)));
+assert.ok(!semExames.some((item) => /CAT - Cortesia/.test(item)));
 
 assert.equal(
   resolveQuantidadeColaboradoresOrcamento(orcamentoDoisColaboradores),
@@ -421,8 +421,11 @@ assert.match(pontualRaw, /PGR/);
 assert.match(pontualRaw, /LTCAT/);
 assert.match(pontualRaw, /PCMSO/);
 assert.match(pontualRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
-assert.match(pontualRaw, /CAT -/);
-assert.match(pontualRaw, /Cortesia/);
+assert.match(pontualRaw, /Gest[aã]o completa e envio ao eSocial/i);
+assert.match(pontualRaw, /Exames Cl[ií]nicos:/);
+assert.match(pontualRaw, /Observa[cç][oõ]es/i);
+assert.doesNotMatch(pontualRaw, /CAT - Cortesia/);
+assert.doesNotMatch(pontualRaw, /Cortesia/);
 assert.match(pontualRaw, /Valor Total/i);
 assert.match(pontualRaw, /5%/);
 assert.doesNotMatch(pontualRaw, /Essa gest[aã]o inclui/i);
@@ -462,8 +465,8 @@ assert.match(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
 assert.match(mensalRaw, /Gest[aã]o completa e envio ao eSocial/i);
 assert.match(mensalRaw, /Exames Cl[ií]nicos:/);
 assert.match(mensalRaw, /23/);
-assert.match(mensalRaw, /CAT -/);
-assert.match(mensalRaw, /Cortesia/);
+assert.doesNotMatch(mensalRaw, /CAT - Cortesia/);
+assert.doesNotMatch(mensalRaw, /Cortesia/);
 assert.match(mensalRaw, new RegExp(ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO));
 assert.match(mensalRaw, /12 meses/);
 assert.match(mensalRaw, /Autom[aá]tica ao final da vig[eê]ncia/i);

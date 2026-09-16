@@ -186,7 +186,6 @@ function buildPacoteCompletoInclusosItens(
     itens.push(`Exames Clínicos: ${quantidadeColaboradores}`);
   }
 
-  itens.push("CAT - Cortesia.");
   return itens;
 }
 
