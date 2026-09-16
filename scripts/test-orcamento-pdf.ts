@@ -413,6 +413,7 @@ const pontualPacote = renderPdf(
     itens: [{ nome: PACOTE_COMPLETO_SST_NOME, quantidade: 10, valor: 2800 }],
   })
 );
+assert.equal(pontualPacote.getNumberOfPages(), 1, "Pacote completo pontual deve caber em 1 página");
 const pontualRaw = pdfVisibleText(pdfLatin1(pontualPacote));
 assert.match(pontualRaw, /O que est[áa] incluso/i);
 assert.match(pontualRaw, /Este pacote inclui/i);
@@ -441,7 +442,15 @@ const mensalidadeOrc = buildOrcamento({
   ],
 });
 const mensalPdf = renderPdf(mensalidadeOrc);
-const mensalRaw = pdfVisibleText(pdfLatin1(mensalPdf));
+assert.equal(
+  mensalPdf.getNumberOfPages(),
+  1,
+  "Mensalidade 23 colaboradores / R$ 350 deve caber em 1 página"
+);
+const mensalBinary = pdfLatin1(mensalPdf);
+assert.match(mensalBinary, /Página 1 de 1|Pagina 1 de 1/);
+assert.doesNotMatch(mensalBinary, /Página 1 de 2|Pagina 1 de 2/);
+const mensalRaw = pdfVisibleText(mensalBinary);
 assert.match(mensalRaw, /Essa gest[aã]o inclui/i);
 assert.match(mensalRaw, /PGR/);
 assert.match(mensalRaw, /LTCAT/);
