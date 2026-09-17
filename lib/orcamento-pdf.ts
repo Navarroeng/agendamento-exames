@@ -34,6 +34,11 @@ import {
   PACOTE_COMPLETO_SST_NOME,
   resolveItensInclusosServico,
 } from "@/lib/servico-sst-pacote";
+import {
+  AET_INCLUSOS_ITENS,
+  orcamentoEhExclusivoAet,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_AET,
+} from "@/lib/servico-aet";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
@@ -163,9 +168,12 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE: readonly string[] = [
 ] as const;
 
 function resolveDescricaoPropostaParagrafos(
-  modalidade: string | null | undefined
+  orcamento: OrcamentoComItens
 ): readonly string[] {
-  return isOrcamentoMensalidade(modalidade)
+  if (orcamentoEhExclusivoAet(orcamento.orcamento_itens)) {
+    return PROPOSTA_DESCRICAO_PARAGRAFOS_AET;
+  }
+  return isOrcamentoMensalidade(orcamento.modalidade)
     ? PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
 }
@@ -198,7 +206,8 @@ function servicoListaInclusosNaTabela(
   return (
     isPacoteCompletoSst(nome) ||
     isPacoteCompletoNome(nome) ||
-    isGestaoCompletaSstNome(nome)
+    isGestaoCompletaSstNome(nome) ||
+    orcamentoEhExclusivoAet([{ servico_nome: nome ?? "" }])
   );
 }
 
@@ -1050,11 +1059,18 @@ function orcamentoHasGestaoMensal(
   });
 }
 
+function orcamentoHasAet(
+  orcamento: OrcamentoComItens
+): boolean {
+  return orcamentoEhExclusivoAet(orcamento.orcamento_itens);
+}
+
 /** Mesmo card estruturado de “O que está incluso?” do Pacote completo - SST. */
 function orcamentoUsaCardInclusosEstruturado(
   orcamento: OrcamentoComItens,
   catalogo: ServicoSstRecord[]
 ): boolean {
+  if (orcamentoHasAet(orcamento)) return true;
   if (orcamentoHasPacoteCompleto(orcamento, catalogo)) return true;
   return (
     isOrcamentoMensalidade(orcamento.modalidade) &&
@@ -1332,7 +1348,8 @@ function drawObservacoesInclusosBox(
 function measurePacoteCompletoInclusosBlockHeight(
   doc: JsPDF,
   width: number,
-  itens: string[]
+  itens: string[],
+  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
 ): number {
   const textWidth = width - CARD_PAD_X * 2;
   let h = CARD_HEADER_H + CARD_BODY_PAD;
@@ -1341,8 +1358,10 @@ function measurePacoteCompletoInclusosBlockHeight(
     h += measureStructuredInclusoItemHeight(doc, item, textWidth);
   });
 
-  h += INCLUSOS_ITEMS_TO_OBS_GAP;
-  h += measureObservacoesInclusosBoxHeight(doc, textWidth - 5);
+  if (observacoes.length > 0) {
+    h += INCLUSOS_ITEMS_TO_OBS_GAP;
+    h += measureObservacoesInclusosBoxHeight(doc, textWidth - 5, observacoes);
+  }
   h += CARD_BODY_PAD;
 
   return h;
@@ -1354,7 +1373,8 @@ function drawPacoteCompletoInclusosBlock(
   y: number,
   width: number,
   height: number,
-  itens: string[]
+  itens: string[],
+  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
 ): void {
   const bodyY = drawFaturaStyleCardShell(doc, x, y, width, height, "O que está incluso?");
 
@@ -1364,11 +1384,17 @@ function drawPacoteCompletoInclusosBlock(
 
   itens.forEach((item, index) => {
     itemY = drawStructuredInclusoItem(doc, textX, itemY, textWidth, item, {
-      emphasis: index < 2,
+      emphasis: observacoes.length > 0 && index < 2,
     });
   });
 
-  const obsBlockH = measureObservacoesInclusosBoxHeight(doc, textWidth - 5);
+  if (observacoes.length === 0) return;
+
+  const obsBlockH = measureObservacoesInclusosBoxHeight(
+    doc,
+    textWidth - 5,
+    observacoes
+  );
   const obsY = y + height - CARD_BODY_PAD - obsBlockH;
   drawObservacoesInclusosBox(
     doc,
@@ -1376,7 +1402,7 @@ function drawPacoteCompletoInclusosBlock(
     obsY,
     textWidth,
     obsBlockH,
-    PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
+    observacoes
   );
 }
 
@@ -1736,7 +1762,8 @@ function measureDesiredCardsRowHeight(
   hasPacote: boolean,
   pacoteItens: string[],
   inclusos: string[],
-  isMensalidade = false
+  isMensalidade = false,
+  inclusosObservacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
 ): { desiredH: number; contentMinH: number } {
   let inclusosH = 0;
   if (isMensalidade) {
@@ -1745,7 +1772,8 @@ function measureDesiredCardsRowHeight(
     inclusosH = measurePacoteCompletoInclusosBlockHeight(
       doc,
       checklistW,
-      pacoteItens
+      pacoteItens,
+      inclusosObservacoes
     );
   } else if (inclusos.length > 0) {
     inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
@@ -1850,9 +1878,9 @@ function estimateServiceRowHeight(
   serviceColWidth: number
 ): number {
   const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-  const listaInclusos = servicoListaInclusosNaTabela(
-    servico?.nome ?? item.servico_nome
-  );
+  const listaInclusos =
+    !orcamentoEhExclusivoAet([{ servico_nome: servico?.nome ?? item.servico_nome }]) &&
+    servicoListaInclusosNaTabela(servico?.nome ?? item.servico_nome);
 
   if (listaInclusos && inclusos.length > 0) {
     return (
@@ -1884,17 +1912,22 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
-  const colWidths = [98, 44, 40];
-  const colStarts = [
-    MARGIN,
-    MARGIN + colWidths[0],
-    MARGIN + colWidths[0] + colWidths[1],
-  ];
-  const headers = [
-    "Serviço",
-    "Quantidade de Colaboradores",
-    labelValorColunaOrcamento(orcamento.modalidade),
-  ];
+  const isAet = orcamentoHasAet(orcamento);
+  const colWidths = isAet ? [138, 40] : [98, 44, 40];
+  const colStarts = isAet
+    ? [MARGIN, MARGIN + colWidths[0]]
+    : [
+        MARGIN,
+        MARGIN + colWidths[0],
+        MARGIN + colWidths[0] + colWidths[1],
+      ];
+  const headers = isAet
+    ? ["Serviço", labelValorColunaOrcamento(orcamento.modalidade)]
+    : [
+        "Serviço",
+        "Quantidade de Colaboradores",
+        labelValorColunaOrcamento(orcamento.modalidade),
+      ];
   const tableHeadH = 12;
 
   const drawTableHead = (startY: number) => {
@@ -1941,9 +1974,9 @@ function drawServicesTable(
   itens.forEach((item, index) => {
     const servico = resolveCatalogoServico(item, catalogo);
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
-    const listaInclusos = servicoListaInclusosNaTabela(
-      servico?.nome ?? item.servico_nome
-    );
+    const listaInclusos =
+      !isAet &&
+      servicoListaInclusosNaTabela(servico?.nome ?? item.servico_nome);
     const rowH = estimateServiceRowHeight(
       doc,
       item,
@@ -2002,18 +2035,21 @@ function drawServicesTable(
     doc.setFontSize(TABLE_CELL_FONT);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
-    doc.text(
-      String(Math.round(Number(item.quantidade))),
-      colStarts[1] + colWidths[1] / 2,
-      valueY,
-      { align: "center" }
-    );
+    const valorColIndex = isAet ? 1 : 2;
+    if (!isAet) {
+      doc.text(
+        String(Math.round(Number(item.quantidade))),
+        colStarts[1] + colWidths[1] / 2,
+        valueY,
+        { align: "center" }
+      );
+    }
     doc.setFont("helvetica", "bold");
     doc.text(
       isOrcamentoMensalidade(orcamento.modalidade)
         ? formatValorMensalidade(resolveItemValorServico(item))
         : formatCurrency(resolveItemValorServico(item)),
-      colStarts[2] + colWidths[2] / 2,
+      colStarts[valorColIndex] + colWidths[valorColIndex] / 2,
       valueY,
       { align: "center" }
     );
@@ -2045,6 +2081,7 @@ function drawFinancialAndInclusosRow(
   layout: OrcamentoPdfLayout
 ): number {
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
+  const isAet = orcamentoHasAet(orcamento);
   const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
     orcamento,
     catalogo
@@ -2054,10 +2091,12 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  const pacoteInclusosItens =
-    !isMensalidade && usaCardInclusosEstruturado
+  const pacoteInclusosItens = isAet
+    ? [...AET_INCLUSOS_ITENS]
+    : !isMensalidade && usaCardInclusosEstruturado
       ? buildPacoteCompletoInclusosItens(orcamento)
       : [];
+  const inclusosObservacoes = isAet ? [] : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;
 
   const { desiredH, contentMinH } = measureDesiredCardsRowHeight(
     doc,
@@ -2065,7 +2104,8 @@ function drawFinancialAndInclusosRow(
     usaCardInclusosEstruturado,
     pacoteInclusosItens,
     inclusos,
-    isMensalidade
+    isMensalidade,
+    inclusosObservacoes
   );
   const { needsNewPage, cardH } = resolveCardsBlockPlacement(
     y,
@@ -2085,7 +2125,8 @@ function drawFinancialAndInclusosRow(
       y,
       checklistW,
       cardH,
-      pacoteInclusosItens
+      pacoteInclusosItens,
+      inclusosObservacoes
     );
   } else if (inclusos.length > 0) {
     drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);
@@ -2180,7 +2221,7 @@ export function drawOrcamentoPdfDocument(
   y = drawDescricaoProposta(
     doc,
     y,
-    resolveDescricaoPropostaParagrafos(orcamento.modalidade),
+    resolveDescricaoPropostaParagrafos(orcamento),
     layout
   );
   y = drawServicesTable(doc, y, orcamento, options.catalogo, layout);

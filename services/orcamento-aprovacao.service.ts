@@ -20,6 +20,7 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
   CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
@@ -78,6 +79,9 @@ async function encerrarOutrosContratosAtivos(
 async function syncClienteContratoFromAprovacao(
   aprovacao: OrcamentoAprovacaoRecord
 ): Promise<void> {
+  if (orcamentoEhExclusivoAet(aprovacao.orcamento_aprovacao_itens)) {
+    return;
+  }
   const supabase = createClient();
   const syncPayload = buildClienteContratoSyncFromAprovacao({
     aprovacao: {
@@ -281,12 +285,6 @@ export async function atualizarCondicoesAprovadas(
   if (!usuario) {
     throw new Error("Informe o usuário responsável pela alteração.");
   }
-  if (payload.quantidade_colaboradores < 1) {
-    throw new Error("Informe a quantidade de colaboradores.");
-  }
-  if (payload.valor_final <= 0) {
-    throw new Error("Informe o valor total fechado.");
-  }
 
   const { data: beforeRaw, error: beforeError } = await supabase
     .from("orcamento_aprovacoes")
@@ -296,6 +294,13 @@ export async function atualizarCondicoesAprovadas(
   if (beforeError) throw beforeError;
 
   const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+  const isAet = orcamentoEhExclusivoAet(before.orcamento_aprovacao_itens);
+  if (!isAet && payload.quantidade_colaboradores < 1) {
+    throw new Error("Informe a quantidade de colaboradores.");
+  }
+  if (payload.valor_final <= 0) {
+    throw new Error("Informe o valor total fechado.");
+  }
   if (!condicoesComerciaisMudaram(before, payload)) {
     throw new Error("Nenhuma alteração nas condições aprovadas.");
   }
@@ -320,6 +325,7 @@ export async function atualizarCondicoesAprovadas(
 
   const aprovacao = sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord);
 
+  if (!isAet) {
   const { data: contratos, error: findContratosError } = await supabase
     .from("cliente_contratos")
     .select("id")
@@ -351,6 +357,7 @@ export async function atualizarCondicoesAprovadas(
         `Falha ao sincronizar condições no contrato: ${syncError.message}`
       );
     }
+  }
   }
 
   const { data: historicoRaw, error: historicoError } = await supabase

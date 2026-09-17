@@ -41,24 +41,34 @@ type JsPDFDoc = InstanceType<typeof jsPDF>;
 
 type LogoAsset = { dataUrl: string; width: number; height: number };
 
-function sanitizarNomeArquivo(value: string): string {
-  const cleaned = value
+function sanitizarTrechoArquivo(value: string, fallback: string): string {
+  const cleaned = String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-  return cleaned || "Cliente";
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return cleaned.slice(0, 80) || fallback;
+}
+
+/** Número do orçamento: mantém hífens (ex.: ORC-2026-0007). */
+function sanitizarNumeroOrcamentoArquivo(value: string): string {
+  const cleaned = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return cleaned.slice(0, 40) || "Orcamento";
 }
 
 export function nomeArquivoContratoNavarro(
   numero: string,
-  clienteNome: string,
-  versao?: number
+  clienteNome: string
 ): string {
-  const cliente = sanitizarNomeArquivo(clienteNome);
-  const v = versao && versao > 1 ? `-v${versao}` : "";
-  return `Contrato-${numero}-${cliente}${v}.pdf`;
+  const cliente = sanitizarTrechoArquivo(clienteNome, "Cliente");
+  const orc = sanitizarNumeroOrcamentoArquivo(numero);
+  return `Contrato_Navarro_${cliente}_${orc}.pdf`;
 }
 
 function logoDisplaySize(pixelW: number, pixelH: number): { w: number; h: number } {
@@ -379,8 +389,7 @@ export function drawContratoPdfDocument(
 }
 
 export async function gerarPdfContratoNavarro(
-  documento: ContratoNavarroDocumento,
-  versao?: number
+  documento: ContratoNavarroDocumento
 ): Promise<{
   blob: Blob;
   filename: string;
@@ -388,17 +397,18 @@ export async function gerarPdfContratoNavarro(
   arrayBuffer: ArrayBuffer;
 }> {
   const logo = await loadLogoAsset();
+  const filename = nomeArquivoContratoNavarro(
+    documento.numeroOrcamento,
+    documento.contratante.razaoSocial
+  );
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setProperties({ title: filename.replace(/\.pdf$/i, "") });
   drawContratoPdfDocument(doc, documento, logo);
   const arrayBuffer = doc.output("arraybuffer") as ArrayBuffer;
   const blob = new Blob([arrayBuffer], { type: "application/pdf" });
   return {
     blob,
-    filename: nomeArquivoContratoNavarro(
-      documento.numeroOrcamento,
-      documento.contratante.razaoSocial,
-      versao
-    ),
+    filename,
     pageCount: doc.getNumberOfPages(),
     arrayBuffer,
   };

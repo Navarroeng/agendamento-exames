@@ -15,6 +15,7 @@ import {
 } from "../lib/orcamento-aprovacao";
 import { parseMoney } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
+import { SERVICO_AET_NOME } from "../lib/servico-aet";
 
 const orcamento = {
   id: "o1",
@@ -171,5 +172,49 @@ assert.equal(
   }),
   false
 );
+
+const orcamentoAet = {
+  ...orcamento,
+  modalidade: "pontual" as const,
+  orcamento_itens: [
+    {
+      id: "iaet",
+      orcamento_id: "o1",
+      servico_id: "aet-1",
+      servico_nome: SERVICO_AET_NOME,
+      quantidade: 1,
+      valor_unitario: 2800,
+      valor_total: 2800,
+      ordem: 0,
+    },
+  ],
+  valor_total: 2800,
+  subtotal: 2800,
+} as OrcamentoComItens;
+const resumoAet = buildResumoComercialOrcamento(orcamentoAet);
+assert.equal(resumoAet.quantidadeColaboradores, 0);
+const formAet = buildAprovacaoFormFromOrcamento(orcamentoAet);
+const payloadAet = buildAprovacaoInsertPayload(
+  orcamentoAet,
+  formAet,
+  "Ágatha",
+  parseMoney
+);
+assert.equal(payloadAet.quantidade_colaboradores, 0);
+assert.equal(payloadAet.itens[0]?.servico_id, "aet-1");
+assert.equal(payloadAet.itens[0]?.servico_nome, SERVICO_AET_NOME);
+const diffsAet = buildAprovacaoDiffs(
+  orcamentoAet,
+  { ...formAet, condicoes_iguais: false, valor_final: "3.000,00" },
+  parseMoney
+);
+assert.ok(!diffsAet.some((d) => d.label === "Quantidade de colaboradores"));
+const condicoesAet = buildCondicoesComerciaisFromForm(
+  { ...formAet, condicoes_iguais: false, valor_final: "3.000,00" },
+  parseMoney,
+  "pontual",
+  orcamentoAet.orcamento_itens
+);
+assert.equal(condicoesAet.quantidade_colaboradores, 0);
 
 console.log("test-orcamento-aprovacao: OK");

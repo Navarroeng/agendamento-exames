@@ -36,8 +36,8 @@ export function formatCnpjAuditoria(cnpj: string | null | undefined): string {
 export interface OrcamentoAprovacaoIntegracaoResult {
   aprovacao_id: string;
   cliente_id: string;
-  contrato_id: string;
-  numero_contrato: string;
+  contrato_id: string | null;
+  numero_contrato: string | null;
   cliente_criado: boolean;
   cliente_localizado: boolean;
   contrato_criado: boolean;

@@ -51,6 +51,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               pendentesDefinicao: processo.pendentesDefinicao ?? undefined,
               vagasComprometidas: processo.vagasComprometidas ?? undefined,
               treinamento: processo.treinamento,
+              aet: processo.aet ?? null,
             }
           );
           const tone =

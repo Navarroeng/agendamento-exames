@@ -10,6 +10,7 @@ import {
   isOrcamentoMensalidade,
   labelValorColunaOrcamento,
 } from "@/lib/orcamento-modalidade";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -48,13 +49,15 @@ export function OrcamentoItensSection({
   onApplyValorSugerido,
 }: OrcamentoItensSectionProps) {
   const isMensalidade = isOrcamentoMensalidade(modalidade);
+  const isAet = orcamentoEhExclusivoAet(itens);
+  const colSpanValor = isAet ? 1 : 2;
   return (
     <Panel
       title="Itens do orçamento"
       icon={<IconClipboard />}
       iconTone="purple"
       action={
-        isMensalidade ? undefined : (
+        isMensalidade || isAet ? undefined : (
         <button type="button" className="btn btn-primary text-xs" onClick={onAdd}>
           + Adicionar Serviço
         </button>
@@ -78,7 +81,9 @@ export function OrcamentoItensSection({
           <thead>
             <tr>
               <th className={TH}>Serviço</th>
+              {isAet ? null : (
               <th className={TH}>Quantidade de colaboradores</th>
+              )}
               <th className={TH}>{labelValorColunaOrcamento(modalidade)}</th>
               <th className={`${TH} w-10 text-center`}>Ação</th>
             </tr>
@@ -98,7 +103,7 @@ export function OrcamentoItensSection({
                 onApplyValorSugerido={(valor) =>
                   onApplyValorSugerido(item.id, valor)
                 }
-                isMensalidade={isMensalidade}
+                hideQuantidadeColaboradores={isAet}
               />
             ))}
           </tbody>
@@ -106,7 +111,7 @@ export function OrcamentoItensSection({
             {isMensalidade ? (
               <tr className="bg-brand-blue-soft/40">
                 <td
-                  colSpan={2}
+                  colSpan={colSpanValor}
                   className="border-t border-[#eef2f7] px-2.5 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wide text-navy"
                 >
                   Mensalidade
@@ -120,7 +125,7 @@ export function OrcamentoItensSection({
               <>
             <tr className="bg-[#f8fafc]">
               <td
-                colSpan={2}
+                colSpan={colSpanValor}
                 className="border-t border-[#eef2f7] px-2.5 py-2 text-right text-[11px] font-semibold text-[#64748b]"
               >
                 Subtotal
@@ -132,7 +137,7 @@ export function OrcamentoItensSection({
             </tr>
             <tr className="bg-brand-blue-soft/40">
               <td
-                colSpan={2}
+                colSpan={colSpanValor}
                 className="border-t border-[#eef2f7] px-2.5 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wide text-navy"
               >
                 Valor total

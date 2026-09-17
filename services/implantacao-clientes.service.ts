@@ -17,11 +17,13 @@ import {
   resolveItensParaFluxoImplantacao,
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
+import { resolveAetServicoId } from "@/lib/servico-aet";
+import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
+import { buscarAetPorOrcamentoIds } from "@/services/implantacao-aet.service";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
 import { contarCreditosDisponiveisPorContratos } from "@/services/contrato-creditos-aso.service";
 import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
 import { listarVagasPorContratos } from "@/services/contrato-vagas.service";
-import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
 
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
@@ -68,6 +70,7 @@ export async function listarProcessosImplantacao(): Promise<
     nome: string;
   }>;
   const treinamentosServicoId = resolveTreinamentosServicoId(catalogoServicos);
+  const aetServicoId = resolveAetServicoId(catalogoServicos);
   const pacoteCompletoServicoId =
     resolvePacoteCompletoSstServicoId(catalogoServicos);
 
@@ -161,6 +164,7 @@ export async function listarProcessosImplantacao(): Promise<
 
   const treinamentosByOrcamento =
     await buscarTreinamentosPorOrcamentoIds(idsArray);
+  const aetByOrcamento = await buscarAetPorOrcamentoIds(idsArray);
 
   const contratoIds = Array.from(
     new Set(
@@ -235,9 +239,11 @@ export async function listarProcessosImplantacao(): Promise<
     });
     const fluxoImplantacao = classifyOrcamentoFluxoImplantacao(
       itens,
-      treinamentosServicoId
+      treinamentosServicoId,
+      aetServicoId
     );
     const treinamento = treinamentosByOrcamento.get(id) ?? null;
+    const aet = aetByOrcamento.get(id) ?? null;
     const possuiPacoteCompletoSst = orcamentoPossuiPacoteCompletoSst(
       itens,
       pacoteCompletoServicoId
@@ -255,6 +261,7 @@ export async function listarProcessosImplantacao(): Promise<
         vagasComprometidas: contagem.vagasComprometidas,
         fluxoImplantacao,
         treinamento,
+        aet,
         possuiPacoteCompletoSst,
       })
     );

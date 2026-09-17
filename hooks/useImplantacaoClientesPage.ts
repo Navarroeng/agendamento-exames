@@ -240,7 +240,10 @@ export function useImplantacaoClientesPage() {
     async (orcamentoId: string) => {
       const processo = processos.find((p) => p.orcamento.id === orcamentoId);
       const etapa = processo?.etapaAtual ?? "contrato";
-      await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
+      await openProcesso(
+        orcamentoId,
+        implantacaoEtapaToModalTab(etapa, processo?.fluxoImplantacao)
+      );
     },
     [openProcesso, processos]
   );
@@ -253,14 +256,19 @@ export function useImplantacaoClientesPage() {
         toast.message("Processo já concluído. Abrindo consulta.");
         await openProcesso(
           orcamentoId,
-          processo?.fluxoImplantacao === "somente_treinamentos" ||
-            processo?.fluxoImplantacao === "combinado"
-            ? "treinamento"
-            : "agendamentos"
+          processo?.fluxoImplantacao === "aet"
+            ? "envio"
+            : processo?.fluxoImplantacao === "somente_treinamentos" ||
+                processo?.fluxoImplantacao === "combinado"
+              ? "treinamento"
+              : "agendamentos"
         );
         return;
       }
-      await openProcesso(orcamentoId, implantacaoEtapaToModalTab(etapa));
+      await openProcesso(
+        orcamentoId,
+        implantacaoEtapaToModalTab(etapa, processo?.fluxoImplantacao)
+      );
     },
     [openProcesso, processos]
   );
@@ -294,7 +302,8 @@ export function useImplantacaoClientesPage() {
         const payload = buildCondicoesComerciaisFromForm(
           formValues,
           parseMoney,
-          modalOrcamento.modalidade
+          modalOrcamento.modalidade,
+          modalOrcamento.orcamento_itens
         );
         const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
           modalAprovacao.id,

@@ -23,6 +23,10 @@ import {
 } from "@/lib/orcamento-modalidade";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
+import {
+  orcamentoEhExclusivoAet,
+  SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG,
+} from "@/lib/servico-aet";
 import { formatCurrency } from "@/lib/money";
 
 export type ContratoNavarroDocumento = {
@@ -105,7 +109,29 @@ export function podeGerarContratoNavarro(
 ): boolean {
   if (!orcamento?.id || !orcamento.numero?.trim()) return false;
   if (!aprovacao?.id) return false;
+  if (orcamentoEhExclusivoAet(orcamento.orcamento_itens, undefined)) {
+    return false;
+  }
+  if (
+    orcamentoEhExclusivoAet(aprovacao.orcamento_aprovacao_itens, undefined)
+  ) {
+    return false;
+  }
   return Boolean(orcamento.cliente_nome?.trim());
+}
+
+export function motivoBloqueioGeracaoContrato(
+  orcamento: OrcamentoComItens | null | undefined,
+  aprovacao: OrcamentoAprovacaoRecord | null | undefined
+): string | null {
+  const itens =
+    (aprovacao?.orcamento_aprovacao_itens?.length
+      ? aprovacao.orcamento_aprovacao_itens
+      : orcamento?.orcamento_itens) ?? [];
+  if (orcamentoEhExclusivoAet(itens)) {
+    return SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG;
+  }
+  return null;
 }
 
 export function formatValorContratoResumo(
@@ -123,6 +149,13 @@ export function buildContratoNavarroDocumento(params: {
   dataContrato: string;
 }): ContratoNavarroDocumento {
   const { orcamento, aprovacao, dataContrato } = params;
+  const itensAet =
+    (aprovacao?.orcamento_aprovacao_itens?.length
+      ? aprovacao.orcamento_aprovacao_itens
+      : orcamento.orcamento_itens) ?? [];
+  if (orcamentoEhExclusivoAet(itensAet)) {
+    throw new Error(SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG);
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataContrato)) {
     throw new Error("Informe a data do contrato no formato AAAA-MM-DD.");
   }

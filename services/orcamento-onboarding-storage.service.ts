@@ -3,6 +3,8 @@ import {
   ORCAMENTO_ONBOARDING_BUCKET,
   buildOrcamentoOnboardingPath,
   resolveOnboardingContentType,
+  validateAetDocumentoEmpresaFile,
+  validateAetLaudoPdfFile,
   validateOrcamentoContratoPdfFile,
   validateOrcamentoListaFuncionariosFile,
   validateOrcamentoLogoFile,
@@ -10,7 +12,7 @@ import {
 
 async function uploadOnboardingFile(
   aprovacaoId: string,
-  kind: "funcionarios" | "logo" | "contrato",
+  kind: "funcionarios" | "logo" | "contrato" | "aet_documento" | "aet_laudo",
   file: File
 ): Promise<{ path: string; nome: string; tipo: string; tamanho: number }> {
   const supabase = createClient();
@@ -49,14 +51,28 @@ export async function uploadOrcamentoContratoPdf(
   return uploadOnboardingFile(aprovacaoId, "contrato", file);
 }
 
+export async function uploadAetDocumentoEmpresa(
+  aprovacaoId: string,
+  file: File
+) {
+  validateAetDocumentoEmpresaFile(file);
+  return uploadOnboardingFile(aprovacaoId, "aet_documento", file);
+}
+
+export async function uploadAetLaudoPdf(aprovacaoId: string, file: File) {
+  validateAetLaudoPdfFile(file);
+  return uploadOnboardingFile(aprovacaoId, "aet_laudo", file);
+}
+
 export async function obterUrlOrcamentoOnboarding(
   path: string,
-  expiresInSeconds = 3600
+  expiresInSeconds = 3600,
+  options?: { download?: string | boolean }
 ): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase.storage
     .from(ORCAMENTO_ONBOARDING_BUCKET)
-    .createSignedUrl(path.trim(), expiresInSeconds);
+    .createSignedUrl(path.trim(), expiresInSeconds, options);
   if (error) throw error;
   if (!data?.signedUrl) {
     throw new Error("Não foi possível gerar o link do arquivo.");

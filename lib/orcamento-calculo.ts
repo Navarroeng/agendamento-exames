@@ -8,6 +8,7 @@ import {
   isPacoteCompletoSst,
   PACOTE_COMPLETO_SST_NOME,
 } from "@/lib/servico-sst-pacote";
+import { isServicoAetNome } from "@/lib/servico-aet";
 
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
@@ -218,7 +219,10 @@ export function validateOrcamentoItensValores(
   for (const item of itens) {
     if (!item.servico_nome.trim()) continue;
     const qtd = Math.round(Number(item.quantidade));
-    if (!Number.isFinite(qtd) || qtd < 1) {
+    if (
+      !isServicoAetNome(item.servico_nome) &&
+      (!Number.isFinite(qtd) || qtd < 1)
+    ) {
       return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
     }
 
@@ -331,6 +335,10 @@ export function resolveQuantidadeColaboradoresOrcamento(
     (a, b) => a.ordem - b.ordem
   );
   if (itens.length === 0) return 0;
+
+  if (itens.every((item) => isServicoAetNome(item.servico_nome))) {
+    return 0;
+  }
 
   const pacoteItem = itens.find(
     (item) =>

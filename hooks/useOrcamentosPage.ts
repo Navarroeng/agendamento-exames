@@ -996,7 +996,8 @@ export function useOrcamentosPage() {
         const payload = buildCondicoesComerciaisFromForm(
           formValues,
           parseMoney,
-          aprovarOrcamento.modalidade
+          aprovarOrcamento.modalidade,
+          aprovarOrcamento.orcamento_itens
         );
         const { aprovacao: saved, historico } = await atualizarCondicoesAprovadas(
           aprovarAprovacao.id,

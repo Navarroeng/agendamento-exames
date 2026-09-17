@@ -8,7 +8,8 @@ export const SERVICO_SST_NOME_TREINAMENTOS = "Treinamentos" as const;
 export type OrcamentoFluxoImplantacao =
   | "padrao"
   | "somente_treinamentos"
-  | "combinado";
+  | "combinado"
+  | "aet";
 
 export type ServicoItemRef = {
   servico_id?: string | null;
@@ -74,9 +75,24 @@ export function resolveItensParaFluxoImplantacao(params: {
   );
 }
 
+const AET_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("Laudo AET – Análise Ergonômica do Trabalho"),
+  normalizeServicoNome("Laudo AET - Análise Ergonômica do Trabalho"),
+]);
+
+function isItemAetFluxo(
+  item: ServicoItemRef,
+  aetServicoId?: string | null
+): boolean {
+  const id = (item.servico_id ?? "").trim();
+  if (aetServicoId && id) return id === aetServicoId;
+  return AET_NOMES_NORMALIZADOS.has(normalizeServicoNome(item.servico_nome));
+}
+
 export function classifyOrcamentoFluxoImplantacao(
   itens: ServicoItemRef[],
-  treinamentosServicoId?: string | null
+  treinamentosServicoId?: string | null,
+  aetServicoId?: string | null
 ): OrcamentoFluxoImplantacao {
   const relevant = itens.filter(
     (item) =>
@@ -84,6 +100,10 @@ export function classifyOrcamentoFluxoImplantacao(
       Boolean((item.servico_nome ?? "").trim())
   );
   if (relevant.length === 0) return "padrao";
+
+  if (relevant.every((item) => isItemAetFluxo(item, aetServicoId))) {
+    return "aet";
+  }
 
   let hasTreinamentos = false;
   let hasOutros = false;

@@ -9,6 +9,7 @@ import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   buildContratoNavarroDocumento,
   hojeIsoLocal,
+  motivoBloqueioGeracaoContrato,
   podeGerarContratoNavarro,
   resumoConferenciaContrato,
   type ContratoNavarroDocumento,
@@ -53,6 +54,7 @@ export function OrcamentoContratoGerarPanel({
   const [viewUrl, setViewUrl] = useState<string | null>(null);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
+  const motivoBloqueio = motivoBloqueioGeracaoContrato(orcamento, aprovacao);
   const atual = documentos[0] ?? null;
   const anteriores = documentos.slice(1);
 
@@ -124,8 +126,7 @@ export function OrcamentoContratoGerarPanel({
         aprovacao,
         dataContrato,
       });
-      const versao = await proximaVersaoContratoDocumento(aprovacao.id);
-      const pdf = await gerarPdfContratoNavarro(documento, versao);
+      const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       const url = URL.createObjectURL(pdf.blob);
       setPreviewUrl(url);
@@ -146,7 +147,7 @@ export function OrcamentoContratoGerarPanel({
     setWorking(true);
     try {
       const versao = await proximaVersaoContratoDocumento(aprovacao.id);
-      const pdf = await gerarPdfContratoNavarro(previewDoc, versao);
+      const pdf = await gerarPdfContratoNavarro(previewDoc);
       const file = new File([new Uint8Array(pdf.arrayBuffer)], pdf.filename, {
         type: "application/pdf",
       });
@@ -249,8 +250,9 @@ export function OrcamentoContratoGerarPanel({
             Contrato automático
           </p>
           <p className="mt-1 text-[12px] text-[#475569]">
-            Gera o PDF a partir do orçamento aprovado. Não marca como enviado
-            nem assinado.
+            {motivoBloqueio
+              ? motivoBloqueio
+              : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
           </p>
           {atual ? (
             <p className="mt-1 text-[12px] text-[#334155]">
@@ -268,7 +270,7 @@ export function OrcamentoContratoGerarPanel({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {!atual ? (
+          {motivoBloqueio ? null : !atual ? (
             <button
               type="button"
               className="btn btn-primary justify-center text-[12px]"

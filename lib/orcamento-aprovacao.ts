@@ -8,6 +8,7 @@ import {
   formatValorMensalidade,
   isOrcamentoMensalidade,
 } from "@/lib/orcamento-modalidade";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
@@ -281,7 +282,9 @@ export function resolveFinanceiroAndamento(
 export function buildResumoComercialOrcamento(
   orcamento: OrcamentoComItens
 ): OrcamentoResumoComercial {
-  const quantidade = resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
+  const quantidade = orcamentoEhExclusivoAet(orcamento.orcamento_itens)
+    ? 0
+    : resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
   const valorTotal = Number(orcamento.valor_total) || 0;
   if (isOrcamentoMensalidade(orcamento.modalidade)) {
     return {
@@ -437,7 +440,9 @@ export function buildAprovacaoInsertPayload(
     };
   }
 
-  const quantidade = Number(form.quantidade_colaboradores) || 1;
+  const quantidade = orcamentoEhExclusivoAet(orcamento.orcamento_itens)
+    ? 0
+    : Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);
 
   if (isOrcamentoMensalidade(orcamento.modalidade)) {
@@ -507,13 +512,16 @@ export function buildAprovacaoDiffs(
       ? `À vista · ${formatCurrency(valorAprovado)}`
       : `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`;
 
-  return [
-    {
+  const diffs: OrcamentoAprovacaoDiffItem[] = [];
+  if (!orcamentoEhExclusivoAet(orcamento.orcamento_itens)) {
+    diffs.push({
       label: "Quantidade de colaboradores",
       original: String(resumo.quantidadeColaboradores || "—"),
       aprovado: String(qtdAprovada || "—"),
       changed: resumo.quantidadeColaboradores !== qtdAprovada,
-    },
+    });
+  }
+  diffs.push(
     {
       label: isMensalidade ? "Valor da mensalidade" : "Valor",
       original: isMensalidade
@@ -532,7 +540,8 @@ export function buildAprovacaoDiffs(
       aprovado: pagamentoAprovado,
       changed: true,
     },
-  ];
+  );
+  return diffs;
 }
 
 export function formatCondicaoAprovada(
@@ -568,9 +577,12 @@ export function formatCondicaoAprovada(
 export function buildCondicoesComerciaisFromForm(
   form: OrcamentoAprovacaoFormValues,
   parseMoneyFn: (value: string) => number,
-  modalidade?: string | null
+  modalidade?: string | null,
+  itens?: { servico_id?: string | null; servico_nome?: string | null }[] | null
 ): OrcamentoCondicoesComerciaisPayload {
-  const quantidade = Number(form.quantidade_colaboradores) || 1;
+  const quantidade = orcamentoEhExclusivoAet(itens)
+    ? 0
+    : Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);
 
   if (isOrcamentoMensalidade(modalidade)) {

@@ -82,6 +82,15 @@ import {
   resolveItensParaFluxoImplantacao,
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
+import { resolveAetServicoId } from "@/lib/servico-aet";
+import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
+import {
+  OrcamentoAbaAetDocumentos,
+  OrcamentoAbaAetElaboracao,
+  OrcamentoAbaAetEnvio,
+  OrcamentoAbaAetVisita,
+  OrcamentoResumoAetStatus,
+} from "./OrcamentoAbasAet";
 
 type TabId = OrcamentoEtapaId;
 
@@ -233,7 +242,11 @@ export function OrcamentoAprovarModal({
       aprovacaoItens: aprovacao?.orcamento_aprovacao_itens,
       orcamentoItens: orcamento.orcamento_itens,
     });
-    const fluxo = classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
+    const fluxo = classifyOrcamentoFluxoImplantacao(
+      itens,
+      treinamentosId,
+      resolveAetServicoId(servicos)
+    );
     const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
     const ctxInit: OrcamentoEtapasContexto = {
@@ -375,12 +388,26 @@ export function OrcamentoAprovarModal({
       aprovacaoItens: aprovacao?.orcamento_aprovacao_itens,
       orcamentoItens: orcamento.orcamento_itens,
     });
-    return classifyOrcamentoFluxoImplantacao(itens, treinamentosId);
+    return classifyOrcamentoFluxoImplantacao(
+      itens,
+      treinamentosId,
+      resolveAetServicoId(servicos)
+    );
   }, [orcamento, aprovacao, servicos]);
+  const aetEnabled = Boolean(
+    open && orcamento && aprovacao && fluxoImplantacao === "aet"
+  );
+  const aetEtapas = useOrcamentoAetEtapas({
+    enabled: aetEnabled,
+    orcamentoId: orcamento?.id ?? null,
+    aprovacaoId: aprovacao?.id ?? null,
+    orcamentoNumero: orcamento?.numero ?? null,
+  });
   const etapasCtx: OrcamentoEtapasContexto = useMemo(
     () => ({
       fluxo: fluxoImplantacao,
       treinamento,
+      aet: aetEtapas.aet,
       contagem: agendamentosContagem
         ? {
             quantidadeContratada: agendamentosContagem.contratados,
@@ -397,7 +424,13 @@ export function OrcamentoAprovarModal({
             }
           : null,
     }),
-    [fluxoImplantacao, treinamento, agendamentosContagem, aprovacao]
+    [
+      fluxoImplantacao,
+      treinamento,
+      aetEtapas.aet,
+      agendamentosContagem,
+      aprovacao,
+    ]
   );
   const mensagemVisita = useMemo(
     () =>
@@ -445,8 +478,9 @@ export function OrcamentoAprovarModal({
   async function handleSalvarCondicoesEditadasClick() {
     if (!form || !aprovacao) return;
     if (
-      !form.quantidade_colaboradores.trim() ||
-      Number(form.quantidade_colaboradores) < 1
+      fluxoImplantacao !== "aet" &&
+      (!form.quantidade_colaboradores.trim() ||
+        Number(form.quantidade_colaboradores) < 1)
     ) {
       toast.error("Informe a quantidade de colaboradores.");
       return;
@@ -491,8 +525,9 @@ export function OrcamentoAprovarModal({
 
     if (!form.condicoes_iguais) {
       if (
-        !form.quantidade_colaboradores.trim() ||
-        Number(form.quantidade_colaboradores) < 1
+        fluxoImplantacao !== "aet" &&
+        (!form.quantidade_colaboradores.trim() ||
+          Number(form.quantidade_colaboradores) < 1)
       ) {
         toast.error("Informe a quantidade de colaboradores.");
         return;
@@ -588,7 +623,9 @@ export function OrcamentoAprovarModal({
     await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
     if (boletoPago) {
-      if (
+      if (fluxoImplantacao === "aet") {
+        setTab("documentos");
+      } else if (
         fluxoImplantacao === "somente_treinamentos" ||
         fluxoImplantacao === "combinado"
       ) {
@@ -721,6 +758,7 @@ export function OrcamentoAprovarModal({
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
+  const isAet = fluxoImplantacao === "aet";
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
@@ -797,6 +835,7 @@ export function OrcamentoAprovarModal({
             disabled={saving}
             fluxo={fluxoImplantacao}
             treinamento={treinamento}
+            aet={aetEtapas.aet}
             contagemAgendamentos={
               agendamentosContagem
                 ? {
@@ -820,7 +859,10 @@ export function OrcamentoAprovarModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6">
           {tab === "resumo" ? (
-            <OrcamentoViewBody orcamento={orcamento} servicos={servicos} />
+            <div className="space-y-4">
+              {isAet ? <OrcamentoResumoAetStatus aet={aetEtapas.aet} /> : null}
+              <OrcamentoViewBody orcamento={orcamento} servicos={servicos} />
+            </div>
           ) : null}
 
           {tab === "aprovado" ? (
@@ -832,10 +874,12 @@ export function OrcamentoAprovarModal({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                  {isAet ? null : (
                   <ResumoItem
                     label="Quantidade de colaboradores"
                     value={String(resumoComercial.quantidadeColaboradores)}
                   />
+                  )}
                   <ResumoItem
                     label={
                       isMensalidade
@@ -913,6 +957,7 @@ export function OrcamentoAprovarModal({
                   {editandoCondicoes && form ? (
                     <div className="space-y-4 p-4 sm:p-5">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {isAet ? null : (
                         <Field label="Quantidade de colaboradores" required>
                           <input
                             className="field-input"
@@ -926,6 +971,7 @@ export function OrcamentoAprovarModal({
                             }
                           />
                         </Field>
+                        )}
                         <Field
                           label={
                             isMensalidade
@@ -1061,10 +1107,12 @@ export function OrcamentoAprovarModal({
                           Aprovado conforme o orçamento original.
                         </div>
                       ) : null}
+                      {isAet ? null : (
                       <ResumoItem
                         label="Quantidade de colaboradores"
                         value={String(aprovacao.quantidade_colaboradores)}
                       />
+                      )}
                       <ResumoItem
                         label={
                           isMensalidade
@@ -1144,6 +1192,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       <div className="space-y-4 p-4 sm:p-5">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {isAet ? null : (
                           <Field label="Quantidade de colaboradores" required>
                             <input
                               className="field-input"
@@ -1157,6 +1206,7 @@ export function OrcamentoAprovarModal({
                               }
                             />
                           </Field>
+                          )}
                           <Field
                             label={
                               isMensalidade
@@ -1339,12 +1389,14 @@ export function OrcamentoAprovarModal({
                           {formatDateTimeBR(row.alterado_em)} · {row.alterado_por}
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          {isAet ? null : (
                           <p className="text-[#64748b]">
                             Quantidade: {row.quantidade_anterior} →{" "}
                             <span className="font-semibold text-[#334155]">
                               {row.quantidade_nova}
                             </span>
                           </p>
+                          )}
                           <p className="text-[#64748b]">
                             Valor:{" "}
                             {isMensalidade
@@ -1724,6 +1776,96 @@ export function OrcamentoAprovarModal({
               }
               onCopiarMensagem={() => void handleCopiarMensagemTreinamento()}
               onSalvar={() => void handleSalvarTreinamentoClick()}
+            />
+          ) : null}
+
+          {tab === "documentos" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "documentos",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaAetDocumentos
+              conferidos={Boolean(aetEtapas.aet?.documentos_conferidos)}
+              documentos={aetEtapas.documentos}
+              saving={saving || aetEtapas.saving}
+              onToggleConferidos={(value) =>
+                void aetEtapas.handleToggleDocumentosConferidos(value)
+              }
+              onFileChange={(file) => void aetEtapas.handleUploadDocumento(file)}
+              onRemover={(doc) => void aetEtapas.handleRemoverDocumento(doc)}
+              onVisualizar={(doc) =>
+                void aetEtapas.abrirArquivo(doc.storage_path)
+              }
+              onBaixar={(doc) =>
+                void aetEtapas.abrirArquivo(doc.storage_path, doc.arquivo_nome)
+              }
+            />
+          ) : null}
+
+          {tab === "visita_aet" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "visita_aet",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaAetVisita
+              aet={aetEtapas.aet}
+              form={aetEtapas.visitaForm}
+              saving={saving || aetEtapas.saving}
+              onChange={(patch) =>
+                aetEtapas.setVisitaForm((prev) => ({ ...prev, ...patch }))
+              }
+              onSalvar={() => void aetEtapas.handleSalvarVisita()}
+            />
+          ) : null}
+
+          {tab === "elaboracao" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "elaboracao",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaAetElaboracao
+              aet={aetEtapas.aet}
+              form={aetEtapas.elaboracaoForm}
+              saving={saving || aetEtapas.saving}
+              onChange={(patch) =>
+                aetEtapas.setElaboracaoForm((prev) => ({ ...prev, ...patch }))
+              }
+              onFileChange={(file) => void aetEtapas.handleUploadLaudo(file)}
+              onRemoverLaudo={() => void aetEtapas.handleRemoverLaudo()}
+              onVisualizarLaudo={() => {
+                if (aetEtapas.aet?.laudo_path) {
+                  void aetEtapas.abrirArquivo(aetEtapas.aet.laudo_path);
+                }
+              }}
+              onSalvar={() => void aetEtapas.handleSalvarElaboracao()}
+            />
+          ) : null}
+
+          {tab === "envio" &&
+          aprovacao &&
+          isOrcamentoEtapaLiberada(
+            "envio",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaAetEnvio
+              aet={aetEtapas.aet}
+              form={aetEtapas.envioForm}
+              saving={saving || aetEtapas.saving}
+              onChange={(patch) =>
+                aetEtapas.setEnvioForm((prev) => ({ ...prev, ...patch }))
+              }
+              onSalvar={() => void aetEtapas.handleSalvarEnvio()}
             />
           ) : null}
         </div>

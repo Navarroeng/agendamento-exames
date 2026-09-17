@@ -34,6 +34,11 @@ import {
   isPacoteCompletoSst,
   resolveItensInclusosServico,
 } from "../lib/servico-sst-pacote";
+import {
+  AET_INCLUSOS_ITENS,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_AET,
+  SERVICO_AET_NOME,
+} from "../lib/servico-aet";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
@@ -575,5 +580,33 @@ assert.match(
 );
 assert.doesNotMatch(mensalPagRaw, /Valor Total/i);
 assert.doesNotMatch(mensalPagRaw, /4\.200|4200/);
+
+const aetOrc = buildOrcamento({
+  numero: "ORC-2026-0401",
+  modalidade: "pontual",
+  quantidade_parcelas: 2,
+  itens: [{ nome: SERVICO_AET_NOME, quantidade: 1, valor: 2800 }],
+});
+const aetDoc = renderPdf(aetOrc);
+const aetRaw = pdfVisibleText(pdfLatin1(aetDoc));
+assert.match(aetRaw, /An[aá]lise Ergon[oô]mica do Trabalho/);
+assert.match(aetRaw, /crit[eé]rios aplic[aá]veis da NR-17/);
+assert.match(aetRaw, /Visita t[eé]cnica para avalia[cç][aã]o das atividades/);
+assert.match(aetRaw, /Entrega do documento final em formato digital/);
+assert.doesNotMatch(aetRaw, /Quantidade de Colaboradores/i);
+assert.doesNotMatch(aetRaw, /Exames Cl[ií]nicos/);
+assert.doesNotMatch(aetRaw, /BENEF[IÍ]CIOS DO PLANO/i);
+assert.doesNotMatch(aetRaw, /Pacote completo/);
+assert.doesNotMatch(aetRaw, /Este pacote inclui/i);
+assert.doesNotMatch(aetRaw, /eSocial/);
+assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_AET.length, 3);
+assert.equal(AET_INCLUSOS_ITENS.length, 8);
+assert.equal(aetOrc.modalidade, "pontual");
+const previewDir = path.join(process.cwd(), "tmp");
+fs.mkdirSync(previewDir, { recursive: true });
+fs.writeFileSync(
+  path.join(previewDir, "preview-aet.pdf"),
+  Buffer.from(aetDoc.output("arraybuffer"))
+);
 
 console.log("test-orcamento-pdf: OK");

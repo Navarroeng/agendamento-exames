@@ -70,7 +70,7 @@ export async function persistirContratoDocumentoGerado(params: {
     ...params.payload,
     versao,
     storage_path: uploaded.path,
-    arquivo_nome: uploaded.nome,
+    arquivo_nome: params.payload.arquivo_nome || uploaded.nome,
     arquivo_tipo: uploaded.tipo,
     arquivo_tamanho: uploaded.tamanho,
   };
@@ -86,7 +86,8 @@ export async function persistirContratoDocumentoGerado(params: {
 }
 
 export async function obterUrlContratoDocumento(
-  path: string
+  path: string,
+  options?: { download?: string }
 ): Promise<string> {
-  return obterUrlOrcamentoOnboarding(path, 3600);
+  return obterUrlOrcamentoOnboarding(path, 3600, options);
 }

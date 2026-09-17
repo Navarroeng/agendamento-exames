@@ -14,6 +14,7 @@ import {
   isPacoteCompletoSst,
   resolveItensInclusosServico,
 } from "@/lib/servico-sst-pacote";
+import { isServicoAetNome } from "@/lib/servico-aet";
 
 interface OrcamentoItemTableRowProps {
   item: OrcamentoItemFormItem;
@@ -28,6 +29,7 @@ interface OrcamentoItemTableRowProps {
   ) => void;
   onApplyValorSugerido: (valor: number | null) => void;
   isMensalidade?: boolean;
+  hideQuantidadeColaboradores?: boolean;
 }
 
 const inputClass = "field-input field-input-compact min-w-0 w-full";
@@ -43,6 +45,7 @@ export function OrcamentoItemTableRow({
   onUpdate,
   onApplyValorSugerido,
   isMensalidade = false,
+  hideQuantidadeColaboradores = false,
 }: OrcamentoItemTableRowProps) {
   const selectedServico = servicos.find((s) => s.id === item.servico_id);
   const isOutros = selectedServico?.nome === "Outros";
@@ -65,7 +68,7 @@ export function OrcamentoItemTableRow({
     const servico = servicos.find((s) => s.id === servicoId);
     const nome = servico?.nome === "Outros" ? "" : servico?.nome ?? "";
     onUpdate("servico_id", servicoId, nome);
-    if (isPacoteCompletoSst(nome) || isGestaoMensalSstNome(nome)) {
+    if (isPacoteCompletoSst(nome) || isGestaoMensalSstNome(nome) || isServicoAetNome(nome)) {
       onApplyValorSugerido(null);
       return;
     }
@@ -108,6 +111,7 @@ export function OrcamentoItemTableRow({
           />
         )}
       </td>
+      {hideQuantidadeColaboradores ? null : (
       <td className={TD}>
         <input
           className={`${inputClass} max-w-[80px]`}
@@ -116,6 +120,7 @@ export function OrcamentoItemTableRow({
           onChange={(e) => onUpdate("quantidade", e.target.value)}
         />
       </td>
+      )}
       <td className={TD}>
         <input
           className={`${inputClass} max-w-[120px]`}

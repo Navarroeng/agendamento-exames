@@ -13,6 +13,7 @@ import {
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 import type { ImplantacaoTreinamentoRecord } from "@/lib/implantacao-treinamento";
+import type { ImplantacaoAetRecord } from "@/lib/implantacao-aet";
 
 interface OrcamentoEtapasNavProps {
   tab: OrcamentoEtapaId;
@@ -21,6 +22,7 @@ interface OrcamentoEtapasNavProps {
   disabled?: boolean;
   fluxo?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
+  aet?: ImplantacaoAetRecord | null;
   contagemAgendamentos?: OrcamentoEtapasContagemAgendamentos | null;
   onChange: (tab: OrcamentoEtapaId) => void;
 }
@@ -39,6 +41,7 @@ export function OrcamentoEtapasNav({
   disabled,
   fluxo = "padrao",
   treinamento = null,
+  aet = null,
   contagemAgendamentos = null,
   onChange,
 }: OrcamentoEtapasNavProps) {
@@ -46,6 +49,7 @@ export function OrcamentoEtapasNav({
   const ctx: OrcamentoEtapasContexto = {
     fluxo,
     treinamento,
+    aet,
     contagem: contagemAgendamentos,
   };
 
@@ -68,7 +72,15 @@ export function OrcamentoEtapasNav({
             key={item.id}
             type="button"
             disabled={bloqueada || disabled}
-            title={bloqueada ? "Etapa bloqueada" : item.label}
+            title={
+              bloqueada
+                ? item.id === "elaboracao"
+                  ? "Aguardando realização da visita"
+                  : item.id === "envio"
+                    ? "Conclua a elaboração do AET antes de registrar o envio"
+                    : "Etapa bloqueada"
+                : item.label
+            }
             onClick={() => {
               if (!bloqueada) onChange(item.id);
             }}

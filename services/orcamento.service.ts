@@ -13,6 +13,11 @@ import type {
   OrcamentoInsertPayload,
   OrcamentoRecord,
 } from "@/lib/orcamento-types";
+import {
+  orcamentoEhExclusivoAet,
+  orcamentoPossuiAet,
+  SERVICO_AET_EXCLUSIVIDADE_MSG,
+} from "@/lib/servico-aet";
 
 const ORCAMENTO_SELECT = `
   *,
@@ -26,6 +31,9 @@ function normalizeOrcamentoPayload(
   const validationError = validateOrcamentoItensValores(itens);
   if (validationError) {
     throw new Error(validationError);
+  }
+  if (orcamentoPossuiAet(itens) && !orcamentoEhExclusivoAet(itens)) {
+    throw new Error(SERVICO_AET_EXCLUSIVIDADE_MSG);
   }
 
   const subtotal = itens.reduce(

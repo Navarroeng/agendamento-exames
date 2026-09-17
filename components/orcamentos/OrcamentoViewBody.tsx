@@ -23,6 +23,7 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
@@ -84,6 +85,7 @@ export function OrcamentoViewBody({
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
+  const isAet = orcamentoEhExclusivoAet(itens);
   const valorServico = Number(orcamento.valor_total) || 0;
   const linhasMensalidade = isMensalidade
     ? buildResumoMensalidadeLinhas(valorServico)
@@ -136,9 +138,11 @@ export function OrcamentoViewBody({
             <thead>
               <tr className="bg-[#082b63] text-left text-[10px] font-semibold uppercase tracking-wide text-white">
                 <th className="px-4 py-3 font-semibold sm:px-5">Serviço</th>
+                {isAet ? null : (
                 <th className="px-3 py-3 text-center font-semibold">
                   Quantidade de colaboradores
                 </th>
+                )}
                 <th className="px-4 py-3 text-right font-semibold sm:px-5">
                   {labelValorColunaOrcamento(orcamento.modalidade)}
                 </th>
@@ -179,9 +183,11 @@ export function OrcamentoViewBody({
                         </div>
                       ) : null}
                     </td>
+                    {isAet ? null : (
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
                       {item.quantidade}
                     </td>
+                    )}
                     <td className="px-4 py-3.5 text-right align-top font-extrabold text-navy sm:px-5">
                       {isMensalidade
                         ? formatValorMensalidade(resolveItemValorServico(item))

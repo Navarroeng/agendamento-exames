@@ -2,6 +2,13 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { isProcuracaoStatusConcluida } from "@/lib/cliente-procuracao";
 import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 import {
+  isAetDocumentosEtapaConcluida,
+  isAetElaboracaoConcluida,
+  isAetEnvioConcluido,
+  isAetVisitaRealizada,
+  type ImplantacaoAetRecord,
+} from "@/lib/implantacao-aet";
+import {
   isTreinamentoEtapaConcluida,
   type ImplantacaoTreinamentoRecord,
 } from "@/lib/implantacao-treinamento";
@@ -17,7 +24,11 @@ export type OrcamentoEtapaId =
   | "logo"
   | "visita"
   | "agendamentos"
-  | "treinamento";
+  | "treinamento"
+  | "documentos"
+  | "visita_aet"
+  | "elaboracao"
+  | "envio";
 
 export type OrcamentoEtapaEstado =
   | "concluida"
@@ -47,11 +58,25 @@ export const ORCAMENTO_ETAPAS = ORCAMENTO_ETAPAS_PADRAO;
  * Montagem dinâmica das abas:
  * - somente_treinamentos: 5 abas (sem docs SST / exames)
  * - combinado: fluxo SST completo + Agendamento do Treinamento (após Financeiro)
+ * - aet: fluxo próprio (sem SST ocupacional)
  * - padrao: fluxo atual
  */
 export function buildOrcamentoEtapas(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): Array<{ id: OrcamentoEtapaId; label: string }> {
+  if (fluxo === "aet") {
+    return [
+      { id: "resumo", label: "Resumo" },
+      { id: "aprovado", label: "Orçamento aprovado" },
+      { id: "contrato", label: "Contrato" },
+      { id: "financeiro", label: "Financeiro" },
+      { id: "documentos", label: "Documentos da empresa" },
+      { id: "visita_aet", label: "Agendamento da visita" },
+      { id: "elaboracao", label: "Elaboração do AET" },
+      { id: "envio", label: "Envio ao cliente" },
+    ];
+  }
+
   if (fluxo === "somente_treinamentos") {
     return [
       { id: "resumo", label: "Resumo" },
@@ -90,6 +115,7 @@ export type OrcamentoEtapasContagemAgendamentos = {
 export type OrcamentoEtapasContexto = {
   fluxo?: OrcamentoFluxoImplantacao;
   treinamento?: ImplantacaoTreinamentoRecord | null;
+  aet?: ImplantacaoAetRecord | null;
   contagem?: OrcamentoEtapasContagemAgendamentos | null;
 };
 
@@ -195,21 +221,34 @@ export function isOrcamentoEtapaLiberada(
     case "financeiro":
       return isContratoEtapaConcluida(aprovacao);
     case "treinamento":
+      if (fluxo === "aet") return false;
       return isFinanceiroEtapaConcluida(aprovacao);
+    case "documentos":
+      if (fluxo !== "aet") return false;
+      return isFinanceiroEtapaConcluida(aprovacao);
+    case "visita_aet":
+      if (fluxo !== "aet") return false;
+      return isAetDocumentosEtapaConcluida(ctx?.aet);
+    case "elaboracao":
+      if (fluxo !== "aet") return false;
+      return isAetVisitaRealizada(ctx?.aet);
+    case "envio":
+      if (fluxo !== "aet") return false;
+      return isAetElaboracaoConcluida(ctx?.aet);
     case "procuracao":
-      if (fluxo === "somente_treinamentos") return false;
+      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "funcionarios":
-      if (fluxo === "somente_treinamentos") return false;
+      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
       return isProcuracaoEtapaConcluida(aprovacao);
     case "logo":
-      if (fluxo === "somente_treinamentos") return false;
+      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
       return isFuncionariosEtapaConcluida(aprovacao);
     case "visita":
-      if (fluxo === "somente_treinamentos") return false;
+      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
       return isLogoEtapaConcluida(aprovacao);
     case "agendamentos":
-      if (fluxo === "somente_treinamentos") return false;
+      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
       return isVisitaEtapaConcluida(aprovacao);
     default:
       return false;
@@ -234,6 +273,14 @@ export function isOrcamentoEtapaConcluida(
       return isFinanceiroEtapaConcluida(aprovacao);
     case "treinamento":
       return isTreinamentoEtapaConcluida(ctx?.treinamento);
+    case "documentos":
+      return isAetDocumentosEtapaConcluida(ctx?.aet);
+    case "visita_aet":
+      return isAetVisitaRealizada(ctx?.aet);
+    case "elaboracao":
+      return isAetElaboracaoConcluida(ctx?.aet);
+    case "envio":
+      return isAetEnvioConcluido(ctx?.aet);
     case "procuracao":
       return isProcuracaoEtapaConcluida(aprovacao);
     case "funcionarios":

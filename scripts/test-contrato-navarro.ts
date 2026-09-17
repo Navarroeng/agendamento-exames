@@ -28,7 +28,10 @@ import {
   buildContratoNavarroDocumento,
   podeGerarContratoNavarro,
 } from "../lib/contrato-modelo";
-import { drawContratoPdfDocument } from "../lib/contrato-pdf";
+import {
+  drawContratoPdfDocument,
+  nomeArquivoContratoNavarro,
+} from "../lib/contrato-pdf";
 import { mensagemErroContratoDocumento } from "../lib/contrato-documento-erro";
 import { buildOrcamentoOnboardingPath } from "../lib/orcamento-onboarding-files";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
@@ -358,9 +361,31 @@ await run("orçamento antigo sem modalidade explícita usa pontual", () => {
   assert.ok(doc.texto.includes("R$ 100,00"));
 });
 
+await run("nome do PDF segue Contrato_Navarro_cliente_orcamento", () => {
+  assert.equal(
+    nomeArquivoContratoNavarro("ORC-2026-0007", "NEPPER CONSTRUTORA"),
+    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("ORC-2026-0007", "José & Cia. Ltda"),
+    "Contrato_Navarro_Jose_Cia_Ltda_ORC-2026-0007.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("ORC-2026-0008", "NEPPER CONSTRUTORA"),
+    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0008.pdf"
+  );
+});
+
 await run("path de storage reutiliza onboarding", () => {
-  const p = buildOrcamentoOnboardingPath("ap1", "contrato", "Contrato.pdf");
-  assert.match(p, /^ap1\/contrato-\d+\.pdf$/);
+  const friendly =
+    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007.pdf";
+  const p = buildOrcamentoOnboardingPath("ap1", "contrato", friendly);
+  assert.match(
+    p,
+    /^ap1\/\d+\/Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007\.pdf$/
+  );
+  const logo = buildOrcamentoOnboardingPath("ap1", "logo", "marca.png");
+  assert.match(logo, /^ap1\/logo-\d+\.png$/);
 });
 
 await run("PDF pontual e mensalidade", async () => {
