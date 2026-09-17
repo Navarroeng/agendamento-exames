@@ -26,7 +26,10 @@ import {
   buildResumoComercialOrcamento,
   formatCondicaoAprovada,
 } from "../lib/orcamento-aprovacao";
-import { resolveItensInclusosServico } from "../lib/servico-sst-pacote";
+import {
+  PACOTE_COMPLETO_SST_ITENS,
+  resolveItensInclusosServico,
+} from "../lib/servico-sst-pacote";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 
 const VALOR_MENSAL = 180;
@@ -92,6 +95,18 @@ assert.deepEqual(
   resolveItensInclusosServico({ nome: "Gestão SST - Mensal" }),
   [...GESTAO_COMPLETA_SST_ITENS]
 );
+assert.equal(GESTAO_COMPLETA_SST_ITENS.length, 6);
+assert.deepEqual(
+  resolveItensInclusosServico({
+    nome: "Gestão SST - Mensal",
+    itens_inclusos: ["item antigo do catálogo"],
+  }),
+  [...GESTAO_COMPLETA_SST_ITENS]
+);
+assert.equal(
+  GESTAO_COMPLETA_SST_ITENS[5],
+  "eSocial SST - Eventos S-2210, S-2220 e S-2240."
+);
 assert.equal(
   labelItensInclusosServico("Gestão SST - Mensal"),
   "Essa gestão inclui:"
@@ -101,6 +116,13 @@ assert.equal(labelValorColunaOrcamento("pontual"), "Valor");
 assert.equal(
   labelItensInclusosServico("Pacote completo - SST"),
   "Este pacote inclui:"
+);
+assert.equal(PACOTE_COMPLETO_SST_ITENS.length, 5);
+assert.deepEqual(resolveItensInclusosServico({ nome: "Pacote completo - SST" }), [
+  ...PACOTE_COMPLETO_SST_ITENS,
+]);
+assert.ok(
+  PACOTE_COMPLETO_SST_ITENS.includes("ASO - Atestado de saúde ocupacional.")
 );
 
 assert.equal(formatValorMensalidade(VALOR_MENSAL), "R$ 180,00 / mês");

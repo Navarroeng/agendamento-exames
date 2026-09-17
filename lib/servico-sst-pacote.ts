@@ -94,15 +94,16 @@ export function resolveItensInclusosServico(
     | undefined,
   servicoNome?: string | null
 ): string[] {
+  const nome = servico?.nome ?? servicoNome ?? "";
+  if (isGestaoCompletaSstNome(nome)) {
+    return [...GESTAO_COMPLETA_SST_ITENS];
+  }
+
   const parsed = parseItensInclusos(servico?.itens_inclusos);
   if (parsed.length > 0) return parsed;
 
-  const nome = servico?.nome ?? servicoNome ?? "";
   if (isPacoteCompletoSst(nome)) {
     return [...PACOTE_COMPLETO_SST_ITENS];
-  }
-  if (isGestaoCompletaSstNome(nome)) {
-    return [...GESTAO_COMPLETA_SST_ITENS];
   }
 
   return [];

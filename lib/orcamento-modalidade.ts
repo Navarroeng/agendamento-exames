@@ -22,11 +22,12 @@ export const GESTAO_SST_MENSAL_NOME = "Gestão SST - Mensal";
 export const GESTAO_COMPLETA_SST_NOME = GESTAO_SST_MENSAL_NOME;
 
 export const GESTAO_COMPLETA_SST_ITENS: readonly string[] = [
-  "PGR - Programa de gerenciamento de riscos.",
-  "LTCAT - Laudo técnico das condições do ambiente de trabalho.",
-  "PCMSO - NR07 - Programa de controle médico de saúde ocupacional.",
-  "ASO - Atestado de saúde ocupacional.",
-  "Laudo de Riscos Psicossociais - Nova NR - 01",
+  "PGR - Programa de Gerenciamento de Riscos.",
+  "LTCAT - Laudo Técnico das Condições do Ambiente de Trabalho.",
+  "PCMSO - NR-07 - Programa de Controle Médico de Saúde Ocupacional.",
+  "ASO - Exames clínicos ocupacionais.",
+  "Riscos Psicossociais - NR-01 - Avaliação e relatório.",
+  "eSocial SST - Eventos S-2210, S-2220 e S-2240.",
 ] as const;
 
 export const ORCAMENTO_MENSALIDADE_MESES = 12;
