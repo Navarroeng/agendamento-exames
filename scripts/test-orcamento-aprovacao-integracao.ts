@@ -5,6 +5,7 @@ import {
   ORCAMENTO_APROVACAO_CNPJ_OBRIGATORIO_MSG,
   assertOrcamentoCnpjParaAprovacao,
   formatCnpjAuditoria,
+  isAprovacaoIntegracaoCompleta,
   resolveOrcamentoCnpjDigits,
 } from "../lib/orcamento-aprovacao-integracao";
 
@@ -30,6 +31,23 @@ try {
 assert.equal(
   formatCnpjAuditoria("12345678000195"),
   "12.345.678/0001-95"
+);
+
+assert.equal(
+  isAprovacaoIntegracaoCompleta({
+    result: {
+      aprovacao_id: "ap-aet",
+      cliente_id: "cli-1",
+      contrato_id: null,
+    },
+    itens: [
+      {
+        servico_id: "aet",
+        servico_nome: "Laudo AET – Análise Ergonômica do Trabalho",
+      },
+    ],
+  }),
+  true
 );
 
 console.log("test-orcamento-aprovacao-integracao: OK");

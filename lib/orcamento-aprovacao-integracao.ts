@@ -1,6 +1,8 @@
 import { formatCNPJ } from "@/lib/cnpj";
 import { normalizeCnpjDigits } from "@/lib/cliente-cnpj";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 
@@ -45,6 +47,22 @@ export interface OrcamentoAprovacaoIntegracaoResult {
   cnpj_digits: string;
   cliente_nome: string;
   numero_orcamento: string;
+}
+
+/**
+ * AET exclusivo: cliente + aprovação bastam; contrato SST é opcional (null).
+ * Demais serviços: contrato SST continua obrigatório.
+ */
+export function isAprovacaoIntegracaoCompleta(params: {
+  result: Pick<
+    OrcamentoAprovacaoIntegracaoResult,
+    "aprovacao_id" | "cliente_id" | "contrato_id"
+  >;
+  itens: ServicoItemRef[] | null | undefined;
+}): boolean {
+  if (!params.result.aprovacao_id || !params.result.cliente_id) return false;
+  if (orcamentoEhExclusivoAet(params.itens)) return true;
+  return Boolean(params.result.contrato_id);
 }
 
 export function parseAprovacaoIntegracaoError(error: unknown): string {

@@ -21,6 +21,7 @@ import {
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
 import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { garantirImplantacaoAet } from "@/services/implantacao-aet.service";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
   CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
@@ -263,6 +264,18 @@ export async function salvarAprovacaoOrcamento(
   const aprovacao = await buscarAprovacaoPorOrcamentoId(orcamentoId);
   if (!aprovacao) {
     throw new Error("Aprovação não encontrada após salvar.");
+  }
+
+  if (orcamentoEhExclusivoAet(aprovacao.orcamento_aprovacao_itens)) {
+    try {
+      await garantirImplantacaoAet({
+        orcamentoId,
+        aprovacaoId: aprovacao.id,
+        usuarioNome: payload.aprovado_por,
+      });
+    } catch (err) {
+      console.error("Falha ao iniciar implantação AET após aprovação.", err);
+    }
   }
 
   return { aprovacao, integracao };

@@ -8,11 +8,13 @@ import { ClienteContratoFormModal } from "@/components/clientes/ClienteContratoF
 import { ClienteContratosHistoricoTable } from "@/components/clientes/ClienteContratosHistoricoTable";
 import { ClienteEncerrarContratoModal } from "@/components/clientes/ClienteEncerrarContratoModal";
 import { ClienteIncluirRiscosModal } from "@/components/clientes/ClienteIncluirRiscosModal";
+import { ClienteServicosPontuaisSection } from "@/components/clientes/ClienteServicosPontuaisSection";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useClienteContratos } from "@/hooks/useClienteContratos";
 import { useClienteEdit } from "@/hooks/useClienteEdit";
+import { useClienteServicosPontuais } from "@/hooks/useClienteServicosPontuais";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { formatVigenciaContrato } from "@/lib/cliente-contrato-mappers";
@@ -110,6 +112,9 @@ export function ClienteViewModal({
     closeForm,
     closeEncerrar,
   } = useClienteContratos(cliente?.id ?? null, cliente?.nome ?? null);
+
+  const { itens: servicosPontuais, loading: loadingPontuais } =
+    useClienteServicosPontuais(cliente?.id ?? null);
 
   const podeIncluirRiscos = clienteTemContratoVigente(contratos);
   const disponibilidadeAgendamento = resolveDisponibilidadeAgendamentoCliente({
@@ -363,11 +368,11 @@ export function ClienteViewModal({
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-[15px] font-extrabold text-[#2d2a4a]">
-                    Contratos e renovações
+                    Contrato SST
                   </h4>
                   <p className="mt-0.5 text-xs text-[#8b95a8]">
-                    Histórico completo de vigência, valores e condições
-                    comerciais.
+                    Vínculo operacional de SST: vigência, colaboradores,
+                    agendamento e financeiro do contrato.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -405,7 +410,7 @@ export function ClienteViewModal({
 
               <div className="mt-5">
                 <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8b95a8]">
-                  Histórico de contratos
+                  Histórico de contratos SST
                 </p>
                 <ClienteContratosHistoricoTable
                   contratos={historico}
@@ -416,6 +421,11 @@ export function ClienteViewModal({
                 />
               </div>
             </div>
+
+            <ClienteServicosPontuaisSection
+              itens={servicosPontuais}
+              loading={loadingPontuais}
+            />
           </div>
         </div>
       </div>

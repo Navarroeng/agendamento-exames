@@ -34,6 +34,7 @@ import {
   isOrcamentoFormDirty,
   serializeOrcamentoFormSnapshot,
 } from "@/lib/orcamento-form-dirty";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import {
   ORCAMENTO_JA_APROVADO_MSG,
   orcamentoPermiteAprovar,
@@ -73,6 +74,7 @@ import {
 import {
   assertOrcamentoCnpjParaAprovacao,
   formatCnpjAuditoria,
+  isAprovacaoIntegracaoCompleta,
   ORCAMENTO_CONTRATO_JA_VINCULADO_MSG,
 } from "@/lib/orcamento-aprovacao-integracao";
 import {
@@ -965,11 +967,29 @@ export function useOrcamentosPage() {
         const refreshed = await buscarOrcamentoComItens(aprovarOrcamento.id);
         if (refreshed) setAprovarOrcamento(refreshed);
         setAprovarAprovacao(saved);
-        toast.success(
-          integracao.cliente_criado
-            ? "Aprovação salva. Cliente e contrato criados."
-            : "Aprovação salva. Contrato vinculado ao cliente."
-        );
+        const itensAprovados = saved.orcamento_aprovacao_itens;
+        const isAet = orcamentoEhExclusivoAet(itensAprovados);
+        const integracaoCompleta = isAprovacaoIntegracaoCompleta({
+          result: integracao,
+          itens: itensAprovados,
+        });
+        if (!integracaoCompleta) {
+          toast.error(
+            "APROVACAO_INCOMPLETA: o orçamento só pode ficar Aprovado após criar/vincular cliente e contrato. Use a RPC aprovar_orcamento_integrar_cliente."
+          );
+        } else if (isAet) {
+          toast.success(
+            integracao.cliente_criado
+              ? "Aprovação salva. Cliente vinculado e implantação AET iniciada."
+              : "Aprovação salva. Implantação AET iniciada."
+          );
+        } else {
+          toast.success(
+            integracao.cliente_criado
+              ? "Aprovação salva. Cliente e contrato criados."
+              : "Aprovação salva. Contrato vinculado ao cliente."
+          );
+        }
         refresh();
         refreshClientes();
       } catch (err) {

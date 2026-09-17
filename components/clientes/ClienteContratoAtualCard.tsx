@@ -38,10 +38,13 @@ export function ClienteContratoAtualCard({
   if (!contrato) {
     return (
       <div className="rounded-2xl border border-dashed border-[#d7deec] bg-gradient-to-br from-[#fbfcff] to-[#f6f8fc] px-5 py-8 text-center">
-        <p className="text-sm font-bold text-[#52617a]">Nenhum contrato</p>
+        <p className="text-sm font-bold text-[#52617a]">
+          Nenhum contrato SST ativo
+        </p>
         <p className="mt-1 text-xs text-[#8b95a8]">
-          Ao aprovar um orçamento, o pré-cadastro e o contrato são criados
-          automaticamente.
+          Pacote SST, mensalidade e demais vínculos operacionais aparecem
+          aqui. Serviços pontuais (AET, perícias, laudos avulsos) ficam na
+          seção abaixo.
         </p>
       </div>
     );

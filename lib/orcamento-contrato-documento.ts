@@ -1,5 +1,11 @@
 import type { OrcamentoModalidade } from "@/lib/orcamento-modalidade";
 
+/**
+ * PDFs de contrato gerados a partir do orçamento aprovado (versionados).
+ * O contrato documental do AET reutiliza esta tabela (modalidade pontual),
+ * vinculado ao orçamento/aprovação/cliente — não é cliente_contratos SST.
+ */
+
 export interface OrcamentoContratoDocumentoRecord {
   id: string;
   orcamento_id: string;

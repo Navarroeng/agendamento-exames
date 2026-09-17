@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { useServicosSstList } from "@/hooks/useServicosSstList";
@@ -19,6 +19,7 @@ import {
 import {
   resolveInitialImplantacaoMes,
   resolveImplantacaoMesParaAno,
+  yearMonthFromDataAprovacao,
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
@@ -68,6 +69,7 @@ import {
   salvarImplantacaoTreinamento,
 } from "@/services/implantacao-treinamento.service";
 import { IMPLANTACAO_TREINAMENTO_STATUS_LABELS } from "@/lib/implantacao-treinamento";
+import { readImplantacaoOrcamentoIdFromSearch } from "@/lib/servicos-pontuais";
 
 export function useImplantacaoClientesPage() {
   const auditContext = useAuditoriaUsuario();
@@ -102,6 +104,7 @@ export function useImplantacaoClientesPage() {
   const [modalTreinamentoEventos, setModalTreinamentoEventos] = useState<
     ImplantacaoTreinamentoEventoRecord[]
   >([]);
+  const deepLinkOrcamentoIdRef = useRef<string | null>(null);
 
   const refresh = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = Boolean(opts?.silent);
@@ -272,6 +275,20 @@ export function useImplantacaoClientesPage() {
     },
     [openProcesso, processos]
   );
+
+  useEffect(() => {
+    if (loading || typeof window === "undefined") return;
+    const orcamentoId = readImplantacaoOrcamentoIdFromSearch(
+      window.location.search
+    );
+    if (!orcamentoId || deepLinkOrcamentoIdRef.current === orcamentoId) return;
+    const processo = processos.find((p) => p.orcamento.id === orcamentoId);
+    if (!processo) return;
+    deepLinkOrcamentoIdRef.current = orcamentoId;
+    const mes = yearMonthFromDataAprovacao(processo.dataAprovacao);
+    if (mes) setMesSelecionado(mes);
+    void handleContinuar(orcamentoId);
+  }, [loading, processos, handleContinuar]);
 
   const closeModal = useCallback(() => {
     if (modalSaving) return;
