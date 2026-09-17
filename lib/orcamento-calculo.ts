@@ -27,6 +27,29 @@ export function parseQuantidadeColaboradores(value: string): number {
   return Number.isFinite(qtd) && qtd >= 1 ? qtd : 0;
 }
 
+/** Quantidade persistida do item → campo do formulário, sem herdar de outro item. */
+export function quantidadeColaboradoresItemParaFormulario(
+  quantidade: string | number | null | undefined
+): string {
+  const n = Math.round(Number(quantidade));
+  return Number.isFinite(n) && n >= 1 ? String(n) : "1";
+}
+
+/** Altera a quantidade só do item indicado; recálculo automático do Pacote SST permanece local. */
+export function applyQuantidadeColaboradoresSomenteNoItem(
+  itens: OrcamentoItemFormItem[],
+  itemId: string,
+  quantidadeRaw: string
+): OrcamentoItemFormItem[] {
+  const quantidade = formatQuantidadeColaboradoresInput(quantidadeRaw);
+  return itens.map((item) => {
+    if (item.id !== itemId) return item;
+    const next = { ...item, quantidade };
+    if (next.valor_manual) return next;
+    return { ...next, ...applyValorAutomaticoPacoteCompletoSstItem(next) };
+  });
+}
+
 export function formatValorOrcamentoInput(valor: number): string {
   if (!Number.isFinite(valor) || valor <= 0) return "";
   return maskMoneyInput(String(Math.round(valor * 100)));

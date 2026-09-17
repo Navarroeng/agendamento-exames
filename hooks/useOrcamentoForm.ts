@@ -8,15 +8,15 @@ import {
 } from "@/lib/text-normalize";
 import {
   applyPacoteCompletoSstPrecoItensPayload,
+  applyQuantidadeColaboradoresSomenteNoItem,
   applyValorAutomaticoPacoteCompletoSstItem,
   calcSubtotalItens,
-  formatQuantidadeColaboradoresInput,
   formatValorOrcamentoInput,
   inferValorManualOrcamentoItem,
   isPacoteCompletoSstValorAutomatico,
   parseQuantidadeColaboradores,
+  quantidadeColaboradoresItemParaFormulario,
   resolveItemValorParaFormulario,
-  resolveQuantidadeColaboradoresOrcamento,
   validateOrcamentoItensValores,
 } from "@/lib/orcamento-calculo";
 import {
@@ -51,18 +51,6 @@ import type { ClienteRecord } from "@/lib/types";
 import { maskCNPJInput } from "@/lib/cnpj";
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
-
-function syncQuantidadeColaboradores(
-  itens: OrcamentoItemFormItem[],
-  quantidade: string
-): OrcamentoItemFormItem[] {
-  return itens.map((item) => {
-    const next = { ...item, quantidade };
-    if (next.valor_manual) return next;
-    const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
-    return { ...next, ...auto };
-  });
-}
 
 export function useOrcamentoForm() {
   const [form, setForm] = useState<OrcamentoFormValues>(getEmptyOrcamentoForm);
@@ -101,14 +89,9 @@ export function useOrcamentoForm() {
   const addItem = useCallback(() => {
     setForm((prev) => {
       if (isOrcamentoMensalidade(prev.modalidade)) return prev;
-      const quantidadeReferencia =
-        prev.itens.find((item) => item.quantidade.trim())?.quantidade ?? "1";
       return {
         ...prev,
-        itens: [
-          ...prev.itens,
-          { ...createEmptyOrcamentoItem(), quantidade: quantidadeReferencia },
-        ],
+        itens: [...prev.itens, createEmptyOrcamentoItem()],
       };
     });
   }, []);
@@ -132,10 +115,13 @@ export function useOrcamentoForm() {
     ) => {
       setForm((prev) => {
         if (field === "quantidade") {
-          const quantidade = formatQuantidadeColaboradoresInput(value);
           return {
             ...prev,
-            itens: syncQuantidadeColaboradores(prev.itens, quantidade),
+            itens: applyQuantidadeColaboradoresSomenteNoItem(
+              prev.itens,
+              id,
+              value
+            ),
           };
         }
 
@@ -258,9 +244,6 @@ export function useOrcamentoForm() {
     const itensDb = [...(orcamento.orcamento_itens ?? [])].sort(
       (a, b) => a.ordem - b.ordem
     );
-    const quantidadeReferencia = String(
-      resolveQuantidadeColaboradoresOrcamento({ orcamento_itens: itensDb }) || 1
-    );
 
     setForm({
       numero: orcamento.numero,
@@ -292,13 +275,16 @@ export function useOrcamentoForm() {
         itensDb.length > 0
           ? itensDb.map((item) => {
               const valor = resolveItemValorParaFormulario(item);
-              const qtd =
-                parseQuantidadeColaboradores(quantidadeReferencia) || 1;
+              const qtd = parseQuantidadeColaboradores(
+                quantidadeColaboradoresItemParaFormulario(item.quantidade)
+              );
               return {
                 id: item.id,
                 servico_id: item.servico_id ?? "",
                 servico_nome: item.servico_nome,
-                quantidade: quantidadeReferencia,
+                quantidade: quantidadeColaboradoresItemParaFormulario(
+                  item.quantidade
+                ),
                 valor_unitario:
                   valor > 0
                     ? maskMoneyInput(String(Math.round(valor * 100)))

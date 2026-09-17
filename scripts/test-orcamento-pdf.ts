@@ -310,6 +310,28 @@ assert.match(casoRaw, /Página 1 de 2|Pagina 1 de 2/);
 assert.match(casoRaw, /Página 2 de 2|Pagina 2 de 2/);
 assert.doesNotMatch(casoRaw, /Página 1 de 1|Pagina 1 de 1/);
 
+const qtdsIndividuaisOrcamento = buildOrcamento({
+  numero: "ORC-2026-0300",
+  itens: [
+    { nome: PACOTE_COMPLETO_SST_NOME, quantidade: 3, valor: 1500 },
+    { nome: "Exames Complementares - Audiometria", quantidade: 2, valor: 200 },
+  ],
+});
+assert.equal(qtdsIndividuaisOrcamento.orcamento_itens[0].quantidade, 3);
+assert.equal(qtdsIndividuaisOrcamento.orcamento_itens[1].quantidade, 2);
+assert.equal(
+  resolveQuantidadeColaboradoresOrcamento(qtdsIndividuaisOrcamento),
+  3
+);
+const qtdsIndividuais = renderPdf(qtdsIndividuaisOrcamento);
+assert.ok(qtdsIndividuais.getNumberOfPages() >= 1);
+const qtdsRaw = pdfLatin1(qtdsIndividuais);
+const qtdsVisible = pdfVisibleText(qtdsRaw);
+assert.match(qtdsVisible, /Pacote completo/);
+assert.match(qtdsVisible, /Audiometria/);
+assert.match(qtdsVisible, /^3$/m);
+assert.match(qtdsVisible, /^2$/m);
+
 const maior = renderPdf(
   buildOrcamento({
     numero: "ORC-2026-0100",

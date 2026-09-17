@@ -11,6 +11,8 @@ import {
   inferValorManualOrcamentoItem,
   isValorOrcamentoItemBloqueado,
   parseQuantidadeColaboradores,
+  quantidadeColaboradoresItemParaFormulario,
+  applyQuantidadeColaboradoresSomenteNoItem,
   resolveItemValorForm,
   resolveItemValorParaFormulario,
   resolveItemValorServico,
@@ -320,6 +322,153 @@ assert.equal(
     ],
   }),
   2
+);
+
+assert.equal(
+  quantidadeColaboradoresItemParaFormulario(3),
+  "3"
+);
+assert.equal(
+  quantidadeColaboradoresItemParaFormulario(2),
+  "2"
+);
+assert.equal(
+  quantidadeColaboradoresItemParaFormulario(null),
+  "1"
+);
+
+const tresItens = [
+  itemForm({
+    id: "a",
+    servico_nome: PACOTE_COMPLETO_SST_NOME,
+    quantidade: "3",
+    valor_unitario: "R$ 1.500,00",
+    valor_total: "1500",
+  }),
+  itemForm({
+    id: "b",
+    servico_nome: "Exames Complementares - Audiometria",
+    quantidade: "2",
+    valor_unitario: "200,00",
+    valor_total: "200",
+  }),
+  itemForm({
+    id: "c",
+    servico_nome: "Treinamento NR06",
+    quantidade: "10",
+    valor_unitario: "800,00",
+    valor_total: "800",
+  }),
+];
+const soSegundo = applyQuantidadeColaboradoresSomenteNoItem(
+  tresItens,
+  "b",
+  "5"
+);
+assert.equal(soSegundo[0].quantidade, "3");
+assert.equal(soSegundo[1].quantidade, "5");
+assert.equal(soSegundo[2].quantidade, "10");
+assert.equal(soSegundo[0].valor_total, "1500");
+assert.equal(soSegundo[2].valor_total, "800");
+
+const pacoteEAudio = applyQuantidadeColaboradoresSomenteNoItem(
+  [
+    itemForm({
+      id: "p",
+      servico_nome: PACOTE_COMPLETO_SST_NOME,
+      quantidade: "3",
+    }),
+    itemForm({
+      id: "a2",
+      servico_nome: "Audiometria",
+      quantidade: "1",
+      valor_unitario: "90,00",
+      valor_total: "90",
+    }),
+  ],
+  "a2",
+  "2"
+);
+assert.equal(pacoteEAudio[0].quantidade, "3");
+assert.equal(pacoteEAudio[1].quantidade, "2");
+
+const pacoteEOutro = [
+  itemForm({
+    id: "p3",
+    servico_nome: PACOTE_COMPLETO_SST_NOME,
+    quantidade: "3",
+    valor_manual: false,
+  }),
+  itemForm({
+    id: "o1",
+    servico_nome: "Outro",
+    quantidade: "1",
+    valor_unitario: "100,00",
+    valor_total: "100",
+  }),
+];
+const pacoteEOutroComPreco = pacoteEOutro.map((item) =>
+  item.valor_manual
+    ? item
+    : { ...item, ...applyValorAutomaticoPacoteCompletoSstItem(item) }
+);
+assert.equal(pacoteEOutroComPreco[0].quantidade, "3");
+assert.equal(pacoteEOutroComPreco[1].quantidade, "1");
+const subtotalPacoteOutro = calcSubtotalItens(pacoteEOutroComPreco);
+const outroParaCinco = applyQuantidadeColaboradoresSomenteNoItem(
+  pacoteEOutroComPreco,
+  "o1",
+  "5"
+);
+assert.equal(outroParaCinco[0].quantidade, "3");
+assert.equal(outroParaCinco[1].quantidade, "5");
+assert.equal(calcSubtotalItens(outroParaCinco), subtotalPacoteOutro);
+assert.equal(outroParaCinco[0].valor_total, pacoteEOutroComPreco[0].valor_total);
+assert.equal(outroParaCinco[1].valor_total, "100");
+
+const pacoteParaQuatro = applyQuantidadeColaboradoresSomenteNoItem(
+  pacoteEOutroComPreco,
+  "p3",
+  "4"
+);
+assert.equal(pacoteParaQuatro[0].quantidade, "4");
+assert.equal(pacoteParaQuatro[1].quantidade, "1");
+assert.equal(pacoteParaQuatro[1].valor_total, "100");
+
+const reaberto = [
+  { quantidade: 3 },
+  { quantidade: 2 },
+  { quantidade: 10 },
+  { quantidade: null as number | null },
+].map((item) => quantidadeColaboradoresItemParaFormulario(item.quantidade));
+assert.deepEqual(reaberto, ["3", "2", "10", "1"]);
+
+assert.equal(
+  resolveQuantidadeColaboradoresOrcamento({
+    orcamento_itens: [
+      {
+        id: "1",
+        orcamento_id: "o1",
+        servico_id: null,
+        servico_nome: PACOTE_COMPLETO_SST_NOME,
+        quantidade: 3,
+        valor_unitario: 1500,
+        valor_total: 1500,
+        ordem: 0,
+      },
+      {
+        id: "2",
+        orcamento_id: "o1",
+        servico_id: null,
+        servico_nome: "Audiometria",
+        quantidade: 2,
+        valor_unitario: 200,
+        valor_total: 200,
+        ordem: 1,
+      },
+    ],
+  }),
+  3
 );
 
 console.log("test-orcamento-calculo: OK");
