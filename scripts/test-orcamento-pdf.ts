@@ -629,6 +629,8 @@ assert.match(aetRaw, /Condi[cç][aã]o de pagamento/i);
 assert.match(aetRaw, /Valor total/i);
 assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_AET.length, 3);
 assert.equal(AET_INCLUSOS_ITENS.length, 8);
+assert.doesNotMatch(aetRaw, /•/);
+assert.doesNotMatch(aetRaw, /\u2022/);
 assert.equal(aetOrc.modalidade, "pontual");
 const previewDir = path.join(process.cwd(), "tmp");
 fs.mkdirSync(previewDir, { recursive: true });

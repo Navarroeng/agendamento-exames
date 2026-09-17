@@ -85,6 +85,11 @@ const FINANCIAL_VALIDADE_COLOR: [number, number, number] = [107, 114, 128];
 const COLON_VALUE_GAP = 1.5;
 const CARD_ITEM_GAP = 1.6;
 const INCLUSO_LINE_H = 3.3;
+const AET_INCLUSO_BULLET_R = 0.55;
+const AET_INCLUSO_BULLET_GAP = 2.2;
+const AET_INCLUSO_ITEM_GAP = 2;
+const AET_INCLUSO_BULLET_INDENT =
+  AET_INCLUSO_BULLET_R * 2 + AET_INCLUSO_BULLET_GAP;
 const INCLUSOS_ITEMS_TO_OBS_GAP = 1;
 const INCLUSOS_OBS_PAD = 2;
 const INCLUSOS_OBS_LABEL_H = 3.2;
@@ -1317,15 +1322,31 @@ function parseInclusoLabelValue(
 function measureStructuredInclusoItemHeight(
   doc: JsPDF,
   text: string,
-  textWidth: number
+  textWidth: number,
+  options?: { comMarcador?: boolean }
 ): number {
-  if (parseInclusoLabelValue(text)) {
-    return INCLUSO_LINE_H + CARD_ITEM_GAP;
+  const wrapWidth = options?.comMarcador
+    ? Math.max(textWidth - AET_INCLUSO_BULLET_INDENT, 10)
+    : textWidth;
+  const itemGap = options?.comMarcador ? AET_INCLUSO_ITEM_GAP : CARD_ITEM_GAP;
+
+  if (!options?.comMarcador && parseInclusoLabelValue(text)) {
+    return INCLUSO_LINE_H + itemGap;
   }
 
   doc.setFontSize(8);
-  const lines = doc.splitTextToSize(text, textWidth);
-  return lines.length * INCLUSO_LINE_H + CARD_ITEM_GAP;
+  const lines = doc.splitTextToSize(text, wrapWidth);
+  return lines.length * INCLUSO_LINE_H + itemGap;
+}
+
+function drawAetInclusoMarcador(doc: JsPDF, x: number, baselineY: number): void {
+  doc.setFillColor(...NAVY);
+  doc.circle(
+    x + AET_INCLUSO_BULLET_R,
+    baselineY - 0.9,
+    AET_INCLUSO_BULLET_R,
+    "F"
+  );
 }
 
 function drawStructuredInclusoItem(
@@ -1334,9 +1355,15 @@ function drawStructuredInclusoItem(
   y: number,
   textWidth: number,
   text: string,
-  options?: { emphasis?: boolean }
+  options?: { emphasis?: boolean; comMarcador?: boolean }
 ): number {
-  const parsed = parseInclusoLabelValue(text);
+  const comMarcador = Boolean(options?.comMarcador);
+  const itemGap = comMarcador ? AET_INCLUSO_ITEM_GAP : CARD_ITEM_GAP;
+  const wrapWidth = comMarcador
+    ? Math.max(textWidth - AET_INCLUSO_BULLET_INDENT, 10)
+    : textWidth;
+  const textX = comMarcador ? x + AET_INCLUSO_BULLET_INDENT : x;
+  const parsed = comMarcador ? null : parseInclusoLabelValue(text);
 
   if (parsed) {
     const labelText =
@@ -1352,15 +1379,18 @@ function drawStructuredInclusoItem(
       x + doc.getTextWidth(labelText) + COLON_VALUE_GAP,
       y
     );
-    return y + INCLUSO_LINE_H + CARD_ITEM_GAP;
+    return y + INCLUSO_LINE_H + itemGap;
   }
 
   doc.setFont("helvetica", options?.emphasis ? "bold" : "normal");
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_700);
-  const lines = doc.splitTextToSize(text, textWidth);
-  doc.text(lines, x, y);
-  return y + lines.length * INCLUSO_LINE_H + CARD_ITEM_GAP;
+  const lines = doc.splitTextToSize(text, wrapWidth);
+  if (comMarcador) {
+    drawAetInclusoMarcador(doc, x, y);
+  }
+  doc.text(lines, textX, y);
+  return y + lines.length * INCLUSO_LINE_H + itemGap;
 }
 
 function measureObservacoesInclusosBoxHeight(
@@ -1411,13 +1441,16 @@ function measurePacoteCompletoInclusosBlockHeight(
   doc: JsPDF,
   width: number,
   itens: string[],
-  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
+  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES,
+  comMarcador = false
 ): number {
   const textWidth = width - CARD_PAD_X * 2;
   let h = CARD_HEADER_H + CARD_BODY_PAD;
 
   itens.forEach((item) => {
-    h += measureStructuredInclusoItemHeight(doc, item, textWidth);
+    h += measureStructuredInclusoItemHeight(doc, item, textWidth, {
+      comMarcador,
+    });
   });
 
   if (observacoes.length > 0) {
@@ -1436,7 +1469,8 @@ function drawPacoteCompletoInclusosBlock(
   width: number,
   height: number,
   itens: string[],
-  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
+  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES,
+  comMarcador = false
 ): void {
   const bodyY = drawFaturaStyleCardShell(doc, x, y, width, height, "O que está incluso?");
 
@@ -1447,6 +1481,7 @@ function drawPacoteCompletoInclusosBlock(
   itens.forEach((item, index) => {
     itemY = drawStructuredInclusoItem(doc, textX, itemY, textWidth, item, {
       emphasis: observacoes.length > 0 && index < 2,
+      comMarcador,
     });
   });
 
@@ -1838,7 +1873,8 @@ function measureDesiredCardsRowHeight(
       doc,
       checklistW,
       pacoteItens,
-      inclusosObservacoes
+      inclusosObservacoes,
+      isAet
     );
   } else if (inclusos.length > 0) {
     inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
@@ -2195,7 +2231,8 @@ function drawFinancialAndInclusosRow(
       checklistW,
       cardH,
       pacoteInclusosItens,
-      inclusosObservacoes
+      inclusosObservacoes,
+      isAet
     );
   } else if (inclusos.length > 0) {
     drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);
