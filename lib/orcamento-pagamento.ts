@@ -7,6 +7,7 @@ import type {
   OrcamentoItemFormItem,
   OrcamentoItemRecord,
 } from "@/lib/orcamento-types";
+import { orcamentoPermitePagamentoAVista } from "@/lib/servico-aet";
 import { isItemPacoteCompletoSst } from "@/lib/servico-sst-pacote";
 
 export const DESCONTO_AVISTA_PERCENTUAL = 5;
@@ -70,6 +71,7 @@ export function calcValorAVistaOrcamento(
   itens: ItemBaseDescontoAvista[],
   pacoteServicoId?: string | null
 ): number {
+  if (!orcamentoPermitePagamentoAVista(itens)) return 0;
   const { elegivel, demais } = splitValoresDescontoAvista(
     itens,
     pacoteServicoId
@@ -148,6 +150,15 @@ export function calcValorParcela(valorTotal: number, parcelas: number): number {
   return Math.round((valorTotal / parcelas) * 100) / 100;
 }
 
+export function formatCondicaoPagamentoParcelas(
+  parcelas: number,
+  valorParcela: number
+): string {
+  const n = Math.max(1, Math.floor(Number(parcelas)) || 1);
+  const unidade = n === 1 ? "parcela" : "parcelas";
+  return `${n} ${unidade} de ${formatCurrency(valorParcela)}`;
+}
+
 export interface CondicoesPagamentoProposta {
   valorTotal: number;
   parcelas: number;
@@ -157,6 +168,7 @@ export interface CondicoesPagamentoProposta {
   valorAVista: number;
   textoParcelado: string;
   textoAVista: string;
+  permitePagamentoAVista: boolean;
 }
 
 /** Condições de pagamento da proposta (parcelas manuais, limitadas pelo valor). */
@@ -174,8 +186,12 @@ export function calcCondicoesPagamentoProposta(
     quantidadeParcelas
   );
   const valorParcela = calcValorParcela(safeTotal, parcelas);
-  const valorAVista =
-    itensDescontoAvista == null
+  const permitePagamentoAVista = orcamentoPermitePagamentoAVista(
+    itensDescontoAvista ?? []
+  );
+  const valorAVista = !permitePagamentoAVista
+    ? 0
+    : itensDescontoAvista == null
       ? calcValorAVistaProposta(safeTotal)
       : calcValorAVistaOrcamento(itensDescontoAvista, pacoteServicoId);
 
@@ -187,6 +203,7 @@ export function calcCondicoesPagamentoProposta(
     valorParcela,
     valorAVista,
     textoParcelado: `${parcelas}x de ${formatCurrency(valorParcela)}`,
-    textoAVista: formatCurrency(valorAVista),
+    textoAVista: permitePagamentoAVista ? formatCurrency(valorAVista) : "",
+    permitePagamentoAVista,
   };
 }

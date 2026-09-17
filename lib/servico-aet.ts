@@ -87,6 +87,14 @@ export function orcamentoEhExclusivoAet(
   return relevant.every((item) => isServicoAet(item, aetServicoId));
 }
 
+/** AET exclusivo não tem à vista. Demais Pontuais (SST, treinamentos) sim. */
+export function orcamentoPermitePagamentoAVista(
+  itens: ServicoItemRef[] | null | undefined,
+  aetServicoId?: string | null
+): boolean {
+  return !orcamentoEhExclusivoAet(itens, aetServicoId);
+}
+
 function itemTemServico(item: ServicoItemRef): boolean {
   return (
     Boolean((item.servico_id ?? "").trim()) ||

@@ -8,12 +8,14 @@ import {
   calcValorAVistaOrcamento,
   calcValorAVistaProposta,
   calcValorParcela,
+  formatCondicaoPagamentoParcelas,
   itensFormParaDescontoAvista,
   listOpcoesParcelas,
   resolveQuantidadeParcelasEscolhida,
   splitValoresDescontoAvista,
 } from "../lib/orcamento-pagamento";
 import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
+import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 
 assert.equal(arredondarCentenaParaBaixo(1235), 1200);
@@ -56,6 +58,7 @@ assert.equal(caso1300.parcelas, 2);
 assert.equal(caso1300.maxParcelas, 2);
 assert.equal(caso1300.valorParcela, 650);
 assert.equal(caso1300.valorAVista, 1200);
+assert.equal(caso1300.permitePagamentoAVista, true);
 assert.equal(caso1300.textoParcelado, "2x de R$ 650,00");
 assert.equal(caso1300.textoAVista, "R$ 1.200,00");
 
@@ -205,5 +208,36 @@ assert.equal(
   calcValorAVistaOrcamento(itensFormParaDescontoAvista(formItens)),
   4345
 );
+
+const aetItens = [
+  { servico_id: "aet-1", servico_nome: SERVICO_AET_NOME, valor: 3200 },
+];
+assert.equal(calcValorAVistaOrcamento(aetItens), 0);
+assert.notEqual(calcValorAVistaProposta(3200), 0);
+
+const condicoesAet = calcCondicoesPagamentoProposta(3200, 2, aetItens);
+assert.equal(condicoesAet.permitePagamentoAVista, false);
+assert.equal(condicoesAet.valorAVista, 0);
+assert.equal(condicoesAet.textoAVista, "");
+assert.equal(condicoesAet.parcelas, 2);
+assert.equal(condicoesAet.valorParcela, 1600);
+assert.equal(condicoesAet.valorTotal, 3200);
+assert.equal(condicoesAet.textoParcelado, "2x de R$ 1.600,00");
+assert.equal(
+  formatCondicaoPagamentoParcelas(2, 1600),
+  "2 parcelas de R$ 1.600,00"
+);
+assert.notEqual(condicoesAet.valorAVista, calcValorAVistaProposta(3200));
+
+const treinamentoItens = [
+  { servico_nome: "Treinamento NR-12", valor: 1800 },
+];
+const condicoesTreino = calcCondicoesPagamentoProposta(
+  1800,
+  3,
+  treinamentoItens
+);
+assert.equal(condicoesTreino.permitePagamentoAVista, true);
+assert.equal(condicoesTreino.valorAVista, 1800);
 
 console.log("test-orcamento-pagamento: OK");

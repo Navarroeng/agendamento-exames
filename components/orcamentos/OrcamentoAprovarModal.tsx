@@ -460,6 +460,15 @@ export function OrcamentoAprovarModal({
     []
   );
 
+  useEffect(() => {
+    if (fluxoImplantacao !== "aet") return;
+    setForm((prev) =>
+      prev && prev.forma_pagamento === "avista"
+        ? { ...prev, forma_pagamento: "parcelado" }
+        : prev
+    );
+  }, [fluxoImplantacao]);
+
   function iniciarEdicaoCondicoes() {
     if (!orcamento || !aprovacao) return;
     setForm({
@@ -495,7 +504,7 @@ export function OrcamentoAprovarModal({
     }
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
-      form.forma_pagamento === "parcelado" &&
+      (form.forma_pagamento === "parcelado" || fluxoImplantacao === "aet") &&
       (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
     ) {
       toast.error("Informe a quantidade de parcelas.");
@@ -505,6 +514,8 @@ export function OrcamentoAprovarModal({
     await onAtualizarCondicoesAprovadas({
       ...form,
       condicoes_iguais: false,
+      forma_pagamento:
+        fluxoImplantacao === "aet" ? "parcelado" : form.forma_pagamento,
     });
     setEditandoCondicoes(false);
     try {
@@ -542,7 +553,7 @@ export function OrcamentoAprovarModal({
       }
       if (
         !isOrcamentoMensalidade(orcamento.modalidade) &&
-        form.forma_pagamento === "parcelado" &&
+        (form.forma_pagamento === "parcelado" || fluxoImplantacao === "aet") &&
         (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
       ) {
         toast.error("Informe a quantidade de parcelas.");
@@ -554,7 +565,11 @@ export function OrcamentoAprovarModal({
       }
     }
 
-    await onSalvarAprovacao(form);
+    await onSalvarAprovacao(
+      fluxoImplantacao === "aet"
+        ? { ...form, forma_pagamento: "parcelado" }
+        : form
+    );
     setShowDiffConfirm(false);
     setTab("contrato");
   }
@@ -909,6 +924,7 @@ export function OrcamentoAprovarModal({
                     </>
                   ) : (
                     <>
+                  {isAet ? null : (
                   <ResumoItem
                     label="À vista"
                     value={
@@ -917,6 +933,7 @@ export function OrcamentoAprovarModal({
                         : "—"
                     }
                   />
+                  )}
                   <ResumoItem
                     label="Parcelado"
                     value={resumoComercial.textoParcelado || "—"}
@@ -1017,6 +1034,7 @@ export function OrcamentoAprovarModal({
                         </div>
                       ) : (
                       <>
+                      {isAet ? null : (
                       <div>
                         <p className="mb-2 text-xs font-bold text-navy">
                           Forma de pagamento <RequiredMark />
@@ -1050,8 +1068,9 @@ export function OrcamentoAprovarModal({
                           </label>
                         </div>
                       </div>
+                      )}
 
-                      {form.forma_pagamento === "avista" ? (
+                      {!isAet && form.forma_pagamento === "avista" ? (
                         <ResumoItem
                           label="Valor final fechado"
                           value={
@@ -1252,6 +1271,7 @@ export function OrcamentoAprovarModal({
                           </div>
                         ) : (
                         <>
+                        {isAet ? null : (
                         <div>
                           <p className="mb-2 text-xs font-bold text-navy">
                             Forma de pagamento <RequiredMark />
@@ -1288,8 +1308,9 @@ export function OrcamentoAprovarModal({
                             </label>
                           </div>
                         </div>
+                        )}
 
-                        {form.forma_pagamento === "avista" ? (
+                        {!isAet && form.forma_pagamento === "avista" ? (
                           <ResumoItem
                             label="Valor final fechado"
                             value={

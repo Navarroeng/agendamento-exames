@@ -329,7 +329,13 @@ export function OrcamentoForm({
             </p>
           </div>
         ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div
+          className={
+            condicoesPagamento.permitePagamentoAVista
+              ? "grid grid-cols-1 gap-3 md:grid-cols-2"
+              : "grid grid-cols-1 gap-3"
+          }
+        >
           <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
               Pagamento parcelado
@@ -365,6 +371,7 @@ export function OrcamentoForm({
               para este valor.
             </p>
           </div>
+          {condicoesPagamento.permitePagamentoAVista ? (
           <div className="rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#b45309]">
               Valor à vista
@@ -376,6 +383,7 @@ export function OrcamentoForm({
               {TEXTO_DESCONTO_AVISTA_PACOTE}
             </p>
           </div>
+          ) : null}
         </div>
         )}
         </Panel>

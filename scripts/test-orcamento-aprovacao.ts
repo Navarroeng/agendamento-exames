@@ -193,7 +193,11 @@ const orcamentoAet = {
 } as OrcamentoComItens;
 const resumoAet = buildResumoComercialOrcamento(orcamentoAet);
 assert.equal(resumoAet.quantidadeColaboradores, 0);
+assert.equal(resumoAet.valorAVista, 0);
+assert.equal(resumoAet.textoAVista, "");
+assert.equal(resumoAet.parcelas > 0, true);
 const formAet = buildAprovacaoFormFromOrcamento(orcamentoAet);
+assert.equal(formAet.forma_pagamento, "parcelado");
 const payloadAet = buildAprovacaoInsertPayload(
   orcamentoAet,
   formAet,
@@ -201,20 +205,76 @@ const payloadAet = buildAprovacaoInsertPayload(
   parseMoney
 );
 assert.equal(payloadAet.quantidade_colaboradores, 0);
+assert.equal(payloadAet.valor_avista, null);
+assert.equal(payloadAet.desconto_percentual, 0);
+assert.equal(payloadAet.quantidade_parcelas != null, true);
+assert.equal(payloadAet.valor_parcela != null, true);
+assert.doesNotMatch(payloadAet.condicao_pagamento ?? "", /vista/i);
 assert.equal(payloadAet.itens[0]?.servico_id, "aet-1");
 assert.equal(payloadAet.itens[0]?.servico_nome, SERVICO_AET_NOME);
+const payloadAetAvistaIgnorado = buildAprovacaoInsertPayload(
+  orcamentoAet,
+  {
+    ...formAet,
+    condicoes_iguais: false,
+    forma_pagamento: "avista",
+    valor_final: "3.200,00",
+    quantidade_parcelas: "2",
+  },
+  "Ágatha",
+  parseMoney
+);
+assert.notEqual(payloadAetAvistaIgnorado.condicao_pagamento, "À vista");
+assert.equal(payloadAetAvistaIgnorado.valor_avista, null);
+assert.equal(payloadAetAvistaIgnorado.quantidade_parcelas, 2);
+assert.equal(payloadAetAvistaIgnorado.valor_parcela, 1600);
+assert.equal(payloadAetAvistaIgnorado.valor_final, 3200);
 const diffsAet = buildAprovacaoDiffs(
   orcamentoAet,
   { ...formAet, condicoes_iguais: false, valor_final: "3.000,00" },
   parseMoney
 );
 assert.ok(!diffsAet.some((d) => d.label === "Quantidade de colaboradores"));
+assert.ok(
+  !diffsAet.some((d) => /vista/i.test(`${d.original} ${d.aprovado}`))
+);
 const condicoesAet = buildCondicoesComerciaisFromForm(
-  { ...formAet, condicoes_iguais: false, valor_final: "3.000,00" },
+  {
+    ...formAet,
+    condicoes_iguais: false,
+    forma_pagamento: "avista",
+    valor_final: "3.000,00",
+    quantidade_parcelas: "2",
+  },
   parseMoney,
   "pontual",
   orcamentoAet.orcamento_itens
 );
 assert.equal(condicoesAet.quantidade_colaboradores, 0);
+assert.equal(condicoesAet.valor_avista, null);
+assert.equal(condicoesAet.quantidade_parcelas, 2);
+const aprovacaoAetResidual = {
+  quantidade_colaboradores: 0,
+  valor_final: 2500,
+  valor_avista: 2500,
+  quantidade_parcelas: 1,
+  valor_parcela: null,
+  condicao_pagamento: "À vista",
+  observacoes: null,
+  orcamento_aprovacao_itens: [
+    {
+      id: "ai1",
+      aprovacao_id: "ap1",
+      servico_id: "aet-1",
+      servico_nome: SERVICO_AET_NOME,
+      quantidade: 1,
+      valor_unitario: 2500,
+      valor_total: 2500,
+      ordem: 0,
+    },
+  ],
+} as OrcamentoAprovacaoRecord;
+assert.doesNotMatch(formatCondicaoAprovada(aprovacaoAetResidual), /vista/i);
+assert.match(formatCondicaoAprovada(aprovacaoAetResidual), /1x de/);
 
 console.log("test-orcamento-aprovacao: OK");

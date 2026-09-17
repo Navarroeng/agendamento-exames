@@ -6,6 +6,7 @@ import {
   bloqueioAetExclusivo,
   isServicoAetNome,
   orcamentoEhExclusivoAet,
+  orcamentoPermitePagamentoAVista,
   orcamentoPossuiAet,
   PROPOSTA_DESCRICAO_PARAGRAFOS_AET,
   resolveTipoDocumentoContrato,
@@ -42,6 +43,13 @@ const aetItem = {
 };
 assert.equal(orcamentoPossuiAet([aetItem]), true);
 assert.equal(orcamentoEhExclusivoAet([aetItem]), true);
+assert.equal(orcamentoPermitePagamentoAVista([aetItem]), false);
+assert.equal(
+  orcamentoPermitePagamentoAVista([
+    { servico_id: "pgr", servico_nome: "PGR" },
+  ]),
+  true
+);
 assert.equal(
   orcamentoEhExclusivoAet([
     aetItem,

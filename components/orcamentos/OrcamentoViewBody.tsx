@@ -291,6 +291,7 @@ export function OrcamentoViewBody({
               </p>
             </div>
           </div>
+          {condicoesPagamento.permitePagamentoAVista ? (
           <div className="flex items-start gap-3 py-4">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#c9972b]/15 text-[#a07820]">
               <IconTag size={16} />
@@ -304,6 +305,7 @@ export function OrcamentoViewBody({
               </p>
             </div>
           </div>
+          ) : null}
             </>
           )}
         </div>
