@@ -152,6 +152,8 @@ export const AUDITORIA_ACOES = {
   orcamento_cancelado: "orcamento_cancelado",
   orcamento_valor_alterado: "orcamento_valor_alterado",
   orcamento_responsavel_alterado: "orcamento_responsavel_alterado",
+  contrato_gerado: "contrato_gerado",
+  contrato_regenerado: "contrato_regenerado",
   agendamento_periodico_vinculado: "agendamento_periodico_vinculado",
   agendamento_valores_alterados: "agendamento_valores_alterados",
 } as const;
@@ -316,6 +318,8 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   orcamento_cancelado: "Orçamento cancelado",
   orcamento_valor_alterado: "Valor do orçamento alterado",
   orcamento_responsavel_alterado: "Responsável do processo alterado",
+  contrato_gerado: "Contrato gerado",
+  contrato_regenerado: "Contrato regenerado",
   agendamento_periodico_vinculado: "Agendamento vinculado a periódico futuro",
   agendamento_valores_alterados: "Exames e valores do agendamento alterados",
 };

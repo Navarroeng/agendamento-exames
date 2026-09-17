@@ -57,6 +57,7 @@ import {
   type OrcamentoAbaTreinamentoForm,
 } from "./OrcamentoAbaTreinamento";
 import { OrcamentoViewBody } from "./OrcamentoViewBody";
+import { OrcamentoContratoGerarPanel } from "./OrcamentoContratoGerarPanel";
 import {
   isOrcamentoEtapaLiberada,
   type OrcamentoEtapaId,
@@ -1373,6 +1374,12 @@ export function OrcamentoAprovarModal({
 
           {tab === "contrato" && aprovacao ? (
             <div className="space-y-4">
+              <OrcamentoContratoGerarPanel
+                orcamento={orcamento}
+                aprovacao={aprovacao}
+                disabled={acompanhamentoBloqueado}
+              />
+
               <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
                 Andamento documental:{" "}
                 <strong className="text-navy">

@@ -24,6 +24,19 @@ export function validateOrcamentoListaFuncionariosFile(file: File): void {
   }
 }
 
+export function validateOrcamentoContratoPdfFile(file: File): void {
+  if (!file || file.size <= 0) {
+    throw new Error("Selecione o PDF do contrato.");
+  }
+  if (file.size > ORCAMENTO_ONBOARDING_MAX_BYTES) {
+    throw new Error("O contrato deve ter no máximo 10 MB.");
+  }
+  const ext = extensionOf(file.name);
+  if (ext !== "pdf") {
+    throw new Error("O contrato gerado deve ser um arquivo PDF.");
+  }
+}
+
 export function validateOrcamentoLogoFile(file: File): void {
   if (!file || file.size <= 0) {
     throw new Error("Selecione a logomarca da empresa.");
@@ -37,9 +50,11 @@ export function validateOrcamentoLogoFile(file: File): void {
   }
 }
 
+export type OrcamentoOnboardingKind = "funcionarios" | "logo" | "contrato";
+
 export function buildOrcamentoOnboardingPath(
   aprovacaoId: string,
-  kind: "funcionarios" | "logo",
+  kind: OrcamentoOnboardingKind,
   fileName: string
 ): string {
   const ext = extensionOf(fileName) || "bin";

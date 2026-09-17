@@ -3,13 +3,14 @@ import {
   ORCAMENTO_ONBOARDING_BUCKET,
   buildOrcamentoOnboardingPath,
   resolveOnboardingContentType,
+  validateOrcamentoContratoPdfFile,
   validateOrcamentoListaFuncionariosFile,
   validateOrcamentoLogoFile,
 } from "@/lib/orcamento-onboarding-files";
 
 async function uploadOnboardingFile(
   aprovacaoId: string,
-  kind: "funcionarios" | "logo",
+  kind: "funcionarios" | "logo" | "contrato",
   file: File
 ): Promise<{ path: string; nome: string; tipo: string; tamanho: number }> {
   const supabase = createClient();
@@ -38,6 +39,14 @@ export async function uploadOrcamentoListaFuncionarios(
 export async function uploadOrcamentoLogo(aprovacaoId: string, file: File) {
   validateOrcamentoLogoFile(file);
   return uploadOnboardingFile(aprovacaoId, "logo", file);
+}
+
+export async function uploadOrcamentoContratoPdf(
+  aprovacaoId: string,
+  file: File
+) {
+  validateOrcamentoContratoPdfFile(file);
+  return uploadOnboardingFile(aprovacaoId, "contrato", file);
 }
 
 export async function obterUrlOrcamentoOnboarding(
