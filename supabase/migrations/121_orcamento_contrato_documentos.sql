@@ -51,3 +51,6 @@ create policy "staff_insert_orcamento_contrato_documentos"
   on public.orcamento_contrato_documentos
   for insert to authenticated
   with check (public.is_staff_user());
+
+grant select, insert on table public.orcamento_contrato_documentos to authenticated;
+grant select, insert on table public.orcamento_contrato_documentos to service_role;

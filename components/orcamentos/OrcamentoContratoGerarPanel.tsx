@@ -15,6 +15,7 @@ import {
 } from "@/lib/contrato-modelo";
 import { gerarPdfContratoNavarro } from "@/lib/contrato-pdf";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
+import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
@@ -63,9 +64,10 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível carregar os contratos gerados."
+        mensagemErroContratoDocumento(
+          err,
+          "Não foi possível carregar os contratos gerados."
+        )
       );
     } finally {
       setLoadingDocs(false);
@@ -132,7 +134,7 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Não foi possível gerar a prévia."
+        mensagemErroContratoDocumento(err, "Não foi possível gerar a prévia.")
       );
     } finally {
       setWorking(false);
@@ -195,7 +197,7 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Não foi possível salvar o contrato."
+        mensagemErroContratoDocumento(err, "Não foi possível salvar o contrato.")
       );
     } finally {
       setWorking(false);
@@ -210,9 +212,7 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível abrir o contrato."
+        mensagemErroContratoDocumento(err, "Não foi possível abrir o contrato.")
       );
     } finally {
       setWorking(false);
@@ -232,9 +232,7 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível baixar o contrato."
+        mensagemErroContratoDocumento(err, "Não foi possível baixar o contrato.")
       );
     } finally {
       setWorking(false);

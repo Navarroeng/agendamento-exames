@@ -16,6 +16,8 @@ import type { ContratoParcela } from "@/lib/contrato-pagamento";
 export const NAVARRO_CONTRATO_INSTITUCIONAL = {
   razaoSocial: NAVARRO_DADOS_BANCARIOS.favorecido,
   cnpj: NAVARRO_DADOS_BANCARIOS.pixCnpj,
+  endereco:
+    "Rua Francisco Marengo, nº 500, Tatuapé, São Paulo/SP, CEP 03313-000",
   telefone: "(11) 3181-7697",
   whatsapp: "(11) 97706-5599",
   email: "contato@navarroeng.com.br",
@@ -100,7 +102,7 @@ export function redigirContratante(c: ContratoParteContratante): string {
 
 export function redigirContratada(): string {
   const n = NAVARRO_CONTRATO_INSTITUCIONAL;
-  return `${n.razaoSocial}, inscrita no CNPJ sob nº ${n.cnpj}, telefone ${n.telefone}, e-mail ${n.email}, doravante denominada CONTRATADA.`;
+  return `${n.razaoSocial}, inscrita no CNPJ sob nº ${n.cnpj}, com sede na ${n.endereco}, telefone ${n.telefone}, e-mail ${n.email}, doravante denominada CONTRATADA.`;
 }
 
 export function redigirObjeto(numeroOrcamento: string): string {

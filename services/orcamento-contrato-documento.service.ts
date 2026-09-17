@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
 import type {
   OrcamentoContratoDocumentoInsert,
   OrcamentoContratoDocumentoRecord,
@@ -17,6 +18,14 @@ function mapRow(row: OrcamentoContratoDocumentoRecord): OrcamentoContratoDocumen
   };
 }
 
+function throwOnError(
+  error: { message?: string; details?: string; hint?: string } | null,
+  fallback: string
+): void {
+  if (!error) return;
+  throw new Error(mensagemErroContratoDocumento(error, fallback));
+}
+
 export async function listarContratoDocumentos(
   aprovacaoId: string
 ): Promise<OrcamentoContratoDocumentoRecord[]> {
@@ -26,7 +35,7 @@ export async function listarContratoDocumentos(
     .select("*")
     .eq("aprovacao_id", aprovacaoId)
     .order("versao", { ascending: false });
-  if (error) throw error;
+  throwOnError(error, "Não foi possível carregar os contratos gerados.");
   return (data ?? []).map((row) =>
     mapRow(row as OrcamentoContratoDocumentoRecord)
   );
@@ -45,10 +54,17 @@ export async function persistirContratoDocumentoGerado(params: {
   file: File;
 }): Promise<OrcamentoContratoDocumentoRecord> {
   const versao = await proximaVersaoContratoDocumento(params.payload.aprovacao_id);
-  const uploaded = await uploadOrcamentoContratoPdf(
-    params.payload.aprovacao_id,
-    params.file
-  );
+  let uploaded: Awaited<ReturnType<typeof uploadOrcamentoContratoPdf>>;
+  try {
+    uploaded = await uploadOrcamentoContratoPdf(
+      params.payload.aprovacao_id,
+      params.file
+    );
+  } catch (err) {
+    throw new Error(
+      mensagemErroContratoDocumento(err, "Não foi possível enviar o PDF do contrato.")
+    );
+  }
 
   const insert: OrcamentoContratoDocumentoInsert = {
     ...params.payload,
@@ -65,7 +81,7 @@ export async function persistirContratoDocumentoGerado(params: {
     .insert(insert)
     .select("*")
     .single();
-  if (error) throw error;
+  throwOnError(error, "Não foi possível salvar o contrato.");
   return mapRow(data as OrcamentoContratoDocumentoRecord);
 }
 

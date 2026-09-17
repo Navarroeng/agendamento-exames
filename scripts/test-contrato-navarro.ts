@@ -22,12 +22,14 @@ import {
 import {
   CONTRATO_TEXTOS_PROIBIDOS,
   NAVARRO_CONTRATO_INSTITUCIONAL,
+  redigirContratada,
 } from "../lib/contrato-navarro";
 import {
   buildContratoNavarroDocumento,
   podeGerarContratoNavarro,
 } from "../lib/contrato-modelo";
 import { drawContratoPdfDocument } from "../lib/contrato-pdf";
+import { mensagemErroContratoDocumento } from "../lib/contrato-documento-erro";
 import { buildOrcamentoOnboardingPath } from "../lib/orcamento-onboarding-files";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
@@ -160,6 +162,13 @@ async function main() {
   );
 });
 
+await run("qualificação da CONTRATADA inclui sede", () => {
+  assert.equal(
+    redigirContratada(),
+    "NAVARRO ENGENHARIA DE SEGURANÇA DO TRABALHO E MEDICINA OCUPACIONAL LTDA, inscrita no CNPJ sob nº 45.206.250/0001-10, com sede na Rua Francisco Marengo, nº 500, Tatuapé, São Paulo/SP, CEP 03313-000, telefone (11) 3181-7697, e-mail contato@navarroeng.com.br, doravante denominada CONTRATADA."
+  );
+});
+
 await run("divisão monetária 1400 / 3", () => {
   const cents = splitValorEmCentavos(1400, 3);
   assert.deepEqual(cents, [46667, 46667, 46666]);
@@ -247,6 +256,7 @@ await run("contrato pontual", () => {
   assert.match(texto, /CONTRATANTE/);
   assert.match(texto, /CONTRATADA/);
   assert.ok(texto.includes(NAVARRO_CONTRATO_INSTITUCIONAL.razaoSocial));
+  assert.ok(texto.includes("Rua Francisco Marengo, nº 500, Tatuapé, São Paulo/SP, CEP 03313-000"));
   assert.ok(!texto.includes("valor mensal"));
   assertSemTextosProibidos(texto, "pontual");
   assert.equal(aprovacao.contrato_enviado, false);
@@ -318,6 +328,7 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.match(texto, /nem implica cancelamento automático/);
   assert.match(texto, /multa de 2%/);
   assert.match(texto, /juros de mora de 1%/);
+  assert.ok(texto.includes("Rua Francisco Marengo, nº 500, Tatuapé, São Paulo/SP, CEP 03313-000"));
   assertSemTextosProibidos(texto, "mensalidade");
 });
 
@@ -380,6 +391,8 @@ await run("PDF pontual e mensalidade", async () => {
   const bufP = docP.output("arraybuffer") as ArrayBuffer;
   const rawP = extractPdfLatin1(bufP);
   assert.ok(bufP.byteLength > 2000);
+  assert.ok(rawP.includes("INSTRUMENTO PARTICULAR"));
+  assert.ok(rawP.includes("TRABALHO"));
   assert.ok(!/Eko/i.test(rawP));
   assert.ok(!rawP.includes("A&L"));
   assert.ok(!/QR Code/i.test(rawP));
@@ -414,6 +427,7 @@ await run("PDF pontual e mensalidade", async () => {
   assert.ok(docM.getNumberOfPages() >= 2, "mensalidade deve ter várias páginas");
   const bufM = docM.output("arraybuffer") as ArrayBuffer;
   const rawM = extractPdfLatin1(bufM);
+  assert.ok(rawM.includes("INSTRUMENTO PARTICULAR"));
   assert.ok(!rawM.includes("4.200"));
   assert.ok(!rawM.includes("4200"));
   assert.ok(!/Eko/i.test(rawM));
@@ -429,6 +443,25 @@ await run("PDF pontual e mensalidade", async () => {
     `    PDF mensalidade: ${mensalPath} (${docM.getNumberOfPages()} págs)`
   );
 });
+
+  await run("erro PostgREST plano não vira toast genérico", () => {
+    const fallback = "Não foi possível gerar a prévia.";
+    assert.equal(
+      mensagemErroContratoDocumento(
+        {
+          message: "permission denied for table orcamento_contrato_documentos",
+          code: "42501",
+        },
+        fallback
+      ),
+      "permission denied for table orcamento_contrato_documentos"
+    );
+    assert.equal(
+      mensagemErroContratoDocumento(new Error("Data ISO inválida."), fallback),
+      "Data ISO inválida."
+    );
+    assert.equal(mensagemErroContratoDocumento({ foo: 1 }, fallback), fallback);
+  });
 
   console.log("\nTodos os testes de contrato Navarro passaram.");
 }

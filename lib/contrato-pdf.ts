@@ -26,6 +26,16 @@ const TITLE_GAP = 3.2;
 const PARA_LINE_H = 4.4;
 const CLAUSE_GAP = 4.2;
 const LOGO_MAX_MM = 16;
+const LOGO_MAX_H_MM = 12;
+const LOGO_POS_Y = 6.5;
+const LOGO_CORNER_RADIUS_MM = 1.2;
+const OPENING_TITLE_SIZE = 12.5;
+const OPENING_TITLE_LINE_H = 6.2;
+const OPENING_TITLE_BOTTOM_GAP = 8;
+const OPENING_TITLE_LINES = [
+  "INSTRUMENTO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS",
+  "DE SAÚDE E SEGURANÇA DO TRABALHO",
+] as const;
 
 type JsPDFDoc = InstanceType<typeof jsPDF>;
 
@@ -51,6 +61,64 @@ export function nomeArquivoContratoNavarro(
   return `Contrato-${numero}-${cliente}${v}.pdf`;
 }
 
+function logoDisplaySize(pixelW: number, pixelH: number): { w: number; h: number } {
+  const ratio = pixelH / Math.max(pixelW, 1);
+  let w = LOGO_MAX_MM;
+  let h = w * ratio;
+  if (h > LOGO_MAX_H_MM) {
+    h = LOGO_MAX_H_MM;
+    w = h / ratio;
+  }
+  return { w, h };
+}
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function applyLogoRoundedBackground(
+  img: HTMLImageElement,
+  radiusPx: number
+): string | null {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.fillStyle = "#ffffff";
+  roundRectPath(ctx, 0, 0, w, h, radiusPx);
+  ctx.fill();
+
+  ctx.save();
+  roundRectPath(ctx, 0, 0, w, h, radiusPx);
+  ctx.clip();
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.restore();
+
+  return canvas.toDataURL("image/png");
+}
+
 async function loadLogoAsset(): Promise<LogoAsset | null> {
   if (typeof fetch !== "function" || typeof document === "undefined") return null;
   try {
@@ -66,14 +134,12 @@ async function loadLogoAsset(): Promise<LogoAsset | null> {
     });
     const dims = { w: img.naturalWidth, h: img.naturalHeight };
     URL.revokeObjectURL(objectUrl);
-    const canvas = document.createElement("canvas");
-    canvas.width = dims.w;
-    canvas.height = dims.h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(img, 0, 0);
+    const display = logoDisplaySize(dims.w, dims.h);
+    const radiusPx = (LOGO_CORNER_RADIUS_MM * dims.w) / Math.max(display.w, 0.01);
+    const dataUrl = applyLogoRoundedBackground(img, radiusPx);
+    if (!dataUrl) return null;
     return {
-      dataUrl: canvas.toDataURL("image/png"),
+      dataUrl,
       width: dims.w,
       height: dims.h,
     };
@@ -94,15 +160,9 @@ function drawHeader(
 
   let textX = MARGIN;
   if (logo) {
-    const ratio = logo.height / Math.max(logo.width, 1);
-    let w = LOGO_MAX_MM;
-    let h = w * ratio;
-    if (h > 12) {
-      h = 12;
-      w = h / ratio;
-    }
+    const { w, h } = logoDisplaySize(logo.width, logo.height);
     try {
-      doc.addImage(logo.dataUrl, "PNG", MARGIN, 6.5, w, h);
+      doc.addImage(logo.dataUrl, "PNG", MARGIN, LOGO_POS_Y, w, h);
       textX = MARGIN + w + 4;
     } catch {
       textX = MARGIN;
@@ -177,6 +237,22 @@ function signatureBlockHeight(): number {
   return 78;
 }
 
+function drawOpeningTitle(doc: JsPDFDoc, startY: number): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(OPENING_TITLE_SIZE);
+  doc.setTextColor(...NAVY);
+  let y = startY;
+  const centerX = PAGE_W / 2;
+  for (const line of OPENING_TITLE_LINES) {
+    const wrapped = paragraphLines(doc, line);
+    for (const wrappedLine of wrapped) {
+      doc.text(wrappedLine, centerX, y, { align: "center" });
+      y += OPENING_TITLE_LINE_H;
+    }
+  }
+  return y + OPENING_TITLE_BOTTOM_GAP;
+}
+
 export function drawContratoPdfDocument(
   doc: JsPDFDoc,
   documento: ContratoNavarroDocumento,
@@ -196,7 +272,7 @@ export function drawContratoPdfDocument(
   };
 
   drawHeader(doc, documento, logo);
-  let y = BODY_START;
+  let y = drawOpeningTitle(doc, BODY_START);
 
   for (let i = 0; i < documento.clausulas.length; i += 1) {
     const clause = documento.clausulas[i];
