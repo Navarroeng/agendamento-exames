@@ -21,6 +21,7 @@ import {
   applyValorAutomaticoPacoteCompletoSstItem,
 } from "../lib/orcamento-calculo";
 import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
+import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 
 function itemForm(
@@ -197,6 +198,36 @@ assert.equal(
       servico_nome: PACOTE_COMPLETO_SST_NOME,
       quantidade: 5,
       valor_unitario: 0,
+    },
+  ]),
+  null
+);
+assert.equal(
+  validateOrcamentoItensValores([
+    {
+      servico_nome: PACOTE_COMPLETO_SST_NOME,
+      quantidade: 0,
+      valor_unitario: 1700,
+    },
+  ]),
+  "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços."
+);
+assert.equal(
+  validateOrcamentoItensValores([
+    {
+      servico_nome: "Treinamento NR",
+      quantidade: 0,
+      valor_unitario: 900,
+    },
+  ]),
+  "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços."
+);
+assert.equal(
+  validateOrcamentoItensValores([
+    {
+      servico_nome: SERVICO_AET_NOME,
+      quantidade: 1,
+      valor_unitario: 2800,
     },
   ]),
   null

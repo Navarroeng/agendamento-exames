@@ -231,7 +231,8 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
     id: item.servico_id ?? `s-${index}`,
     nome: item.servico_nome,
     descricao:
-      item.servico_nome === PACOTE_COMPLETO_SST_NOME
+      item.servico_nome === PACOTE_COMPLETO_SST_NOME ||
+      item.servico_nome === SERVICO_AET_NOME
         ? null
         : "Exame complementar ocupacional.",
     valor_sugerido: item.valor_unitario,
@@ -242,7 +243,9 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
         ? [...PACOTE_COMPLETO_SST_ITENS]
         : item.servico_nome === GESTAO_SST_MENSAL_NOME
           ? [...GESTAO_COMPLETA_SST_ITENS]
-          : null,
+          : item.servico_nome === SERVICO_AET_NOME
+            ? [...AET_INCLUSOS_ITENS]
+            : null,
   }));
 }
 
@@ -612,7 +615,7 @@ assert.doesNotMatch(aetRaw, /N[uú]mero de Colaboradores/i);
 assert.doesNotMatch(aetRaw, /Exames Cl[ií]nicos/);
 assert.doesNotMatch(aetRaw, /BENEF[IÍ]CIOS DO PLANO/i);
 assert.doesNotMatch(aetRaw, /Pacote completo/);
-assert.doesNotMatch(aetRaw, /Este pacote inclui/i);
+assert.doesNotMatch(aetRaw, /Exame complementar ocupacional/i);
 assert.doesNotMatch(aetRaw, /eSocial/);
 assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_AET.length, 3);
 assert.equal(AET_INCLUSOS_ITENS.length, 8);

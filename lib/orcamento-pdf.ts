@@ -1901,7 +1901,10 @@ function estimateServiceRowHeight(
 
   let h = 7;
   const descricao = servico?.descricao?.trim();
-  if (descricao) {
+  if (
+    descricao &&
+    !orcamentoEhExclusivoAet([{ servico_nome: servico?.nome ?? item.servico_nome }])
+  ) {
     doc.setFontSize(TABLE_DETAIL_FONT);
     const lines = doc.splitTextToSize(descricao, serviceColWidth - 4);
     h += lines.length * TABLE_DETAIL_LINE_H + 1.5;
@@ -2029,7 +2032,7 @@ function drawServicesTable(
         doc.text(wrapped, colStarts[0] + 3, detailY);
         detailY += wrapped.length * TABLE_DETAIL_LINE_H;
       });
-    } else {
+    } else if (!isAet) {
       const descricao = servico?.descricao?.trim();
       if (descricao) {
         doc.setFont("helvetica", "normal");
