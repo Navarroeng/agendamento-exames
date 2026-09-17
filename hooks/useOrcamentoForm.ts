@@ -21,6 +21,7 @@ import {
 } from "@/lib/orcamento-calculo";
 import {
   calcCondicoesPagamentoProposta,
+  itensFormParaDescontoAvista,
   resolveQuantidadeParcelasEscolhida,
 } from "@/lib/orcamento-pagamento";
 import {
@@ -344,7 +345,8 @@ export function useOrcamentoForm() {
         : Number(form.quantidade_parcelas);
     const condicoesPagamento = calcCondicoesPagamentoProposta(
       valorTotal,
-      quantidadeEscolhida
+      quantidadeEscolhida,
+      itensFormParaDescontoAvista(form.itens)
     );
     const validadeProposta = form.data_proposta.trim()
       ? calcValidadePropostaIso(form.data_proposta)

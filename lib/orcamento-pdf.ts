@@ -10,7 +10,10 @@ import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
-import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  calcCondicoesPagamentoProposta,
+  itensRegistroParaDescontoAvista,
+} from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
 import {
   MENSALIDADE_BENEFICIOS_ITENS,
@@ -33,6 +36,7 @@ import {
   isPacoteCompletoSst,
   PACOTE_COMPLETO_SST_NOME,
   resolveItensInclusosServico,
+  resolvePacoteCompletoSstServicoId,
 } from "@/lib/servico-sst-pacote";
 import {
   AET_INCLUSOS_ITENS,
@@ -1120,7 +1124,8 @@ function drawResumoFinanceiroCard(
   y: number,
   w: number,
   h: number,
-  orcamento: OrcamentoComItens
+  orcamento: OrcamentoComItens,
+  catalogo: ServicoSstRecord[] = []
 ): void {
   const bodyY = drawResumoFinanceiroCardShell(doc, x, y, w, h);
 
@@ -1160,7 +1165,9 @@ function drawResumoFinanceiroCard(
 
   const pagamento = calcCondicoesPagamentoProposta(
     valorTotal,
-    orcamento.quantidade_parcelas
+    orcamento.quantidade_parcelas,
+    itensRegistroParaDescontoAvista(orcamento.orcamento_itens ?? []),
+    resolvePacoteCompletoSstServicoId(catalogo)
   );
   drawRow(
     "total",
@@ -1704,11 +1711,13 @@ function drawClientCard(
     ["Contato", displayValue(orcamento.contato)],
     ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
-    [
+  ];
+  if (!orcamentoHasAet(orcamento)) {
+    fieldsRight.push([
       "Número de Colaboradores",
       String(resolveNumeroColaboradoresOrcamento(orcamento)),
-    ],
-  ];
+    ]);
+  }
 
   const metrics = resolveClientCardMetrics(orcamento.modalidade);
   const leftH = measureClientColumnHeight(
@@ -2132,7 +2141,7 @@ function drawFinancialAndInclusosRow(
     drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);
   }
 
-  drawResumoFinanceiroCard(doc, boxX, y, boxW, cardH, orcamento);
+  drawResumoFinanceiroCard(doc, boxX, y, boxW, cardH, orcamento, catalogo);
 
   return y + cardH + afterSectionGap(orcamento.modalidade);
 }

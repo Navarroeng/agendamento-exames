@@ -6,7 +6,10 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { maskCNPJInput } from "@/lib/cnpj";
 import { formatCurrency } from "@/lib/money";
 import { VALIDADE_PROPOSTA_DIAS } from "@/lib/orcamento-validade";
-import type { CondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  TEXTO_DESCONTO_AVISTA_PACOTE,
+  type CondicoesPagamentoProposta,
+} from "@/lib/orcamento-pagamento";
 import type { OrcamentoFormField } from "@/hooks/useOrcamentoForm";
 import {
   ORCAMENTO_ORIGEM_OPTIONS,
@@ -370,8 +373,7 @@ export function OrcamentoForm({
               {condicoesPagamento.textoAVista}
             </p>
             <p className="mt-1 text-[11px] text-[#64748b]">
-              5% de desconto sobre {formatCurrency(valorTotal)}, arredondado para
-              baixo na centena.
+              {TEXTO_DESCONTO_AVISTA_PACOTE}
             </p>
           </div>
         </div>

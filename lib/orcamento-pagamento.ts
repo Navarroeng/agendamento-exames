@@ -1,8 +1,26 @@
 import { formatCurrency } from "@/lib/money";
+import {
+  resolveItemValorForm,
+  resolveItemValorServico,
+} from "@/lib/orcamento-calculo";
+import type {
+  OrcamentoItemFormItem,
+  OrcamentoItemRecord,
+} from "@/lib/orcamento-types";
+import { isItemPacoteCompletoSst } from "@/lib/servico-sst-pacote";
 
 export const DESCONTO_AVISTA_PERCENTUAL = 5;
 export const PARCELA_MINIMA = 500;
 export const MAX_PARCELAS = 10;
+
+export const TEXTO_DESCONTO_AVISTA_PACOTE =
+  "5% de desconto sobre o Pacote completo - SST, arredondado para baixo na centena. Serviços adicionais não recebem desconto.";
+
+export type ItemBaseDescontoAvista = {
+  servico_id?: string | null;
+  servico_nome?: string | null;
+  valor: number;
+};
 
 /** Arredonda para baixo na centena imediatamente inferior. */
 export function arredondarCentenaParaBaixo(valor: number): number {
@@ -15,9 +33,75 @@ export function calcValorComDescontoAvista(valorTotal: number): number {
   return valorTotal * (1 - DESCONTO_AVISTA_PERCENTUAL / 100);
 }
 
-/** Valor à vista exibido na proposta (5% de desconto + arredondamento). */
+/** Valor à vista do Pacote completo - SST (5% de desconto + arredondamento). */
 export function calcValorAVistaProposta(valorTotal: number): number {
   return arredondarCentenaParaBaixo(calcValorComDescontoAvista(valorTotal));
+}
+
+function valorItemPositivo(valor: number): number {
+  const n = Number(valor);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Pacote completo - SST é a única base elegível ao desconto à vista. */
+export function splitValoresDescontoAvista(
+  itens: ItemBaseDescontoAvista[],
+  pacoteServicoId?: string | null
+): { elegivel: number; demais: number } {
+  let elegivel = 0;
+  let demais = 0;
+  for (const item of itens) {
+    const valor = valorItemPositivo(item.valor);
+    if (valor <= 0) continue;
+    if (isItemPacoteCompletoSst(item, pacoteServicoId)) {
+      elegivel += valor;
+    } else {
+      demais += valor;
+    }
+  }
+  return { elegivel, demais };
+}
+
+/**
+ * À vista da proposta: desconto/arredondamento só no Pacote;
+ * demais itens entram pelo valor integral.
+ */
+export function calcValorAVistaOrcamento(
+  itens: ItemBaseDescontoAvista[],
+  pacoteServicoId?: string | null
+): number {
+  const { elegivel, demais } = splitValoresDescontoAvista(
+    itens,
+    pacoteServicoId
+  );
+  return calcValorAVistaProposta(elegivel) + demais;
+}
+
+export function itensFormParaDescontoAvista(
+  itens: OrcamentoItemFormItem[]
+): ItemBaseDescontoAvista[] {
+  return itens
+    .filter((item) => item.servico_nome.trim() !== "")
+    .map((item) => ({
+      servico_id: item.servico_id,
+      servico_nome: item.servico_nome,
+      valor: resolveItemValorForm(item),
+    }));
+}
+
+export function itensRegistroParaDescontoAvista(
+  itens: Array<
+    Pick<
+      OrcamentoItemRecord,
+      "servico_id" | "servico_nome" | "quantidade" | "valor_unitario" | "valor_total"
+    >
+  >
+): ItemBaseDescontoAvista[] {
+  return itens.map((item) => ({
+    servico_id: item.servico_id,
+    servico_nome: item.servico_nome,
+    valor: resolveItemValorServico(item),
+  }));
 }
 
 /**
@@ -78,7 +162,9 @@ export interface CondicoesPagamentoProposta {
 /** Condições de pagamento da proposta (parcelas manuais, limitadas pelo valor). */
 export function calcCondicoesPagamentoProposta(
   valorTotal: number,
-  quantidadeParcelas?: number | null
+  quantidadeParcelas?: number | null,
+  itensDescontoAvista?: ItemBaseDescontoAvista[] | null,
+  pacoteServicoId?: string | null
 ): CondicoesPagamentoProposta {
   const total = Number(valorTotal);
   const safeTotal = Number.isFinite(total) && total > 0 ? total : 0;
@@ -88,7 +174,10 @@ export function calcCondicoesPagamentoProposta(
     quantidadeParcelas
   );
   const valorParcela = calcValorParcela(safeTotal, parcelas);
-  const valorAVista = calcValorAVistaProposta(safeTotal);
+  const valorAVista =
+    itensDescontoAvista == null
+      ? calcValorAVistaProposta(safeTotal)
+      : calcValorAVistaOrcamento(itensDescontoAvista, pacoteServicoId);
 
   return {
     valorTotal: safeTotal,

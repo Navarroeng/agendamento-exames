@@ -5,11 +5,16 @@ import {
   arredondarCentenaParaBaixo,
   calcCondicoesPagamentoProposta,
   calcQuantidadeParcelas,
+  calcValorAVistaOrcamento,
   calcValorAVistaProposta,
   calcValorParcela,
+  itensFormParaDescontoAvista,
   listOpcoesParcelas,
   resolveQuantidadeParcelasEscolhida,
+  splitValoresDescontoAvista,
 } from "../lib/orcamento-pagamento";
+import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
+import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 
 assert.equal(arredondarCentenaParaBaixo(1235), 1200);
 assert.equal(arredondarCentenaParaBaixo(3040), 3000);
@@ -78,5 +83,127 @@ assert.equal(casoManual.textoParcelado, "3x de R$ 2.666,67");
 const casoClamp = calcCondicoesPagamentoProposta(2000, 10);
 assert.equal(casoClamp.parcelas, 4);
 assert.deepEqual(casoClamp.opcoesParcelas, [1, 2, 3, 4]);
+
+assert.equal(calcValorAVistaProposta(4600), 4300);
+
+const pacoteMaisOutro = [
+  { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+  { servico_nome: "Outros", valor: 45 },
+];
+assert.deepEqual(splitValoresDescontoAvista(pacoteMaisOutro), {
+  elegivel: 4600,
+  demais: 45,
+});
+assert.equal(calcValorAVistaOrcamento(pacoteMaisOutro), 4345);
+assert.notEqual(calcValorAVistaProposta(4645), 4345);
+
+const pacoteMaisVarios = [
+  { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+  { servico_nome: "Exames Complementares - Audiometria", valor: 45 },
+  { servico_nome: "Outro serviço", valor: 200 },
+];
+assert.equal(calcValorAVistaOrcamento(pacoteMaisVarios), 4545);
+
+assert.equal(
+  calcValorAVistaOrcamento([
+    { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+  ]),
+  4300
+);
+
+const pacoteNegociado = [
+  { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4800 },
+  { servico_nome: "Outros", valor: 45 },
+];
+assert.equal(calcValorAVistaOrcamento(pacoteNegociado), 4545);
+
+const adicionalAlterado = [
+  { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+  { servico_nome: "Outros", valor: 90 },
+];
+assert.equal(calcValorAVistaOrcamento(adicionalAlterado), 4390);
+
+assert.equal(
+  calcValorAVistaOrcamento([
+    { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+  ]),
+  4300
+);
+assert.equal(
+  calcValorAVistaOrcamento([
+    { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+    { servico_nome: "Outros", valor: 45 },
+  ]),
+  4345
+);
+assert.equal(
+  calcValorAVistaOrcamento([
+    { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+    { servico_nome: "Outros", valor: 200 },
+  ]),
+  4500
+);
+
+const adicionalPrimeiro = [
+  { servico_nome: "Audiometria", valor: 45 },
+  { servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 4600 },
+];
+assert.equal(calcValorAVistaOrcamento(adicionalPrimeiro), 4345);
+
+assert.equal(
+  calcValorAVistaOrcamento(
+    [
+      {
+        servico_id: "pacote-id",
+        servico_nome: "Nome qualquer",
+        valor: 4600,
+      },
+      { servico_id: "outros-id", servico_nome: "Outros", valor: 45 },
+    ],
+    "pacote-id"
+  ),
+  4345
+);
+
+const condicoesComAdicionais = calcCondicoesPagamentoProposta(
+  4645,
+  null,
+  pacoteMaisOutro
+);
+assert.equal(condicoesComAdicionais.valorTotal, 4645);
+assert.equal(condicoesComAdicionais.valorAVista, 4345);
+assert.equal(
+  condicoesComAdicionais.maxParcelas,
+  calcQuantidadeParcelas(4645)
+);
+assert.notEqual(
+  condicoesComAdicionais.maxParcelas,
+  calcQuantidadeParcelas(4345)
+);
+
+const formItens: OrcamentoItemFormItem[] = [
+  {
+    id: "1",
+    servico_id: "s-pacote",
+    servico_nome: PACOTE_COMPLETO_SST_NOME,
+    quantidade: "3",
+    valor_unitario: "4.600,00",
+    valor_total: "4600",
+    valor_manual: true,
+  },
+  {
+    id: "2",
+    servico_id: "s-outros",
+    servico_nome: "Outros",
+    quantidade: "1",
+    valor_unitario: "45,00",
+    valor_total: "45",
+    valor_manual: true,
+  },
+];
+assert.equal(
+  calcValorAVistaOrcamento(itensFormParaDescontoAvista(formItens)),
+  4345
+);
 
 console.log("test-orcamento-pagamento: OK");

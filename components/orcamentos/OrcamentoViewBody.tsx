@@ -8,7 +8,10 @@ import {
 } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { resolveItemValorServico } from "@/lib/orcamento-calculo";
-import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
+import {
+  calcCondicoesPagamentoProposta,
+  itensRegistroParaDescontoAvista,
+} from "@/lib/orcamento-pagamento";
 import { resolveValidadePropostaIso } from "@/lib/orcamento-validade";
 import { formatCurrency } from "@/lib/money";
 import {
@@ -26,7 +29,10 @@ import {
 import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
-import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
+import {
+  resolveItensInclusosServico,
+  resolvePacoteCompletoSstServicoId,
+} from "@/lib/servico-sst-pacote";
 
 function displayValue(value: string | null | undefined): string {
   const trimmed = value?.trim();
@@ -80,7 +86,9 @@ export function OrcamentoViewBody({
   );
   const condicoesPagamento = calcCondicoesPagamentoProposta(
     Number(orcamento.valor_total),
-    orcamento.quantidade_parcelas
+    orcamento.quantidade_parcelas,
+    itensRegistroParaDescontoAvista(itens),
+    resolvePacoteCompletoSstServicoId(servicos)
   );
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;

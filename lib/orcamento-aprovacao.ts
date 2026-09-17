@@ -2,6 +2,7 @@ import { formatCurrency } from "@/lib/money";
 import {
   calcCondicoesPagamentoProposta,
   calcValorParcela,
+  itensRegistroParaDescontoAvista,
 } from "@/lib/orcamento-pagamento";
 import {
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
@@ -299,7 +300,8 @@ export function buildResumoComercialOrcamento(
   }
   const pagamento = calcCondicoesPagamentoProposta(
     valorTotal,
-    orcamento.quantidade_parcelas
+    orcamento.quantidade_parcelas,
+    itensRegistroParaDescontoAvista(orcamento.orcamento_itens ?? [])
   );
   return {
     quantidadeColaboradores: quantidade,

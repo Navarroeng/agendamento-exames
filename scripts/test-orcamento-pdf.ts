@@ -470,6 +470,20 @@ assert.doesNotMatch(pontualRaw, /Essa gest[aã]o inclui/i);
 assert.doesNotMatch(pontualRaw, /eSocial SST - Eventos/);
 assert.doesNotMatch(pontualRaw, /12 mensalidades/);
 
+const avistaPacoteOutro = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-0345",
+    itens: [
+      { nome: PACOTE_COMPLETO_SST_NOME, quantidade: 34, valor: 4600 },
+      { nome: "Outros", quantidade: 1, valor: 45 },
+    ],
+  })
+);
+const avistaRaw = pdfVisibleText(pdfLatin1(avistaPacoteOutro));
+assert.match(avistaRaw, /4\.345/);
+assert.doesNotMatch(avistaRaw, /4\.400/);
+assert.match(avistaRaw, /4\.645/);
+
 const VALOR_MENSAL_PDF = 350;
 const mensalidadeOrc = buildOrcamento({
   numero: "ORC-2026-0301",
@@ -594,6 +608,7 @@ assert.match(aetRaw, /crit[eé]rios aplic[aá]veis da NR-17/);
 assert.match(aetRaw, /Visita t[eé]cnica para avalia[cç][aã]o das atividades/);
 assert.match(aetRaw, /Entrega do documento final em formato digital/);
 assert.doesNotMatch(aetRaw, /Quantidade de Colaboradores/i);
+assert.doesNotMatch(aetRaw, /N[uú]mero de Colaboradores/i);
 assert.doesNotMatch(aetRaw, /Exames Cl[ií]nicos/);
 assert.doesNotMatch(aetRaw, /BENEF[IÍ]CIOS DO PLANO/i);
 assert.doesNotMatch(aetRaw, /Pacote completo/);
