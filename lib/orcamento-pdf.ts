@@ -110,11 +110,16 @@ export const ORCAMENTO_WATERMARK_WIDTH_RATIO = 0.8;
 const LOGO_BG_RADIUS_PX = 10;
 const CLIENT_LABEL_FONT = 8;
 const CLIENT_VALUE_FONT = 8.5;
+const CLIENT_VALUE_FONT_MENSAL = 8;
 const CLIENT_FIELD_LINE_H = 3.5;
+const CLIENT_FIELD_LINE_H_MENSAL = 3.15;
 const CLIENT_FIELD_ROW_GAP = 2.5;
+const CLIENT_FIELD_ROW_GAP_MENSAL = 1.9;
 const CLIENT_CARD_PAD_X = 6;
 const CLIENT_CARD_PAD_TOP = 5;
+const CLIENT_CARD_PAD_TOP_MENSAL = 3.8;
 const CLIENT_CARD_PAD_BOTTOM = 4;
+const CLIENT_CARD_PAD_BOTTOM_MENSAL = 3;
 const CLIENT_LEFT_LABEL_W = 24;
 const CLIENT_RIGHT_LABEL_W = 40;
 const TABLE_HEAD_FONT = 8.5;
@@ -574,13 +579,43 @@ function drawSectionTitle(
   return y + 6;
 }
 
+type ClientCardMetrics = {
+  valueFont: number;
+  lineH: number;
+  rowGap: number;
+  padTop: number;
+  padBottom: number;
+};
+
+function resolveClientCardMetrics(
+  modalidade: string | null | undefined
+): ClientCardMetrics {
+  if (isOrcamentoMensalidade(modalidade)) {
+    return {
+      valueFont: CLIENT_VALUE_FONT_MENSAL,
+      lineH: CLIENT_FIELD_LINE_H_MENSAL,
+      rowGap: CLIENT_FIELD_ROW_GAP_MENSAL,
+      padTop: CLIENT_CARD_PAD_TOP_MENSAL,
+      padBottom: CLIENT_CARD_PAD_BOTTOM_MENSAL,
+    };
+  }
+  return {
+    valueFont: CLIENT_VALUE_FONT,
+    lineH: CLIENT_FIELD_LINE_H,
+    rowGap: CLIENT_FIELD_ROW_GAP,
+    padTop: CLIENT_CARD_PAD_TOP,
+    padBottom: CLIENT_CARD_PAD_BOTTOM,
+  };
+}
+
 function wrapClientFieldValue(
   doc: JsPDF,
   value: string,
-  maxWidth: number
+  maxWidth: number,
+  valueFont = CLIENT_VALUE_FONT
 ): string[] {
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(CLIENT_VALUE_FONT);
+  doc.setFontSize(valueFont);
   const normalized = String(value).trim() || "—";
   if (maxWidth <= 0) return [normalized];
   return doc.splitTextToSize(normalized, maxWidth);
@@ -590,20 +625,18 @@ function measureClientColumnHeight(
   doc: JsPDF,
   fields: [string, string][],
   colWidth: number,
-  labelWidth: number
+  labelWidth: number,
+  metrics: ClientCardMetrics
 ): number {
   const valueMaxW = Math.max(colWidth - labelWidth - 1, 8);
   let height = 0;
 
   fields.forEach(([label, value], index) => {
-    const lines = wrapClientFieldValue(doc, value, valueMaxW);
-    const rowH = Math.max(
-      CLIENT_FIELD_LINE_H,
-      lines.length * CLIENT_FIELD_LINE_H
-    );
+    const lines = wrapClientFieldValue(doc, value, valueMaxW, metrics.valueFont);
+    const rowH = Math.max(metrics.lineH, lines.length * metrics.lineH);
     height += rowH;
     if (index < fields.length - 1) {
-      height += CLIENT_FIELD_ROW_GAP;
+      height += metrics.rowGap;
     }
   });
 
@@ -616,7 +649,8 @@ function drawClientColumn(
   startY: number,
   colWidth: number,
   labelWidth: number,
-  fields: [string, string][]
+  fields: [string, string][],
+  metrics: ClientCardMetrics
 ): number {
   const valueMaxW = Math.max(colWidth - labelWidth - 1, 8);
   let y = startY;
@@ -628,21 +662,18 @@ function drawClientColumn(
     doc.text(label, x, y);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(CLIENT_VALUE_FONT);
+    doc.setFontSize(metrics.valueFont);
     doc.setTextColor(...SLATE_900);
-    const lines = wrapClientFieldValue(doc, value, valueMaxW);
+    const lines = wrapClientFieldValue(doc, value, valueMaxW, metrics.valueFont);
     const valueX = x + labelWidth;
     lines.forEach((line, lineIndex) => {
-      doc.text(line, valueX, y + lineIndex * CLIENT_FIELD_LINE_H);
+      doc.text(line, valueX, y + lineIndex * metrics.lineH);
     });
 
-    const rowH = Math.max(
-      CLIENT_FIELD_LINE_H,
-      lines.length * CLIENT_FIELD_LINE_H
-    );
+    const rowH = Math.max(metrics.lineH, lines.length * metrics.lineH);
     y += rowH;
     if (index < fields.length - 1) {
-      y += CLIENT_FIELD_ROW_GAP;
+      y += metrics.rowGap;
     }
   });
 
@@ -650,6 +681,39 @@ function drawClientColumn(
 }
 
 /** Shell visual alinhado aos cards de Fatura (cabeçalho navy + corpo dourado claro). */
+function drawPairedCardShell(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  title: string,
+  options?: { headerH?: number; titleFont?: number; titleBaseline?: number }
+): number {
+  const headerH = options?.headerH ?? CARD_HEADER_H;
+  const radius = 2.5;
+
+  doc.setFillColor(...PREMIUM_CARD_BODY_FILL);
+  doc.roundedRect(x, y, w, h, radius, radius, "F");
+
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(x, y, w, headerH, radius, radius, "F");
+  doc.rect(x, y + headerH - 3, w, 3, "F");
+
+  doc.setDrawColor(...SLATE_200);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, h, radius, radius, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(options?.titleFont ?? 8.5);
+  doc.setTextColor(...WHITE);
+  doc.text(title.toUpperCase(), x + w / 2, y + (options?.titleBaseline ?? 6), {
+    align: "center",
+  });
+
+  return y + headerH;
+}
+
 function drawFaturaStyleCardShell(
   doc: JsPDF,
   x: number,
@@ -658,24 +722,7 @@ function drawFaturaStyleCardShell(
   h: number,
   title: string
 ): number {
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(x, y, w, h, CARD_RADIUS, CARD_RADIUS, "S");
-
-  doc.setFillColor(...NAVY);
-  doc.roundedRect(x, y, w, CARD_HEADER_H, CARD_RADIUS, CARD_RADIUS, "F");
-  doc.setFillColor(...NAVY);
-  doc.rect(x, y + CARD_HEADER_H - 3, w, 3, "F");
-
-  doc.setFillColor(...PREMIUM_CARD_BODY_FILL);
-  doc.rect(x, y + CARD_HEADER_H, w, h - CARD_HEADER_H, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...WHITE);
-  doc.text(title.toUpperCase(), x + w / 2, y + 6, { align: "center" });
-
-  return y + CARD_HEADER_H;
+  return drawPairedCardShell(doc, x, y, w, h, title);
 }
 
 /** Cabeçalho premium do Resumo Financeiro (fonte maior, centralizado). */
@@ -686,24 +733,11 @@ function drawResumoFinanceiroCardShell(
   w: number,
   h: number
 ): number {
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(x, y, w, h, CARD_RADIUS, CARD_RADIUS, "S");
-
-  doc.setFillColor(...NAVY);
-  doc.roundedRect(x, y, w, FINANCIAL_CARD_HEADER_H, CARD_RADIUS, CARD_RADIUS, "F");
-  doc.setFillColor(...NAVY);
-  doc.rect(x, y + FINANCIAL_CARD_HEADER_H - 3, w, 3, "F");
-
-  doc.setFillColor(...PREMIUM_CARD_BODY_FILL);
-  doc.rect(x, y + FINANCIAL_CARD_HEADER_H, w, h - FINANCIAL_CARD_HEADER_H, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...WHITE);
-  doc.text("RESUMO FINANCEIRO", x + w / 2, y + 6.1, { align: "center" });
-
-  return y + FINANCIAL_CARD_HEADER_H;
+  return drawPairedCardShell(doc, x, y, w, h, "RESUMO FINANCEIRO", {
+    headerH: FINANCIAL_CARD_HEADER_H,
+    titleFont: 9,
+    titleBaseline: 6.1,
+  });
 }
 
 function drawFinancialRowDivider(
@@ -1350,7 +1384,9 @@ const BENEFICIO_FONT = 7.5;
 const BENEFICIO_LINE_H = 2.9;
 const BENEFICIO_ITEM_GAP = 0.45;
 const BENEFICIO_CHECK_W = 3.4;
-const BENEFICIO_BODY_PAD = 2.2;
+/** ~8 px visíveis entre o cabeçalho azul e o primeiro check. */
+const BENEFICIO_BODY_PAD_TOP = 4.6;
+const BENEFICIO_BODY_PAD_BOTTOM = 2.2;
 const BENEFICIO_ITEMS_TO_OBS_GAP = 0.5;
 const BENEFICIO_OBS_PAD = 1.35;
 const BENEFICIO_OBS_LABEL_H = 2.6;
@@ -1415,7 +1451,7 @@ function measureMensalidadeBeneficiosBlockHeight(
 ): number {
   const textWidth = width - CARD_PAD_X * 2;
   const wrapW = textWidth - BENEFICIO_CHECK_W;
-  let h = CARD_HEADER_H + BENEFICIO_BODY_PAD;
+  let h = CARD_HEADER_H + BENEFICIO_BODY_PAD_TOP;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(BENEFICIO_FONT);
   MENSALIDADE_BENEFICIOS_ITENS.forEach((item) => {
@@ -1424,7 +1460,7 @@ function measureMensalidadeBeneficiosBlockHeight(
   });
   h += BENEFICIO_ITEMS_TO_OBS_GAP;
   h += measureMensalidadeObservacoesBoxHeight(doc, textWidth - 4.4);
-  h += BENEFICIO_BODY_PAD;
+  h += BENEFICIO_BODY_PAD_BOTTOM;
   return h;
 }
 
@@ -1446,7 +1482,7 @@ function drawMensalidadeBeneficiosBlock(
   const textX = x + CARD_PAD_X;
   const textWidth = width - CARD_PAD_X * 2;
   const wrapW = textWidth - BENEFICIO_CHECK_W;
-  let itemY = bodyY + BENEFICIO_BODY_PAD;
+  let itemY = bodyY + BENEFICIO_BODY_PAD_TOP;
 
   MENSALIDADE_BENEFICIOS_ITENS.forEach((item) => {
     drawBeneficioCheck(doc, textX, itemY);
@@ -1462,7 +1498,7 @@ function drawMensalidadeBeneficiosBlock(
     doc,
     textWidth - 4.4
   );
-  const obsY = y + height - BENEFICIO_BODY_PAD - obsBlockH;
+  const obsY = y + height - BENEFICIO_BODY_PAD_BOTTOM - obsBlockH;
   drawMensalidadeObservacoesBox(doc, textX, obsY, textWidth, obsBlockH);
 }
 
@@ -1648,35 +1684,47 @@ function drawClientCard(
     ],
   ];
 
+  const metrics = resolveClientCardMetrics(orcamento.modalidade);
   const leftH = measureClientColumnHeight(
     doc,
     fieldsLeft,
     colWidth,
-    CLIENT_LEFT_LABEL_W
+    CLIENT_LEFT_LABEL_W,
+    metrics
   );
   const rightH = measureClientColumnHeight(
     doc,
     fieldsRight,
     colWidth,
-    CLIENT_RIGHT_LABEL_W
+    CLIENT_RIGHT_LABEL_W,
+    metrics
   );
   const contentH = Math.max(leftH, rightH);
-  const cardH = CLIENT_CARD_PAD_TOP + contentH + CLIENT_CARD_PAD_BOTTOM;
+  const cardH = metrics.padTop + contentH + metrics.padBottom;
 
   drawCardWithSoftShadow(doc, MARGIN, y, CONTENT_W, cardH, {
     fill: WHITE,
     stroke: SLATE_200,
   });
 
-  const rowY = y + CLIENT_CARD_PAD_TOP;
-  drawClientColumn(doc, col1X, rowY, colWidth, CLIENT_LEFT_LABEL_W, fieldsLeft);
+  const rowY = y + metrics.padTop;
+  drawClientColumn(
+    doc,
+    col1X,
+    rowY,
+    colWidth,
+    CLIENT_LEFT_LABEL_W,
+    fieldsLeft,
+    metrics
+  );
   drawClientColumn(
     doc,
     col2X,
     rowY,
     colWidth,
     CLIENT_RIGHT_LABEL_W,
-    fieldsRight
+    fieldsRight,
+    metrics
   );
 
   return y + cardH + afterSectionGap(orcamento.modalidade);
