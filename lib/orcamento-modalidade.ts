@@ -36,7 +36,7 @@ export const MENSALIDADE_BENEFICIOS_ITENS: readonly string[] = [
   "Gestão contínua de SST durante a vigência",
   "Gestão e envio dos eventos ao eSocial",
   "Controle dos exames ocupacionais",
-  "Ampla rede de clínicas credenciada em São Paulo e Grande SP",
+  "Ampla rede de clínicas para exames ocupacionais em São Paulo e Grande SP",
   "Documentos disponíveis em formato digital",
   "Acompanhamento técnico durante o contrato",
 ] as const;

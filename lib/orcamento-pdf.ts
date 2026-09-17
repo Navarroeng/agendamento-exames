@@ -2,6 +2,7 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { resolveValidadePropostaIso } from "@/lib/orcamento-validade";
 import {
   calcPdfContentBottomY,
+  calcPdfFooterTopY,
   drawNavarroPremiumFooter,
 } from "@/lib/pdf-navarro-footer";
 import { formatCNPJ } from "@/lib/cnpj";
@@ -86,9 +87,13 @@ const PREMIUM_CARD_BODY_FILL = GOLD_BG;
 
 /** ~20 px entre o fim de um card e o título da próxima seção. */
 const SECTION_AFTER_CARD_GAP = 7;
+const SECTION_AFTER_CARD_GAP_MENSAL = 4;
 /** Respiro entre a tabela de serviços e os cards inferiores. */
 const CARDS_AFTER_TABLE_GAP = 4;
-const CARDS_AFTER_TABLE_GAP_MENSAL = 2.5;
+/** ~12–18 px abaixo da tabela na Mensalidade. */
+const CARDS_AFTER_TABLE_GAP_MENSAL = 4.5;
+/** 1 mm acima do rodapé ao decidir se os cards cabem na página atual. */
+const CARDS_FOOTER_SAFETY_MM = 1;
 
 const MARGIN = 12;
 const PAGE_W = 210;
@@ -485,6 +490,20 @@ export type OrcamentoPdfLayout = {
 
 export function blockFitsOnPage(y: number, needed: number): boolean {
   return y + needed <= CONTENT_BOTTOM_Y;
+}
+
+function cardsContentBottomY(): number {
+  return calcPdfFooterTopY(PAGE_H) - CARDS_FOOTER_SAFETY_MM;
+}
+
+function cardsBlockFitsOnPage(y: number, needed: number): boolean {
+  return y + needed <= cardsContentBottomY();
+}
+
+function afterSectionGap(modalidade: string | null | undefined): number {
+  return isOrcamentoMensalidade(modalidade)
+    ? SECTION_AFTER_CARD_GAP_MENSAL
+    : SECTION_AFTER_CARD_GAP;
 }
 
 function addOrcamentoPage(doc: JsPDF, layout: OrcamentoPdfLayout): number {
@@ -917,13 +936,21 @@ function drawMensalidadeResumoFinanceiroBody(
   }
 }
 
-/** Cards finais nunca encolhem: ou cabem inteiros, ou vão juntos para a próxima página. */
+/** Cards finais: cabem na página atual pela altura real do par, ou vão juntos. */
 export function resolveCardsBlockPlacement(
   y: number,
-  desiredH: number
+  desiredH: number,
+  minH = desiredH
 ): { needsNewPage: boolean; cardH: number } {
+  if (cardsBlockFitsOnPage(y, desiredH)) {
+    return { needsNewPage: false, cardH: desiredH };
+  }
+  const remaining = cardsContentBottomY() - y;
+  if (minH <= remaining) {
+    return { needsNewPage: false, cardH: remaining };
+  }
   return {
-    needsNewPage: !blockFitsOnPage(y, desiredH),
+    needsNewPage: true,
     cardH: desiredH,
   };
 }
@@ -1652,7 +1679,7 @@ function drawClientCard(
     fieldsRight
   );
 
-  return y + cardH + SECTION_AFTER_CARD_GAP;
+  return y + cardH + afterSectionGap(orcamento.modalidade);
 }
 
 function measureDesiredCardsRowHeight(
@@ -1662,7 +1689,7 @@ function measureDesiredCardsRowHeight(
   pacoteItens: string[],
   inclusos: string[],
   isMensalidade = false
-): number {
+): { desiredH: number; contentMinH: number } {
   let inclusosH = 0;
   if (isMensalidade) {
     inclusosH = measureMensalidadeBeneficiosBlockHeight(doc, checklistW);
@@ -1678,7 +1705,13 @@ function measureDesiredCardsRowHeight(
 
   const financeiroH = measureResumoFinanceiroCardHeight(isMensalidade);
   const hasInclusosCard = isMensalidade || hasPacote || inclusos.length > 0;
-  return hasInclusosCard ? Math.max(inclusosH, financeiroH) : financeiroH;
+  const desiredH = hasInclusosCard
+    ? Math.max(inclusosH, financeiroH)
+    : financeiroH;
+  const contentMinH = isMensalidade
+    ? Math.max(inclusosH, FINANCIAL_CARD_HEADER_H + 36)
+    : desiredH;
+  return { desiredH, contentMinH };
 }
 
 /* ── Descrição da proposta ─────────────────────────────────────── */
@@ -1741,7 +1774,7 @@ function drawDescricaoProposta(
     textY += lines.length * 3.8 + (index < paragrafos.length - 1 ? 2 : 0);
   });
 
-  return y + blockH + SECTION_AFTER_CARD_GAP;
+  return y + blockH + afterSectionGap(layout.orcamento.modalidade);
 }
 
 /* ── Tabela de serviços ────────────────────────────────────────── */
@@ -1978,7 +2011,7 @@ function drawFinancialAndInclusosRow(
       ? buildPacoteCompletoInclusosItens(orcamento)
       : [];
 
-  const desiredH = measureDesiredCardsRowHeight(
+  const { desiredH, contentMinH } = measureDesiredCardsRowHeight(
     doc,
     checklistW,
     usaCardInclusosEstruturado,
@@ -1986,8 +2019,14 @@ function drawFinancialAndInclusosRow(
     inclusos,
     isMensalidade
   );
-  const { cardH } = resolveCardsBlockPlacement(y, desiredH);
-  y = ensureSpace(doc, y, cardH, layout);
+  const { needsNewPage, cardH } = resolveCardsBlockPlacement(
+    y,
+    desiredH,
+    contentMinH
+  );
+  if (needsNewPage) {
+    y = addOrcamentoPage(doc, layout);
+  }
 
   if (isMensalidade) {
     drawMensalidadeBeneficiosBlock(doc, MARGIN, y, checklistW, cardH);
@@ -2006,7 +2045,7 @@ function drawFinancialAndInclusosRow(
 
   drawResumoFinanceiroCard(doc, boxX, y, boxW, cardH, orcamento);
 
-  return y + cardH + SECTION_AFTER_CARD_GAP;
+  return y + cardH + afterSectionGap(orcamento.modalidade);
 }
 
 /* ── Observações ───────────────────────────────────────────────── */

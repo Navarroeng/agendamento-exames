@@ -114,7 +114,7 @@ assert.equal(MENSALIDADE_BENEFICIOS_TITULO, "Benefícios do plano");
 assert.equal(MENSALIDADE_BENEFICIOS_ITENS.length, 6);
 assert.ok(
   MENSALIDADE_BENEFICIOS_ITENS.includes(
-    "Ampla rede de clínicas credenciada em São Paulo e Grande SP"
+    "Ampla rede de clínicas para exames ocupacionais em São Paulo e Grande SP"
   )
 );
 assert.deepEqual(

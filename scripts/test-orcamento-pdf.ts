@@ -19,7 +19,7 @@ import {
   ensureSpace,
   resolveCardsBlockPlacement,
 } from "../lib/orcamento-pdf";
-import { calcPdfContentBottomY } from "../lib/pdf-navarro-footer";
+import { calcPdfContentBottomY, calcPdfFooterTopY } from "../lib/pdf-navarro-footer";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens, ServicoSstRecord } from "../lib/orcamento-types";
 import {
@@ -156,12 +156,19 @@ assert.equal(cardsOverflow.needsNewPage, true);
 assert.equal(blockFitsOnPage(248, 58), false);
 assert.ok(248 + 58 > FIRST_PAGE_CONTENT_BOTTOM);
 
+const cardsTightFit = resolveCardsBlockPlacement(225, 54, 45);
+assert.equal(cardsTightFit.needsNewPage, false);
+assert.ok(cardsTightFit.cardH <= 54);
+assert.ok(225 + cardsTightFit.cardH <= calcPdfFooterTopY(297) - 1);
+
 function buildOrcamento(params: {
   numero: string;
   itens: Array<{ nome: string; quantidade: number; valor: number; id?: string }>;
   observacoes?: string | null;
   modalidade?: "pontual" | "mensalidade";
   quantidade_parcelas?: number | null;
+  cliente_nome?: string;
+  cliente_endereco?: string;
 }): OrcamentoComItens {
   const itens = params.itens.map((item, index) => ({
     id: item.id ?? `i${index}`,
@@ -179,9 +186,9 @@ function buildOrcamento(params: {
     numero: params.numero,
     data_proposta: "2026-09-15",
     cliente_id: "c1",
-    cliente_nome: "Empresa Teste Ltda",
+    cliente_nome: params.cliente_nome ?? "Empresa Teste Ltda",
     cliente_cnpj: "12.345.678/0001-90",
-    cliente_endereco: "Rua A, 100",
+    cliente_endereco: params.cliente_endereco ?? "Rua A, 100",
     cliente_setor: "Comercio",
     contato: "Maria",
     email: "maria@teste.com",
@@ -441,6 +448,9 @@ const mensalidadeOrc = buildOrcamento({
   numero: "ORC-2026-0301",
   modalidade: "mensalidade",
   quantidade_parcelas: null,
+  cliente_nome: "AUTOMNI AUTOMAÇÕES INDUSTRIAIS LTDA",
+  cliente_endereco:
+    "Rua das Indústrias, 1000 - Distrito Industrial - São Paulo/SP",
   itens: [
     {
       nome: GESTAO_SST_MENSAL_NOME,
@@ -459,7 +469,7 @@ const mensalBinary = pdfLatin1(mensalPdf);
 assert.match(mensalBinary, /Página 1 de 1|Pagina 1 de 1/);
 assert.doesNotMatch(mensalBinary, /Página 1 de 2|Pagina 1 de 2/);
 const mensalRaw = pdfVisibleText(mensalBinary);
-assert.match(mensalRaw, /A presente proposta contempla/i);
+assert.match(mensalRaw, /AUTOMNI AUTOMA[CÇ][OÕ]ES INDUSTRIAIS/i);
 assert.match(mensalRaw, /Gest[aã]o Completa de Sa[uú]de e Seguran[cç]a do Trabalho \(SST\)/i);
 assert.match(mensalRaw, /vig[eê]ncia contratual de 12 meses/i);
 assert.match(mensalRaw, /PGR, LTCAT e PCMSO/);
@@ -488,12 +498,14 @@ assert.match(mensalRaw, /BENEF[IÍ]CIOS DO PLANO/i);
 assert.match(mensalRaw, /Gest[aã]o cont[ií]nua de SST durante a vig[eê]ncia/i);
 assert.match(mensalRaw, /Gest[aã]o e envio dos eventos ao eSocial/i);
 assert.match(mensalRaw, /Controle dos exames ocupacionais/i);
-assert.match(mensalRaw, /Ampla rede de cl[ií]nicas credenciada em S[aã]o Paulo e Grande SP/i);
+assert.match(mensalRaw, /Ampla rede de cl[ií]nicas para exames ocupacionais/i);
+assert.match(mensalRaw, /em S[aã]o Paulo e[\s\S]*Grande SP/i);
 assert.match(mensalRaw, /Documentos dispon[ií]veis em formato digital/i);
 assert.match(mensalRaw, /Acompanhamento t[eé]cnico durante o contrato/i);
 assert.match(mensalRaw, /Exames complementares ser[aã]o cobrados [aà] parte/i);
 assert.doesNotMatch(mensalRaw, /O que est[áa] incluso/i);
 assert.doesNotMatch(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
+assert.doesNotMatch(mensalRaw, /cl[ií]nicas credenciada/i);
 assert.doesNotMatch(mensalRaw, /Tatuap[eé]/i);
 assert.doesNotMatch(mensalRaw, /Itaquera/i);
 assert.doesNotMatch(mensalRaw, /Se necess[aá]rio, a realiza[cç][aã]o de Exames Complementares/i);
