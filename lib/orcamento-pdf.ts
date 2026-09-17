@@ -134,10 +134,27 @@ const NAVARRO = {
   responsavelTecnico: "Equipe Técnica Navarro Engenharia",
 } as const;
 
+const PROPOSTA_DESCRICAO_NOTA_LEGAL =
+  "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)";
+
 const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
   "Valor abaixo equivalente a realização e elaboração dos laudos, disponibilização dos arquivos em PDF para a empresa e gestão dos eventos de saúde e segurança do trabalho S-2210; S-2220; S-2240 dentro da plataforma E-social durante toda vigência do contrato (12 meses). Incluindo o Laudo de Riscos Psicossociais conforme a nova NR-01.",
-  "(Laudos obrigatórios por lei sujeito a multa do Ministério do trabalho MTE)",
+  PROPOSTA_DESCRICAO_NOTA_LEGAL,
 ] as const;
+
+const PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE: readonly string[] = [
+  "A presente proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho (SST) durante a vigência contratual de 12 meses, incluindo elaboração e gestão dos documentos PGR, LTCAT e PCMSO, realização dos ASOs previstos no contrato, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
+  "Durante a vigência, a empresa contará com acompanhamento contínuo da Navarro Engenharia, gestão das obrigações contratadas e disponibilização dos documentos em formato digital.",
+  PROPOSTA_DESCRICAO_NOTA_LEGAL,
+] as const;
+
+function resolveDescricaoPropostaParagrafos(
+  modalidade: string | null | undefined
+): readonly string[] {
+  return isOrcamentoMensalidade(modalidade)
+    ? PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE
+    : PROPOSTA_DESCRICAO_PARAGRAFOS;
+}
 
 const DESCRICAO_CARD_PADDING_X = 5;
 
@@ -1920,7 +1937,12 @@ export function drawOrcamentoPdfDocument(
   y = drawClientCard(doc, y, orcamento, clienteInfo);
 
   const watermarkYTop = y;
-  y = drawDescricaoProposta(doc, y, PROPOSTA_DESCRICAO_PARAGRAFOS, layout);
+  y = drawDescricaoProposta(
+    doc,
+    y,
+    resolveDescricaoPropostaParagrafos(orcamento.modalidade),
+    layout
+  );
   y = drawServicesTable(doc, y, orcamento, options.catalogo, layout);
   const afterTablePage = doc.getNumberOfPages();
   const afterTableY = y;
