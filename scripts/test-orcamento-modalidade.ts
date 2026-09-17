@@ -6,6 +6,9 @@ import { formatCurrency, parseMoney } from "../lib/money";
 import {
   GESTAO_COMPLETA_SST_ITENS,
   GESTAO_SST_MENSAL_NOME,
+  MENSALIDADE_BENEFICIOS_ITENS,
+  MENSALIDADE_BENEFICIOS_OBSERVACOES,
+  MENSALIDADE_BENEFICIOS_TITULO,
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
   ORCAMENTO_MENSALIDADE_MESES,
   ORCAMENTO_MODALIDADE_MENSALIDADE,
@@ -106,6 +109,20 @@ assert.deepEqual(
 assert.equal(
   GESTAO_COMPLETA_SST_ITENS[5],
   "eSocial SST - Eventos S-2210, S-2220 e S-2240."
+);
+assert.equal(MENSALIDADE_BENEFICIOS_TITULO, "Benefícios do plano");
+assert.equal(MENSALIDADE_BENEFICIOS_ITENS.length, 6);
+assert.ok(
+  MENSALIDADE_BENEFICIOS_ITENS.includes(
+    "Ampla rede de clínicas credenciada em São Paulo e Grande SP"
+  )
+);
+assert.deepEqual(
+  [...MENSALIDADE_BENEFICIOS_OBSERVACOES],
+  [
+    "Exames complementares serão cobrados à parte.",
+    "ASOs adicionais serão cobrados à parte.",
+  ]
 );
 assert.equal(
   labelItensInclusosServico("Gestão SST - Mensal"),

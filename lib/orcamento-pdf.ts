@@ -12,6 +12,9 @@ import {
 import { calcCondicoesPagamentoProposta } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
 import {
+  MENSALIDADE_BENEFICIOS_ITENS,
+  MENSALIDADE_BENEFICIOS_OBSERVACOES,
+  MENSALIDADE_BENEFICIOS_TITULO,
   buildResumoMensalidadeLinhas,
   formatValorMensalidade,
   isGestaoCompletaSstNome,
@@ -85,6 +88,7 @@ const PREMIUM_CARD_BODY_FILL = GOLD_BG;
 const SECTION_AFTER_CARD_GAP = 7;
 /** Respiro entre a tabela de serviços e os cards inferiores. */
 const CARDS_AFTER_TABLE_GAP = 4;
+const CARDS_AFTER_TABLE_GAP_MENSAL = 2.5;
 
 const MARGIN = 12;
 const PAGE_W = 210;
@@ -1222,15 +1226,46 @@ function drawStructuredInclusoItem(
 
 function measureObservacoesInclusosBoxHeight(
   doc: JsPDF,
-  wrapWidth: number
+  wrapWidth: number,
+  observacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
 ): number {
   let obsContentH = INCLUSOS_OBS_LABEL_H;
   doc.setFontSize(7);
-  PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
+  observacoes.forEach((paragrafo) => {
     const lines = wrapParagraphLines(doc, paragrafo, wrapWidth);
     obsContentH += lines.length * INCLUSOS_OBS_PARA_LINE_H + INCLUSOS_OBS_PARA_GAP;
   });
   return obsContentH + INCLUSOS_OBS_PAD * 2;
+}
+
+function drawObservacoesInclusosBox(
+  doc: JsPDF,
+  textX: number,
+  obsY: number,
+  textWidth: number,
+  obsBlockH: number,
+  observacoes: readonly string[]
+): void {
+  doc.setFillColor(...WHITE);
+  doc.setDrawColor(...GRAY_LINE);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(textX, obsY, textWidth, obsBlockH, 1.4, 1.4, "FD");
+
+  let obsTextY = obsY + INCLUSOS_OBS_PAD + 2.6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...NAVY);
+  doc.text("Observações", textX + 2.5, obsTextY);
+  obsTextY += INCLUSOS_OBS_LABEL_H;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE_700);
+  observacoes.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth - 5);
+    doc.text(lines, textX + 2.5, obsTextY);
+    obsTextY += lines.length * INCLUSOS_OBS_PARA_LINE_H + INCLUSOS_OBS_PARA_GAP;
+  });
 }
 
 function measurePacoteCompletoInclusosBlockHeight(
@@ -1274,27 +1309,134 @@ function drawPacoteCompletoInclusosBlock(
 
   const obsBlockH = measureObservacoesInclusosBoxHeight(doc, textWidth - 5);
   const obsY = y + height - CARD_BODY_PAD - obsBlockH;
+  drawObservacoesInclusosBox(
+    doc,
+    textX,
+    obsY,
+    textWidth,
+    obsBlockH,
+    PACOTE_COMPLETO_INCLUSOS_OBSERVACOES
+  );
+}
 
+const BENEFICIO_FONT = 7.5;
+const BENEFICIO_LINE_H = 2.9;
+const BENEFICIO_ITEM_GAP = 0.45;
+const BENEFICIO_CHECK_W = 3.4;
+const BENEFICIO_BODY_PAD = 2.2;
+const BENEFICIO_ITEMS_TO_OBS_GAP = 0.5;
+const BENEFICIO_OBS_PAD = 1.35;
+const BENEFICIO_OBS_LABEL_H = 2.6;
+const BENEFICIO_OBS_PARA_LINE_H = 2.6;
+const BENEFICIO_OBS_PARA_GAP = 0.3;
+
+function measureMensalidadeObservacoesBoxHeight(
+  doc: JsPDF,
+  wrapWidth: number
+): number {
+  let obsContentH = BENEFICIO_OBS_LABEL_H;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  MENSALIDADE_BENEFICIOS_OBSERVACOES.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, wrapWidth);
+    obsContentH +=
+      lines.length * BENEFICIO_OBS_PARA_LINE_H + BENEFICIO_OBS_PARA_GAP;
+  });
+  return obsContentH + BENEFICIO_OBS_PAD * 2;
+}
+
+function drawMensalidadeObservacoesBox(
+  doc: JsPDF,
+  textX: number,
+  obsY: number,
+  textWidth: number,
+  obsBlockH: number
+): void {
   doc.setFillColor(...WHITE);
   doc.setDrawColor(...GRAY_LINE);
   doc.setLineWidth(0.2);
-  doc.roundedRect(textX, obsY, textWidth, obsBlockH, 1.4, 1.4, "FD");
+  doc.roundedRect(textX, obsY, textWidth, obsBlockH, 1.2, 1.2, "FD");
 
-  let obsTextY = obsY + INCLUSOS_OBS_PAD + 2.6;
+  let obsTextY = obsY + BENEFICIO_OBS_PAD + 2.1;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(...NAVY);
-  doc.text("Observações", textX + 2.5, obsTextY);
-  obsTextY += INCLUSOS_OBS_LABEL_H;
+  doc.text("Observações", textX + 2.2, obsTextY);
+  obsTextY += BENEFICIO_OBS_LABEL_H;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SLATE_700);
-  PACOTE_COMPLETO_INCLUSOS_OBSERVACOES.forEach((paragrafo) => {
-    const lines = wrapParagraphLines(doc, paragrafo, textWidth - 5);
-    doc.text(lines, textX + 2.5, obsTextY);
-    obsTextY += lines.length * INCLUSOS_OBS_PARA_LINE_H + INCLUSOS_OBS_PARA_GAP;
+  MENSALIDADE_BENEFICIOS_OBSERVACOES.forEach((paragrafo) => {
+    const lines = wrapParagraphLines(doc, paragrafo, textWidth - 4.4);
+    doc.text(lines, textX + 2.2, obsTextY);
+    obsTextY +=
+      lines.length * BENEFICIO_OBS_PARA_LINE_H + BENEFICIO_OBS_PARA_GAP;
   });
+}
+
+function drawBeneficioCheck(doc: JsPDF, x: number, y: number): void {
+  doc.setDrawColor(...CHECK_GREEN);
+  doc.setLineWidth(0.42);
+  doc.line(x, y - 0.55, x + 0.95, y);
+  doc.line(x + 0.95, y, x + 2.2, y - 1.95);
+}
+
+function measureMensalidadeBeneficiosBlockHeight(
+  doc: JsPDF,
+  width: number
+): number {
+  const textWidth = width - CARD_PAD_X * 2;
+  const wrapW = textWidth - BENEFICIO_CHECK_W;
+  let h = CARD_HEADER_H + BENEFICIO_BODY_PAD;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(BENEFICIO_FONT);
+  MENSALIDADE_BENEFICIOS_ITENS.forEach((item) => {
+    const lines = doc.splitTextToSize(item, wrapW);
+    h += lines.length * BENEFICIO_LINE_H + BENEFICIO_ITEM_GAP;
+  });
+  h += BENEFICIO_ITEMS_TO_OBS_GAP;
+  h += measureMensalidadeObservacoesBoxHeight(doc, textWidth - 4.4);
+  h += BENEFICIO_BODY_PAD;
+  return h;
+}
+
+function drawMensalidadeBeneficiosBlock(
+  doc: JsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const bodyY = drawFaturaStyleCardShell(
+    doc,
+    x,
+    y,
+    width,
+    height,
+    MENSALIDADE_BENEFICIOS_TITULO
+  );
+  const textX = x + CARD_PAD_X;
+  const textWidth = width - CARD_PAD_X * 2;
+  const wrapW = textWidth - BENEFICIO_CHECK_W;
+  let itemY = bodyY + BENEFICIO_BODY_PAD;
+
+  MENSALIDADE_BENEFICIOS_ITENS.forEach((item) => {
+    drawBeneficioCheck(doc, textX, itemY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(BENEFICIO_FONT);
+    doc.setTextColor(...SLATE_700);
+    const lines = doc.splitTextToSize(item, wrapW);
+    doc.text(lines, textX + BENEFICIO_CHECK_W, itemY);
+    itemY += lines.length * BENEFICIO_LINE_H + BENEFICIO_ITEM_GAP;
+  });
+
+  const obsBlockH = measureMensalidadeObservacoesBoxHeight(
+    doc,
+    textWidth - 4.4
+  );
+  const obsY = y + height - BENEFICIO_BODY_PAD - obsBlockH;
+  drawMensalidadeObservacoesBox(doc, textX, obsY, textWidth, obsBlockH);
 }
 
 function wrapParagraphLines(
@@ -1522,7 +1664,9 @@ function measureDesiredCardsRowHeight(
   isMensalidade = false
 ): number {
   let inclusosH = 0;
-  if (hasPacote) {
+  if (isMensalidade) {
+    inclusosH = measureMensalidadeBeneficiosBlockHeight(doc, checklistW);
+  } else if (hasPacote) {
     inclusosH = measurePacoteCompletoInclusosBlockHeight(
       doc,
       checklistW,
@@ -1533,7 +1677,7 @@ function measureDesiredCardsRowHeight(
   }
 
   const financeiroH = measureResumoFinanceiroCardHeight(isMensalidade);
-  const hasInclusosCard = hasPacote || inclusos.length > 0;
+  const hasInclusosCard = isMensalidade || hasPacote || inclusos.length > 0;
   return hasInclusosCard ? Math.max(inclusosH, financeiroH) : financeiroH;
 }
 
@@ -1802,7 +1946,12 @@ function drawServicesTable(
   doc.setDrawColor(...SLATE_200);
   doc.roundedRect(MARGIN, y - 0.5, CONTENT_W, 0.5, 0, 0, "S");
 
-  return y + CARDS_AFTER_TABLE_GAP;
+  return (
+    y +
+    (isOrcamentoMensalidade(orcamento.modalidade)
+      ? CARDS_AFTER_TABLE_GAP_MENSAL
+      : CARDS_AFTER_TABLE_GAP)
+  );
 }
 
 /* ── Resumo financeiro + checklist (lado a lado) ─────────────────── */
@@ -1814,6 +1963,7 @@ function drawFinancialAndInclusosRow(
   inclusos: string[],
   layout: OrcamentoPdfLayout
 ): number {
+  const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
     orcamento,
     catalogo
@@ -1823,9 +1973,10 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  const pacoteInclusosItens = usaCardInclusosEstruturado
-    ? buildPacoteCompletoInclusosItens(orcamento)
-    : [];
+  const pacoteInclusosItens =
+    !isMensalidade && usaCardInclusosEstruturado
+      ? buildPacoteCompletoInclusosItens(orcamento)
+      : [];
 
   const desiredH = measureDesiredCardsRowHeight(
     doc,
@@ -1833,12 +1984,14 @@ function drawFinancialAndInclusosRow(
     usaCardInclusosEstruturado,
     pacoteInclusosItens,
     inclusos,
-    isOrcamentoMensalidade(orcamento.modalidade)
+    isMensalidade
   );
   const { cardH } = resolveCardsBlockPlacement(y, desiredH);
   y = ensureSpace(doc, y, cardH, layout);
 
-  if (usaCardInclusosEstruturado) {
+  if (isMensalidade) {
+    drawMensalidadeBeneficiosBlock(doc, MARGIN, y, checklistW, cardH);
+  } else if (usaCardInclusosEstruturado) {
     drawPacoteCompletoInclusosBlock(
       doc,
       MARGIN,

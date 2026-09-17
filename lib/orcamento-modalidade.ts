@@ -30,6 +30,22 @@ export const GESTAO_COMPLETA_SST_ITENS: readonly string[] = [
   "eSocial SST - Eventos S-2210, S-2220 e S-2240.",
 ] as const;
 
+export const MENSALIDADE_BENEFICIOS_TITULO = "Benefícios do plano";
+
+export const MENSALIDADE_BENEFICIOS_ITENS: readonly string[] = [
+  "Gestão contínua de SST durante a vigência",
+  "Gestão e envio dos eventos ao eSocial",
+  "Controle dos exames ocupacionais",
+  "Ampla rede de clínicas credenciada em São Paulo e Grande SP",
+  "Documentos disponíveis em formato digital",
+  "Acompanhamento técnico durante o contrato",
+] as const;
+
+export const MENSALIDADE_BENEFICIOS_OBSERVACOES: readonly string[] = [
+  "Exames complementares serão cobrados à parte.",
+  "ASOs adicionais serão cobrados à parte.",
+] as const;
+
 export const ORCAMENTO_MENSALIDADE_MESES = 12;
 export const ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL = "12 meses";
 export const ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL =

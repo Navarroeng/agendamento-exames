@@ -484,13 +484,19 @@ assert.match(mensalRaw, /LTCAT/);
 assert.match(mensalRaw, /PCMSO/);
 assert.match(mensalRaw, /ASO/);
 assert.match(mensalRaw, /Riscos Psicossociais/i);
-assert.match(mensalRaw, /O que est[áa] incluso/i);
-assert.match(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
-assert.match(mensalRaw, /Gest[aã]o completa e envio ao eSocial/i);
-assert.match(mensalRaw, /Exames Cl[ií]nicos:/);
-assert.match(mensalRaw, /23/);
-assert.doesNotMatch(mensalRaw, /CAT - Cortesia/);
-assert.doesNotMatch(mensalRaw, /Cortesia/);
+assert.match(mensalRaw, /BENEF[IÍ]CIOS DO PLANO/i);
+assert.match(mensalRaw, /Gest[aã]o cont[ií]nua de SST durante a vig[eê]ncia/i);
+assert.match(mensalRaw, /Gest[aã]o e envio dos eventos ao eSocial/i);
+assert.match(mensalRaw, /Controle dos exames ocupacionais/i);
+assert.match(mensalRaw, /Ampla rede de cl[ií]nicas credenciada em S[aã]o Paulo e Grande SP/i);
+assert.match(mensalRaw, /Documentos dispon[ií]veis em formato digital/i);
+assert.match(mensalRaw, /Acompanhamento t[eé]cnico durante o contrato/i);
+assert.match(mensalRaw, /Exames complementares ser[aã]o cobrados [aà] parte/i);
+assert.doesNotMatch(mensalRaw, /O que est[áa] incluso/i);
+assert.doesNotMatch(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
+assert.doesNotMatch(mensalRaw, /Tatuap[eé]/i);
+assert.doesNotMatch(mensalRaw, /Itaquera/i);
+assert.doesNotMatch(mensalRaw, /Se necess[aá]rio, a realiza[cç][aã]o de Exames Complementares/i);
 assert.match(mensalRaw, new RegExp(ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO));
 assert.match(mensalRaw, /12 meses/);
 assert.match(mensalRaw, /Autom[aá]tica ao final da vig[eê]ncia/i);
@@ -527,7 +533,7 @@ assert.ok(
 const mensalPagBinary = pdfLatin1(mensalPaginado);
 const mensalPagRaw = pdfVisibleText(mensalPagBinary);
 const mensalPages = mensalPaginado.getNumberOfPages();
-assert.match(mensalPagRaw, /O que est[áa] incluso/i);
+assert.match(mensalPagRaw, /BENEF[IÍ]CIOS DO PLANO/i);
 assert.match(mensalPagBinary, new RegExp(`P[áa]gina 1 de ${mensalPages}`));
 assert.match(
   mensalPagBinary,
