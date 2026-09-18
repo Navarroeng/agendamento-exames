@@ -308,6 +308,21 @@ run("16. APIs portal exigem staff e isolamento", () => {
   assert.doesNotMatch(server, /custo_clinica/);
 });
 
+run("17. ação da listagem usa ícone de olho", () => {
+  const ui = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components/portal-cliente/PortalAgendamentos.tsx"
+    ),
+    "utf8"
+  );
+  assert.match(ui, /IconEye/);
+  assert.match(ui, /aria-label="Ver detalhes"/);
+  assert.match(ui, /title="Ver detalhes"/);
+  assert.match(ui, /h-9 w-9/);
+  assert.doesNotMatch(ui, />\s*Ver detalhes\s*</);
+});
+
 if (failed > 0) {
   console.error(`\n${failed} teste(s) falharam.`);
   process.exit(1);
