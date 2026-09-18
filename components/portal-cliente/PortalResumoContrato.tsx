@@ -36,11 +36,11 @@ export function PortalResumoContrato({
   ];
 
   return (
-    <dl className="grid grid-cols-1 gap-px border-t border-[#eef2f7] bg-[#eef2f7] sm:grid-cols-2 xl:grid-cols-4">
+    <dl className="grid grid-cols-1 gap-px border-t border-[#e2e8f0] bg-[#e2e8f0] sm:grid-cols-2 xl:grid-cols-4">
       {campos.map((campo) => (
         <div
           key={campo.label}
-          className="flex flex-col justify-center gap-1 bg-white px-5 py-3.5"
+          className="flex flex-col justify-center gap-1 bg-[#F8FAFC] px-5 py-3.5"
         >
           <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
             {campo.label}

@@ -310,7 +310,7 @@ export function PortalHome() {
     "Empresa";
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 text-[#0b1f4d]">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 text-[#0b1f4d]">
       <div className="flex flex-col gap-1">
         <p className="text-lg font-semibold tracking-tight text-[#0b1f4d] sm:text-xl">
           Portal SST do Cliente
@@ -390,7 +390,7 @@ export function PortalHome() {
       !viewAgendamentos &&
       !viewLaudos &&
       !viewColaboradores ? (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           <PortalEmpresaHeader
             nome={empresaNomeSelecionada}
             logoUrl={resumo.logoUrl}

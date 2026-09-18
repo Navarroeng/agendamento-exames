@@ -28,21 +28,29 @@ export function PortalVisaoGeral({
     colaboradores: colaboradoresResumo,
   });
 
+  const temBloqueio = visao.pendencias.some((p) => p.tone === "bloqueio");
+  const shellClass = visao.temPendencias
+    ? temBloqueio
+      ? "border-[#fecaca] bg-[#fef2f2]"
+      : "border-[#fde68a] bg-[#fffbeb]"
+    : "border-[#D8EEE0] bg-[#F3FAF6]";
+  const iconeClass = visao.temPendencias
+    ? temBloqueio
+      ? "bg-[#fecaca] text-[#b91c1c]"
+      : "bg-[#fde68a] text-[#b45309]"
+    : "bg-[#c7ead4] text-[#15803d]";
+
   return (
-    <section className="rounded-2xl border border-[#e8edf5] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(11,31,77,0.04)] sm:px-6">
+    <section
+      className={`rounded-2xl border px-5 py-4 shadow-[0_8px_24px_rgba(11,31,77,0.05)] sm:px-6 ${shellClass}`}
+    >
       <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
         Visão geral
       </h2>
 
-      <div className="mt-3 flex items-start gap-2.5">
+      <div className="mt-3 flex items-start gap-3">
         <span
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-            visao.temPendencias
-              ? visao.pendencias.some((p) => p.tone === "bloqueio")
-                ? "bg-[#fee2e2] text-[#b91c1c]"
-                : "bg-[#fef3c7] text-[#b45309]"
-              : "bg-[#dcfce7] text-[#15803d]"
-          }`}
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${iconeClass}`}
           aria-hidden
         >
           {visao.temPendencias ? "!" : "✓"}
@@ -77,7 +85,7 @@ export function PortalVisaoGeral({
         {visao.indicadores.map((item) => (
           <li
             key={item.id}
-            className="rounded-xl bg-[#f8fafc] px-3 py-2 text-sm text-[#475569]"
+            className="rounded-xl border border-white/80 bg-white/85 px-3 py-2.5 text-sm text-[#475569] shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
           >
             {item.label}
           </li>
