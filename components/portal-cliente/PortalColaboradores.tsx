@@ -33,17 +33,8 @@ const FILTROS: { key: PortalColaboradoresFiltro; label: string }[] = [
   { key: "todos", label: "Todos" },
 ];
 
-function situacaoClass(situacao: PortalColaboradorLinha["situacao"]): string {
-  if (situacao === "demitido") {
-    return "bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0]";
-  }
-  if (situacao === "admissional_em_andamento") {
-    return "bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]";
-  }
-  if (situacao === "demissional_em_andamento") {
-    return "bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]";
-  }
-  return "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]";
+function cargoApresentacao(cargo: string): string {
+  return cargo.toLocaleUpperCase("pt-BR");
 }
 
 export function PortalColaboradores({
@@ -211,10 +202,9 @@ export function PortalColaboradores({
                   <div className="hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[28%]" />
+                        <col className="w-[34%]" />
                         <col className="w-[16%]" />
-                        <col className="w-[22%]" />
-                        <col className="w-[12%]" />
+                        <col className="w-[28%]" />
                         <col className="w-[11%]" />
                         <col className="w-[11%]" />
                       </colgroup>
@@ -223,7 +213,6 @@ export function PortalColaboradores({
                           <th className="px-4 py-3">Nome</th>
                           <th className="px-4 py-3">CPF</th>
                           <th className="px-4 py-3">Cargo</th>
-                          <th className="px-4 py-3">Situação</th>
                           <th className="px-4 py-3">Admissão</th>
                           <th className="px-4 py-3">Desligamento</th>
                         </tr>
@@ -243,13 +232,8 @@ export function PortalColaboradores({
                               {row.cpfMascarado}
                             </td>
                             <td className="px-4 py-3 text-[#475569]">
-                              <span className="line-clamp-2">{row.cargo}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${situacaoClass(row.situacao)}`}
-                              >
-                                {row.situacaoLabel}
+                              <span className="line-clamp-2">
+                                {cargoApresentacao(row.cargo)}
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-[#64748b]">
@@ -270,26 +254,19 @@ export function PortalColaboradores({
                         key={row.id}
                         className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[15px] font-semibold text-[#0b1f4d]">
-                              {row.nome}
-                            </p>
-                            <p className="mt-0.5 font-mono text-xs text-[#64748b]">
-                              {row.cpfMascarado}
-                            </p>
-                          </div>
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${situacaoClass(row.situacao)}`}
-                          >
-                            {row.situacaoLabel}
-                          </span>
+                        <div className="min-w-0">
+                          <p className="text-[15px] font-semibold text-[#0b1f4d]">
+                            {row.nome}
+                          </p>
+                          <p className="mt-0.5 font-mono text-xs text-[#64748b]">
+                            {row.cpfMascarado}
+                          </p>
                         </div>
                         <dl className="mt-3 space-y-1 text-sm">
                           <div className="flex justify-between gap-2">
                             <dt className="text-[#94a3b8]">Cargo</dt>
                             <dd className="text-right text-[#475569]">
-                              {row.cargo}
+                              {cargoApresentacao(row.cargo)}
                             </dd>
                           </div>
                           {row.dataAdmissaoLabel ? (

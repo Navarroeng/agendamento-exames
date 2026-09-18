@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   calcPortalColaboradoresResumo,
   consolidarPortalColaboradores,
@@ -275,6 +277,20 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).length,
     1
   );
+}
+
+{
+  const ui = readFileSync(
+    join(process.cwd(), "components/portal-cliente/PortalColaboradores.tsx"),
+    "utf8"
+  );
+  assert.match(ui, /cargoApresentacao/);
+  assert.match(ui, /toLocaleUpperCase\("pt-BR"\)/);
+  assert.doesNotMatch(ui, />Situação</);
+  assert.doesNotMatch(ui, /situacaoLabel/);
+  assert.match(ui, /Equipe atual/);
+  assert.match(ui, /Admissional/);
+  assert.match(ui, /Demissional/);
 }
 
 console.log("test-portal-colaboradores: ok");
