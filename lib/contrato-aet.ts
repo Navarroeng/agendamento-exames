@@ -3,13 +3,14 @@
  * Não gera nem altera o contrato operacional SST. Textos oficiais do modelo AET.
  */
 
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatCNPJ } from "@/lib/cnpj";
 import type {
   ContratoClausula,
   ContratoParteContratante,
 } from "@/lib/contrato-navarro";
 import type { ContratoParcela } from "@/lib/contrato-pagamento";
-import { valorPorExtenso } from "@/lib/extenso";
+import { formatMoedaComExtenso, numeroPorExtenso } from "@/lib/extenso";
 import { formatCurrency } from "@/lib/money";
 import { AET_INCLUSOS_ITENS, SERVICO_AET_NOME } from "@/lib/servico-aet";
 
@@ -71,17 +72,27 @@ export function qualificacaoContratoAet(contratante: ContratoParteContratante): 
   };
 }
 
-function rotuloParcelas(quantidade: number): string {
+function quantidadeParcelasRedacao(quantidade: number): string {
   const n = Math.max(1, Math.floor(quantidade) || 1);
-  return n === 1 ? "1 parcela" : `${n} parcelas`;
+  if (n === 1) return "1 (uma) parcela";
+  const extenso = numeroPorExtenso(n) === "dois" ? "duas" : numeroPorExtenso(n);
+  return `${n} (${extenso}) parcelas`;
 }
 
 export function buildClausulasContratoAet(
   ctx: ContratoAetContexto
 ): ContratoClausula[] {
   const numero = ctx.numeroOrcamento.trim();
-  const valorTotal = `${formatCurrency(ctx.valor)} (${valorPorExtenso(ctx.valor)})`;
-  const valorParcela = formatCurrency(ctx.valorParcela);
+  const valorTotal = `${formatMoedaComExtenso(ctx.valor)}.`;
+  const parcelas = ctx.parcelas;
+  const n = Math.max(1, parcelas.length || ctx.quantidadeParcelas || 1);
+  const valoresIguais =
+    parcelas.length > 0 &&
+    parcelas.every((p) => p.valorCentavos === parcelas[0]?.valorCentavos);
+  const valorParcelaRef = parcelas[0]?.valor ?? ctx.valorParcela;
+  const condicaoIguais = valoresIguais
+    ? `O pagamento será realizado em ${quantidadeParcelasRedacao(n)} de ${formatMoedaComExtenso(valorParcelaRef)}, conforme a seguinte condição:`
+    : `O pagamento será realizado em ${quantidadeParcelasRedacao(n)}, conforme a seguinte condição:`;
 
   return [
     {
@@ -137,9 +148,18 @@ export function buildClausulasContratoAet(
       titulo: "DO VALOR E DA FORMA DE PAGAMENTO",
       paragrafos: [
         "Pelos serviços contratados, a CONTRATANTE pagará à CONTRATADA o valor total de:",
-        `${valorTotal}.`,
-        `O pagamento será realizado em ${rotuloParcelas(ctx.quantidadeParcelas)} de ${valorParcela}, conforme condição estabelecida na Proposta Comercial nº ${numero}.`,
-        "O primeiro vencimento ocorrerá na data da formalização do contrato, e os vencimentos seguintes ocorrerão no mesmo dia dos meses subsequentes, quando houver mais de uma parcela.",
+        valorTotal,
+        condicaoIguais,
+      ],
+      tabela: {
+        colunas: ["PARCELA", "VALOR", "VENCIMENTO"],
+        linhas: parcelas.map((p) => [
+          String(p.indice),
+          formatCurrency(p.valor),
+          formatDateIsoToBR(p.dataIso),
+        ]),
+      },
+      paragrafosApos: [
         "Em caso de atraso, incidirão multa de 2% sobre o valor em atraso e juros de 1% ao mês, calculados proporcionalmente ao período de inadimplência.",
       ],
     },

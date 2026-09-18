@@ -55,12 +55,19 @@ export type ContratoParteContratante = {
   setor: string | null;
 };
 
+export type ContratoClausulaTabela = {
+  colunas: string[];
+  linhas: string[][];
+};
+
 export type ContratoClausula = {
   numero: string;
   titulo: string;
   paragrafos: string[];
   /** Lista com marcadores (contrato AET, cláusula de inclusos). */
   itens?: string[];
+  tabela?: ContratoClausulaTabela;
+  paragrafosApos?: string[];
 };
 
 export function rotuloClausulaContrato(
@@ -324,7 +331,20 @@ export function textoPlanoContrato(
   return clausulas
     .map((c) => {
       const itens = (c.itens ?? []).map((item) => `• ${item}`).join("\n");
-      const corpo = [...c.paragrafos, itens].filter(Boolean).join("\n");
+      const tabela = c.tabela
+        ? [
+            c.tabela.colunas.join(" | "),
+            ...c.tabela.linhas.map((linha) => linha.join(" | ")),
+          ].join("\n")
+        : "";
+      const corpo = [
+        ...c.paragrafos,
+        itens,
+        tabela,
+        ...(c.paragrafosApos ?? []),
+      ]
+        .filter(Boolean)
+        .join("\n");
       return `${rotuloClausulaContrato(c, estilo)}\n${corpo}`;
     })
     .join("\n\n");

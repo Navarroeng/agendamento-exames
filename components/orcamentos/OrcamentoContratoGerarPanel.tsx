@@ -16,7 +16,18 @@ import {
 } from "@/lib/contrato-modelo";
 import { gerarPdfContratoNavarro } from "@/lib/contrato-pdf";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import {
+  resolveTipoDocumentoContrato,
+} from "@/lib/servico-aet";
+import { montarParcelasPontual } from "@/lib/contrato-pagamento";
+import { formatCurrency } from "@/lib/money";
+import {
+  CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG,
+  contratoUsaCronogramaVencimentos,
+  mesclarVencimentosSalvos,
+  sugerirDatasVencimento,
+  validarCronogramaVencimentos,
+} from "@/lib/contrato-vencimentos";
 import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
@@ -28,6 +39,10 @@ import {
   persistirContratoDocumentoGerado,
   proximaVersaoContratoDocumento,
 } from "@/services/orcamento-contrato-documento.service";
+import {
+  listarContratoVencimentos,
+  salvarContratoVencimentos,
+} from "@/services/orcamento-contrato-vencimento.service";
 
 type EtapaFluxo = "idle" | "conferencia" | "preview";
 
@@ -53,13 +68,46 @@ export function OrcamentoContratoGerarPanel({
   );
   const [working, setWorking] = useState(false);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [vencimentos, setVencimentos] = useState<string[]>([]);
+  const [loadingVencimentos, setLoadingVencimentos] = useState(false);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
   const motivoBloqueio = motivoBloqueioGeracaoContrato(orcamento, aprovacao);
-  const isAet = orcamentoEhExclusivoAet(
+  const itensContrato =
     aprovacao.orcamento_aprovacao_itens?.length
       ? aprovacao.orcamento_aprovacao_itens
-      : orcamento.orcamento_itens
+      : orcamento.orcamento_itens;
+  const tipoDocumento = resolveTipoDocumentoContrato({
+    itens: itensContrato,
+    isMensalidade: isOrcamentoMensalidade(orcamento.modalidade),
+  });
+  const isAet = tipoDocumento === "aet";
+  const usaCronograma = contratoUsaCronogramaVencimentos(tipoDocumento);
+  const contratoAssinado = Boolean(aprovacao.contrato_assinado);
+  const quantidadeParcelas = (() => {
+    const fromAprovacao = Number(aprovacao.quantidade_parcelas);
+    if (Number.isFinite(fromAprovacao) && fromAprovacao >= 1) {
+      return Math.floor(fromAprovacao);
+    }
+    const fromOrcamento = Number(orcamento.quantidade_parcelas);
+    if (Number.isFinite(fromOrcamento) && fromOrcamento >= 1) {
+      return Math.floor(fromOrcamento);
+    }
+    return 1;
+  })();
+  const valorContrato = (() => {
+    const fromAprovacao = Number(aprovacao.valor_final);
+    if (Number.isFinite(fromAprovacao) && fromAprovacao > 0) return fromAprovacao;
+    return Number(orcamento.valor_total) || 0;
+  })();
+  const parcelasValores = useMemo(
+    () =>
+      montarParcelasPontual({
+        valorTotal: valorContrato,
+        quantidadeParcelas,
+        dataContrato: hojeIsoLocal(),
+      }),
+    [quantidadeParcelas, valorContrato]
   );
   const atual = documentos[0] ?? null;
   const anteriores = documentos.slice(1);
@@ -86,6 +134,45 @@ export function OrcamentoContratoGerarPanel({
     void carregar();
   }, [carregar]);
 
+  const carregarVencimentos = useCallback(async () => {
+    if (!usaCronograma) {
+      setVencimentos([]);
+      return;
+    }
+    setLoadingVencimentos(true);
+    try {
+      const salvas = await listarContratoVencimentos(aprovacao.id);
+      const sugeridas = sugerirDatasVencimento(
+        hojeIsoLocal(),
+        quantidadeParcelas
+      );
+      setVencimentos(
+        mesclarVencimentosSalvos({
+          quantidade: quantidadeParcelas,
+          sugeridas,
+          salvas,
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        mensagemErroContratoDocumento(
+          err,
+          "Não foi possível carregar as datas de vencimento."
+        )
+      );
+      setVencimentos(
+        sugerirDatasVencimento(hojeIsoLocal(), quantidadeParcelas)
+      );
+    } finally {
+      setLoadingVencimentos(false);
+    }
+  }, [aprovacao.id, quantidadeParcelas, usaCronograma]);
+
+  useEffect(() => {
+    void carregarVencimentos();
+  }, [carregarVencimentos]);
+
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -100,12 +187,13 @@ export function OrcamentoContratoGerarPanel({
           orcamento,
           aprovacao,
           dataContrato,
+          vencimentosIso: usaCronograma ? vencimentos : null,
         })
       );
     } catch {
       return null;
     }
-  }, [aprovacao, dataContrato, orcamento, podeGerar]);
+  }, [aprovacao, dataContrato, orcamento, podeGerar, usaCronograma, vencimentos]);
 
   function fecharFluxo() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -114,9 +202,51 @@ export function OrcamentoContratoGerarPanel({
     setEtapa("idle");
   }
 
+  function erroVencimentos(): string | null {
+    if (!usaCronograma) return null;
+    return validarCronogramaVencimentos(vencimentos, quantidadeParcelas);
+  }
+
+  async function persistirVencimentosAtuais(datas: string[]) {
+    if (!usaCronograma || contratoAssinado) return;
+    await salvarContratoVencimentos({
+      aprovacaoId: aprovacao.id,
+      orcamentoId: orcamento.id,
+      vencimentos: datas.map((data, i) => ({
+        indice: i + 1,
+        data_vencimento: data,
+      })),
+    });
+  }
+
+  async function handleAlterarVencimento(index: number, value: string) {
+    const next = vencimentos.map((data, i) => (i === index ? value : data));
+    setVencimentos(next);
+    try {
+      await persistirVencimentosAtuais(next);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        mensagemErroContratoDocumento(
+          err,
+          "Não foi possível salvar a data de vencimento."
+        )
+      );
+    }
+  }
+
   async function handleAbrirConferencia() {
     if (!podeGerar) {
       toast.error("É necessário um orçamento aprovado com dados do cliente.");
+      return;
+    }
+    if (contratoAssinado) {
+      toast.error(CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG);
+      return;
+    }
+    const erroDatas = erroVencimentos();
+    if (erroDatas) {
+      toast.error(erroDatas);
       return;
     }
     setDataContrato(hojeIsoLocal());
@@ -125,12 +255,21 @@ export function OrcamentoContratoGerarPanel({
 
   async function handleVisualizarRascunho() {
     if (!podeGerar) return;
+    const erroDatas = erroVencimentos();
+    if (erroDatas) {
+      toast.error(erroDatas);
+      return;
+    }
     setWorking(true);
     try {
+      if (usaCronograma) {
+        await persistirVencimentosAtuais(vencimentos);
+      }
       const documento = buildContratoNavarroDocumento({
         orcamento,
         aprovacao,
         dataContrato,
+        vencimentosIso: usaCronograma ? vencimentos : null,
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -150,8 +289,20 @@ export function OrcamentoContratoGerarPanel({
 
   async function handlePersistirPdf() {
     if (!previewDoc || !previewUrl) return;
+    if (contratoAssinado) {
+      toast.error(CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG);
+      return;
+    }
+    const erroDatas = erroVencimentos();
+    if (erroDatas) {
+      toast.error(erroDatas);
+      return;
+    }
     setWorking(true);
     try {
+      if (usaCronograma) {
+        await persistirVencimentosAtuais(vencimentos);
+      }
       const versao = await proximaVersaoContratoDocumento(aprovacao.id);
       const pdf = await gerarPdfContratoNavarro(previewDoc);
       const file = new File([new Uint8Array(pdf.arrayBuffer)], pdf.filename, {
@@ -192,6 +343,7 @@ export function OrcamentoContratoGerarPanel({
           tipo_documento: previewDoc.tipoDocumento,
           data_contrato: previewDoc.dataContrato,
           versao: saved.versao,
+          vencimentos: usaCronograma ? vencimentos : undefined,
         },
       });
 
@@ -283,7 +435,7 @@ export function OrcamentoContratoGerarPanel({
             <button
               type="button"
               className="btn btn-primary justify-center text-[12px]"
-              disabled={busy || !podeGerar}
+              disabled={busy || !podeGerar || contratoAssinado}
               onClick={() => void handleAbrirConferencia()}
             >
               Gerar contrato
@@ -309,7 +461,7 @@ export function OrcamentoContratoGerarPanel({
               <button
                 type="button"
                 className="btn justify-center text-[12px]"
-                disabled={busy || !podeGerar}
+                disabled={busy || !podeGerar || contratoAssinado}
                 onClick={() => void handleAbrirConferencia()}
               >
                 Gerar novamente
@@ -318,6 +470,53 @@ export function OrcamentoContratoGerarPanel({
           )}
         </div>
       </div>
+
+      {usaCronograma ? (
+        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+            Vencimento das parcelas
+          </p>
+          {contratoAssinado ? (
+            <p className="mt-1 text-[12px] text-[#64748b]">
+              {CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG}
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-[#64748b]">
+              Valores vêm da condição aprovada. Ajuste só as datas antes de
+              gerar o contrato.
+            </p>
+          )}
+          {loadingVencimentos ? (
+            <p className="mt-2 text-[12px] text-[#64748b]">Carregando datas…</p>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {parcelasValores.map((parcela, index) => (
+                <div
+                  key={parcela.indice}
+                  className="grid grid-cols-1 items-center gap-1 text-[12px] text-[#334155] sm:grid-cols-[5.75rem_7.25rem_auto] sm:gap-x-3"
+                >
+                  <span className="font-semibold text-navy">
+                    Parcela {parcela.indice}
+                  </span>
+                  <span>{formatCurrency(parcela.valor)}</span>
+                  <label className="flex items-center gap-2">
+                    <span className="text-[#64748b]">Vencimento</span>
+                    <input
+                      type="date"
+                      className="field-input max-w-[168px] py-1 text-[12px]"
+                      value={vencimentos[index] ?? ""}
+                      disabled={busy || contratoAssinado}
+                      onChange={(e) =>
+                        void handleAlterarVencimento(index, e.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {anteriores.length > 0 ? (
         <details className="mt-3">

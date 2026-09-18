@@ -5,6 +5,7 @@ import {
   NAVARRO_CONTRATO_INSTITUCIONAL,
   rotuloClausulaContrato,
   type ContratoClausula,
+  type ContratoClausulaTabela,
 } from "@/lib/contrato-navarro";
 import {
   CONTRATO_AET_FECHO,
@@ -21,6 +22,8 @@ const GOLD: [number, number, number] = [201, 151, 43];
 const WHITE: [number, number, number] = [255, 255, 255];
 const SLATE_700: [number, number, number] = [51, 65, 85];
 const SLATE_900: [number, number, number] = [15, 23, 42];
+const TABLE_HEAD_BG: [number, number, number] = [232, 238, 246];
+const TABLE_BORDER: [number, number, number] = [197, 208, 222];
 
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -41,6 +44,9 @@ const OPENING_TITLE_BOTTOM_GAP = 8;
 const AET_BULLET_R = 0.55;
 const AET_BULLET_GAP = 2.2;
 const AET_BULLET_INDENT = AET_BULLET_R * 2 + AET_BULLET_GAP;
+const TABLE_HEAD_H = 7.2;
+const TABLE_ROW_H = 6.8;
+const TABLE_GAP_AFTER = 7;
 
 function isContratoAet(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "aet";
@@ -283,7 +289,18 @@ function clauseBlockHeight(
     const lines = itemLines(doc, item);
     h += lines.length * PARA_LINE_H + 1.6;
   }
+  if (clause.tabela) {
+    h += tabelaBlockHeight(clause.tabela);
+  }
+  for (const p of clause.paragrafosApos ?? []) {
+    const lines = paragraphLines(doc, p);
+    h += lines.length * PARA_LINE_H + 2.2;
+  }
   return h;
+}
+
+function tabelaBlockHeight(tabela: ContratoClausulaTabela): number {
+  return TABLE_HEAD_H + tabela.linhas.length * TABLE_ROW_H + TABLE_GAP_AFTER;
 }
 
 function qualificacaoBlockHeight(
@@ -328,6 +345,62 @@ function drawOpeningTitle(
 function drawAetBullet(doc: JsPDFDoc, x: number, baselineY: number): void {
   doc.setFillColor(...NAVY);
   doc.circle(x + AET_BULLET_R, baselineY - 1.15, AET_BULLET_R, "F");
+}
+
+function drawClausulaTabela(
+  doc: JsPDFDoc,
+  tabela: ContratoClausulaTabela,
+  startY: number
+): number {
+  const colW = [28, 58, CONTENT_W - 28 - 58];
+  const x0 = MARGIN;
+  const tableW = CONTENT_W;
+  const tableH = TABLE_HEAD_H + tabela.linhas.length * TABLE_ROW_H;
+
+  doc.setDrawColor(...TABLE_BORDER);
+  doc.setLineWidth(0.25);
+  doc.setFillColor(...TABLE_HEAD_BG);
+  doc.rect(x0, startY, tableW, TABLE_HEAD_H, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  let x = x0;
+  const headY = startY + TABLE_HEAD_H / 2 + 1.1;
+  for (let i = 0; i < tabela.colunas.length; i += 1) {
+    const align = i === 1 ? "right" : "center";
+    const tx = i === 1 ? x + colW[i] - 3 : x + colW[i] / 2;
+    doc.text(tabela.colunas[i] ?? "", tx, headY, { align });
+    x += colW[i];
+  }
+
+  let y = startY + TABLE_HEAD_H;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...SLATE_700);
+  for (const linha of tabela.linhas) {
+    doc.setDrawColor(...TABLE_BORDER);
+    doc.rect(x0, y, tableW, TABLE_ROW_H, "S");
+    x = x0;
+    const rowY = y + TABLE_ROW_H / 2 + 1.1;
+    for (let i = 0; i < colW.length; i += 1) {
+      const align = i === 1 ? "right" : "center";
+      const tx = i === 1 ? x + colW[i] - 3 : x + colW[i] / 2;
+      doc.text(linha[i] ?? "", tx, rowY, { align });
+      x += colW[i];
+    }
+    y += TABLE_ROW_H;
+  }
+
+  doc.setDrawColor(...TABLE_BORDER);
+  doc.rect(x0, startY, tableW, tableH, "S");
+  x = x0;
+  for (let i = 0; i < colW.length - 1; i += 1) {
+    x += colW[i];
+    doc.line(x, startY, x, startY + tableH);
+  }
+
+  return startY + tableH + TABLE_GAP_AFTER;
 }
 
 export function drawContratoPdfDocument(
@@ -441,6 +514,27 @@ export function drawContratoPdfDocument(
         y += PARA_LINE_H;
       }
       y += 1.6;
+    }
+
+    if (clause.tabela) {
+      y = ensure(y, tabelaBlockHeight(clause.tabela));
+      y = drawClausulaTabela(doc, clause.tabela, y);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(...SLATE_700);
+    for (const paragrafo of clause.paragrafosApos ?? []) {
+      const lines = paragraphLines(doc, paragrafo);
+      for (let li = 0; li < lines.length; li += 1) {
+        if (y + PARA_LINE_H > contentBottom) y = addPage();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(...SLATE_700);
+        doc.text(lines[li], MARGIN, y);
+        y += PARA_LINE_H;
+      }
+      y += 2.2;
     }
     y += CLAUSE_GAP;
   }

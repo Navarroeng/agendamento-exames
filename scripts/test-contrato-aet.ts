@@ -164,7 +164,14 @@ assert.match(texto, /12\.345\.678\/0001-95/);
 assert.match(texto, /Rua Industrial, 100/);
 assert.match(texto, /Proposta Comercial nº ORC-2026-0063/);
 assert.match(texto, /R\$ 3\.200,00 \(três mil e duzentos reais\)/);
-assert.match(texto, /2 parcelas de R\$ 1\.600,00/);
+assert.match(texto, /2 \(duas\) parcelas de R\$ 1\.600,00 \(mil e seiscentos reais\)/);
+assert.match(texto, /PARCELA \| VALOR \| VENCIMENTO/);
+assert.match(texto, /1 \| R\$ 1\.600,00 \| 18\/09\/2026/);
+assert.match(texto, /2 \| R\$ 1\.600,00 \| 18\/10\/2026/);
+assert.doesNotMatch(
+  texto,
+  /O primeiro vencimento ocorrerá na data da formalização/
+);
 assert.match(texto, /Pedro Henrique Navarro/);
 assert.match(texto, /385\.381\.338-02/);
 assert.match(texto, /CEP 03138-010/);
@@ -203,6 +210,69 @@ for (const termo of ausentes) {
 }
 assert.ok(!/\bASO\b/i.test(texto), "AET não pode citar ASO");
 assert.ok(!/5%/.test(texto));
+
+const aet1 = buildContratoNavarroDocumento({
+  orcamento: makeOrcamento({
+    id: "o-aet-1",
+    numero: "ORC-2026-0101",
+    modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+    valor_total: 3200,
+    quantidade_parcelas: 1,
+    orcamento_itens: [itemAet()],
+  }),
+  aprovacao: makeAprovacao({
+    id: "ap-aet-1",
+    orcamento_id: "o-aet-1",
+    quantidade_parcelas: 1,
+    valor_parcela: 3200,
+    condicao_pagamento: "1 parcela",
+  }),
+  dataContrato: "2026-09-18",
+  vencimentosIso: ["2026-09-25"],
+});
+assert.equal(aet1.parcelas.length, 1);
+assert.equal(aet1.parcelas[0]?.dataIso, "2026-09-25");
+assert.match(aet1.texto, /1 \(uma\) parcela/);
+assert.match(aet1.texto, /1 \| R\$ 3\.200,00 \| 25\/09\/2026/);
+
+const aet3 = buildContratoNavarroDocumento({
+  orcamento: makeOrcamento({
+    id: "o-aet-3",
+    numero: "ORC-2026-0103",
+    modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+    valor_total: 3200,
+    quantidade_parcelas: 3,
+    orcamento_itens: [itemAet()],
+  }),
+  aprovacao: makeAprovacao({
+    id: "ap-aet-3",
+    orcamento_id: "o-aet-3",
+    quantidade_parcelas: 3,
+    valor_parcela: 3200 / 3,
+    condicao_pagamento: "3 parcelas",
+  }),
+  dataContrato: "2026-01-31",
+  vencimentosIso: ["2026-01-31", "2026-02-28", "2026-03-31"],
+});
+assert.equal(aet3.parcelas.map((p) => p.dataIso).join(","), "2026-01-31,2026-02-28,2026-03-31");
+assert.match(aet3.texto, /3 \(três\) parcelas/);
+assert.match(aet3.texto, /31\/01\/2026/);
+assert.match(aet3.texto, /28\/02\/2026/);
+assert.match(aet3.texto, /31\/03\/2026/);
+
+const aetManual = buildContratoNavarroDocumento({
+  orcamento: orcAet,
+  aprovacao: apAet,
+  dataContrato: "2026-09-18",
+  vencimentosIso: ["2026-09-20", "2026-10-20"],
+});
+assert.equal(aetManual.parcelas[0]?.dataIso, "2026-09-20");
+assert.equal(aetManual.parcelas[1]?.dataIso, "2026-10-20");
+assert.match(aetManual.texto, /20\/09\/2026/);
+assert.match(aetManual.texto, /20\/10\/2026/);
+assert.ok(!aetManual.texto.includes("18/09/2026"));
+assert.ok(doc.texto.includes("18/09/2026"));
+assert.ok(!doc.texto.includes("20/09/2026"));
 
 const sst = buildContratoNavarroDocumento({
   orcamento: makeOrcamento({
@@ -248,6 +318,8 @@ const sst = buildContratoNavarroDocumento({
 });
 assert.equal(sst.tipoDocumento, "pontual_sst");
 assert.match(sst.texto, /Programa de Gerenciamento de Riscos \(PGR\)/);
+assert.doesNotMatch(sst.texto, /PARCELA \| VALOR \| VENCIMENTO/);
+assert.doesNotMatch(sst.texto, /2 \(duas\) parcelas/);
 assert.equal(sst.colaboradores, 57);
 assert.ok(!doc.texto.includes("PGR"));
 assert.notEqual(doc.numeroOrcamento, sst.numeroOrcamento);
@@ -352,6 +424,7 @@ const mensal = buildContratoNavarroDocumento({
 });
 assert.equal(mensal.tipoDocumento, "mensalidade");
 assert.match(mensal.texto, /automaticamente renovado/);
+assert.doesNotMatch(mensal.texto, /PARCELA \| VALOR \| VENCIMENTO/);
 
 const treino = buildContratoNavarroDocumento({
   orcamento: makeOrcamento({
@@ -436,6 +509,23 @@ const srcPersist = fs.readFileSync(
 );
 assert.match(srcPersist, /orcamento_contrato_documentos/);
 assert.doesNotMatch(srcPersist, /\.from\(["']cliente_contratos["']\)/);
+const srcVenc = fs.readFileSync(
+  path.join(process.cwd(), "services", "orcamento-contrato-vencimento.service.ts"),
+  "utf8"
+);
+assert.match(srcVenc, /orcamento_contrato_vencimentos/);
+assert.doesNotMatch(srcVenc, /\.from\(["']cliente_contratos["']\)/);
+const srcMig = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "126_orcamento_contrato_vencimentos.sql"
+  ),
+  "utf8"
+);
+assert.match(srcMig, /orcamento_contrato_vencimentos/);
+assert.match(srcMig, /NÃO altera cliente_contratos SST/);
 
 const previewDir = path.join(process.cwd(), "tmp");
 fs.mkdirSync(previewDir, { recursive: true });

@@ -15,6 +15,10 @@ import {
   qualificacaoContratoAet,
 } from "@/lib/contrato-aet";
 import {
+  aplicarDatasNasParcelas,
+  contratoUsaCronogramaVencimentos,
+} from "@/lib/contrato-vencimentos";
+import {
   montarMensalidades,
   montarParcelasPontual,
   type ContratoParcela,
@@ -161,6 +165,7 @@ export function buildContratoNavarroDocumento(params: {
   orcamento: OrcamentoComItens;
   aprovacao: OrcamentoAprovacaoRecord | null;
   dataContrato: string;
+  vencimentosIso?: string[] | null;
 }): ContratoNavarroDocumento {
   const { orcamento, aprovacao, dataContrato } = params;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataContrato)) {
@@ -181,7 +186,7 @@ export function buildContratoNavarroDocumento(params: {
   const colaboradores =
     tipoDocumento === "aet" ? 0 : resolveColaboradores(orcamento, aprovacao);
 
-  const parcelas =
+  let parcelas =
     tipoDocumento === "mensalidade"
       ? montarMensalidades({
           valorMensal: valor,
@@ -193,6 +198,14 @@ export function buildContratoNavarroDocumento(params: {
           quantidadeParcelas: resolveParcelasQuantidade(orcamento, aprovacao),
           dataContrato,
         });
+
+  if (
+    contratoUsaCronogramaVencimentos(tipoDocumento) &&
+    params.vencimentosIso &&
+    params.vencimentosIso.length > 0
+  ) {
+    parcelas = aplicarDatasNasParcelas(parcelas, params.vencimentosIso);
+  }
 
   const contratante: ContratoParteContratante = {
     razaoSocial: orcamento.cliente_nome.trim(),
