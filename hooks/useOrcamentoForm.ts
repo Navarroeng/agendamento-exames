@@ -52,11 +52,11 @@ import type { ClienteRecord } from "@/lib/types";
 import { maskCNPJInput } from "@/lib/cnpj";
 import { toast } from "sonner";
 import {
-  bloqueioAetExclusivo,
-  isServicoAetNome,
-  SERVICO_AET_EXCLUSIVIDADE_MSG,
-  SERVICO_AET_QUANTIDADE_INTERNA,
-} from "@/lib/servico-aet";
+  bloqueioLaudoPontualExclusivo,
+  isServicoLaudoPontualNome,
+  mensagemExclusividadeLaudoPontual,
+  SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA,
+} from "@/lib/servico-laudo-pontual";
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
 
@@ -97,7 +97,7 @@ export function useOrcamentoForm() {
   const addItem = useCallback(() => {
     setForm((prev) => {
       if (isOrcamentoMensalidade(prev.modalidade)) return prev;
-      const bloqueio = bloqueioAetExclusivo({
+      const bloqueio = bloqueioLaudoPontualExclusivo({
         itens: prev.itens,
         itemIdAlterado: null,
       });
@@ -131,7 +131,7 @@ export function useOrcamentoForm() {
     ) => {
       setForm((prev) => {
         if (field === "quantidade") {
-          if (prev.itens.some((item) => isServicoAetNome(item.servico_nome))) {
+          if (prev.itens.some((item) => isServicoLaudoPontualNome(item.servico_nome))) {
             return prev;
           }
           return {
@@ -145,7 +145,7 @@ export function useOrcamentoForm() {
         }
 
         if (field === "servico_id" && servicoNome !== undefined) {
-          const bloqueio = bloqueioAetExclusivo({
+          const bloqueio = bloqueioLaudoPontualExclusivo({
             itens: prev.itens,
             itemIdAlterado: id,
             novoNome: servicoNome,
@@ -169,8 +169,8 @@ export function useOrcamentoForm() {
           if (field === "servico_id" && servicoNome !== undefined) {
             next.servico_nome = servicoNome;
             next.valor_manual = false;
-            if (isServicoAetNome(servicoNome)) {
-              next.quantidade = String(SERVICO_AET_QUANTIDADE_INTERNA);
+            if (isServicoLaudoPontualNome(servicoNome)) {
+              next.quantidade = String(SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA);
             }
             if (isGestaoMensalSstNome(servicoNome)) {
               next.valor_unitario = "";
@@ -377,8 +377,8 @@ export function useOrcamentoForm() {
     const itensRaw = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
-        const quantidade = isServicoAetNome(item.servico_nome)
-          ? SERVICO_AET_QUANTIDADE_INTERNA
+        const quantidade = isServicoLaudoPontualNome(item.servico_nome)
+          ? SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA
           : parseQuantidadeColaboradores(item.quantidade) || 1;
         const valor = parseMoney(item.valor_unitario);
 
@@ -461,11 +461,9 @@ export function useOrcamentoForm() {
     if (itensValidos.length === 0) {
       return "Adicione ao menos um serviço.";
     }
-    if (
-      itensValidos.some((item) => isServicoAetNome(item.servico_nome)) &&
-      !itensValidos.every((item) => isServicoAetNome(item.servico_nome))
-    ) {
-      return SERVICO_AET_EXCLUSIVIDADE_MSG;
+    const exclusividade = mensagemExclusividadeLaudoPontual(itensValidos);
+    if (exclusividade) {
+      return exclusividade;
     }
     if (isOrcamentoMensalidade(form.modalidade)) {
       if (

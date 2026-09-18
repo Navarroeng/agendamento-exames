@@ -22,6 +22,7 @@ import {
   yearMonthFromDataAprovacao,
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
+import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 import type {
   OrcamentoAprovacaoFormValues,
@@ -259,7 +260,7 @@ export function useImplantacaoClientesPage() {
         toast.message("Processo já concluído. Abrindo consulta.");
         await openProcesso(
           orcamentoId,
-          processo?.fluxoImplantacao === "aet"
+          isFluxoLaudoPontual(processo?.fluxoImplantacao)
             ? "envio"
             : processo?.fluxoImplantacao === "somente_treinamentos" ||
                 processo?.fluxoImplantacao === "combinado"

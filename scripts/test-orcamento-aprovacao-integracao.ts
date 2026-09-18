@@ -50,4 +50,21 @@ assert.equal(
   true
 );
 
+assert.equal(
+  isAprovacaoIntegracaoCompleta({
+    result: {
+      aprovacao_id: "ap-insal",
+      cliente_id: "cli-1",
+      contrato_id: null,
+    },
+    itens: [
+      {
+        servico_id: "insal",
+        servico_nome: "Laudo de Insalubridade",
+      },
+    ],
+  }),
+  true
+);
+
 console.log("test-orcamento-aprovacao-integracao: OK");

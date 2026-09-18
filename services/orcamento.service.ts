@@ -13,11 +13,7 @@ import type {
   OrcamentoInsertPayload,
   OrcamentoRecord,
 } from "@/lib/orcamento-types";
-import {
-  orcamentoEhExclusivoAet,
-  orcamentoPossuiAet,
-  SERVICO_AET_EXCLUSIVIDADE_MSG,
-} from "@/lib/servico-aet";
+import { mensagemExclusividadeLaudoPontual } from "@/lib/servico-laudo-pontual";
 
 const ORCAMENTO_SELECT = `
   *,
@@ -32,8 +28,9 @@ function normalizeOrcamentoPayload(
   if (validationError) {
     throw new Error(validationError);
   }
-  if (orcamentoPossuiAet(itens) && !orcamentoEhExclusivoAet(itens)) {
-    throw new Error(SERVICO_AET_EXCLUSIVIDADE_MSG);
+  const exclusividade = mensagemExclusividadeLaudoPontual(itens);
+  if (exclusividade) {
+    throw new Error(exclusividade);
   }
 
   const subtotal = itens.reduce(

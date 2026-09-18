@@ -32,6 +32,7 @@ import {
 } from "@/lib/orcamento-modalidade";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
+import { SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-insalubridade";
 import {
   resolveTipoDocumentoContrato,
   type TipoDocumentoContrato,
@@ -120,19 +121,43 @@ function resolveServicos(
     .filter(Boolean);
 }
 
+function resolveTipoDocumentoFromAprovacao(
+  orcamento: OrcamentoComItens | null | undefined,
+  aprovacao: OrcamentoAprovacaoRecord | null | undefined
+): TipoDocumentoContrato | null {
+  if (!orcamento) return null;
+  const itens =
+    (aprovacao?.orcamento_aprovacao_itens?.length
+      ? aprovacao.orcamento_aprovacao_itens
+      : orcamento.orcamento_itens) ?? [];
+  return resolveTipoDocumentoContrato({
+    itens,
+    isMensalidade: isOrcamentoMensalidade(orcamento.modalidade),
+  });
+}
+
 export function podeGerarContratoNavarro(
   orcamento: OrcamentoComItens | null | undefined,
   aprovacao: OrcamentoAprovacaoRecord | null | undefined
 ): boolean {
   if (!orcamento?.id || !orcamento.numero?.trim()) return false;
   if (!aprovacao?.id) return false;
-  return Boolean(orcamento.cliente_nome?.trim());
+  if (!orcamento.cliente_nome?.trim()) return false;
+  if (resolveTipoDocumentoFromAprovacao(orcamento, aprovacao) === "insalubridade") {
+    return false;
+  }
+  return true;
 }
 
 export function motivoBloqueioGeracaoContrato(
-  _orcamento: OrcamentoComItens | null | undefined,
-  _aprovacao: OrcamentoAprovacaoRecord | null | undefined
+  orcamento: OrcamentoComItens | null | undefined,
+  aprovacao: OrcamentoAprovacaoRecord | null | undefined
 ): string | null {
+  if (
+    resolveTipoDocumentoFromAprovacao(orcamento, aprovacao) === "insalubridade"
+  ) {
+    return SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG;
+  }
   return null;
 }
 
@@ -184,7 +209,9 @@ export function buildContratoNavarroDocumento(params: {
   });
   const valor = resolveValor(orcamento, aprovacao);
   const colaboradores =
-    tipoDocumento === "aet" ? 0 : resolveColaboradores(orcamento, aprovacao);
+    tipoDocumento === "aet" || tipoDocumento === "insalubridade"
+      ? 0
+      : resolveColaboradores(orcamento, aprovacao);
 
   let parcelas =
     tipoDocumento === "mensalidade"
@@ -215,6 +242,10 @@ export function buildContratoNavarroDocumento(params: {
     email: orcamento.email?.trim() || null,
     setor: orcamento.cliente_setor?.trim() || null,
   };
+
+  if (tipoDocumento === "insalubridade") {
+    throw new Error(SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG);
+  }
 
   if (tipoDocumento === "aet") {
     const quantidadeParcelas = Math.max(1, parcelas.length);

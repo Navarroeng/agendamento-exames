@@ -83,6 +83,8 @@ import {
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 import { resolveAetServicoId } from "@/lib/servico-aet";
+import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
+import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
 import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
 import {
   OrcamentoAbaAetElaboracao,
@@ -244,7 +246,8 @@ export function OrcamentoAprovarModal({
     const fluxo = classifyOrcamentoFluxoImplantacao(
       itens,
       treinamentosId,
-      resolveAetServicoId(servicos)
+      resolveAetServicoId(servicos),
+      resolveInsalubridadeServicoId(servicos)
     );
     const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
@@ -253,7 +256,7 @@ export function OrcamentoAprovarModal({
       treinamento,
     };
     const requestedTab: TabId | null | undefined =
-      fluxo === "aet" && initialTab === "documentos"
+      isFluxoLaudoPontual(fluxo) && initialTab === "documentos"
         ? "visita_aet"
         : initialTab;
     const tabInicial: TabId =
@@ -394,11 +397,12 @@ export function OrcamentoAprovarModal({
     return classifyOrcamentoFluxoImplantacao(
       itens,
       treinamentosId,
-      resolveAetServicoId(servicos)
+      resolveAetServicoId(servicos),
+      resolveInsalubridadeServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
   const aetEnabled = Boolean(
-    open && orcamento && aprovacao && fluxoImplantacao === "aet"
+    open && orcamento && aprovacao && isFluxoLaudoPontual(fluxoImplantacao)
   );
   const aetEtapas = useOrcamentoAetEtapas({
     enabled: aetEnabled,
@@ -464,7 +468,7 @@ export function OrcamentoAprovarModal({
   );
 
   useEffect(() => {
-    if (fluxoImplantacao !== "aet") return;
+    if (!isFluxoLaudoPontual(fluxoImplantacao)) return;
     setForm((prev) =>
       prev && prev.forma_pagamento === "avista"
         ? { ...prev, forma_pagamento: "parcelado" }
@@ -490,7 +494,7 @@ export function OrcamentoAprovarModal({
   async function handleSalvarCondicoesEditadasClick() {
     if (!form || !aprovacao) return;
     if (
-      fluxoImplantacao !== "aet" &&
+      !isFluxoLaudoPontual(fluxoImplantacao) &&
       (!form.quantidade_colaboradores.trim() ||
         Number(form.quantidade_colaboradores) < 1)
     ) {
@@ -507,7 +511,7 @@ export function OrcamentoAprovarModal({
     }
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
-      (form.forma_pagamento === "parcelado" || fluxoImplantacao === "aet") &&
+      (form.forma_pagamento === "parcelado" || isFluxoLaudoPontual(fluxoImplantacao)) &&
       (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
     ) {
       toast.error("Informe a quantidade de parcelas.");
@@ -518,7 +522,7 @@ export function OrcamentoAprovarModal({
       ...form,
       condicoes_iguais: false,
       forma_pagamento:
-        fluxoImplantacao === "aet" ? "parcelado" : form.forma_pagamento,
+        isFluxoLaudoPontual(fluxoImplantacao) ? "parcelado" : form.forma_pagamento,
     });
     setEditandoCondicoes(false);
     try {
@@ -539,7 +543,7 @@ export function OrcamentoAprovarModal({
 
     if (!form.condicoes_iguais) {
       if (
-        fluxoImplantacao !== "aet" &&
+        !isFluxoLaudoPontual(fluxoImplantacao) &&
         (!form.quantidade_colaboradores.trim() ||
           Number(form.quantidade_colaboradores) < 1)
       ) {
@@ -556,7 +560,7 @@ export function OrcamentoAprovarModal({
       }
       if (
         !isOrcamentoMensalidade(orcamento.modalidade) &&
-        (form.forma_pagamento === "parcelado" || fluxoImplantacao === "aet") &&
+        (form.forma_pagamento === "parcelado" || isFluxoLaudoPontual(fluxoImplantacao)) &&
         (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
       ) {
         toast.error("Informe a quantidade de parcelas.");
@@ -569,7 +573,7 @@ export function OrcamentoAprovarModal({
     }
 
     await onSalvarAprovacao(
-      fluxoImplantacao === "aet"
+      isFluxoLaudoPontual(fluxoImplantacao)
         ? { ...form, forma_pagamento: "parcelado" }
         : form
     );
@@ -641,7 +645,7 @@ export function OrcamentoAprovarModal({
     await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
     if (boletoPago) {
-      if (fluxoImplantacao === "aet") {
+      if (isFluxoLaudoPontual(fluxoImplantacao)) {
         setTab("visita_aet");
       } else if (
         fluxoImplantacao === "somente_treinamentos" ||
@@ -776,7 +780,9 @@ export function OrcamentoAprovarModal({
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isAet = fluxoImplantacao === "aet";
+  const isLaudoPontual = isFluxoLaudoPontual(fluxoImplantacao);
+  const laudoKind =
+    fluxoImplantacao === "insalubridade" ? "insalubridade" : "aet";
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
@@ -878,7 +884,12 @@ export function OrcamentoAprovarModal({
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6">
           {tab === "resumo" ? (
             <div className="space-y-4">
-              {isAet ? <OrcamentoResumoAetStatus aet={aetEtapas.aet} /> : null}
+              {isLaudoPontual ? (
+                <OrcamentoResumoAetStatus
+                  kind={laudoKind}
+                  aet={aetEtapas.aet}
+                />
+              ) : null}
               <OrcamentoViewBody orcamento={orcamento} servicos={servicos} />
             </div>
           ) : null}
@@ -892,7 +903,7 @@ export function OrcamentoAprovarModal({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                  {isAet ? null : (
+                  {isLaudoPontual ? null : (
                   <ResumoItem
                     label="Quantidade de colaboradores"
                     value={String(resumoComercial.quantidadeColaboradores)}
@@ -927,7 +938,7 @@ export function OrcamentoAprovarModal({
                     </>
                   ) : (
                     <>
-                  {isAet ? null : (
+                  {isLaudoPontual ? null : (
                   <ResumoItem
                     label="À vista"
                     value={
@@ -977,7 +988,7 @@ export function OrcamentoAprovarModal({
                   {editandoCondicoes && form ? (
                     <div className="space-y-4 p-4 sm:p-5">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {isAet ? null : (
+                        {isLaudoPontual ? null : (
                         <Field label="Quantidade de colaboradores" required>
                           <input
                             className="field-input"
@@ -1037,7 +1048,7 @@ export function OrcamentoAprovarModal({
                         </div>
                       ) : (
                       <>
-                      {isAet ? null : (
+                      {isLaudoPontual ? null : (
                       <div>
                         <p className="mb-2 text-xs font-bold text-navy">
                           Forma de pagamento <RequiredMark />
@@ -1073,7 +1084,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       )}
 
-                      {!isAet && form.forma_pagamento === "avista" ? (
+                      {!isLaudoPontual && form.forma_pagamento === "avista" ? (
                         <ResumoItem
                           label="Valor final fechado"
                           value={
@@ -1129,7 +1140,7 @@ export function OrcamentoAprovarModal({
                           Aprovado conforme o orçamento original.
                         </div>
                       ) : null}
-                      {isAet ? null : (
+                      {isLaudoPontual ? null : (
                       <ResumoItem
                         label="Quantidade de colaboradores"
                         value={String(aprovacao.quantidade_colaboradores)}
@@ -1214,7 +1225,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       <div className="space-y-4 p-4 sm:p-5">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {isAet ? null : (
+                          {isLaudoPontual ? null : (
                           <Field label="Quantidade de colaboradores" required>
                             <input
                               className="field-input"
@@ -1274,7 +1285,7 @@ export function OrcamentoAprovarModal({
                           </div>
                         ) : (
                         <>
-                        {isAet ? null : (
+                        {isLaudoPontual ? null : (
                         <div>
                           <p className="mb-2 text-xs font-bold text-navy">
                             Forma de pagamento <RequiredMark />
@@ -1313,7 +1324,7 @@ export function OrcamentoAprovarModal({
                         </div>
                         )}
 
-                        {!isAet && form.forma_pagamento === "avista" ? (
+                        {!isLaudoPontual && form.forma_pagamento === "avista" ? (
                           <ResumoItem
                             label="Valor final fechado"
                             value={
@@ -1413,7 +1424,7 @@ export function OrcamentoAprovarModal({
                           {formatDateTimeBR(row.alterado_em)} · {row.alterado_por}
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                          {isAet ? null : (
+                          {isLaudoPontual ? null : (
                           <p className="text-[#64748b]">
                             Quantidade: {row.quantidade_anterior} →{" "}
                             <span className="font-semibold text-[#334155]">
@@ -1812,6 +1823,7 @@ export function OrcamentoAprovarModal({
             etapasCtx
           ) ? (
             <OrcamentoAbaAetVisita
+              kind={laudoKind}
               aet={aetEtapas.aet}
               form={aetEtapas.visitaForm}
               saving={saving || aetEtapas.saving}
@@ -1831,6 +1843,7 @@ export function OrcamentoAprovarModal({
             etapasCtx
           ) ? (
             <OrcamentoAbaAetElaboracao
+              kind={laudoKind}
               aet={aetEtapas.aet}
               form={aetEtapas.elaboracaoForm}
               saving={saving || aetEtapas.saving}
@@ -1857,6 +1870,7 @@ export function OrcamentoAprovarModal({
             etapasCtx
           ) ? (
             <OrcamentoAbaAetEnvio
+              kind={laudoKind}
               aet={aetEtapas.aet}
               form={aetEtapas.envioForm}
               saving={saving || aetEtapas.saving}

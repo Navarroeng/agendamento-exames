@@ -85,6 +85,18 @@ assert.equal(
   isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, { fluxo: "aet" }),
   true
 );
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, {
+    fluxo: "insalubridade",
+  }),
+  true
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("elaboracao", contratoOk, true, {
+    fluxo: "insalubridade",
+  }),
+  false
+);
 
 const procuracaoOk = aprovacao({
   ...financeiroOk,

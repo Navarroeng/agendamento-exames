@@ -11,6 +11,7 @@ import {
   isTreinamentoEtapaConcluida,
   type ImplantacaoTreinamentoRecord,
 } from "@/lib/implantacao-treinamento";
+import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 
 export type OrcamentoEtapaId =
@@ -58,20 +59,26 @@ export const ORCAMENTO_ETAPAS = ORCAMENTO_ETAPAS_PADRAO;
  * Montagem dinâmica das abas:
  * - somente_treinamentos: 5 abas (sem docs SST / exames)
  * - combinado: fluxo SST completo + Agendamento do Treinamento (após Financeiro)
- * - aet: fluxo próprio (sem SST ocupacional)
+ * - aet / insalubridade: laudos pontuais (sem SST ocupacional)
  * - padrao: fluxo atual
  */
 export function buildOrcamentoEtapas(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): Array<{ id: OrcamentoEtapaId; label: string }> {
-  if (fluxo === "aet") {
+  if (isFluxoLaudoPontual(fluxo)) {
     return [
       { id: "resumo", label: "Resumo" },
       { id: "aprovado", label: "Orçamento aprovado" },
       { id: "contrato", label: "Contrato" },
       { id: "financeiro", label: "Financeiro" },
       { id: "visita_aet", label: "Agendamento da visita" },
-      { id: "elaboracao", label: "Elaboração do AET" },
+      {
+        id: "elaboracao",
+        label:
+          fluxo === "insalubridade"
+            ? "Elaboração do Laudo"
+            : "Elaboração do AET",
+      },
       { id: "envio", label: "Envio ao cliente" },
     ];
   }
@@ -162,7 +169,7 @@ export function isOrcamentoPagamentoPendente(
 export function fluxoOperacaoIndependeDoPagamento(
   fluxo: OrcamentoFluxoImplantacao
 ): boolean {
-  return fluxo === "aet";
+  return isFluxoLaudoPontual(fluxo);
 }
 
 export function isProcuracaoEtapaConcluida(
@@ -244,33 +251,38 @@ export function isOrcamentoEtapaLiberada(
     case "financeiro":
       return isContratoEtapaConcluida(aprovacao);
     case "treinamento":
-      if (fluxo === "aet") return false;
+      if (isFluxoLaudoPontual(fluxo)) return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "documentos":
       return false;
     case "visita_aet":
-      if (fluxo !== "aet") return false;
+      if (!isFluxoLaudoPontual(fluxo)) return false;
       return isContratoEtapaConcluida(aprovacao);
     case "elaboracao":
-      if (fluxo !== "aet") return false;
+      if (!isFluxoLaudoPontual(fluxo)) return false;
       return isAetVisitaRealizada(ctx?.aet);
     case "envio":
-      if (fluxo !== "aet") return false;
+      if (!isFluxoLaudoPontual(fluxo)) return false;
       return isAetElaboracaoConcluida(ctx?.aet);
     case "procuracao":
-      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
+      if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
+        return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "funcionarios":
-      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
+      if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
+        return false;
       return isProcuracaoEtapaConcluida(aprovacao);
     case "logo":
-      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
+      if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
+        return false;
       return isFuncionariosEtapaConcluida(aprovacao);
     case "visita":
-      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
+      if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
+        return false;
       return isLogoEtapaConcluida(aprovacao);
     case "agendamentos":
-      if (fluxo === "somente_treinamentos" || fluxo === "aet") return false;
+      if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
+        return false;
       return isVisitaEtapaConcluida(aprovacao);
     default:
       return false;

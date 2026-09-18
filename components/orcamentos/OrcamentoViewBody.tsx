@@ -26,7 +26,7 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import {
@@ -93,7 +93,7 @@ export function OrcamentoViewBody({
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isAet = orcamentoEhExclusivoAet(itens);
+  const isLaudoPontual = isLaudoPontualExclusivo(itens);
   const valorServico = Number(orcamento.valor_total) || 0;
   const linhasMensalidade = isMensalidade
     ? buildResumoMensalidadeLinhas(valorServico)
@@ -146,7 +146,7 @@ export function OrcamentoViewBody({
             <thead>
               <tr className="bg-[#082b63] text-left text-[10px] font-semibold uppercase tracking-wide text-white">
                 <th className="px-4 py-3 font-semibold sm:px-5">Serviço</th>
-                {isAet ? null : (
+                {isLaudoPontual ? null : (
                 <th className="px-3 py-3 text-center font-semibold">
                   Quantidade de colaboradores
                 </th>
@@ -191,7 +191,7 @@ export function OrcamentoViewBody({
                         </div>
                       ) : null}
                     </td>
-                    {isAet ? null : (
+                    {isLaudoPontual ? null : (
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
                       {item.quantidade}
                     </td>

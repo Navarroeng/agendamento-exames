@@ -21,6 +21,7 @@ import {
   isAetVisitaRealizada,
   type ImplantacaoAetRecord,
 } from "@/lib/implantacao-aet";
+import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
@@ -102,8 +103,16 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS_AET: Array<{
 export function buildImplantacaoEtapasOperacionais(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): Array<{ id: ImplantacaoEtapaOperacionalId; label: string }> {
-  if (fluxo === "aet") {
-    return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_AET];
+  if (isFluxoLaudoPontual(fluxo)) {
+    const etapas = [...IMPLANTACAO_ETAPAS_OPERACIONAIS_AET];
+    if (fluxo === "insalubridade") {
+      return etapas.map((etapa) =>
+        etapa.id === "elaboracao"
+          ? { ...etapa, label: "Elaboração do Laudo" }
+          : etapa
+      );
+    }
+    return etapas;
   }
   if (fluxo === "somente_treinamentos") {
     return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_TREINAMENTOS];
@@ -454,7 +463,7 @@ export function resolveImplantacaoEtapaAtual(
 
   if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
 
-  if (fluxo === "aet") {
+  if (isFluxoLaudoPontual(fluxo)) {
     const aet = opts?.aet ?? null;
     if (!aet || aet.visita_status === "aguardando_agendamento") {
       return "visita_aet";
@@ -510,13 +519,13 @@ export function countImplantacaoEtapasConcluidas(
     fluxo?: OrcamentoFluxoImplantacao;
     treinamento?: ImplantacaoTreinamentoRecord | null;
     aet?: ImplantacaoAetRecord | null;
-    /** Para fluxo somente_treinamentos/aet: conta as abas (inclui resumo/aprovado). */
+    /** Para fluxo somente_treinamentos/laudo pontual: conta as abas (inclui resumo/aprovado). */
     orcamentoAprovado?: boolean;
   }
 ): number {
   const fluxo = opts?.fluxo ?? "padrao";
 
-  if (fluxo === "aet") {
+  if (isFluxoLaudoPontual(fluxo)) {
     let n = 0;
     n += 1;
     if (opts?.orcamentoAprovado || aprovacao) n += 1;
@@ -566,7 +575,7 @@ export function implantacaoEtapaToModalTab(
   etapa: ImplantacaoEtapaId,
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): OrcamentoEtapaId {
-  if (fluxo === "aet") {
+  if (isFluxoLaudoPontual(fluxo)) {
     if (etapa === "documentos" || etapa === "visita_aet" || etapa === "visita_agendada") {
       return "visita_aet";
     }
@@ -663,13 +672,13 @@ export function buildImplantacaoProcesso(params: {
   const totalEtapas =
     fluxo === "somente_treinamentos"
       ? 5
-      : fluxo === "aet"
+      : isFluxoLaudoPontual(fluxo)
         ? 7
         : etapasOperacionais.length;
   const agendamentoLiberado =
     etapaAtual === "contrato_encerrado" ||
     etapaAtual === "treinamento_cancelado" ||
-    fluxo === "aet"
+    isFluxoLaudoPontual(fluxo)
       ? false
       : fluxo === "somente_treinamentos"
         ? false
@@ -700,7 +709,7 @@ export function buildImplantacaoProcesso(params: {
         : `${etapasConcluidas} de ${totalEtapas}`,
     agendamentoLiberado,
     agendamentoLabel:
-      fluxo === "aet"
+      isFluxoLaudoPontual(fluxo)
         ? "Não aplicável"
         : labelAgendamentoLiberacao(agendamentoLiberado),
     dataAprovacao: aprovacao?.aprovado_em ?? null,

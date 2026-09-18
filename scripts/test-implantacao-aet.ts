@@ -649,4 +649,27 @@ assert.equal(
   "financeiro"
 );
 
+assert.deepEqual(
+  buildOrcamentoEtapas("insalubridade").map((e) => e.id),
+  buildOrcamentoEtapas("aet").map((e) => e.id)
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, {
+    fluxo: "insalubridade",
+  }),
+  true
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("elaboracao", contratoOk, true, {
+    fluxo: "insalubridade",
+  }),
+  false
+);
+assert.equal(
+  fluxoOperacaoIndependeDoPagamento("insalubridade"),
+  true
+);
+assert.equal(fluxoOperacaoIndependeDoPagamento("aet"), true);
+assert.equal(fluxoOperacaoIndependeDoPagamento("padrao"), false);
+
 console.log("test-implantacao-aet: ok");

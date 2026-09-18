@@ -39,6 +39,12 @@ import {
   PROPOSTA_DESCRICAO_PARAGRAFOS_AET,
   SERVICO_AET_NOME,
 } from "../lib/servico-aet";
+import {
+  INSALUBRIDADE_INCLUSOS_ITENS,
+  INSALUBRIDADE_INCLUSOS_OBSERVACOES,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE,
+  SERVICO_INSALUBRIDADE_NOME,
+} from "../lib/servico-insalubridade";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
@@ -232,7 +238,8 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
     nome: item.servico_nome,
     descricao:
       item.servico_nome === PACOTE_COMPLETO_SST_NOME ||
-      item.servico_nome === SERVICO_AET_NOME
+      item.servico_nome === SERVICO_AET_NOME ||
+      item.servico_nome === SERVICO_INSALUBRIDADE_NOME
         ? null
         : "Exame complementar ocupacional.",
     valor_sugerido: item.valor_unitario,
@@ -245,7 +252,9 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
           ? [...GESTAO_COMPLETA_SST_ITENS]
           : item.servico_nome === SERVICO_AET_NOME
             ? [...AET_INCLUSOS_ITENS]
-            : null,
+            : item.servico_nome === SERVICO_INSALUBRIDADE_NOME
+              ? [...INSALUBRIDADE_INCLUSOS_ITENS]
+              : null,
   }));
 }
 
@@ -637,6 +646,56 @@ fs.mkdirSync(previewDir, { recursive: true });
 fs.writeFileSync(
   path.join(previewDir, "preview-aet.pdf"),
   Buffer.from(aetDoc.output("arraybuffer"))
+);
+
+const insalOrc = buildOrcamento({
+  numero: "ORC-2026-0501",
+  modalidade: "pontual",
+  quantidade_parcelas: 2,
+  itens: [{ nome: SERVICO_INSALUBRIDADE_NOME, quantidade: 1, valor: 4500 }],
+});
+const insalDoc = renderPdf(insalOrc);
+const insalRaw = pdfVisibleText(pdfLatin1(insalDoc));
+assert.match(insalRaw, /Laudo de Insalubridade/);
+assert.match(insalRaw, /Norma Regulamentadora n[ºo] 15/);
+assert.match(insalRaw, /auxiliar de limpeza/);
+assert.match(insalRaw, /Visita t[eé]cnica na empresa/);
+assert.match(insalRaw, /Mapeamento dos riscos insalubres/);
+assert.match(insalRaw, /An[aá]lises quantitativas utilizando m[eé]todo e equipamento/);
+assert.match(insalRaw, /adequado\./);
+assert.match(insalRaw, /Elabora[cç][aã]o de Laudo de Insalubridade/);
+assert.match(
+  insalRaw,
+  /Ser[aá] necess[aá]rio agendar um dia de visita pr[eé]via para avalia[cç][oõ]es/
+);
+assert.doesNotMatch(insalRaw, /Quantidade de Colaboradores/i);
+assert.doesNotMatch(insalRaw, /N[uú]mero de Colaboradores/i);
+assert.doesNotMatch(insalRaw, /Valor [àa] vista/i);
+assert.doesNotMatch(insalRaw, /[ÀA] vista/);
+assert.doesNotMatch(insalRaw, /5%/);
+assert.doesNotMatch(insalRaw, /desconto/i);
+assert.doesNotMatch(insalRaw, /An[aá]lise Ergon[oô]mica/);
+assert.doesNotMatch(insalRaw, /NR-17/);
+assert.doesNotMatch(insalRaw, /BENEF[IÍ]CIOS DO PLANO/i);
+assert.doesNotMatch(insalRaw, /Pacote completo/);
+assert.doesNotMatch(insalRaw, /eSocial/);
+assert.doesNotMatch(insalRaw, /PGR/);
+assert.doesNotMatch(insalRaw, /PCMSO/);
+assert.doesNotMatch(insalRaw, /LTCAT/);
+assert.doesNotMatch(insalRaw, /Riscos Psicossociais/);
+assert.match(insalRaw, /2 parcelas de/);
+assert.match(insalRaw, /2\.250,00/);
+assert.match(insalRaw, /4\.500,00/);
+assert.match(insalRaw, /Condi[cç][aã]o de pagamento/i);
+assert.match(insalRaw, /Valor total/i);
+assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE.length, 1);
+assert.equal(INSALUBRIDADE_INCLUSOS_ITENS.length, 4);
+assert.equal(INSALUBRIDADE_INCLUSOS_OBSERVACOES.length, 1);
+assert.doesNotMatch(insalRaw, /•/);
+assert.doesNotMatch(insalRaw, /\u2022/);
+fs.writeFileSync(
+  path.join(previewDir, "preview-insalubridade.pdf"),
+  Buffer.from(insalDoc.output("arraybuffer"))
 );
 
 console.log("test-orcamento-pdf: OK");

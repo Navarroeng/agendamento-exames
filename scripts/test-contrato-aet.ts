@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { jsPDF } from "jspdf";
 import { AET_INCLUSOS_ITENS, SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG, SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import { valorPorExtenso } from "../lib/extenso";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 import {
@@ -15,6 +16,7 @@ import {
 import { SERVICO_SST_NOME_TREINAMENTOS } from "../lib/servico-treinamentos";
 import {
   buildContratoNavarroDocumento,
+  motivoBloqueioGeracaoContrato,
   podeGerarContratoNavarro,
 } from "../lib/contrato-modelo";
 import { drawContratoPdfDocument, nomeArquivoContratoNavarro } from "../lib/contrato-pdf";
@@ -135,6 +137,48 @@ const orcAet = makeOrcamento({
 const apAet = makeAprovacao();
 
 assert.equal(podeGerarContratoNavarro(orcAet, apAet), true);
+assert.equal(motivoBloqueioGeracaoContrato(orcAet, apAet), null);
+
+const orcInsal = makeOrcamento({
+  id: "o-insal",
+  numero: "ORC-2026-0501",
+  modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+  valor_total: 4500,
+  orcamento_itens: [
+    {
+      id: "i-insal",
+      orcamento_id: "o-insal",
+      servico_id: "insal-1",
+      servico_nome: SERVICO_INSALUBRIDADE_NOME,
+      quantidade: 1,
+      valor_unitario: 4500,
+      valor_total: 4500,
+      ordem: 0,
+    },
+  ],
+});
+const apInsal = makeAprovacao({
+  id: "ap-insal",
+  orcamento_id: "o-insal",
+  valor_final: 4500,
+  orcamento_aprovacao_itens: [
+    {
+      id: "ai-insal",
+      aprovacao_id: "ap-insal",
+      servico_id: "insal-1",
+      servico_nome: SERVICO_INSALUBRIDADE_NOME,
+      quantidade: 1,
+      valor_unitario: 4500,
+      valor_total: 4500,
+      ordem: 0,
+    },
+  ],
+});
+assert.equal(podeGerarContratoNavarro(orcInsal, apInsal), false);
+assert.equal(
+  motivoBloqueioGeracaoContrato(orcInsal, apInsal),
+  SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG
+);
 assert.equal(valorPorExtenso(3200), "três mil e duzentos reais");
 assert.equal(
   valorPorExtenso(3200.5),

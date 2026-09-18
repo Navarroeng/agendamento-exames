@@ -16,6 +16,7 @@ import {
 } from "../lib/orcamento-pagamento";
 import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 
 assert.equal(arredondarCentenaParaBaixo(1235), 1200);
@@ -228,6 +229,27 @@ assert.equal(
   "2 parcelas de R$ 1.600,00"
 );
 assert.notEqual(condicoesAet.valorAVista, calcValorAVistaProposta(3200));
+
+const insalItens = [
+  {
+    servico_id: "insal-1",
+    servico_nome: SERVICO_INSALUBRIDADE_NOME,
+    valor: 4500,
+  },
+];
+const condicoesInsal = calcCondicoesPagamentoProposta(4500, 2, insalItens);
+assert.equal(condicoesInsal.permitePagamentoAVista, false);
+assert.equal(condicoesInsal.valorAVista, 0);
+assert.equal(condicoesInsal.textoAVista, "");
+assert.equal(condicoesInsal.parcelas, 2);
+assert.equal(condicoesInsal.valorParcela, 2250);
+
+const pacoteItens = [
+  { servico_id: "sst-1", servico_nome: PACOTE_COMPLETO_SST_NOME, valor: 3200 },
+];
+const condicoesPacote = calcCondicoesPagamentoProposta(3200, 2, pacoteItens);
+assert.equal(condicoesPacote.permitePagamentoAVista, true);
+assert.ok((condicoesPacote.valorAVista ?? 0) > 0);
 
 const treinamentoItens = [
   { servico_nome: "Treinamento NR-12", valor: 1800 },

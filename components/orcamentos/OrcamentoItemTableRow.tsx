@@ -14,7 +14,7 @@ import {
   isPacoteCompletoSst,
   resolveItensInclusosServico,
 } from "@/lib/servico-sst-pacote";
-import { isServicoAetNome } from "@/lib/servico-aet";
+import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 
 interface OrcamentoItemTableRowProps {
   item: OrcamentoItemFormItem;
@@ -68,7 +68,7 @@ export function OrcamentoItemTableRow({
     const servico = servicos.find((s) => s.id === servicoId);
     const nome = servico?.nome === "Outros" ? "" : servico?.nome ?? "";
     onUpdate("servico_id", servicoId, nome);
-    if (isPacoteCompletoSst(nome) || isGestaoMensalSstNome(nome) || isServicoAetNome(nome)) {
+    if (isPacoteCompletoSst(nome) || isGestaoMensalSstNome(nome) || isServicoLaudoPontualNome(nome)) {
       onApplyValorSugerido(null);
       return;
     }

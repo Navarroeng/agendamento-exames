@@ -16,6 +16,7 @@ import {
 import { parseMoney } from "../lib/money";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 
 const orcamento = {
   id: "o1",
@@ -238,6 +239,37 @@ assert.ok(!diffsAet.some((d) => d.label === "Quantidade de colaboradores"));
 assert.ok(
   !diffsAet.some((d) => /vista/i.test(`${d.original} ${d.aprovado}`))
 );
+
+const orcamentoInsal = {
+  ...orcamento,
+  modalidade: "pontual" as const,
+  orcamento_itens: [
+    {
+      id: "iinsal",
+      orcamento_id: "o1",
+      servico_id: "insal-1",
+      servico_nome: SERVICO_INSALUBRIDADE_NOME,
+      quantidade: 1,
+      valor_unitario: 4500,
+      valor_total: 4500,
+      ordem: 0,
+    },
+  ],
+  valor_total: 4500,
+  subtotal: 4500,
+} as OrcamentoComItens;
+const payloadInsal = buildAprovacaoInsertPayload(
+  orcamentoInsal,
+  {
+    ...buildAprovacaoFormFromOrcamento(orcamentoInsal),
+    forma_pagamento: "avista",
+  },
+  "Ágatha",
+  parseMoney
+);
+assert.equal(payloadInsal.quantidade_colaboradores, 0);
+assert.equal(payloadInsal.valor_avista, null);
+assert.notEqual(payloadInsal.condicao_pagamento, "À vista");
 const condicoesAet = buildCondicoesComerciaisFromForm(
   {
     ...formAet,

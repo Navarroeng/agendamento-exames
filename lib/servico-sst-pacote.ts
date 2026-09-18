@@ -3,6 +3,10 @@ import {
   isGestaoCompletaSstNome,
 } from "@/lib/orcamento-modalidade";
 import { AET_INCLUSOS_ITENS, isServicoAetNome } from "@/lib/servico-aet";
+import {
+  INSALUBRIDADE_INCLUSOS_ITENS,
+  isServicoInsalubridadeNome,
+} from "@/lib/servico-insalubridade";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const PACOTE_COMPLETO_SST_NOME = "Pacote completo - SST";
@@ -101,6 +105,9 @@ export function resolveItensInclusosServico(
   }
   if (isServicoAetNome(nome)) {
     return [...AET_INCLUSOS_ITENS];
+  }
+  if (isServicoInsalubridadeNome(nome)) {
+    return [...INSALUBRIDADE_INCLUSOS_ITENS];
   }
 
   const parsed = parseItensInclusos(servico?.itens_inclusos);

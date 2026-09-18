@@ -12,6 +12,7 @@ import {
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaStatus,
 } from "@/lib/implantacao-aet";
+import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
 
 const VISITA_STATUS_OPTIONS: ImplantacaoAetVisitaStatus[] = [
   "aguardando_agendamento",
@@ -34,12 +35,14 @@ type AetVisitaForm = {
 };
 
 export function OrcamentoAbaAetVisita({
+  kind = "aet",
   aet,
   form,
   saving,
   onChange,
   onSalvar,
 }: {
+  kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
   form: {
     visita_status: ImplantacaoAetVisitaStatus;
@@ -58,8 +61,9 @@ export function OrcamentoAbaAetVisita({
   return (
     <div className="space-y-4">
       <p className="text-sm text-[#64748b]">
-        Agende e registre a visita técnica para avaliação das atividades e
-        postos de trabalho.
+        {kind === "insalubridade"
+          ? "Agende e registre a visita técnica para avaliações quantitativas dos agentes insalubres."
+          : "Agende e registre a visita técnica para avaliação das atividades e postos de trabalho."}
       </p>
       {aet?.visita_status === "realizada" ? (
         <p className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-[12px] font-semibold text-[#166534]">
@@ -154,6 +158,7 @@ export function OrcamentoAbaAetVisita({
 }
 
 export function OrcamentoAbaAetElaboracao({
+  kind = "aet",
   aet,
   form,
   saving,
@@ -163,6 +168,7 @@ export function OrcamentoAbaAetElaboracao({
   onVisualizarLaudo,
   onSalvar,
 }: {
+  kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
   form: {
     elaboracao_status: ImplantacaoAetElaboracaoStatus;
@@ -189,8 +195,9 @@ export function OrcamentoAbaAetElaboracao({
         </p>
       ) : (
         <p className="text-sm text-[#64748b]">
-          Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final
-          antes de concluir.
+          {kind === "insalubridade"
+            ? "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir."
+            : "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir."}
         </p>
       )}
 
@@ -234,7 +241,9 @@ export function OrcamentoAbaAetElaboracao({
 
       <div className="rounded-xl border border-[#e4ebf4] bg-white p-4">
         <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-navy">
-          Laudo AET final (PDF)
+          {kind === "insalubridade"
+            ? "Laudo de Insalubridade (PDF)"
+            : "Laudo AET final (PDF)"}
         </p>
         {laudoAnexado ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -294,12 +303,14 @@ export function OrcamentoAbaAetElaboracao({
 }
 
 export function OrcamentoAbaAetEnvio({
+  kind = "aet",
   aet,
   form,
   saving,
   onChange,
   onSalvar,
 }: {
+  kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
   form: {
     enviado_cliente: boolean;
@@ -320,13 +331,15 @@ export function OrcamentoAbaAetEnvio({
     <div className="space-y-4">
       {!podeEnviar ? (
         <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm font-semibold text-[#b45309]">
-          Conclua a elaboração do AET e anexe o PDF final antes de registrar o
-          envio.
+          {kind === "insalubridade"
+            ? "Conclua a elaboração do Laudo e anexe o PDF final antes de registrar o envio."
+            : "Conclua a elaboração do AET e anexe o PDF final antes de registrar o envio."}
         </p>
       ) : (
         <p className="text-sm text-[#64748b]">
-          Registre o envio do Laudo AET ao cliente. O envio automático por
-          e-mail não faz parte desta etapa.
+          {kind === "insalubridade"
+            ? "Registre o envio do Laudo de Insalubridade ao cliente. O envio automático por e-mail não faz parte desta etapa."
+            : "Registre o envio do Laudo AET ao cliente. O envio automático por e-mail não faz parte desta etapa."}
         </p>
       )}
 
@@ -385,14 +398,18 @@ export function OrcamentoAbaAetEnvio({
 }
 
 export function OrcamentoResumoAetStatus({
+  kind = "aet",
   aet,
 }: {
+  kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
 }) {
   return (
     <section className="rounded-2xl border border-[#e4ebf4] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-navy">
-        Andamento do Laudo AET
+        {kind === "insalubridade"
+          ? "Andamento do Laudo de Insalubridade"
+          : "Andamento do Laudo AET"}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>

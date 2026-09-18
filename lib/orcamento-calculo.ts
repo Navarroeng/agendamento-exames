@@ -8,7 +8,7 @@ import {
   isPacoteCompletoSst,
   PACOTE_COMPLETO_SST_NOME,
 } from "@/lib/servico-sst-pacote";
-import { isServicoAetNome } from "@/lib/servico-aet";
+import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
@@ -220,7 +220,7 @@ export function validateOrcamentoItensValores(
     if (!item.servico_nome.trim()) continue;
     const qtd = Math.round(Number(item.quantidade));
     if (
-      !isServicoAetNome(item.servico_nome) &&
+      !isServicoLaudoPontualNome(item.servico_nome) &&
       (!Number.isFinite(qtd) || qtd < 1)
     ) {
       return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
@@ -336,7 +336,7 @@ export function resolveQuantidadeColaboradoresOrcamento(
   );
   if (itens.length === 0) return 0;
 
-  if (itens.every((item) => isServicoAetNome(item.servico_nome))) {
+  if (itens.every((item) => isServicoLaudoPontualNome(item.servico_nome))) {
     return 0;
   }
 

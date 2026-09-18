@@ -1,7 +1,6 @@
 /**
  * Contratações pontuais independentes do contrato operacional SST
- * (`cliente_contratos`). Hoje: Laudo AET exclusivo. Extensível para perícia
- * e outros laudos avulsos, sempre a partir do snapshot da aprovação.
+ * (`cliente_contratos`). Laudos pontuais exclusivos: AET e Insalubridade.
  */
 
 import {
@@ -15,10 +14,13 @@ import {
   isFinanceiroEtapaConcluida,
   isOrcamentoPagamentoPendente,
 } from "@/lib/orcamento-etapas";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import {
+  resolveLaudoPontualKind,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 
-export type ServicoPontualKind = "aet";
+export type ServicoPontualKind = LaudoPontualKind;
 
 export interface ServicoPontualContratado {
   kind: ServicoPontualKind;
@@ -38,8 +40,7 @@ export interface ServicoPontualContratado {
 export function resolveServicoPontualKind(
   itens: ServicoItemRef[] | null | undefined
 ): ServicoPontualKind | null {
-  if (orcamentoEhExclusivoAet(itens)) return "aet";
-  return null;
+  return resolveLaudoPontualKind(itens);
 }
 
 export function isContratacaoServicoPontual(
@@ -60,8 +61,14 @@ export function readImplantacaoOrcamentoIdFromSearch(
   return value || null;
 }
 
-export function labelStatusServicoPontual(etapa: ImplantacaoEtapaId): string {
+export function labelStatusServicoPontual(
+  etapa: ImplantacaoEtapaId,
+  kind?: ServicoPontualKind | null
+): string {
   if (etapa === "contrato") return "Aguardando contrato";
+  if (kind === "insalubridade" && etapa === "elaboracao") {
+    return "Laudo em elaboração";
+  }
   return IMPLANTACAO_ETAPA_LABELS[etapa];
 }
 
@@ -85,14 +92,11 @@ export function resolveStatusServicoPontual(params: {
   aprovacao: OrcamentoAprovacaoRecord | null;
   aet?: ImplantacaoAetRecord | null;
 }): { id: ImplantacaoEtapaId; label: string } {
-  const id =
-    params.kind === "aet"
-      ? resolveImplantacaoEtapaAtual(params.aprovacao, {
-          fluxo: "aet",
-          aet: params.aet ?? null,
-        })
-      : resolveImplantacaoEtapaAtual(params.aprovacao);
-  return { id, label: labelStatusServicoPontual(id) };
+  const id = resolveImplantacaoEtapaAtual(params.aprovacao, {
+    fluxo: params.kind,
+    aet: params.aet ?? null,
+  });
+  return { id, label: labelStatusServicoPontual(id, params.kind) };
 }
 
 export function buildServicoPontualContratado(params: {

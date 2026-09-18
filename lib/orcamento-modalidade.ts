@@ -1,5 +1,5 @@
 import { formatCurrency } from "@/lib/money";
-import { isServicoAetNome } from "@/lib/servico-aet";
+import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const ORCAMENTO_MODALIDADE_PONTUAL = "pontual";
@@ -124,7 +124,7 @@ export function filterServicosPorModalidade<
   T extends { nome: string },
 >(servicos: T[], modalidade?: string | null): T[] {
   const base = isOrcamentoMensalidade(modalidade)
-    ? servicos.filter((s) => !isServicoAetNome(s.nome))
+    ? servicos.filter((s) => !isServicoLaudoPontualNome(s.nome))
     : servicos;
   const temCanonico = base.some(
     (s) =>
@@ -156,7 +156,7 @@ export function formatValorOrcamentoExibicao(orcamento: {
 export function labelItensInclusosServico(
   nome: string | null | undefined
 ): string {
-  if (isServicoAetNome(nome)) return "O que está incluso?";
+  if (isServicoLaudoPontualNome(nome)) return "O que está incluso?";
   return isGestaoCompletaSstNome(nome)
     ? "Essa gestão inclui:"
     : "Este pacote inclui:";

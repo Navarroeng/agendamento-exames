@@ -10,7 +10,7 @@ import {
   isOrcamentoMensalidade,
   labelValorColunaOrcamento,
 } from "@/lib/orcamento-modalidade";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -49,15 +49,15 @@ export function OrcamentoItensSection({
   onApplyValorSugerido,
 }: OrcamentoItensSectionProps) {
   const isMensalidade = isOrcamentoMensalidade(modalidade);
-  const isAet = orcamentoEhExclusivoAet(itens);
-  const colSpanValor = isAet ? 1 : 2;
+  const isLaudoPontual = isLaudoPontualExclusivo(itens);
+  const colSpanValor = isLaudoPontual ? 1 : 2;
   return (
     <Panel
       title="Itens do orçamento"
       icon={<IconClipboard />}
       iconTone="purple"
       action={
-        isMensalidade || isAet ? undefined : (
+        isMensalidade || isLaudoPontual ? undefined : (
         <button type="button" className="btn btn-primary text-xs" onClick={onAdd}>
           + Adicionar Serviço
         </button>
@@ -81,7 +81,7 @@ export function OrcamentoItensSection({
           <thead>
             <tr>
               <th className={TH}>Serviço</th>
-              {isAet ? null : (
+              {isLaudoPontual ? null : (
               <th className={TH}>Quantidade de colaboradores</th>
               )}
               <th className={TH}>{labelValorColunaOrcamento(modalidade)}</th>
@@ -103,7 +103,7 @@ export function OrcamentoItensSection({
                 onApplyValorSugerido={(valor) =>
                   onApplyValorSugerido(item.id, valor)
                 }
-                hideQuantidadeColaboradores={isAet}
+                hideQuantidadeColaboradores={isLaudoPontual}
               />
             ))}
           </tbody>

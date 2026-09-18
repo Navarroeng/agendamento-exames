@@ -34,7 +34,7 @@ import {
   isOrcamentoFormDirty,
   serializeOrcamentoFormSnapshot,
 } from "@/lib/orcamento-form-dirty";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { resolveLaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import {
   ORCAMENTO_JA_APROVADO_MSG,
   orcamentoPermiteAprovar,
@@ -968,7 +968,7 @@ export function useOrcamentosPage() {
         if (refreshed) setAprovarOrcamento(refreshed);
         setAprovarAprovacao(saved);
         const itensAprovados = saved.orcamento_aprovacao_itens;
-        const isAet = orcamentoEhExclusivoAet(itensAprovados);
+        const laudoKind = resolveLaudoPontualKind(itensAprovados);
         const integracaoCompleta = isAprovacaoIntegracaoCompleta({
           result: integracao,
           itens: itensAprovados,
@@ -977,11 +977,17 @@ export function useOrcamentosPage() {
           toast.error(
             "APROVACAO_INCOMPLETA: o orçamento só pode ficar Aprovado após criar/vincular cliente e contrato. Use a RPC aprovar_orcamento_integrar_cliente."
           );
-        } else if (isAet) {
+        } else if (laudoKind === "aet") {
           toast.success(
             integracao.cliente_criado
               ? "Aprovação salva. Cliente vinculado e implantação AET iniciada."
               : "Aprovação salva. Implantação AET iniciada."
+          );
+        } else if (laudoKind === "insalubridade") {
+          toast.success(
+            integracao.cliente_criado
+              ? "Aprovação salva. Cliente vinculado e implantação do Laudo de Insalubridade iniciada."
+              : "Aprovação salva. Implantação do Laudo de Insalubridade iniciada."
           );
         } else {
           toast.success(

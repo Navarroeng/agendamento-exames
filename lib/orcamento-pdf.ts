@@ -41,9 +41,17 @@ import {
 } from "@/lib/servico-sst-pacote";
 import {
   AET_INCLUSOS_ITENS,
-  orcamentoEhExclusivoAet,
   PROPOSTA_DESCRICAO_PARAGRAFOS_AET,
 } from "@/lib/servico-aet";
+import {
+  INSALUBRIDADE_INCLUSOS_ITENS,
+  INSALUBRIDADE_INCLUSOS_OBSERVACOES,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE,
+} from "@/lib/servico-insalubridade";
+import {
+  isLaudoPontualExclusivo,
+  resolveLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
@@ -180,8 +188,10 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE: readonly string[] = [
 function resolveDescricaoPropostaParagrafos(
   orcamento: OrcamentoComItens
 ): readonly string[] {
-  if (orcamentoEhExclusivoAet(orcamento.orcamento_itens)) {
-    return PROPOSTA_DESCRICAO_PARAGRAFOS_AET;
+  const kind = resolveLaudoPontualKind(orcamento.orcamento_itens);
+  if (kind === "aet") return PROPOSTA_DESCRICAO_PARAGRAFOS_AET;
+  if (kind === "insalubridade") {
+    return PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE;
   }
   return isOrcamentoMensalidade(orcamento.modalidade)
     ? PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE
@@ -216,8 +226,7 @@ function servicoListaInclusosNaTabela(
   return (
     isPacoteCompletoSst(nome) ||
     isPacoteCompletoNome(nome) ||
-    isGestaoCompletaSstNome(nome) ||
-    orcamentoEhExclusivoAet([{ servico_nome: nome ?? "" }])
+    isGestaoCompletaSstNome(nome)
   );
 }
 
@@ -1085,10 +1094,10 @@ function orcamentoHasGestaoMensal(
   });
 }
 
-function orcamentoHasAet(
+function orcamentoHasLaudoPontual(
   orcamento: OrcamentoComItens
 ): boolean {
-  return orcamentoEhExclusivoAet(orcamento.orcamento_itens);
+  return isLaudoPontualExclusivo(orcamento.orcamento_itens);
 }
 
 /** Mesmo card estruturado de “O que está incluso?” do Pacote completo - SST. */
@@ -1096,7 +1105,7 @@ function orcamentoUsaCardInclusosEstruturado(
   orcamento: OrcamentoComItens,
   catalogo: ServicoSstRecord[]
 ): boolean {
-  if (orcamentoHasAet(orcamento)) return true;
+  if (orcamentoHasLaudoPontual(orcamento)) return true;
   if (orcamentoHasPacoteCompleto(orcamento, catalogo)) return true;
   return (
     isOrcamentoMensalidade(orcamento.modalidade) &&
@@ -1197,9 +1206,9 @@ function drawResumoFinanceiroCard(
     itensRegistroParaDescontoAvista(orcamento.orcamento_itens ?? []),
     resolvePacoteCompletoSstServicoId(catalogo)
   );
-  const isAet = orcamentoHasAet(orcamento);
+  const isLaudoPontual = orcamentoHasLaudoPontual(orcamento);
 
-  if (isAet) {
+  if (isLaudoPontual) {
     drawRow(
       "parcel",
       "Condição de pagamento",
@@ -1802,7 +1811,7 @@ function drawClientCard(
     ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
   ];
-  if (!orcamentoHasAet(orcamento)) {
+  if (!orcamentoHasLaudoPontual(orcamento)) {
     fieldsRight.push([
       "Número de Colaboradores",
       String(resolveNumeroColaboradoresOrcamento(orcamento)),
@@ -1980,7 +1989,7 @@ function estimateServiceRowHeight(
 ): number {
   const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
   const listaInclusos =
-    !orcamentoEhExclusivoAet([{ servico_nome: servico?.nome ?? item.servico_nome }]) &&
+    !isLaudoPontualExclusivo([{ servico_nome: servico?.nome ?? item.servico_nome }]) &&
     servicoListaInclusosNaTabela(servico?.nome ?? item.servico_nome);
 
   if (listaInclusos && inclusos.length > 0) {
@@ -1995,7 +2004,7 @@ function estimateServiceRowHeight(
   const descricao = servico?.descricao?.trim();
   if (
     descricao &&
-    !orcamentoEhExclusivoAet([{ servico_nome: servico?.nome ?? item.servico_nome }])
+    !isLaudoPontualExclusivo([{ servico_nome: servico?.nome ?? item.servico_nome }])
   ) {
     doc.setFontSize(TABLE_DETAIL_FONT);
     const lines = doc.splitTextToSize(descricao, serviceColWidth - 4);
@@ -2016,16 +2025,16 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
-  const isAet = orcamentoHasAet(orcamento);
-  const colWidths = isAet ? [138, 40] : [98, 44, 40];
-  const colStarts = isAet
+  const isLaudoPontual = orcamentoHasLaudoPontual(orcamento);
+  const colWidths = isLaudoPontual ? [138, 40] : [98, 44, 40];
+  const colStarts = isLaudoPontual
     ? [MARGIN, MARGIN + colWidths[0]]
     : [
         MARGIN,
         MARGIN + colWidths[0],
         MARGIN + colWidths[0] + colWidths[1],
       ];
-  const headers = isAet
+  const headers = isLaudoPontual
     ? ["Serviço", labelValorColunaOrcamento(orcamento.modalidade)]
     : [
         "Serviço",
@@ -2079,7 +2088,7 @@ function drawServicesTable(
     const servico = resolveCatalogoServico(item, catalogo);
     const inclusos = resolveItensInclusosServico(servico, item.servico_nome);
     const listaInclusos =
-      !isAet &&
+      !isLaudoPontual &&
       servicoListaInclusosNaTabela(servico?.nome ?? item.servico_nome);
     const rowH = estimateServiceRowHeight(
       doc,
@@ -2124,7 +2133,7 @@ function drawServicesTable(
         doc.text(wrapped, colStarts[0] + 3, detailY);
         detailY += wrapped.length * TABLE_DETAIL_LINE_H;
       });
-    } else if (!isAet) {
+    } else if (!isLaudoPontual) {
       const descricao = servico?.descricao?.trim();
       if (descricao) {
         doc.setFont("helvetica", "normal");
@@ -2139,8 +2148,8 @@ function drawServicesTable(
     doc.setFontSize(TABLE_CELL_FONT);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
-    const valorColIndex = isAet ? 1 : 2;
-    if (!isAet) {
+    const valorColIndex = isLaudoPontual ? 1 : 2;
+    if (!isLaudoPontual) {
       doc.text(
         String(Math.round(Number(item.quantidade))),
         colStarts[1] + colWidths[1] / 2,
@@ -2185,7 +2194,8 @@ function drawFinancialAndInclusosRow(
   layout: OrcamentoPdfLayout
 ): number {
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isAet = orcamentoHasAet(orcamento);
+  const laudoKind = resolveLaudoPontualKind(orcamento.orcamento_itens);
+  const isLaudoPontual = laudoKind !== null;
   const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
     orcamento,
     catalogo
@@ -2195,12 +2205,20 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  const pacoteInclusosItens = isAet
-    ? [...AET_INCLUSOS_ITENS]
-    : !isMensalidade && usaCardInclusosEstruturado
-      ? buildPacoteCompletoInclusosItens(orcamento)
-      : [];
-  const inclusosObservacoes = isAet ? [] : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;
+  const pacoteInclusosItens =
+    laudoKind === "aet"
+      ? [...AET_INCLUSOS_ITENS]
+      : laudoKind === "insalubridade"
+        ? [...INSALUBRIDADE_INCLUSOS_ITENS]
+        : !isMensalidade && usaCardInclusosEstruturado
+          ? buildPacoteCompletoInclusosItens(orcamento)
+          : [];
+  const inclusosObservacoes =
+    laudoKind === "insalubridade"
+      ? INSALUBRIDADE_INCLUSOS_OBSERVACOES
+      : laudoKind === "aet"
+        ? []
+        : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;
 
   const { desiredH, contentMinH } = measureDesiredCardsRowHeight(
     doc,
@@ -2210,7 +2228,7 @@ function drawFinancialAndInclusosRow(
     inclusos,
     isMensalidade,
     inclusosObservacoes,
-    isAet
+    isLaudoPontual
   );
   const { needsNewPage, cardH } = resolveCardsBlockPlacement(
     y,
@@ -2232,7 +2250,7 @@ function drawFinancialAndInclusosRow(
       cardH,
       pacoteInclusosItens,
       inclusosObservacoes,
-      isAet
+      isLaudoPontual
     );
   } else if (inclusos.length > 0) {
     drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);

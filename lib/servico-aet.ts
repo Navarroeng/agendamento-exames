@@ -4,6 +4,7 @@
  * normalizado (match exato, sem includes).
  */
 
+import { orcamentoEhExclusivoInsalubridade } from "@/lib/servico-insalubridade";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const SERVICO_AET_NOME =
@@ -84,12 +85,16 @@ export function orcamentoEhExclusivoAet(
   return relevant.every((item) => isServicoAet(item, aetServicoId));
 }
 
-/** AET exclusivo não tem à vista. Demais Pontuais (SST, treinamentos) sim. */
+/** Laudos pontuais exclusivos (AET, Insalubridade) não têm à vista. */
 export function orcamentoPermitePagamentoAVista(
   itens: ServicoItemRef[] | null | undefined,
-  aetServicoId?: string | null
+  aetServicoId?: string | null,
+  insalubridadeServicoId?: string | null
 ): boolean {
-  return !orcamentoEhExclusivoAet(itens, aetServicoId);
+  return (
+    !orcamentoEhExclusivoAet(itens, aetServicoId) &&
+    !orcamentoEhExclusivoInsalubridade(itens, insalubridadeServicoId)
+  );
 }
 
 function itemTemServico(item: ServicoItemRef): boolean {
@@ -141,16 +146,29 @@ export function bloqueioAetExclusivo(params: {
   return null;
 }
 
-export type TipoDocumentoContrato = "aet" | "mensalidade" | "pontual_sst";
+export type TipoDocumentoContrato =
+  | "aet"
+  | "insalubridade"
+  | "mensalidade"
+  | "pontual_sst";
 
 export function resolveTipoDocumentoContrato(params: {
   modalidade?: string | null;
   itens?: ServicoItemRef[] | null;
   aetServicoId?: string | null;
+  insalubridadeServicoId?: string | null;
   isMensalidade?: boolean;
 }): TipoDocumentoContrato {
   if (orcamentoEhExclusivoAet(params.itens, params.aetServicoId)) {
     return "aet";
+  }
+  if (
+    orcamentoEhExclusivoInsalubridade(
+      params.itens,
+      params.insalubridadeServicoId
+    )
+  ) {
+    return "insalubridade";
   }
   if (params.isMensalidade) return "mensalidade";
   return "pontual_sst";

@@ -12,6 +12,7 @@ import {
 import { GESTAO_COMPLETA_SST_NOME } from "../lib/orcamento-modalidade";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import { SERVICO_SST_NOME_TREINAMENTOS } from "../lib/servico-treinamentos";
 import {
   hrefAcompanhamentoServicoPontual,
@@ -30,7 +31,11 @@ function aprovacao(
   valor = 3200
 ): OrcamentoAprovacaoRecord {
   return {
-    quantidade_colaboradores: servicoNome === SERVICO_AET_NOME ? 0 : 57,
+    quantidade_colaboradores:
+      servicoNome === SERVICO_AET_NOME ||
+      servicoNome === SERVICO_INSALUBRIDADE_NOME
+        ? 0
+        : 57,
     valor_final: valor,
     condicao_pagamento: "Parcelado",
     quantidade_parcelas: 1,
@@ -221,6 +226,33 @@ assert.equal(sstMaisAet[0].financeiroLabel, "—");
 assert.equal(sstMaisAet[0].kind, "aet");
 assert.match(sstMaisAet[0].href, /orcamentoId=o-aet-1/);
 
+const insal2026 = aprovacao(
+  { id: "ap-insal-1", orcamento_id: "o-insal-1" },
+  SERVICO_INSALUBRIDADE_NOME,
+  4500
+);
+const sstAetInsal = listServicosPontuaisContratados({
+  orcamentos: [
+    { id: "o-sst", numero: "ORC-2026-0028" },
+    { id: "o-aet-1", numero: "ORC-2026-0063" },
+    { id: "o-insal-1", numero: "ORC-2026-0501" },
+  ],
+  aprovacoesByOrcamentoId: new Map([
+    ["o-sst", sst],
+    ["o-aet-1", aet2026],
+    ["o-insal-1", insal2026],
+  ]),
+});
+assert.equal(sstAetInsal.length, 2);
+assert.deepEqual(
+  sstAetInsal.map((item) => item.kind).sort(),
+  ["aet", "insalubridade"]
+);
+assert.ok(
+  sstAetInsal.some((item) => item.servicoNome === SERVICO_INSALUBRIDADE_NOME)
+);
+assert.ok(!sstAetInsal.some((item) => item.numeroOrcamento === "ORC-2026-0028"));
+
 const soAet = listServicosPontuaisContratados({
   orcamentos: [{ id: "o-aet-1", numero: "ORC-2026-0063" }],
   aprovacoesByOrcamentoId: new Map([["o-aet-1", aet2026]]),
@@ -378,17 +410,20 @@ function latestDefining(fnName: string): { file: string; sql: string } {
 }
 
 const rpc = latestDefining("aprovar_orcamento_integrar_cliente");
-assert.equal(rpc.file, "124_servico_aet_aprovacao_rpc.sql");
+assert.equal(rpc.file, "127_servico_insalubridade.sql");
 const contratoSkip = rpc.sql.indexOf("v_contrato_id := null");
-assert.ok(contratoSkip >= 0, "RPC 124 deve zerar contrato_id no ramo AET");
+assert.ok(contratoSkip >= 0, "RPC deve zerar contrato_id no ramo de laudo pontual");
 const skipWindow = rpc.sql.slice(Math.max(0, contratoSkip - 80), contratoSkip + 220);
-assert.match(skipWindow, /if v_is_aet then/);
+assert.match(skipWindow, /if v_is_laudo_pontual then/);
 assert.doesNotMatch(skipWindow, /insert into public\.cliente_contratos/i);
 assert.match(rpc.sql, /insert into public\.cliente_contratos/i);
+assert.match(rpc.sql, /is_servico_insalubridade_nome/);
+assert.match(rpc.sql, /is_servico_aet_nome/);
 
 const trigger = latestDefining("trg_orcamento_aprovado_exige_contrato");
-assert.equal(trigger.file, "125_servico_aet_aprovacao_sem_contrato_sst.sql");
+assert.equal(trigger.file, "127_servico_insalubridade.sql");
 assert.match(trigger.sql, /orcamento_eh_exclusivo_aet/);
+assert.match(trigger.sql, /orcamento_eh_exclusivo_insalubridade/);
 assert.match(trigger.sql, /cliente_id is null/);
 assert.match(trigger.sql, /from public\.cliente_contratos/);
 
@@ -396,5 +431,9 @@ const helper = latestDefining("orcamento_eh_exclusivo_aet");
 assert.equal(helper.file, "125_servico_aet_aprovacao_sem_contrato_sst.sql");
 assert.match(helper.sql, /is_servico_aet_nome/);
 assert.doesNotMatch(helper.sql, /includes/);
+
+const helperInsal = latestDefining("orcamento_eh_exclusivo_insalubridade");
+assert.equal(helperInsal.file, "127_servico_insalubridade.sql");
+assert.match(helperInsal.sql, /is_servico_insalubridade_nome/);
 
 console.log("test-servicos-pontuais: OK");

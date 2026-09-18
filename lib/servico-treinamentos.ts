@@ -9,7 +9,8 @@ export type OrcamentoFluxoImplantacao =
   | "padrao"
   | "somente_treinamentos"
   | "combinado"
-  | "aet";
+  | "aet"
+  | "insalubridade";
 
 export type ServicoItemRef = {
   servico_id?: string | null;
@@ -89,10 +90,26 @@ function isItemAetFluxo(
   return AET_NOMES_NORMALIZADOS.has(normalizeServicoNome(item.servico_nome));
 }
 
+const INSALUBRIDADE_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("Laudo de Insalubridade"),
+]);
+
+function isItemInsalubridadeFluxo(
+  item: ServicoItemRef,
+  insalubridadeServicoId?: string | null
+): boolean {
+  const id = (item.servico_id ?? "").trim();
+  if (insalubridadeServicoId && id) return id === insalubridadeServicoId;
+  return INSALUBRIDADE_NOMES_NORMALIZADOS.has(
+    normalizeServicoNome(item.servico_nome)
+  );
+}
+
 export function classifyOrcamentoFluxoImplantacao(
   itens: ServicoItemRef[],
   treinamentosServicoId?: string | null,
-  aetServicoId?: string | null
+  aetServicoId?: string | null,
+  insalubridadeServicoId?: string | null
 ): OrcamentoFluxoImplantacao {
   const relevant = itens.filter(
     (item) =>
@@ -103,6 +120,14 @@ export function classifyOrcamentoFluxoImplantacao(
 
   if (relevant.every((item) => isItemAetFluxo(item, aetServicoId))) {
     return "aet";
+  }
+
+  if (
+    relevant.every((item) =>
+      isItemInsalubridadeFluxo(item, insalubridadeServicoId)
+    )
+  ) {
+    return "insalubridade";
   }
 
   let hasTreinamentos = false;

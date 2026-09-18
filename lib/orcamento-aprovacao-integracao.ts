@@ -1,7 +1,7 @@
 import { formatCNPJ } from "@/lib/cnpj";
 import { normalizeCnpjDigits } from "@/lib/cliente-cnpj";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
@@ -50,7 +50,7 @@ export interface OrcamentoAprovacaoIntegracaoResult {
 }
 
 /**
- * AET exclusivo: cliente + aprovação bastam; contrato SST é opcional (null).
+ * Laudo pontual exclusivo: cliente + aprovação bastam; contrato SST é opcional (null).
  * Demais serviços: contrato SST continua obrigatório.
  */
 export function isAprovacaoIntegracaoCompleta(params: {
@@ -61,7 +61,7 @@ export function isAprovacaoIntegracaoCompleta(params: {
   itens: ServicoItemRef[] | null | undefined;
 }): boolean {
   if (!params.result.aprovacao_id || !params.result.cliente_id) return false;
-  if (orcamentoEhExclusivoAet(params.itens)) return true;
+  if (isLaudoPontualExclusivo(params.itens)) return true;
   return Boolean(params.result.contrato_id);
 }
 

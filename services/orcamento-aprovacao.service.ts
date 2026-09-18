@@ -20,7 +20,7 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
-import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
+import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
 import { garantirImplantacaoAet } from "@/services/implantacao-aet.service";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
@@ -80,7 +80,7 @@ async function encerrarOutrosContratosAtivos(
 async function syncClienteContratoFromAprovacao(
   aprovacao: OrcamentoAprovacaoRecord
 ): Promise<void> {
-  if (orcamentoEhExclusivoAet(aprovacao.orcamento_aprovacao_itens)) {
+  if (isLaudoPontualExclusivo(aprovacao.orcamento_aprovacao_itens)) {
     return;
   }
   const supabase = createClient();
@@ -266,7 +266,7 @@ export async function salvarAprovacaoOrcamento(
     throw new Error("Aprovação não encontrada após salvar.");
   }
 
-  if (orcamentoEhExclusivoAet(aprovacao.orcamento_aprovacao_itens)) {
+  if (isLaudoPontualExclusivo(aprovacao.orcamento_aprovacao_itens)) {
     try {
       await garantirImplantacaoAet({
         orcamentoId,
@@ -274,7 +274,10 @@ export async function salvarAprovacaoOrcamento(
         usuarioNome: payload.aprovado_por,
       });
     } catch (err) {
-      console.error("Falha ao iniciar implantação AET após aprovação.", err);
+      console.error(
+        "Falha ao iniciar implantação do laudo pontual após aprovação.",
+        err
+      );
     }
   }
 
@@ -307,7 +310,7 @@ export async function atualizarCondicoesAprovadas(
   if (beforeError) throw beforeError;
 
   const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
-  const isAet = orcamentoEhExclusivoAet(before.orcamento_aprovacao_itens);
+  const isAet = isLaudoPontualExclusivo(before.orcamento_aprovacao_itens);
   if (!isAet && payload.quantidade_colaboradores < 1) {
     throw new Error("Informe a quantidade de colaboradores.");
   }
