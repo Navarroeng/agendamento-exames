@@ -56,7 +56,9 @@ export function PortalModulosSst({
   onVerLaudos: () => void;
   onVerColaboradores: () => void;
 }) {
-  const temAvaliacao = resumo.statusPortal !== "sem_avaliacao";
+  const temAvaliacao =
+    resumo.statusPortal !== "sem_avaliacao" ||
+    resumo.campanhasLista.length > 0;
   const faturaModuloCarregado = faturasResumo !== null;
   const agendamentosModuloCarregado = agendamentosResumo !== null;
   const laudosModuloCarregado = laudosResumo !== null;

@@ -416,6 +416,7 @@ run("API preview exige staff e valida cliente_id", () => {
   assert.match(api, /resolverClienteIdPortalPreview/);
   assert.match(api, /cliente_id/);
   assert.match(api, /carregarPortalHome/);
+  assert.match(api, /campanha_id/);
   assert.doesNotMatch(api, /PORTAL_DEV_CLIENTE_ID(?!_ENV)/);
 });
 
@@ -431,7 +432,8 @@ run("serviço não consulta respostas/sessão/vínculo", () => {
   assert.match(svc, /id, cliente_id, empresa_nome, status, data_inicio/);
   assert.match(svc, /logo_storage_path/);
   assert.match(svc, /resolverUrlLogoCampanhaAdmin/);
-  assert.match(svc, /\.eq\("campanha_id", campanha\.id\)/);
+  assert.match(svc, /montarListaCampanhasPortal/);
+  assert.match(svc, /escolherCampanhaPortalDaEmpresa/);
   assert.match(svc, /\.in\("campanha_id", campanhaIds\)/);
   assert.match(svc, /montarHistoricoRiscosPortal/);
   assert.doesNotMatch(svc, /codigo_publico/);
@@ -918,6 +920,10 @@ run("APIs do portal exigem sessão staff", () => {
     join(root, "components/portal-cliente/PortalAvaliacaoRiscos.tsx"),
     "utf8"
   );
+  const detalheCampanha = readFileSync(
+    join(root, "components/portal-cliente/PortalCampanhaDetalhe.tsx"),
+    "utf8"
+  );
   const identidade = readFileSync(
     join(root, "components/portal-cliente/PortalEmpresaIdentidade.tsx"),
     "utf8"
@@ -980,11 +986,13 @@ run("APIs do portal exigem sessão staff", () => {
   assert.doesNotMatch(modulos, /bg-\[#0b1f4d\]\/\[0\.06\]/);
   assert.match(identidade, /object-contain/);
   assert.match(identidade, /iniciaisEmpresa/);
-  assert.match(avaliacao, /pathPortalRelatorio/);
-  assert.match(avaliacao, /window\.open/);
-  assert.match(avaliacao, /PortalEvolucaoRiscos/);
+  assert.match(avaliacao, /PortalHistoricoAvaliacoes/);
+  assert.match(avaliacao, /PortalCampanhaDetalhe/);
   assert.doesNotMatch(avaliacao, /RiscosRelatorioViewerModal/);
-  assert.match(avaliacao, /Relatório ainda não disponível/);
+  assert.match(detalheCampanha, /pathPortalRelatorioPdf/);
+  assert.match(detalheCampanha, /PortalEvolucaoRiscos/);
+  assert.doesNotMatch(detalheCampanha, /RiscosRelatorioViewerModal/);
+  assert.match(detalheCampanha, /Relatório ainda não disponível/);
   const printView = readFileSync(
     join(root, "components/portal-cliente/PortalRelatorioPrintView.tsx"),
     "utf8"

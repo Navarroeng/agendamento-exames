@@ -49,7 +49,11 @@ export async function GET(request: Request) {
       });
     }
 
-    const { resumo } = await carregarPortalHome(resolved.clienteId);
+    const campanhaId = url.searchParams.get("campanha_id");
+    const { resumo } = await carregarPortalHome(
+      resolved.clienteId,
+      campanhaId
+    );
     const vazamento = dtoContemCampoProibido(resumo);
     if (vazamento) {
       console.error("[api/portal/home] DTO com campo proibido:", vazamento);

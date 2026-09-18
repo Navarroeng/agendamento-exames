@@ -32,6 +32,12 @@ export const PORTAL_SEM_AVALIACAO_MSG =
 export const PORTAL_PRIVACIDADE_AVISO =
   "Sua empresa pode acompanhar apenas a situação de participação dos colaboradores. As respostas individuais são confidenciais e os resultados são apresentados de forma consolidada.";
 
+export const PORTAL_PRIVACIDADE_CURTA =
+  "As respostas são confidenciais. O Portal apresenta apenas a situação de participação e os resultados consolidados.";
+
+export const PORTAL_SEM_CAMPANHAS_MSG =
+  "Nenhuma avaliação realizada até o momento.";
+
 export const PORTAL_SELECIONE_EMPRESA_MSG =
   "Selecione uma empresa para visualizar o portal.";
 
@@ -41,7 +47,7 @@ export const PORTAL_RESULTADOS_AGUARDANDO_MSG =
   "Os resultados consolidados estarão disponíveis após a conclusão da avaliação e geração do relatório.";
 
 export const PORTAL_HISTORICO_UM_CICLO_MSG =
-  "A comparação histórica será apresentada automaticamente após a realização de uma nova avaliação.";
+  "A evolução histórica ficará disponível após uma nova avaliação.";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -103,7 +109,25 @@ export type PortalResumo = {
   indicadoresComplementaresDisponivel: boolean;
   indicadoresComplementaresStatus: StatusGeralIndicadoresComplementares;
   indicadoresComplementaresLabel: string;
+  campanhasLista: PortalCampanhaListaItem[];
   contrato: PortalContratoResumo;
+};
+
+export type PortalCampanhaListaItem = {
+  campanhaId: string;
+  ciclo: number | null;
+  label: string;
+  dataInicio: string | null;
+  dataEncerramento: string | null;
+  periodo: string | null;
+  statusPortal: PortalStatusHome;
+  statusCampanha: string | null;
+  statusLabel: string;
+  cadastrados: number;
+  respondidos: number;
+  pendentes: number;
+  participacaoPercentual: number | null;
+  relatorioDisponivel: boolean;
 };
 
 export type PortalHistoricoCategoriaPonto = {
@@ -176,6 +200,16 @@ export const PORTAL_STATUS_LABELS: Record<PortalStatusHome, string> = {
   resultados_disponiveis: "Resultados disponíveis",
 };
 
+/** Rótulos compactos da lista/detalhe no Portal (apresentação, sem alterar o processo). */
+export const PORTAL_STATUS_CLIENTE_LABELS: Record<PortalStatusHome, string> = {
+  sem_avaliacao: "Sem avaliação",
+  programada: "Programada",
+  aberta: "Em andamento",
+  em_andamento: "Em andamento",
+  concluida: "Concluída",
+  resultados_disponiveis: "Resultados disponíveis",
+};
+
 export const PORTAL_CLASSIFICACAO_LABEL: Record<PortalClassificacao, string> = {
   favoravel: "Situação Favorável",
   atencao: "Situação Moderada",
@@ -209,6 +243,7 @@ export function portalResumoVazio(): PortalResumo {
     indicadoresComplementaresDisponivel: false,
     indicadoresComplementaresStatus: "indisponivel",
     indicadoresComplementaresLabel: "Indisponível",
+    campanhasLista: [],
     contrato: portalContratoResumoVazio(),
   };
 }
@@ -297,6 +332,39 @@ export function escolherCampanhaAtualPortal(
   campanhas: readonly PortalCampanhaFonte[]
 ): PortalCampanhaFonte | null {
   return escolherCampanhaParaProgresso(campanhas);
+}
+
+/** Campanha da empresa: a solicitada, se pertencer à lista; senão a atual. */
+export function escolherCampanhaPortalDaEmpresa(
+  campanhas: readonly PortalCampanhaFonte[],
+  campanhaIdSolicitada?: string | null
+): PortalCampanhaFonte | null {
+  const requested = String(campanhaIdSolicitada ?? "").trim();
+  if (requested) {
+    return campanhas.find((c) => c.id === requested) ?? null;
+  }
+  return escolherCampanhaAtualPortal(campanhas);
+}
+
+/**
+ * Rótulo do cliente: 100% de participação com campanha ainda aberta
+ * não vira "Concluída" — só o status real da campanha/relatório.
+ */
+export function labelStatusClientePortal(input: {
+  statusPortal: PortalStatusHome;
+  statusCampanha?: string | null;
+}): string {
+  const campanha = String(input.statusCampanha ?? "").trim();
+  if (input.statusPortal === "resultados_disponiveis") {
+    return PORTAL_STATUS_CLIENTE_LABELS.resultados_disponiveis;
+  }
+  if (campanha === "aberta") {
+    return PORTAL_STATUS_CLIENTE_LABELS.em_andamento;
+  }
+  if (campanha === "em_preparacao" || input.statusPortal === "programada") {
+    return PORTAL_STATUS_CLIENTE_LABELS.programada;
+  }
+  return PORTAL_STATUS_CLIENTE_LABELS[input.statusPortal];
 }
 
 export function cicloFromDataInicio(dataInicio: string | null | undefined): number | null {
@@ -429,6 +497,7 @@ export function montarPortalResumo(input: {
   snapshot: PortalSnapshotFonte | null;
   logoUrl?: string | null;
   historicoRiscos?: PortalHistoricoCiclo[];
+  campanhasLista?: PortalCampanhaListaItem[];
 }): PortalResumo {
   if (!input.campanha) return portalResumoVazio();
 
@@ -521,6 +590,7 @@ export function montarPortalResumo(input: {
     indicadoresComplementaresDisponivel: indicadoresComplementares.disponivel,
     indicadoresComplementaresStatus: indicadoresComplementares.statusGeral,
     indicadoresComplementaresLabel: indicadoresComplementares.labelStatusGeral,
+    campanhasLista: input.campanhasLista ?? [],
     contrato: portalResumoVazio().contrato,
   };
 }
@@ -529,6 +599,14 @@ export function pathPortalRelatorio(campanhaId: string): string {
   const id = campanhaId.trim();
   if (!isPortalUuid(id)) return "";
   return `/portal/relatorio/${id}`;
+}
+
+export function pathPortalRelatorioPdf(
+  campanhaId: string,
+  clienteId: string
+): string {
+  if (!isPortalUuid(campanhaId) || !isPortalUuid(clienteId)) return "";
+  return `/api/portal/riscos/relatorio/${campanhaId}/pdf?cliente_id=${encodeURIComponent(clienteId)}`;
 }
 
 export function snapshotTemResultadoConsolidado(
@@ -638,6 +716,167 @@ export function montarHistoricoRiscosPortal(input: {
       ],
     };
   });
+}
+
+export function montarListaCampanhasPortal(input: {
+  campanhas: readonly PortalCampanhaFonte[];
+  participantesPorCampanha: ReadonlyMap<
+    string,
+    readonly PortalParticipanteFonte[]
+  >;
+  snapshots: readonly PortalHistoricoSnapshotFonte[];
+}): PortalCampanhaListaItem[] {
+  const snapsPorCampanha = new Map(
+    input.snapshots.map((s) => [String(s.campanha_id ?? "").trim(), s])
+  );
+
+  const itens: Array<PortalCampanhaListaItem & { createdAt: string }> = [];
+  for (const campanha of input.campanhas) {
+    if (!campanha.id || String(campanha.status ?? "") === "cancelada") continue;
+    const participantes = input.participantesPorCampanha.get(campanha.id) ?? [];
+    const ativos = participantes.filter(participanteAtivoNoPortal);
+    const resumo = buildParticipantesResumo(
+      ativos.map((p) => ({
+        status: p.status as RiscosParticipanteStatus,
+      }))
+    );
+    const participacao = calcularParticipacaoOperacional(
+      resumo.respondidos,
+      resumo.cadastrados
+    );
+    const snap = snapsPorCampanha.get(campanha.id);
+    const temSnapshot = Boolean(snap?.resultado_json);
+    const relatorioDisponivel = relatorioLiberadoAoClientePortal({
+      temSnapshot,
+      relatorioGeradoEm: snap?.gerado_em,
+      relatorioEnviadoEm: snap?.relatorio_enviado_em,
+    });
+    const statusPortal = resolverStatusPortal({
+      statusCampanha: campanha.status,
+      respondidos: resumo.respondidos,
+      pendentes: resumo.pendentes,
+      cadastrados: resumo.cadastrados,
+      relatorioDisponivel,
+    });
+    const dataInicio =
+      String(campanha.data_inicio ?? "").slice(0, 10) || null;
+    const dataEncerramento =
+      String(campanha.data_encerramento ?? "").slice(0, 10) || null;
+    itens.push({
+      campanhaId: campanha.id,
+      ciclo: cicloFromDataInicio(dataInicio),
+      label: "",
+      dataInicio,
+      dataEncerramento,
+      periodo:
+        dataInicio && dataEncerramento
+          ? formatPeriodoCampanha(dataInicio, dataEncerramento)
+          : null,
+      statusPortal,
+      statusCampanha: String(campanha.status ?? "").trim() || null,
+      statusLabel: labelStatusClientePortal({
+        statusPortal,
+        statusCampanha: campanha.status,
+      }),
+      cadastrados: resumo.cadastrados,
+      respondidos: resumo.respondidos,
+      pendentes: resumo.pendentes,
+      participacaoPercentual: participacao.percentual,
+      relatorioDisponivel,
+      createdAt: String(campanha.created_at ?? ""),
+    });
+  }
+
+  itens.sort((a, b) => {
+    const da = a.dataInicio ?? "";
+    const db = b.dataInicio ?? "";
+    if (da !== db) return db.localeCompare(da);
+    const ca = a.createdAt ?? "";
+    const cb = b.createdAt ?? "";
+    if (ca !== cb) return cb.localeCompare(ca);
+    return String(b.campanhaId).localeCompare(String(a.campanhaId));
+  });
+
+  const porAno = new Map<number, number>();
+  for (const item of itens) {
+    if (item.ciclo == null) continue;
+    porAno.set(item.ciclo, (porAno.get(item.ciclo) ?? 0) + 1);
+  }
+
+  return itens.map((item) => ({
+    campanhaId: item.campanhaId,
+    ciclo: item.ciclo,
+    label: labelCicloPortal({
+      dataInicio: item.dataInicio,
+      dataEncerramento: item.dataEncerramento,
+      anoDuplicado: item.ciclo != null && (porAno.get(item.ciclo) ?? 0) > 1,
+    }),
+    dataInicio: item.dataInicio,
+    dataEncerramento: item.dataEncerramento,
+    periodo: item.periodo,
+    statusPortal: item.statusPortal,
+    statusCampanha: item.statusCampanha,
+    statusLabel: item.statusLabel,
+    cadastrados: item.cadastrados,
+    respondidos: item.respondidos,
+    pendentes: item.pendentes,
+    participacaoPercentual: item.participacaoPercentual,
+    relatorioDisponivel: item.relatorioDisponivel,
+  }));
+}
+
+export function historicoResultadosComparaveis(
+  historico: readonly PortalHistoricoCiclo[]
+): boolean {
+  if (historico.length < 2) return false;
+  const conjuntos = historico.map(
+    (ciclo) => new Set(ciclo.categorias.map((c) => c.id).filter(Boolean))
+  );
+  const base = conjuntos[0];
+  if (!base || base.size === 0) return false;
+  return conjuntos.every(
+    (atual) =>
+      atual.size === base.size &&
+      Array.from(base).every((id) => atual.has(id))
+  );
+}
+
+export function montarPrincipaisResultadosPortal(input: {
+  categoriasFavoraveis: readonly PortalCategoriaResumo[];
+  categoriasAtencao: readonly PortalCategoriaResumo[];
+  categoriasDesfavoraveis: readonly PortalCategoriaResumo[];
+  indicadoresComplementaresDisponivel?: boolean;
+  indicadoresComplementaresStatus?: StatusGeralIndicadoresComplementares;
+  indicadoresComplementaresLabel?: string;
+}): {
+  positivos: PortalCategoriaResumo[];
+  positivosOcultos: number;
+  pontosAtencao: PortalCategoriaResumo[];
+  atencaoOcultos: number;
+  semDesfavoraveis: boolean;
+  indicadorComplementarAtencao: boolean;
+  indicadorComplementarLabel: string;
+} {
+  const positivos = input.categoriasFavoraveis.slice(0, 3);
+  const pontosAtencao = [
+    ...input.categoriasDesfavoraveis,
+    ...input.categoriasAtencao,
+  ].slice(0, 3);
+  const atencaoTotal =
+    input.categoriasDesfavoraveis.length + input.categoriasAtencao.length;
+  return {
+    positivos,
+    positivosOcultos: Math.max(0, input.categoriasFavoraveis.length - 3),
+    pontosAtencao,
+    atencaoOcultos: Math.max(0, atencaoTotal - 3),
+    semDesfavoraveis: input.categoriasDesfavoraveis.length === 0,
+    indicadorComplementarAtencao:
+      Boolean(input.indicadoresComplementaresDisponivel) &&
+      input.indicadoresComplementaresStatus === "requer_atencao",
+    indicadorComplementarLabel: String(
+      input.indicadoresComplementaresLabel ?? ""
+    ).trim(),
+  };
 }
 
 export function categoriasHistoricoUnicas(

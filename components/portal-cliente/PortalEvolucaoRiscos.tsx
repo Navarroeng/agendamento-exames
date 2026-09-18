@@ -5,6 +5,7 @@ import {
   PORTAL_CLASSIFICACAO_LABEL,
   PORTAL_HISTORICO_UM_CICLO_MSG,
   categoriasHistoricoUnicas,
+  historicoResultadosComparaveis,
   type PortalClassificacao,
   type PortalHistoricoCiclo,
 } from "@/lib/portal-cliente";
@@ -43,6 +44,20 @@ export function PortalEvolucaoRiscos({
 
   if (historico.length === 1) {
     return <EvolucaoUmCiclo ciclo={historico[0]} />;
+  }
+
+  if (!historicoResultadosComparaveis(historico)) {
+    return (
+      <section className="rounded-2xl border border-[#e8edf5] bg-white px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
+          Evolução dos Riscos Psicossociais
+        </h2>
+        <p className="mt-1 text-sm leading-relaxed text-[#64748b]">
+          A comparação entre ciclos só é exibida quando as avaliações usam o
+          mesmo conjunto de categorias.
+        </p>
+      </section>
+    );
   }
 
   const max = Math.max(

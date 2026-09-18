@@ -6,8 +6,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   consolidarEmpresasPortalPreview,
-  escolherCampanhaAtualPortal,
+  escolherCampanhaPortalDaEmpresa,
   montarHistoricoRiscosPortal,
+  montarListaCampanhasPortal,
   montarPortalResumo,
   portalResumoVazio,
   type PortalCampanhaFonte,
@@ -29,7 +30,7 @@ import { resolverUrlLogoCampanhaAdmin } from "@/services/riscos-campanha-logo.se
 const CAMPANHA_SELECT =
   "id, cliente_id, empresa_nome, status, data_inicio, data_encerramento, created_at, logo_storage_path, orcamento_id, cnpj";
 
-const PARTICIPANTE_SELECT = "nome_completo, status, removido_em";
+const PARTICIPANTE_SELECT = "campanha_id, nome_completo, status, removido_em";
 
 const RELATORIO_SELECT =
   "campanha_id, cliente_id, gerado_em, relatorio_enviado_em, resultado_json";
@@ -95,7 +96,8 @@ export async function listarEmpresasPortalPreview(): Promise<
 }
 
 export async function carregarPortalHome(
-  clienteId: string
+  clienteId: string,
+  campanhaIdSolicitada?: string | null
 ): Promise<PortalHomeResultado> {
   const admin = createAdminClient();
 
@@ -110,7 +112,27 @@ export async function carregarPortalHome(
   const campanhas = mapCampanhas(
     (campanhasRaw ?? []) as Array<Record<string, unknown>>
   );
-  const campanha = escolherCampanhaAtualPortal(campanhas);
+  const campanhaIds = campanhas.map((c) => c.id).filter(Boolean);
+  const participantesPorCampanha = await carregarParticipantesPortal(
+    admin,
+    campanhaIds
+  );
+  const snapshots = await carregarSnapshotsPortal(admin, campanhaIds);
+  const campanhasLista = montarListaCampanhasPortal({
+    campanhas,
+    participantesPorCampanha,
+    snapshots,
+  });
+  const historicoRiscos = montarHistoricoRiscosPortal({
+    clienteId,
+    campanhas,
+    snapshots,
+  });
+
+  const campanha = escolherCampanhaPortalDaEmpresa(
+    campanhas,
+    campanhaIdSolicitada
+  );
   const campanhaLogoRow = campanhasRaw?.find(
     (row) => String((row as { id?: string }).id ?? "") === campanha?.id
   ) as CampanhaLogoRow | undefined;
@@ -130,6 +152,8 @@ export async function carregarPortalHome(
       resumo: {
         ...vazio,
         empresaNome: nome || null,
+        campanhasLista,
+        historicoRiscos,
         contrato,
       },
     };
@@ -141,30 +165,7 @@ export async function carregarPortalHome(
     cliente_id: clienteId,
   });
 
-  const { data: participantesRaw, error: participantesError } = await admin
-    .from("riscos_campanha_participantes")
-    .select(PARTICIPANTE_SELECT)
-    .eq("campanha_id", campanha.id);
-
-  if (participantesError) throw participantesError;
-
-  const participantes: PortalParticipanteFonte[] = (participantesRaw ?? []).map(
-    (row) => ({
-      nome_completo: String(
-        (row as { nome_completo?: string }).nome_completo ?? ""
-      ),
-      status: String((row as { status?: string }).status ?? "pendente"),
-      removido_em: (row as { removido_em?: string | null }).removido_em ?? null,
-    })
-  );
-
-  const campanhaIds = campanhas.map((c) => c.id).filter(Boolean);
-  const snapshots = await carregarSnapshotsPortal(admin, campanhaIds);
-  const historicoRiscos = montarHistoricoRiscosPortal({
-    clienteId,
-    campanhas,
-    snapshots,
-  });
+  const participantes = participantesPorCampanha.get(campanha.id) ?? [];
   const snapshotAtual = snapshots.find((s) => s.campanha_id === campanha.id);
   const snapshot: PortalSnapshotFonte | null = snapshotAtual?.resultado_json
     ? {
@@ -182,10 +183,44 @@ export async function carregarPortalHome(
         snapshot,
         logoUrl,
         historicoRiscos,
+        campanhasLista,
       }),
       contrato: await carregarPortalContrato(admin, clienteId),
     },
   };
+}
+
+async function carregarParticipantesPortal(
+  admin: ReturnType<typeof createAdminClient>,
+  campanhaIds: string[]
+): Promise<Map<string, PortalParticipanteFonte[]>> {
+  const porCampanha = new Map<string, PortalParticipanteFonte[]>();
+  if (campanhaIds.length === 0) return porCampanha;
+
+  const { data, error } = await admin
+    .from("riscos_campanha_participantes")
+    .select(PARTICIPANTE_SELECT)
+    .in("campanha_id", campanhaIds);
+
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    const campanhaId = String(
+      (row as { campanha_id?: string }).campanha_id ?? ""
+    ).trim();
+    if (!campanhaId) continue;
+    const item: PortalParticipanteFonte = {
+      nome_completo: String(
+        (row as { nome_completo?: string }).nome_completo ?? ""
+      ),
+      status: String((row as { status?: string }).status ?? "pendente"),
+      removido_em: (row as { removido_em?: string | null }).removido_em ?? null,
+    };
+    const lista = porCampanha.get(campanhaId) ?? [];
+    lista.push(item);
+    porCampanha.set(campanhaId, lista);
+  }
+  return porCampanha;
 }
 
 async function carregarPortalContrato(
