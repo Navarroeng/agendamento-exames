@@ -44,11 +44,11 @@ assert.deepEqual(abas, [
   "aprovado",
   "contrato",
   "financeiro",
-  "documentos",
   "visita_aet",
   "elaboracao",
   "envio",
 ]);
+assert.ok(!abas.includes("documentos"));
 assert.ok(!abas.includes("procuracao"));
 assert.ok(!abas.includes("funcionarios"));
 assert.ok(!abas.includes("logo"));
@@ -70,7 +70,7 @@ assert.deepEqual(treino, [
 
 assert.deepEqual(
   buildImplantacaoEtapasOperacionais("aet").map((e) => e.id),
-  ["contrato", "financeiro", "documentos", "visita_aet", "elaboracao", "envio"]
+  ["contrato", "financeiro", "visita_aet", "elaboracao", "envio"]
 );
 
 function aprovacao(
@@ -169,12 +169,16 @@ assert.equal(fluxoOperacaoIndependeDoPagamento("combinado"), false);
 
 assert.equal(
   isOrcamentoEtapaLiberada("documentos", financeiroOk, true, { fluxo: "aet" }),
-  true
+  false
 );
 assert.equal(
   isOrcamentoEtapaLiberada("documentos", contratoOk, true, { fluxo: "aet" }),
+  false
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, { fluxo: "aet" }),
   true,
-  "AET: contrato assinado libera Documentos mesmo com pagamento pendente"
+  "AET: contrato assinado libera Agendamento da visita mesmo com pagamento pendente"
 );
 assert.equal(
   isOrcamentoEtapaConcluida("financeiro", contratoOk, true, null, {
@@ -186,7 +190,7 @@ assert.equal(isOrcamentoPagamentoPendente(contratoOk), true);
 assert.equal(isOrcamentoPagamentoPendente(financeiroOk), false);
 assert.equal(
   resolveOrcamentoEtapaEstado(
-    "documentos",
+    "visita_aet",
     contratoOk,
     true,
     "financeiro",
@@ -200,7 +204,7 @@ assert.equal(
     "financeiro",
     contratoOk,
     true,
-    "documentos",
+    "visita_aet",
     null,
     { fluxo: "aet" }
   ),
@@ -211,12 +215,19 @@ assert.equal(
     fluxo: "aet",
     aet: aetRow(),
   }),
+  true
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("elaboracao", contratoOk, true, {
+    fluxo: "aet",
+    aet: aetRow(),
+  }),
   false
 );
 assert.equal(
   isOrcamentoEtapaLiberada("visita_aet", financeiroOk, true, {
     fluxo: "aet",
-    aet: aetRow({ documentos_conferidos: true }),
+    aet: aetRow(),
   }),
   true
 );
@@ -236,7 +247,7 @@ assert.equal(
 assert.equal(
   validateAetElaboracaoPayload(
     { elaboracao_status: "em_elaboracao", elaboracao_observacao: null },
-    aetRow({ documentos_conferidos: true })
+    aetRow()
   ),
   "Aguardando realização da visita"
 );
@@ -295,11 +306,28 @@ assert.equal(
   isImplantacaoAetConcluida(financeiroOk, elaboracaoOk, true),
   false
 );
+assert.equal(
+  isImplantacaoAetConcluida(
+    contratoOk,
+    aetRow({
+      documentos_conferidos: false,
+      visita_status: "realizada",
+      visita_data: "2026-09-20",
+      elaboracao_status: "concluido",
+      laudo_path: "ap1/aet_laudo-1.pdf",
+      enviado_cliente: true,
+      enviado_em: "2026-09-22",
+    }),
+    true
+  ),
+  true,
+  "documentos_conferidos não entra mais na conclusão operacional do AET"
+);
 
 assert.equal(
   resolveImplantacaoEtapaAtual(financeiroOk, {
     fluxo: "aet",
-    aet: aetRow({ documentos_conferidos: true, visita_status: "agendada" }),
+    aet: aetRow({ visita_status: "agendada" }),
   }),
   "visita_agendada"
 );
@@ -307,6 +335,7 @@ assert.equal(
   implantacaoEtapaToModalTab("visita_agendada", "aet"),
   "visita_aet"
 );
+assert.equal(implantacaoEtapaToModalTab("documentos", "aet"), "visita_aet");
 assert.equal(implantacaoEtapaToModalTab("concluido", "aet"), "envio");
 assert.equal(
   implantacaoEtapaToModalTab("aguardando_agendamentos", "padrao"),
@@ -329,29 +358,29 @@ const processo = buildImplantacaoProcesso({
   aprovacao: financeiroOk,
   contrato: null,
   fluxoImplantacao: "aet",
-  aet: aetRow({ documentos_conferidos: true }),
+  aet: aetRow(),
 });
 assert.equal(processo.etapaAtual, "visita_aet");
 assert.equal(processo.agendamentoLabel, "Não aplicável");
 assert.equal(processo.agendamentoLiberado, false);
-assert.equal(processo.totalEtapas, 8);
+assert.equal(processo.totalEtapas, 7);
 
 const summary = computeImplantacaoSummary([processo]);
 assert.equal(summary.totalEmImplantacao, 1);
 assert.equal(summary.liberadosAgendamento, 0);
 assert.equal(summary.aguardandoDocumentos, 0);
 
-const docsProcesso = buildImplantacaoProcesso({
+const visitaProcesso = buildImplantacaoProcesso({
   orcamento,
   aprovacao: financeiroOk,
   contrato: null,
   fluxoImplantacao: "aet",
   aet: aetRow(),
 });
-assert.equal(docsProcesso.etapaAtual, "documentos");
+assert.equal(visitaProcesso.etapaAtual, "visita_aet");
 assert.equal(
-  computeImplantacaoSummary([docsProcesso]).aguardandoDocumentos,
-  1
+  computeImplantacaoSummary([visitaProcesso]).aguardandoDocumentos,
+  0
 );
 
 const orcAet = {
@@ -389,7 +418,7 @@ assert.equal(
   true
 );
 
-const dummyProcesso = docsProcesso as ImplantacaoProcesso;
+const dummyProcesso = visitaProcesso as ImplantacaoProcesso;
 assert.equal(dummyProcesso.fluxoImplantacao, "aet");
 
 assert.equal(
@@ -410,8 +439,9 @@ const pagamentoFuturo = aprovacao({
 });
 assert.equal(isOrcamentoPagamentoPendente(pagamentoFuturo), true);
 assert.equal(
-  isOrcamentoEtapaLiberada("documentos", pagamentoFuturo, true, {
+  isOrcamentoEtapaLiberada("visita_aet", pagamentoFuturo, true, {
     fluxo: "aet",
+    aet: aetRow(),
   }),
   true
 );
@@ -420,28 +450,28 @@ assert.equal(
     fluxo: "aet",
     aet: aetRow(),
   }),
-  "documentos"
+  "visita_aet"
 );
 assert.equal(
-  isOrcamentoEtapaLiberada("visita_aet", pagamentoFuturo, true, {
+  isOrcamentoEtapaLiberada("elaboracao", pagamentoFuturo, true, {
     fluxo: "aet",
     aet: aetRow(),
   }),
   false
 );
 
-const docsConferidosPendentes = aetRow({ documentos_conferidos: true });
+const visitaAguardando = aetRow();
 assert.equal(
   isOrcamentoEtapaLiberada("visita_aet", pagamentoFuturo, true, {
     fluxo: "aet",
-    aet: docsConferidosPendentes,
+    aet: visitaAguardando,
   }),
   true
 );
 assert.equal(
   resolveImplantacaoEtapaAtual(pagamentoFuturo, {
     fluxo: "aet",
-    aet: docsConferidosPendentes,
+    aet: visitaAguardando,
   }),
   "visita_aet"
 );
@@ -496,7 +526,7 @@ const pendenteProcesso = buildImplantacaoProcesso({
   fluxoImplantacao: "aet",
   aet: aetRow(),
 });
-assert.equal(pendenteProcesso.etapaAtual, "documentos");
+assert.equal(pendenteProcesso.etapaAtual, "visita_aet");
 assert.equal(pendenteProcesso.pagamentoPendente, true);
 assert.equal(
   computeImplantacaoSummary([pendenteProcesso]).aguardandoPagamento,
@@ -504,7 +534,7 @@ assert.equal(
 );
 assert.equal(
   computeImplantacaoSummary([pendenteProcesso]).aguardandoDocumentos,
-  1
+  0
 );
 assert.equal(
   resolveImplantacaoEtapaVisual(
@@ -517,7 +547,7 @@ assert.equal(
 );
 assert.equal(
   resolveImplantacaoEtapaVisual(
-    "documentos",
+    "visita_aet",
     pendenteProcesso.etapaAtual,
     pagamentoFuturo,
     { fluxo: "aet", aet: aetRow() }
@@ -530,7 +560,7 @@ const visitaPendenteProcesso = buildImplantacaoProcesso({
   aprovacao: pagamentoFuturo,
   contrato: null,
   fluxoImplantacao: "aet",
-  aet: docsConferidosPendentes,
+  aet: visitaAguardando,
 });
 assert.equal(visitaPendenteProcesso.etapaAtual, "visita_aet");
 assert.equal(visitaPendenteProcesso.pagamentoPendente, true);
@@ -591,13 +621,17 @@ assert.equal(
 assert.equal(
   resolveImplantacaoEtapaAtual(pagoDepois, {
     fluxo: "aet",
-    aet: docsConferidosPendentes,
+    aet: visitaAguardando,
   }),
   "visita_aet"
 );
 
 assert.equal(
   isOrcamentoEtapaLiberada("documentos", contratoOk, true, { fluxo: "padrao" }),
+  false
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, { fluxo: "padrao" }),
   false
 );
 assert.equal(

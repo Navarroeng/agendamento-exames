@@ -2,7 +2,6 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { isProcuracaoStatusConcluida } from "@/lib/cliente-procuracao";
 import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 import {
-  isAetDocumentosEtapaConcluida,
   isAetElaboracaoConcluida,
   isAetEnvioConcluido,
   isAetVisitaRealizada,
@@ -71,7 +70,6 @@ export function buildOrcamentoEtapas(
       { id: "aprovado", label: "Orçamento aprovado" },
       { id: "contrato", label: "Contrato" },
       { id: "financeiro", label: "Financeiro" },
-      { id: "documentos", label: "Documentos da empresa" },
       { id: "visita_aet", label: "Agendamento da visita" },
       { id: "elaboracao", label: "Elaboração do AET" },
       { id: "envio", label: "Envio ao cliente" },
@@ -249,14 +247,10 @@ export function isOrcamentoEtapaLiberada(
       if (fluxo === "aet") return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "documentos":
-      if (fluxo !== "aet") return false;
-      if (fluxoOperacaoIndependeDoPagamento(fluxo)) {
-        return isContratoEtapaConcluida(aprovacao);
-      }
-      return isFinanceiroEtapaConcluida(aprovacao);
+      return false;
     case "visita_aet":
       if (fluxo !== "aet") return false;
-      return isAetDocumentosEtapaConcluida(ctx?.aet);
+      return isContratoEtapaConcluida(aprovacao);
     case "elaboracao":
       if (fluxo !== "aet") return false;
       return isAetVisitaRealizada(ctx?.aet);
@@ -302,7 +296,7 @@ export function isOrcamentoEtapaConcluida(
     case "treinamento":
       return isTreinamentoEtapaConcluida(ctx?.treinamento);
     case "documentos":
-      return isAetDocumentosEtapaConcluida(ctx?.aet);
+      return false;
     case "visita_aet":
       return isAetVisitaRealizada(ctx?.aet);
     case "elaboracao":

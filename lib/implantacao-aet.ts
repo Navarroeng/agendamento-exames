@@ -32,6 +32,7 @@ export interface ImplantacaoAetRecord {
   id: string;
   orcamento_id: string;
   aprovacao_id: string;
+  /** Legado da migration 123; fora do fluxo operacional do AET. */
   documentos_conferidos: boolean;
   documentos_conferidos_em: string | null;
   documentos_conferidos_por: string | null;
@@ -88,12 +89,6 @@ export type ImplantacaoAetEnvioPayload = {
   envio_observacao: string | null;
 };
 
-export function isAetDocumentosEtapaConcluida(
-  aet: Pick<ImplantacaoAetRecord, "documentos_conferidos"> | null | undefined
-): boolean {
-  return Boolean(aet?.documentos_conferidos);
-}
-
 export function isAetVisitaRealizada(
   aet: Pick<ImplantacaoAetRecord, "visita_status"> | null | undefined
 ): boolean {
@@ -133,7 +128,6 @@ export function isImplantacaoAetConcluida(
   return (
     Boolean(aprovacao) &&
     contratoOk &&
-    isAetDocumentosEtapaConcluida(aet) &&
     isAetVisitaRealizada(aet) &&
     isAetElaboracaoConcluida(aet) &&
     isAetEnvioConcluido(aet)

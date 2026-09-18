@@ -16,7 +16,6 @@ import {
   type ImplantacaoTreinamentoRecord,
 } from "@/lib/implantacao-treinamento";
 import {
-  isAetDocumentosEtapaConcluida,
   isAetElaboracaoConcluida,
   isAetEnvioConcluido,
   isAetVisitaRealizada,
@@ -95,7 +94,6 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS_AET: Array<{
 }> = [
   { id: "contrato", label: "Contrato" },
   { id: "financeiro", label: "Aguardando pagamento" },
-  { id: "documentos", label: "Documentos da empresa" },
   { id: "visita_aet", label: "Agendamento da visita" },
   { id: "elaboracao", label: "Elaboração do AET" },
   { id: "envio", label: "Envio ao cliente" },
@@ -458,7 +456,6 @@ export function resolveImplantacaoEtapaAtual(
 
   if (fluxo === "aet") {
     const aet = opts?.aet ?? null;
-    if (!isAetDocumentosEtapaConcluida(aet)) return "documentos";
     if (!aet || aet.visita_status === "aguardando_agendamento") {
       return "visita_aet";
     }
@@ -525,7 +522,6 @@ export function countImplantacaoEtapasConcluidas(
     if (opts?.orcamentoAprovado || aprovacao) n += 1;
     if (isContratoEtapaConcluida(aprovacao)) n += 1;
     if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
-    if (isAetDocumentosEtapaConcluida(opts?.aet)) n += 1;
     if (isAetVisitaRealizada(opts?.aet)) n += 1;
     if (isAetElaboracaoConcluida(opts?.aet)) n += 1;
     if (isAetEnvioConcluido(opts?.aet)) n += 1;
@@ -571,8 +567,9 @@ export function implantacaoEtapaToModalTab(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): OrcamentoEtapaId {
   if (fluxo === "aet") {
-    if (etapa === "documentos") return "documentos";
-    if (etapa === "visita_aet" || etapa === "visita_agendada") return "visita_aet";
+    if (etapa === "documentos" || etapa === "visita_aet" || etapa === "visita_agendada") {
+      return "visita_aet";
+    }
     if (etapa === "elaboracao") return "elaboracao";
     if (
       etapa === "envio" ||
@@ -667,7 +664,7 @@ export function buildImplantacaoProcesso(params: {
     fluxo === "somente_treinamentos"
       ? 5
       : fluxo === "aet"
-        ? 8
+        ? 7
         : etapasOperacionais.length;
   const agendamentoLiberado =
     etapaAtual === "contrato_encerrado" ||
@@ -757,7 +754,7 @@ export function computeImplantacaoSummary(
       Boolean(p.pagamentoPendente ?? p.etapaAtual === "financeiro")
     ).length,
     aguardandoDocumentos: ativos.filter((p) =>
-      ["procuracao", "funcionarios", "logo", "documentos"].includes(p.etapaAtual)
+      ["procuracao", "funcionarios", "logo"].includes(p.etapaAtual)
     ).length,
     liberadosAgendamento: ativos.filter((p) => p.agendamentoLiberado).length,
   };
@@ -868,10 +865,10 @@ const ETAPA_SORT_ORDER: Record<ImplantacaoEtapaId, number> = {
   logo: 5,
   visita: 6,
   documentos: 3,
-  visita_aet: 4,
-  visita_agendada: 5,
-  elaboracao: 6,
-  envio: 7,
+  visita_aet: 3,
+  visita_agendada: 4,
+  elaboracao: 5,
+  envio: 6,
   aguardando_agendamentos: 7,
   agendamento_treinamento: 7,
   treinamento_agendado: 8,
@@ -988,7 +985,7 @@ export function resolveImplantacaoEtapaVisual(
     visita: isVisitaEtapaConcluida(aprovacao),
     agendamentos: agendamentosDone,
     treinamento: treinamentoDone,
-    documentos: isAetDocumentosEtapaConcluida(opts?.aet),
+    documentos: false,
     visita_aet: isAetVisitaRealizada(opts?.aet),
     elaboracao: isAetElaboracaoConcluida(opts?.aet),
     envio: isAetEnvioConcluido(opts?.aet),

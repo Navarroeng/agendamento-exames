@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
-  type ImplantacaoAetDocumentoRecord,
   type ImplantacaoAetElaboracaoStatus,
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaStatus,
@@ -13,11 +12,7 @@ import {
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
   garantirImplantacaoAet,
-  inserirDocumentoAet,
-  listarDocumentosAet,
-  removerDocumentoAet,
   removerLaudoAet,
-  salvarDocumentosConferidosAet,
   salvarElaboracaoAet,
   salvarEnvioAet,
   salvarLaudoAet,
@@ -26,7 +21,6 @@ import {
 import {
   obterUrlOrcamentoOnboarding,
   removerArquivoOrcamentoOnboarding,
-  uploadAetDocumentoEmpresa,
   uploadAetLaudoPdf,
 } from "@/services/orcamento-onboarding-storage.service";
 
@@ -90,9 +84,6 @@ export function useOrcamentoAetEtapas(params: {
 }) {
   const auditContext = useAuditoriaUsuario();
   const [aet, setAet] = useState<ImplantacaoAetRecord | null>(null);
-  const [documentos, setDocumentos] = useState<ImplantacaoAetDocumentoRecord[]>(
-    []
-  );
   const [visitaForm, setVisitaForm] = useState(emptyAetVisitaForm);
   const [elaboracaoForm, setElaboracaoForm] = useState(emptyAetElaboracaoForm);
   const [envioForm, setEnvioForm] = useState(emptyAetEnvioForm);
@@ -101,7 +92,6 @@ export function useOrcamentoAetEtapas(params: {
   const reload = useCallback(async () => {
     if (!params.enabled || !params.orcamentoId || !params.aprovacaoId) {
       setAet(null);
-      setDocumentos([]);
       return null;
     }
     const row = await garantirImplantacaoAet({
@@ -109,9 +99,7 @@ export function useOrcamentoAetEtapas(params: {
       aprovacaoId: params.aprovacaoId,
       usuarioNome: auditContext.usuarioNome,
     });
-    const docs = await listarDocumentosAet(row.id);
     setAet(row);
-    setDocumentos(docs);
     const forms = formsFromAet(row);
     setVisitaForm(forms.visita);
     setElaboracaoForm(forms.elaboracao);
@@ -127,7 +115,6 @@ export function useOrcamentoAetEtapas(params: {
   useEffect(() => {
     if (!params.enabled) {
       setAet(null);
-      setDocumentos([]);
       return;
     }
     void reload().catch((err) => {
@@ -150,85 +137,6 @@ export function useOrcamentoAetEtapas(params: {
       descricao,
       dadosDepois,
     });
-  }
-
-  async function handleToggleDocumentosConferidos(conferidos: boolean) {
-    if (!aet) return;
-    setSaving(true);
-    try {
-      const saved = await salvarDocumentosConferidosAet({
-        aetId: aet.id,
-        conferidos,
-        usuarioNome: auditContext.usuarioNome,
-      });
-      setAet(saved);
-      toast.success(
-        conferidos
-          ? "Documentos marcados como conferidos."
-          : "Conferência de documentos desmarcada."
-      );
-    } catch (err) {
-      console.error(err);
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível salvar a conferência dos documentos."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleUploadDocumento(file: File | null) {
-    if (!file || !aet || !params.aprovacaoId) return;
-    setSaving(true);
-    try {
-      const uploaded = await uploadAetDocumentoEmpresa(params.aprovacaoId, file);
-      await inserirDocumentoAet({
-        aetId: aet.id,
-        storagePath: uploaded.path,
-        arquivoNome: uploaded.nome,
-        arquivoTipo: uploaded.tipo,
-        arquivoTamanho: uploaded.tamanho,
-        usuarioNome: auditContext.usuarioNome,
-        usuarioId: auditContext.usuarioId,
-      });
-      await audit(
-        AUDITORIA_ACOES.implantacao_aet_documento_anexado,
-        `${auditContext.usuarioNome} anexou um documento da empresa no AET.`,
-        { arquivo_nome: uploaded.nome }
-      );
-      setDocumentos(await listarDocumentosAet(aet.id));
-      toast.success("Documento anexado.");
-    } catch (err) {
-      console.error(err);
-      toast.error(
-        err instanceof Error ? err.message : "Não foi possível anexar o documento."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleRemoverDocumento(doc: ImplantacaoAetDocumentoRecord) {
-    if (!aet) return;
-    setSaving(true);
-    try {
-      await removerDocumentoAet(doc.id);
-      await removerArquivoOrcamentoOnboarding(doc.storage_path);
-      await audit(
-        AUDITORIA_ACOES.implantacao_aet_documento_removido,
-        `${auditContext.usuarioNome} removeu um documento da empresa do AET.`,
-        { arquivo_nome: doc.arquivo_nome }
-      );
-      setDocumentos(await listarDocumentosAet(aet.id));
-      toast.success("Documento removido.");
-    } catch (err) {
-      console.error(err);
-      toast.error("Não foi possível remover o documento.");
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function abrirArquivo(path: string, downloadName?: string) {
@@ -410,7 +318,6 @@ export function useOrcamentoAetEtapas(params: {
 
   return {
     aet,
-    documentos,
     visitaForm,
     setVisitaForm,
     elaboracaoForm,
@@ -418,9 +325,6 @@ export function useOrcamentoAetEtapas(params: {
     envioForm,
     setEnvioForm,
     saving,
-    handleToggleDocumentosConferidos,
-    handleUploadDocumento,
-    handleRemoverDocumento,
     abrirArquivo,
     handleSalvarVisita,
     handleUploadLaudo,

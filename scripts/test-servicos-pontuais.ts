@@ -323,7 +323,7 @@ const aetDebito = listServicosPontuaisContratados({
     ],
   ]),
 });
-assert.equal(aetDebito[0].statusLabel, "Aguardando documentos");
+assert.equal(aetDebito[0].statusLabel, "Visita a agendar");
 assert.equal(aetDebito[0].financeiroPendente, true);
 assert.equal(aetDebito[0].financeiroLabel, "Aguardando pagamento");
 assert.equal(

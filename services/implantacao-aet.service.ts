@@ -3,7 +3,6 @@ import {
   validateAetElaboracaoPayload,
   validateAetEnvioPayload,
   validateAetVisitaPayload,
-  type ImplantacaoAetDocumentoRecord,
   type ImplantacaoAetElaboracaoPayload,
   type ImplantacaoAetEnvioPayload,
   type ImplantacaoAetRecord,
@@ -75,19 +74,6 @@ export async function garantirImplantacaoAet(params: {
   return mapAet(data as ImplantacaoAetRecord);
 }
 
-export async function listarDocumentosAet(
-  aetId: string
-): Promise<ImplantacaoAetDocumentoRecord[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("implantacao_aet_documentos")
-    .select("*")
-    .eq("aet_id", aetId)
-    .order("enviado_em", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as ImplantacaoAetDocumentoRecord[];
-}
-
 async function updateAetRow(
   aetId: string,
   patch: Record<string, unknown>
@@ -101,60 +87,6 @@ async function updateAetRow(
     .single();
   if (error) throw error;
   return mapAet(data as ImplantacaoAetRecord);
-}
-
-export async function salvarDocumentosConferidosAet(params: {
-  aetId: string;
-  conferidos: boolean;
-  usuarioNome: string;
-}): Promise<ImplantacaoAetRecord> {
-  const agora = new Date().toISOString();
-  const usuario = params.usuarioNome.trim() || "Sistema";
-  return updateAetRow(params.aetId, {
-    documentos_conferidos: params.conferidos,
-    documentos_conferidos_em: params.conferidos ? agora : null,
-    documentos_conferidos_por: params.conferidos ? usuario : null,
-    atualizado_em: agora,
-    atualizado_por: usuario,
-  });
-}
-
-export async function inserirDocumentoAet(params: {
-  aetId: string;
-  storagePath: string;
-  arquivoNome: string;
-  arquivoTipo: string | null;
-  arquivoTamanho: number | null;
-  usuarioNome: string;
-  usuarioId: string | null;
-}): Promise<ImplantacaoAetDocumentoRecord> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("implantacao_aet_documentos")
-    .insert({
-      aet_id: params.aetId,
-      storage_path: params.storagePath,
-      arquivo_nome: params.arquivoNome,
-      arquivo_tipo: params.arquivoTipo,
-      arquivo_tamanho: params.arquivoTamanho,
-      enviado_por: params.usuarioNome.trim() || "Sistema",
-      enviado_por_user_id: params.usuarioId,
-    })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data as ImplantacaoAetDocumentoRecord;
-}
-
-export async function removerDocumentoAet(
-  documentoId: string
-): Promise<void> {
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("implantacao_aet_documentos")
-    .delete()
-    .eq("id", documentoId);
-  if (error) throw error;
 }
 
 export async function salvarVisitaAet(params: {

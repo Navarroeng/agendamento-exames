@@ -3,7 +3,6 @@ import {
   ORCAMENTO_ONBOARDING_BUCKET,
   buildOrcamentoOnboardingPath,
   resolveOnboardingContentType,
-  validateAetDocumentoEmpresaFile,
   validateAetLaudoPdfFile,
   validateOrcamentoContratoPdfFile,
   validateOrcamentoListaFuncionariosFile,
@@ -49,14 +48,6 @@ export async function uploadOrcamentoContratoPdf(
 ) {
   validateOrcamentoContratoPdfFile(file);
   return uploadOnboardingFile(aprovacaoId, "contrato", file);
-}
-
-export async function uploadAetDocumentoEmpresa(
-  aprovacaoId: string,
-  file: File
-) {
-  validateAetDocumentoEmpresaFile(file);
-  return uploadOnboardingFile(aprovacaoId, "aet_documento", file);
 }
 
 export async function uploadAetLaudoPdf(aprovacaoId: string, file: File) {

@@ -82,7 +82,7 @@ assert.equal(
   false
 );
 assert.equal(
-  isOrcamentoEtapaLiberada("documentos", contratoOk, true, { fluxo: "aet" }),
+  isOrcamentoEtapaLiberada("visita_aet", contratoOk, true, { fluxo: "aet" }),
   true
 );
 

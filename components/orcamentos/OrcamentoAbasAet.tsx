@@ -8,7 +8,6 @@ import {
   IMPLANTACAO_AET_VISITA_STATUS_LABELS,
   isAetElaboracaoConcluida,
   isAetVisitaRealizada,
-  type ImplantacaoAetDocumentoRecord,
   type ImplantacaoAetElaboracaoStatus,
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaStatus,
@@ -33,114 +32,6 @@ type AetVisitaForm = {
   visita_responsavel: string;
   visita_observacao: string;
 };
-
-export function OrcamentoAbaAetDocumentos({
-  conferidos,
-  documentos,
-  saving,
-  onToggleConferidos,
-  onFileChange,
-  onRemover,
-  onVisualizar,
-  onBaixar,
-}: {
-  conferidos: boolean;
-  documentos: ImplantacaoAetDocumentoRecord[];
-  saving: boolean;
-  onToggleConferidos: (value: boolean) => void;
-  onFileChange: (file: File | null) => void;
-  onRemover: (doc: ImplantacaoAetDocumentoRecord) => void;
-  onVisualizar: (doc: ImplantacaoAetDocumentoRecord) => void;
-  onBaixar: (doc: ImplantacaoAetDocumentoRecord) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-[#64748b]">
-        Anexe os documentos fornecidos pela empresa para elaboração do AET.
-      </p>
-
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-bold text-navy">
-          Anexar documento
-        </span>
-        <input
-          type="file"
-          className="field-input"
-          disabled={saving}
-          onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
-
-      {documentos.length > 0 ? (
-        <div className="overflow-hidden rounded-xl border border-[#e4ebf4] bg-white">
-          {documentos.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eef2f7] px-4 py-3 last:border-b-0"
-            >
-              <div>
-                <p className="text-sm font-semibold text-navy">
-                  {doc.arquivo_nome}
-                </p>
-                <p className="text-[11px] text-[#64748b]">
-                  {formatDateTimeBR(doc.enviado_em)}
-                  {doc.enviado_por ? ` · ${doc.enviado_por}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn justify-center text-[12px]"
-                  disabled={saving}
-                  onClick={() => onVisualizar(doc)}
-                >
-                  Visualizar
-                </button>
-                <button
-                  type="button"
-                  className="btn justify-center text-[12px]"
-                  disabled={saving}
-                  onClick={() => onBaixar(doc)}
-                >
-                  Baixar
-                </button>
-                <button
-                  type="button"
-                  className="btn justify-center text-[12px] text-brand-red"
-                  disabled={saving}
-                  onClick={() => onRemover(doc)}
-                >
-                  Remover
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-xl border border-dashed border-[#e4ebf4] bg-white px-4 py-6 text-center text-sm text-[#64748b]">
-          Nenhum documento anexado ainda.
-        </p>
-      )}
-
-      <label className="flex items-start gap-2 rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-sm font-semibold text-navy">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 accent-brand-blue"
-          checked={conferidos}
-          disabled={saving}
-          onChange={(e) => onToggleConferidos(e.target.checked)}
-        />
-        <span>
-          Documentos recebidos/conferidos
-          <span className="mt-0.5 block text-[12px] font-normal text-[#64748b]">
-            Marque somente após conferir os documentos necessários para a
-            elaboração do AET.
-          </span>
-        </span>
-      </label>
-    </div>
-  );
-}
 
 export function OrcamentoAbaAetVisita({
   aet,

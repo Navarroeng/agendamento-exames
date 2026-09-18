@@ -85,7 +85,6 @@ import {
 import { resolveAetServicoId } from "@/lib/servico-aet";
 import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
 import {
-  OrcamentoAbaAetDocumentos,
   OrcamentoAbaAetElaboracao,
   OrcamentoAbaAetEnvio,
   OrcamentoAbaAetVisita,
@@ -253,15 +252,19 @@ export function OrcamentoAprovarModal({
       fluxo,
       treinamento,
     };
+    const requestedTab: TabId | null | undefined =
+      fluxo === "aet" && initialTab === "documentos"
+        ? "visita_aet"
+        : initialTab;
     const tabInicial: TabId =
-      initialTab &&
+      requestedTab &&
       isOrcamentoEtapaLiberada(
-        initialTab,
+        requestedTab,
         aprovacao,
         orcamentoAprovadoInit,
         ctxInit
       )
-        ? initialTab
+        ? requestedTab
         : "resumo";
     setTab(tabInicial);
     setShowDiffConfirm(false);
@@ -639,7 +642,7 @@ export function OrcamentoAprovarModal({
     setComprovanteFile(null);
     if (boletoPago) {
       if (fluxoImplantacao === "aet") {
-        setTab("documentos");
+        setTab("visita_aet");
       } else if (
         fluxoImplantacao === "somente_treinamentos" ||
         fluxoImplantacao === "combinado"
@@ -1797,32 +1800,6 @@ export function OrcamentoAprovarModal({
               }
               onCopiarMensagem={() => void handleCopiarMensagemTreinamento()}
               onSalvar={() => void handleSalvarTreinamentoClick()}
-            />
-          ) : null}
-
-          {tab === "documentos" &&
-          aprovacao &&
-          isOrcamentoEtapaLiberada(
-            "documentos",
-            aprovacao,
-            orcamentoAprovado,
-            etapasCtx
-          ) ? (
-            <OrcamentoAbaAetDocumentos
-              conferidos={Boolean(aetEtapas.aet?.documentos_conferidos)}
-              documentos={aetEtapas.documentos}
-              saving={saving || aetEtapas.saving}
-              onToggleConferidos={(value) =>
-                void aetEtapas.handleToggleDocumentosConferidos(value)
-              }
-              onFileChange={(file) => void aetEtapas.handleUploadDocumento(file)}
-              onRemover={(doc) => void aetEtapas.handleRemoverDocumento(doc)}
-              onVisualizar={(doc) =>
-                void aetEtapas.abrirArquivo(doc.storage_path)
-              }
-              onBaixar={(doc) =>
-                void aetEtapas.abrirArquivo(doc.storage_path, doc.arquivo_nome)
-              }
             />
           ) : null}
 
