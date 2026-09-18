@@ -10,6 +10,7 @@ import {
   extrairCategoriasDoSnapshot,
   historicoResultadosComparaveis,
   labelStatusClientePortal,
+  labelTotalParticipantesPortal,
   montarHistoricoRiscosPortal,
   montarListaCampanhasPortal,
   montarPortalResumo,
@@ -578,6 +579,48 @@ run("20. participante pendente", () => {
     snapshot: null,
   });
   assert.equal(resumo.participantes[0]?.participacao, "pendente");
+});
+
+run("20b. card Participantes usa o total cadastrado", () => {
+  const resumo = montarPortalResumo({
+    campanha: campanha({ id: CAMP_2026, status: "aberta" }),
+    participantes: [
+      ...Array.from({ length: 19 }, (_, i) => ({
+        nome_completo: `Concluido ${i}`,
+        status: "respondido" as const,
+      })),
+      ...Array.from({ length: 9 }, (_, i) => ({
+        nome_completo: `Pendente ${i}`,
+        status: "pendente" as const,
+      })),
+    ],
+    snapshot: null,
+  });
+  assert.equal(resumo.cadastrados, 28);
+  assert.equal(resumo.respondidos, 19);
+  assert.equal(resumo.pendentes, 9);
+  assert.equal(resumo.participacaoPercentual, 68);
+  assert.equal(
+    labelTotalParticipantesPortal(resumo.cadastrados),
+    "28 colaboradores participam desta avaliação"
+  );
+  assert.notEqual(
+    labelTotalParticipantesPortal(resumo.cadastrados),
+    labelTotalParticipantesPortal(resumo.respondidos)
+  );
+  assert.equal(
+    labelTotalParticipantesPortal(1),
+    "1 colaborador participa desta avaliação"
+  );
+  const detalhe = readFileSync(
+    join(process.cwd(), "components/portal-cliente/PortalCampanhaDetalhe.tsx"),
+    "utf8"
+  );
+  assert.match(detalhe, /labelTotalParticipantesPortal\(resumo\.cadastrados\)/);
+  assert.doesNotMatch(
+    detalhe,
+    /labelTotalParticipantesPortal\(resumo\.respondidos\)/
+  );
 });
 
 run("21. respostas individuais não são expostas", () => {

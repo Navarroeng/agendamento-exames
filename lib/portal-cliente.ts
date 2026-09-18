@@ -609,6 +609,12 @@ export function pathPortalRelatorioPdf(
   return `/api/portal/riscos/relatorio/${campanhaId}/pdf?cliente_id=${encodeURIComponent(clienteId)}`;
 }
 
+/** Rótulo do card Participantes: total vinculado à campanha, não só quem já respondeu. */
+export function labelTotalParticipantesPortal(cadastrados: number): string {
+  if (cadastrados === 1) return "1 colaborador participa desta avaliação";
+  return `${cadastrados} colaboradores participam desta avaliação`;
+}
+
 export function snapshotTemResultadoConsolidado(
   json: RiscosRelatorioResultadoJson | Record<string, unknown> | null | undefined
 ): boolean {

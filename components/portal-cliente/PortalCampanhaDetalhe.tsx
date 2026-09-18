@@ -10,6 +10,7 @@ import {
   PORTAL_PRIVACIDADE_CURTA,
   PORTAL_RESULTADOS_AGUARDANDO_MSG,
   labelStatusClientePortal,
+  labelTotalParticipantesPortal,
   montarPrincipaisResultadosPortal,
   pathPortalRelatorioPdf,
   type PortalCategoriaResumo,
@@ -360,7 +361,7 @@ function ParticipantesCard({
         Participantes
       </h2>
       <p className="mt-1 text-sm text-[#64748b]">
-        {resumo.respondidos} colaboradores participam desta avaliação
+        {labelTotalParticipantesPortal(resumo.cadastrados)}
       </p>
       <button
         type="button"
