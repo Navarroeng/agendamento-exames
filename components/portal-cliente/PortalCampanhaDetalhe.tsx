@@ -360,7 +360,7 @@ function ParticipantesCard({
         Participantes
       </h2>
       <p className="mt-1 text-sm text-[#64748b]">
-        {resumo.respondidos} colaboradores participaram desta avaliação
+        {resumo.respondidos} colaboradores participam desta avaliação
       </p>
       <button
         type="button"
