@@ -31,9 +31,9 @@ const BODY_START = MARGIN + HEADER_H + 4;
 const TITLE_GAP = 3.2;
 const PARA_LINE_H = 4.4;
 const CLAUSE_GAP = 4.2;
-const LOGO_MAX_MM = 16;
-const LOGO_MAX_H_MM = 12;
-const LOGO_POS_Y = 6.5;
+const LOGO_MAX_MM = 22;
+const LOGO_MAX_H_MM = 17;
+const LOGO_TITLE_GAP_MM = 4;
 const LOGO_CORNER_RADIUS_MM = 1.2;
 const OPENING_TITLE_SIZE = 12.5;
 const OPENING_TITLE_LINE_H = 6.2;
@@ -187,9 +187,10 @@ function drawHeader(
   let textX = MARGIN;
   if (logo) {
     const { w, h } = logoDisplaySize(logo.width, logo.height);
+    const logoY = (HEADER_H - h) / 2;
     try {
-      doc.addImage(logo.dataUrl, "PNG", MARGIN, LOGO_POS_Y, w, h);
-      textX = MARGIN + w + 4;
+      doc.addImage(logo.dataUrl, "PNG", MARGIN, logoY, w, h);
+      textX = MARGIN + w + LOGO_TITLE_GAP_MM;
     } catch {
       textX = MARGIN;
     }
