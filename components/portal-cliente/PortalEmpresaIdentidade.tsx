@@ -10,17 +10,23 @@ export function PortalEmpresaIdentidade({
 }: {
   nome: string;
   logoUrl: string | null;
-  variante: "sst" | "avaliacao";
+  variante: "sst" | "avaliacao" | "compacta";
   children?: React.ReactNode;
 }) {
   const iniciais = iniciaisEmpresa(nome || "Empresa");
   const logoBox =
     variante === "sst"
       ? "h-[5.25rem] w-[6.25rem] sm:h-[6rem] sm:w-[7.25rem]"
-      : "h-14 w-[4.25rem] sm:h-16 sm:w-[5rem]";
+      : variante === "compacta"
+        ? "h-11 w-14 sm:h-12 sm:w-[3.75rem]"
+        : "h-14 w-[4.25rem] sm:h-16 sm:w-[5rem]";
 
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+    <header
+      className={`flex flex-col gap-4 sm:flex-row sm:items-center ${
+        variante === "compacta" ? "gap-3 sm:gap-3.5" : "sm:gap-5"
+      }`}
+    >
       <div
         className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e8edf5] bg-white p-2.5 ${logoBox}`}
         aria-hidden={!logoUrl}
@@ -55,6 +61,13 @@ export function PortalEmpresaIdentidade({
             <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#64748b]">
               Estamos aqui para apoiar a gestão de SST da sua empresa.
             </p>
+          </>
+        ) : variante === "compacta" ? (
+          <>
+            <p className="text-sm font-semibold leading-snug tracking-tight text-[#0b1f4d] sm:text-base">
+              {nome}
+            </p>
+            {children}
           </>
         ) : (
           <>

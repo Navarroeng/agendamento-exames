@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   calcPortalColaboradoresResumo,
   consolidarPortalColaboradores,
@@ -275,6 +277,23 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).length,
     1
   );
+}
+
+{
+  const ui = readFileSync(
+    join(process.cwd(), "components/portal-cliente/PortalColaboradores.tsx"),
+    "utf8"
+  );
+  assert.match(ui, />Nome</);
+  assert.match(ui, />CPF</);
+  assert.match(ui, />Cargo</);
+  assert.match(ui, />Admissão</);
+  assert.match(ui, />Desligamento</);
+  assert.doesNotMatch(ui, />Situação</);
+  assert.doesNotMatch(ui, /situacaoLabel/);
+  assert.match(ui, /uppercase/);
+  assert.match(ui, /filtro === f\.key/);
+  assert.match(ui, /totalAtivos/);
 }
 
 console.log("test-portal-colaboradores: ok");

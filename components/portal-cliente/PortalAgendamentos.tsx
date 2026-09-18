@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
 import { PortalAgendamentoDetalheModal } from "@/components/portal-cliente/PortalAgendamentoDetalheModal";
+import { IconEye } from "@/components/ui/icons/OutlineIcons";
 import {
   calcPortalAgendamentosResumo,
   filtrarPortalAgendamentos,
@@ -181,58 +182,54 @@ export function PortalAgendamentos({
                   <div className="hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[12%]" />
-                        <col className="w-[10%]" />
-                        <col className="w-[34%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[11%]" />
+                        <col className="w-[36%]" />
                         <col className="w-[16%]" />
                         <col className="w-[16%]" />
-                        <col className="w-[12%]" />
+                        <col className="w-[8%]" />
                       </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
-                          <th className="px-4 py-3">Data</th>
-                          <th className="px-4 py-3">Horário</th>
-                          <th className="px-4 py-3">Colaborador</th>
-                          <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-right">Ação</th>
+                          <th className="px-4 py-2.5">Data</th>
+                          <th className="px-4 py-2.5">Horário</th>
+                          <th className="px-4 py-2.5">Colaborador</th>
+                          <th className="px-4 py-2.5">Tipo</th>
+                          <th className="px-4 py-2.5">Status</th>
+                          <th className="px-4 py-2.5 text-center">Ação</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filtrados.map((row) => (
                           <tr
                             key={row.id}
-                            className="border-t border-[#eef2f7] odd:bg-white even:bg-[#fbfdff]"
+                            className="border-t border-[#eef2f7] odd:bg-white even:bg-[#fbfdff] transition-colors duration-150 hover:bg-[#f8fafc]"
                           >
-                            <td className="whitespace-nowrap px-4 py-3 font-medium text-[#0b1f4d]">
+                            <td className="whitespace-nowrap px-4 py-2.5 align-middle text-[#64748b]">
                               {row.dataLabel}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-[#475569]">
+                            <td className="whitespace-nowrap px-4 py-2.5 align-middle text-[#64748b]">
                               {row.horarioLabel}
                             </td>
-                            <td className="px-4 py-3 font-medium text-[#0b1f4d]">
+                            <td className="px-4 py-2.5 align-middle font-semibold text-[#0b1f4d]">
                               <span className="line-clamp-2 break-words">
                                 {row.colaborador}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-[#475569]">
+                            <td className="px-4 py-2.5 align-middle text-[#475569]">
                               {row.tipoAso}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-2.5 align-middle">
                               <span
                                 className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusClass(row.status)}`}
                               >
                                 {row.statusLabel}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                className="text-sm font-semibold text-[#0b1f4d] underline-offset-2 hover:underline"
+                            <td className="px-4 py-2.5 text-center align-middle">
+                              <BotaoVerDetalhes
                                 onClick={() => setDetalheId(row.id)}
-                              >
-                                Ver detalhes
-                              </button>
+                              />
                             </td>
                           </tr>
                         ))}
@@ -270,13 +267,11 @@ export function PortalAgendamentos({
                             </dd>
                           </div>
                         </dl>
-                        <button
-                          type="button"
-                          className="mt-3 text-sm font-semibold text-[#0b1f4d] underline-offset-2 hover:underline"
-                          onClick={() => setDetalheId(row.id)}
-                        >
-                          Ver detalhes
-                        </button>
+                        <div className="mt-3">
+                          <BotaoVerDetalhes
+                            onClick={() => setDetalheId(row.id)}
+                          />
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -296,5 +291,19 @@ export function PortalAgendamentos({
         />
       ) : null}
     </div>
+  );
+}
+
+function BotaoVerDetalhes({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title="Ver detalhes"
+      aria-label="Ver detalhes"
+      onClick={onClick}
+      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-[#e2e8f0] bg-white text-[#0b1f4d] transition-colors duration-150 hover:bg-[#eff6ff]"
+    >
+      <IconEye size={16} />
+    </button>
   );
 }

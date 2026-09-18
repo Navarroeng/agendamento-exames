@@ -73,11 +73,7 @@ export function PortalModulosSst({
           id="riscos"
           titulo="Riscos Psicossociais"
           className="xl:col-span-2"
-          acao={
-            temAvaliacao
-              ? { label: "Ver avaliação →", onClick: onVerAvaliacao }
-              : null
-          }
+          acao={{ label: "Ver avaliação →", onClick: onVerAvaliacao }}
         >
           {temAvaliacao ? (
             <div>

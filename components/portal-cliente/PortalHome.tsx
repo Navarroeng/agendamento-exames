@@ -89,6 +89,7 @@ export function PortalHome() {
   const searchParams = useSearchParams();
   const clienteId = (searchParams.get("cliente") ?? "").trim();
   const viewParam = searchParams.get("view");
+  const campanhaParam = (searchParams.get("campanha") ?? "").trim();
   const viewRiscos = viewParam === "riscos";
   const viewFaturas = viewParam === "faturas";
   const viewAgendamentos = viewParam === "agendamentos";
@@ -110,7 +111,11 @@ export function PortalHome() {
     useState<PortalColaboradoresResumo | null>(null);
 
   const atualizarQuery = useCallback(
-    (next: { cliente?: string; view?: PortalView }) => {
+    (next: {
+      cliente?: string;
+      view?: PortalView;
+      campanha?: string | null;
+    }) => {
       const params = new URLSearchParams(searchParams.toString());
       if (next.cliente !== undefined) {
         if (next.cliente) params.set("cliente", next.cliente);
@@ -122,7 +127,14 @@ export function PortalHome() {
       else if (next.view === "laudos") params.set("view", "laudos");
       else if (next.view === "colaboradores")
         params.set("view", "colaboradores");
-      else if (next.view === null) params.delete("view");
+      else if (next.view === null) {
+        params.delete("view");
+        params.delete("campanha");
+      }
+      if (next.campanha !== undefined) {
+        if (next.campanha) params.set("campanha", next.campanha);
+        else params.delete("campanha");
+      }
       const qs = params.toString();
       router.replace(qs ? `/portal?${qs}` : "/portal");
     },
@@ -178,6 +190,10 @@ export function PortalHome() {
         const empresaNome =
           empresas.find((e) => e.id === clienteId)?.nome ?? "";
         const qsCliente = `cliente_id=${encodeURIComponent(clienteId)}&cliente_nome=${encodeURIComponent(empresaNome)}`;
+        const campanhaQs =
+          viewRiscos && campanhaParam
+            ? `&campanha_id=${encodeURIComponent(campanhaParam)}`
+            : "";
         const [
           resHome,
           resFaturas,
@@ -186,7 +202,7 @@ export function PortalHome() {
           resColaboradores,
         ] = await Promise.all([
           fetch(
-            `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}`,
+            `/api/portal/home?cliente_id=${encodeURIComponent(clienteId)}${campanhaQs}`,
             { cache: "no-store" }
           ),
           fetch(`/api/portal/faturas?${qsCliente}`, { cache: "no-store" }),
@@ -286,7 +302,7 @@ export function PortalHome() {
     return () => {
       cancel = true;
     };
-  }, [clienteId, empresas]);
+  }, [clienteId, empresas, viewRiscos, campanhaParam]);
 
   const mostrarPainel =
     Boolean(clienteId) &&
@@ -341,10 +357,18 @@ export function PortalHome() {
         <EmptyState mensagem={erro ?? PORTAL_SEM_AVALIACAO_MSG} />
       ) : null}
 
-      {mostrarPainel && viewRiscos ? (
+      {mostrarHomeSst && viewRiscos ? (
         <PortalAvaliacaoRiscos
           resumo={resumo}
-          onVoltar={() => atualizarQuery({ view: null })}
+          clienteId={clienteId}
+          campanhaIdSelecionada={campanhaParam || null}
+          onVoltar={() => atualizarQuery({ view: null, campanha: null })}
+          onAbrirCampanha={(id) =>
+            atualizarQuery({ view: "riscos", campanha: id })
+          }
+          onVoltarLista={() =>
+            atualizarQuery({ view: "riscos", campanha: null })
+          }
         />
       ) : null}
 
@@ -409,7 +433,9 @@ export function PortalHome() {
             agendamentosResumo={agendamentosResumo}
             laudosResumo={laudosResumo}
             colaboradoresResumo={colaboradoresResumo}
-            onVerAvaliacao={() => atualizarQuery({ view: "riscos" })}
+            onVerAvaliacao={() =>
+              atualizarQuery({ view: "riscos", campanha: null })
+            }
             onVerFaturas={() => atualizarQuery({ view: "faturas" })}
             onVerAgendamentos={() => atualizarQuery({ view: "agendamentos" })}
             onVerLaudos={() => atualizarQuery({ view: "laudos" })}
@@ -418,10 +444,6 @@ export function PortalHome() {
             }
           />
         </div>
-      ) : null}
-
-      {mostrarHomeSst && viewRiscos && !mostrarPainel ? (
-        <EmptyState mensagem={erro ?? PORTAL_SEM_AVALIACAO_MSG} />
       ) : null}
     </div>
   );

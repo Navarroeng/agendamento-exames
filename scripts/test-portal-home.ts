@@ -17,6 +17,7 @@ import {
   montarPortalResumo,
   participanteAtivoNoPortal,
   pathPortalRelatorio,
+  pathPortalRelatorioPdf,
   portalResumoVazio,
   resolvePortalDevClienteId,
   resolverClienteIdPortalPreview,
@@ -431,13 +432,16 @@ run("serviço não consulta respostas/sessão/vínculo", () => {
   assert.match(svc, /id, cliente_id, empresa_nome, status, data_inicio/);
   assert.match(svc, /logo_storage_path/);
   assert.match(svc, /resolverUrlLogoCampanhaAdmin/);
-  assert.match(svc, /\.eq\("campanha_id", campanha\.id\)/);
+  assert.match(svc, /montarListaCampanhasPortal/);
+  assert.match(svc, /escolherCampanhaPortalDaEmpresa/);
   assert.match(svc, /\.in\("campanha_id", campanhaIds\)/);
   assert.match(svc, /montarHistoricoRiscosPortal/);
   assert.doesNotMatch(svc, /codigo_publico/);
   assert.doesNotMatch(svc, /codigo_acesso/);
   assert.doesNotMatch(svc, /\bcpf\b/);
   assert.doesNotMatch(svc, /data_nascimento/);
+  assert.doesNotMatch(svc, /copsoq-engine/);
+  assert.doesNotMatch(svc, /classificarDimensao/);
 });
 
 run("menu admin tem atalho para /portal em Gestão Comercial", () => {
@@ -575,10 +579,20 @@ run("troca de empresa não mistura dados", () => {
 run("PDF do portal usa campanhaId selecionado", () => {
   const a = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const b = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const cliente = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   assert.equal(pathPortalRelatorio(a), `/portal/relatorio/${a}`);
   assert.equal(pathPortalRelatorio(b), `/portal/relatorio/${b}`);
   assert.notEqual(pathPortalRelatorio(a), pathPortalRelatorio(b));
   assert.equal(pathPortalRelatorio("nao-e-uuid"), "");
+  assert.equal(
+    pathPortalRelatorioPdf(a, cliente),
+    `/api/portal/riscos/relatorio/${a}/pdf?cliente_id=${cliente}`
+  );
+  assert.notEqual(
+    pathPortalRelatorioPdf(a, cliente),
+    pathPortalRelatorioPdf(b, cliente)
+  );
+  assert.equal(pathPortalRelatorioPdf("nao-e-uuid", cliente), "");
 });
 
 run("histórico: um ciclo, zeros e campanha sem relatório fora da comparação", () => {
@@ -970,11 +984,39 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(visao, /montarPortalVisaoGeral/);
   assert.match(identidade, /object-contain/);
   assert.match(identidade, /iniciaisEmpresa/);
-  assert.match(avaliacao, /pathPortalRelatorio/);
-  assert.match(avaliacao, /window\.open/);
-  assert.match(avaliacao, /PortalEvolucaoRiscos/);
+  assert.match(identidade, /compacta/);
+  assert.match(avaliacao, /PortalHistoricoAvaliacoes/);
+  assert.match(avaliacao, /PortalCampanhaDetalhe/);
+  assert.match(avaliacao, /campanhaIdSelecionada/);
+  assert.doesNotMatch(avaliacao, /window\.open/);
+  assert.doesNotMatch(avaliacao, /pathPortalRelatorio[^P]/);
+  assert.doesNotMatch(avaliacao, /PortalTimeline/);
   assert.doesNotMatch(avaliacao, /RiscosRelatorioViewerModal/);
-  assert.match(avaliacao, /Relatório ainda não disponível/);
+  const historicoUi = readFileSync(
+    join(root, "components/portal-cliente/PortalHistoricoAvaliacoes.tsx"),
+    "utf8"
+  );
+  const detalheUi = readFileSync(
+    join(root, "components/portal-cliente/PortalCampanhaDetalhe.tsx"),
+    "utf8"
+  );
+  const pdfRoute = readFileSync(
+    join(root, "app/api/portal/riscos/relatorio/[campanhaId]/pdf/route.ts"),
+    "utf8"
+  );
+  assert.match(historicoUi, /Avaliações realizadas/);
+  assert.match(historicoUi, /Ver detalhes/);
+  assert.match(historicoUi, /PORTAL_SEM_CAMPANHAS_MSG/);
+  assert.match(detalheUi, /pathPortalRelatorioPdf/);
+  assert.match(detalheUi, /Baixar relatório em PDF/);
+  assert.match(detalheUi, /Ver participantes/);
+  assert.match(detalheUi, /PortalGraficoResultadoGeral/);
+  assert.match(detalheUi, /PortalEvolucaoRiscos/);
+  assert.doesNotMatch(detalheUi, /window\.open/);
+  assert.doesNotMatch(detalheUi, /Visualizar relatório/);
+  assert.match(pdfRoute, /requirePortalStaffUser/);
+  assert.match(pdfRoute, /gerarPdfRelatorioPortalCliente/);
+  assert.match(pdfRoute, /application\/pdf/);
   const printView = readFileSync(
     join(root, "components/portal-cliente/PortalRelatorioPrintView.tsx"),
     "utf8"
