@@ -16,6 +16,7 @@ import { SERVICO_SST_NOME_TREINAMENTOS } from "../lib/servico-treinamentos";
 import {
   hrefAcompanhamentoServicoPontual,
   isContratacaoServicoPontual,
+  labelFinanceiroServicoPontual,
   labelStatusServicoPontual,
   listServicosPontuaisContratados,
   readImplantacaoOrcamentoIdFromSearch,
@@ -215,6 +216,8 @@ assert.equal(sstMaisAet[0].numeroOrcamento, "ORC-2026-0063");
 assert.equal(sstMaisAet[0].servicoNome, SERVICO_AET_NOME);
 assert.equal(sstMaisAet[0].valorFinal, 3200);
 assert.equal(sstMaisAet[0].statusLabel, "Aguardando contrato");
+assert.equal(sstMaisAet[0].financeiroPendente, false);
+assert.equal(sstMaisAet[0].financeiroLabel, "—");
 assert.equal(sstMaisAet[0].kind, "aet");
 assert.match(sstMaisAet[0].href, /orcamentoId=o-aet-1/);
 
@@ -292,6 +295,65 @@ const aetEmElaboracao = listServicosPontuaisContratados({
   ]),
 });
 assert.equal(aetEmElaboracao[0].statusLabel, "AET em elaboração");
+assert.equal(aetEmElaboracao[0].financeiroPendente, false);
+assert.equal(aetEmElaboracao[0].financeiroLabel, "Pago");
+
+const aetContratoSemPagamento = aprovacao(
+  {
+    id: "ap-aet-debito",
+    orcamento_id: "o-aet-debito",
+    contrato_assinado: true,
+    contrato_assinado_em: "2026-09-18",
+    contrato_salvo_em: "2026-09-18T12:00:00Z",
+    boleto_pago: false,
+    boleto_vencimento: "2026-10-08",
+  },
+  SERVICO_AET_NOME
+);
+const aetDebito = listServicosPontuaisContratados({
+  orcamentos: [{ id: "o-aet-debito", numero: "ORC-2026-0100" }],
+  aprovacoesByOrcamentoId: new Map([["o-aet-debito", aetContratoSemPagamento]]),
+  aetByOrcamentoId: new Map([
+    [
+      "o-aet-debito",
+      aetRow({
+        orcamento_id: "o-aet-debito",
+        aprovacao_id: "ap-aet-debito",
+      }),
+    ],
+  ]),
+});
+assert.equal(aetDebito[0].statusLabel, "Aguardando documentos");
+assert.equal(aetDebito[0].financeiroPendente, true);
+assert.equal(aetDebito[0].financeiroLabel, "Aguardando pagamento");
+assert.equal(
+  labelFinanceiroServicoPontual(aetContratoSemPagamento),
+  "Aguardando pagamento"
+);
+
+const aetEnviadoComDebito = listServicosPontuaisContratados({
+  orcamentos: [{ id: "o-aet-debito", numero: "ORC-2026-0100" }],
+  aprovacoesByOrcamentoId: new Map([["o-aet-debito", aetContratoSemPagamento]]),
+  aetByOrcamentoId: new Map([
+    [
+      "o-aet-debito",
+      aetRow({
+        orcamento_id: "o-aet-debito",
+        aprovacao_id: "ap-aet-debito",
+        documentos_conferidos: true,
+        visita_status: "realizada",
+        visita_data: "2026-09-20",
+        elaboracao_status: "concluido",
+        laudo_path: "ap-aet-debito/laudo.pdf",
+        enviado_cliente: true,
+        enviado_em: "2026-09-22",
+      }),
+    ],
+  ]),
+});
+assert.equal(aetEnviadoComDebito[0].statusLabel, "Concluído");
+assert.equal(aetEnviadoComDebito[0].financeiroPendente, true);
+assert.equal(aetEnviadoComDebito[0].financeiroLabel, "Aguardando pagamento");
 
 const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
 const files = fs

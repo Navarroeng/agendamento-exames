@@ -52,6 +52,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               vagasComprometidas: processo.vagasComprometidas ?? undefined,
               treinamento: processo.treinamento,
               aet: processo.aet ?? null,
+              fluxo: processo.fluxoImplantacao,
             }
           );
           const tone =
@@ -59,7 +60,9 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               ? "bg-brand-green"
               : estado === "atual"
                 ? "bg-brand-blue"
-                : "bg-[#e2e8f0]";
+                : estado === "pendente"
+                  ? "bg-[#f59e0b]"
+                  : "bg-[#e2e8f0]";
           return (
             <span
               key={etapa.id}
@@ -171,10 +174,13 @@ export function ImplantacaoTable({
                           processo.concluidoComExamesFuturos
                         }
                         observacao={
-                          processo.agendamentosIniciaisDispensados &&
-                          processo.etapaAtual === "concluido"
-                            ? "Agendamentos iniciais dispensados"
-                            : null
+                          processo.pagamentoPendente &&
+                          processo.etapaAtual !== "financeiro"
+                            ? "Aguardando pagamento"
+                            : processo.agendamentosIniciaisDispensados &&
+                                processo.etapaAtual === "concluido"
+                              ? "Agendamentos iniciais dispensados"
+                              : null
                         }
                       />
                     </td>

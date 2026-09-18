@@ -120,16 +120,19 @@ export function isAetEnvioConcluido(
   return Boolean(aet?.enviado_cliente) && Boolean(aet?.enviado_em);
 }
 
+/**
+ * Conclusão operacional do AET (envio ao cliente).
+ * Independente do pagamento: débito em aberto continua em
+ * `isOrcamentoPagamentoPendente` / etapa Financeiro.
+ */
 export function isImplantacaoAetConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null,
   aet: ImplantacaoAetRecord | null | undefined,
-  contratoOk: boolean,
-  financeiroOk: boolean
+  contratoOk: boolean
 ): boolean {
   return (
     Boolean(aprovacao) &&
     contratoOk &&
-    financeiroOk &&
     isAetDocumentosEtapaConcluida(aet) &&
     isAetVisitaRealizada(aet) &&
     isAetElaboracaoConcluida(aet) &&

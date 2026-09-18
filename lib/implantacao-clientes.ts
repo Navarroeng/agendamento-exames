@@ -1,9 +1,11 @@
 import { isClassificacaoVagasContratoCompleta } from "@/lib/contrato-vagas";
 import {
+  fluxoOperacaoIndependeDoPagamento,
   isContratoEtapaConcluida,
   isFinanceiroEtapaConcluida,
   isFuncionariosEtapaConcluida,
   isLogoEtapaConcluida,
+  isOrcamentoPagamentoPendente,
   isProcuracaoEtapaConcluida,
   isVisitaEtapaConcluida,
   type OrcamentoEtapaId,
@@ -351,6 +353,11 @@ export interface ImplantacaoProcesso {
    * Gatilho do encaminhamento automático para Laudos SST e Riscos.
    */
   possuiPacoteCompletoSst?: boolean;
+  /**
+   * Contrato assinado e boleto ainda não pago.
+   * No AET coexiste com a etapa operacional atual.
+   */
+  pagamentoPendente?: boolean;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -448,7 +455,6 @@ export function resolveImplantacaoEtapaAtual(
   }
 
   if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
-  if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
 
   if (fluxo === "aet") {
     const aet = opts?.aet ?? null;
@@ -461,6 +467,8 @@ export function resolveImplantacaoEtapaAtual(
     if (!isAetEnvioConcluido(aet)) return "envio";
     return "concluido";
   }
+
+  if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
 
   if (fluxo === "combinado") {
     if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
@@ -714,6 +722,7 @@ export function buildImplantacaoProcesso(params: {
     aet,
     etapasOperacionais,
     possuiPacoteCompletoSst: Boolean(params.possuiPacoteCompletoSst),
+    pagamentoPendente: isOrcamentoPagamentoPendente(aprovacao),
   };
 }
 
@@ -744,8 +753,9 @@ export function computeImplantacaoSummary(
     ).length,
     aguardandoContrato: ativos.filter((p) => p.etapaAtual === "contrato")
       .length,
-    aguardandoPagamento: ativos.filter((p) => p.etapaAtual === "financeiro")
-      .length,
+    aguardandoPagamento: ativos.filter((p) =>
+      Boolean(p.pagamentoPendente ?? p.etapaAtual === "financeiro")
+    ).length,
     aguardandoDocumentos: ativos.filter((p) =>
       ["procuracao", "funcionarios", "logo", "documentos"].includes(p.etapaAtual)
     ).length,
@@ -800,7 +810,15 @@ export function filterImplantacaoProcessos(
       }
     }
 
-    if (filters.etapa && etapaAtual !== filters.etapa) return false;
+    if (filters.etapa) {
+      if (filters.etapa === "financeiro") {
+        const pendente =
+          p.pagamentoPendente ?? etapaAtual === "financeiro";
+        if (!pendente) return false;
+      } else if (etapaAtual !== filters.etapa) {
+        return false;
+      }
+    }
     if (filters.status && orcamento.status !== filters.status) return false;
     if (filters.origem && orcamento.origem_cliente !== filters.origem) {
       return false;
@@ -935,7 +953,8 @@ export function filterImplantacaoProcessosPorMes(
 export type ImplantacaoEtapaVisualEstado =
   | "concluida"
   | "atual"
-  | "bloqueada";
+  | "bloqueada"
+  | "pendente";
 
 export function resolveImplantacaoEtapaVisual(
   etapa: ImplantacaoEtapaOperacionalId,
@@ -949,6 +968,7 @@ export function resolveImplantacaoEtapaVisual(
     vagasComprometidas?: number;
     treinamento?: ImplantacaoTreinamentoRecord | null;
     aet?: ImplantacaoAetRecord | null;
+    fluxo?: OrcamentoFluxoImplantacao;
   }
 ): ImplantacaoEtapaVisualEstado {
   const agendamentosDone = isAgendamentosImplantacaoConcluida(
@@ -975,6 +995,14 @@ export function resolveImplantacaoEtapaVisual(
   };
 
   if (doneMap[etapa]) return "concluida";
+
+  if (
+    etapa === "financeiro" &&
+    fluxoOperacaoIndependeDoPagamento(opts?.fluxo ?? "padrao") &&
+    isContratoEtapaConcluida(aprovacao)
+  ) {
+    return "pendente";
+  }
 
   if (etapa === "agendamentos") {
     if (etapaAtual === "aguardando_agendamentos") return "atual";

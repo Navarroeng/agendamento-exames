@@ -31,6 +31,7 @@ function estadoIcon(estado: OrcamentoEtapaEstado): string {
   if (estado === "concluida") return "✓";
   if (estado === "atual") return "→";
   if (estado === "bloqueada") return "🔒";
+  if (estado === "pendente") return "●";
   return "○";
 }
 
@@ -79,7 +80,9 @@ export function OrcamentoEtapasNav({
                   : item.id === "envio"
                     ? "Conclua a elaboração do AET antes de registrar o envio"
                     : "Etapa bloqueada"
-                : item.label
+                : estado === "pendente"
+                  ? "Aguardando pagamento"
+                  : item.label
             }
             onClick={() => {
               if (!bloqueada) onChange(item.id);
@@ -89,7 +92,9 @@ export function OrcamentoEtapasNav({
                 ? "bg-white text-[#082b63]"
                 : bloqueada
                   ? "cursor-not-allowed bg-white/5 text-white/35 opacity-60"
-                  : "bg-white/10 text-white/85 hover:bg-white/20"
+                  : estado === "pendente"
+                    ? "bg-[#f59e0b]/25 text-[#fde68a] hover:bg-[#f59e0b]/40"
+                    : "bg-white/10 text-white/85 hover:bg-white/20"
             }`}
           >
             <span className="mr-1 inline-block w-3 text-center">

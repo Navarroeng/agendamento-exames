@@ -298,6 +298,31 @@ assert.equal(
   }),
   true
 );
+assert.equal(
+  isOrcamentoEtapaLiberada(
+    "treinamento",
+    aprovacaoBase({
+      boleto_pago: false,
+      boleto_pago_em: null,
+      financeiro_salvo_em: null,
+    }),
+    true,
+    { fluxo: "somente_treinamentos" }
+  ),
+  false,
+  "Treinamentos continuam exigindo pagamento para liberar o agendamento"
+);
+assert.equal(
+  resolveImplantacaoEtapaAtual(
+    aprovacaoBase({
+      boleto_pago: false,
+      boleto_pago_em: null,
+      financeiro_salvo_em: null,
+    }),
+    { fluxo: "somente_treinamentos" }
+  ),
+  "financeiro"
+);
 
 // Combinado não aplica fluxo reduzido
 const processoCombinado = buildImplantacaoProcesso({

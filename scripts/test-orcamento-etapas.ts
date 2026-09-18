@@ -72,6 +72,19 @@ const financeiroOk = aprovacao({
 });
 assert.equal(isFinanceiroEtapaConcluida(financeiroOk), true);
 assert.equal(isOrcamentoEtapaLiberada("procuracao", financeiroOk, true), true);
+assert.equal(
+  isOrcamentoEtapaLiberada("procuracao", contratoOk, true),
+  false,
+  "Pacote SST continua bloqueando procuração até o pagamento"
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("documentos", financeiroOk, true, { fluxo: "padrao" }),
+  false
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("documentos", contratoOk, true, { fluxo: "aet" }),
+  true
+);
 
 const procuracaoOk = aprovacao({
   ...financeiroOk,

@@ -79,6 +79,13 @@ export function ClienteServicosPontuaisSection({
                     >
                       {item.statusLabel}
                     </span>
+                    {item.financeiroPendente ? (
+                      <span
+                        className={`${IMPLANTACAO_ETAPA_BADGE_BASE} ${IMPLANTACAO_ETAPA_BADGE.financeiro.className}`}
+                      >
+                        {item.financeiroLabel}
+                      </span>
+                    ) : null}
                     <a
                       href={item.href}
                       className="btn btn-primary !px-4 !py-2 text-xs"
@@ -87,7 +94,7 @@ export function ClienteServicosPontuaisSection({
                     </a>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Metric
                     label="Valor"
                     value={formatCurrency(item.valorFinal)}
@@ -96,7 +103,8 @@ export function ClienteServicosPontuaisSection({
                     label="Contratação"
                     value={formatDateBR(item.contratadoEm)}
                   />
-                  <Metric label="Status" value={item.statusLabel} />
+                  <Metric label="Status operacional" value={item.statusLabel} />
+                  <Metric label="Financeiro" value={item.financeiroLabel} />
                 </div>
               </div>
             );

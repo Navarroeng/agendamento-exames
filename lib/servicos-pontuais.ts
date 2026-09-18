@@ -11,6 +11,10 @@ import {
 } from "@/lib/implantacao-clientes";
 import type { ImplantacaoAetRecord } from "@/lib/implantacao-aet";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import {
+  isFinanceiroEtapaConcluida,
+  isOrcamentoPagamentoPendente,
+} from "@/lib/orcamento-etapas";
 import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 
@@ -26,6 +30,8 @@ export interface ServicoPontualContratado {
   contratadoEm: string | null;
   statusId: ImplantacaoEtapaId;
   statusLabel: string;
+  financeiroPendente: boolean;
+  financeiroLabel: string;
   href: string;
 }
 
@@ -64,6 +70,14 @@ export function nomeServicoPontualDoSnapshot(
 ): string {
   const found = (itens ?? []).find((item) => (item.servico_nome ?? "").trim());
   return (found?.servico_nome ?? "").trim();
+}
+
+export function labelFinanceiroServicoPontual(
+  aprovacao: OrcamentoAprovacaoRecord | null
+): string {
+  if (isFinanceiroEtapaConcluida(aprovacao)) return "Pago";
+  if (isOrcamentoPagamentoPendente(aprovacao)) return "Aguardando pagamento";
+  return "—";
 }
 
 export function resolveStatusServicoPontual(params: {
@@ -106,6 +120,8 @@ export function buildServicoPontualContratado(params: {
     contratadoEm: params.aprovacao.aprovado_em ?? null,
     statusId: status.id,
     statusLabel: status.label,
+    financeiroPendente: isOrcamentoPagamentoPendente(params.aprovacao),
+    financeiroLabel: labelFinanceiroServicoPontual(params.aprovacao),
     href: hrefAcompanhamentoServicoPontual(params.orcamento.id),
   };
 }

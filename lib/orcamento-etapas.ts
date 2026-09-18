@@ -34,7 +34,8 @@ export type OrcamentoEtapaEstado =
   | "concluida"
   | "atual"
   | "bloqueada"
-  | "disponivel";
+  | "disponivel"
+  | "pendente";
 
 export const ORCAMENTO_ETAPAS_PADRAO: Array<{
   id: OrcamentoEtapaId;
@@ -142,6 +143,30 @@ export function isFinanceiroEtapaConcluida(
   );
 }
 
+/**
+ * Contrato assinado e boleto ainda não pago. Independente da etapa operacional.
+ */
+export function isOrcamentoPagamentoPendente(
+  aprovacao: OrcamentoAprovacaoRecord | null
+): boolean {
+  return (
+    isContratoEtapaConcluida(aprovacao) &&
+    !isFinanceiroEtapaConcluida(aprovacao)
+  );
+}
+
+/**
+ * Fluxos pontuais em que o pagamento é acompanhado sem bloquear
+ * as etapas operacionais após o contrato assinado.
+ * Começa no AET; outros laudos/perícias entram aqui no futuro.
+ * Identificação canônica por `fluxo`, nunca por includes no nome.
+ */
+export function fluxoOperacaoIndependeDoPagamento(
+  fluxo: OrcamentoFluxoImplantacao
+): boolean {
+  return fluxo === "aet";
+}
+
 export function isProcuracaoEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
 ): boolean {
@@ -225,6 +250,9 @@ export function isOrcamentoEtapaLiberada(
       return isFinanceiroEtapaConcluida(aprovacao);
     case "documentos":
       if (fluxo !== "aet") return false;
+      if (fluxoOperacaoIndependeDoPagamento(fluxo)) {
+        return isContratoEtapaConcluida(aprovacao);
+      }
       return isFinanceiroEtapaConcluida(aprovacao);
     case "visita_aet":
       if (fluxo !== "aet") return false;
@@ -349,6 +377,13 @@ export function resolveOrcamentoEtapaEstado(
     )
   ) {
     return tabAtiva === etapa ? "atual" : "concluida";
+  }
+  const fluxo = ctx?.fluxo ?? "padrao";
+  if (
+    etapa === "financeiro" &&
+    fluxoOperacaoIndependeDoPagamento(fluxo)
+  ) {
+    return tabAtiva === etapa ? "atual" : "pendente";
   }
   if (tabAtiva === etapa) return "atual";
   return "disponivel";
