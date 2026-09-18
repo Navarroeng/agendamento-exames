@@ -1,9 +1,15 @@
 import { jsPDF } from "jspdf";
+import { formatCNPJ } from "@/lib/cnpj";
 import { dataPorExtensoPtBr } from "@/lib/extenso";
 import {
   NAVARRO_CONTRATO_INSTITUCIONAL,
+  rotuloClausulaContrato,
   type ContratoClausula,
 } from "@/lib/contrato-navarro";
+import {
+  CONTRATO_AET_FECHO,
+  NAVARRO_CONTRATO_AET,
+} from "@/lib/contrato-aet";
 import type { ContratoNavarroDocumento } from "@/lib/contrato-modelo";
 import {
   calcPdfContentBottomY,
@@ -32,13 +38,19 @@ const LOGO_CORNER_RADIUS_MM = 1.2;
 const OPENING_TITLE_SIZE = 12.5;
 const OPENING_TITLE_LINE_H = 6.2;
 const OPENING_TITLE_BOTTOM_GAP = 8;
-const OPENING_TITLE_LINES = [
-  "INSTRUMENTO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS",
-  "DE SAÚDE E SEGURANÇA DO TRABALHO",
-] as const;
+const AET_BULLET_R = 0.55;
+const AET_BULLET_GAP = 2.2;
+const AET_BULLET_INDENT = AET_BULLET_R * 2 + AET_BULLET_GAP;
+
+function isContratoAet(documento: ContratoNavarroDocumento): boolean {
+  return documento.tipoDocumento === "aet";
+}
+
+function estiloClausula(documento: ContratoNavarroDocumento): "sst" | "aet" {
+  return isContratoAet(documento) ? "aet" : "sst";
+}
 
 type JsPDFDoc = InstanceType<typeof jsPDF>;
-
 type LogoAsset = { dataUrl: string; width: number; height: number };
 
 function sanitizarTrechoArquivo(value: string, fallback: string): string {
@@ -64,10 +76,14 @@ function sanitizarNumeroOrcamentoArquivo(value: string): string {
 
 export function nomeArquivoContratoNavarro(
   numero: string,
-  clienteNome: string
+  clienteNome: string,
+  tipoDocumento?: ContratoNavarroDocumento["tipoDocumento"]
 ): string {
   const cliente = sanitizarTrechoArquivo(clienteNome, "Cliente");
   const orc = sanitizarNumeroOrcamentoArquivo(numero);
+  if (tipoDocumento === "aet") {
+    return `Contrato_Navarro_AET_${cliente}_${orc}.pdf`;
+  }
   return `Contrato_Navarro_${cliente}_${orc}.pdf`;
 }
 
@@ -182,10 +198,17 @@ function drawHeader(
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS", textX, 11);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text("Saúde e Segurança do Trabalho", textX, 16);
+  if (isContratoAet(documento)) {
+    doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Análise Ergonômica do Trabalho – AET", textX, 16);
+  } else {
+    doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS", textX, 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Saúde e Segurança do Trabalho", textX, 16);
+  }
 
   doc.setFontSize(8);
   doc.text(`Proposta nº ${documento.numeroOrcamento}`, PAGE_W - MARGIN, 11, {
@@ -196,7 +219,11 @@ function drawHeader(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.text(
-    documento.modalidade === "mensalidade" ? "Modalidade: Mensalidade" : "Modalidade: Pontual",
+    isContratoAet(documento)
+      ? "Serviço: Laudo AET"
+      : documento.modalidade === "mensalidade"
+        ? "Modalidade: Mensalidade"
+        : "Modalidade: Pontual",
     PAGE_W - MARGIN,
     21,
     { align: "right" }
@@ -229,10 +256,21 @@ function paragraphLines(doc: JsPDFDoc, text: string): string[] {
   return doc.splitTextToSize(text, CONTENT_W) as string[];
 }
 
-function clauseBlockHeight(doc: JsPDFDoc, clause: ContratoClausula): number {
+function itemLines(doc: JsPDFDoc, text: string): string[] {
+  return doc.splitTextToSize(text, CONTENT_W - AET_BULLET_INDENT) as string[];
+}
+
+function clauseBlockHeight(
+  doc: JsPDFDoc,
+  clause: ContratoClausula,
+  estilo: "sst" | "aet" = "sst"
+): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  const titleLines = paragraphLines(doc, `CLÁUSULA ${clause.numero} — ${clause.titulo}`);
+  const titleLines = paragraphLines(
+    doc,
+    rotuloClausulaContrato(clause, estilo)
+  );
   let h = titleLines.length * 5 + TITLE_GAP;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
@@ -240,20 +278,43 @@ function clauseBlockHeight(doc: JsPDFDoc, clause: ContratoClausula): number {
     const lines = paragraphLines(doc, p);
     h += lines.length * PARA_LINE_H + 2.2;
   }
+  for (const item of clause.itens ?? []) {
+    const lines = itemLines(doc, item);
+    h += lines.length * PARA_LINE_H + 1.6;
+  }
   return h;
 }
 
-function signatureBlockHeight(): number {
-  return 78;
+function qualificacaoBlockHeight(
+  doc: JsPDFDoc,
+  qualificacao: { titulo: string; paragrafos: string[] }
+): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  let h = paragraphLines(doc, qualificacao.titulo).length * 5 + TITLE_GAP;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  for (const p of qualificacao.paragrafos) {
+    h += paragraphLines(doc, p).length * PARA_LINE_H + 2.2;
+  }
+  return h + CLAUSE_GAP;
 }
 
-function drawOpeningTitle(doc: JsPDFDoc, startY: number): number {
+function signatureBlockHeight(aet: boolean): number {
+  return aet ? 92 : 78;
+}
+
+function drawOpeningTitle(
+  doc: JsPDFDoc,
+  startY: number,
+  linhas: string[]
+): number {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(OPENING_TITLE_SIZE);
   doc.setTextColor(...NAVY);
   let y = startY;
   const centerX = PAGE_W / 2;
-  for (const line of OPENING_TITLE_LINES) {
+  for (const line of linhas) {
     const wrapped = paragraphLines(doc, line);
     for (const wrappedLine of wrapped) {
       doc.text(wrappedLine, centerX, y, { align: "center" });
@@ -263,12 +324,19 @@ function drawOpeningTitle(doc: JsPDFDoc, startY: number): number {
   return y + OPENING_TITLE_BOTTOM_GAP;
 }
 
+function drawAetBullet(doc: JsPDFDoc, x: number, baselineY: number): void {
+  doc.setFillColor(...NAVY);
+  doc.circle(x + AET_BULLET_R, baselineY - 1.15, AET_BULLET_R, "F");
+}
+
 export function drawContratoPdfDocument(
   doc: JsPDFDoc,
   documento: ContratoNavarroDocumento,
   logo: LogoAsset | null
 ): void {
   const contentBottom = calcPdfContentBottomY(PAGE_H, 2);
+  const aet = isContratoAet(documento);
+  const estilo = estiloClausula(documento);
 
   const addPage = (): number => {
     doc.addPage();
@@ -282,18 +350,50 @@ export function drawContratoPdfDocument(
   };
 
   drawHeader(doc, documento, logo);
-  let y = drawOpeningTitle(doc, BODY_START);
+  let y = drawOpeningTitle(
+    doc,
+    BODY_START,
+    documento.tituloLinhas?.length
+      ? documento.tituloLinhas
+      : [
+          "INSTRUMENTO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS",
+          "DE SAÚDE E SEGURANÇA DO TRABALHO",
+        ]
+  );
+
+  if (documento.qualificacao) {
+    y = ensure(y, qualificacaoBlockHeight(doc, documento.qualificacao));
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...NAVY);
+    const qTitle = paragraphLines(doc, documento.qualificacao.titulo);
+    doc.text(qTitle, MARGIN, y);
+    y += qTitle.length * 5 + TITLE_GAP;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(...SLATE_700);
+    for (const paragrafo of documento.qualificacao.paragrafos) {
+      const lines = paragraphLines(doc, paragrafo);
+      for (const line of lines) {
+        if (y + PARA_LINE_H > contentBottom) y = addPage();
+        doc.text(line, MARGIN, y);
+        y += PARA_LINE_H;
+      }
+      y += 2.2;
+    }
+    y += CLAUSE_GAP;
+  }
 
   for (let i = 0; i < documento.clausulas.length; i += 1) {
     const clause = documento.clausulas[i];
     const isLast = i === documento.clausulas.length - 1;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    const title = `CLÁUSULA ${clause.numero} — ${clause.titulo}`;
+    const title = rotuloClausulaContrato(clause, estilo);
     const titleLines = paragraphLines(doc, title);
     const titleH = titleLines.length * 5;
     const minBlock = isLast
-      ? clauseBlockHeight(doc, clause) + signatureBlockHeight()
+      ? clauseBlockHeight(doc, clause, estilo) + signatureBlockHeight(aet)
       : titleH + PARA_LINE_H * 3;
     y = ensure(y, minBlock);
     doc.setTextColor(...NAVY);
@@ -326,10 +426,25 @@ export function drawContratoPdfDocument(
       }
       y += 2.2;
     }
+
+    for (const item of clause.itens ?? []) {
+      const lines = itemLines(doc, item);
+      if (y + PARA_LINE_H > contentBottom) y = addPage();
+      drawAetBullet(doc, MARGIN, y);
+      for (let li = 0; li < lines.length; li += 1) {
+        if (y + PARA_LINE_H > contentBottom) y = addPage();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(...SLATE_700);
+        doc.text(lines[li], MARGIN + AET_BULLET_INDENT, y);
+        y += PARA_LINE_H;
+      }
+      y += 1.6;
+    }
     y += CLAUSE_GAP;
   }
 
-  y = ensure(y, signatureBlockHeight());
+  y = ensure(y, signatureBlockHeight(aet));
   doc.setDrawColor(...GOLD);
   doc.setLineWidth(0.4);
   doc.line(MARGIN, y, PAGE_W - MARGIN, y);
@@ -338,10 +453,15 @@ export function drawContratoPdfDocument(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...NAVY);
-  doc.text("E por estarem justas e contratadas, as partes assinam o presente instrumento.", MARGIN, y, {
-    maxWidth: CONTENT_W,
-  });
-  y += 8;
+  doc.text(
+    aet
+      ? CONTRATO_AET_FECHO
+      : "E por estarem justas e contratadas, as partes assinam o presente instrumento.",
+    MARGIN,
+    y,
+    { maxWidth: CONTENT_W }
+  );
+  y += aet ? 10 : 8;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -353,6 +473,12 @@ export function drawContratoPdfDocument(
   const leftX = MARGIN;
   const rightX = MARGIN + colW + 12;
   const lineY = y + 12;
+  const contratadaRazao = aet
+    ? NAVARRO_CONTRATO_AET.razaoSocial
+    : NAVARRO_CONTRATO_INSTITUCIONAL.razaoSocial;
+  const contratadaCnpj = aet
+    ? NAVARRO_CONTRATO_AET.cnpj
+    : NAVARRO_CONTRATO_INSTITUCIONAL.cnpj;
 
   doc.setDrawColor(...NAVY);
   doc.setLineWidth(0.35);
@@ -373,13 +499,18 @@ export function drawContratoPdfDocument(
     colW
   ) as string[];
   doc.text(contratanteNome, leftX + colW / 2, lineY + 9.5, { align: "center" });
-  const contratadaNome = doc.splitTextToSize(
-    NAVARRO_CONTRATO_INSTITUCIONAL.razaoSocial,
-    colW
-  ) as string[];
+  if (aet && documento.contratante.cnpj?.trim()) {
+    doc.text(
+      `CNPJ: ${formatCNPJ(documento.contratante.cnpj)}`,
+      leftX + colW / 2,
+      lineY + 9.5 + contratanteNome.length * 3.4,
+      { align: "center" }
+    );
+  }
+  const contratadaNome = doc.splitTextToSize(contratadaRazao, colW) as string[];
   doc.text(contratadaNome, rightX + colW / 2, lineY + 9.5, { align: "center" });
   doc.text(
-    `CNPJ ${NAVARRO_CONTRATO_INSTITUCIONAL.cnpj}`,
+    `CNPJ: ${contratadaCnpj}`,
     rightX + colW / 2,
     lineY + 9.5 + contratadaNome.length * 3.4,
     { align: "center" }
@@ -399,7 +530,8 @@ export async function gerarPdfContratoNavarro(
   const logo = await loadLogoAsset();
   const filename = nomeArquivoContratoNavarro(
     documento.numeroOrcamento,
-    documento.contratante.razaoSocial
+    documento.contratante.razaoSocial,
+    documento.tipoDocumento
   );
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setProperties({ title: filename.replace(/\.pdf$/i, "") });

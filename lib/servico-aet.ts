@@ -12,9 +12,6 @@ export const SERVICO_AET_NOME =
 export const SERVICO_AET_EXCLUSIVIDADE_MSG =
   "O Laudo AET possui proposta e fluxo próprios e deve ser contratado em um orçamento separado.";
 
-export const SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG =
-  "Modelo de contrato do Laudo AET ainda não configurado.";
-
 /** Quantidade interna de linha (DB exige > 0). Nunca exibir como colaboradores. */
 export const SERVICO_AET_QUANTIDADE_INTERNA = 1;
 

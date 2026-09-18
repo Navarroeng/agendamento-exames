@@ -59,7 +59,19 @@ export type ContratoClausula = {
   numero: string;
   titulo: string;
   paragrafos: string[];
+  /** Lista com marcadores (contrato AET, cláusula de inclusos). */
+  itens?: string[];
 };
+
+export function rotuloClausulaContrato(
+  clause: ContratoClausula,
+  estilo: "sst" | "aet"
+): string {
+  if (estilo === "aet") {
+    return `CLÁUSULA ${clause.numero}ª – ${clause.titulo}`;
+  }
+  return `CLÁUSULA ${clause.numero} — ${clause.titulo}`;
+}
 
 export type ContratoNavarroContexto = {
   modalidade: OrcamentoModalidade;
@@ -305,11 +317,15 @@ export function buildClausulasContrato(
   ];
 }
 
-export function textoPlanoContrato(clausulas: ContratoClausula[]): string {
+export function textoPlanoContrato(
+  clausulas: ContratoClausula[],
+  estilo: "sst" | "aet" = "sst"
+): string {
   return clausulas
-    .map(
-      (c) =>
-        `CLÁUSULA ${c.numero} — ${c.titulo}\n${c.paragrafos.join("\n")}`
-    )
+    .map((c) => {
+      const itens = (c.itens ?? []).map((item) => `• ${item}`).join("\n");
+      const corpo = [...c.paragrafos, itens].filter(Boolean).join("\n");
+      return `${rotuloClausulaContrato(c, estilo)}\n${corpo}`;
+    })
     .join("\n\n");
 }

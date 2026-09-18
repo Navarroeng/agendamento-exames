@@ -30,7 +30,6 @@ import {
   motivoBloqueioGeracaoContrato,
   podeGerarContratoNavarro,
 } from "../lib/contrato-modelo";
-import { SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG } from "../lib/servico-aet";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 
 const abas = buildOrcamentoEtapas("aet").map((e) => e.id);
@@ -321,11 +320,8 @@ const orcAet = {
     },
   ],
 } as OrcamentoComItens;
-assert.equal(podeGerarContratoNavarro(orcAet, financeiroOk), false);
-assert.equal(
-  motivoBloqueioGeracaoContrato(orcAet, financeiroOk),
-  SERVICO_AET_CONTRATO_NAO_CONFIGURADO_MSG
-);
+assert.equal(podeGerarContratoNavarro(orcAet, financeiroOk), true);
+assert.equal(motivoBloqueioGeracaoContrato(orcAet, financeiroOk), null);
 
 assert.equal(
   isOrcamentoEtapaLiberada("procuracao", financeiroOk, true, { fluxo: "aet" }),

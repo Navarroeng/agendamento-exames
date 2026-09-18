@@ -16,6 +16,7 @@ import {
 } from "@/lib/contrato-modelo";
 import { gerarPdfContratoNavarro } from "@/lib/contrato-pdf";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
+import { orcamentoEhExclusivoAet } from "@/lib/servico-aet";
 import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
@@ -55,6 +56,11 @@ export function OrcamentoContratoGerarPanel({
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
   const motivoBloqueio = motivoBloqueioGeracaoContrato(orcamento, aprovacao);
+  const isAet = orcamentoEhExclusivoAet(
+    aprovacao.orcamento_aprovacao_itens?.length
+      ? aprovacao.orcamento_aprovacao_itens
+      : orcamento.orcamento_itens
+  );
   const atual = documentos[0] ?? null;
   const anteriores = documentos.slice(1);
 
@@ -183,6 +189,7 @@ export function OrcamentoContratoGerarPanel({
           orcamento_id: orcamento.id,
           cliente_id: orcamento.cliente_id,
           modalidade: previewDoc.modalidade,
+          tipo_documento: previewDoc.tipoDocumento,
           data_contrato: previewDoc.dataContrato,
           versao: saved.versao,
         },
@@ -252,7 +259,9 @@ export function OrcamentoContratoGerarPanel({
           <p className="mt-1 text-[12px] text-[#475569]">
             {motivoBloqueio
               ? motivoBloqueio
-              : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
+              : isAet
+                ? "Contrato específico do Laudo AET – Análise Ergonômica do Trabalho. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
+                : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
           </p>
           {atual ? (
             <p className="mt-1 text-[12px] text-[#334155]">
@@ -377,11 +386,16 @@ export function OrcamentoContratoGerarPanel({
                       <Row label="Cliente" value={resumo.cliente} />
                       <Row label="CNPJ" value={resumo.cnpj} />
                       <Row label="Orçamento" value={resumo.orcamento} />
-                      <Row label="Modalidade" value={resumo.modalidade} />
                       <Row
-                        label="Colaboradores"
-                        value={resumo.colaboradores}
+                        label={isAet ? "Serviço" : "Modalidade"}
+                        value={resumo.modalidade}
                       />
+                      {isAet ? null : (
+                        <Row
+                          label="Colaboradores"
+                          value={resumo.colaboradores}
+                        />
+                      )}
                       <Row
                         label={
                           isOrcamentoMensalidade(orcamento.modalidade)
