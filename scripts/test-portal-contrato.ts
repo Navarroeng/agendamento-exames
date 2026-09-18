@@ -8,6 +8,7 @@ import { join } from "node:path";
 import {
   filtrarContratosDoClientePortal,
   formatVigenciaPortalContrato,
+  formatVigenciaResumoPortal,
   montarPortalContratoResumo,
   PORTAL_CONTRATO_FALLBACK,
   portalContratoResumoVazio,
@@ -72,17 +73,26 @@ run("Exames e eSocial não aparecem na Home; Laudos e Colaboradores sim", () => 
   assert.match(src, /titulo="Colaboradores"/);
 });
 
-run("Riscos, Faturas e Contrato aparecem na Home", () => {
-  const src = readFileSync(
+run("Riscos, Faturas e resumo contratual aparecem na Home", () => {
+  const modulos = readFileSync(
     join(process.cwd(), "components/portal-cliente/PortalModulosSst.tsx"),
     "utf8"
   );
-  assert.match(src, /Riscos Psicossociais/);
-  assert.match(src, /titulo="Faturas"/);
-  assert.match(src, /Contrato e acesso aos serviços/);
-  assert.match(src, /Colaboradores contratados/);
-  assert.match(src, /label: "Agendamento"/);
-  assert.doesNotMatch(src, /Disponível para agendamento/);
+  const resumo = readFileSync(
+    join(process.cwd(), "components/portal-cliente/PortalResumoContrato.tsx"),
+    "utf8"
+  );
+  const header = readFileSync(
+    join(process.cwd(), "components/portal-cliente/PortalEmpresaHeader.tsx"),
+    "utf8"
+  );
+  assert.match(modulos, /Riscos Psicossociais/);
+  assert.match(modulos, /titulo="Faturas"/);
+  assert.match(header, /PortalResumoContrato/);
+  assert.match(resumo, /Colaboradores contratados/);
+  assert.match(resumo, /label: "Agendamento"/);
+  assert.doesNotMatch(resumo, /Disponível para agendamento/);
+  assert.doesNotMatch(modulos, /Contrato e acesso aos serviços/);
 });
 
 console.log("\n== Vigência ==");
@@ -381,9 +391,36 @@ run("troca de empresa troca vigência", () => {
   assert.equal(b.procuracaoLabel, "Pendente");
 });
 
+run("resumo da Home prioriza data-fim e indeterminado", () => {
+  assert.deepEqual(
+    formatVigenciaResumoPortal("2026-01-01", "2026-12-31"),
+    { titulo: "Contrato vigente até", valor: "31/12/2026" }
+  );
+  assert.deepEqual(formatVigenciaResumoPortal("2026-01-01", null), {
+    titulo: "Contrato",
+    valor: "Vigência indeterminada",
+  });
+  assert.deepEqual(formatVigenciaResumoPortal(null, null), {
+    titulo: "Contrato",
+    valor: PORTAL_CONTRATO_FALLBACK,
+  });
+});
+
+run("montarPortalContratoResumo preenche vigenciaResumoLabel", () => {
+  const r = montarPortalContratoResumo({
+    clienteId: "c1",
+    cliente: cliente({ id: "c1" }),
+    contratos: [contrato({ id: "ct1", cliente_id: "c1" })],
+  });
+  assert.equal(r.vigenciaTitulo, "Contrato vigente até");
+  assert.equal(r.vigenciaResumoLabel, "31/12/2026");
+  assert.equal(r.vigenciaLabel, "01/01/2026 a 31/12/2026");
+});
+
 run("resumo vazio não quebra", () => {
   const v = portalContratoResumoVazio();
   assert.equal(v.vigenciaLabel, PORTAL_CONTRATO_FALLBACK);
+  assert.equal(v.vigenciaResumoLabel, PORTAL_CONTRATO_FALLBACK);
   assert.equal(v.temContrato, false);
 });
 

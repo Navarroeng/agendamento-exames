@@ -28,6 +28,12 @@ import {
 import type { RiscosRelatorioResultadoJson } from "../lib/riscos-relatorio";
 import { NAV_SECTIONS } from "../lib/constants";
 import { canAccessPath } from "../lib/perfil-access";
+import { calcPortalAgendamentosResumo } from "../lib/portal-agendamentos";
+import { calcPortalColaboradoresResumo } from "../lib/portal-colaboradores";
+import { portalContratoResumoVazio } from "../lib/portal-contrato";
+import { calcPortalFaturasResumo } from "../lib/portal-faturas";
+import { calcPortalLaudosSstResumo } from "../lib/portal-laudos-sst";
+import { montarPortalVisaoGeral } from "../lib/portal-visao-geral";
 
 const root = process.cwd();
 
@@ -916,6 +922,18 @@ run("APIs do portal exigem sessão staff", () => {
     join(root, "components/portal-cliente/PortalEmpresaIdentidade.tsx"),
     "utf8"
   );
+  const header = readFileSync(
+    join(root, "components/portal-cliente/PortalEmpresaHeader.tsx"),
+    "utf8"
+  );
+  const visao = readFileSync(
+    join(root, "components/portal-cliente/PortalVisaoGeral.tsx"),
+    "utf8"
+  );
+  const resumoContrato = readFileSync(
+    join(root, "components/portal-cliente/PortalResumoContrato.tsx"),
+    "utf8"
+  );
   const modulos = readFileSync(
     join(root, "components/portal-cliente/PortalModulosSst.tsx"),
     "utf8"
@@ -932,15 +950,24 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(page, /AppShell/);
   assert.match(ui, /Pré-visualização interna|PORTAL_PREVIEW_INTERNO_LABEL/);
   assert.match(ui, /Visualizar portal de/);
+  assert.match(ui, /PortalEmpresaHeader/);
+  assert.match(ui, /PortalVisaoGeral/);
+  assert.match(ui, /max-w-\[1400px\]/);
   assert.match(modulos, /Ver avaliação/);
-  assert.match(modulos, /Em preparação/);
   assert.match(modulos, /Riscos Psicossociais/);
   assert.match(modulos, /Agendamentos/);
   assert.match(modulos, /Ver agendamentos/);
-  assert.match(modulos, /Contrato e acesso aos serviços/);
+  assert.match(modulos, /Laudos SST/);
+  assert.match(modulos, /Colaboradores/);
+  assert.match(modulos, /Serviços e acompanhamento/);
   assert.doesNotMatch(modulos, /Exames Ocupacionais/);
-  assert.doesNotMatch(modulos, /Laudos SST/);
   assert.doesNotMatch(modulos, /titulo="eSocial"/);
+  assert.doesNotMatch(modulos, />Disponível</);
+  assert.doesNotMatch(modulos, /Contrato e acesso aos serviços/);
+  assert.match(header, /PortalResumoContrato/);
+  assert.match(resumoContrato, /label: "Agendamento"/);
+  assert.doesNotMatch(resumoContrato, /Disponível para agendamento/);
+  assert.match(visao, /montarPortalVisaoGeral/);
   assert.match(identidade, /object-contain/);
   assert.match(identidade, /iniciaisEmpresa/);
   assert.match(avaliacao, /pathPortalRelatorio/);
@@ -967,6 +994,80 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(evolucao, /PORTAL_HISTORICO_UM_CICLO_MSG/);
   assert.match(logoServer, /RISCOS_LISTA_PRESENCA_BUCKET/);
   assert.match(logoServer, /ORCAMENTO_ONBOARDING_BUCKET/);
+});
+
+run("visão geral: ausência de fatura/agendamento não é pendência", () => {
+  const visao = montarPortalVisaoGeral({
+    contrato: {
+      ...portalContratoResumoVazio(),
+      procuracaoTone: "ok",
+      procuracaoLabel: "Ativa",
+      agendamentoLabel: "Liberado",
+      agendamentoTone: "ok",
+    },
+    faturas: calcPortalFaturasResumo([]),
+    agendamentos: calcPortalAgendamentosResumo([]),
+    laudos: calcPortalLaudosSstResumo([]),
+    colaboradores: calcPortalColaboradoresResumo([]),
+  });
+  assert.equal(visao.temPendencias, false);
+  assert.equal(visao.titulo, "Tudo certo com sua empresa");
+  assert.ok(visao.indicadores.some((i) => i.label === "Nenhuma fatura pendente"));
+  assert.ok(
+    visao.indicadores.some((i) => i.label === "Nenhum agendamento futuro")
+  );
+});
+
+run("visão geral: fatura vencida e procuração pendente viram atenção", () => {
+  const visao = montarPortalVisaoGeral({
+    contrato: {
+      ...portalContratoResumoVazio(),
+      procuracaoTone: "pendente",
+      procuracaoLabel: "Pendente",
+      agendamentoLabel: "Liberado",
+      agendamentoTone: "ok",
+    },
+    faturas: {
+      totalEmAberto: 0,
+      totalVencidas: 1,
+      totalPagas: 0,
+      valorEmAberto: 150,
+      valorEmAbertoFormatado: "R$ 150,00",
+      temFaturas: true,
+    },
+    agendamentos: calcPortalAgendamentosResumo([]),
+    laudos: calcPortalLaudosSstResumo([]),
+    colaboradores: calcPortalColaboradoresResumo([]),
+  });
+  assert.equal(visao.temPendencias, true);
+  assert.equal(visao.titulo, "2 itens precisam da sua atenção");
+  assert.ok(visao.pendencias.some((p) => p.label === "1 fatura vencida"));
+  assert.ok(visao.pendencias.some((p) => p.label === "Procuração pendente"));
+  assert.ok(
+    visao.indicadores.some((i) => i.label === "Nenhum agendamento futuro")
+  );
+});
+
+run("visão geral: agendamento não liberado é pendência; sem fatura não é", () => {
+  const visao = montarPortalVisaoGeral({
+    contrato: {
+      ...portalContratoResumoVazio(),
+      procuracaoTone: "ok",
+      procuracaoLabel: "Ativa",
+      agendamentoLabel: "Não liberado",
+      agendamentoTone: "bloqueio",
+    },
+    faturas: calcPortalFaturasResumo([]),
+    agendamentos: calcPortalAgendamentosResumo([]),
+    laudos: calcPortalLaudosSstResumo([]),
+    colaboradores: calcPortalColaboradoresResumo([]),
+  });
+  assert.equal(visao.temPendencias, true);
+  assert.equal(visao.titulo, "1 item precisa da sua atenção");
+  assert.deepEqual(
+    visao.pendencias.map((p) => p.label),
+    ["Agendamento não liberado"]
+  );
 });
 
 console.log("test-portal-home: OK");

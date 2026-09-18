@@ -5,10 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PortalAvaliacaoRiscos } from "@/components/portal-cliente/PortalAvaliacaoRiscos";
 import { PortalAgendamentos } from "@/components/portal-cliente/PortalAgendamentos";
 import { PortalColaboradores } from "@/components/portal-cliente/PortalColaboradores";
-import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
+import { PortalEmpresaHeader } from "@/components/portal-cliente/PortalEmpresaHeader";
 import { PortalFaturas } from "@/components/portal-cliente/PortalFaturas";
 import { PortalLaudosSst } from "@/components/portal-cliente/PortalLaudosSst";
 import { PortalModulosSst } from "@/components/portal-cliente/PortalModulosSst";
+import { PortalVisaoGeral } from "@/components/portal-cliente/PortalVisaoGeral";
 import {
   PORTAL_PREVIEW_INTERNO_LABEL,
   PORTAL_SELECIONE_EMPRESA_MSG,
@@ -309,7 +310,16 @@ export function PortalHome() {
     "Empresa";
 
   return (
-    <div className="mx-auto flex w-full max-w-[72rem] flex-col gap-6 text-[#0b1f4d]">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 text-[#0b1f4d]">
+      <div className="flex flex-col gap-1">
+        <p className="text-lg font-semibold tracking-tight text-[#0b1f4d] sm:text-xl">
+          Portal SST do Cliente
+        </p>
+        <p className="text-sm text-[#64748b]">
+          Acompanhamento dos serviços de Saúde e Segurança do Trabalho
+        </p>
+      </div>
+
       <PreviewBar
         empresas={empresas}
         clienteId={clienteId}
@@ -380,11 +390,18 @@ export function PortalHome() {
       !viewAgendamentos &&
       !viewLaudos &&
       !viewColaboradores ? (
-        <div className="flex flex-col gap-6 sm:gap-7">
-          <PortalEmpresaIdentidade
+        <div className="flex flex-col gap-5">
+          <PortalEmpresaHeader
             nome={empresaNomeSelecionada}
             logoUrl={resumo.logoUrl}
-            variante="sst"
+            contrato={resumo.contrato}
+          />
+          <PortalVisaoGeral
+            contrato={resumo.contrato}
+            faturasResumo={faturasResumo}
+            agendamentosResumo={agendamentosResumo}
+            laudosResumo={laudosResumo}
+            colaboradoresResumo={colaboradoresResumo}
           />
           <PortalModulosSst
             resumo={resumo}
@@ -422,12 +439,11 @@ function PreviewBar({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-[#e8edf5] bg-white px-5 py-3.5">
+    <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-[#eef2f7] bg-[#f8fafc] px-4 py-2.5">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-          Modo de visualização
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94a3b8]">
+          {PORTAL_PREVIEW_INTERNO_LABEL}
         </p>
-        <p className="mt-1 text-xs text-[#64748b]">{PORTAL_PREVIEW_INTERNO_LABEL}</p>
       </div>
       <label className="flex min-w-[240px] flex-1 flex-col gap-1.5 sm:max-w-sm">
         <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">

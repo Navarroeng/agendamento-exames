@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import {
-  IconBriefcase,
   IconCalendar,
   IconFileText,
   IconReceipt,
@@ -13,10 +12,6 @@ import {
   PORTAL_STATUS_LABELS,
   type PortalResumo,
 } from "@/lib/portal-cliente";
-import type {
-  PortalContratoBadgeTone,
-  PortalContratoResumo,
-} from "@/lib/portal-contrato";
 import type { PortalFaturasResumo } from "@/lib/portal-faturas";
 import type { PortalAgendamentosResumo } from "@/lib/portal-agendamentos";
 import type { PortalLaudosSstResumo } from "@/lib/portal-laudos-sst";
@@ -27,12 +22,11 @@ type ModuloSstId =
   | "faturas"
   | "agendamentos"
   | "laudos"
-  | "colaboradores"
-  | "contrato";
+  | "colaboradores";
 
 function participacaoLabel(resumo: PortalResumo): string | null {
   if (resumo.participacaoPercentual == null) return null;
-  return `${resumo.participacaoPercentual}% de participação`;
+  return `${resumo.participacaoPercentual}%`;
 }
 
 export function PortalModulosSst({
@@ -62,48 +56,45 @@ export function PortalModulosSst({
   const faturaModuloCarregado = faturasResumo !== null;
   const agendamentosModuloCarregado = agendamentosResumo !== null;
   const laudosModuloCarregado = laudosResumo !== null;
-  const laudosDisponivel = Boolean(laudosResumo?.temDocumentos);
   const colaboradoresModuloCarregado = colaboradoresResumo !== null;
-  const colaboradoresDisponivel = Boolean(
-    colaboradoresResumo && colaboradoresResumo.totalAtivos > 0
-  );
+  const pct = participacaoLabel(resumo);
 
   return (
-    <section className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight text-[#0b1f4d]">
-          Serviços da sua empresa
-        </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-[#64748b]">
-          Acompanhe o andamento de cada módulo de SST.
-        </p>
-      </div>
+    <section>
+      <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
+        Serviços e acompanhamento
+      </h2>
+      <p className="mt-1 text-sm text-[#64748b]">
+        Acesse os principais módulos e acompanhe as informações da sua empresa.
+      </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
         <ModuloShell
           id="riscos"
           titulo="Riscos Psicossociais"
-          disponivel={temAvaliacao}
-          destaque={temAvaliacao}
+          className="xl:col-span-2"
           acao={
             temAvaliacao
-              ? { label: "Ver avaliação", onClick: onVerAvaliacao }
+              ? { label: "Ver avaliação →", onClick: onVerAvaliacao }
               : null
           }
         >
           {temAvaliacao ? (
-            <div className="space-y-2">
-              {resumo.ciclo ? (
-                <p className="text-sm text-[#64748b]">Ciclo {resumo.ciclo}</p>
-              ) : null}
-              {participacaoLabel(resumo) ? (
-                <p className="text-[22px] font-bold leading-tight tracking-tight text-[#0b1f4d]">
-                  {participacaoLabel(resumo)}
-                </p>
+            <div>
+              {pct ? (
+                <>
+                  <p className="text-[28px] font-bold leading-none tracking-tight text-[#0b1f4d]">
+                    {pct}
+                  </p>
+                  <p className="mt-1 text-sm text-[#64748b]">de participação</p>
+                </>
               ) : (
                 <p className="text-sm text-[#94a3b8]">Participação indisponível</p>
               )}
-              <p className="text-sm font-medium text-[#475569]">
+              {resumo.ciclo ? (
+                <p className="mt-2 text-sm text-[#475569]">Ciclo {resumo.ciclo}</p>
+              ) : null}
+              <p className="mt-0.5 text-sm font-medium text-[#334155]">
                 {PORTAL_STATUS_LABELS[resumo.statusPortal]}
               </p>
             </div>
@@ -115,27 +106,12 @@ export function PortalModulosSst({
         </ModuloShell>
 
         <ModuloShell
-          id="faturas"
-          titulo="Faturas"
-          disponivel={faturaModuloCarregado}
-          destaqueVencida={(faturasResumo?.totalVencidas ?? 0) > 0}
-          acao={
-            faturaModuloCarregado
-              ? { label: "Ver faturas", onClick: onVerFaturas }
-              : null
-          }
-        >
-          <FaturasConteudo resumo={faturasResumo} />
-        </ModuloShell>
-
-        <ModuloShell
           id="agendamentos"
           titulo="Agendamentos"
-          disponivel={agendamentosModuloCarregado}
-          ocultarBadgeEmPreparacao
+          className="xl:col-span-2"
           acao={
             agendamentosModuloCarregado
-              ? { label: "Ver agendamentos", onClick: onVerAgendamentos }
+              ? { label: "Ver agendamentos →", onClick: onVerAgendamentos }
               : null
           }
         >
@@ -143,13 +119,26 @@ export function PortalModulosSst({
         </ModuloShell>
 
         <ModuloShell
+          id="faturas"
+          titulo="Faturas"
+          className="xl:col-span-2"
+          badge={faturaBadge(faturasResumo)}
+          acao={
+            faturaModuloCarregado
+              ? { label: "Ver faturas →", onClick: onVerFaturas }
+              : null
+          }
+        >
+          <FaturasConteudo resumo={faturasResumo} />
+        </ModuloShell>
+
+        <ModuloShell
           id="laudos"
           titulo="Laudos SST"
-          disponivel={laudosDisponivel}
-          ocultarBadgeEmPreparacao={!laudosModuloCarregado}
+          className="xl:col-span-3"
           acao={
             laudosModuloCarregado
-              ? { label: "Ver documentos", onClick: onVerLaudos }
+              ? { label: "Ver documentos →", onClick: onVerLaudos }
               : null
           }
         >
@@ -159,21 +148,23 @@ export function PortalModulosSst({
         <ModuloShell
           id="colaboradores"
           titulo="Colaboradores"
-          disponivel={colaboradoresDisponivel}
-          ocultarBadgeEmPreparacao={!colaboradoresModuloCarregado}
+          className="xl:col-span-3"
           acao={
             colaboradoresModuloCarregado
-              ? { label: "Ver colaboradores", onClick: onVerColaboradores }
+              ? { label: "Ver colaboradores →", onClick: onVerColaboradores }
               : null
           }
         >
           <ColaboradoresConteudo resumo={colaboradoresResumo} />
         </ModuloShell>
       </div>
-
-      <ContratoCardHorizontal contrato={resumo.contrato} />
     </section>
   );
+}
+
+function faturaBadge(resumo: PortalFaturasResumo | null): string | null {
+  if (!resumo || resumo.totalVencidas <= 0) return null;
+  return `${resumo.totalVencidas} vencida${resumo.totalVencidas !== 1 ? "s" : ""}`;
 }
 
 function FaturasConteudo({ resumo }: { resumo: PortalFaturasResumo | null }) {
@@ -184,46 +175,33 @@ function FaturasConteudo({ resumo }: { resumo: PortalFaturasResumo | null }) {
       </p>
     );
   }
-  if (!resumo.temFaturas) {
+  if (resumo.totalEmAberto === 0 && resumo.totalVencidas === 0) {
     return (
-      <p className="text-sm leading-relaxed text-[#94a3b8]">
-        Nenhuma fatura disponível no momento.
-      </p>
+      <div>
+        <p className="text-lg font-semibold leading-snug text-[#0b1f4d]">
+          Nenhuma fatura pendente
+        </p>
+        <p className="mt-1 text-sm text-[#64748b]">Sua empresa está em dia.</p>
+      </div>
     );
   }
 
-  const temAberto = resumo.valorEmAberto > 0;
+  const totalAberto = resumo.totalEmAberto + resumo.totalVencidas;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
-          {temAberto ? "Valor em aberto" : "Situação"}
+    <div>
+      <p
+        className={`text-lg font-semibold leading-snug ${
+          resumo.totalVencidas > 0 ? "text-[#b91c1c]" : "text-[#0b1f4d]"
+        }`}
+      >
+        {totalAberto} fatura{totalAberto !== 1 ? "s" : ""} em aberto
+      </p>
+      {resumo.valorEmAberto > 0 ? (
+        <p className="mt-1 text-sm tabular-nums text-[#475569]">
+          {resumo.valorEmAbertoFormatado} em aberto
         </p>
-        <p
-          className={`mt-1 text-[22px] font-bold leading-tight tracking-tight tabular-nums ${
-            resumo.totalVencidas > 0 ? "text-[#b91c1c]" : "text-[#0b1f4d]"
-          }`}
-        >
-          {temAberto ? resumo.valorEmAbertoFormatado : "Em dia"}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-[#64748b]">
-        {resumo.totalEmAberto > 0 ? (
-          <span>
-            {resumo.totalEmAberto} fatura
-            {resumo.totalEmAberto !== 1 ? "s" : ""} em aberto
-          </span>
-        ) : temAberto ? null : (
-          <span>Nenhuma fatura em aberto</span>
-        )}
-        {resumo.totalVencidas > 0 ? (
-          <span className="font-medium text-[#b91c1c]">
-            {resumo.totalVencidas} vencida
-            {resumo.totalVencidas !== 1 ? "s" : ""}
-          </span>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -242,21 +220,19 @@ function AgendamentosConteudo({
   }
 
   if (resumo.proximoDataLabel) {
+    const quando = resumo.proximoHorarioLabel
+      ? `${resumo.proximoDataLabel} às ${resumo.proximoHorarioLabel}`
+      : resumo.proximoDataLabel;
     return (
-      <div className="space-y-2">
+      <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
           Próximo agendamento
         </p>
-        <p className="text-[22px] font-bold leading-tight tracking-tight text-[#0b1f4d]">
-          {resumo.proximoDataLabel}
+        <p className="mt-1 text-lg font-semibold leading-snug text-[#0b1f4d]">
+          {quando}
         </p>
-        {resumo.proximoHorarioLabel ? (
-          <p className="text-base font-semibold text-[#334155]">
-            {resumo.proximoHorarioLabel}
-          </p>
-        ) : null}
         {resumo.totalProximos > 1 ? (
-          <p className="text-sm text-[#64748b]">
+          <p className="mt-1 text-sm text-[#64748b]">
             +{resumo.totalProximos - 1} próximo
             {resumo.totalProximos - 1 !== 1 ? "s" : ""}
           </p>
@@ -266,15 +242,13 @@ function AgendamentosConteudo({
   }
 
   return (
-    <div className="space-y-1">
-      <p className="text-[17px] font-semibold leading-snug text-[#0b1f4d]">
+    <div>
+      <p className="text-lg font-semibold leading-snug text-[#0b1f4d]">
         Nenhum agendamento futuro
       </p>
-      {!resumo.temAgendamentos ? (
-        <p className="text-sm text-[#94a3b8]">
-          Nenhum agendamento disponível no momento.
-        </p>
-      ) : null}
+      <p className="mt-1 text-sm text-[#64748b]">
+        Acompanhe os agendamentos ocupacionais da sua empresa.
+      </p>
     </div>
   );
 }
@@ -290,23 +264,23 @@ function LaudosConteudo({ resumo }: { resumo: PortalLaudosSstResumo | null }) {
 
   if (!resumo.temDocumentos) {
     return (
-      <p className="text-[17px] font-semibold leading-snug text-[#0b1f4d]">
-        Nenhum laudo disponível
+      <p className="text-lg font-semibold leading-snug text-[#0b1f4d]">
+        Nenhum documento disponível
       </p>
     );
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-[22px] font-bold leading-tight tracking-tight text-[#0b1f4d]">
+    <div>
+      <p className="text-lg font-semibold leading-snug text-[#0b1f4d]">
         {resumo.linhaResumo}
       </p>
       {resumo.tiposDisponiveis.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {resumo.tiposDisponiveis.map((tipo) => (
             <span
               key={tipo}
-              className="inline-flex rounded-full border border-[#d7e0ee] bg-[#f8fafc] px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-[#334155]"
+              className="inline-flex rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[11px] font-semibold tracking-wide text-[#334155]"
             >
               {tipo}
             </span>
@@ -330,188 +304,85 @@ function ColaboradoresConteudo({
     );
   }
 
+  const extras: string[] = [];
+  if (resumo.totalAdmissionalEmAndamento > 0) {
+    extras.push(
+      `${resumo.totalAdmissionalEmAndamento} em admissão`
+    );
+  }
+  if (resumo.totalDemissionalEmAndamento > 0) {
+    extras.push(
+      `${resumo.totalDemissionalEmAndamento} em desligamento`
+    );
+  }
+
   return (
-    <div className="space-y-1">
-      <p className="text-[22px] font-bold leading-tight tracking-tight text-[#0b1f4d]">
+    <div>
+      <p className="text-lg font-semibold leading-snug text-[#0b1f4d]">
         {resumo.linhaResumo}
       </p>
-      {resumo.totalDemitidos > 0 ? (
-        <p className="text-sm text-[#64748b]">
-          {resumo.totalDemitidos} demitido
-          {resumo.totalDemitidos !== 1 ? "s" : ""} no histórico
-        </p>
+      {extras.length > 0 ? (
+        <p className="mt-1 text-sm text-[#64748b]">{extras.join(" · ")}</p>
       ) : null}
     </div>
   );
 }
 
-function ContratoCardHorizontal({
-  contrato,
-}: {
-  contrato: PortalContratoResumo;
-}) {
-  const campos: {
-    label: string;
-    valor: string;
-    tone?: PortalContratoBadgeTone;
-  }[] = [
-    { label: "Vigência", valor: contrato.vigenciaLabel },
-    {
-      label: "Procuração",
-      valor: contrato.procuracaoLabel,
-      tone: contrato.procuracaoTone,
-    },
-    {
-      label: "Colaboradores contratados",
-      valor: contrato.colaboradoresContratadosLabel,
-    },
-    {
-      label: "Agendamento",
-      valor: contrato.agendamentoLabel,
-      tone: contrato.agendamentoTone,
-    },
-  ];
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-[#e8edf5] bg-white shadow-[0_8px_24px_rgba(11,31,77,0.04)] transition hover:border-[#d7e0ee] hover:shadow-[0_12px_28px_rgba(11,31,77,0.06)]">
-      <div className="flex items-center gap-3 border-b border-[#eef2f7] bg-gradient-to-r from-[#f8fafc] to-white px-5 py-4 sm:px-6">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0b1f4d]/[0.06] text-[#0b1f4d]">
-          <IconBriefcase size={18} />
-        </span>
-        <div className="min-w-0">
-          <h3 className="text-[15px] font-bold tracking-tight text-[#0b1f4d] sm:text-base">
-            Contrato e acesso aos serviços
-          </h3>
-          <p className="mt-0.5 text-sm text-[#64748b]">
-            Situação contratual e liberações de agendamento.
-          </p>
-        </div>
-      </div>
-      <dl className="grid grid-cols-1 gap-px bg-[#eef2f7] sm:grid-cols-2 lg:grid-cols-4">
-        {campos.map((campo) => (
-          <div
-            key={campo.label}
-            className="flex flex-col justify-between gap-2 bg-white px-5 py-4 sm:px-5 sm:py-5"
-          >
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
-              {campo.label}
-            </dt>
-            <dd className="mt-1">
-              {campo.tone ? (
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClass(campo.tone)}`}
-                >
-                  {campo.valor}
-                </span>
-              ) : (
-                <span className="text-sm font-semibold text-[#0b1f4d]">
-                  {campo.valor}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </article>
-  );
-}
-
-function badgeClass(tone: PortalContratoBadgeTone): string {
-  if (tone === "ok") {
-    return "bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]";
-  }
-  if (tone === "pendente") {
-    return "bg-[#fffbeb] text-[#b45309] border border-[#fde68a]";
-  }
-  if (tone === "bloqueio") {
-    return "bg-[#fff5f5] text-[#dc2626] border border-[#fecaca]";
-  }
-  return "bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0]";
-}
-
 function ModuloShell({
   id,
   titulo,
-  disponivel,
   children,
   acao,
-  destaque,
-  destaqueVencida,
-  ocultarBadgeEmPreparacao,
+  badge,
+  className,
 }: {
   id: ModuloSstId;
   titulo: string;
-  disponivel: boolean;
   children: ReactNode;
   acao?: { label: string; onClick: () => void } | null;
-  destaque?: boolean;
-  destaqueVencida?: boolean;
-  ocultarBadgeEmPreparacao?: boolean;
+  badge?: string | null;
+  className?: string;
 }) {
   return (
     <article
-      className={`group flex h-full min-h-[220px] flex-col rounded-2xl border bg-white p-5 shadow-[0_8px_24px_rgba(11,31,77,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(11,31,77,0.08)] sm:p-6 ${
-        destaque && disponivel
-          ? "border-[#d7e0ee]"
-          : destaqueVencida && disponivel
-            ? "border-[#fca5a5]"
-            : disponivel
-              ? "border-[#e8edf5]"
-              : "border-[#eef2f7] bg-[#fafbfc]"
-      }`}
+      className={`flex h-full min-h-[168px] flex-col rounded-2xl border border-[#e8edf5] bg-white p-4 ${className ?? ""}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
-              destaque && disponivel
-                ? "bg-[#0b1f4d] text-white shadow-[0_8px_16px_rgba(11,31,77,0.18)]"
-                : "bg-[#0b1f4d]/[0.06] text-[#0b1f4d]"
-            }`}
-          >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0b1f4d]/[0.06] text-[#0b1f4d]">
             <ModuloIcon id={id} />
           </span>
-          <h3 className="text-[15px] font-bold tracking-tight text-[#0b1f4d] sm:text-base">
+          <h3 className="text-[15px] font-semibold tracking-tight text-[#0b1f4d]">
             {titulo}
           </h3>
         </div>
-        {disponivel ? (
-          <span className="shrink-0 rounded-full border border-[#d7e0ee] bg-[#f8fafc] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#334155]">
-            Disponível
+        {badge ? (
+          <span className="shrink-0 rounded-full bg-[#fff5f5] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#b91c1c]">
+            {badge}
           </span>
-        ) : ocultarBadgeEmPreparacao ? null : (
-          <span className="shrink-0 rounded-full bg-[#f1f5f9] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
-            {id === "laudos" ? "Em andamento" : "Em preparação"}
-          </span>
-        )}
+        ) : null}
       </div>
 
-      <div className="mt-5 flex-1">{children}</div>
+      <div className="mt-3 flex-1">{children}</div>
 
       {acao ? (
         <button
           type="button"
-          className="mt-5 inline-flex w-fit items-center rounded-lg bg-[#0b1f4d] px-4 py-2 text-sm font-semibold text-white shadow-[0_6px_14px_rgba(11,31,77,0.16)] transition hover:bg-[#12316f] group-hover:shadow-[0_8px_18px_rgba(11,31,77,0.2)]"
+          className="mt-3 inline-flex w-fit items-center rounded-md text-sm font-semibold text-[#0b1f4d] transition hover:text-[#12316f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b1f4d]/30"
           onClick={acao.onClick}
         >
           {acao.label}
         </button>
-      ) : (
-        <p className="mt-5 text-xs leading-relaxed text-[#94a3b8]">
-          Este módulo será liberado quando o serviço estiver disponível para a
-          sua empresa.
-        </p>
-      )}
+      ) : null}
     </article>
   );
 }
 
 function ModuloIcon({ id }: { id: ModuloSstId }) {
-  const props = { size: 18 };
+  const props = { size: 16 };
   if (id === "riscos") return <IconShield {...props} />;
   if (id === "faturas") return <IconReceipt {...props} />;
   if (id === "agendamentos") return <IconCalendar {...props} />;
   if (id === "laudos") return <IconFileText {...props} />;
-  if (id === "colaboradores") return <IconUsers {...props} />;
-  return <IconBriefcase {...props} />;
+  return <IconUsers {...props} />;
 }

@@ -25,6 +25,10 @@ export type PortalContratoBadgeTone = "ok" | "pendente" | "neutro" | "bloqueio";
 export type PortalContratoResumo = {
   temContrato: boolean;
   vigenciaLabel: string;
+  /** Título curto do resumo na Home (ex.: "Contrato vigente até"). */
+  vigenciaTitulo: string;
+  /** Valor curto do resumo na Home (fim, indeterminado ou fallback). */
+  vigenciaResumoLabel: string;
   procuracaoStatus: ProcuracaoStatus;
   procuracaoLabel: string;
   procuracaoTone: PortalContratoBadgeTone;
@@ -91,6 +95,8 @@ export function portalContratoResumoVazio(): PortalContratoResumo {
   return {
     temContrato: false,
     vigenciaLabel: PORTAL_CONTRATO_FALLBACK,
+    vigenciaTitulo: "Contrato",
+    vigenciaResumoLabel: PORTAL_CONTRATO_FALLBACK,
     procuracaoStatus: "pendente",
     procuracaoLabel: PORTAL_CONTRATO_FALLBACK,
     procuracaoTone: "neutro",
@@ -134,6 +140,33 @@ export function formatVigenciaPortalContrato(
   const end = formatDateBR(fimRaw);
   if (end === "—") return `${start} a Indeterminado`;
   return `${start} a ${end}`;
+}
+
+/**
+ * Resumo da Home: prioriza a data-fim.
+ * Indeterminado / sem contrato usam fallback real — não inventa data.
+ */
+export function formatVigenciaResumoPortal(
+  inicio: string | null | undefined,
+  fim: string | null | undefined
+): { titulo: string; valor: string } {
+  const startRaw = String(inicio ?? "").trim();
+  if (!startRaw) {
+    return { titulo: "Contrato", valor: PORTAL_CONTRATO_FALLBACK };
+  }
+  const start = formatDateBR(startRaw);
+  if (start === "—") {
+    return { titulo: "Contrato", valor: PORTAL_CONTRATO_FALLBACK };
+  }
+  const fimRaw = String(fim ?? "").trim();
+  if (!fimRaw) {
+    return { titulo: "Contrato", valor: "Vigência indeterminada" };
+  }
+  const end = formatDateBR(fimRaw);
+  if (end === "—") {
+    return { titulo: "Contrato", valor: "Vigência indeterminada" };
+  }
+  return { titulo: "Contrato vigente até", valor: end };
 }
 
 function toneProcuracao(status: ProcuracaoStatus): PortalContratoBadgeTone {
@@ -190,6 +223,12 @@ export function montarPortalContratoResumo(input: {
   const bloqueioManual = cliente?.agendamento_bloqueio_manual === true;
 
   const temContrato = Boolean(contratoAtual);
+  const vigenciaResumo = contratoAtual
+    ? formatVigenciaResumoPortal(
+        contratoAtual.data_inicio,
+        contratoAtual.data_fim
+      )
+    : { titulo: "Contrato", valor: PORTAL_CONTRATO_FALLBACK };
   const liberado = contratoAtual
     ? contratoLiberaAgendamento(contratoAtual)
     : null;
@@ -212,6 +251,8 @@ export function montarPortalContratoResumo(input: {
           contratoAtual.data_fim
         )
       : PORTAL_CONTRATO_FALLBACK,
+    vigenciaTitulo: vigenciaResumo.titulo,
+    vigenciaResumoLabel: vigenciaResumo.valor,
     procuracaoStatus,
     procuracaoLabel: procuracaoInformada
       ? formatProcuracaoStatusLabel(procuracaoStatus)

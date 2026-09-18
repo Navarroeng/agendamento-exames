@@ -16,7 +16,10 @@ import {
   indicadoresComplementaresDeRelatorio,
   type StatusGeralIndicadoresComplementares,
 } from "@/lib/riscos-indicadores-complementares";
-import type { PortalContratoResumo } from "@/lib/portal-contrato";
+import {
+  portalContratoResumoVazio,
+  type PortalContratoResumo,
+} from "@/lib/portal-contrato";
 
 export const PORTAL_DEV_CLIENTE_ID_ENV = "PORTAL_DEV_CLIENTE_ID";
 
@@ -206,23 +209,7 @@ export function portalResumoVazio(): PortalResumo {
     indicadoresComplementaresDisponivel: false,
     indicadoresComplementaresStatus: "indisponivel",
     indicadoresComplementaresLabel: "Indisponível",
-    contrato: {
-      temContrato: false,
-      vigenciaLabel: "Não informado",
-      procuracaoStatus: "pendente",
-      procuracaoLabel: "Não informado",
-      procuracaoTone: "neutro",
-      colaboradoresContratados: null,
-      colaboradoresContratadosLabel: "Não informado",
-      agendamentoLabel: "Não informado",
-      agendamentoTone: "neutro",
-      disponivelAgendamento: null,
-      disponivelAgendamentoLabel: "Não informado",
-      disponivelAgendamentoTone: "neutro",
-      agendamentoLiberado: null,
-      agendamentoLiberadoLabel: "Não informado",
-      agendamentoLiberadoTone: "neutro",
-    },
+    contrato: portalContratoResumoVazio(),
   };
 }
 
