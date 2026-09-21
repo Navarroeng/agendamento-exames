@@ -2,8 +2,7 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconBriefcase } from "@/components/ui/icons/OutlineIcons";
-import { CargoFormActions } from "./CargoFormActions";
-import { CargoForm } from "./CargoForm";
+import { CargoFormModal } from "./CargoFormModal";
 import { CargoTopActions } from "./CargoTopActions";
 import { CargoViewModal } from "./CargoViewModal";
 import { CargosSearchPanel } from "./CargosSearchPanel";
@@ -30,7 +29,6 @@ export function CargosPage() {
     setField,
     toggleExame,
     saving,
-    resetForm,
     closeForm,
     handleNovo,
     handleEditar,
@@ -67,25 +65,18 @@ export function CargosPage() {
         onToggleAtivo={handleToggleAtivo}
       />
 
-      {showForm && (
-        <>
-          <CargoForm
-            form={form}
-            catalogExames={catalogAtivos}
-            catalogLoading={catalogLoading}
-            isEditing={!!editingId}
-            onChange={setField}
-            onToggleExame={toggleExame}
-          />
-          <CargoFormActions
-            saving={saving}
-            isEditing={!!editingId}
-            onClear={resetForm}
-            onCancel={closeForm}
-            onSave={handleSave}
-          />
-        </>
-      )}
+      <CargoFormModal
+        open={showForm}
+        isEditing={!!editingId}
+        form={form}
+        catalogExames={catalogAtivos}
+        catalogLoading={catalogLoading}
+        saving={saving}
+        onChange={setField}
+        onToggleExame={toggleExame}
+        onClose={closeForm}
+        onSave={handleSave}
+      />
 
       <CargoViewModal cargo={viewCargo} onClose={closeView} />
 

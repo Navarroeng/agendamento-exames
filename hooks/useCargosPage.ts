@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
@@ -72,26 +72,27 @@ export function useCargosPage() {
     setEditingId(null);
   }, [reset]);
 
+  const formIntentRef = useRef(0);
+
   const closeForm = useCallback(() => {
+    formIntentRef.current += 1;
     setShowForm(false);
     resetForm();
   }, [resetForm]);
 
   const handleNovo = useCallback(() => {
+    formIntentRef.current += 1;
     resetForm();
     setShowForm(true);
-    requestAnimationFrame(() => {
-      document
-        .getElementById("cadastrar-cargo")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }, [resetForm]);
 
   const handleEditar = useCallback(
     async (id: string) => {
+      const intent = ++formIntentRef.current;
       setViewLoading(true);
       try {
         const cargo = await buscarCargoComExames(id);
+        if (intent !== formIntentRef.current) return;
         if (!cargo) {
           toast.error("Cargo não encontrado.");
           return;
@@ -99,16 +100,14 @@ export function useCargosPage() {
         loadForm(cargo);
         setEditingId(id);
         setShowForm(true);
-        requestAnimationFrame(() => {
-          document
-            .getElementById("cadastrar-cargo")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
       } catch (err) {
+        if (intent !== formIntentRef.current) return;
         console.error(err);
         toast.error("Erro ao carregar cargo.");
       } finally {
-        setViewLoading(false);
+        if (intent === formIntentRef.current) {
+          setViewLoading(false);
+        }
       }
     },
     [loadForm]

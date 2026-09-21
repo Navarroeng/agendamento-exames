@@ -10,6 +10,8 @@ interface CargoFormProps {
   catalogExames: ExameRecord[];
   catalogLoading: boolean;
   isEditing: boolean;
+  /** Quando true, o título fica só no Modal — sem Panel duplicado. */
+  embeddedInModal?: boolean;
   onChange: (field: CargoFormField, value: string) => void;
   onToggleExame: (exameId: string) => void;
 }
@@ -19,17 +21,14 @@ export function CargoForm({
   catalogExames,
   catalogLoading,
   isEditing,
+  embeddedInModal = false,
   onChange,
   onToggleExame,
 }: CargoFormProps) {
   const periodicidadeNaoSelecionada = form.validadePeriodicoMeses === "";
 
-  return (
-    <Panel
-      id="cadastrar-cargo"
-      title={isEditing ? "Editar cargo" : "Novo cargo"}
-      icon={<IconFileText />}
-    >
+  const fields = (
+    <>
       <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 md:grid-cols-2">
         <div>
           <label className="mb-1.5 block text-xs font-bold text-navy">
@@ -152,7 +151,7 @@ export function CargoForm({
         )}
 
         {!catalogLoading && catalogExames.length > 0 && (
-          <div className="max-h-[280px] overflow-y-auto rounded-xl border border-[#e8edf5] bg-[#f8fafc] p-3">
+          <div className={`${embeddedInModal ? "max-h-[min(48vh,440px)]" : "max-h-[280px]"} overflow-y-auto rounded-xl border border-[#e8edf5] bg-[#f8fafc] p-3`}>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {catalogExames.map((exame) => {
                 const checked = form.exameIds.includes(exame.id);
@@ -188,6 +187,18 @@ export function CargoForm({
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (embeddedInModal) return fields;
+
+  return (
+    <Panel
+      id="cadastrar-cargo"
+      title={isEditing ? "Editar cargo" : "Novo cargo"}
+      icon={<IconFileText />}
+    >
+      {fields}
     </Panel>
   );
 }
