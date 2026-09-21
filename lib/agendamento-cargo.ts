@@ -63,8 +63,10 @@ export function normalizeCargoNomeMatch(
 }
 
 /**
- * Localiza o cargo do catálogo sem criar duplicata.
- * Prefere cargo_id; se só houver nome, compara caixa/espaços.
+ * Localiza o cargo no catálogo ativo passado, sem criar registro nem opção extra.
+ * Prefere cargo_id canônico; se o id não estiver no catálogo (inclui inativo),
+ * retorna vazio — não cai no nome. Sem cargo_id, compara nome só por igualdade
+ * após normalizeCargoNomeMatch (trim, espaços, caixa). Sem includes/fuzzy.
  */
 export function resolveCargoIdFromPrefill(
   cargos: Pick<CargoRecord, "id" | "nome">[],
@@ -72,8 +74,7 @@ export function resolveCargoIdFromPrefill(
 ): string {
   const id = prefill.cargo_id?.trim() ?? "";
   if (id) {
-    const byId = cargos.find((cargo) => cargo.id === id);
-    return byId?.id ?? id;
+    return cargos.find((cargo) => cargo.id === id)?.id ?? "";
   }
 
   const nome = normalizeCargoNomeMatch(prefill.cargo_nome);
@@ -82,4 +83,24 @@ export function resolveCargoIdFromPrefill(
     cargos.find((cargo) => normalizeCargoNomeMatch(cargo.nome) === nome)?.id ??
     ""
   );
+}
+
+export type CargoAtivoResolvido = {
+  cargoId: string;
+  cargoNome: string;
+};
+
+/**
+ * Cargo a selecionar no Novo Agendamento a partir da vaga/prefill.
+ * Só devolve item existente no catálogo ativo; caso contrário null (campo vazio).
+ */
+export function resolveCargoAtivoParaAgendamento(
+  cargosAtivos: Pick<CargoRecord, "id" | "nome">[],
+  origem: { cargo_id?: string | null; cargo_nome?: string | null }
+): CargoAtivoResolvido | null {
+  const cargoId = resolveCargoIdFromPrefill(cargosAtivos, origem);
+  if (!cargoId) return null;
+  const found = cargosAtivos.find((cargo) => cargo.id === cargoId);
+  if (!found) return null;
+  return { cargoId: found.id, cargoNome: found.nome };
 }

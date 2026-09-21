@@ -86,8 +86,9 @@ export function parseAgendamentoPrefillFromSearchParams(
 }
 
 /**
- * Não aplica o prefill até a lista de clientes (e, se preciso, cargos) existir.
- * Evita consumir o storage e marcar como aplicado enquanto o select ainda está vazio.
+ * Não aplica o prefill até a lista de clientes existir.
+ * Se a vaga/prefill trouxer cargo_id ou cargo_nome, espera o catálogo ativo:
+ * só selecionamos cargo presente nele (id inativo ou nome livre não entram no select).
  */
 export function shouldDeferAgendamentoPrefillApply(input: {
   clientesLoading: boolean;
@@ -98,7 +99,7 @@ export function shouldDeferAgendamentoPrefillApply(input: {
   if (input.clientesLoading) return true;
   const hasCargoId = Boolean(input.cargoId?.trim());
   const hasCargoNome = Boolean(input.cargoNome?.trim());
-  return !hasCargoId && hasCargoNome && input.cargosLoading;
+  return (hasCargoId || hasCargoNome) && input.cargosLoading;
 }
 
 /**

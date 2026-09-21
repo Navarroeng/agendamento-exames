@@ -94,7 +94,7 @@ import { useClientesList } from "@/hooks/useClientesList";
 import {
   buildCargoAgendamentoFields,
   buildCargosFormOptions,
-  resolveCargoIdFromPrefill,
+  resolveCargoAtivoParaAgendamento,
 } from "@/lib/agendamento-cargo";
 import {
   buildClienteFilterOptionsHistorico,
@@ -1099,12 +1099,9 @@ export function useAgendamentosPage() {
       setFiltersExpanded(false);
 
       const clienteResolved = resolveClienteIdFromPrefill(clientes, staged);
-      const cargoResolved = resolveCargoIdFromPrefill(cargosAtivos, staged);
-      if (cargoResolved) {
-        pendingPrefillCargoRef.current = {
-          cargoId: cargoResolved,
-          cargoNome: staged.cargo_nome,
-        };
+      const cargoAtivo = resolveCargoAtivoParaAgendamento(cargosAtivos, staged);
+      if (cargoAtivo) {
+        pendingPrefillCargoRef.current = cargoAtivo;
       }
 
       let clienteOk = false;
@@ -1683,9 +1680,11 @@ export function useAgendamentosPage() {
     if (vaga.colaborador && !form.colaborador.trim()) {
       setField("colaborador", vaga.colaborador);
     }
-    if (vaga.cargo_id) {
-      setCargoId(vaga.cargo_id);
-      if (vaga.cargo_nome) setCargoNomeSalvo(vaga.cargo_nome);
+
+    const cargoAtivo = resolveCargoAtivoParaAgendamento(cargosAtivos, vaga);
+    if (cargoAtivo) {
+      setCargoId(cargoAtivo.cargoId);
+      setCargoNomeSalvo(cargoAtivo.cargoNome);
     }
 
     const pending = pendingSaveStatusRef.current;
@@ -1696,8 +1695,34 @@ export function useAgendamentosPage() {
         const fn = continuarSaveAposCreditoRef.current;
         if (fn) fn();
       });
+      return;
     }
-  }, [vagaComprometida, form.colaborador, setField, setSaving]);
+
+    if (!cargoAtivo) return;
+
+    void (async () => {
+      try {
+        const examesObrigatorios = await listarExamesObrigatoriosPorCargo(
+          cargoAtivo.cargoId
+        );
+        const nomes = examesObrigatorios.map((exame) => exame.nome);
+        await replaceExamesFromCargo(nomes);
+        examsManuallyModifiedRef.current = false;
+      } catch (err) {
+        console.error(
+          "Erro ao carregar exames do cargo (vaga comprometida):",
+          err
+        );
+      }
+    })();
+  }, [
+    vagaComprometida,
+    form.colaborador,
+    setField,
+    setSaving,
+    cargosAtivos,
+    replaceExamesFromCargo,
+  ]);
 
   const showClienteProcuracaoAlert = useMemo(() => {
     if (!clienteId) return false;

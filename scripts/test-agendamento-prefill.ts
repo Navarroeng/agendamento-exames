@@ -44,8 +44,8 @@ assert.equal(
     cargoId: "cargo-coz",
     cargoNome: "Cozinheiro",
   }),
-  false,
-  "com cargo_id não precisa esperar o catálogo"
+  true,
+  "com cargo_id espera o catálogo ativo para validar o id"
 );
 
 assert.equal(
@@ -120,8 +120,8 @@ assert.equal(
 
 assert.equal(
   resolveCargoIdFromPrefill(cargos, { cargo_id: "cargo-inativo" }),
-  "cargo-inativo",
-  "mantém cargo_id mesmo fora do catálogo ativo"
+  "",
+  "cargo_id fora do catálogo ativo não seleciona"
 );
 
 assert.equal(
