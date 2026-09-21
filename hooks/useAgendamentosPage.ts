@@ -98,7 +98,6 @@ import {
 } from "@/lib/agendamento-cargo";
 import {
   buildClienteFilterOptionsHistorico,
-  resolveClienteIdByNome,
 } from "@/lib/cliente-display";
 import {
   buildClinicaFilterOptionsHistorico,
@@ -115,6 +114,7 @@ import {
   isClienteIndisponivelAgendamentoError,
 } from "@/services/cliente.service";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
+import { escolherUnicoPorNome, mensagemErroSalvarAgendamento } from "@/lib/agendamento-cliente-lookup";
 import {
   agendamentoPossuiComplementares,
   isOrdemChegada,
@@ -139,7 +139,7 @@ import {
 } from "@/services/agendamento-aso-retido.service";
 import {
   CONTRATO_VIGENTE_ERROR_MESSAGE,
-  verificarContratoVigentePorNome,
+  verificarContratoVigenteDoAgendamento,
 } from "@/lib/cliente-contrato-vigencia";
 import {
   atualizarAgendamentoComExames,
@@ -384,7 +384,8 @@ export function useAgendamentosPage() {
   );
   const contratoVigencia = useContratoVigenciaCheck(
     form.cliente_nome,
-    form.data_agendamento
+    form.data_agendamento,
+    clienteId
   );
   const contratoInvalido = contratoVigencia.status === "invalid";
   const clinicasAtivas = useMemo(
@@ -1278,6 +1279,7 @@ export function useAgendamentosPage() {
           colaborador: form.colaborador,
           colaboradorCpf: cpfValido ? form.colaborador_cpf : null,
           tipoAso: form.aso || null,
+          clienteId: clienteId || null,
         });
         if (grupos.length === 0) {
           setPeriodicoVinculoList([]);
@@ -1328,6 +1330,7 @@ export function useAgendamentosPage() {
       form.cliente_nome,
       form.colaborador,
       form.colaborador_cpf,
+      clienteId,
     ]
   );
 
@@ -1824,7 +1827,9 @@ export function useAgendamentosPage() {
       loadExams(examesForm);
       prevAsoRef.current = agendamento.aso ?? "";
       setClienteId(
-        resolveClienteIdByNome(clientes, agendamento.cliente_nome ?? "")
+        (agendamento.cliente_id ?? "").trim() ||
+          (escolherUnicoPorNome(clientes, agendamento.cliente_nome ?? "").item
+            ?.id ?? "")
       );
       setCargoId(agendamento.cargo_id ?? "");
       setCargoNomeSalvo(agendamento.cargo_nome ?? "");
@@ -2347,7 +2352,11 @@ export function useAgendamentosPage() {
           return;
         }
         try {
-          await assertClienteDisponivelParaAgendamento(clienteNome);
+          await assertClienteDisponivelParaAgendamento(clienteNome, {
+            clienteId: clienteId || null,
+            clienteCnpj:
+              clientes.find((item) => item.id === clienteId)?.cnpj ?? null,
+          });
         } catch (err) {
           if (isClienteIndisponivelAgendamentoError(err)) {
             toast.error(err.message);
@@ -2357,7 +2366,9 @@ export function useAgendamentosPage() {
           throw err;
         }
         try {
-          await assertClienteSemInadimplencia(clienteNome);
+          await assertClienteSemInadimplencia(clienteNome, {
+            clienteId: clienteId || null,
+          });
         } catch (err) {
           if (isClienteInadimplenteError(err)) {
             exibirBloqueioInadimplencia(
@@ -2441,10 +2452,14 @@ export function useAgendamentosPage() {
       }
 
       if (dataIso) {
-        const contrato = await verificarContratoVigentePorNome(
-          form.cliente_nome,
-          dataIso
-        );
+        const contrato = await verificarContratoVigenteDoAgendamento({
+          clienteId: clienteId || null,
+          clienteNome: form.cliente_nome,
+          clienteCnpj:
+            clientes.find((item) => item.id === clienteId)?.cnpj ?? null,
+          dataAgendamento: dataIso,
+          contratoId: vagaContratoIdRef.current,
+        });
         if (!contrato.vigente) {
           toast.error(CONTRATO_VIGENTE_ERROR_MESSAGE);
           return;
@@ -2595,6 +2610,7 @@ export function useAgendamentosPage() {
             colaborador: form.colaborador,
             colaboradorCpf: form.colaborador_cpf,
             tipoAso: form.aso || null,
+            clienteId: clienteId || null,
           });
           const grupo = encontrarGrupoPeriodicoPorIds(grupos, periodicoLinkIds);
           if (!grupo) {
@@ -2627,10 +2643,14 @@ export function useAgendamentosPage() {
             : status;
         let payload = buildPayload(payloadStatus, cargoFields);
 
-        const clienteIdResolvido =
-          clienteId.trim() ||
-          resolveClienteIdByNome(clientes, payload.cliente_nome) ||
-          null;
+        const clienteIdResolvido = (() => {
+          const id = clienteId.trim();
+          if (id) return id;
+          const chosen = escolherUnicoPorNome(clientes, payload.cliente_nome);
+          return chosen.status === "unique" && chosen.item
+            ? chosen.item.id
+            : null;
+        })();
         payload = {
           ...payload,
           cliente_id: clienteIdResolvido,
@@ -2910,6 +2930,10 @@ export function useAgendamentosPage() {
           );
           return;
         }
+        if (isClienteIndisponivelAgendamentoError(err)) {
+          toast.error(err.message);
+          return;
+        }
         const message =
           err && typeof err === "object" && "message" in err
             ? String((err as { message: unknown }).message)
@@ -2931,7 +2955,7 @@ export function useAgendamentosPage() {
             return;
           }
         }
-        toast.error(message || "Erro ao salvar agendamento");
+        toast.error(mensagemErroSalvarAgendamento(err) || "Erro ao salvar agendamento");
       }
       } finally {
         exitAgendamentoSave(saveLockRef.current);

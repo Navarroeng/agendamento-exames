@@ -2,7 +2,16 @@ import {
   buscarContratoAtivo,
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
-import { listarClientesParaSelect } from "@/services/cliente.service";
+import {
+  buscarClientePorCnpjDigits,
+  listarClientesParaSelect,
+} from "@/services/cliente.service";
+import {
+  CLIENTE_CADASTRO_AMBIGUO_MSG,
+  escolherUnicoPorNome,
+  planClienteLookup,
+  selecionarContratoVigenteParaAgendamento,
+} from "@/lib/agendamento-cliente-lookup";
 import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
 import type { ClienteContratoRecord } from "@/lib/types";
 
@@ -96,12 +105,16 @@ export function clienteTemContratoVigente(
 
 export async function verificarContratoVigente(
   clienteId: string,
-  dataAgendamento: string
+  dataAgendamento: string,
+  options?: { contratoId?: string | null }
 ): Promise<ContratoVigenciaResult> {
   const contratos = await listarContratosPorCliente(clienteId);
+  const contratoIdPreferido = options?.contratoId?.trim() || null;
 
-  const vigente = contratos.find((c) =>
-    contratoEstaVigenteNaData(c, dataAgendamento)
+  const vigente = selecionarContratoVigenteParaAgendamento(
+    contratos,
+    (contrato) => contratoEstaVigenteNaData(contrato, dataAgendamento),
+    contratoIdPreferido
   );
   if (vigente) {
     return {
@@ -111,6 +124,10 @@ export async function verificarContratoVigente(
       clienteId,
       contratoId: vigente.id,
     };
+  }
+
+  if (contratoIdPreferido) {
+    return { vigente: false, clienteId, contratoId: contratoIdPreferido };
   }
 
   // Fallback: único ativo com datas (compatível com busca antiga)
@@ -135,47 +152,112 @@ export async function verificarContratoVigentePorNome(
   clienteNome: string,
   dataAgendamento: string
 ): Promise<ContratoVigenciaResult> {
-  const nome = clienteNome.trim();
-  if (!nome) {
+  return verificarContratoVigenteDoAgendamento({
+    clienteNome,
+    dataAgendamento,
+  });
+}
+
+export async function verificarContratoVigenteDoAgendamento(input: {
+  clienteId?: string | null;
+  clienteNome?: string | null;
+  clienteCnpj?: string | null;
+  dataAgendamento: string;
+  contratoId?: string | null;
+}): Promise<ContratoVigenciaResult> {
+  const plan = planClienteLookup(input);
+  if (plan.by === "none") {
     return { vigente: false };
   }
 
-  const clientes = await listarClientesParaSelect();
-  const cliente = clientes.find(
-    (c) => c.nome.trim().toLowerCase() === nome.toLowerCase()
-  );
-
-  if (!cliente) {
-    return { vigente: false };
+  let clienteId = "";
+  if (plan.by === "id") {
+    clienteId = plan.value;
+  } else if (plan.by === "cnpj") {
+    const cliente = await buscarClientePorCnpjDigits(plan.value);
+    if (!cliente) return { vigente: false };
+    clienteId = cliente.id;
+  } else {
+    const clientes = await listarClientesParaSelect();
+    const chosen = escolherUnicoPorNome(clientes, plan.value);
+    if (chosen.status === "ambiguous") {
+      throw new Error(CLIENTE_CADASTRO_AMBIGUO_MSG);
+    }
+    if (chosen.status !== "unique" || !chosen.item) {
+      return { vigente: false };
+    }
+    clienteId = chosen.item.id;
   }
 
-  return verificarContratoVigente(cliente.id, dataAgendamento);
+  return verificarContratoVigente(clienteId, input.dataAgendamento, {
+    contratoId: input.contratoId,
+  });
 }
 
 export async function assertContratoVigentePorNome(
   clienteNome: string,
   dataAgendamento: string
 ): Promise<void> {
-  const nome = clienteNome.trim();
-  if (!nome) return;
+  await assertContratoVigenteDoAgendamento({
+    clienteNome,
+    dataAgendamento,
+  });
+}
 
-  const clientes = await listarClientesParaSelect();
-  const cliente = clientes.find(
-    (c) => c.nome.trim().toLowerCase() === nome.toLowerCase()
-  );
+export async function assertContratoVigenteDoAgendamento(input: {
+  clienteId?: string | null;
+  clienteNome?: string | null;
+  clienteCnpj?: string | null;
+  dataAgendamento: string;
+  contratoId?: string | null;
+}): Promise<void> {
+  const plan = planClienteLookup(input);
+  if (plan.by === "none") return;
+
+  let cliente: {
+    id: string;
+    nome: string;
+    disponivel_agendamento?: boolean | null;
+    agendamento_bloqueio_manual?: boolean | null;
+    agendamento_bloqueio_motivo?: string | null;
+  } | null = null;
+
+  if (plan.by === "id") {
+    const clientes = await listarClientesParaSelect();
+    cliente = clientes.find((item) => item.id === plan.value) ?? null;
+  } else if (plan.by === "cnpj") {
+    cliente = await buscarClientePorCnpjDigits(plan.value);
+  } else {
+    const clientes = await listarClientesParaSelect();
+    const chosen = escolherUnicoPorNome(clientes, plan.value);
+    if (chosen.status === "ambiguous") {
+      throw new Error(CLIENTE_CADASTRO_AMBIGUO_MSG);
+    }
+    cliente = chosen.item ?? null;
+  }
+
   if (!cliente) {
     throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
   }
 
   const contratos = await listarContratosPorCliente(cliente.id);
+  const contratoId = input.contratoId?.trim() || "";
+  const contratosAlvo = contratoId
+    ? contratos.filter((contrato) => contrato.id === contratoId)
+    : contratos;
+
+  if (contratoId && contratosAlvo.length === 0) {
+    throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
+  }
+
   const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
     cliente: {
       disponivel_agendamento: cliente.disponivel_agendamento,
       agendamento_bloqueio_manual: cliente.agendamento_bloqueio_manual,
       agendamento_bloqueio_motivo: cliente.agendamento_bloqueio_motivo,
     },
-    contratos,
-    dataReferenciaIso: dataAgendamento,
+    contratos: contratosAlvo,
+    dataReferenciaIso: input.dataAgendamento,
   });
 
   if (disponibilidade.disponivel) return;

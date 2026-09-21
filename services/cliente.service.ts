@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
+import {
+  CLIENTE_CADASTRO_AMBIGUO_MSG,
+  planClienteLookup,
+} from "@/lib/agendamento-cliente-lookup";
 import { clienteRecordMatchesBusca } from "@/lib/cliente-busca";
 import { buildCamposBloqueioManualAgendamento } from "@/lib/cliente-bloqueio-manual";
 import {
@@ -82,35 +86,78 @@ export async function buscarClientePorCnpjDigits(
 
 export async function assertClienteDisponivelParaAgendamento(
   clienteNome: string,
-  options?: { agendamentoIdAtual?: string | null }
+  options?: {
+    agendamentoIdAtual?: string | null;
+    clienteId?: string | null;
+    clienteCnpj?: string | null;
+  }
 ): Promise<void> {
-  const trimmed = clienteNome.trim();
-  if (!trimmed) return;
+  const plan = planClienteLookup({
+    clienteId: options?.clienteId,
+    clienteCnpj: options?.clienteCnpj,
+    clienteNome,
+  });
+  if (plan.by === "none") return;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("clientes")
-    .select("id, nome, disponivel_agendamento")
-    .eq("nome", trimmed)
-    .maybeSingle();
+  let data: {
+    id: string;
+    nome: string;
+    disponivel_agendamento: boolean | null;
+  } | null = null;
 
-  if (error) throw error;
+  if (plan.by === "id") {
+    const res = await supabase
+      .from("clientes")
+      .select("id, nome, disponivel_agendamento")
+      .eq("id", plan.value)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    data = res.data;
+  } else if (plan.by === "cnpj") {
+    const res = await supabase
+      .from("clientes")
+      .select("id, nome, disponivel_agendamento")
+      .eq("cnpj_digits", plan.value)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    data = res.data;
+  } else {
+    const res = await supabase
+      .from("clientes")
+      .select("id, nome, disponivel_agendamento")
+      .eq("nome", plan.value);
+    if (res.error) throw res.error;
+    const rows = res.data ?? [];
+    if (rows.length > 1) {
+      throw new Error(CLIENTE_CADASTRO_AMBIGUO_MSG);
+    }
+    data = rows[0] ?? null;
+  }
+
   if (!data) return;
 
   if (!isClienteDisponivelAgendamento(data.disponivel_agendamento)) {
     if (options?.agendamentoIdAtual) {
       const { data: agendamento, error: agError } = await supabase
         .from("agendamentos")
-        .select("cliente_nome")
+        .select("cliente_nome, cliente_id")
         .eq("id", options.agendamentoIdAtual)
         .maybeSingle();
 
       if (agError) throw agError;
-      if (
-        agendamento &&
-        agendamento.cliente_nome.trim().toLowerCase() === trimmed.toLowerCase()
-      ) {
-        return;
+      if (agendamento) {
+        const agClienteId = String(agendamento.cliente_id ?? "").trim();
+        if (plan.by === "id" && agClienteId && agClienteId === plan.value) {
+          return;
+        }
+        if (
+          plan.by !== "id" &&
+          agendamento.cliente_nome.trim().toLowerCase() ===
+            (data.nome ?? clienteNome).trim().toLowerCase()
+        ) {
+          return;
+        }
       }
     }
 

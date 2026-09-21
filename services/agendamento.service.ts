@@ -1,6 +1,6 @@
 import { assertExamesValorClientePermitido } from "@/lib/agendamento-clinico-zero-demissional";
 import { assertDataAgendamentoPermitida } from "@/lib/agendamento-datetime";
-import { assertContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
+import { assertContratoVigenteDoAgendamento } from "@/lib/cliente-contrato-vigencia";
 import { assertClienteDisponivelParaAgendamento } from "@/services/cliente.service";
 import { assertExamesSemDuplicidade } from "@/lib/duplicidade-validations";
 import {
@@ -97,18 +97,24 @@ export async function salvarAgendamentoComExames(
   assertDataAgendamentoPermitida({
     dataIso: agendamento.data_agendamento,
   });
-  await assertContratoVigentePorNome(
-    agendamento.cliente_nome,
-    agendamento.data_agendamento
-  );
-  await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome);
+  await assertContratoVigenteDoAgendamento({
+    clienteId: agendamento.cliente_id,
+    clienteNome: agendamento.cliente_nome,
+    dataAgendamento: agendamento.data_agendamento,
+    contratoId: agendamento.contrato_id,
+  });
+  await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome, {
+    clienteId: agendamento.cliente_id,
+  });
   await assertAgendamentoSemDuplicidade90Dias({
     clienteNome: agendamento.cliente_nome,
     colaboradorCpf: agendamento.colaborador_cpf,
     dataAgendamentoIso: agendamento.data_agendamento,
     tipoAso: agendamento.aso ?? "",
   });
-  await assertClienteSemInadimplencia(agendamento.cliente_nome);
+  await assertClienteSemInadimplencia(agendamento.cliente_nome, {
+    clienteId: agendamento.cliente_id,
+  });
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo);
   const supabase = createClient();
 
@@ -223,10 +229,12 @@ export async function atualizarAgendamentoComExames(
     dataOriginalIso: atualRow?.data_agendamento ?? null,
   });
 
-  await assertContratoVigentePorNome(
-    agendamento.cliente_nome,
-    agendamento.data_agendamento
-  );
+  await assertContratoVigenteDoAgendamento({
+    clienteId: agendamento.cliente_id,
+    clienteNome: agendamento.cliente_nome,
+    dataAgendamento: agendamento.data_agendamento,
+    contratoId: agendamento.contrato_id,
+  });
   await assertAgendamentoSemDuplicidade90Dias({
     clienteNome: agendamento.cliente_nome,
     colaboradorCpf: agendamento.colaborador_cpf,
@@ -236,6 +244,7 @@ export async function atualizarAgendamentoComExames(
   });
   await assertClienteDisponivelParaAgendamento(agendamento.cliente_nome, {
     agendamentoIdAtual: id,
+    clienteId: agendamento.cliente_id,
   });
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo, id);
 

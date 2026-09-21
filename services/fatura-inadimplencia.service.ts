@@ -135,20 +135,30 @@ async function sincronizarFaturasVencidasInterno(
 
 export async function listarPendenciasInadimplenciaCliente(
   clienteNome: string,
-  dataReferencia: Date = new Date()
+  dataReferencia: Date = new Date(),
+  options?: { clienteId?: string | null }
 ): Promise<FaturaPendenciaInadimplencia[]> {
+  const clienteId = options?.clienteId?.trim() ?? "";
   const nome = normalizeReferenciaNome(clienteNome);
-  if (!nome) return [];
+  if (!clienteId && !nome) return [];
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("faturas")
     .select("*")
     .eq("tipo", "cliente")
     .eq("pago", false)
-    .in("status", ["emitida", "vencida"])
-    .eq("referencia_nome", nome)
-    .order("data_vencimento", { ascending: true });
+    .in("status", ["emitida", "vencida"]);
+
+  if (clienteId) {
+    query = query.eq("referencia_id", clienteId);
+  } else {
+    query = query.eq("referencia_nome", nome);
+  }
+
+  const { data, error } = await query.order("data_vencimento", {
+    ascending: true,
+  });
 
   if (error) throw error;
 
@@ -181,8 +191,22 @@ export async function listarFaturasVencidasCliente(
 }
 
 export async function assertClienteSemInadimplencia(
-  clienteNome: string
+  clienteNome: string,
+  options?: { clienteId?: string | null }
 ): Promise<void> {
+  const clienteId = options?.clienteId?.trim() ?? "";
+  if (clienteId) {
+    const pendencias = await listarPendenciasInadimplenciaCliente(
+      clienteNome,
+      new Date(),
+      { clienteId }
+    );
+    if (pendencias.length > 0) {
+      throw new ClienteInadimplenteError(pendencias);
+    }
+    return;
+  }
+
   const nome = normalizeReferenciaNome(clienteNome);
   if (!nome) return;
 

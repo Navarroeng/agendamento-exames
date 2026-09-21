@@ -8,7 +8,7 @@ import {
 import {
   CONTRATO_ENCERRADO_ERROR_MESSAGE,
   CONTRATO_VIGENTE_ERROR_MESSAGE,
-  verificarContratoVigentePorNome,
+  verificarContratoVigenteDoAgendamento,
   type ContratoVigenciaResult,
 } from "@/lib/cliente-contrato-vigencia";
 import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
@@ -44,7 +44,8 @@ async function toCheckState(
 
 export function useContratoVigenciaCheck(
   clienteNome: string,
-  dataAgendamento: string
+  dataAgendamento: string,
+  clienteId?: string | null
 ): ContratoVigenciaCheckState {
   const [state, setState] = useState<ContratoVigenciaCheckState>({
     status: "idle",
@@ -52,9 +53,10 @@ export function useContratoVigenciaCheck(
 
   useEffect(() => {
     const nome = clienteNome.trim();
+    const id = (clienteId ?? "").trim();
     const data = dataAgendamento.trim();
 
-    if (!nome || !data) {
+    if ((!nome && !id) || !data) {
       setState({ status: "idle" });
       return;
     }
@@ -73,7 +75,11 @@ export function useContratoVigenciaCheck(
     let cancelled = false;
     setState({ status: "loading" });
 
-    void verificarContratoVigentePorNome(nome, dataIso)
+    void verificarContratoVigenteDoAgendamento({
+      clienteId: id || null,
+      clienteNome: nome,
+      dataAgendamento: dataIso,
+    })
       .then((result) => toCheckState(result))
       .then((next) => {
         if (cancelled) return;
@@ -90,7 +96,7 @@ export function useContratoVigenciaCheck(
     return () => {
       cancelled = true;
     };
-  }, [clienteNome, dataAgendamento]);
+  }, [clienteNome, dataAgendamento, clienteId]);
 
   return state;
 }

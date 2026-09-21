@@ -18,6 +18,7 @@ import {
 import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { isAsoDemissional } from "@/lib/periodico-geracao";
 import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
+import { filtrarPeriodicosDoCliente } from "@/lib/agendamento-cliente-lookup";
 import {
   agruparPeriodicosPendentesParaVinculo,
   chaveCicloPeriodico,
@@ -29,6 +30,7 @@ import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 
 export type PeriodicoProgramadoContrato = Pick<
   PeriodicoFuturoRecord,
@@ -627,6 +629,7 @@ export async function listarPeriodicosPendentesColaborador(params: {
   colaborador: string;
   colaboradorCpf?: string | null;
   tipoAso?: string | null;
+  clienteId?: string | null;
 }): Promise<PeriodicoFuturoRecord[]> {
   const supabase = createClient();
   const cliente = params.clienteNome.trim();
@@ -670,10 +673,19 @@ export async function listarPeriodicosPendentesColaborador(params: {
   }
 
   const clienteNorm = cliente.toLowerCase();
-  const matchEmpresa = rows.filter(
-    (r) => (r.cliente_nome ?? "").trim().toLowerCase() === clienteNorm
-  );
-  rows = matchEmpresa.length > 0 ? matchEmpresa : rows;
+  const clienteId = params.clienteId?.trim() ?? "";
+  if (clienteId) {
+    const contratos = await listarContratosPorCliente(clienteId);
+    rows = filtrarPeriodicosDoCliente({
+      rows,
+      contratoIdsDoCliente: contratos.map((contrato) => contrato.id),
+    });
+  } else {
+    const matchEmpresa = rows.filter(
+      (r) => (r.cliente_nome ?? "").trim().toLowerCase() === clienteNorm
+    );
+    rows = matchEmpresa.length > 0 ? matchEmpresa : rows;
+  }
 
   if (tipoAso) {
     const asoNorm = tipoAso.toLowerCase();
@@ -697,6 +709,7 @@ export async function listarPeriodicosPendentesAgrupadosColaborador(params: {
   colaborador: string;
   colaboradorCpf?: string | null;
   tipoAso?: string | null;
+  clienteId?: string | null;
 }): Promise<PeriodicoFuturoGrupo[]> {
   const rows = await listarPeriodicosPendentesColaborador(params);
   return agruparPeriodicosPendentesParaVinculo(rows);
@@ -711,6 +724,7 @@ export async function buscarPeriodicoPendenteColaborador(params: {
   colaborador: string;
   colaboradorCpf?: string | null;
   tipoAso?: string | null;
+  clienteId?: string | null;
 }): Promise<PeriodicoFuturoRecord | null> {
   const rows = await listarPeriodicosPendentesColaborador(params);
   return rows[0] ?? null;
