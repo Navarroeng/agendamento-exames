@@ -569,7 +569,7 @@ const aplicados = aplicarImportacaoNasVagas({
 });
 assert.equal(aplicados.aplicados, 2);
 assert.equal(aplicados.excedentes.length, 0);
-assert.equal(aplicados.drafts[0].colaborador, "Natália Porfírio");
+assert.equal(aplicados.drafts[0].colaborador, "NATÁLIA PORFÍRIO");
 assert.equal(aplicados.drafts[0].manterAsoAberto, false);
 
 // Cabeçalho sem Cargo
@@ -676,7 +676,7 @@ const comAso = aplicarImportacaoNasVagas({
 });
 assert.equal(comAso.drafts[0].manterAsoAberto, true);
 assert.equal(comAso.drafts[0].colaborador, "");
-assert.equal(comAso.drafts[1].colaborador, "Natália Porfírio");
+assert.equal(comAso.drafts[1].colaborador, "NATÁLIA PORFÍRIO");
 
 function aprovacao(
   partial: Partial<OrcamentoAprovacaoRecord>
@@ -939,6 +939,8 @@ const abaFuncionariosSrc = readFileSync(
 );
 assert.match(abaFuncionariosSrc, /Importar lista/);
 assert.match(abaFuncionariosSrc, /Baixar modelo Excel/);
+assert.match(abaFuncionariosSrc, /Exportar lista/);
+assert.match(abaFuncionariosSrc, /downloadListaFuncionariosXlsx/);
 assert.match(abaFuncionariosSrc, /gerarModeloListaFuncionariosXlsx|downloadModeloListaFuncionariosXlsx/);
 assert.match(abaFuncionariosSrc, /handleBaixarModelo/);
 assert.match(abaFuncionariosSrc, /mensagemExcessoVagasListaFuncionarios/);

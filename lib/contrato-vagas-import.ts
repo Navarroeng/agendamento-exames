@@ -15,11 +15,21 @@ import {
   normalizeNomeOcupante,
   type ContratoVagaDraft,
 } from "@/lib/contrato-vagas";
+import type { ListaFuncionariosExportRow } from "@/lib/contrato-vagas-lista";
+import { nomeArquivoListaFuncionariosExport } from "@/lib/contrato-vagas-lista";
 
 export const CONTRATO_VAGAS_IMPORT_HEADERS = [
   "Nome do funcionário",
   "CPF",
   "Cargo",
+] as const;
+
+export const CONTRATO_VAGAS_EXPORT_HEADERS = [
+  "#",
+  "Nome do funcionário",
+  "CPF",
+  "Cargo",
+  "Situação",
 ] as const;
 
 export const CONTRATO_VAGAS_SHEET_FUNCIONARIOS = "Funcionários";
@@ -214,6 +224,82 @@ export function downloadModeloListaFuncionariosXlsx(params: {
   a.download = nomeArquivoModeloListaFuncionarios(params.numeroOrcamento);
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function writeXlsxArrayBuffer(wb: XLSX.WorkBook): ArrayBuffer {
+  const out = XLSX.write(wb, {
+    type: "array",
+    bookType: "xlsx",
+    cellStyles: true,
+  });
+  if (out instanceof ArrayBuffer) return out;
+  if (out instanceof Uint8Array) {
+    return out.buffer.slice(
+      out.byteOffset,
+      out.byteOffset + out.byteLength
+    ) as ArrayBuffer;
+  }
+  return new Uint8Array(out as ArrayLike<number>).buffer;
+}
+
+function triggerXlsxDownload(buffer: ArrayBuffer, filename: string): void {
+  const blob = new Blob([new Uint8Array(buffer)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Gera ArrayBuffer da lista preenchida (não é o modelo vazio). */
+export function gerarListaFuncionariosXlsx(
+  rows: ListaFuncionariosExportRow[]
+): ArrayBuffer {
+  const aoa: string[][] = [[...CONTRATO_VAGAS_EXPORT_HEADERS]];
+  for (const row of rows) {
+    aoa.push([
+      String(row.numeroVisual),
+      row.nome,
+      row.cpf,
+      row.cargo,
+      row.situacao,
+    ]);
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  sheet["!cols"] = [
+    { wch: 6 },
+    { wch: 36 },
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 16 },
+  ];
+  for (let i = 0; i < rows.length; i += 1) {
+    const ref = XLSX.utils.encode_cell({ r: i + 1, c: 2 });
+    sheet[ref] = { t: "s", v: rows[i].cpf, z: "@" };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, CONTRATO_VAGAS_SHEET_FUNCIONARIOS);
+  return writeXlsxArrayBuffer(wb);
+}
+
+export function downloadListaFuncionariosXlsx(params: {
+  rows: ListaFuncionariosExportRow[];
+  clienteNome?: string | null;
+  data?: Date;
+}): void {
+  const buffer = gerarListaFuncionariosXlsx(params.rows);
+  triggerXlsxDownload(
+    buffer,
+    nomeArquivoListaFuncionariosExport({
+      clienteNome: params.clienteNome,
+      data: params.data,
+    })
+  );
 }
 
 export function resumirErrosImportacaoListaFuncionarios(

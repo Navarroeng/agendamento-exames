@@ -12,6 +12,7 @@ import {
   IconTrash,
 } from "@/components/ui/icons/OutlineIcons";
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
   CONTRATO_VAGA_STATUS_LABELS,
   buildVagaDraftsIniciais,
@@ -19,7 +20,6 @@ import {
   emptyVagaDraft,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
-  resolveStatusVagaRascunho,
   validarDraftsListaVagas,
   vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
@@ -29,11 +29,19 @@ import {
 } from "@/lib/contrato-vagas";
 import {
   aplicarImportacaoNasVagas,
+  downloadListaFuncionariosXlsx,
   downloadModeloListaFuncionariosXlsx,
   lerArquivoListaFuncionarios,
   mensagemExcessoVagasListaFuncionarios,
   resumirErrosImportacaoListaFuncionarios,
 } from "@/lib/contrato-vagas-import";
+import {
+  buildLinhasVisuaisListaFuncionarios,
+  buildListaFuncionariosExportRows,
+  cycleListaFuncionariosNomeSort,
+  resolveStatusListaFuncionarioPreview,
+  type ListaFuncionariosNomeSort,
+} from "@/lib/contrato-vagas-lista";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
 import {
@@ -94,6 +102,7 @@ export function OrcamentoAbaFuncionarios({
   orcamentoNumero,
   aprovacao,
   usuarioNome,
+  clienteNome,
   clienteCnpj,
   clienteId,
   file,
@@ -126,6 +135,7 @@ export function OrcamentoAbaFuncionarios({
   } | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nomeSort, setNomeSort] = useState<ListaFuncionariosNomeSort>("asc");
 
   const hasSavedAnexo = Boolean(savedName);
   const hasPreview = Boolean(file || savedName);
@@ -385,7 +395,30 @@ export function OrcamentoAbaFuncionarios({
     }
   }
 
-  const visiveis = drafts.slice(0, quantidadePrevista);
+  const linhasVisuais = useMemo(
+    () =>
+      buildLinhasVisuaisListaFuncionarios(
+        drafts.slice(0, quantidadePrevista),
+        nomeSort
+      ),
+    [drafts, quantidadePrevista, nomeSort]
+  );
+
+  function handleExportarLista() {
+    try {
+      const rows = buildListaFuncionariosExportRows({
+        linhas: linhasVisuais,
+        vagaByIndice,
+      });
+      downloadListaFuncionariosXlsx({
+        rows,
+        clienteNome,
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível exportar a lista.");
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -423,6 +456,16 @@ export function OrcamentoAbaFuncionarios({
         >
           Importar lista
         </button>
+        <button
+          type="button"
+          className="btn btn-muted inline-flex items-center gap-1.5 text-xs"
+          disabled={busy || loading || quantidadePrevista <= 0}
+          title="Exportar a lista de funcionários atualmente exibida"
+          onClick={handleExportarLista}
+        >
+          <IconDownload size={14} />
+          Exportar lista
+        </button>
         <input
           ref={importInputRef}
           type="file"
@@ -452,14 +495,38 @@ export function OrcamentoAbaFuncionarios({
         </p>
       ) : null}
 
-      {!loading && visiveis.length > 0 ? (
+      {!loading && linhasVisuais.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border border-[#e4ebf4] bg-white">
           <table className="min-w-full text-left text-xs">
             <thead className="bg-[#f8fafc]">
               <tr>
                 <th className="w-10 border-b px-2 py-2 font-bold text-navy">#</th>
                 <th className="border-b px-2 py-2 font-bold text-navy">
-                  Nome do funcionário
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 font-bold text-navy hover:text-brand-blue"
+                    aria-label={
+                      nomeSort === "asc"
+                        ? "Ordenar nome Z–A"
+                        : "Ordenar nome A–Z"
+                    }
+                    title={
+                      nomeSort === "asc"
+                        ? "Ordenado A–Z. Clique para Z–A."
+                        : "Ordenado Z–A. Clique para A–Z."
+                    }
+                    onClick={() =>
+                      setNomeSort((prev) => cycleListaFuncionariosNomeSort(prev))
+                    }
+                  >
+                    Nome do funcionário
+                    <span
+                      className="text-[9px] leading-none text-brand-blue"
+                      aria-hidden
+                    >
+                      {nomeSort === "asc" ? "▲" : "▼"}
+                    </span>
+                  </button>
                 </th>
                 <th className="w-40 border-b px-2 py-2 font-bold text-navy">
                   CPF
@@ -473,18 +540,15 @@ export function OrcamentoAbaFuncionarios({
               </tr>
             </thead>
             <tbody>
-              {visiveis.map((row, rowIdx) => {
+              {linhasVisuais.map(({ numeroVisual, draft: row }, rowIdx) => {
                 const persistida = vagaByIndice.get(row.indice);
                 const locked = persistida
                   ? vagaStatusBloqueiaEdicao(persistida.status)
                   : false;
-                const statusPreview = persistida
-                  ? persistida.status
-                  : resolveStatusVagaRascunho({
-                      colaborador: row.colaborador,
-                      colaboradorCpf: row.colaboradorCpf,
-                      manterAsoAberto: row.manterAsoAberto,
-                    });
+                const statusPreview = resolveStatusListaFuncionarioPreview({
+                  persistida,
+                  draft: row,
+                });
                 const podeRemoverFuncionario = persistida
                   ? vagaPermiteRemoverFuncionario(persistida)
                   : false;
@@ -492,15 +556,15 @@ export function OrcamentoAbaFuncionarios({
                   !isNomeFuncionarioReal(row.colaborador) &&
                   normalizeCpfDigits(row.colaboradorCpf).length === 0;
                 return (
-                  <tr key={row.indice} className="odd:bg-white even:bg-[#fbfdff]">
+                  <tr key={row.id ?? `indice-${row.indice}`} className="odd:bg-white even:bg-[#fbfdff]">
                     <td className="border-b border-[#eef2f7] px-2 py-1.5 font-bold tabular-nums text-navy">
-                      {row.indice}
+                      {numeroVisual}
                     </td>
                     <td className="border-b border-[#eef2f7] px-2 py-1">
                       <input
                         data-vaga-cell={`${rowIdx}-0`}
                         className="field-input h-8 px-2 text-xs"
-                        value={row.colaborador}
+                        value={formatUppercaseInput(row.colaborador)}
                         disabled={busy || locked}
                         placeholder={locked ? undefined : "Nome"}
                         title={
@@ -510,8 +574,13 @@ export function OrcamentoAbaFuncionarios({
                         }
                         onChange={(e) =>
                           patchDraft(row.indice, {
-                            colaborador: e.target.value,
+                            colaborador: formatUppercaseInput(e.target.value),
                             manterAsoAberto: false,
+                          })
+                        }
+                        onBlur={() =>
+                          patchDraft(row.indice, {
+                            colaborador: normalizeNomeOcupante(row.colaborador),
                           })
                         }
                         onKeyDown={(e) => {
@@ -554,18 +623,28 @@ export function OrcamentoAbaFuncionarios({
                         data-vaga-cell={`${rowIdx}-2`}
                         className="field-input h-8 px-2 text-xs"
                         list="contrato-vagas-cargos"
-                        value={row.cargoNome}
+                        value={formatUppercaseInput(row.cargoNome)}
                         disabled={busy || locked}
                         placeholder="Cargo"
                         onChange={(e) => {
-                          const nome = e.target.value;
+                          const nome = formatUppercaseInput(e.target.value);
                           const found = cargos.find(
                             (c) =>
-                              c.nome.toLocaleLowerCase("pt-BR") ===
-                              nome.trim().toLocaleLowerCase("pt-BR")
+                              normalizeNomeOcupante(c.nome) ===
+                              normalizeNomeOcupante(nome)
                           );
                           patchDraft(row.indice, {
                             cargoNome: nome,
+                            cargoId: found?.id ?? null,
+                          });
+                        }}
+                        onBlur={() => {
+                          const cargoNome = normalizeNomeOcupante(row.cargoNome);
+                          const found = cargos.find(
+                            (c) => normalizeNomeOcupante(c.nome) === cargoNome
+                          );
+                          patchDraft(row.indice, {
+                            cargoNome,
                             cargoId: found?.id ?? null,
                           });
                         }}

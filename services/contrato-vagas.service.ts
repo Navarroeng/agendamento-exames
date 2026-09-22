@@ -190,7 +190,7 @@ export async function salvarListaVagasContrato(params: {
       nextStatus === "comprometida"
         ? normalizeCpfDigits(draft.colaboradorCpf)
         : null;
-    const cargoNome = draft.cargoNome.trim() || null;
+    const cargoNome = normalizeNomeOcupante(draft.cargoNome) || null;
     const cargoId = draft.cargoId?.trim() || null;
 
     if (nextStatus === "aso_aberto") {

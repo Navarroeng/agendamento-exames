@@ -5,6 +5,7 @@
  */
 
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { normalizeUppercaseField } from "@/lib/text-normalize";
 
 export const CONTRATO_VAGA_STATUSES = [
   "aberta",
@@ -74,7 +75,7 @@ export function isContratoVagaStatus(
 export function normalizeNomeOcupante(
   value: string | null | undefined
 ): string {
-  return (value ?? "").trim().replace(/\s+/g, " ");
+  return normalizeUppercaseField(value);
 }
 
 export function isNomeFuncionarioReal(
