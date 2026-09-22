@@ -5,7 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  consolidarEmpresasPortalPreview,
+  montarEmpresasPortalPreview,
   escolherCampanhaPortalDaEmpresa,
   montarHistoricoRiscosPortal,
   montarListaCampanhasPortal,
@@ -35,7 +35,8 @@ const PARTICIPANTE_SELECT = "campanha_id, nome_completo, status, removido_em";
 const RELATORIO_SELECT =
   "campanha_id, cliente_id, gerado_em, relatorio_enviado_em, resultado_json";
 
-const CAMPANHA_LISTA_SELECT = "cliente_id, empresa_nome, status";
+/** Mesmo lote de listarClientesParaSelect. */
+const CLIENTES_SELECT_BATCH = 1000;
 
 export type PortalHomeResultado = {
   resumo: PortalResumo;
@@ -61,38 +62,42 @@ type CampanhaLogoRow = {
   cliente_id?: string | null;
 };
 
+/**
+ * Todas as empresas do cadastro canônico (`public.clientes`),
+ * a mesma origem de `/clientes` / `listarClientesParaSelect`.
+ * Sem filtro de Riscos, contrato ou disponível para agendamento.
+ */
 export async function listarEmpresasPortalPreview(): Promise<
   PortalEmpresaOpcao[]
 > {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("riscos_campanhas")
-    .select(CAMPANHA_LISTA_SELECT)
-    .not("cliente_id", "is", null);
+  const clientes: Array<{
+    id: string;
+    nome: string | null;
+    cnpj: string | null;
+  }> = [];
+  let from = 0;
 
-  if (error) throw error;
+  while (true) {
+    const { data, error } = await admin
+      .from("clientes")
+      .select("id, nome, cnpj")
+      .order("nome", { ascending: true })
+      .range(from, from + CLIENTES_SELECT_BATCH - 1);
 
-  const campanhas = (data ?? []) as Array<{
-    cliente_id: string | null;
-    empresa_nome: string | null;
-    status: string | null;
-  }>;
-  const ids = Array.from(
-    new Set(
-      campanhas
-        .map((c) => String(c.cliente_id ?? "").trim())
-        .filter(Boolean)
-    )
-  );
+    if (error) throw error;
 
-  let clientes: Array<{ id: string; nome: string | null }> = [];
-  if (ids.length > 0) {
-    const cli = await admin.from("clientes").select("id, nome").in("id", ids);
-    if (cli.error) throw cli.error;
-    clientes = (cli.data ?? []) as Array<{ id: string; nome: string | null }>;
+    const batch = (data ?? []) as Array<{
+      id: string;
+      nome: string | null;
+      cnpj: string | null;
+    }>;
+    clientes.push(...batch);
+    if (batch.length < CLIENTES_SELECT_BATCH) break;
+    from += CLIENTES_SELECT_BATCH;
   }
 
-  return consolidarEmpresasPortalPreview(campanhas, clientes);
+  return montarEmpresasPortalPreview(clientes);
 }
 
 export async function carregarPortalHome(

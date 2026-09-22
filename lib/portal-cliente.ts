@@ -3,6 +3,10 @@
  * Sem PII, sem respostas, sem código público.
  */
 
+import {
+  formatClienteNomeDisplay,
+  formatClienteSelectLabel,
+} from "@/lib/cliente-display";
 import { calcularParticipacaoOperacional } from "@/lib/copsoq-engine";
 import { formatPeriodoCampanha } from "@/lib/riscos-campanha";
 import { escolherCampanhaParaProgresso } from "@/lib/riscos-campanha-origem";
@@ -263,7 +267,10 @@ export function resolvePortalDevClienteId(
 
 export type PortalEmpresaOpcao = {
   id: string;
+  /** Nome do cadastro — apresentação e fallback legado, nunca a chave. */
   nome: string;
+  /** Rótulo do select (Nome — CNPJ). */
+  label: string;
 };
 
 export type ResolveClientePortalPreview =
@@ -299,33 +306,47 @@ export function isPerfilStaffNavarro(
   return perfil === "admin" || perfil === "operacional";
 }
 
-/** Uma opção por cliente, só campanhas não canceladas. */
-export function consolidarEmpresasPortalPreview(
-  campanhas: ReadonlyArray<{
-    cliente_id?: string | null;
-    empresa_nome?: string | null;
-    status?: string | null;
-  }>,
-  clientes: ReadonlyArray<{ id: string; nome?: string | null }>
+/** Rótulo do select interno: Nome — CNPJ. Sem CNPJ, só o nome. */
+export function labelEmpresaPortalPreview(input: {
+  nome?: string | null;
+  cnpj?: string | null;
+}): string {
+  const nome = String(input.nome ?? "").trim();
+  const cnpj = String(input.cnpj ?? "").trim();
+  if (!cnpj) return formatClienteNomeDisplay(nome) || "Empresa";
+  return formatClienteSelectLabel({ nome, cnpj });
+}
+
+/**
+ * Opções do preview interno a partir do cadastro canônico de Clientes.
+ * Identidade = cliente.id. Não filtra por Riscos, contrato ou agendamento.
+ */
+export function montarEmpresasPortalPreview(
+  clientes: ReadonlyArray<{
+    id: string;
+    nome?: string | null;
+    cnpj?: string | null;
+  }>
 ): PortalEmpresaOpcao[] {
-  const nomesCadastro = new Map(
-    clientes.map((c) => [c.id, String(c.nome ?? "").trim()])
-  );
-  const porCliente = new Map<string, string>();
-  for (const campanha of campanhas) {
-    if (String(campanha.status ?? "") === "cancelada") continue;
-    const id = String(campanha.cliente_id ?? "").trim();
+  const itens: PortalEmpresaOpcao[] = [];
+  for (const cliente of clientes) {
+    const id = String(cliente.id ?? "").trim();
     if (!isPortalUuid(id)) continue;
-    if (porCliente.has(id)) continue;
-    const nome =
-      nomesCadastro.get(id) ||
-      String(campanha.empresa_nome ?? "").trim() ||
-      "Empresa";
-    porCliente.set(id, nome);
+    const nome = String(cliente.nome ?? "").trim() || "Empresa";
+    itens.push({
+      id,
+      nome,
+      label: labelEmpresaPortalPreview({
+        nome,
+        cnpj: cliente.cnpj,
+      }),
+    });
   }
-  return Array.from(porCliente.entries())
-    .map(([id, nome]) => ({ id, nome }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return itens.sort((a, b) => {
+    const byNome = a.nome.localeCompare(b.nome, "pt-BR");
+    if (byNome !== 0) return byNome;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 export function escolherCampanhaAtualPortal(

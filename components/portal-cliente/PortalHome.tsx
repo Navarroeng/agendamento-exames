@@ -476,7 +476,7 @@ function PreviewBar({
           <option value="">Selecionar empresa</option>
           {empresas.map((empresa) => (
             <option key={empresa.id} value={empresa.id}>
-              {empresa.nome}
+              {empresa.label}
             </option>
           ))}
         </select>

@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   PORTAL_DEV_CLIENTE_ID_ENV,
-  consolidarEmpresasPortalPreview,
+  montarEmpresasPortalPreview,
   dtoContemCampoProibido,
   escolherCampanhaAtualPortal,
   estadoTimelinePortal,
@@ -26,6 +26,7 @@ import {
   type PortalSnapshotFonte,
 } from "../lib/portal-cliente";
 import type { RiscosRelatorioResultadoJson } from "../lib/riscos-relatorio";
+import { formatCNPJ } from "../lib/cnpj";
 import { NAV_SECTIONS } from "../lib/constants";
 import { canAccessPath } from "../lib/perfil-access";
 import { calcPortalAgendamentosResumo } from "../lib/portal-agendamentos";
@@ -501,43 +502,104 @@ run("UUID inválido na request não cai no fallback de env", () => {
   }
 });
 
-run("consolidar empresas: só campanha elegível, um por cliente", () => {
-  const navarro = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  const al = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+run("empresas do portal vêm do cadastro de Clientes, não de Riscos", () => {
+  const semCampanha = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const comCampanha = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   const soCancelada = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-  const empresas = consolidarEmpresasPortalPreview(
-    [
-      {
-        cliente_id: navarro,
-        empresa_nome: "Navarro campanha",
-        status: "aberta",
-      },
-      {
-        cliente_id: navarro,
-        empresa_nome: "Navarro outra",
-        status: "encerrada",
-      },
-      {
-        cliente_id: al,
-        empresa_nome: "AL campanha",
-        status: "em_preparacao",
-      },
-      {
-        cliente_id: soCancelada,
-        empresa_nome: "Só cancelada",
-        status: "cancelada",
-      },
-    ],
-    [
-      { id: navarro, nome: "NAVARRO ENGENHARIA" },
-      { id: al, nome: "AL ASSESSORIA" },
-    ]
+  const empresas = montarEmpresasPortalPreview([
+    { id: comCampanha, nome: "NAVARRO ENGENHARIA", cnpj: "12345678000199" },
+    { id: semCampanha, nome: "AL ASSESSORIA", cnpj: "11111111000191" },
+    { id: soCancelada, nome: "EMPRESA SO CANCELADA", cnpj: "22222222000100" },
+  ]);
+  assert.deepEqual(
+    empresas.map((e) => e.id),
+    [semCampanha, soCancelada, comCampanha]
   );
+  assert.equal(empresas.length, 3);
+  assert.ok(empresas.some((e) => e.id === semCampanha));
+  assert.ok(empresas.some((e) => e.id === comCampanha));
+  assert.ok(empresas.some((e) => e.id === soCancelada));
+});
+
+run("empresas homônimas são opções distintas por UUID e CNPJ", () => {
+  const filialA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const filialB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const nome = "FESHI SERVICOS ADUANEIROS E TRANSPORTES LTDA";
+  const cnpjA = "47190517000405";
+  const cnpjB = "47190517000162";
+  const empresas = montarEmpresasPortalPreview([
+    { id: filialB, nome, cnpj: cnpjB },
+    { id: filialA, nome, cnpj: cnpjA },
+  ]);
+  assert.equal(empresas.length, 2);
+  assert.notEqual(empresas[0]?.id, empresas[1]?.id);
+  assert.equal(empresas[0]?.nome, nome);
+  assert.equal(empresas[1]?.nome, nome);
+  assert.notEqual(empresas[0]?.label, empresas[1]?.label);
+  assert.ok((empresas[0]?.label ?? "").includes(formatCNPJ(cnpjA)));
+  assert.ok((empresas[1]?.label ?? "").includes(formatCNPJ(cnpjB)));
+  assert.equal(
+    empresas.find((e) => e.id === filialA)?.label,
+    `${nome} — ${formatCNPJ(cnpjA)}`
+  );
+});
+
+run("empresa sem CNPJ tem label só com o nome", () => {
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const empresas = montarEmpresasPortalPreview([
+    { id, nome: "Empresa Sem Cnpj", cnpj: "" },
+  ]);
+  assert.equal(empresas[0]?.id, id);
+  assert.equal(empresas[0]?.label, "EMPRESA SEM CNPJ");
+  assert.doesNotMatch(empresas[0]?.label ?? "", /—/);
+  assert.doesNotMatch(empresas[0]?.label ?? "", /CNPJ não informado/);
+});
+
+run("empresas do portal ordenam A–Z pelo nome", () => {
+  const zeta = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const alfa = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const beta = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const empresas = montarEmpresasPortalPreview([
+    { id: zeta, nome: "Zeta Ltda", cnpj: "11111111000191" },
+    { id: alfa, nome: "Alfa Ltda", cnpj: "22222222000100" },
+    { id: beta, nome: "Beta Ltda", cnpj: "33333333000177" },
+  ]);
   assert.deepEqual(
     empresas.map((e) => e.nome),
-    ["AL ASSESSORIA", "NAVARRO ENGENHARIA"]
+    ["Alfa Ltda", "Beta Ltda", "Zeta Ltda"]
   );
-  assert.equal(empresas.length, 2);
+  assert.deepEqual(
+    empresas.map((e) => e.id),
+    [alfa, beta, zeta]
+  );
+});
+
+run("select do portal usa cliente.id como identidade", () => {
+  const ui = readFileSync(
+    join(root, "components/portal-cliente/PortalHome.tsx"),
+    "utf8"
+  );
+  assert.match(ui, /value=\{empresa\.id\}/);
+  assert.match(ui, /\{empresa\.label\}/);
+  assert.match(ui, /selecionarEmpresa/);
+  assert.match(ui, /cliente: id/);
+  assert.doesNotMatch(ui, /value=\{empresa\.nome\}/);
+  assert.doesNotMatch(ui, /value=\{empresa\.cnpj\}/);
+});
+
+run("empresa sem campanha ainda monta o portal vazio", () => {
+  const vazio = portalResumoVazio();
+  assert.equal(vazio.statusPortal, "sem_avaliacao");
+  assert.deepEqual(vazio.campanhasLista, []);
+  const svc = readFileSync(
+    join(root, "services/portal-home.server.ts"),
+    "utf8"
+  );
+  assert.match(svc, /empresaNome: nome \|\| null/);
+  assert.match(svc, /campanhasLista/);
+  assert.match(svc, /montarEmpresasPortalPreview/);
+  assert.match(svc, /select\("id, nome, cnpj"\)/);
+  assert.doesNotMatch(svc, /eq\("disponivel_agendamento"/);
 });
 
 run("troca de empresa não mistura dados", () => {
@@ -952,6 +1014,8 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(staff, /isPerfilStaffNavarro/);
   assert.match(home, /requirePortalStaffUser/);
   assert.match(empresas, /requirePortalStaffUser/);
+  assert.doesNotMatch(empresas, /campanha de Riscos/);
+  assert.match(empresas, /cadastro de Clientes/);
   assert.match(page, /PerfilRouteGuard/);
   assert.match(page, /AppShell/);
   assert.match(ui, /Pré-visualização interna|PORTAL_PREVIEW_INTERNO_LABEL/);

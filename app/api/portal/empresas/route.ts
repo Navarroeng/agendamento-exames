@@ -6,7 +6,7 @@ import { requirePortalStaffUser } from "@/services/portal-staff.server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Lista clientes com campanha de Riscos — preview interno staff. */
+/** Lista todas as empresas do cadastro de Clientes — preview interno staff. */
 export async function GET() {
   try {
     const staff = await requirePortalStaffUser();
