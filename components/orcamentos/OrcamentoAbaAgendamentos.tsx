@@ -56,6 +56,11 @@ import {
   type ContratoVagaRecord,
   type ContratoVagaStatus,
 } from "@/lib/contrato-vagas";
+import {
+  cycleListaFuncionariosNomeSort,
+  orderPorNomeColaborador,
+  type ListaFuncionariosNomeSort,
+} from "@/lib/contrato-vagas-lista";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { AgendamentoWithExames, ClienteContratoRecord } from "@/lib/types";
 import {
@@ -302,6 +307,8 @@ export function OrcamentoAbaAgendamentos({
     ColaboradorSugestao[]
   >([]);
   const [vagas, setVagas] = useState<ContratoVagaRecord[]>([]);
+  const [vagasNomeSort, setVagasNomeSort] =
+    useState<ListaFuncionariosNomeSort>("asc");
 
   const onContagemChangeRef = useRef(onContagemChange);
   onContagemChangeRef.current = onContagemChange;
@@ -514,6 +521,11 @@ export function OrcamentoAbaAgendamentos({
     }
     return map;
   }, [vagas, itens, programacoes]);
+
+  const vagasOrdenadas = useMemo(
+    () => orderPorNomeColaborador(vagas, vagasNomeSort),
+    [vagas, vagasNomeSort]
+  );
 
   useEffect(() => {
     onContagemChangeRef.current?.(contagemPreview);
@@ -1232,7 +1244,33 @@ export function OrcamentoAbaAgendamentos({
               <thead className="bg-[#f8fafc]">
                 <tr>
                   <th className="border-b px-4 py-2 font-bold text-navy">
-                    Colaborador / vaga
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 font-bold text-navy hover:text-brand-blue"
+                      aria-label={
+                        vagasNomeSort === "asc"
+                          ? "Ordenar colaborador Z–A"
+                          : "Ordenar colaborador A–Z"
+                      }
+                      title={
+                        vagasNomeSort === "asc"
+                          ? "Ordenado A–Z. Clique para Z–A."
+                          : "Ordenado Z–A. Clique para A–Z."
+                      }
+                      onClick={() =>
+                        setVagasNomeSort((prev) =>
+                          cycleListaFuncionariosNomeSort(prev)
+                        )
+                      }
+                    >
+                      Colaborador / vaga
+                      <span
+                        className="text-[9px] leading-none text-brand-blue"
+                        aria-hidden
+                      >
+                        {vagasNomeSort === "asc" ? "▲" : "▼"}
+                      </span>
+                    </button>
                   </th>
                   <th className="whitespace-nowrap border-b px-4 py-2 font-bold text-navy">
                     Data do exame
@@ -1252,7 +1290,7 @@ export function OrcamentoAbaAgendamentos({
                 </tr>
               </thead>
               <tbody>
-                {vagas.map((vaga) => {
+                {vagasOrdenadas.map((vaga) => {
                   const dados = dadosExibicaoPorVagaId.get(vaga.id);
                   const agVisualizar = dados?.agendamentoIdVisualizar
                     ? agendamentosPorId.get(dados.agendamentoIdVisualizar) ??

@@ -9,8 +9,11 @@ import { join } from "node:path";
 import * as XLSX from "xlsx";
 import {
   emptyVagaDraft,
+  labelColaboradorOuVaga,
   normalizeNomeOcupante,
   type ContratoVagaDraft,
+  type ContratoVagaRecord,
+  type ContratoVagaStatus,
 } from "../lib/contrato-vagas";
 import {
   aplicarImportacaoNasVagas,
@@ -22,6 +25,7 @@ import {
   buildListaFuncionariosExportRows,
   cycleListaFuncionariosNomeSort,
   nomeArquivoListaFuncionariosExport,
+  orderPorNomeColaborador,
 } from "../lib/contrato-vagas-lista";
 import { formatUppercaseInput, normalizeUppercaseField } from "../lib/text-normalize";
 
@@ -280,6 +284,150 @@ run("salvar lista normaliza cargo_nome e a UI não reordena o estado", () => {
   assert.match(ui, /drafts\.slice\(0, quantidadePrevista\)/);
   assert.match(ui, /patchDraft\(row\.indice/);
   assert.doesNotMatch(ui, /setDrafts\(.*orderDraftsListaFuncionarios/);
+});
+
+function acaoVagaContrato(status: ContratoVagaStatus): string {
+  if (status === "comprometida") return "Agendar";
+  if (status === "programada") return "Editar";
+  if (status === "aberta" || status === "aso_aberto") return "Definir funcionário";
+  return "—";
+}
+
+function vagaTabela(partial: Partial<ContratoVagaRecord> & {
+  id: string;
+  indice: number;
+  status: ContratoVagaStatus;
+}): ContratoVagaRecord {
+  return {
+    contrato_id: "ctr-1",
+    orcamento_id: "orc-1",
+    colaborador: null,
+    colaborador_cpf: null,
+    cargo_id: null,
+    cargo_nome: null,
+    credito_aso_id: null,
+    agendamento_id: null,
+    periodico_futuro_id: null,
+    created_at: "",
+    updated_at: "",
+    ...partial,
+  };
+}
+
+run("Vagas do contrato: A–Z mistura situações sem usar o status", () => {
+  const originais = [
+    vagaTabela({
+      id: "uuid-zeca",
+      indice: 1,
+      colaborador: "Zeca Lima",
+      status: "comprometida",
+      agendamento_id: null,
+    }),
+    vagaTabela({
+      id: "uuid-ana",
+      indice: 2,
+      colaborador: "Ana Souza",
+      status: "agendada",
+      agendamento_id: "ag-ana",
+    }),
+    vagaTabela({
+      id: "uuid-bruno",
+      indice: 3,
+      colaborador: "Bruno Dias",
+      status: "programada",
+      periodico_futuro_id: "pf-bruno",
+    }),
+    vagaTabela({
+      id: "uuid-vaga-aberta",
+      indice: 4,
+      colaborador: null,
+      status: "aso_aberto",
+    }),
+  ];
+  const ordenadas = orderPorNomeColaborador(originais, "asc");
+  assert.deepEqual(
+    ordenadas.map((v) => v.id),
+    ["uuid-ana", "uuid-bruno", "uuid-zeca", "uuid-vaga-aberta"]
+  );
+  assert.equal(ordenadas[0].status, "agendada");
+  assert.equal(ordenadas[1].status, "programada");
+  assert.equal(ordenadas[2].status, "comprometida");
+  assert.deepEqual(
+    orderPorNomeColaborador(originais, "desc").map((v) => v.id),
+    ["uuid-zeca", "uuid-bruno", "uuid-ana", "uuid-vaga-aberta"]
+  );
+  assert.equal(originais[0].id, "uuid-zeca");
+  assert.equal(originais[0].indice, 1);
+});
+
+run("ordenar não troca ações nem vínculos entre vagas", () => {
+  const originais = [
+    vagaTabela({
+      id: "uuid-carlos",
+      indice: 9,
+      colaborador: "Carlos",
+      status: "comprometida",
+    }),
+    vagaTabela({
+      id: "uuid-ana",
+      indice: 2,
+      colaborador: "Ana",
+      status: "programada",
+      periodico_futuro_id: "pf-ana",
+      agendamento_id: null,
+    }),
+  ];
+  const porIdAntes = new Map(
+    originais.map((v) => [
+      v.id,
+      {
+        indice: v.indice,
+        acao: acaoVagaContrato(v.status),
+        periodico: v.periodico_futuro_id,
+        agendamento: v.agendamento_id,
+      },
+    ])
+  );
+  const ordenadas = orderPorNomeColaborador(originais, "asc");
+  assert.equal(ordenadas[0].id, "uuid-ana");
+  assert.equal(acaoVagaContrato(ordenadas[0].status), "Editar");
+  assert.equal(ordenadas[0].periodico_futuro_id, "pf-ana");
+  assert.equal(acaoVagaContrato(ordenadas[1].status), "Agendar");
+  assert.equal(ordenadas[1].id, "uuid-carlos");
+  for (const vaga of ordenadas) {
+    const antes = porIdAntes.get(vaga.id);
+    assert.ok(antes);
+    assert.equal(vaga.indice, antes?.indice);
+    assert.equal(acaoVagaContrato(vaga.status), antes?.acao);
+    assert.equal(vaga.periodico_futuro_id, antes?.periodico);
+    assert.equal(vaga.agendamento_id, antes?.agendamento);
+  }
+});
+
+run("aba Agendamentos reusa o helper e não altera os cards", () => {
+  const aba = read("components/orcamentos/OrcamentoAbaAgendamentos.tsx");
+  assert.match(aba, /orderPorNomeColaborador\(vagas, vagasNomeSort\)/);
+  assert.match(aba, /vagasOrdenadas\.map\(\(vaga\) =>/);
+  assert.match(aba, /onClick=\{\(\) => handleAgendarVaga\(vaga\)\}/);
+  assert.match(aba, /onClick=\{\(\) => handleAbrirProgramarVaga\(vaga\)\}/);
+  assert.match(aba, /onClick=\{\(\) => handleAbrirEditarProgramacao\(vaga\)\}/);
+  assert.match(aba, /key=\{vaga\.id\}/);
+  assert.doesNotMatch(aba, /setVagas\(.*orderPorNomeColaborador/);
+  assert.match(
+    aba,
+    /vagasComprometidas = vagas\.filter\(\(v\) => v\.status === \"comprometida\"\)/
+  );
+  assert.equal(
+    labelColaboradorOuVaga({
+      indice: 1,
+      colaborador: "josé da conceição",
+      status: "comprometida",
+    }),
+    "JOSÉ DA CONCEIÇÃO"
+  );
+  assert.match(aba, /dadosExibicaoPorVagaId\.get\(vaga\.id\)/);
+  assert.match(aba, /useState<ListaFuncionariosNomeSort>\("asc"\)/);
+  assert.match(aba, /vaga_id: vaga\.id/);
 });
 
 console.log("test-lista-funcionarios-ux: OK");

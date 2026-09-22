@@ -53,10 +53,9 @@ export function compareListaFuncionariosNome(
   return direction === "desc" ? -cmp : cmp;
 }
 
-export function orderDraftsListaFuncionarios<T extends ContratoVagaDraft>(
-  rows: T[],
-  direction: ListaFuncionariosNomeSort
-): T[] {
+export function orderPorNomeColaborador<
+  T extends { colaborador?: string | null; indice: number }
+>(rows: T[], direction: ListaFuncionariosNomeSort): T[] {
   return [...rows].sort((left, right) => {
     const byNome = compareListaFuncionariosNome(
       left.colaborador,
@@ -66,6 +65,13 @@ export function orderDraftsListaFuncionarios<T extends ContratoVagaDraft>(
     if (byNome !== 0) return byNome;
     return left.indice - right.indice;
   });
+}
+
+export function orderDraftsListaFuncionarios<T extends ContratoVagaDraft>(
+  rows: T[],
+  direction: ListaFuncionariosNomeSort
+): T[] {
+  return orderPorNomeColaborador(rows, direction);
 }
 
 export function numerarLinhasListaFuncionarios<T extends ContratoVagaDraft>(
