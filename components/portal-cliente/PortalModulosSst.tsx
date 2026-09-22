@@ -318,14 +318,6 @@ function ColaboradoresConteudo({
     );
   }
 
-  const extras: string[] = [];
-  if (resumo.totalAdmissionalEmAndamento > 0) {
-    extras.push(`${resumo.totalAdmissionalEmAndamento} em admissão`);
-  }
-  if (resumo.totalDemissionalEmAndamento > 0) {
-    extras.push(`${resumo.totalDemissionalEmAndamento} em desligamento`);
-  }
-
   return (
     <DadoPrincipal
       valor={String(resumo.totalAtivos)}
@@ -334,7 +326,6 @@ function ColaboradoresConteudo({
         "colaborador ativo",
         "colaboradores ativos"
       )}
-      extra={extras.length > 0 ? <p>{extras.join(" · ")}</p> : null}
     />
   );
 }

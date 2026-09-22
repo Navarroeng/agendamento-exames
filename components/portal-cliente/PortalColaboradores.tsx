@@ -132,15 +132,11 @@ export function PortalColaboradores({
 
       {estado.fase === "ok" && (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Kpi label="Equipe atual" valor={String(estado.resumo.totalAtivos)} />
             <Kpi
               label="Demitidos"
               valor={String(estado.resumo.totalDemitidos)}
-            />
-            <Kpi
-              label="Admissional"
-              valor={String(estado.resumo.totalAdmissionalEmAndamento)}
             />
           </div>
 

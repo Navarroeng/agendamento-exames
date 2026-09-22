@@ -1029,6 +1029,10 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(modulos, /Ver agendamentos/);
   assert.match(modulos, /Laudos SST/);
   assert.match(modulos, /Colaboradores/);
+  assert.match(modulos, /Ver colaboradores/);
+  assert.doesNotMatch(modulos, /em admissão/);
+  assert.doesNotMatch(modulos, /em desligamento/);
+  assert.doesNotMatch(modulos, /totalAdmissionalEmAndamento/);
   assert.match(modulos, /Serviços e acompanhamento/);
   assert.doesNotMatch(modulos, /titulo="Exames Ocupacionais"/);
   assert.match(modulos, /titulo="Faturas de Exames Ocupacionais"/);
@@ -1151,6 +1155,42 @@ run("visão geral: agendamento não liberado é pendência; sem fatura não é",
     visao.pendencias.map((p) => p.label),
     ["Agendamento não liberado"]
   );
+});
+
+run("visão geral: colaboradores só mostra ativos, sem em admissão", () => {
+  const colaboradores = calcPortalColaboradoresResumo([
+    {
+      id: "52998224725",
+      cpfDigits: "52998224725",
+      cpfMascarado: "***.***.***-25",
+      nome: "MARIA SILVA",
+      cargo: "Auxiliar",
+      situacao: "ativo",
+      situacaoLabel: "Ativo",
+      dataAdmissaoIso: "2026-03-01",
+      dataAdmissaoLabel: "01/03/2026",
+      dataDesligamentoIso: null,
+      dataDesligamentoLabel: null,
+    },
+  ]);
+  assert.equal(colaboradores.linhaResumo, "1 colaborador ativo");
+  const visao = montarPortalVisaoGeral({
+    contrato: {
+      ...portalContratoResumoVazio(),
+      procuracaoTone: "ok",
+      procuracaoLabel: "Ativa",
+      agendamentoLabel: "Liberado",
+      agendamentoTone: "ok",
+    },
+    faturas: calcPortalFaturasResumo([]),
+    agendamentos: calcPortalAgendamentosResumo([]),
+    laudos: calcPortalLaudosSstResumo([]),
+    colaboradores,
+  });
+  assert.ok(
+    visao.indicadores.some((i) => i.label === "1 colaborador ativo")
+  );
+  assert.ok(visao.indicadores.every((i) => !/admissão/i.test(i.label)));
 });
 
 console.log("test-portal-home: OK");
