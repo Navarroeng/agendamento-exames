@@ -3,12 +3,11 @@
  * Derivado de contrato_vagas (lista implantação) + agendamentos.
  * Sem tabela mestre nova. Identidade: cliente + CPF normalizado.
  *
- * Situações (fatos persistidos):
- * - Ativo: vaga / Admissional aso_retido / sem demissional concluído pendente
- * - Admissional em andamento: Admissional status=agendado (não cancelado)
- * - Demissional em andamento: Demissional status=agendado (não cancelado)
- * - Demitido: Demissional status=aso_retido sem Admissional posterior
- * Cancelados nunca alteram a situação.
+ * Situações (fatos persistidos, ordem cronológica):
+ * - Ativo: vaga / Admissional aso_retido, sem Demissional vigente posterior
+ * - Admissional em andamento: Admissional agendado (novo ou readmissão)
+ * - Demitido: Demissional agendado ou aso_retido, sem Admissional posterior
+ * Cancelados não entram na fonte e não produzem efeito.
  */
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
@@ -41,10 +40,11 @@ export type PortalColaboradorLinha = {
 
 export type PortalColaboradoresResumo = {
   total: number;
-  /** Equipe atual (não demitidos): ativo + processos em andamento. */
+  /** Equipe atual (não demitidos): ativo + admissional em andamento. */
   totalAtivos: number;
   totalDemitidos: number;
   totalAdmissionalEmAndamento: number;
+  /** Mantido em 0: Demissional vigente classifica como demitido. */
   totalDemissionalEmAndamento: number;
   temColaboradores: boolean;
   linhaResumo: string;
@@ -73,13 +73,11 @@ type Interno = {
   cargo: string;
   fromVaga: boolean;
   dataAdmissaoIso: string | null;
-  dataDesligamentoIso: string | null;
   ultimoAdmissionalSortKey: string;
   ultimoAdmissionalRetidoSortKey: string;
   ultimoAdmissionalAgendadoSortKey: string;
-  ultimoDemissionalRetidoIso: string | null;
-  ultimoDemissionalRetidoSortKey: string;
-  ultimoDemissionalAgendadoSortKey: string;
+  ultimoDemissionalSortKey: string;
+  ultimoDemissionalIso: string | null;
   ultimoEventoSortKey: string;
 };
 
@@ -182,15 +180,12 @@ export function calcPortalColaboradoresResumo(
   const totalAdmissionalEmAndamento = linhas.filter(
     (l) => l.situacao === "admissional_em_andamento"
   ).length;
-  const totalDemissionalEmAndamento = linhas.filter(
-    (l) => l.situacao === "demissional_em_andamento"
-  ).length;
   return {
     total,
     totalAtivos,
     totalDemitidos,
     totalAdmissionalEmAndamento,
-    totalDemissionalEmAndamento,
+    totalDemissionalEmAndamento: 0,
     temColaboradores: total > 0,
     linhaResumo:
       totalAtivos === 0
@@ -210,13 +205,11 @@ function ensureBucket(map: Map<string, Interno>, cpfDigits: string): Interno {
       cargo: "",
       fromVaga: false,
       dataAdmissaoIso: null,
-      dataDesligamentoIso: null,
       ultimoAdmissionalSortKey: "",
       ultimoAdmissionalRetidoSortKey: "",
       ultimoAdmissionalAgendadoSortKey: "",
-      ultimoDemissionalRetidoIso: null,
-      ultimoDemissionalRetidoSortKey: "",
-      ultimoDemissionalAgendadoSortKey: "",
+      ultimoDemissionalSortKey: "",
+      ultimoDemissionalIso: null,
       ultimoEventoSortKey: "",
     };
     map.set(cpfDigits, row);
@@ -242,35 +235,24 @@ function aplicarIdentidade(
 }
 
 function resolverSituacao(row: Interno): PortalColaboradorSituacao {
-  const demRet = row.ultimoDemissionalRetidoSortKey;
+  const demAny = row.ultimoDemissionalSortKey;
   const admAny = row.ultimoAdmissionalSortKey;
   const admAge = row.ultimoAdmissionalAgendadoSortKey;
   const admRet = row.ultimoAdmissionalRetidoSortKey;
-  const demAge = row.ultimoDemissionalAgendadoSortKey;
 
-  // Demitido: Demissional aso_retido sem Admissional posterior
-  if (demRet && (!admAny || admAny < demRet)) {
+  // Demitido: Demissional vigente (agendado ou aso_retido) posterior ao Admissional.
+  // Empate de chave: não considera Demitido (readmissão prevalece).
+  if (demAny && (!admAny || admAny < demAny)) {
     return "demitido";
   }
 
-  // Demissional em andamento
-  if (
-    demAge &&
-    (!demRet || demAge > demRet) &&
-    (!admAny || admAny < demAge)
-  ) {
-    return "demissional_em_andamento";
-  }
-
-  // Admissional em andamento:
-  // - novo (sem vaga / sem admissional retido), ou
-  // - readmissão após demissional concluído
+  // Admissional em andamento: novo ou readmissão após Demissional vigente
   if (
     admAge &&
     (!admRet || admAge > admRet) &&
-    (!demRet || admAge > demRet)
+    (!demAny || admAge > demAny)
   ) {
-    const readmissao = Boolean(demRet && admAge > demRet);
+    const readmissao = Boolean(demAny && admAge > demAny);
     const novoSemBase = !row.fromVaga && !admRet;
     if (readmissao || novoSemBase) {
       return "admissional_em_andamento";
@@ -332,11 +314,6 @@ export function consolidarPortalColaboradores(input: {
       continue;
     }
 
-    // Demissional só agendado de desconhecido: não cria registro
-    if (demissional && !retido && !map.has(cpf)) {
-      continue;
-    }
-
     const row = ensureBucket(map, cpf);
     aplicarIdentidade(row, nome, cargo, sortKey);
 
@@ -355,15 +332,9 @@ export function consolidarPortalColaboradores(input: {
       }
     }
 
-    if (demissional) {
-      if (retido && dataIso && sortKey >= row.ultimoDemissionalRetidoSortKey) {
-        row.ultimoDemissionalRetidoIso = dataIso;
-        row.ultimoDemissionalRetidoSortKey = sortKey;
-        row.dataDesligamentoIso = dataIso;
-      }
-      if (agendado && sortKey >= row.ultimoDemissionalAgendadoSortKey) {
-        row.ultimoDemissionalAgendadoSortKey = sortKey;
-      }
+    if (demissional && dataIso && sortKey >= row.ultimoDemissionalSortKey) {
+      row.ultimoDemissionalSortKey = sortKey;
+      row.ultimoDemissionalIso = dataIso;
     }
   }
 
@@ -373,6 +344,7 @@ export function consolidarPortalColaboradores(input: {
 
     const situacao = resolverSituacao(row);
     const demitido = situacao === "demitido";
+    const desligamentoIso = demitido ? row.ultimoDemissionalIso : null;
 
     linhas.push({
       id: row.cpfDigits,
@@ -386,11 +358,10 @@ export function consolidarPortalColaboradores(input: {
       dataAdmissaoLabel: row.dataAdmissaoIso
         ? formatDateIsoToBR(row.dataAdmissaoIso)
         : null,
-      dataDesligamentoIso: demitido ? row.dataDesligamentoIso : null,
-      dataDesligamentoLabel:
-        demitido && row.dataDesligamentoIso
-          ? formatDateIsoToBR(row.dataDesligamentoIso)
-          : null,
+      dataDesligamentoIso: desligamentoIso,
+      dataDesligamentoLabel: desligamentoIso
+        ? formatDateIsoToBR(desligamentoIso)
+        : null,
     });
   }
 
