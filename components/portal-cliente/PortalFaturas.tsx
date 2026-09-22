@@ -83,10 +83,10 @@ export function PortalFaturas({
 
       <div>
         <h2 className="text-base font-semibold tracking-tight text-[#0b1f4d]">
-          Faturas
+          Faturas de Exames Ocupacionais
         </h2>
         <p className="mt-1 text-sm text-[#64748b]">
-          Acompanhe as faturas emitidas para sua empresa.
+          Acompanhe as faturas referentes aos exames ocupacionais realizados para sua empresa.
         </p>
       </div>
 

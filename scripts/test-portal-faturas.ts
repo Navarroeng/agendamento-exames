@@ -4,6 +4,8 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   calcPortalFaturasResumo,
   faturaPertencesseAoCliente,
@@ -13,6 +15,8 @@ import {
   type PortalFaturaFiltros,
 } from "../lib/portal-faturas";
 import type { FaturaRecord } from "../lib/types";
+
+const root = process.cwd();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -305,6 +309,112 @@ run("status outros nunca aparece", () => {
 run("lista vazia sem quebrar", () => {
   const r = filtrarPortalFaturas([], filtroDefault);
   assert.equal(r.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Escopo: faturas do portal = exames ocupacionais (tipo cliente)
+// ---------------------------------------------------------------------------
+
+console.log("\n== escopo exames ocupacionais ==");
+
+run("consulta do portal filtra apenas tipo=cliente", () => {
+  const svc = readFileSync(
+    join(root, "services/portal-faturas.server.ts"),
+    "utf8"
+  );
+  assert.match(svc, /\.eq\("tipo", "cliente"\)/);
+  assert.match(svc, /\.eq\("referencia_id", clienteId\)/);
+  assert.doesNotMatch(svc, /mensalidade/);
+  assert.doesNotMatch(svc, /orcamento/);
+});
+
+run("itens da fatura vêm de agendamentos (exame/ASO), não de contrato SST", () => {
+  const svc = readFileSync(
+    join(root, "services/portal-faturas.server.ts"),
+    "utf8"
+  );
+  assert.match(svc, /agendamento_id/);
+  assert.match(svc, /tipo_aso/);
+  assert.match(svc, /exame_nome/);
+});
+
+run("tipo FaturaTipo permanece apenas cliente|clinica", () => {
+  const types = readFileSync(join(root, "lib/types.ts"), "utf8");
+  assert.match(types, /export type FaturaTipo = "cliente" \| "clinica"/);
+});
+
+run("seção do portal usa título e texto de exames ocupacionais", () => {
+  const ui = readFileSync(
+    join(root, "components/portal-cliente/PortalFaturas.tsx"),
+    "utf8"
+  );
+  assert.match(ui, />\s*Faturas de Exames Ocupacionais\s*</);
+  assert.match(
+    ui,
+    /Acompanhe as faturas referentes aos exames ocupacionais realizados para sua empresa\./
+  );
+  assert.doesNotMatch(ui, />\s*Faturas\s*</);
+  assert.doesNotMatch(ui, /Acompanhe as faturas emitidas para sua empresa\./);
+});
+
+run("card da Home usa o mesmo escopo e abre o módulo existente", () => {
+  const modulos = readFileSync(
+    join(root, "components/portal-cliente/PortalModulosSst.tsx"),
+    "utf8"
+  );
+  const home = readFileSync(
+    join(root, "components/portal-cliente/PortalHome.tsx"),
+    "utf8"
+  );
+  assert.match(modulos, /titulo="Faturas de Exames Ocupacionais"/);
+  assert.match(
+    modulos,
+    /Acompanhe as faturas dos exames ocupacionais, vencimentos e pagamentos\./
+  );
+  assert.match(modulos, /label: "Ver faturas"/);
+  assert.match(modulos, /onClick: onVerFaturas/);
+  assert.match(home, /onVerFaturas=\{\(\) => atualizarQuery\(\{ view: "faturas" \}\)\}/);
+});
+
+run("listagem desktop não mostra coluna Emissão; DTO e detalhe mantêm a data", () => {
+  const listagem = readFileSync(
+    join(root, "components/portal-cliente/PortalFaturasListagem.tsx"),
+    "utf8"
+  );
+  const detalhe = readFileSync(
+    join(root, "components/portal-cliente/PortalFaturaDetalheModal.tsx"),
+    "utf8"
+  );
+  const lib = readFileSync(join(root, "lib/portal-faturas.ts"), "utf8");
+
+  assert.match(
+    listagem,
+    /"Nº",\s*"Competência",\s*"Vencimento",\s*"Valor",\s*"Status",\s*"Ação"/
+  );
+  assert.doesNotMatch(listagem, /"Emissão"/);
+  assert.doesNotMatch(listagem, /f\.dataEmissao/);
+
+  assert.match(listagem, /Competência/);
+  assert.match(listagem, /Vencimento/);
+  assert.match(listagem, /f\.dataVencimento/);
+  assert.match(listagem, /f\.valorFormatado/);
+  assert.match(listagem, /Visualizar/);
+
+  assert.match(detalhe, /label: "Emissão"/);
+  assert.match(lib, /dataEmissao:/);
+});
+
+run("cards mobile da listagem não apresentam Emissão", () => {
+  const listagem = readFileSync(
+    join(root, "components/portal-cliente/PortalFaturasListagem.tsx"),
+    "utf8"
+  );
+  const blocoMobile = listagem.slice(listagem.indexOf("Cards mobile"));
+  assert.match(blocoMobile, /Competência/);
+  assert.match(blocoMobile, /Vencimento/);
+  assert.match(blocoMobile, /Valor/);
+  assert.doesNotMatch(blocoMobile, /Emissão/);
+  assert.doesNotMatch(blocoMobile, /dataEmissao/);
 });
 
 // ---------------------------------------------------------------------------

@@ -1030,7 +1030,8 @@ run("APIs do portal exigem sessão staff", () => {
   assert.match(modulos, /Laudos SST/);
   assert.match(modulos, /Colaboradores/);
   assert.match(modulos, /Serviços e acompanhamento/);
-  assert.doesNotMatch(modulos, /Exames Ocupacionais/);
+  assert.doesNotMatch(modulos, /titulo="Exames Ocupacionais"/);
+  assert.match(modulos, /titulo="Faturas de Exames Ocupacionais"/);
   assert.doesNotMatch(modulos, /titulo="eSocial"/);
   assert.doesNotMatch(modulos, />Disponível</);
   assert.doesNotMatch(modulos, /Contrato e acesso aos serviços/);

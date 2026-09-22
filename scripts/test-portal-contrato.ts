@@ -67,7 +67,7 @@ run("Exames e eSocial não aparecem na Home; Laudos e Colaboradores sim", () => 
     join(process.cwd(), "components/portal-cliente/PortalModulosSst.tsx"),
     "utf8"
   );
-  assert.doesNotMatch(src, /Exames Ocupacionais/);
+  assert.doesNotMatch(src, /titulo="Exames Ocupacionais"/);
   assert.doesNotMatch(src, /titulo="eSocial"/);
   assert.match(src, /Laudos SST/);
   assert.match(src, /titulo="Colaboradores"/);
@@ -87,7 +87,7 @@ run("Riscos, Faturas e resumo contratual aparecem na Home", () => {
     "utf8"
   );
   assert.match(modulos, /Riscos Psicossociais/);
-  assert.match(modulos, /titulo="Faturas"/);
+  assert.match(modulos, /titulo="Faturas de Exames Ocupacionais"/);
   assert.match(header, /PortalResumoContrato/);
   assert.match(resumo, /Colaboradores contratados/);
   assert.match(resumo, /label: "Agendamento"/);

@@ -130,7 +130,6 @@ export function PortalFaturasListagem({
                   {[
                     "Nº",
                     "Competência",
-                    "Emissão",
                     "Vencimento",
                     "Valor",
                     "Status",
@@ -156,9 +155,6 @@ export function PortalFaturasListagem({
                     </td>
                     <td className="px-4 py-3 text-[#475569]">
                       {f.competencia ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[#475569]">
-                      {f.dataEmissao ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-[#475569]">
                       {f.dataVencimento}

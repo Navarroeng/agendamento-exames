@@ -129,7 +129,7 @@ export function PortalModulosSst({
 
         <ModuloShell
           id="faturas"
-          titulo="Faturas"
+          titulo="Faturas de Exames Ocupacionais"
           className="xl:col-span-2"
           iconeVariante={faturasIcone}
           badge={faturaBadge(faturasResumo)}
@@ -209,7 +209,7 @@ function FaturasConteudo({ resumo }: { resumo: PortalFaturasResumo | null }) {
   if (!resumo) {
     return (
       <p className="text-sm leading-relaxed text-[#94a3b8]">
-        Acompanhe suas faturas, vencimentos e pagamentos.
+        Acompanhe as faturas dos exames ocupacionais, vencimentos e pagamentos.
       </p>
     );
   }
