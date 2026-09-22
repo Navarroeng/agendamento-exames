@@ -15,6 +15,7 @@ import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { vagaTemOcupanteIdentificado } from "@/lib/contrato-vagas";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { isAgendamentoCancelado } from "@/lib/contrato-agendamentos";
+import { compareByLabel } from "@/lib/sort-by-label";
 
 export type PortalColaboradorSituacao =
   | "ativo"
@@ -89,12 +90,14 @@ const SITUACAO_LABEL: Record<PortalColaboradorSituacao, string> = {
   demitido: "Demitido",
 };
 
-const SITUACAO_ORDER: Record<PortalColaboradorSituacao, number> = {
-  ativo: 0,
-  admissional_em_andamento: 1,
-  demissional_em_andamento: 2,
-  demitido: 3,
-};
+/** Exibição em caixa alta (pt-BR). Não altera o valor persistido. */
+export function apresentarNomeColaboradorPortal(nome: string): string {
+  return nome.toLocaleUpperCase("pt-BR");
+}
+
+export function apresentarCargoColaboradorPortal(cargo: string): string {
+  return cargo.toLocaleUpperCase("pt-BR");
+}
 
 function normalizeAso(value: string | null | undefined): string {
   return String(value ?? "").trim().toLocaleLowerCase("pt-BR");
@@ -391,11 +394,7 @@ export function consolidarPortalColaboradores(input: {
     });
   }
 
-  linhas.sort((a, b) => {
-    const ord = SITUACAO_ORDER[a.situacao] - SITUACAO_ORDER[b.situacao];
-    if (ord !== 0) return ord;
-    return a.nome.localeCompare(b.nome, "pt-BR");
-  });
+  linhas.sort((a, b) => compareByLabel(a.nome, b.nome));
 
   return linhas;
 }
@@ -420,7 +419,7 @@ export function filtrarPortalColaboradores(
       l.nome.toLocaleLowerCase("pt-BR").includes(q)
     );
   }
-  return base;
+  return base.slice().sort((a, b) => compareByLabel(a.nome, b.nome));
 }
 
 export function linhasResumoColaboradoresHome(

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  apresentarCargoColaboradorPortal,
+  apresentarNomeColaboradorPortal,
   calcPortalColaboradoresResumo,
   consolidarPortalColaboradores,
   filtrarPortalColaboradores,
@@ -277,6 +279,86 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).length,
     1
   );
+
+  const todos = filtrarPortalColaboradores(linhas, { filtro: "todos" });
+  assert.deepEqual(
+    todos.map((l) => l.nome),
+    ["JOAO SOUZA", "MARIA SILVA", "PEDRO"]
+  );
+  const ativos = filtrarPortalColaboradores(linhas, { filtro: "ativos" });
+  assert.deepEqual(
+    ativos.map((l) => l.nome),
+    ["MARIA SILVA", "PEDRO"]
+  );
+  const demitidos = filtrarPortalColaboradores(linhas, { filtro: "demitidos" });
+  assert.deepEqual(
+    demitidos.map((l) => l.nome),
+    ["JOAO SOUZA"]
+  );
+  const busca = filtrarPortalColaboradores(linhas, {
+    filtro: "todos",
+    buscaNome: "souza",
+  });
+  assert.deepEqual(
+    busca.map((l) => l.nome),
+    ["JOAO SOUZA"]
+  );
+}
+
+{
+  assert.equal(
+    apresentarNomeColaboradorPortal("Boanergis Alves Viana"),
+    "BOANERGIS ALVES VIANA"
+  );
+  assert.equal(
+    apresentarNomeColaboradorPortal("Dani Quele dos Santos Alves"),
+    "DANI QUELE DOS SANTOS ALVES"
+  );
+  assert.equal(apresentarNomeColaboradorPortal("joão"), "JOÃO");
+  assert.equal(
+    apresentarCargoColaboradorPortal("Auxiliar Administrativo"),
+    "AUXILIAR ADMINISTRATIVO"
+  );
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "dani quele dos santos alves",
+        colaborador_cpf: CPF_A,
+        cargo_nome: "Auxiliar Administrativo",
+      },
+      {
+        colaborador: "BOANERGIS ALVES VIANA",
+        colaborador_cpf: CPF_B,
+        cargo_nome: "motorista",
+      },
+      {
+        colaborador: "Álvaro Costa",
+        colaborador_cpf: CPF_C,
+        cargo_nome: "Analista",
+      },
+    ],
+    agendamentos: [],
+  });
+  assert.deepEqual(
+    linhas.map((l) => l.nome),
+    ["Álvaro Costa", "BOANERGIS ALVES VIANA", "dani quele dos santos alves"]
+  );
+  assert.equal(linhas[1].nome, "BOANERGIS ALVES VIANA");
+  assert.equal(
+    apresentarNomeColaboradorPortal(linhas[2].nome),
+    "DANI QUELE DOS SANTOS ALVES"
+  );
+  assert.deepEqual(
+    linhas.map((l) => apresentarNomeColaboradorPortal(l.nome)),
+    ["ÁLVARO COSTA", "BOANERGIS ALVES VIANA", "DANI QUELE DOS SANTOS ALVES"]
+  );
+  assert.deepEqual(
+    linhas.map((l) => apresentarCargoColaboradorPortal(l.cargo)),
+    ["ANALISTA", "MOTORISTA", "AUXILIAR ADMINISTRATIVO"]
+  );
 }
 
 {
@@ -284,8 +366,20 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     join(process.cwd(), "components/portal-cliente/PortalColaboradores.tsx"),
     "utf8"
   );
-  assert.match(ui, /cargoApresentacao/);
-  assert.match(ui, /toLocaleUpperCase\("pt-BR"\)/);
+  const lib = readFileSync(
+    join(process.cwd(), "lib/portal-colaboradores.ts"),
+    "utf8"
+  );
+  const svc = readFileSync(
+    join(process.cwd(), "services/portal-colaboradores.server.ts"),
+    "utf8"
+  );
+  assert.match(ui, /apresentarNomeColaboradorPortal\(row\.nome\)/);
+  assert.match(ui, /apresentarCargoColaboradorPortal\(row\.cargo\)/);
+  assert.doesNotMatch(ui, /cargoApresentacao/);
+  assert.match(lib, /toLocaleUpperCase\("pt-BR"\)/);
+  assert.match(lib, /compareByLabel\(a\.nome, b\.nome\)/);
+  assert.doesNotMatch(svc, /toLocaleUpperCase/);
   assert.doesNotMatch(ui, />Situação</);
   assert.doesNotMatch(ui, /situacaoLabel/);
   assert.match(ui, /Equipe atual/);

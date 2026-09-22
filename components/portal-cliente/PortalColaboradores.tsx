@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalEmpresaIdentidade } from "@/components/portal-cliente/PortalEmpresaIdentidade";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import {
+  apresentarCargoColaboradorPortal,
+  apresentarNomeColaboradorPortal,
   calcPortalColaboradoresResumo,
   filtrarPortalColaboradores,
   type PortalColaboradorLinha,
@@ -32,10 +34,6 @@ const FILTROS: { key: PortalColaboradoresFiltro; label: string }[] = [
   { key: "demitidos", label: "Demitidos" },
   { key: "todos", label: "Todos" },
 ];
-
-function cargoApresentacao(cargo: string): string {
-  return cargo.toLocaleUpperCase("pt-BR");
-}
 
 export function PortalColaboradores({
   clienteId,
@@ -225,7 +223,7 @@ export function PortalColaboradores({
                           >
                             <td className="px-4 py-3 font-semibold text-[#0b1f4d]">
                               <span className="line-clamp-2 break-words">
-                                {row.nome}
+                                {apresentarNomeColaboradorPortal(row.nome)}
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[#475569]">
@@ -233,7 +231,7 @@ export function PortalColaboradores({
                             </td>
                             <td className="px-4 py-3 text-[#475569]">
                               <span className="line-clamp-2">
-                                {cargoApresentacao(row.cargo)}
+                                {apresentarCargoColaboradorPortal(row.cargo)}
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-[#64748b]">
@@ -256,7 +254,7 @@ export function PortalColaboradores({
                       >
                         <div className="min-w-0">
                           <p className="text-[15px] font-semibold text-[#0b1f4d]">
-                            {row.nome}
+                            {apresentarNomeColaboradorPortal(row.nome)}
                           </p>
                           <p className="mt-0.5 font-mono text-xs text-[#64748b]">
                             {row.cpfMascarado}
@@ -266,7 +264,7 @@ export function PortalColaboradores({
                           <div className="flex justify-between gap-2">
                             <dt className="text-[#94a3b8]">Cargo</dt>
                             <dd className="text-right text-[#475569]">
-                              {cargoApresentacao(row.cargo)}
+                              {apresentarCargoColaboradorPortal(row.cargo)}
                             </dd>
                           </div>
                           {row.dataAdmissaoLabel ? (
