@@ -749,6 +749,9 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   assert.doesNotMatch(ui, /grid-cols-3/);
   assert.doesNotMatch(lib, /admissional_em_andamento/);
   assert.doesNotMatch(lib, /totalAdmissionalEmAndamento/);
+  assert.match(ui, /exibirDesligamento = filtro !== "ativos"/);
+  assert.match(ui, /exibirDesligamento \? \(/);
+  assert.match(ui, /exibirDesligamento && row\.dataDesligamentoLabel/);
 }
 
 console.log("test-portal-colaboradores: ok");

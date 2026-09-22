@@ -89,6 +89,8 @@ export function PortalColaboradores({
     });
   }, [estado, filtro, busca]);
 
+  const exibirDesligamento = filtro !== "ativos";
+
   return (
     <div className="flex flex-col gap-5">
       <PortalEmpresaIdentidade
@@ -192,11 +194,22 @@ export function PortalColaboradores({
                   <div className="hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[34%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[28%]" />
-                        <col className="w-[11%]" />
-                        <col className="w-[11%]" />
+                        {exibirDesligamento ? (
+                          <>
+                            <col className="w-[34%]" />
+                            <col className="w-[16%]" />
+                            <col className="w-[28%]" />
+                            <col className="w-[11%]" />
+                            <col className="w-[11%]" />
+                          </>
+                        ) : (
+                          <>
+                            <col className="w-[40%]" />
+                            <col className="w-[18%]" />
+                            <col className="w-[28%]" />
+                            <col className="w-[14%]" />
+                          </>
+                        )}
                       </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
@@ -204,7 +217,9 @@ export function PortalColaboradores({
                           <th className="px-4 py-3">CPF</th>
                           <th className="px-4 py-3">Cargo</th>
                           <th className="px-4 py-3">Admissão</th>
-                          <th className="px-4 py-3">Desligamento</th>
+                          {exibirDesligamento ? (
+                            <th className="px-4 py-3">Desligamento</th>
+                          ) : null}
                         </tr>
                       </thead>
                       <tbody>
@@ -229,9 +244,11 @@ export function PortalColaboradores({
                             <td className="whitespace-nowrap px-4 py-3 text-[#64748b]">
                               {row.dataAdmissaoLabel ?? "—"}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-[#64748b]">
-                              {row.dataDesligamentoLabel ?? "—"}
-                            </td>
+                            {exibirDesligamento ? (
+                              <td className="whitespace-nowrap px-4 py-3 text-[#64748b]">
+                                {row.dataDesligamentoLabel ?? "—"}
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>
@@ -267,7 +284,7 @@ export function PortalColaboradores({
                               </dd>
                             </div>
                           ) : null}
-                          {row.dataDesligamentoLabel ? (
+                          {exibirDesligamento && row.dataDesligamentoLabel ? (
                             <div className="flex justify-between gap-2">
                               <dt className="text-[#94a3b8]">Desligamento</dt>
                               <dd className="text-right text-[#475569]">
