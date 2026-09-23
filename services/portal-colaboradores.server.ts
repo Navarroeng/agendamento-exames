@@ -1,6 +1,7 @@
 /**
  * Portal — Colaboradores (server-only).
- * Isolamento por cliente_id + contrato atual (contrato_vagas) + agendamentos.
+ * Isolamento por cliente_id + contrato atual (contrato_vagas) +
+ * agendamentos + colaborador_movimentacoes.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,8 +13,9 @@ import {
 import {
   calcPortalColaboradoresResumo,
   consolidarPortalColaboradores,
+  type ClienteColaboradorLinha,
   type PortalColaboradorAgendamentoFonte,
-  type PortalColaboradorLinha,
+  type PortalColaboradorMovimentacaoFonte,
   type PortalColaboradorVagaFonte,
   type PortalColaboradoresResumo,
 } from "@/lib/portal-colaboradores";
@@ -28,7 +30,7 @@ const AGENDAMENTO_SELECT = `
 `;
 
 export async function listarColaboradoresPortal(clienteId: string): Promise<{
-  colaboradores: PortalColaboradorLinha[];
+  colaboradores: ClienteColaboradorLinha[];
   resumo: PortalColaboradoresResumo;
 }> {
   const id = clienteId.trim();
@@ -77,9 +79,23 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
 
   const agendamentos = (agsRaw ?? []) as PortalColaboradorAgendamentoFonte[];
 
+  const { data: movRaw, error: errMov } = await admin
+    .from("colaborador_movimentacoes")
+    .select(
+      "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em"
+    )
+    .eq("cliente_id", id)
+    .eq("tipo", "desligamento_admin")
+    .is("cancelado_em", null);
+
+  if (errMov) throw errMov;
+
+  const movimentacoes = (movRaw ?? []) as PortalColaboradorMovimentacaoFonte[];
+
   const colaboradores = consolidarPortalColaboradores({
     vagas,
     agendamentos,
+    movimentacoes,
   });
 
   return {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolverClienteIdPortalPreview } from "@/lib/portal-cliente";
+import { paraColaboradoresPortalCliente } from "@/lib/portal-colaboradores";
 import { listarColaboradoresPortal } from "@/services/portal-colaboradores.server";
 import { requirePortalStaffUser } from "@/services/portal-staff.server";
 
@@ -34,7 +35,11 @@ export async function GET(request: Request) {
       resolved.clienteId
     );
 
-    return NextResponse.json({ ok: true, colaboradores, resumo });
+    return NextResponse.json({
+      ok: true,
+      colaboradores: paraColaboradoresPortalCliente(colaboradores),
+      resumo,
+    });
   } catch (err) {
     console.error("[api/portal/colaboradores]", err);
     return NextResponse.json(

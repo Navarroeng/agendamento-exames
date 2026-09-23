@@ -164,6 +164,9 @@ export const AUDITORIA_ACOES = {
   contrato_regenerado: "contrato_regenerado",
   agendamento_periodico_vinculado: "agendamento_periodico_vinculado",
   agendamento_valores_alterados: "agendamento_valores_alterados",
+  colaborador_desligamento_admin: "colaborador_desligamento_admin",
+  colaborador_desligamento_admin_desfeito:
+    "colaborador_desligamento_admin_desfeito",
 } as const;
 
 export type AuditoriaAcao =
@@ -338,6 +341,10 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
   contrato_regenerado: "Contrato regenerado",
   agendamento_periodico_vinculado: "Agendamento vinculado a periódico futuro",
   agendamento_valores_alterados: "Exames e valores do agendamento alterados",
+  colaborador_desligamento_admin:
+    "Desligamento administrativo de colaborador",
+  colaborador_desligamento_admin_desfeito:
+    "Desligamento administrativo desfeito",
 };
 
 export interface AuditoriaUsuarioContext {

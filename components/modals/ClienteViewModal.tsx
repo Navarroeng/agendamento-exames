@@ -9,6 +9,7 @@ import { ClienteContratosHistoricoTable } from "@/components/clientes/ClienteCon
 import { ClienteEncerrarContratoModal } from "@/components/clientes/ClienteEncerrarContratoModal";
 import { ClienteIncluirRiscosModal } from "@/components/clientes/ClienteIncluirRiscosModal";
 import { ClienteServicosPontuaisSection } from "@/components/clientes/ClienteServicosPontuaisSection";
+import { ClienteColaboradoresSection } from "@/components/clientes/ClienteColaboradoresSection";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
@@ -421,6 +422,8 @@ export function ClienteViewModal({
                 />
               </div>
             </div>
+
+            <ClienteColaboradoresSection clienteId={cliente.id} />
 
             <ClienteServicosPontuaisSection
               itens={servicosPontuais}

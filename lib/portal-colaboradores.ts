@@ -1,12 +1,12 @@
 /**
  * Portal do Cliente — módulo Colaboradores.
- * Derivado de contrato_vagas (lista implantação) + agendamentos.
- * Sem tabela mestre nova. Identidade: cliente + CPF normalizado.
+ * Derivado de contrato_vagas + agendamentos + colaborador_movimentacoes.
+ * Sem tabela mestre de pessoas. Identidade: cliente + CPF normalizado.
  *
  * Situações (fatos persistidos, ordem cronológica):
- * - Ativo: vaga e/ou Admissional vigente (agendado ou aso_retido)
- * - Demitido: Demissional vigente posterior ao último Admissional
- * Cancelados não entram na fonte e não produzem efeito.
+ * - Ativo: vaga e/ou última entrada (Admissional) posterior à última saída
+ * - Demitido: última saída (Demissional ou desligamento_admin) posterior à entrada
+ * Cancelados (agendamento ou movimentação) não entram na fonte.
  * Empate de chave: não considera Demitido (readmissão prevalece).
  */
 
@@ -20,6 +20,9 @@ export type PortalColaboradorSituacao = "ativo" | "demitido";
 
 export type PortalColaboradoresFiltro = "todos" | "ativos" | "demitidos";
 
+export type PortalColaboradorDesligamentoOrigem = "demissional" | "admin";
+
+/** DTO visível no Portal do Cliente. Sem metadados administrativos. */
 export type PortalColaboradorLinha = {
   id: string;
   cpfDigits: string;
@@ -33,6 +36,42 @@ export type PortalColaboradorLinha = {
   dataDesligamentoIso: string | null;
   dataDesligamentoLabel: string | null;
 };
+
+/** DTO interno/admin. Inclui origem da saída vigente para Desfazer. */
+export type ClienteColaboradorLinha = PortalColaboradorLinha & {
+  desligamentoOrigem: PortalColaboradorDesligamentoOrigem | null;
+  desligamentoMovimentacaoId: string | null;
+};
+
+export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
+  "desligamentoOrigem",
+  "desligamentoMovimentacaoId",
+] as const;
+
+/** Remove metadados administrativos. Não altera a regra consolidada. */
+export function paraLinhaPortalCliente(
+  linha: ClienteColaboradorLinha
+): PortalColaboradorLinha {
+  return {
+    id: linha.id,
+    cpfDigits: linha.cpfDigits,
+    cpfMascarado: linha.cpfMascarado,
+    nome: linha.nome,
+    cargo: linha.cargo,
+    situacao: linha.situacao,
+    situacaoLabel: linha.situacaoLabel,
+    dataAdmissaoIso: linha.dataAdmissaoIso,
+    dataAdmissaoLabel: linha.dataAdmissaoLabel,
+    dataDesligamentoIso: linha.dataDesligamentoIso,
+    dataDesligamentoLabel: linha.dataDesligamentoLabel,
+  };
+}
+
+export function paraColaboradoresPortalCliente(
+  linhas: ClienteColaboradorLinha[]
+): PortalColaboradorLinha[] {
+  return linhas.map(paraLinhaPortalCliente);
+}
 
 export type PortalColaboradoresResumo = {
   total: number;
@@ -60,14 +99,29 @@ export type PortalColaboradorAgendamentoFonte = {
   aso_retido_em?: string | null;
 };
 
+export type PortalColaboradorMovimentacaoFonte = {
+  id?: string | null;
+  cpf_digits?: string | null;
+  tipo?: string | null;
+  data_evento?: string | null;
+  cancelado_em?: string | null;
+  colaborador_nome?: string | null;
+  cargo_nome?: string | null;
+  criado_em?: string | null;
+};
+
+const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin";
+
 type Interno = {
   cpfDigits: string;
   nome: string;
   cargo: string;
   ultimoAdmissionalSortKey: string;
   ultimoAdmissionalIso: string | null;
-  ultimoDemissionalSortKey: string;
-  ultimoDemissionalIso: string | null;
+  ultimoSaidaSortKey: string;
+  ultimoSaidaIso: string | null;
+  ultimoSaidaOrigem: PortalColaboradorDesligamentoOrigem | null;
+  ultimoSaidaMovimentacaoId: string | null;
   ultimoEventoSortKey: string;
 };
 
@@ -174,8 +228,10 @@ function ensureBucket(map: Map<string, Interno>, cpfDigits: string): Interno {
       cargo: "",
       ultimoAdmissionalSortKey: "",
       ultimoAdmissionalIso: null,
-      ultimoDemissionalSortKey: "",
-      ultimoDemissionalIso: null,
+      ultimoSaidaSortKey: "",
+      ultimoSaidaIso: null,
+      ultimoSaidaOrigem: null,
+      ultimoSaidaMovimentacaoId: null,
       ultimoEventoSortKey: "",
     };
     map.set(cpfDigits, row);
@@ -201,25 +257,48 @@ function aplicarIdentidade(
 }
 
 function resolverSituacao(row: Interno): PortalColaboradorSituacao {
-  const demAny = row.ultimoDemissionalSortKey;
+  const saida = row.ultimoSaidaSortKey;
   const admAny = row.ultimoAdmissionalSortKey;
 
-  // Demitido: Demissional vigente posterior ao Admissional.
+  // Demitido: saída vigente posterior à última entrada.
   // Empate de chave: não considera Demitido (readmissão prevalece).
-  if (demAny && (!admAny || admAny < demAny)) {
+  if (saida && (!admAny || admAny < saida)) {
     return "demitido";
   }
 
   return "ativo";
 }
 
+function aplicarSaida(
+  row: Interno,
+  sortKey: string,
+  dataIso: string,
+  origem: PortalColaboradorDesligamentoOrigem,
+  movimentacaoId: string | null
+) {
+  if (sortKey < row.ultimoSaidaSortKey) return;
+  row.ultimoSaidaSortKey = sortKey;
+  row.ultimoSaidaIso = dataIso;
+  row.ultimoSaidaOrigem = origem;
+  row.ultimoSaidaMovimentacaoId = movimentacaoId;
+}
+
+function isDesligamentoAdminValido(
+  mov: PortalColaboradorMovimentacaoFonte
+): boolean {
+  if (String(mov.tipo ?? "").trim() !== TIPO_DESLIGAMENTO_ADMIN) return false;
+  return !String(mov.cancelado_em ?? "").trim();
+}
+
 /**
- * Consolida roster Portal a partir de vagas + agendamentos (cancelados ignorados).
+ * Consolida roster a partir de vagas + agendamentos + movimentações.
+ * Cancelados (agendamento ou movimentação) são ignorados.
  */
 export function consolidarPortalColaboradores(input: {
   vagas: PortalColaboradorVagaFonte[];
   agendamentos: PortalColaboradorAgendamentoFonte[];
-}): PortalColaboradorLinha[] {
+  movimentacoes?: PortalColaboradorMovimentacaoFonte[];
+}): ClienteColaboradorLinha[] {
   const map = new Map<string, Interno>();
 
   for (const vaga of input.vagas) {
@@ -270,20 +349,51 @@ export function consolidarPortalColaboradores(input: {
       row.ultimoAdmissionalIso = dataIso;
     }
 
-    if (demissional && dataIso && sortKey >= row.ultimoDemissionalSortKey) {
-      row.ultimoDemissionalSortKey = sortKey;
-      row.ultimoDemissionalIso = dataIso;
+    if (demissional && dataIso) {
+      aplicarSaida(row, sortKey, dataIso, "demissional", null);
     }
   }
 
-  const linhas: PortalColaboradorLinha[] = [];
+  const movs = (input.movimentacoes ?? [])
+    .filter(isDesligamentoAdminValido)
+    .slice()
+    .sort((a, b) =>
+      eventSortKey(a.data_evento, a.criado_em).localeCompare(
+        eventSortKey(b.data_evento, b.criado_em)
+      )
+    );
+
+  for (const mov of movs) {
+    const cpf = normalizeCpfDigits(mov.cpf_digits);
+    if (!isValidCPF(cpf)) continue;
+    const existing = map.get(cpf);
+    if (!existing) continue;
+
+    const dataIso = toDataIso(mov.data_evento);
+    if (!dataIso) continue;
+    const sortKey = eventSortKey(mov.data_evento, mov.criado_em);
+    aplicarIdentidade(
+      existing,
+      nomeLimpo(mov.colaborador_nome),
+      cargoLimpo(mov.cargo_nome),
+      sortKey
+    );
+    aplicarSaida(
+      existing,
+      sortKey,
+      dataIso,
+      "admin",
+      String(mov.id ?? "").trim() || null
+    );
+  }
+
+  const linhas: ClienteColaboradorLinha[] = [];
   for (const row of Array.from(map.values())) {
     if (!row.nome) continue;
 
     const situacao = resolverSituacao(row);
     const demitido = situacao === "demitido";
-    const desligamentoIso = demitido ? row.ultimoDemissionalIso : null;
-    const admissaoIso = row.ultimoAdmissionalIso;
+    const desligamentoIso = demitido ? row.ultimoSaidaIso : null;
 
     linhas.push({
       id: row.cpfDigits,
@@ -293,13 +403,17 @@ export function consolidarPortalColaboradores(input: {
       cargo: row.cargo || "—",
       situacao,
       situacaoLabel: SITUACAO_LABEL[situacao],
-      dataAdmissaoIso: admissaoIso,
-      dataAdmissaoLabel: admissaoIso
-        ? formatDateIsoToBR(admissaoIso)
+      dataAdmissaoIso: row.ultimoAdmissionalIso,
+      dataAdmissaoLabel: row.ultimoAdmissionalIso
+        ? formatDateIsoToBR(row.ultimoAdmissionalIso)
         : null,
       dataDesligamentoIso: desligamentoIso,
       dataDesligamentoLabel: desligamentoIso
         ? formatDateIsoToBR(desligamentoIso)
+        : null,
+      desligamentoOrigem: demitido ? row.ultimoSaidaOrigem : null,
+      desligamentoMovimentacaoId: demitido
+        ? row.ultimoSaidaMovimentacaoId
         : null,
     });
   }
@@ -309,13 +423,13 @@ export function consolidarPortalColaboradores(input: {
   return linhas;
 }
 
-export function filtrarPortalColaboradores(
-  linhas: PortalColaboradorLinha[],
+export function filtrarPortalColaboradores<T extends PortalColaboradorLinha>(
+  linhas: T[],
   opts: {
     filtro: PortalColaboradoresFiltro;
     buscaNome?: string;
   }
-): PortalColaboradorLinha[] {
+): T[] {
   let base =
     opts.filtro === "ativos"
       ? linhas.filter((l) => isSituacaoEquipeAtual(l.situacao))

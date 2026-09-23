@@ -5,9 +5,12 @@ import {
   apresentarCargoColaboradorPortal,
   apresentarNomeColaboradorPortal,
   calcPortalColaboradoresResumo,
+  COLABORADOR_CAMPOS_ADMIN_PRIVADOS,
   consolidarPortalColaboradores,
   filtrarPortalColaboradores,
   mascararCpfPortal,
+  paraColaboradoresPortalCliente,
+  paraLinhaPortalCliente,
 } from "../lib/portal-colaboradores";
 
 const CPF_A = "52998224725";
@@ -721,6 +724,311 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   assert.equal(linhas[0].dataDesligamentoLabel, "05/09/2026");
 }
 
+// Desligamento administrativo: Ativo → Demitido
+{
+  const vagas = [
+    {
+      colaborador: "PEDRO LIMA",
+      colaborador_cpf: CPF_C,
+      cargo_nome: "Analista",
+    },
+  ];
+  const vagasAntes = JSON.stringify(vagas);
+  const linhas = consolidarPortalColaboradores({
+    vagas,
+    agendamentos: [],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+        criado_em: "2026-09-15T12:00:00.000Z",
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(vagas), vagasAntes);
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataDesligamentoLabel, "15/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, "mov-1");
+  assert.equal(
+    filtrarPortalColaboradores(linhas, { filtro: "ativos" }).length,
+    0
+  );
+  assert.equal(
+    filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).length,
+    1
+  );
+  const resumo = calcPortalColaboradoresResumo(linhas);
+  assert.equal(resumo.totalAtivos, 0);
+  assert.equal(resumo.totalDemitidos, 1);
+}
+
+// Cancelamento lógico do admin: volta a Ativo se restar vaga
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        cargo_nome: "Analista",
+      },
+    ],
+    agendamentos: [],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+        cancelado_em: "2026-09-16T10:00:00.000Z",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas[0].dataDesligamentoIso, null);
+  assert.equal(linhas[0].desligamentoOrigem, null);
+}
+
+// Desfazer admin com Demissional anterior: continua Demitido na data do Demissional
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [],
+    agendamentos: [
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        aso: "Demissional",
+        status: "agendado",
+        data_agendamento: "2026-09-10",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_B,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+        cancelado_em: "2026-09-16T10:00:00.000Z",
+        colaborador_nome: "JOAO SOUZA",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataDesligamentoLabel, "10/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "demissional");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, null);
+}
+
+// Readmissão após desligamento admin
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [],
+    agendamentos: [
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2026-08-01",
+      },
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2026-10-10",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-08-20",
+        colaborador_nome: "PEDRO LIMA",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas[0].dataAdmissaoLabel, "10/10/2026");
+  assert.equal(linhas[0].dataDesligamentoIso, null);
+}
+
+// Ciclo: admissão → admin → readmissão → novo admin
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [],
+    agendamentos: [
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        aso: "Admissional",
+        status: "aso_retido",
+        data_agendamento: "2026-01-10",
+        aso_retido_em: "2026-01-11T10:00:00.000Z",
+      },
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2026-09-10",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-08-20",
+      },
+      {
+        id: "mov-2",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-10-15",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataAdmissaoLabel, "10/09/2026");
+  assert.equal(linhas[0].dataDesligamentoLabel, "15/10/2026");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, "mov-2");
+}
+
+// Admin anterior + Demissional posterior
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        cargo_nome: "Motorista",
+      },
+    ],
+    agendamentos: [
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        aso: "Demissional",
+        status: "agendado",
+        data_agendamento: "2026-09-15",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_B,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-10",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataDesligamentoLabel, "15/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "demissional");
+}
+
+// Demissional anterior + admin posterior
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [],
+    agendamentos: [
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        aso: "Admissional",
+        status: "aso_retido",
+        data_agendamento: "2026-08-01",
+        aso_retido_em: "2026-08-02T10:00:00.000Z",
+      },
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        aso: "Demissional",
+        status: "agendado",
+        data_agendamento: "2026-09-10",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_B,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+      },
+    ],
+  });
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataDesligamentoLabel, "15/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, "mov-1");
+}
+
+// Desligamento admin sem pessoa na relação não cria registro
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [],
+    agendamentos: [],
+    movimentacoes: [
+      {
+        id: "mov-x",
+        cpf_digits: CPF_A,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+        colaborador_nome: "FANTASMA",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 0);
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "PEDRO LIMA",
+        colaborador_cpf: CPF_C,
+        cargo_nome: "Analista",
+      },
+    ],
+    agendamentos: [],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_C,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-15",
+        criado_em: "2026-09-15T12:00:00.000Z",
+      },
+    ],
+  });
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, "mov-1");
+
+  const publico = paraLinhaPortalCliente(linhas[0]);
+  assert.equal(publico.situacao, "demitido");
+  assert.equal(publico.dataDesligamentoLabel, "15/09/2026");
+  assert.equal(publico.id, CPF_C);
+  for (const campo of COLABORADOR_CAMPOS_ADMIN_PRIVADOS) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(publico, campo),
+      false,
+      `Portal não deve expor ${campo}`
+    );
+  }
+
+  const json = JSON.stringify({
+    colaboradores: paraColaboradoresPortalCliente(linhas),
+  });
+  assert.doesNotMatch(json, /desligamentoOrigem/);
+  assert.doesNotMatch(json, /desligamentoMovimentacaoId/);
+  assert.doesNotMatch(json, /colaborador_movimentacoes/);
+  assert.doesNotMatch(json, /"mov-1"/);
+}
+
 {
   const ui = readFileSync(
     join(process.cwd(), "components/portal-cliente/PortalColaboradores.tsx"),
@@ -732,6 +1040,17 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   );
   const svc = readFileSync(
     join(process.cwd(), "services/portal-colaboradores.server.ts"),
+    "utf8"
+  );
+  const portalApi = readFileSync(
+    join(process.cwd(), "app/api/portal/colaboradores/route.ts"),
+    "utf8"
+  );
+  const adminApi = readFileSync(
+    join(
+      process.cwd(),
+      "app/api/clientes/[clienteId]/colaboradores/route.ts"
+    ),
     "utf8"
   );
   assert.match(ui, /apresentarNomeColaboradorPortal\(row\.nome\)/);
@@ -752,6 +1071,16 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   assert.match(ui, /exibirDesligamento = filtro !== "ativos"/);
   assert.match(ui, /exibirDesligamento \? \(/);
   assert.match(ui, /exibirDesligamento && row\.dataDesligamentoLabel/);
+  assert.doesNotMatch(ui, />Demitir</);
+  assert.doesNotMatch(ui, /Desfazer desligamento/);
+  assert.match(svc, /colaborador_movimentacoes/);
+  assert.doesNotMatch(svc, /\.from\("contrato_vagas"\)[\s\S]*\.(update|insert|delete)\(/);
+  assert.doesNotMatch(ui, /desligamentoOrigem/);
+  assert.doesNotMatch(ui, /desligamentoMovimentacaoId/);
+  assert.match(portalApi, /paraColaboradoresPortalCliente/);
+  assert.doesNotMatch(portalApi, /desligamentoOrigem/);
+  assert.doesNotMatch(portalApi, /desligamentoMovimentacaoId/);
+  assert.doesNotMatch(adminApi, /paraColaboradoresPortalCliente/);
 }
 
 console.log("test-portal-colaboradores: ok");
