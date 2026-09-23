@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
+import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import {
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
@@ -48,12 +49,20 @@ function hojeIso(): string {
   return `${y}-${m}-${day}`;
 }
 
+function rotuloResumoCompacto(ativos: number, demitidos: number): string {
+  const ativosLabel = ativos === 1 ? "1 ativo" : `${ativos} ativos`;
+  const demitidosLabel =
+    demitidos === 1 ? "1 demitido" : `${demitidos} demitidos`;
+  return `${ativosLabel} · ${demitidosLabel}`;
+}
+
 export function ClienteColaboradoresSection({
   clienteId,
 }: {
   clienteId: string;
 }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
+  const [aberto, setAberto] = useState(false);
   const [filtro, setFiltro] = useState<PortalColaboradoresFiltro>("ativos");
   const [busca, setBusca] = useState("");
   const [demitirAlvo, setDemitirAlvo] = useState<ClienteColaboradorLinha | null>(
@@ -93,6 +102,10 @@ export function ClienteColaboradoresSection({
   }, [aplicarLista, clienteId]);
 
   useEffect(() => {
+    setAberto(false);
+  }, [clienteId]);
+
+  useEffect(() => {
     void carregar();
   }, [carregar]);
 
@@ -106,32 +119,68 @@ export function ClienteColaboradoresSection({
 
   const exibirDesligamento = filtro !== "ativos";
 
-  return (
-    <div className="mt-5 rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] p-5 shadow-[0_6px_22px_rgba(15,23,42,0.04)]">
-      <div className="mb-4">
-        <h4 className="text-[15px] font-extrabold text-[#2d2a4a]">
-          Colaboradores
-        </h4>
-        <p className="mt-0.5 text-xs text-[#8b95a8]">
-          Relação consolidada da empresa. O desligamento administrativo não gera
-          exame, agendamento nem altera vagas do contrato.
-        </p>
-      </div>
+  const resumoCompacto =
+    estado.fase === "ok"
+      ? rotuloResumoCompacto(
+          estado.resumo.totalAtivos,
+          estado.resumo.totalDemitidos
+        )
+      : estado.fase === "erro"
+        ? "Não foi possível carregar"
+        : "Carregando...";
 
-      {estado.fase === "carregando" && (
-        <p className="py-8 text-center text-sm text-[#64748b]">
+  return (
+    <div className="mt-5 overflow-hidden rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] shadow-[0_6px_22px_rgba(15,23,42,0.04)]">
+      <button
+        type="button"
+        className="flex min-h-[72px] w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-[#f8fafc]/80"
+        onClick={() => setAberto((atual) => !atual)}
+        aria-expanded={aberto}
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border border-brand-blue/15 bg-gradient-to-br from-brand-blue-soft/90 to-white text-brand-blue shadow-[0_2px_10px_rgba(79,99,255,0.08)]">
+          <IconUsers size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-extrabold text-[#2d2a4a]">
+            Colaboradores
+          </span>
+          <span className="mt-0.5 block text-xs text-[#8b95a8]">
+            Relação consolidada da empresa
+          </span>
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-[#52617a]">
+          {resumoCompacto}
+        </span>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`shrink-0 text-[#64748b] transition-transform ${aberto ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {aberto && estado.fase === "carregando" && (
+        <p className="border-t border-[#eef2f7] px-5 py-8 text-center text-sm text-[#64748b]">
           Carregando colaboradores...
         </p>
       )}
 
-      {estado.fase === "erro" && (
-        <p className="py-6 text-center text-sm text-[#dc2626]">
+      {aberto && estado.fase === "erro" && (
+        <p className="border-t border-[#eef2f7] px-5 py-6 text-center text-sm text-[#dc2626]">
           {estado.mensagem}
         </p>
       )}
 
-      {estado.fase === "ok" && (
-        <>
+      {aberto && estado.fase === "ok" && (
+        <div className="border-t border-[#eef2f7] px-5 pb-5 pt-4">
           <div className="grid grid-cols-2 gap-3">
             <Kpi label="Equipe atual" valor={String(estado.resumo.totalAtivos)} />
             <Kpi
@@ -305,7 +354,7 @@ export function ClienteColaboradoresSection({
               )}
             </>
           )}
-        </>
+        </div>
       )}
 
       {demitirAlvo ? (

@@ -190,6 +190,13 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
   assert.doesNotMatch(portalSvc, /\.from\("contrato_vagas"\)[\s\S]{0,200}\.(update|insert|delete)\(/);
 
   assert.match(modal, /ClienteColaboradoresSection/);
+  assert.match(ui, /useState\(false\)/);
+  assert.match(ui, /aria-expanded=\{aberto\}/);
+  assert.match(ui, /Relação consolidada da empresa/);
+  assert.match(ui, /rotuloResumoCompacto/);
+  assert.match(ui, /aberto && estado\.fase === "ok"/);
+  assert.match(ui, /rotate-180/);
+  assert.match(ui, /setAberto\(false\)/);
   assert.match(ui, /Demitir/);
   assert.match(ui, /Desfazer desligamento/);
   assert.match(ui, /Este desligamento não gera exame demissional nem agendamento/);
