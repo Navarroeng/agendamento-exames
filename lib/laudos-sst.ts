@@ -1,4 +1,15 @@
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
+import { labelImplantacaoEtapa } from "@/lib/implantacao-clientes";
+import {
+  isAetElaboracaoConcluida,
+  isAetEnvioConcluido,
+  isAetVisitaRealizada,
+} from "@/lib/implantacao-aet";
+import {
+  fluxoToLaudoPontualKind,
+  isFluxoLaudoPontual,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
 import { normalizeSearchText } from "@/lib/text-normalize";
@@ -25,6 +36,9 @@ export type LaudosSstEtapaId = (typeof LAUDOS_SST_ETAPAS)[number]["id"];
 export type LaudosSstStatus = "em_andamento" | "concluido";
 
 export const LAUDOS_SST_TOTAL_ETAPAS = LAUDOS_SST_ETAPAS.length;
+
+/** Visita (já feita) + elaboração + envio — acompanhamento em Laudos SST. */
+export const LAUDOS_SST_LAUDO_PONTUAL_TOTAL_ETAPAS = 3;
 
 export const LAUDOS_SST_ETAPA_LABELS: Record<LaudosSstEtapaId, string> =
   Object.fromEntries(
@@ -118,6 +132,10 @@ export interface LaudosSstProcesso {
   dataConclusaoImplantacao: string | null;
   workflow: LaudosSstWorkflow;
   tracking: OrcamentoLaudosSstRecord | null;
+  /** AET / Insalubridade: mesmo `implantacao_aet`, sem tracking PGR. */
+  laudoPontualKind: LaudoPontualKind | null;
+  /** Rótulo da etapa atual (laudo pontual usa o kind canônico). */
+  etapaAtualLabel: string;
 }
 
 export interface LaudosSstFilters {
@@ -171,13 +189,26 @@ export function isImplantacaoProntaParaEncaminhamento(
 }
 
 /**
- * Elegível ao encaminhamento automático para Laudos SST:
+ * Laudo pontual exclusivo (AET / Insalubridade) entra em Laudos SST
+ * quando a Implantação já concluiu na visita realizada.
+ * Não cria `orcamento_laudos_sst` (fluxo PGR).
+ */
+export function isProcessoElegivelLaudoPontualLaudosSst(
+  processo: ImplantacaoProcesso
+): boolean {
+  if (!isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
+  return isImplantacaoProntaParaEncaminhamento(processo);
+}
+
+/**
+ * Elegível ao encaminhamento automático para Laudos SST (fluxo PGR):
  * implantação pronta E orçamento aprovado com "Pacote completo - SST".
- * PGR/LTCAT/PCMSO avulsos não bastam.
+ * PGR/LTCAT/PCMSO avulsos não bastam. Laudo pontual exclusivo não entra aqui.
  */
 export function isProcessoElegivelLaudosSst(
   processo: ImplantacaoProcesso
 ): boolean {
+  if (isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
   if (!isImplantacaoProntaParaEncaminhamento(processo)) return false;
   return Boolean(processo.possuiPacoteCompletoSst);
 }
@@ -194,11 +225,12 @@ export function laudosTrackingTemTrabalhoReal(
   return workflowTemResposta(mapLaudosWorkflowFromRecord(tracking));
 }
 
-/** Lista automática: elegível pelo pacote, ou tracking antigo já trabalhado. */
+/** Lista: Pacote SST, laudo pontual após visita, ou tracking antigo já trabalhado. */
 export function isProcessoVisivelLaudosSst(
   processo: ImplantacaoProcesso,
   tracking: OrcamentoLaudosSstRecord | null | undefined
 ): boolean {
+  if (isProcessoElegivelLaudoPontualLaudosSst(processo)) return true;
   if (isProcessoElegivelLaudosSst(processo)) return true;
   if (
     processo.orcamento.status === "cancelado" ||
@@ -281,10 +313,89 @@ function workflowTemResposta(w: LaudosSstWorkflow): boolean {
   );
 }
 
+export function labelEtapaAtualLaudosSst(processo: LaudosSstProcesso): string {
+  if (processo.status === "concluido") return "Concluído";
+  if (processo.etapaAtualLabel) return processo.etapaAtualLabel;
+  return LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual];
+}
+
+export function etapasProgressoLaudosSst(
+  processo: LaudosSstProcesso
+): Array<{ id: string; label: string }> {
+  if (processo.laudoPontualKind) {
+    return [
+      { id: "visita", label: "Visita realizada" },
+      {
+        id: "elaboracao",
+        label: labelImplantacaoEtapa("elaboracao", processo.laudoPontualKind),
+      },
+      { id: "envio", label: "Envio ao cliente" },
+    ];
+  }
+  return LAUDOS_SST_ETAPAS.map((e) => ({ id: e.id, label: e.label }));
+}
+
+function dataEntradaLaudoPontual(
+  implantacao: ImplantacaoProcesso
+): string | null {
+  const aet = implantacao.aet ?? null;
+  return (
+    aet?.visita_realizada_em ??
+    aet?.visita_data ??
+    implantacao.dataAprovacao ??
+    null
+  );
+}
+
+function buildLaudosSstProcessoLaudoPontual(
+  implantacao: ImplantacaoProcesso
+): LaudosSstProcesso {
+  const kind =
+    fluxoToLaudoPontualKind(implantacao.fluxoImplantacao) ?? "aet";
+  const aet = implantacao.aet ?? null;
+  const visitaOk = isAetVisitaRealizada(aet);
+  const elaboracaoOk = isAetElaboracaoConcluida(aet);
+  const envioOk = isAetEnvioConcluido(aet);
+  let etapasConcluidas = 0;
+  if (visitaOk) etapasConcluidas += 1;
+  if (elaboracaoOk) etapasConcluidas += 1;
+  if (envioOk) etapasConcluidas += 1;
+  const totalEtapas = LAUDOS_SST_LAUDO_PONTUAL_TOTAL_ETAPAS;
+  const concluido = envioOk;
+  const etapaAtual: LaudosSstEtapaId = concluido
+    ? "envio_cliente"
+    : "processo_inicial";
+  const etapaAtualLabel = concluido
+    ? "Concluído"
+    : elaboracaoOk
+      ? "Aguardando envio"
+      : labelImplantacaoEtapa("elaboracao", kind);
+
+  return {
+    implantacao,
+    etapaAtual,
+    etapasConcluidas: concluido ? totalEtapas : etapasConcluidas,
+    totalEtapas,
+    progressoLabel: `${concluido ? totalEtapas : etapasConcluidas} de ${totalEtapas}`,
+    status: concluido ? "concluido" : "em_andamento",
+    dataEntrada: dataEntradaLaudoPontual(implantacao),
+    concluidoEm: concluido ? aet?.enviado_em ?? null : null,
+    dataConclusaoImplantacao: aet?.visita_realizada_em ?? aet?.visita_data ?? null,
+    workflow: { ...EMPTY_LAUDOS_WORKFLOW },
+    tracking: null,
+    laudoPontualKind: kind,
+    etapaAtualLabel,
+  };
+}
+
 export function buildLaudosSstProcesso(
   implantacao: ImplantacaoProcesso,
   tracking: OrcamentoLaudosSstRecord | null
 ): LaudosSstProcesso {
+  if (isFluxoLaudoPontual(implantacao.fluxoImplantacao)) {
+    return buildLaudosSstProcessoLaudoPontual(implantacao);
+  }
+
   const workflow = mapLaudosWorkflowFromRecord(tracking);
   const ordem = LAUDOS_SST_ETAPAS.map((e) => e.id);
   const computed = contarEtapasConsecutivasConcluidas(workflow, ordem);
@@ -306,18 +417,25 @@ export function buildLaudosSstProcesso(
           : null
       );
 
+  const status: LaudosSstStatus = concluido ? "concluido" : "em_andamento";
+  const etapaFinal: LaudosSstEtapaId = concluido ? "envio_cliente" : etapaAtual;
+
   return {
     implantacao,
-    etapaAtual: concluido ? "envio_cliente" : etapaAtual,
+    etapaAtual: etapaFinal,
     etapasConcluidas: concluido ? LAUDOS_SST_TOTAL_ETAPAS : etapasConcluidas,
     totalEtapas: LAUDOS_SST_TOTAL_ETAPAS,
     progressoLabel: `${concluido ? LAUDOS_SST_TOTAL_ETAPAS : etapasConcluidas} de ${LAUDOS_SST_TOTAL_ETAPAS}`,
-    status: concluido ? "concluido" : "em_andamento",
+    status,
     dataEntrada: tracking?.entrada_em ?? tracking?.created_at ?? null,
     concluidoEm: concluido ? tracking?.concluido_em ?? null : null,
     dataConclusaoImplantacao: null,
     workflow,
     tracking,
+    laudoPontualKind: null,
+    etapaAtualLabel: concluido
+      ? "Concluído"
+      : LAUDOS_SST_ETAPA_LABELS[etapaFinal],
   };
 }
 
@@ -348,7 +466,7 @@ export function filterLaudosSstProcessos(
       orcamento.responsavel,
       p.status === "concluido"
         ? "Concluído"
-        : LAUDOS_SST_ETAPA_LABELS[p.etapaAtual],
+        : p.etapaAtualLabel || LAUDOS_SST_ETAPA_LABELS[p.etapaAtual],
     ].join(" ");
 
     if (busca && normalizeSearchText(haystack).includes(busca)) return true;

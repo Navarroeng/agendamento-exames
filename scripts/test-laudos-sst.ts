@@ -7,6 +7,7 @@ import {
   buildLaudosSstProcesso,
   filterLaudosSstProcessos,
   grupoOrdenacaoLaudosSst,
+  isProcessoElegivelLaudoPontualLaudosSst,
   isProcessoElegivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
@@ -112,7 +113,30 @@ assert.equal(
 );
 assert.equal(
   isProcessoElegivelLaudosSst(
-    baseProcesso({ etapaAtual: "aguardando_agendamentos" })
+    baseProcesso({
+      etapaAtual: "concluido",
+      possuiPacoteCompletoSst: true,
+      fluxoImplantacao: "aet",
+    })
+  ),
+  false,
+  "AET exclusivo não entra no fluxo PGR de Laudos SST"
+);
+assert.equal(
+  isProcessoElegivelLaudoPontualLaudosSst(
+    baseProcesso({
+      etapaAtual: "concluido",
+      fluxoImplantacao: "aet",
+    })
+  ),
+  true
+);
+assert.equal(
+  isProcessoElegivelLaudoPontualLaudosSst(
+    baseProcesso({
+      etapaAtual: "visita_aet",
+      fluxoImplantacao: "insalubridade",
+    })
   ),
   false
 );
@@ -139,6 +163,8 @@ assert.equal(built.etapasConcluidas, 0);
 assert.equal(built.progressoLabel, "0 de 6");
 assert.equal(built.status, "em_andamento");
 assert.equal(built.dataConclusaoImplantacao, null);
+assert.equal(built.laudoPontualKind, null);
+assert.equal(built.etapaAtualLabel, "EPIs");
 
 const withTracking = buildLaudosSstProcesso(
   baseProcesso({ etapaAtual: "concluido" }),

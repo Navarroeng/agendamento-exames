@@ -261,7 +261,7 @@ export function useImplantacaoClientesPage() {
         await openProcesso(
           orcamentoId,
           isFluxoLaudoPontual(processo?.fluxoImplantacao)
-            ? "envio"
+            ? "visita_aet"
             : processo?.fluxoImplantacao === "somente_treinamentos" ||
                 processo?.fluxoImplantacao === "combinado"
               ? "treinamento"

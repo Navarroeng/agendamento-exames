@@ -178,6 +178,14 @@ assert.equal(labelStatusServicoPontual("documentos"), "Aguardando documentos");
 assert.equal(labelStatusServicoPontual("visita_aet"), "Visita a agendar");
 assert.equal(labelStatusServicoPontual("visita_agendada"), "Visita agendada");
 assert.equal(labelStatusServicoPontual("elaboracao"), "AET em elaboração");
+assert.equal(
+  labelStatusServicoPontual("elaboracao", "insalubridade"),
+  "Insalub. em elaboração"
+);
+assert.notEqual(
+  labelStatusServicoPontual("elaboracao", "insalubridade"),
+  "AET em elaboração"
+);
 assert.equal(labelStatusServicoPontual("envio"), "Aguardando envio");
 assert.equal(labelStatusServicoPontual("concluido"), "Concluído");
 
@@ -326,7 +334,7 @@ const aetEmElaboracao = listServicosPontuaisContratados({
     ],
   ]),
 });
-assert.equal(aetEmElaboracao[0].statusLabel, "AET em elaboração");
+assert.equal(aetEmElaboracao[0].statusLabel, "Concluído");
 assert.equal(aetEmElaboracao[0].financeiroPendente, false);
 assert.equal(aetEmElaboracao[0].financeiroLabel, "Pago");
 

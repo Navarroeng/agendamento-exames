@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { LaudosSstModal } from "@/components/laudos-sst/LaudosSstModal";
+import { LaudosPontualModal } from "@/components/laudos-sst/LaudosPontualModal";
 import { LaudosSstSearchPanel } from "@/components/laudos-sst/LaudosSstSearchPanel";
 import { LaudosSstTable } from "@/components/laudos-sst/LaudosSstTable";
 import { useLaudosSstPage } from "@/hooks/useLaudosSstPage";
@@ -53,14 +54,23 @@ export function LaudosSstPage() {
         onVisualizar={openProcesso}
       />
 
-      <LaudosSstModal
-        open={Boolean(modalProcesso)}
-        processo={modalProcesso}
-        tab={modalTab}
-        onTabChange={setModalTab}
-        onClose={closeModal}
-        onSaved={handleModalSaved}
-      />
+      {modalProcesso?.laudoPontualKind ? (
+        <LaudosPontualModal
+          open={Boolean(modalProcesso)}
+          processo={modalProcesso}
+          onClose={closeModal}
+          onSaved={handleModalSaved}
+        />
+      ) : (
+        <LaudosSstModal
+          open={Boolean(modalProcesso)}
+          processo={modalProcesso}
+          tab={modalTab}
+          onTabChange={setModalTab}
+          onClose={closeModal}
+          onSaved={handleModalSaved}
+        />
+      )}
     </AppShell>
   );
 }

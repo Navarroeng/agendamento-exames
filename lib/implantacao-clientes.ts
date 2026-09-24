@@ -36,6 +36,12 @@ import {
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
 
+/**
+ * Implantação de laudo pontual exclusivo: Resumo, Aprovado, Contrato,
+ * Financeiro e Visita. Elaboração/envio pertencem a Laudos SST.
+ */
+export const IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS = 5;
+
 /** Etapas operacionais da implantação (pós-aprovação). */
 export type ImplantacaoEtapaOperacionalId =
   | "contrato"
@@ -96,23 +102,13 @@ export const IMPLANTACAO_ETAPAS_OPERACIONAIS_AET: Array<{
   { id: "contrato", label: "Contrato" },
   { id: "financeiro", label: "Aguardando pagamento" },
   { id: "visita_aet", label: "Agendamento da visita" },
-  { id: "elaboracao", label: "Elaboração do AET" },
-  { id: "envio", label: "Envio ao cliente" },
 ];
 
 export function buildImplantacaoEtapasOperacionais(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): Array<{ id: ImplantacaoEtapaOperacionalId; label: string }> {
   if (isFluxoLaudoPontual(fluxo)) {
-    const etapas = [...IMPLANTACAO_ETAPAS_OPERACIONAIS_AET];
-    if (fluxo === "insalubridade") {
-      return etapas.map((etapa) =>
-        etapa.id === "elaboracao"
-          ? { ...etapa, label: "Elaboração do Laudo" }
-          : etapa
-      );
-    }
-    return etapas;
+    return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_AET];
   }
   if (fluxo === "somente_treinamentos") {
     return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_TREINAMENTOS];
@@ -171,6 +167,16 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
   concluido: "Concluído",
   contrato_encerrado: "Contrato encerrado",
 };
+
+export function labelImplantacaoEtapa(
+  etapa: ImplantacaoEtapaId,
+  fluxo: OrcamentoFluxoImplantacao = "padrao"
+): string {
+  if (etapa === "elaboracao" && fluxo === "insalubridade") {
+    return "Insalub. em elaboração";
+  }
+  return IMPLANTACAO_ETAPA_LABELS[etapa] ?? etapa;
+}
 
 /** Classe base compartilhada — só a cor muda por etapa. */
 export const IMPLANTACAO_ETAPA_BADGE_BASE =
@@ -465,13 +471,12 @@ export function resolveImplantacaoEtapaAtual(
 
   if (isFluxoLaudoPontual(fluxo)) {
     const aet = opts?.aet ?? null;
+    if (isAetVisitaRealizada(aet)) return "concluido";
     if (!aet || aet.visita_status === "aguardando_agendamento") {
       return "visita_aet";
     }
     if (aet.visita_status === "agendada") return "visita_agendada";
-    if (!isAetElaboracaoConcluida(aet)) return "elaboracao";
-    if (!isAetEnvioConcluido(aet)) return "envio";
-    return "concluido";
+    return "visita_aet";
   }
 
   if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
@@ -526,14 +531,14 @@ export function countImplantacaoEtapasConcluidas(
   const fluxo = opts?.fluxo ?? "padrao";
 
   if (isFluxoLaudoPontual(fluxo)) {
+    if (isAetVisitaRealizada(opts?.aet)) {
+      return IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS;
+    }
     let n = 0;
     n += 1;
     if (opts?.orcamentoAprovado || aprovacao) n += 1;
     if (isContratoEtapaConcluida(aprovacao)) n += 1;
     if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
-    if (isAetVisitaRealizada(opts?.aet)) n += 1;
-    if (isAetElaboracaoConcluida(opts?.aet)) n += 1;
-    if (isAetEnvioConcluido(opts?.aet)) n += 1;
     return n;
   }
 
@@ -580,12 +585,9 @@ export function implantacaoEtapaToModalTab(
       return "visita_aet";
     }
     if (etapa === "elaboracao") return "elaboracao";
-    if (
-      etapa === "envio" ||
-      etapa === "concluido" ||
-      etapa === "contrato_encerrado"
-    ) {
-      return "envio";
+    if (etapa === "envio") return "envio";
+    if (etapa === "concluido" || etapa === "contrato_encerrado") {
+      return "visita_aet";
     }
   }
   if (
@@ -673,7 +675,7 @@ export function buildImplantacaoProcesso(params: {
     fluxo === "somente_treinamentos"
       ? 5
       : isFluxoLaudoPontual(fluxo)
-        ? 7
+        ? IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS
         : etapasOperacionais.length;
   const agendamentoLiberado =
     etapaAtual === "contrato_encerrado" ||

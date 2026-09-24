@@ -37,6 +37,13 @@ export function isFluxoLaudoPontual(
   return fluxo === "aet" || fluxo === "insalubridade";
 }
 
+export function fluxoToLaudoPontualKind(
+  fluxo: OrcamentoFluxoImplantacao | null | undefined
+): LaudoPontualKind | null {
+  if (fluxo === "aet" || fluxo === "insalubridade") return fluxo;
+  return null;
+}
+
 export function isServicoLaudoPontualNome(
   nome: string | null | undefined
 ): boolean {

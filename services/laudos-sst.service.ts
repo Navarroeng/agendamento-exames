@@ -84,6 +84,7 @@ const LAUDOS_TRACKING_SELECT = [
 /**
  * Lista processos de Laudos SST.
  * Cria tracking só com Pacote completo - SST; não apaga linhas antigas.
+ * Laudo pontual exclusivo aparece após a visita, reusando implantacao_aet.
  */
 export async function listarProcessosLaudosSst(): Promise<LaudosSstProcesso[]> {
   const implantacao = await listarProcessosImplantacao();

@@ -3,6 +3,7 @@ import {
   IMPLANTACAO_ETAPA_BADGE,
   IMPLANTACAO_ETAPA_BADGE_BASE,
   IMPLANTACAO_ETAPA_LABELS,
+  labelImplantacaoEtapa,
   type ImplantacaoEtapaId,
 } from "../lib/implantacao-clientes";
 
@@ -42,6 +43,13 @@ assert.equal(IMPLANTACAO_ETAPA_BADGE.contrato_encerrado.family, "encerrado");
 
 assert.ok(IMPLANTACAO_ETAPA_BADGE_BASE.includes("rounded-full"));
 assert.ok(IMPLANTACAO_ETAPA_BADGE_BASE.includes("border"));
+
+assert.equal(labelImplantacaoEtapa("elaboracao", "aet"), "AET em elaboração");
+assert.equal(
+  labelImplantacaoEtapa("elaboracao", "insalubridade"),
+  "Insalub. em elaboração"
+);
+assert.equal(labelImplantacaoEtapa("concluido", "aet"), "Concluído");
 
 // Rosa para agendamentos; amarelo para lista (não mais o inverso)
 assert.ok(

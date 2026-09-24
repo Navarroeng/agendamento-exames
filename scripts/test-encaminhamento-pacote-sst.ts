@@ -274,4 +274,30 @@ assert.doesNotMatch(
   "Riscos não deve chamar listarProcessosLaudosSst"
 );
 
+const aetConcluido = processo({
+  etapaAtual: "concluido",
+  possuiPacoteCompletoSst: false,
+});
+aetConcluido.fluxoImplantacao = "aet";
+assert.equal(isProcessoElegivelLaudosSst(aetConcluido), false);
+assert.equal(isProcessoElegivelRiscosPsicossociais(aetConcluido), false);
+assert.equal(isProcessoVisivelLaudosSst(aetConcluido, null), true);
+assert.equal(
+  isProcessoVisivelRiscosAutomatico(aetConcluido, null, false),
+  false
+);
+
+const insalConcluido = processo({
+  etapaAtual: "concluido",
+  possuiPacoteCompletoSst: false,
+});
+insalConcluido.fluxoImplantacao = "insalubridade";
+assert.equal(isProcessoElegivelLaudosSst(insalConcluido), false);
+assert.equal(isProcessoElegivelRiscosPsicossociais(insalConcluido), false);
+assert.equal(isProcessoVisivelLaudosSst(insalConcluido, null), true);
+assert.equal(
+  isProcessoVisivelRiscosAutomatico(insalConcluido, null, false),
+  false
+);
+
 console.log("ok: encaminhamento-pacote-sst");

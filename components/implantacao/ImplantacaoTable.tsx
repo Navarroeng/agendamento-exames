@@ -170,6 +170,7 @@ export function ImplantacaoTable({
                     <td>
                       <EtapaAtualBadge
                         etapa={processo.etapaAtual}
+                        fluxo={processo.fluxoImplantacao}
                         alertaExamesFuturos={
                           processo.concluidoComExamesFuturos
                         }

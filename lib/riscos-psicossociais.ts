@@ -1,7 +1,8 @@
 /**
  * Riscos Psicossociais — fluxo pós-Implantação.
  *
- * Entrada: mesma elegibilidade de Laudos SST (Implantação concluída).
+ * Entrada automática: Implantação concluída E Pacote completo - SST.
+ * Laudo pontual exclusivo (AET / Insalubridade) nunca entra neste fluxo.
  * A 1ª aba "Laudos SST" é automática e deriva do status real de Laudos SST
  * (não é persistida em campo próprio para evitar divergência).
  */
@@ -13,6 +14,7 @@ import {
   type LaudosSstProcesso,
   type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
+import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
 import { EMPTY_LAUDOS_WORKFLOW } from "@/lib/laudos-sst-etapas";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
 import { LISTAGEM_MES_VAZIO_MSG, type YearMonth } from "@/lib/listagem-meses";
@@ -632,6 +634,7 @@ export function calcularProgressoEtapasRiscos(input: {
 export function isProcessoElegivelRiscosPsicossociais(
   implantacao: ImplantacaoProcesso
 ): boolean {
+  if (isFluxoLaudoPontual(implantacao.fluxoImplantacao)) return false;
   return isProcessoElegivelLaudosSst(implantacao);
 }
 
@@ -676,6 +679,8 @@ export function isProcessoElegivelRiscosPsicossociaisPorLaudos(
   laudos: LaudosSstProcesso,
   trackingLaudos: OrcamentoLaudosSstRecord | null
 ): boolean {
+  if (isFluxoLaudoPontual(laudos.implantacao.fluxoImplantacao)) return false;
+  if (laudos.laudoPontualKind) return false;
   if (laudos.status === "concluido") return true;
   return isLaudosSstConcluido(trackingLaudos);
 }
@@ -1043,6 +1048,8 @@ export function buildRiscosProcessoManualCliente(input: {
     dataConclusaoImplantacao: null,
     workflow: { ...EMPTY_LAUDOS_WORKFLOW },
     tracking: null,
+    laudoPontualKind: null,
+    etapaAtualLabel: "Concluído",
   };
 
   const processo = buildRiscosPsicossociaisProcesso(

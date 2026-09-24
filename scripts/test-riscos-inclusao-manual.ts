@@ -217,6 +217,8 @@ run("TESTE 8 fluxo normal ainda tem 6 etapas e Laudos", () => {
     dataConclusaoImplantacao: null,
     workflow: { ...EMPTY_LAUDOS_WORKFLOW },
     tracking: null,
+    laudoPontualKind: null,
+    etapaAtualLabel: "EPIs",
   };
 
   const normal = buildRiscosPsicossociaisProcesso(laudos, null, null);

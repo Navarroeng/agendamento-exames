@@ -70,7 +70,11 @@ assert.deepEqual(treino, [
 
 assert.deepEqual(
   buildImplantacaoEtapasOperacionais("aet").map((e) => e.id),
-  ["contrato", "financeiro", "visita_aet", "elaboracao", "envio"]
+  ["contrato", "financeiro", "visita_aet"]
+);
+assert.deepEqual(
+  buildImplantacaoEtapasOperacionais("insalubridade").map((e) => e.id),
+  ["contrato", "financeiro", "visita_aet"]
 );
 
 function aprovacao(
@@ -336,7 +340,7 @@ assert.equal(
   "visita_aet"
 );
 assert.equal(implantacaoEtapaToModalTab("documentos", "aet"), "visita_aet");
-assert.equal(implantacaoEtapaToModalTab("concluido", "aet"), "envio");
+assert.equal(implantacaoEtapaToModalTab("concluido", "aet"), "visita_aet");
 assert.equal(
   implantacaoEtapaToModalTab("aguardando_agendamentos", "padrao"),
   "agendamentos"
@@ -363,7 +367,7 @@ const processo = buildImplantacaoProcesso({
 assert.equal(processo.etapaAtual, "visita_aet");
 assert.equal(processo.agendamentoLabel, "Não aplicável");
 assert.equal(processo.agendamentoLiberado, false);
-assert.equal(processo.totalEtapas, 7);
+assert.equal(processo.totalEtapas, 5);
 
 const summary = computeImplantacaoSummary([processo]);
 assert.equal(summary.totalEmImplantacao, 1);
@@ -488,7 +492,7 @@ assert.equal(
     fluxo: "aet",
     aet: visitaRealizada,
   }),
-  "elaboracao"
+  "concluido"
 );
 
 assert.equal(
@@ -503,7 +507,7 @@ assert.equal(
     fluxo: "aet",
     aet: elaboracaoOk,
   }),
-  "envio"
+  "concluido"
 );
 assert.equal(
   resolveImplantacaoEtapaAtual(pagamentoFuturo, {

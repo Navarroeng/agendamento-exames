@@ -4,7 +4,7 @@
  */
 
 import {
-  IMPLANTACAO_ETAPA_LABELS,
+  labelImplantacaoEtapa,
   resolveImplantacaoEtapaAtual,
   type ImplantacaoEtapaId,
 } from "@/lib/implantacao-clientes";
@@ -66,10 +66,7 @@ export function labelStatusServicoPontual(
   kind?: ServicoPontualKind | null
 ): string {
   if (etapa === "contrato") return "Aguardando contrato";
-  if (kind === "insalubridade" && etapa === "elaboracao") {
-    return "Laudo em elaboração";
-  }
-  return IMPLANTACAO_ETAPA_LABELS[etapa];
+  return labelImplantacaoEtapa(etapa, kind ?? "padrao");
 }
 
 export function nomeServicoPontualDoSnapshot(

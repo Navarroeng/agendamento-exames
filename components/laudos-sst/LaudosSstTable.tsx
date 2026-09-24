@@ -7,9 +7,9 @@ import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
-  LAUDOS_SST_ETAPA_LABELS,
-  LAUDOS_SST_ETAPAS,
   LAUDOS_SST_MES_VAZIO_MSG,
+  etapasProgressoLaudosSst,
+  labelEtapaAtualLaudosSst,
   laudosSstEtapaAtualBadgeClass,
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
@@ -26,21 +26,20 @@ interface LaudosSstTableProps {
 }
 
 function ProgressoLaudos({ processo }: { processo: LaudosSstProcesso }) {
+  const etapas = etapasProgressoLaudosSst(processo);
   return (
     <div className="min-w-[180px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
         {processo.progressoLabel} etapas
       </p>
       <div className="flex items-center gap-0.5">
-        {LAUDOS_SST_ETAPAS.map((etapa, index) => {
+        {etapas.map((etapa, index) => {
           const concluida = index < processo.etapasConcluidas;
           const atual =
-            !concluida &&
-            etapa.id === processo.etapaAtual &&
-            processo.etapasConcluidas < processo.totalEtapas;
+            !concluida && processo.etapasConcluidas < processo.totalEtapas;
           const tone = concluida
             ? "bg-brand-green"
-            : atual
+            : atual && index === processo.etapasConcluidas
               ? "bg-brand-blue"
               : "bg-[#e2e8f0]";
           return (
@@ -130,9 +129,7 @@ export function LaudosSstTable({
                           processo.status
                         )}
                       >
-                        {processo.status === "concluido"
-                          ? "Concluído"
-                          : LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual]}
+                        {labelEtapaAtualLaudosSst(processo)}
                       </span>
                     </td>
                     <td>
