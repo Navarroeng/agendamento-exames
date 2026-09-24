@@ -13,6 +13,7 @@ import {
   type ImplantacaoAetVisitaStatus,
 } from "@/lib/implantacao-aet";
 import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
+import { copyLaudoPontual } from "@/lib/servico-laudo-pontual";
 
 const VISITA_STATUS_OPTIONS: ImplantacaoAetVisitaStatus[] = [
   "aguardando_agendamento",
@@ -186,6 +187,7 @@ export function OrcamentoAbaAetElaboracao({
 }) {
   const visitaOk = isAetVisitaRealizada(aet);
   const laudoAnexado = Boolean(aet?.laudo_path?.trim());
+  const copy = copyLaudoPontual(kind);
 
   return (
     <div className="space-y-4">
@@ -194,11 +196,7 @@ export function OrcamentoAbaAetElaboracao({
           Aguardando realização da visita
         </p>
       ) : (
-        <p className="text-sm text-[#64748b]">
-          {kind === "insalubridade"
-            ? "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir."
-            : "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir."}
-        </p>
+        <p className="text-sm text-[#64748b]">{copy.textoElaboracao}</p>
       )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -241,9 +239,7 @@ export function OrcamentoAbaAetElaboracao({
 
       <div className="rounded-xl border border-[#e4ebf4] bg-white p-4">
         <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-navy">
-          {kind === "insalubridade"
-            ? "Laudo de Insalubridade (PDF)"
-            : "Laudo AET final (PDF)"}
+          {copy.upload}
         </p>
         {laudoAnexado ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -326,21 +322,16 @@ export function OrcamentoAbaAetEnvio({
   onSalvar: () => void;
 }) {
   const podeEnviar = isAetElaboracaoConcluida(aet);
+  const copy = copyLaudoPontual(kind);
 
   return (
     <div className="space-y-4">
       {!podeEnviar ? (
         <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm font-semibold text-[#b45309]">
-          {kind === "insalubridade"
-            ? "Conclua a elaboração do Laudo e anexe o PDF final antes de registrar o envio."
-            : "Conclua a elaboração do AET e anexe o PDF final antes de registrar o envio."}
+          {copy.concluaAntesEnvio}
         </p>
       ) : (
-        <p className="text-sm text-[#64748b]">
-          {kind === "insalubridade"
-            ? "Registre o envio do Laudo de Insalubridade ao cliente. O envio automático por e-mail não faz parte desta etapa."
-            : "Registre o envio do Laudo AET ao cliente. O envio automático por e-mail não faz parte desta etapa."}
-        </p>
+        <p className="text-sm text-[#64748b]">{copy.textoEnvio}</p>
       )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -400,18 +391,21 @@ export function OrcamentoAbaAetEnvio({
 export function OrcamentoResumoAetStatus({
   kind = "aet",
   aet,
+  visitaInformativa = false,
 }: {
   kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
+  visitaInformativa?: boolean;
 }) {
+  const copy = copyLaudoPontual(kind);
+  const visitaOk = isAetVisitaRealizada(aet);
+
   return (
     <section className="rounded-2xl border border-[#e4ebf4] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
       <p className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-navy">
-        {kind === "insalubridade"
-          ? "Andamento do Laudo de Insalubridade"
-          : "Andamento do Laudo AET"}
+        {copy.andamento}
       </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-start">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
             Visita
@@ -427,7 +421,20 @@ export function OrcamentoResumoAetStatus({
               {aet.visita_horario ? ` · ${aet.visita_horario}` : ""}
             </p>
           ) : null}
+          {visitaInformativa ? (
+            <p className="mt-1 text-[11px] font-medium text-[#64748b]">
+              {visitaOk
+                ? "Concluída na Implantação"
+                : "Registrada na Implantação"}
+            </p>
+          ) : null}
         </div>
+        <p
+          className="hidden self-center text-lg font-extrabold text-[#cbd5e1] sm:block"
+          aria-hidden
+        >
+          →
+        </p>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
             Elaboração
@@ -438,6 +445,12 @@ export function OrcamentoResumoAetStatus({
               : "Aguardando"}
           </p>
         </div>
+        <p
+          className="hidden self-center text-lg font-extrabold text-[#cbd5e1] sm:block"
+          aria-hidden
+        >
+          →
+        </p>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
             Envio

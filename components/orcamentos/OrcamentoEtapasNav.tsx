@@ -12,6 +12,10 @@ import {
 } from "@/lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
+import {
+  copyLaudoPontual,
+  fluxoToLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import type { ImplantacaoTreinamentoRecord } from "@/lib/implantacao-treinamento";
 import type { ImplantacaoAetRecord } from "@/lib/implantacao-aet";
 
@@ -53,6 +57,10 @@ export function OrcamentoEtapasNav({
     aet,
     contagem: contagemAgendamentos,
   };
+  const laudoKind = fluxoToLaudoPontualKind(fluxo);
+  const envioBloqueadoTitle = laudoKind
+    ? copyLaudoPontual(laudoKind).concluaAntesEnvio
+    : "Etapa bloqueada";
 
   return (
     <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
@@ -78,7 +86,7 @@ export function OrcamentoEtapasNav({
                 ? item.id === "elaboracao"
                   ? "Aguardando realização da visita"
                   : item.id === "envio"
-                    ? "Conclua a elaboração do AET antes de registrar o envio"
+                    ? envioBloqueadoTitle
                     : "Etapa bloqueada"
                 : estado === "pendente"
                   ? "Aguardando pagamento"

@@ -23,6 +23,10 @@ import {
   removerArquivoOrcamentoOnboarding,
   uploadAetLaudoPdf,
 } from "@/services/orcamento-onboarding-storage.service";
+import {
+  copyLaudoPontual,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 
 export function emptyAetVisitaForm() {
   return {
@@ -81,7 +85,10 @@ export function useOrcamentoAetEtapas(params: {
   orcamentoId: string | null;
   aprovacaoId: string | null;
   orcamentoNumero: string | null;
+  kind?: LaudoPontualKind;
 }) {
+  const kind = params.kind ?? "aet";
+  const copy = copyLaudoPontual(kind);
   const auditContext = useAuditoriaUsuario();
   const [aet, setAet] = useState<ImplantacaoAetRecord | null>(null);
   const [visitaForm, setVisitaForm] = useState(emptyAetVisitaForm);
@@ -119,7 +126,7 @@ export function useOrcamentoAetEtapas(params: {
     }
     void reload().catch((err) => {
       console.error(err);
-      toast.error("Não foi possível carregar o acompanhamento do AET.");
+      toast.error(copy.toastCarregarErro);
     });
   }, [params.enabled, reload]);
 
@@ -177,8 +184,8 @@ export function useOrcamentoAetEtapas(params: {
       await audit(
         acao,
         saved.visita_status === "realizada"
-          ? `${auditContext.usuarioNome} registrou a visita do AET como realizada.`
-          : `${auditContext.usuarioNome} atualizou o agendamento da visita do AET.`,
+          ? copy.auditVisitaRealizada(auditContext.usuarioNome)
+          : copy.auditVisitaAgendada(auditContext.usuarioNome),
         { visita_status: saved.visita_status, visita_data: saved.visita_data }
       );
       toast.success("Visita salva.");
@@ -208,10 +215,10 @@ export function useOrcamentoAetEtapas(params: {
       setAet(saved);
       await audit(
         AUDITORIA_ACOES.implantacao_aet_laudo_anexado,
-        `${auditContext.usuarioNome} anexou o Laudo AET final.`,
+        copy.auditLaudoAnexado(auditContext.usuarioNome),
         { arquivo_nome: uploaded.nome }
       );
-      toast.success("Laudo AET anexado.");
+      toast.success(copy.toastAnexado);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -258,6 +265,7 @@ export function useOrcamentoAetEtapas(params: {
             elaboracaoForm.elaboracao_observacao.trim() || null,
         },
         usuarioNome: auditContext.usuarioNome,
+        kind,
       });
       setAet(saved);
       const acao =
@@ -267,8 +275,8 @@ export function useOrcamentoAetEtapas(params: {
       await audit(
         acao,
         saved.elaboracao_status === "concluido"
-          ? `${auditContext.usuarioNome} concluiu a elaboração do AET.`
-          : `${auditContext.usuarioNome} atualizou a elaboração do AET.`,
+          ? copy.auditElaboracaoConcluida(auditContext.usuarioNome)
+          : copy.auditElaboracaoAtualizada(auditContext.usuarioNome),
         { elaboracao_status: saved.elaboracao_status }
       );
       toast.success("Elaboração salva.");
@@ -296,12 +304,13 @@ export function useOrcamentoAetEtapas(params: {
           envio_observacao: envioForm.envio_observacao.trim() || null,
         },
         usuarioNome: auditContext.usuarioNome,
+        kind,
       });
       setAet(saved);
       if (saved.enviado_cliente) {
         await audit(
           AUDITORIA_ACOES.implantacao_aet_envio_confirmado,
-          `${auditContext.usuarioNome} confirmou o envio do AET ao cliente.`,
+          copy.auditEnvioConfirmado(auditContext.usuarioNome),
           { enviado_em: saved.enviado_em }
         );
       }

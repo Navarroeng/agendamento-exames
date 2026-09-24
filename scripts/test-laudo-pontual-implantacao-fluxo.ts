@@ -12,7 +12,11 @@ import {
   labelImplantacaoEtapa,
   resolveImplantacaoEtapaAtual,
 } from "../lib/implantacao-clientes";
-import type { ImplantacaoAetRecord } from "../lib/implantacao-aet";
+import {
+  validateAetElaboracaoPayload,
+  validateAetEnvioPayload,
+  type ImplantacaoAetRecord,
+} from "../lib/implantacao-aet";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
 import {
@@ -30,7 +34,9 @@ import {
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import {
+  copyLaudoPontual,
   resolveLaudoPontualKind,
+  resolveLaudoPontualKindFromImplantacao,
   fluxoToLaudoPontualKind,
 } from "../lib/servico-laudo-pontual";
 import { labelStatusServicoPontual } from "../lib/servicos-pontuais";
@@ -437,5 +443,123 @@ assert.equal(
   }),
   "concluido"
 );
+
+const copyAet = copyLaudoPontual("aet");
+assert.equal(copyAet.titulo, "Laudo AET");
+assert.equal(copyAet.andamento, "Andamento do Laudo AET");
+assert.equal(copyAet.abaElaboracao, "AET em elaboração");
+assert.equal(
+  copyAet.textoElaboracao,
+  "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir."
+);
+assert.equal(copyAet.upload, "Laudo AET final (PDF)");
+
+const copyInsal = copyLaudoPontual("insalubridade");
+assert.equal(copyInsal.titulo, "Laudo de Insalubridade");
+assert.equal(copyInsal.andamento, "Andamento do Laudo de Insalubridade");
+assert.equal(copyInsal.abaElaboracao, "Insalub. em elaboração");
+assert.equal(
+  copyInsal.textoElaboracao,
+  "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir."
+);
+assert.equal(copyInsal.upload, "Laudo de Insalubridade final (PDF)");
+for (const value of Object.values(copyInsal)) {
+  if (typeof value !== "string") continue;
+  assert.equal(
+    value.includes("AET"),
+    false,
+    `copy de Insalubridade não pode conter AET: ${value}`
+  );
+}
+assert.equal(
+  copyInsal.auditElaboracaoConcluida("AGATHA").includes("AET"),
+  false
+);
+assert.equal(copyInsal.toastAnexado.includes("AET"), false);
+assert.equal(copyInsal.toastCarregarErro.includes("AET"), false);
+
+assert.equal(
+  resolveLaudoPontualKindFromImplantacao({
+    fluxo: "insalubridade",
+    itens: [
+      { servico_id: "insal-1", servico_nome: SERVICO_INSALUBRIDADE_NOME },
+    ],
+  }),
+  "insalubridade"
+);
+assert.equal(
+  resolveLaudoPontualKindFromImplantacao({
+    fluxo: "padrao",
+    itens: [
+      { servico_id: "insal-1", servico_nome: SERVICO_INSALUBRIDADE_NOME },
+    ],
+  }),
+  "insalubridade"
+);
+
+const orc0065 = buildImplantacaoProcesso({
+  orcamento: orcamento({
+    id: "orc-0065-modal",
+    numero: "ORC-2026-0065",
+    cliente_nome: "AL ASSESSORIA",
+  }),
+  aprovacao: { ...apInsal, orcamento_id: "orc-0065-modal" },
+  contrato: null,
+  fluxoImplantacao: "insalubridade",
+  aet: { ...visitaRealizada, orcamento_id: "orc-0065-modal" },
+});
+const laudos0065 = buildLaudosSstProcesso(orc0065, null);
+assert.equal(laudos0065.laudoPontualKind, "insalubridade");
+assert.equal(laudos0065.implantacao.orcamento.numero, "ORC-2026-0065");
+assert.equal(laudos0065.implantacao.orcamento.cliente_nome, "AL ASSESSORIA");
+const copy0065 = copyLaudoPontual(laudos0065.laudoPontualKind ?? "aet");
+assert.equal(copy0065.titulo, "Laudo de Insalubridade");
+assert.doesNotMatch(copy0065.titulo, /AET/);
+assert.doesNotMatch(copy0065.andamento, /AET/);
+assert.doesNotMatch(copy0065.abaElaboracao, /AET/);
+assert.doesNotMatch(copy0065.textoElaboracao, /AET/);
+assert.doesNotMatch(copy0065.upload, /AET/);
+assert.doesNotMatch(copy0065.concluaAntesEnvio, /AET/);
+assert.doesNotMatch(copy0065.textoEnvio, /AET/);
+assert.equal(labelEtapaAtualLaudosSst(laudos0065), "Insalub. em elaboração");
+
+assert.equal(
+  validateAetElaboracaoPayload(
+    { elaboracao_status: "concluido", elaboracao_observacao: null },
+    visitaRealizada,
+    "insalubridade"
+  ),
+  copyInsal.anexeAntesDeConcluir
+);
+assert.doesNotMatch(
+  validateAetElaboracaoPayload(
+    { elaboracao_status: "concluido", elaboracao_observacao: null },
+    visitaRealizada,
+    "insalubridade"
+  ) ?? "",
+  /AET/
+);
+assert.equal(
+  validateAetEnvioPayload(
+    { enviado_cliente: true, enviado_em: "2026-09-24", envio_observacao: null },
+    visitaRealizada,
+    "insalubridade"
+  ),
+  copyInsal.concluaAntesEnvio
+);
+
+const laudos0065Envio = buildLaudosSstProcesso(
+  buildImplantacaoProcesso({
+    orcamento: orcamento({ numero: "ORC-2026-0065" }),
+    aprovacao: apInsal,
+    contrato: null,
+    fluxoImplantacao: "insalubridade",
+    aet: laudoFinalizado,
+  }),
+  null
+);
+assert.equal(laudos0065Envio.status, "concluido");
+assert.equal(labelEtapaAtualLaudosSst(laudos0065Envio), "Concluído");
+assert.equal(isProcessoElegivelRiscosPsicossociais(laudos0065Envio.implantacao), false);
 
 console.log("ok: laudo-pontual-implantacao-fluxo");

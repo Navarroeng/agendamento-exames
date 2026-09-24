@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
@@ -14,8 +14,11 @@ import {
   labelEtapaAtualLaudosSst,
   type LaudosSstProcesso,
 } from "@/lib/laudos-sst";
-import { labelImplantacaoEtapa } from "@/lib/implantacao-clientes";
-import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
+import {
+  copyLaudoPontual,
+  resolveLaudoPontualKindFromImplantacao,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 
 type LaudoPontualTab = "elaboracao" | "envio";
 
@@ -26,13 +29,28 @@ interface LaudosPontualModalProps {
   onSaved: (processoAtualizado: LaudosSstProcesso) => void;
 }
 
+function resolveKindDoProcesso(
+  processo: LaudosSstProcesso | null
+): LaudoPontualKind {
+  if (!processo) return "aet";
+  return (
+    processo.laudoPontualKind ??
+    resolveLaudoPontualKindFromImplantacao({
+      fluxo: processo.implantacao.fluxoImplantacao,
+      itens: processo.implantacao.aprovacao?.orcamento_aprovacao_itens,
+    }) ??
+    "aet"
+  );
+}
+
 export function LaudosPontualModal({
   open,
   processo,
   onClose,
   onSaved,
 }: LaudosPontualModalProps) {
-  const kind: LaudoPontualKind = processo?.laudoPontualKind ?? "aet";
+  const kind = resolveKindDoProcesso(processo);
+  const copy = copyLaudoPontual(kind);
   const initialTab: LaudoPontualTab =
     processo?.etapaAtualLabel === "Aguardando envio" ? "envio" : "elaboracao";
   const [tab, setTab] = useState<LaudoPontualTab>(initialTab);
@@ -45,9 +63,10 @@ export function LaudosPontualModal({
 
   return (
     <LaudosPontualModalBody
-      key={processo.implantacao.orcamento.id}
+      key={`${processo.implantacao.orcamento.id}-${kind}`}
       processo={processo}
       kind={kind}
+      copy={copy}
       tab={tab}
       onTabChange={setTab}
       onClose={onClose}
@@ -59,6 +78,7 @@ export function LaudosPontualModal({
 function LaudosPontualModalBody({
   processo,
   kind,
+  copy,
   tab,
   onTabChange,
   onClose,
@@ -66,6 +86,7 @@ function LaudosPontualModalBody({
 }: {
   processo: LaudosSstProcesso;
   kind: LaudoPontualKind;
+  copy: ReturnType<typeof copyLaudoPontual>;
   tab: LaudoPontualTab;
   onTabChange: (tab: LaudoPontualTab) => void;
   onClose: () => void;
@@ -78,6 +99,7 @@ function LaudosPontualModalBody({
     orcamentoId: orcamento.id,
     aprovacaoId: aprovacao?.id ?? null,
     orcamentoNumero: orcamento.numero,
+    kind,
   });
 
   useEffect(() => {
@@ -90,28 +112,32 @@ function LaudosPontualModalBody({
     );
   }, [aetEtapas.aet]);
 
-  const subtitle = [
-    orcamento.numero,
-    formatClienteNomeDisplay(orcamento.cliente_nome),
-    labelEtapaAtualLaudosSst(processo),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const subtitle = useMemo(
+    () =>
+      [
+        orcamento.numero,
+        formatClienteNomeDisplay(orcamento.cliente_nome),
+        labelEtapaAtualLaudosSst(processo),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    [orcamento.numero, orcamento.cliente_nome, processo]
+  );
 
   return (
     <Modal
       open
       onClose={onClose}
-      title={
-        kind === "insalubridade"
-          ? "Laudo de Insalubridade"
-          : "Laudo AET"
-      }
+      title={copy.titulo}
       subtitle={subtitle}
       size="xl"
     >
       <div className="space-y-4">
-        <OrcamentoResumoAetStatus kind={kind} aet={aetEtapas.aet} />
+        <OrcamentoResumoAetStatus
+          kind={kind}
+          aet={aetEtapas.aet}
+          visitaInformativa
+        />
 
         <div className="flex gap-2 border-b border-[#e4ebf4] pb-2">
           <button
@@ -123,7 +149,7 @@ function LaudosPontualModalBody({
             }`}
             onClick={() => onTabChange("elaboracao")}
           >
-            {labelImplantacaoEtapa("elaboracao", kind)}
+            {copy.abaElaboracao}
           </button>
           <button
             type="button"

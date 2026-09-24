@@ -1,4 +1,8 @@
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import {
+  copyLaudoPontual,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 
 export type ImplantacaoAetVisitaStatus =
   | "aguardando_agendamento"
@@ -150,7 +154,8 @@ export function validateAetVisitaPayload(
 
 export function validateAetElaboracaoPayload(
   payload: ImplantacaoAetElaboracaoPayload,
-  aet: ImplantacaoAetRecord | null
+  aet: ImplantacaoAetRecord | null,
+  kind: LaudoPontualKind = "aet"
 ): string | null {
   if (!isAetVisitaRealizada(aet)) {
     if (payload.elaboracao_status !== "aguardando") {
@@ -159,18 +164,19 @@ export function validateAetElaboracaoPayload(
     return null;
   }
   if (payload.elaboracao_status === "concluido" && !aet?.laudo_path?.trim()) {
-    return "Anexe o Laudo AET final antes de concluir esta etapa.";
+    return copyLaudoPontual(kind).anexeAntesDeConcluir;
   }
   return null;
 }
 
 export function validateAetEnvioPayload(
   payload: ImplantacaoAetEnvioPayload,
-  aet: ImplantacaoAetRecord | null
+  aet: ImplantacaoAetRecord | null,
+  kind: LaudoPontualKind = "aet"
 ): string | null {
   if (payload.enviado_cliente) {
     if (!isAetElaboracaoConcluida(aet)) {
-      return "Conclua a elaboração do AET e anexe o PDF final antes de registrar o envio.";
+      return copyLaudoPontual(kind).concluaAntesEnvio;
     }
     if (!payload.enviado_em) {
       return "Informe a data de envio ao cliente.";

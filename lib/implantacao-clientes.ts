@@ -21,7 +21,7 @@ import {
   isAetVisitaRealizada,
   type ImplantacaoAetRecord,
 } from "@/lib/implantacao-aet";
-import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
+import { isFluxoLaudoPontual, copyLaudoPontual, fluxoToLaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
@@ -172,8 +172,9 @@ export function labelImplantacaoEtapa(
   etapa: ImplantacaoEtapaId,
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): string {
-  if (etapa === "elaboracao" && fluxo === "insalubridade") {
-    return "Insalub. em elaboração";
+  const kind = fluxoToLaudoPontualKind(fluxo);
+  if (etapa === "elaboracao" && kind) {
+    return copyLaudoPontual(kind).abaElaboracao;
   }
   return IMPLANTACAO_ETAPA_LABELS[etapa] ?? etapa;
 }

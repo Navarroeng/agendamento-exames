@@ -44,6 +44,97 @@ export function fluxoToLaudoPontualKind(
   return null;
 }
 
+export function resolveLaudoPontualKindFromImplantacao(params: {
+  fluxo?: OrcamentoFluxoImplantacao | null;
+  itens?: ServicoItemRef[] | null;
+}): LaudoPontualKind | null {
+  return (
+    fluxoToLaudoPontualKind(params.fluxo) ??
+    resolveLaudoPontualKind(params.itens)
+  );
+}
+
+export function copyLaudoPontual(kind: LaudoPontualKind): {
+  titulo: string;
+  andamento: string;
+  abaElaboracao: string;
+  textoElaboracao: string;
+  upload: string;
+  nomeCurto: string;
+  anexeAntesDeConcluir: string;
+  concluaAntesEnvio: string;
+  textoEnvio: string;
+  toastCarregarErro: string;
+  toastAnexado: string;
+  auditVisitaRealizada: (usuario: string) => string;
+  auditVisitaAgendada: (usuario: string) => string;
+  auditLaudoAnexado: (usuario: string) => string;
+  auditElaboracaoConcluida: (usuario: string) => string;
+  auditElaboracaoAtualizada: (usuario: string) => string;
+  auditEnvioConfirmado: (usuario: string) => string;
+} {
+  if (kind === "insalubridade") {
+    return {
+      titulo: "Laudo de Insalubridade",
+      andamento: "Andamento do Laudo de Insalubridade",
+      abaElaboracao: "Insalub. em elaboração",
+      textoElaboracao:
+        "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir.",
+      upload: "Laudo de Insalubridade final (PDF)",
+      nomeCurto: "Laudo de Insalubridade",
+      anexeAntesDeConcluir:
+        "Anexe o Laudo de Insalubridade final antes de concluir esta etapa.",
+      concluaAntesEnvio:
+        "Conclua a elaboração do Laudo de Insalubridade e anexe o PDF final antes de registrar o envio.",
+      textoEnvio:
+        "Registre o envio do Laudo de Insalubridade ao cliente. O envio automático por e-mail não faz parte desta etapa.",
+      toastCarregarErro:
+        "Não foi possível carregar o acompanhamento do Laudo de Insalubridade.",
+      toastAnexado: "Laudo de Insalubridade anexado.",
+      auditVisitaRealizada: (usuario) =>
+        `${usuario} registrou a visita do Laudo de Insalubridade como realizada.`,
+      auditVisitaAgendada: (usuario) =>
+        `${usuario} atualizou o agendamento da visita do Laudo de Insalubridade.`,
+      auditLaudoAnexado: (usuario) =>
+        `${usuario} anexou o Laudo de Insalubridade final.`,
+      auditElaboracaoConcluida: (usuario) =>
+        `${usuario} concluiu a elaboração do Laudo de Insalubridade.`,
+      auditElaboracaoAtualizada: (usuario) =>
+        `${usuario} atualizou a elaboração do Laudo de Insalubridade.`,
+      auditEnvioConfirmado: (usuario) =>
+        `${usuario} confirmou o envio do Laudo de Insalubridade ao cliente.`,
+    };
+  }
+  return {
+    titulo: "Laudo AET",
+    andamento: "Andamento do Laudo AET",
+    abaElaboracao: "AET em elaboração",
+    textoElaboracao:
+      "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir.",
+    upload: "Laudo AET final (PDF)",
+    nomeCurto: "AET",
+    anexeAntesDeConcluir:
+      "Anexe o Laudo AET final antes de concluir esta etapa.",
+    concluaAntesEnvio:
+      "Conclua a elaboração do AET e anexe o PDF final antes de registrar o envio.",
+    textoEnvio:
+      "Registre o envio do Laudo AET ao cliente. O envio automático por e-mail não faz parte desta etapa.",
+    toastCarregarErro: "Não foi possível carregar o acompanhamento do AET.",
+    toastAnexado: "Laudo AET anexado.",
+    auditVisitaRealizada: (usuario) =>
+      `${usuario} registrou a visita do AET como realizada.`,
+    auditVisitaAgendada: (usuario) =>
+      `${usuario} atualizou o agendamento da visita do AET.`,
+    auditLaudoAnexado: (usuario) => `${usuario} anexou o Laudo AET final.`,
+    auditElaboracaoConcluida: (usuario) =>
+      `${usuario} concluiu a elaboração do AET.`,
+    auditElaboracaoAtualizada: (usuario) =>
+      `${usuario} atualizou a elaboração do AET.`,
+    auditEnvioConfirmado: (usuario) =>
+      `${usuario} confirmou o envio do AET ao cliente.`,
+  };
+}
+
 export function isServicoLaudoPontualNome(
   nome: string | null | undefined
 ): boolean {

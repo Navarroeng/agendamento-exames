@@ -8,6 +8,7 @@ import {
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaPayload,
 } from "@/lib/implantacao-aet";
+import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
 
 function mapAet(row: ImplantacaoAetRecord): ImplantacaoAetRecord {
   return row;
@@ -116,10 +117,12 @@ export async function salvarElaboracaoAet(params: {
   aet: ImplantacaoAetRecord;
   payload: ImplantacaoAetElaboracaoPayload;
   usuarioNome: string;
+  kind?: LaudoPontualKind;
 }): Promise<ImplantacaoAetRecord> {
   const validationError = validateAetElaboracaoPayload(
     params.payload,
-    params.aet
+    params.aet,
+    params.kind ?? "aet"
   );
   if (validationError) throw new Error(validationError);
 
@@ -179,8 +182,13 @@ export async function salvarEnvioAet(params: {
   aet: ImplantacaoAetRecord;
   payload: ImplantacaoAetEnvioPayload;
   usuarioNome: string;
+  kind?: LaudoPontualKind;
 }): Promise<ImplantacaoAetRecord> {
-  const validationError = validateAetEnvioPayload(params.payload, params.aet);
+  const validationError = validateAetEnvioPayload(
+    params.payload,
+    params.aet,
+    params.kind ?? "aet"
+  );
   if (validationError) throw new Error(validationError);
 
   const agora = new Date().toISOString();

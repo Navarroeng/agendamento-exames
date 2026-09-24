@@ -6,8 +6,8 @@ import {
   isAetVisitaRealizada,
 } from "@/lib/implantacao-aet";
 import {
-  fluxoToLaudoPontualKind,
   isFluxoLaudoPontual,
+  resolveLaudoPontualKindFromImplantacao,
   type LaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 import { filterByEtapaEntradaMes } from "@/lib/etapa-entrada";
@@ -351,7 +351,10 @@ function buildLaudosSstProcessoLaudoPontual(
   implantacao: ImplantacaoProcesso
 ): LaudosSstProcesso {
   const kind =
-    fluxoToLaudoPontualKind(implantacao.fluxoImplantacao) ?? "aet";
+    resolveLaudoPontualKindFromImplantacao({
+      fluxo: implantacao.fluxoImplantacao,
+      itens: implantacao.aprovacao?.orcamento_aprovacao_itens,
+    }) ?? "aet";
   const aet = implantacao.aet ?? null;
   const visitaOk = isAetVisitaRealizada(aet);
   const elaboracaoOk = isAetElaboracaoConcluida(aet);

@@ -84,7 +84,7 @@ import {
 } from "@/lib/servico-treinamentos";
 import { resolveAetServicoId } from "@/lib/servico-aet";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
-import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
+import { isFluxoLaudoPontual, fluxoToLaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
 import {
   OrcamentoAbaAetElaboracao,
@@ -404,11 +404,13 @@ export function OrcamentoAprovarModal({
   const aetEnabled = Boolean(
     open && orcamento && aprovacao && isFluxoLaudoPontual(fluxoImplantacao)
   );
+  const laudoKind = fluxoToLaudoPontualKind(fluxoImplantacao) ?? "aet";
   const aetEtapas = useOrcamentoAetEtapas({
     enabled: aetEnabled,
     orcamentoId: orcamento?.id ?? null,
     aprovacaoId: aprovacao?.id ?? null,
     orcamentoNumero: orcamento?.numero ?? null,
+    kind: laudoKind,
   });
   const etapasCtx: OrcamentoEtapasContexto = useMemo(
     () => ({
@@ -781,8 +783,6 @@ export function OrcamentoAprovarModal({
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const isLaudoPontual = isFluxoLaudoPontual(fluxoImplantacao);
-  const laudoKind =
-    fluxoImplantacao === "insalubridade" ? "insalubridade" : "aet";
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
