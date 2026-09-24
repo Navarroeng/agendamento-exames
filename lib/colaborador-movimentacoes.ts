@@ -12,6 +12,31 @@ export type ColaboradorMovimentacaoTipo = typeof TIPO_DESLIGAMENTO_ADMIN;
 
 export type ColaboradorDesligamentoOrigem = "demissional" | "admin";
 
+export function isDesligamentoAdminAtivo(mov: {
+  tipo?: string | null;
+  cancelado_em?: string | null;
+}): boolean {
+  if (String(mov.tipo ?? "").trim() !== TIPO_DESLIGAMENTO_ADMIN) return false;
+  return !isMovimentacaoCancelada(mov.cancelado_em);
+}
+
+/** CPFs com desligamento administrativo vigente (não cancelado). */
+export function coletarCpfsDesligamentoAdminAtivo(
+  movimentacoes: Array<{
+    tipo?: string | null;
+    cpf_digits?: string | null;
+    cancelado_em?: string | null;
+  }>
+): Set<string> {
+  const cpfs = new Set<string>();
+  for (const mov of movimentacoes) {
+    if (!isDesligamentoAdminAtivo(mov)) continue;
+    const cpf = normalizeCpfDigits(mov.cpf_digits);
+    if (isValidCPF(cpf)) cpfs.add(cpf);
+  }
+  return cpfs;
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -415,7 +415,7 @@ run("aba Agendamentos reusa o helper e não altera os cards", () => {
   assert.doesNotMatch(aba, /setVagas\(.*orderPorNomeColaborador/);
   assert.match(
     aba,
-    /vagasComprometidas = vagas\.filter\(\(v\) => v\.status === \"comprometida\"\)/
+    /statusClassificacaoVaga\(v, desligamento\) === \"comprometida\"/
   );
   assert.equal(
     labelColaboradorOuVaga({

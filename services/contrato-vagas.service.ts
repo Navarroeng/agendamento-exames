@@ -4,17 +4,21 @@ import {
   AUDITORIA_MODULOS,
 } from "@/lib/auditoria";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { TIPO_DESLIGAMENTO_ADMIN, coletarCpfsDesligamentoAdminAtivo } from "@/lib/colaborador-movimentacoes";
 import {
   cpfVagaIguais,
+  coletarCpfsDemissionalAtivo,
   escolherAgendamentoValidoParaVaga,
   isContratoVagaStatus,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
   resolveStatusVagaRascunho,
+  statusClassificacaoVaga,
   validarDraftsListaVagas,
+  vagaClassificacaoBloqueiaEdicaoOcupante,
   vagaPermiteRemoverFuncionario,
   vagaPrecisaReconciliarAgendamento,
-  vagaStatusBloqueiaEdicao,
+  type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
   type ContratoVagaStatus,
@@ -138,6 +142,102 @@ export async function listarVagasPorContratos(
   return map;
 }
 
+export async function listarCpfsDesligamentoAdminAtivoPorClientes(
+  clienteIds: string[]
+): Promise<Map<string, Set<string>>> {
+  const ids = Array.from(
+    new Set(clienteIds.map((id) => String(id).trim()).filter(Boolean))
+  );
+  const map = new Map<string, Set<string>>();
+  for (const id of ids) map.set(id, new Set());
+  if (ids.length === 0) return map;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("colaborador_movimentacoes")
+    .select("cliente_id, cpf_digits, tipo, cancelado_em")
+    .in("cliente_id", ids)
+    .eq("tipo", TIPO_DESLIGAMENTO_ADMIN)
+    .is("cancelado_em", null);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const clienteId = String(
+      (row as { cliente_id?: string }).cliente_id ?? ""
+    ).trim();
+    if (!clienteId) continue;
+    const dest = map.get(clienteId) ?? new Set<string>();
+    for (const cpf of Array.from(coletarCpfsDesligamentoAdminAtivo([row]))) {
+      dest.add(cpf);
+    }
+    map.set(clienteId, dest);
+  }
+  return map;
+}
+
+export async function listarCpfsDemissionalAtivoPorClientes(
+  clienteIds: string[]
+): Promise<Map<string, Set<string>>> {
+  const ids = Array.from(
+    new Set(clienteIds.map((id) => String(id).trim()).filter(Boolean))
+  );
+  const map = new Map<string, Set<string>>();
+  for (const id of ids) map.set(id, new Set());
+  if (ids.length === 0) return map;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .select("cliente_id, colaborador_cpf, aso, status")
+    .in("cliente_id", ids)
+    .in("status", ["agendado", "aso_retido"]);
+  if (error) throw error;
+  const porCliente = new Map<
+    string,
+    Array<{
+      colaborador_cpf?: string | null;
+      aso?: string | null;
+      status?: string | null;
+    }>
+  >();
+  for (const row of data ?? []) {
+    const clienteId = String(
+      (row as { cliente_id?: string }).cliente_id ?? ""
+    ).trim();
+    if (!clienteId) continue;
+    const list = porCliente.get(clienteId) ?? [];
+    list.push(
+      row as {
+        colaborador_cpf?: string | null;
+        aso?: string | null;
+        status?: string | null;
+      }
+    );
+    porCliente.set(clienteId, list);
+  }
+  for (const id of ids) {
+    map.set(id, coletarCpfsDemissionalAtivo(porCliente.get(id) ?? []));
+  }
+  return map;
+}
+
+export async function carregarContextoDesligamentoVagasDoCliente(
+  clienteId: string | null | undefined
+): Promise<ContextoClassificacaoDesligamentoVaga> {
+  const id = String(clienteId ?? "").trim();
+  if (!id) {
+    return {
+      cpfsDesligadosAdmin: new Set(),
+      cpfsComDemissionalAtivo: new Set(),
+    };
+  }
+  const [desligados, demissionais] = await Promise.all([
+    listarCpfsDesligamentoAdminAtivoPorClientes([id]),
+    listarCpfsDemissionalAtivoPorClientes([id]),
+  ]);
+  return {
+    cpfsDesligadosAdmin: desligados.get(id) ?? new Set(),
+    cpfsComDemissionalAtivo: demissionais.get(id) ?? new Set(),
+  };
+}
+
 export async function marcarEtapaListaVagas(aprovacaoId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
@@ -169,12 +269,23 @@ export async function salvarListaVagasContrato(params: {
     orcamentoId: params.orcamentoId,
     quantidadePrevista: n,
   });
+  const ctx = params.clienteId
+    ? await carregarContextoDesligamentoVagasDoCliente(params.clienteId).catch(
+        () => null
+      )
+    : null;
   const byIndice = new Map(atuais.map((v) => [v.indice, v]));
 
   for (const draft of drafts) {
     const atual = byIndice.get(draft.indice);
     if (!atual) continue;
-    if (vagaStatusBloqueiaEdicao(atual.status)) continue;
+    if (
+      vagaClassificacaoBloqueiaEdicaoOcupante(
+        statusClassificacaoVaga(atual, ctx)
+      )
+    ) {
+      continue;
+    }
 
     const nextStatus = resolveStatusVagaRascunho({
       statusAtual: atual.status,
@@ -303,7 +414,19 @@ export async function liberarFuncionarioDaVagaComprometida(params: {
       "Esta vaga está programada para exame futuro e não pode ser limpa por aqui."
     );
   }
-  if (!vagaPermiteRemoverFuncionario(vaga)) {
+  let ctx: ContextoClassificacaoDesligamentoVaga | null = null;
+  const { data: contratoRow } = await supabase
+    .from("cliente_contratos")
+    .select("cliente_id")
+    .eq("id", vaga.contrato_id)
+    .maybeSingle();
+  const clienteId = String(contratoRow?.cliente_id ?? "").trim();
+  if (clienteId) {
+    ctx = await carregarContextoDesligamentoVagasDoCliente(clienteId).catch(
+      () => null
+    );
+  }
+  if (!vagaPermiteRemoverFuncionario(vaga, ctx)) {
     throw new Error(
       "Só é possível remover o funcionário de uma vaga comprometida, ainda sem agendamento."
     );

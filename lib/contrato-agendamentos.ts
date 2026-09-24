@@ -4,6 +4,7 @@ import {
   contarCardsPorVagasContrato,
   deveUsarVagasComoFonteDosCards,
   isClassificacaoVagasContratoCompleta,
+  type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaRecord,
 } from "@/lib/contrato-vagas";
 
@@ -23,17 +24,22 @@ export type ContratoAgendamentoContagem = {
    */
   emAberto: number;
   /**
-   * Vagas ainda sem classificação (não agendada, programada, ASO em aberto
-   * nem comprometida). Nunca negativo.
+   * Vagas ainda sem classificação (não agendada, programada, ASO em aberto,
+   * comprometida nem desligada administrativamente). Nunca negativo.
    */
   pendentesDefinicao: number;
-  /** Total comprometido (agendados + futuros + ASOs em aberto + vagas nomeadas). */
+  /** Total classificado (agendados + futuros + ASOs + nomeadas + desligados admin). */
   comprometidos: number;
   /**
    * Funcionários já identificados na lista, ainda sem agendamento/futuro/ASO.
    * Card "Comprometidos" da Implantação.
    */
   vagasComprometidas: number;
+  /**
+   * Vagas consumidas por desligamento administrativo sem Demissional.
+   * Classificadas (não pendentes), mas sem card próprio no cabeçalho.
+   */
+  vagasDesligadasAdmin: number;
   /** @deprecated Alias de pendentesDefinicao. */
   pendentes: number;
   /** @deprecated Alias de pendentesDefinicao. */
@@ -106,6 +112,7 @@ export function buildContratoAgendamentoContagem(
     programadosFuturos?: number;
     emAberto?: number;
     vagasComprometidas?: number;
+    vagasDesligadasAdmin?: number;
   }
 ): ContratoAgendamentoContagem {
   const previstos = Math.max(0, quantidadeContratada || 0);
@@ -114,19 +121,25 @@ export function buildContratoAgendamentoContagem(
   const programadosFuturos = Math.max(0, opts?.programadosFuturos ?? 0);
   const emAberto = Math.max(0, opts?.emAberto ?? 0);
   const vagasComprometidas = Math.max(0, opts?.vagasComprometidas ?? 0);
+  const vagasDesligadasAdmin = Math.max(0, opts?.vagasDesligadasAdmin ?? 0);
 
-  // Comprometidos (classificados) = formalização da vaga, sem dupla contagem.
+  // Classificados = formalização da vaga, sem dupla contagem.
   // Progresso (`utilizados`) continua sendo agendados+futuros+emAberto.
   const hasBreakdown =
     opts?.agendados != null ||
     opts?.programadosFuturos != null ||
     opts?.emAberto != null ||
-    opts?.vagasComprometidas != null;
+    opts?.vagasComprometidas != null ||
+    opts?.vagasDesligadasAdmin != null;
   const comprometidos = Math.max(
     0,
     hasBreakdown
-      ? agendados + programadosFuturos + emAberto + vagasComprometidas
-      : Math.max(0, utilizados) + vagasComprometidas
+      ? agendados +
+          programadosFuturos +
+          emAberto +
+          vagasComprometidas +
+          vagasDesligadasAdmin
+      : Math.max(0, utilizados) + vagasComprometidas + vagasDesligadasAdmin
   );
   const usadosProgresso = Math.max(0, utilizados);
 
@@ -143,6 +156,7 @@ export function buildContratoAgendamentoContagem(
       pendentesDefinicao: 0,
       comprometidos: 0,
       vagasComprometidas: 0,
+      vagasDesligadasAdmin: 0,
       pendentes: 0,
       disponiveis: 0,
       adicionais: extras,
@@ -194,17 +208,32 @@ export function buildContratoAgendamentoContagem(
         : `Existem ${vagasComprometidas} vagas comprometidas ainda pendentes de agendamento, programação para o futuro ou ASO em aberto.`;
   } else {
     mensagem = "A quantidade prevista do contrato foi totalmente classificada.";
+    const partes: string[] = [];
+    if (vagasDesligadasAdmin === 1) {
+      partes.push(
+        "Existe 1 vaga consumida por desligamento administrativo, sem pendência operacional."
+      );
+    } else if (vagasDesligadasAdmin > 1) {
+      partes.push(
+        `Existem ${vagasDesligadasAdmin} vagas consumidas por desligamento administrativo, sem pendência operacional.`
+      );
+    }
     if (emAberto === 1) {
-      mensagemComplemento =
-        "Existe 1 ASO disponível para utilização futura durante a vigência do contrato.";
+      partes.push(
+        "Existe 1 ASO disponível para utilização futura durante a vigência do contrato."
+      );
     } else if (emAberto > 1) {
-      mensagemComplemento = `Existem ${emAberto} ASOs disponíveis para utilização futura durante a vigência do contrato.`;
-    } else if (extras > 0) {
-      mensagemComplemento =
+      partes.push(
+        `Existem ${emAberto} ASOs disponíveis para utilização futura durante a vigência do contrato.`
+      );
+    } else if (extras > 0 && vagasDesligadasAdmin === 0) {
+      partes.push(
         extras === 1
           ? "Existe 1 agendamento adicional além da previsão."
-          : `Existem ${extras} agendamentos adicionais além da previsão.`;
+          : `Existem ${extras} agendamentos adicionais além da previsão.`
+      );
     }
+    mensagemComplemento = partes.length > 0 ? partes.join(" ") : null;
   }
 
   return {
@@ -218,6 +247,7 @@ export function buildContratoAgendamentoContagem(
     pendentesDefinicao,
     comprometidos,
     vagasComprometidas,
+    vagasDesligadasAdmin,
     pendentes: pendentesDefinicao,
     disponiveis: pendentesDefinicao,
     adicionais: extras,
@@ -246,6 +276,7 @@ export function buildContagemContratoComVagas(input: {
     id: string;
     colaborador_cpf?: string | null;
   }>;
+  desligamento?: ContextoClassificacaoDesligamentoVaga | null;
 }): ContratoAgendamentoContagem {
   if (input.dispensado) {
     return buildContratoAgendamentoContagem(
@@ -259,7 +290,8 @@ export function buildContagemContratoComVagas(input: {
   if (deveUsarVagasComoFonteDosCards(input.vagas)) {
     const cards = contarCardsPorVagasContrato(
       input.vagas,
-      input.quantidadePrevista
+      input.quantidadePrevista,
+      input.desligamento
     );
     const adicionais = (input.agendamentosValidos ?? []).filter(
       (ag) => !agendamentoOcupaVagaPrevista(ag, input.vagas)

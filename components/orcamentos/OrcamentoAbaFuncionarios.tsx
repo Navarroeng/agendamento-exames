@@ -14,18 +14,20 @@ import {
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
-  CONTRATO_VAGA_STATUS_LABELS,
+  CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
   buildVagaDraftsIniciais,
   draftAposRemoverFuncionario,
   emptyVagaDraft,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
   validarDraftsListaVagas,
+  vagaClassificacaoBloqueiaEdicaoOcupante,
   vagaPermiteRemoverFuncionario,
-  vagaStatusBloqueiaEdicao,
+  statusClassificacaoVaga,
+  type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
-  type ContratoVagaStatus,
+  type ContratoVagaStatusClassificacao,
 } from "@/lib/contrato-vagas";
 import {
   aplicarImportacaoNasVagas,
@@ -45,6 +47,7 @@ import {
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
 import {
+  carregarContextoDesligamentoVagasDoCliente,
   garantirVagasDoContrato,
   liberarFuncionarioDaVagaComprometida,
   listarVagasDoContrato,
@@ -73,19 +76,20 @@ interface OrcamentoAbaFuncionariosProps {
   onRemover: () => Promise<void>;
 }
 
-function StatusBadge({ status }: { status: ContratoVagaStatus }) {
-  const map: Record<ContratoVagaStatus, string> = {
+function StatusBadge({ status }: { status: ContratoVagaStatusClassificacao }) {
+  const map: Record<ContratoVagaStatusClassificacao, string> = {
     aberta: "bg-[#fffbeb] text-[#b45309]",
     comprometida: "bg-[#ffedd5] text-[#c2410c]",
     aso_aberto: "bg-[#e0f2fe] text-[#0369a1]",
     agendada: "bg-brand-green-soft text-brand-green",
     programada: "bg-[#eef2ff] text-[#4338ca]",
+    desligado_admin: "bg-[#f1f5f9] text-[#475569]",
   };
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${map[status]}`}
     >
-      {CONTRATO_VAGA_STATUS_LABELS[status]}
+      {CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO[status]}
     </span>
   );
 }
@@ -125,6 +129,11 @@ export function OrcamentoAbaFuncionarios({
   const [savingLista, setSavingLista] = useState(false);
   const [contrato, setContrato] = useState<ClienteContratoRecord | null>(null);
   const [vagas, setVagas] = useState<ContratoVagaRecord[]>([]);
+  const [desligamento, setDesligamento] =
+    useState<ContextoClassificacaoDesligamentoVaga>({
+      cpfsDesligadosAdmin: new Set(),
+      cpfsComDemissionalAtivo: new Set(),
+    });
   const [drafts, setDrafts] = useState<ContratoVagaDraft[]>([]);
   const [cargos, setCargos] = useState<CargoRecord[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -162,6 +171,10 @@ export function OrcamentoAbaFuncionarios({
         0;
       if (!contratoRow) {
         setVagas([]);
+        setDesligamento({
+          cpfsDesligadosAdmin: new Set(),
+          cpfsComDemissionalAtivo: new Set(),
+        });
         setDrafts(
           Array.from({ length: qtd }, (_, i) => emptyVagaDraft(i + 1))
         );
@@ -175,6 +188,13 @@ export function OrcamentoAbaFuncionarios({
           quantidadePrevista: qtd,
         });
       }
+      const ctx = await carregarContextoDesligamentoVagasDoCliente(
+        clienteId ?? contratoRow.cliente_id
+      ).catch(() => ({
+        cpfsDesligadosAdmin: new Set<string>(),
+        cpfsComDemissionalAtivo: new Set<string>(),
+      }));
+      setDesligamento(ctx);
       setVagas(existentes);
       setDrafts(buildVagaDraftsIniciais(qtd, existentes));
     } catch (err) {
@@ -187,7 +207,7 @@ export function OrcamentoAbaFuncionarios({
     } finally {
       setLoading(false);
     }
-  }, [aprovacao.quantidade_colaboradores, orcamentoId]);
+  }, [aprovacao.quantidade_colaboradores, orcamentoId, clienteId]);
 
   useEffect(() => {
     void load();
@@ -287,7 +307,11 @@ export function OrcamentoAbaFuncionarios({
 
     const locked = new Set(
       vagas
-        .filter((v) => vagaStatusBloqueiaEdicao(v.status))
+        .filter((v) =>
+          vagaClassificacaoBloqueiaEdicaoOcupante(
+            statusClassificacaoVaga(v, desligamento)
+          )
+        )
         .map((v) => v.indice)
     );
     const atuaisEditaveis = drafts.map((row) =>
@@ -409,6 +433,7 @@ export function OrcamentoAbaFuncionarios({
       const rows = buildListaFuncionariosExportRows({
         linhas: linhasVisuais,
         vagaByIndice,
+        desligamento,
       });
       downloadListaFuncionariosXlsx({
         rows,
@@ -542,15 +567,16 @@ export function OrcamentoAbaFuncionarios({
             <tbody>
               {linhasVisuais.map(({ numeroVisual, draft: row }, rowIdx) => {
                 const persistida = vagaByIndice.get(row.indice);
-                const locked = persistida
-                  ? vagaStatusBloqueiaEdicao(persistida.status)
-                  : false;
                 const statusPreview = resolveStatusListaFuncionarioPreview({
                   persistida,
                   draft: row,
+                  desligamento,
                 });
+                const locked = vagaClassificacaoBloqueiaEdicaoOcupante(
+                  statusPreview
+                );
                 const podeRemoverFuncionario = persistida
-                  ? vagaPermiteRemoverFuncionario(persistida)
+                  ? vagaPermiteRemoverFuncionario(persistida, desligamento)
                   : false;
                 const vazia =
                   !isNomeFuncionarioReal(row.colaborador) &&
@@ -569,7 +595,9 @@ export function OrcamentoAbaFuncionarios({
                         placeholder={locked ? undefined : "Nome"}
                         title={
                           locked
-                            ? "Não é possível editar após o agendamento vinculado. Altere pelo agendamento, se necessário."
+                            ? statusPreview === "desligado_admin"
+                              ? "Vaga consumida por desligamento administrativo. Não é possível atribuir outro funcionário."
+                              : "Não é possível editar após o agendamento vinculado. Altere pelo agendamento, se necessário."
                             : undefined
                         }
                         onChange={(e) =>

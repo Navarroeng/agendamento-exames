@@ -15,7 +15,7 @@ import type {
   AgendamentoWithExames,
   ClienteContratoRecord,
 } from "@/lib/types";
-import { listarVagasDoContrato } from "@/services/contrato-vagas.service";
+import { listarVagasDoContrato, carregarContextoDesligamentoVagasDoCliente } from "@/services/contrato-vagas.service";
 
 const AGENDAMENTO_SELECT = `
   *,
@@ -384,6 +384,9 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   if (!dispensado) {
     vagasComprometidas = vagas.filter((v) => v.status === "comprometida").length;
   }
+  const desligamento = await carregarContextoDesligamentoVagasDoCliente(
+    contrato.cliente_id
+  ).catch(() => null);
 
   return {
     itens,
@@ -396,6 +399,7 @@ export async function carregarAgendamentosVigenciaContrato(params: {
       vagasComprometidasLegado: vagasComprometidas,
       adicionaisLegado: adicionais,
       dispensado,
+      desligamento,
       agendamentosValidos: itens
         .filter((i) => isAgendamentoSelecionavel(i.agendamento.status))
         .map((i) => ({

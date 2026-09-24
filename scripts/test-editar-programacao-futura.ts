@@ -482,7 +482,7 @@ run("UI: Implantação tem Editar na vaga Programado e Periódicos substitui aç
     join(root, "components/periodicos-futuros/PeriodicoRowActionsMenu.tsx"),
     "utf8"
   );
-  assert.match(aba, /vaga\.status === "programada"/);
+  assert.match(aba, /statusClassificacao === "programada"/);
   assert.match(aba, />\s*Editar\s*</);
   assert.match(aba, /atualizarProgramacaoFutura/);
   assert.match(aba, /EditarProgramacaoFuturaModal/);

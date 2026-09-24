@@ -17,12 +17,32 @@ export const CONTRATO_VAGA_STATUSES = [
 
 export type ContratoVagaStatus = (typeof CONTRATO_VAGA_STATUSES)[number];
 
+/** Estado derivado — não persiste em contrato_vagas.status. */
+export const CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN = "desligado_admin" as const;
+
+export type ContratoVagaStatusClassificacao =
+  | ContratoVagaStatus
+  | typeof CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN;
+
 export const CONTRATO_VAGA_STATUS_LABELS: Record<ContratoVagaStatus, string> = {
   aberta: "Em aberto",
   comprometida: "Comprometido",
   aso_aberto: "ASO em aberto",
   agendada: "Agendado",
   programada: "Programado",
+};
+
+export const CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO: Record<
+  ContratoVagaStatusClassificacao,
+  string
+> = {
+  ...CONTRATO_VAGA_STATUS_LABELS,
+  desligado_admin: "Desligado administrativamente",
+};
+
+export type ContextoClassificacaoDesligamentoVaga = {
+  cpfsDesligadosAdmin: ReadonlySet<string>;
+  cpfsComDemissionalAtivo?: ReadonlySet<string>;
 };
 
 export type ContratoVagaRecord = {
@@ -72,6 +92,65 @@ export function isContratoVagaStatus(
   return (CONTRATO_VAGA_STATUSES as readonly string[]).includes(value);
 }
 
+export function coletarCpfsDemissionalAtivo(
+  agendamentos: Array<{
+    colaborador_cpf?: string | null;
+    aso?: string | null;
+    status?: string | null;
+  }>
+): Set<string> {
+  const cpfs = new Set<string>();
+  for (const ag of agendamentos) {
+    const status = String(ag.status ?? "").trim().toLowerCase();
+    if (status === "cancelado") continue;
+    if (status !== "agendado" && status !== "aso_retido") continue;
+    const aso = String(ag.aso ?? "")
+      .trim()
+      .toLocaleLowerCase("pt-BR");
+    if (aso !== "demissional") continue;
+    const cpf = normalizeCpfDigits(ag.colaborador_cpf);
+    if (isValidCPF(cpf)) cpfs.add(cpf);
+  }
+  return cpfs;
+}
+
+/**
+ * Classificação operacional da vaga. Desligado administrativamente é derivado:
+ * ocupante em vaga comprometida + desligamento_admin vigente + sem Demissional
+ * que determine outro estado. Não grava novo status em contrato_vagas.
+ */
+export function statusClassificacaoVaga(
+  vaga: Pick<ContratoVagaRecord, "status"> &
+    Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>,
+  ctx?: ContextoClassificacaoDesligamentoVaga | null
+): ContratoVagaStatusClassificacao {
+  if (vaga.status !== "comprometida") return vaga.status;
+  if (!ctx) return vaga.status;
+  const cpf = normalizeCpfDigits(vaga.colaborador_cpf);
+  if (!isValidCPF(cpf)) return vaga.status;
+  if (ctx.cpfsComDemissionalAtivo?.has(cpf)) return vaga.status;
+  if (ctx.cpfsDesligadosAdmin.has(cpf)) {
+    return CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN;
+  }
+  return vaga.status;
+}
+
+export function vagaPermiteAcoesOperacionaisAgendamento(
+  status: ContratoVagaStatusClassificacao
+): boolean {
+  return status === "comprometida";
+}
+
+export function vagaClassificacaoBloqueiaEdicaoOcupante(
+  status: ContratoVagaStatusClassificacao
+): boolean {
+  return (
+    status === "agendada" ||
+    status === "programada" ||
+    status === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+  );
+}
+
 export function normalizeNomeOcupante(
   value: string | null | undefined
 ): string {
@@ -111,12 +190,27 @@ export function vagaStatusBloqueiaEdicao(status: ContratoVagaStatus): boolean {
  * Só vaga comprometida, sem agendamento nem periódico futuro.
  * Não apaga a linha: o ocupante é limpo e o status volta para aberta.
  */
-export function vagaPermiteRemoverFuncionario(vaga: {
-  status?: ContratoVagaStatus | null;
-  agendamento_id?: string | null;
-  periodico_futuro_id?: string | null;
-}): boolean {
+export function vagaPermiteRemoverFuncionario(
+  vaga: {
+    status?: ContratoVagaStatus | null;
+    colaborador_cpf?: string | null;
+    agendamento_id?: string | null;
+    periodico_futuro_id?: string | null;
+  },
+  ctx?: ContextoClassificacaoDesligamentoVaga | null
+): boolean {
   if (vaga.status !== "comprometida") return false;
+  if (
+    statusClassificacaoVaga(
+      {
+        status: "comprometida",
+        colaborador_cpf: vaga.colaborador_cpf ?? null,
+      },
+      ctx
+    ) === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+  ) {
+    return false;
+  }
   if (vagaStatusBloqueiaEdicao(vaga.status)) return false;
   if (vaga.agendamento_id || vaga.periodico_futuro_id) return false;
   return true;
@@ -210,14 +304,16 @@ export function cpfVagaIguais(
 /**
  * Vaga com definição operacional concluída para a etapa Agendamentos.
  * Comprometido NÃO entra: ainda exige Agendar / programar / ASO em aberto.
+ * Desligado administrativamente entra: a vaga foi consumida e não há pendência.
  */
 export function isVagaAgendamentoResolvida(
-  status: ContratoVagaStatus | string | null | undefined
+  status: ContratoVagaStatusClassificacao | string | null | undefined
 ): boolean {
   return (
     status === "agendada" ||
     status === "programada" ||
-    status === "aso_aberto"
+    status === "aso_aberto" ||
+    status === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
   );
 }
 
@@ -230,7 +326,8 @@ export function vagaStatusEClassificacaoFinal(
 
 /**
  * Etapa Agendamentos concluída somente quando todas as vagas previstas
- * estão operacionalmente resolvidas (Agendado | Programado | ASO em aberto).
+ * estão operacionalmente resolvidas (Agendado | Programado | ASO em aberto
+ * | Desligado administrativamente).
  *
  * Comprometido classifica a vaga, mas NÃO conclui a etapa.
  * `pendentesDefinicao === 0` sozinho não basta se ainda houver comprometidos.
@@ -268,6 +365,7 @@ export type CardsVagasContrato = {
   programadosFuturos: number;
   emAberto: number;
   vagasComprometidas: number;
+  vagasDesligadasAdmin: number;
   pendentesDefinicao: number;
 };
 
@@ -283,32 +381,53 @@ export function deveUsarVagasComoFonteDosCards(
 
 /**
  * Cada vaga prevista entra em uma única categoria.
- * pendentes = previstos - agendados - programados - ASOs - comprometidos.
+ * pendentes = previstos - agendados - programados - ASOs - comprometidos
+ *   - desligados administrativamente.
  */
 export function contarCardsPorVagasContrato(
-  vagas: Array<Pick<ContratoVagaRecord, "status">>,
-  quantidadePrevista: number
+  vagas: Array<
+    Pick<ContratoVagaRecord, "status"> &
+      Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>
+  >,
+  quantidadePrevista: number,
+  ctx?: ContextoClassificacaoDesligamentoVaga | null
 ): CardsVagasContrato {
   let agendados = 0;
   let programadosFuturos = 0;
   let emAberto = 0;
   let vagasComprometidas = 0;
+  let vagasDesligadasAdmin = 0;
   for (const vaga of vagas) {
-    if (vaga.status === "agendada") agendados += 1;
-    else if (vaga.status === "programada") programadosFuturos += 1;
-    else if (vaga.status === "aso_aberto") emAberto += 1;
-    else if (vaga.status === "comprometida") vagasComprometidas += 1;
+    const status = statusClassificacaoVaga(
+      {
+        status: vaga.status,
+        colaborador_cpf: vaga.colaborador_cpf ?? null,
+      },
+      ctx
+    );
+    if (status === "agendada") agendados += 1;
+    else if (status === "programada") programadosFuturos += 1;
+    else if (status === "aso_aberto") emAberto += 1;
+    else if (status === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN) {
+      vagasDesligadasAdmin += 1;
+    } else if (status === "comprometida") vagasComprometidas += 1;
   }
   const previstos = Math.max(0, Math.floor(Number(quantidadePrevista) || 0));
   const pendentesDefinicao = Math.max(
     0,
-    previstos - agendados - programadosFuturos - emAberto - vagasComprometidas
+    previstos -
+      agendados -
+      programadosFuturos -
+      emAberto -
+      vagasComprometidas -
+      vagasDesligadasAdmin
   );
   return {
     agendados,
     programadosFuturos,
     emAberto,
     vagasComprometidas,
+    vagasDesligadasAdmin,
     pendentesDefinicao,
   };
 }

@@ -24,7 +24,7 @@ import { buscarAetPorOrcamentoIds } from "@/services/implantacao-aet.service";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
 import { contarCreditosDisponiveisPorContratos } from "@/services/contrato-creditos-aso.service";
 import { contarProgramacoesFuturasPorContratos } from "@/services/contrato-programacao-futura.service";
-import { listarVagasPorContratos } from "@/services/contrato-vagas.service";
+import { listarVagasPorContratos, listarCpfsDesligamentoAdminAtivoPorClientes, listarCpfsDemissionalAtivoPorClientes } from "@/services/contrato-vagas.service";
 
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
@@ -182,6 +182,21 @@ export async function listarProcessosImplantacao(): Promise<
   const creditosPorContrato =
     await contarCreditosDisponiveisPorContratos(contratoIds);
   const vagasPorContrato = await listarVagasPorContratos(contratoIds);
+  const clienteIds = Array.from(
+    new Set(
+      Array.from(contratoByOrcamento.values())
+        .map((c) => String(c.cliente_id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+  const [desligadosPorCliente, demissionaisPorCliente] = await Promise.all([
+    listarCpfsDesligamentoAdminAtivoPorClientes(clienteIds).catch(
+      () => new Map<string, Set<string>>()
+    ),
+    listarCpfsDemissionalAtivoPorClientes(clienteIds).catch(
+      () => new Map<string, Set<string>>()
+    ),
+  ]);
 
   const processos: ImplantacaoProcesso[] = [];
 
@@ -221,18 +236,22 @@ export async function listarProcessosImplantacao(): Promise<
       aprovacao,
       contrato
     );
-    const vagasComprometidas = vagas.filter(
-      (vaga) => vaga.status === "comprometida"
-    ).length;
+    const clienteId = String(contrato?.cliente_id ?? "").trim();
+    const desligamento = {
+      cpfsDesligadosAdmin: desligadosPorCliente.get(clienteId) ?? new Set<string>(),
+      cpfsComDemissionalAtivo:
+        demissionaisPorCliente.get(clienteId) ?? new Set<string>(),
+    };
     const contagem = buildContagemContratoComVagas({
       quantidadePrevista,
       vagas,
       utilizadosAg: agendados,
       programadosLegado: programados,
       emAbertoLegado: emAberto,
-      vagasComprometidasLegado: vagasComprometidas,
+      vagasComprometidasLegado: 0,
       adicionaisLegado: 0,
       dispensado: Boolean(contrato?.agendamentos_iniciais_dispensados),
+      desligamento,
     });
 
     const itens = resolveItensParaFluxoImplantacao({

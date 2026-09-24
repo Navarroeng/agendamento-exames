@@ -8,6 +8,8 @@ import {
   buildVagaDraftsIniciais,
   contarCardsPorVagasContrato,
   contarVagasComprometidas,
+  CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
+  CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
   cpfVagaIguais,
   deveUsarVagasComoFonteDosCards,
   draftAposRemoverFuncionario,
@@ -15,11 +17,15 @@ import {
   escolherAgendamentoValidoParaVaga,
   isClassificacaoVagasContratoCompleta,
   isNomeFuncionarioReal,
+  isVagaAgendamentoResolvida,
   labelColaboradorOuVaga,
   resolverDadosExibicaoVagaContrato,
   resolveStatusVagaRascunho,
+  statusClassificacaoVaga,
+  vagaClassificacaoBloqueiaEdicaoOcupante,
   vagaPrecisaReconciliarAgendamento,
   validarDraftsListaVagas,
+  vagaPermiteAcoesOperacionaisAgendamento,
   vagaPermiteRemoverFuncionario,
   vagaStatusBloqueiaEdicao,
   type ContratoVagaDraft,
@@ -963,5 +969,186 @@ assert.match(importLibSrc, /export function parsePlanilhaListaFuncionarios/);
 assert.match(importLibSrc, /export async function lerArquivoListaFuncionarios/);
 assert.match(importLibSrc, /export function aplicarImportacaoNasVagas/);
 assert.match(importLibSrc, /CONTRATO_VAGAS_SHEET_FUNCIONARIOS/);
+
+const CPF_JIVALDO = "52998224725";
+const vagasOrc0033 = [
+  vagaCard("agendada", {
+    indice: 1,
+    colaborador: "DANIEL DOS SANTOS",
+    colaborador_cpf: "39053344705",
+    agendamento_id: "ag-daniel",
+  }),
+  vagaCard("agendada", {
+    indice: 2,
+    colaborador: "NATALIA DA SILVA MAZUR",
+    colaborador_cpf: "11144477735",
+    agendamento_id: "ag-natalia",
+  }),
+  vagaCard("comprometida", {
+    indice: 3,
+    colaborador: "JIVALDO JESUS SANTOS",
+    colaborador_cpf: CPF_JIVALDO,
+  }),
+];
+
+const cardsAntesDesligamento = contarCardsPorVagasContrato(vagasOrc0033, 3);
+assert.equal(cardsAntesDesligamento.agendados, 2);
+assert.equal(cardsAntesDesligamento.vagasComprometidas, 1);
+assert.equal(cardsAntesDesligamento.pendentesDefinicao, 0);
+assert.equal(cardsAntesDesligamento.vagasDesligadasAdmin, 0);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 3,
+    pendentesDefinicao: cardsAntesDesligamento.pendentesDefinicao,
+    vagasComprometidas: cardsAntesDesligamento.vagasComprometidas,
+  }),
+  false
+);
+assert.equal(
+  statusClassificacaoVaga(vagasOrc0033[2]),
+  "comprometida"
+);
+assert.equal(
+  vagaPermiteAcoesOperacionaisAgendamento("comprometida"),
+  true
+);
+
+const ctxJivaldo = {
+  cpfsDesligadosAdmin: new Set([CPF_JIVALDO]),
+};
+assert.equal(
+  statusClassificacaoVaga(vagasOrc0033[2], ctxJivaldo),
+  CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+);
+assert.equal(
+  CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO[
+    statusClassificacaoVaga(vagasOrc0033[2], ctxJivaldo)
+  ],
+  "Desligado administrativamente"
+);
+assert.equal(
+  vagaPermiteAcoesOperacionaisAgendamento(
+    statusClassificacaoVaga(vagasOrc0033[2], ctxJivaldo)
+  ),
+  false
+);
+assert.equal(
+  vagaPermiteRemoverFuncionario(vagasOrc0033[2], ctxJivaldo),
+  false
+);
+assert.equal(
+  vagaClassificacaoBloqueiaEdicaoOcupante(
+    statusClassificacaoVaga(vagasOrc0033[2], ctxJivaldo)
+  ),
+  true
+);
+assert.equal(
+  isVagaAgendamentoResolvida(
+    statusClassificacaoVaga(vagasOrc0033[2], ctxJivaldo)
+  ),
+  true
+);
+
+const cardsDepois = contarCardsPorVagasContrato(vagasOrc0033, 3, ctxJivaldo);
+assert.equal(cardsDepois.agendados, 2);
+assert.equal(cardsDepois.vagasComprometidas, 0);
+assert.equal(cardsDepois.vagasDesligadasAdmin, 1);
+assert.equal(cardsDepois.pendentesDefinicao, 0);
+assert.equal(cardsDepois.emAberto, 0);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 3,
+    pendentesDefinicao: cardsDepois.pendentesDefinicao,
+    vagasComprometidas: cardsDepois.vagasComprometidas,
+  }),
+  true
+);
+
+const contagem0033 = buildContagemContratoComVagas({
+  quantidadePrevista: 3,
+  vagas: vagasOrc0033,
+  utilizadosAg: 2,
+  programadosLegado: 0,
+  emAbertoLegado: 0,
+  vagasComprometidasLegado: 1,
+  adicionaisLegado: 0,
+  desligamento: ctxJivaldo,
+});
+assert.equal(contagem0033.previstos, 3);
+assert.equal(contagem0033.agendados, 2);
+assert.equal(contagem0033.vagasComprometidas, 0);
+assert.equal(contagem0033.vagasDesligadasAdmin, 1);
+assert.equal(contagem0033.pendentesDefinicao, 0);
+assert.equal(contagem0033.concluido, true);
+assert.match(
+  contagem0033.mensagemComplemento ?? "",
+  /desligamento administrativo/
+);
+
+const ctxDesfeito = { cpfsDesligadosAdmin: new Set<string>() };
+assert.equal(
+  statusClassificacaoVaga(vagasOrc0033[2], ctxDesfeito),
+  "comprometida"
+);
+const cardsDesfeito = contarCardsPorVagasContrato(
+  vagasOrc0033,
+  3,
+  ctxDesfeito
+);
+assert.equal(cardsDesfeito.vagasComprometidas, 1);
+assert.equal(cardsDesfeito.vagasDesligadasAdmin, 0);
+assert.equal(
+  isClassificacaoVagasContratoCompleta({
+    previstos: 3,
+    pendentesDefinicao: cardsDesfeito.pendentesDefinicao,
+    vagasComprometidas: cardsDesfeito.vagasComprometidas,
+  }),
+  false
+);
+
+const ctxDemissional = {
+  cpfsDesligadosAdmin: new Set([CPF_JIVALDO]),
+  cpfsComDemissionalAtivo: new Set([CPF_JIVALDO]),
+};
+assert.equal(
+  statusClassificacaoVaga(vagasOrc0033[2], ctxDemissional),
+  "comprometida"
+);
+assert.equal(
+  vagaPermiteAcoesOperacionaisAgendamento("comprometida"),
+  true
+);
+
+assert.equal(
+  agendamentoOcupaVagaPrevista(
+    { id: "ag-demissional-posterior", colaborador_cpf: CPF_JIVALDO },
+    vagasOrc0033
+  ),
+  true
+);
+
+const vagaAgendadaComDesligamento = vagaCard("agendada", {
+  indice: 1,
+  colaborador: "COM EXAME",
+  colaborador_cpf: CPF_JIVALDO,
+  agendamento_id: "ag-1",
+});
+assert.equal(
+  statusClassificacaoVaga(vagaAgendadaComDesligamento, ctxJivaldo),
+  "agendada"
+);
+
+const abaAgSrc = readFileSync(
+  join(process.cwd(), "components/orcamentos/OrcamentoAbaAgendamentos.tsx"),
+  "utf8"
+);
+assert.match(abaAgSrc, /statusClassificacaoVaga/);
+assert.match(abaAgSrc, /vagaPermiteAcoesOperacionaisAgendamento/);
+assert.match(abaAgSrc, /CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO/);
+assert.match(
+  readFileSync(join(process.cwd(), "lib/contrato-vagas.ts"), "utf8"),
+  /Desligado administrativamente/
+);
+assert.doesNotMatch(abaAgSrc, /from\("contrato_vagas"\)[\s\S]{0,80}\.update/);
 
 console.log("test-contrato-vagas: OK");

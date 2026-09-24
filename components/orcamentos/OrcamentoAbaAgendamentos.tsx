@@ -49,12 +49,17 @@ import { formatCreatedAtBR } from "@/lib/format-datetime";
 import { saveAgendamentoPrefill } from "@/lib/agendamento-prefill";
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
-  CONTRATO_VAGA_STATUS_LABELS,
+  CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
+  CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
+  coletarCpfsDemissionalAtivo,
   isNomeFuncionarioReal,
   labelColaboradorOuVaga,
   resolverDadosExibicaoVagaContrato,
+  statusClassificacaoVaga,
+  vagaPermiteAcoesOperacionaisAgendamento,
+  type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaRecord,
-  type ContratoVagaStatus,
+  type ContratoVagaStatusClassificacao,
 } from "@/lib/contrato-vagas";
 import {
   cycleListaFuncionariosNomeSort,
@@ -78,6 +83,7 @@ import {
   removerCreditoAsoEmAberto,
 } from "@/services/contrato-creditos-aso.service";
 import {
+  carregarContextoDesligamentoVagasDoCliente,
   listarVagasDoContrato,
   ocuparVagasAbertasComCreditos,
   liberarVagaPorCreditoRemovido,
@@ -156,19 +162,24 @@ function labelOuTraco(value: string | null | undefined): string {
   return texto || "—";
 }
 
-function VagaSituacaoBadge({ status }: { status: ContratoVagaStatus }) {
-  const map: Record<ContratoVagaStatus, string> = {
+function VagaSituacaoBadge({
+  status,
+}: {
+  status: ContratoVagaStatusClassificacao;
+}) {
+  const map: Record<ContratoVagaStatusClassificacao, string> = {
     aberta: "bg-[#fffbeb] text-[#b45309]",
     comprometida: "bg-[#ffedd5] text-[#c2410c]",
     aso_aberto: "bg-[#e0f2fe] text-[#0369a1]",
     agendada: "bg-brand-green-soft text-brand-green",
     programada: "bg-[#eef2ff] text-[#4338ca]",
+    desligado_admin: "bg-[#f1f5f9] text-[#475569]",
   };
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${map[status]}`}
     >
-      {CONTRATO_VAGA_STATUS_LABELS[status]}
+      {CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO[status]}
     </span>
   );
 }
@@ -307,6 +318,11 @@ export function OrcamentoAbaAgendamentos({
     ColaboradorSugestao[]
   >([]);
   const [vagas, setVagas] = useState<ContratoVagaRecord[]>([]);
+  const [desligamento, setDesligamento] =
+    useState<ContextoClassificacaoDesligamentoVaga>({
+      cpfsDesligadosAdmin: new Set(),
+      cpfsComDemissionalAtivo: new Set(),
+    });
   const [vagasNomeSort, setVagasNomeSort] =
     useState<ListaFuncionariosNomeSort>("asc");
 
@@ -323,7 +339,9 @@ export function OrcamentoAbaAgendamentos({
   const creditosDisponiveis = creditosAso.filter(
     (c) => c.status === "disponivel"
   ).length;
-  const vagasComprometidas = vagas.filter((v) => v.status === "comprometida").length;
+  const vagasComprometidas = vagas.filter(
+    (v) => statusClassificacaoVaga(v, desligamento) === "comprometida"
+  ).length;
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -350,6 +368,10 @@ export function OrcamentoAbaAgendamentos({
           setCreditosAso([]);
           setVagas([]);
           setSugestoesColaboradores([]);
+          setDesligamento({
+            cpfsDesligadosAdmin: new Set(),
+            cpfsComDemissionalAtivo: new Set(),
+          });
           onContagemChangeRef.current?.(empty);
           return;
         }
@@ -366,7 +388,8 @@ export function OrcamentoAbaAgendamentos({
           );
         }
 
-        const [resumo, progs, creditos, vagasContrato] = await Promise.all([
+        const [resumo, progs, creditos, vagasContrato, ctxDesligamento] =
+          await Promise.all([
           carregarAgendamentosVigenciaContrato({
             contrato: contratoRow,
             quantidadeContratada: qtd,
@@ -375,6 +398,12 @@ export function OrcamentoAbaAgendamentos({
           listarProgramacoesFuturasDoContrato(contratoRow.id),
           listarCreditosDoContrato(contratoRow.id),
           listarVagasDoContrato(contratoRow.id).catch(() => [] as ContratoVagaRecord[]),
+          carregarContextoDesligamentoVagasDoCliente(contratoRow.cliente_id).catch(
+            () => ({
+              cpfsDesligadosAdmin: new Set<string>(),
+              cpfsComDemissionalAtivo: new Set<string>(),
+            })
+          ),
         ]);
         const idsVagas = new Set(
           vagasContrato
@@ -407,6 +436,17 @@ export function OrcamentoAbaAgendamentos({
         setProgramacoes(progs);
         setCreditosAso(creditos);
         setVagas(vagasContrato);
+        setDesligamento({
+          cpfsDesligadosAdmin: ctxDesligamento.cpfsDesligadosAdmin,
+          cpfsComDemissionalAtivo: new Set([
+            ...Array.from(ctxDesligamento.cpfsComDemissionalAtivo ?? []),
+            ...Array.from(
+              coletarCpfsDemissionalAtivo(
+                itensDoCliente.map((i) => i.agendamento)
+              )
+            ),
+          ]),
+        });
         setSelectedIds(
           new Set(
             itensDoCliente
@@ -482,6 +522,7 @@ export function OrcamentoAbaAgendamentos({
       adicionaisLegado,
       dispensado,
       agendamentosValidos,
+      desligamento,
     });
   }, [
     itens,
@@ -492,6 +533,7 @@ export function OrcamentoAbaAgendamentos({
     creditosDisponiveis,
     vagasComprometidas,
     vagas,
+    desligamento,
   ]);
 
   const agendamentosPorId = useMemo(() => {
@@ -565,16 +607,22 @@ export function OrcamentoAbaAgendamentos({
           .map((i) => normalizeCpfDigits(i.agendamento.colaborador_cpf))
           .filter((d) => d.length === 11)
       );
-      const comprometidasNaoConsumidas = vagas.filter(
-        (v) =>
-          v.status === "comprometida" &&
-          !cpfsNext.has(normalizeCpfDigits(v.colaborador_cpf))
-      ).length;
+      const comprometidasNaoConsumidas = vagas.filter((v) => {
+        const classif = statusClassificacaoVaga(v, desligamento);
+        if (classif !== "comprometida") return false;
+        return !cpfsNext.has(normalizeCpfDigits(v.colaborador_cpf));
+      }).length;
+      const desligadosNaoConsumidos = vagas.filter((v) => {
+        const classif = statusClassificacaoVaga(v, desligamento);
+        if (classif !== CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN) return false;
+        return !cpfsNext.has(normalizeCpfDigits(v.colaborador_cpf));
+      }).length;
       if (
         nextIds.size +
           programacoesAtivas +
           creditosDisponiveis +
-          comprometidasNaoConsumidas >
+          comprometidasNaoConsumidas +
+          desligadosNaoConsumidos >
         quantidadePrevista
       ) {
         toast.error(
@@ -636,6 +684,16 @@ export function OrcamentoAbaAgendamentos({
   }
 
   function handleAbrirProgramarVaga(vaga: ContratoVagaRecord) {
+    if (
+      !vagaPermiteAcoesOperacionaisAgendamento(
+        statusClassificacaoVaga(vaga, desligamento)
+      )
+    ) {
+      toast.error(
+        "Esta vaga foi consumida por desligamento administrativo e não possui pendência de programação."
+      );
+      return;
+    }
     if (!isNomeFuncionarioReal(vaga.colaborador)) {
       toast.error(
         "Preencha o funcionário na Lista de funcionários antes de programar."
@@ -794,6 +852,16 @@ export function OrcamentoAbaAgendamentos({
   }
 
   function handleAgendarVaga(vaga: ContratoVagaRecord) {
+    if (
+      !vagaPermiteAcoesOperacionaisAgendamento(
+        statusClassificacaoVaga(vaga, desligamento)
+      )
+    ) {
+      toast.error(
+        "Esta vaga foi consumida por desligamento administrativo e não possui pendência de agendamento."
+      );
+      return;
+    }
     const empresa = clienteNome?.trim() || "";
     const colaborador = labelColaboradorOuVaga(vaga);
     if (!empresa || !isNomeFuncionarioReal(vaga.colaborador)) {
@@ -1292,10 +1360,17 @@ export function OrcamentoAbaAgendamentos({
               <tbody>
                 {vagasOrdenadas.map((vaga) => {
                   const dados = dadosExibicaoPorVagaId.get(vaga.id);
-                  const agVisualizar = dados?.agendamentoIdVisualizar
-                    ? agendamentosPorId.get(dados.agendamentoIdVisualizar) ??
-                      null
-                    : null;
+                  const statusClassificacao = statusClassificacaoVaga(
+                    vaga,
+                    desligamento
+                  );
+                  const agVisualizar =
+                    statusClassificacao === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+                      ? null
+                      : dados?.agendamentoIdVisualizar
+                        ? agendamentosPorId.get(dados.agendamentoIdVisualizar) ??
+                          null
+                        : null;
                   return (
                     <tr
                       key={vaga.id}
@@ -1305,16 +1380,24 @@ export function OrcamentoAbaAgendamentos({
                         {labelColaboradorOuVaga(vaga)}
                       </td>
                       <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
-                        {labelOuTraco(formatDateIsoToBR(dados?.dataExameIso))}
+                        {statusClassificacao ===
+                        CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+                          ? "—"
+                          : labelOuTraco(formatDateIsoToBR(dados?.dataExameIso))}
                       </td>
                       <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5 text-[#475569]">
-                        {labelOuTraco(dados?.tipoAso)}
+                        {statusClassificacao ===
+                        CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+                          ? "—"
+                          : labelOuTraco(dados?.tipoAso)}
                       </td>
                       <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5">
-                        <VagaSituacaoBadge status={vaga.status} />
+                        <VagaSituacaoBadge status={statusClassificacao} />
                       </td>
                       <td className="whitespace-nowrap border-b border-[#eef2f7] px-4 py-2.5">
-                        {vaga.status === "comprometida" ? (
+                        {vagaPermiteAcoesOperacionaisAgendamento(
+                          statusClassificacao
+                        ) ? (
                           <div className="flex flex-col items-start gap-1">
                             <button
                               type="button"
@@ -1331,8 +1414,8 @@ export function OrcamentoAbaAgendamentos({
                               Programar para o futuro
                             </button>
                           </div>
-                        ) : vaga.status === "aberta" ||
-                          vaga.status === "aso_aberto" ? (
+                        ) : statusClassificacao === "aberta" ||
+                          statusClassificacao === "aso_aberto" ? (
                           <button
                             type="button"
                             className="text-[11px] font-semibold text-brand-blue hover:underline"
@@ -1340,7 +1423,7 @@ export function OrcamentoAbaAgendamentos({
                           >
                             Definir funcionário
                           </button>
-                        ) : vaga.status === "programada" ? (
+                        ) : statusClassificacao === "programada" ? (
                           <button
                             type="button"
                             className="text-[11px] font-semibold text-brand-blue hover:underline disabled:opacity-40"

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   isUuid,
+  coletarCpfsDesligamentoAdminAtivo,
+  isDesligamentoAdminAtivo,
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
   validarPayloadDesfazerDesligamento,
@@ -219,6 +221,63 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
   assert.doesNotMatch(migration, /using \(true\)/);
   assert.match(migration, /idx_colaborador_movimentacoes_admin_data_unica/);
   assert.doesNotMatch(migration, /for delete/);
+  const vagasLib = readFileSync(join(root, "lib/contrato-vagas.ts"), "utf8");
+  assert.match(vagasLib, /CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN/);
+  assert.match(vagasLib, /Estado derivado/);
+  assert.doesNotMatch(migration, /desligado_admin/);
+}
+
+{
+  const ativos = coletarCpfsDesligamentoAdminAtivo([
+    {
+      tipo: "desligamento_admin",
+      cpf_digits: CPF_A,
+      cancelado_em: null,
+    },
+    {
+      tipo: "desligamento_admin",
+      cpf_digits: CPF_A,
+      cancelado_em: "2026-09-20T12:00:00Z",
+    },
+  ]);
+  assert.equal(ativos.has(CPF_A), true);
+  assert.equal(
+    isDesligamentoAdminAtivo({
+      tipo: "desligamento_admin",
+      cancelado_em: "2026-09-20T12:00:00Z",
+    }),
+    false
+  );
+
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "JIVALDO JESUS SANTOS",
+        colaborador_cpf: CPF_A,
+        cargo_nome: "Porteiro",
+      },
+    ],
+    agendamentos: [],
+    movimentacoes: [
+      {
+        id: "mov-1",
+        cpf_digits: CPF_A,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-16",
+        cancelado_em: null,
+        colaborador_nome: "JIVALDO JESUS SANTOS",
+        cargo_nome: "Porteiro",
+        criado_em: "2026-09-16T10:00:00Z",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(linhas[0].dataDesligamentoIso, "2026-09-16");
+  const portal = paraLinhaPortalCliente(linhas[0]);
+  assert.equal(portal.situacaoLabel, "Demitido");
+  assert.equal("desligamentoOrigem" in portal, false);
 }
 
 console.log("test-colaborador-movimentacoes: ok");

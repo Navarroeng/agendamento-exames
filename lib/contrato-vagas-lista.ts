@@ -5,12 +5,14 @@
 
 import { maskCPFInput } from "@/lib/cpf";
 import {
-  CONTRATO_VAGA_STATUS_LABELS,
+  CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
   normalizeNomeOcupante,
   resolveStatusVagaRascunho,
+  statusClassificacaoVaga,
+  type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
-  type ContratoVagaStatus,
+  type ContratoVagaStatusClassificacao,
 } from "@/lib/contrato-vagas";
 
 export type ListaFuncionariosNomeSort = "asc" | "desc";
@@ -84,13 +86,17 @@ export function numerarLinhasListaFuncionarios<T extends ContratoVagaDraft>(
 }
 
 export function resolveStatusListaFuncionarioPreview(params: {
-  persistida?: Pick<ContratoVagaRecord, "status"> | null;
+  persistida?: (Pick<ContratoVagaRecord, "status"> &
+    Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>) | null;
   draft: Pick<
     ContratoVagaDraft,
     "colaborador" | "colaboradorCpf" | "manterAsoAberto"
   >;
-}): ContratoVagaStatus {
-  if (params.persistida) return params.persistida.status;
+  desligamento?: ContextoClassificacaoDesligamentoVaga | null;
+}): ContratoVagaStatusClassificacao {
+  if (params.persistida) {
+    return statusClassificacaoVaga(params.persistida, params.desligamento);
+  }
   return resolveStatusVagaRascunho({
     colaborador: params.draft.colaborador,
     colaboradorCpf: params.draft.colaboradorCpf,
@@ -99,13 +105,15 @@ export function resolveStatusListaFuncionarioPreview(params: {
 }
 
 export function labelStatusListaFuncionario(params: {
-  persistida?: Pick<ContratoVagaRecord, "status"> | null;
+  persistida?: (Pick<ContratoVagaRecord, "status"> &
+    Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>) | null;
   draft: Pick<
     ContratoVagaDraft,
     "colaborador" | "colaboradorCpf" | "manterAsoAberto"
   >;
+  desligamento?: ContextoClassificacaoDesligamentoVaga | null;
 }): string {
-  return CONTRATO_VAGA_STATUS_LABELS[
+  return CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO[
     resolveStatusListaFuncionarioPreview(params)
   ];
 }
@@ -121,7 +129,12 @@ export function buildLinhasVisuaisListaFuncionarios<T extends ContratoVagaDraft>
 
 export function buildListaFuncionariosExportRows(params: {
   linhas: ListaFuncionariosLinhaVisual[];
-  vagaByIndice: Map<number, Pick<ContratoVagaRecord, "id" | "status">>;
+  vagaByIndice: Map<
+    number,
+    Pick<ContratoVagaRecord, "id" | "status"> &
+      Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>
+  >;
+  desligamento?: ContextoClassificacaoDesligamentoVaga | null;
 }): ListaFuncionariosExportRow[] {
   return params.linhas.map(({ numeroVisual, draft }) => {
     const persistida = params.vagaByIndice.get(draft.indice) ?? null;
@@ -130,7 +143,11 @@ export function buildListaFuncionariosExportRows(params: {
       nome: normalizeNomeOcupante(draft.colaborador),
       cpf: maskCPFInput(draft.colaboradorCpf),
       cargo: normalizeNomeOcupante(draft.cargoNome),
-      situacao: labelStatusListaFuncionario({ persistida, draft }),
+      situacao: labelStatusListaFuncionario({
+        persistida,
+        draft,
+        desligamento: params.desligamento,
+      }),
       vagaId: persistida?.id ?? draft.id,
       indice: draft.indice,
     };

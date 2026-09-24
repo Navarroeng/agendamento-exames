@@ -286,4 +286,15 @@ assert.equal(
   "aguardando_agendamentos"
 );
 
+// ORC-2026-0033: 2 agendados + 1 desligado admin → etapa classificada
+assert.equal(
+  resolveImplantacaoEtapaAtual(aprovacaoBase({ quantidade_colaboradores: 3 }), {
+    quantidadeContratada: 3,
+    agendamentosRealizados: 2,
+    pendentesDefinicao: 0,
+    vagasComprometidas: 0,
+  }),
+  "concluido"
+);
+
 console.log("ok: implantacao-agendamentos-etapa");
