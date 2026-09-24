@@ -4,8 +4,10 @@ import {
   isAetElaboracaoConcluida,
   isAetEnvioConcluido,
   isAetVisitaRealizada,
+  type ImplantacaoAetRecord,
 } from "@/lib/implantacao-aet";
 import {
+  copyLaudoPontual,
   isFluxoLaudoPontual,
   resolveLaudoPontualKindFromImplantacao,
   type LaudoPontualKind,
@@ -319,18 +321,51 @@ export function labelEtapaAtualLaudosSst(processo: LaudosSstProcesso): string {
   return LAUDOS_SST_ETAPA_LABELS[processo.etapaAtual];
 }
 
+/** Abas operacionais do modal de laudo pontual em Laudos SST. */
+export type LaudosPontualTabId = "visita" | "elaboracao" | "envio";
+
+export function buildLaudosPontualEtapas(
+  kind: LaudoPontualKind
+): Array<{ id: LaudosPontualTabId; label: string }> {
+  const copy = copyLaudoPontual(kind);
+  return [
+    { id: "visita", label: copy.etapaVisita },
+    { id: "elaboracao", label: copy.etapaElaboracao },
+    { id: "envio", label: copy.etapaEnvio },
+  ];
+}
+
+export function isLaudosPontualEtapaLiberada(
+  etapa: LaudosPontualTabId,
+  aet: ImplantacaoAetRecord | null
+): boolean {
+  if (etapa === "envio") return isAetElaboracaoConcluida(aet);
+  return true;
+}
+
+export function isLaudosPontualEtapaConcluida(
+  etapa: LaudosPontualTabId,
+  aet: ImplantacaoAetRecord | null
+): boolean {
+  if (etapa === "visita") return isAetVisitaRealizada(aet);
+  if (etapa === "elaboracao") return isAetElaboracaoConcluida(aet);
+  return isAetEnvioConcluido(aet);
+}
+
+export function resolveLaudosPontualTabInicial(
+  aet: ImplantacaoAetRecord | null
+): LaudosPontualTabId {
+  if (isAetEnvioConcluido(aet) || isAetElaboracaoConcluida(aet)) {
+    return "envio";
+  }
+  return "elaboracao";
+}
+
 export function etapasProgressoLaudosSst(
   processo: LaudosSstProcesso
 ): Array<{ id: string; label: string }> {
   if (processo.laudoPontualKind) {
-    return [
-      { id: "visita", label: "Visita realizada" },
-      {
-        id: "elaboracao",
-        label: labelImplantacaoEtapa("elaboracao", processo.laudoPontualKind),
-      },
-      { id: "envio", label: "Envio ao cliente" },
-    ];
+    return buildLaudosPontualEtapas(processo.laudoPontualKind);
   }
   return LAUDOS_SST_ETAPAS.map((e) => ({ id: e.id, label: e.label }));
 }

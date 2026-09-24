@@ -72,6 +72,10 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
   titulo: string;
   andamento: string;
   abaElaboracao: string;
+  etapaVisita: string;
+  etapaElaboracao: string;
+  etapaEnvio: string;
+  textoVisitaConsulta: string;
   textoElaboracao: string;
   upload: string;
   nomeCurto: string;
@@ -92,6 +96,11 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
       titulo: "Laudo de Insalubridade",
       andamento: "Andamento do Laudo de Insalubridade",
       abaElaboracao: "Insalub. em elaboração",
+      etapaVisita: "Visita técnica",
+      etapaElaboracao: "Elaboração do Laudo",
+      etapaEnvio: "Envio ao cliente",
+      textoVisitaConsulta:
+        "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
       textoElaboracao:
         "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir.",
       upload: "Laudo de Insalubridade final (PDF)",
@@ -123,6 +132,11 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
     titulo: "Laudo AET",
     andamento: "Andamento do Laudo AET",
     abaElaboracao: "AET em elaboração",
+    etapaVisita: "Visita técnica",
+    etapaElaboracao: "Elaboração do AET",
+    etapaEnvio: "Envio ao cliente",
+    textoVisitaConsulta:
+      "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
     textoElaboracao:
       "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir.",
     upload: "Laudo AET final (PDF)",

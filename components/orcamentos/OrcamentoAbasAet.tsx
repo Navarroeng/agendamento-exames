@@ -40,6 +40,7 @@ export function OrcamentoAbaAetVisita({
   aet,
   form,
   saving,
+  somenteLeitura = false,
   onChange,
   onSalvar,
 }: {
@@ -53,18 +54,23 @@ export function OrcamentoAbaAetVisita({
     visita_observacao: string;
   };
   saving: boolean;
+  somenteLeitura?: boolean;
   onChange: (patch: Partial<AetVisitaForm>) => void;
   onSalvar: () => void;
 }) {
+  const copy = copyLaudoPontual(kind);
   const exigeData = form.visita_status !== "aguardando_agendamento";
   const exigeHorario = form.visita_status === "agendada";
+  const locked = saving || somenteLeitura;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-[#64748b]">
-        {kind === "insalubridade"
-          ? "Agende e registre a visita técnica para avaliações quantitativas dos agentes insalubres."
-          : "Agende e registre a visita técnica para avaliação das atividades e postos de trabalho."}
+        {somenteLeitura
+          ? copy.textoVisitaConsulta
+          : kind === "insalubridade"
+            ? "Agende e registre a visita técnica para avaliações quantitativas dos agentes insalubres."
+            : "Agende e registre a visita técnica para avaliação das atividades e postos de trabalho."}
       </p>
       {aet?.visita_status === "realizada" ? (
         <p className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-[12px] font-semibold text-[#166534]">
@@ -84,7 +90,7 @@ export function OrcamentoAbaAetVisita({
           <select
             className="field-input"
             value={form.visita_status}
-            disabled={saving}
+            disabled={locked}
             onChange={(e) =>
               onChange({
                 visita_status: e.target.value as ImplantacaoAetVisitaStatus,
@@ -100,25 +106,25 @@ export function OrcamentoAbaAetVisita({
         </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-bold text-navy">
-            Data da visita {exigeData ? <RequiredMark /> : null}
+            Data da visita {exigeData && !somenteLeitura ? <RequiredMark /> : null}
           </span>
           <input
             type="date"
             className="field-input"
             value={form.visita_data}
-            disabled={saving || !exigeData}
+            disabled={locked || !exigeData}
             onChange={(e) => onChange({ visita_data: e.target.value })}
           />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-bold text-navy">
-            Horário {exigeHorario ? <RequiredMark /> : null}
+            Horário {exigeHorario && !somenteLeitura ? <RequiredMark /> : null}
           </span>
           <input
             type="time"
             className="field-input"
             value={form.visita_horario}
-            disabled={saving || !exigeData}
+            disabled={locked || !exigeData}
             onChange={(e) => onChange({ visita_horario: e.target.value })}
           />
         </label>
@@ -129,7 +135,7 @@ export function OrcamentoAbaAetVisita({
           <input
             className="field-input"
             value={form.visita_responsavel}
-            disabled={saving}
+            disabled={locked}
             onChange={(e) => onChange({ visita_responsavel: e.target.value })}
           />
         </label>
@@ -140,20 +146,22 @@ export function OrcamentoAbaAetVisita({
           <textarea
             className="field-input min-h-[72px] resize-y"
             value={form.visita_observacao}
-            disabled={saving}
+            disabled={locked}
             onChange={(e) => onChange({ visita_observacao: e.target.value })}
           />
         </label>
       </div>
 
-      <button
-        type="button"
-        className="btn btn-primary justify-center sm:w-auto"
-        disabled={saving}
-        onClick={onSalvar}
-      >
-        {saving ? "Salvando..." : "Salvar visita"}
-      </button>
+      {somenteLeitura ? null : (
+        <button
+          type="button"
+          className="btn btn-primary justify-center sm:w-auto"
+          disabled={saving}
+          onClick={onSalvar}
+        >
+          {saving ? "Salvando..." : "Salvar visita"}
+        </button>
+      )}
     </div>
   );
 }

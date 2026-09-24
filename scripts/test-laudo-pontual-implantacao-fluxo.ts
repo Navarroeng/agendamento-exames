@@ -23,12 +23,16 @@ import {
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
 import {
+  buildLaudosPontualEtapas,
   buildLaudosSstProcesso,
   etapasProgressoLaudosSst,
+  isLaudosPontualEtapaConcluida,
+  isLaudosPontualEtapaLiberada,
   isProcessoElegivelLaudoPontualLaudosSst,
   isProcessoElegivelLaudosSst,
   isProcessoVisivelLaudosSst,
   labelEtapaAtualLaudosSst,
+  resolveLaudosPontualTabInicial,
 } from "../lib/laudos-sst";
 import {
   isProcessoElegivelRiscosPsicossociais,
@@ -207,8 +211,22 @@ const visitaAgendada = aetRow({
 const visitaRealizada = aetRow({
   visita_status: "realizada",
   visita_data: "2026-09-22",
+  visita_horario: "09:00",
+  visita_responsavel: "Navarro",
+  visita_observacao: "Acesso pela portaria 2",
   visita_realizada_em: "2026-09-22T14:00:00Z",
   elaboracao_status: "em_elaboracao",
+});
+const elaboracaoConcluida = aetRow({
+  visita_status: "realizada",
+  visita_data: "2026-09-22",
+  visita_horario: "09:00",
+  visita_responsavel: "Navarro",
+  visita_observacao: "Acesso pela portaria 2",
+  visita_realizada_em: "2026-09-22T14:00:00Z",
+  elaboracao_status: "concluido",
+  laudo_path: "ap1/laudo.pdf",
+  laudo_nome: "Laudo.pdf",
 });
 const laudoFinalizado = aetRow({
   visita_status: "realizada",
@@ -282,6 +300,9 @@ assert.equal(aetDepois.orcamento.numero, "ORC-2026-0063");
 assert.equal(aetDepois.orcamento.cliente_nome, "ALUMINIO FIRENZE");
 assert.equal(aetDepois.aet?.visita_status, "realizada");
 assert.equal(aetDepois.aet?.visita_data, "2026-09-22");
+assert.equal(aetDepois.aet?.visita_horario, "09:00");
+assert.equal(aetDepois.aet?.visita_responsavel, "Navarro");
+assert.equal(aetDepois.aet?.visita_observacao, "Acesso pela portaria 2");
 
 // 3. Insalubridade antes da visita → ainda em Implantação
 const insalAntes = buildImplantacaoProcesso({
@@ -459,6 +480,9 @@ const copyAet = copyLaudoPontual("aet");
 assert.equal(copyAet.titulo, "Laudo AET");
 assert.equal(copyAet.andamento, "Andamento do Laudo AET");
 assert.equal(copyAet.abaElaboracao, "AET em elaboração");
+assert.equal(copyAet.etapaVisita, "Visita técnica");
+assert.equal(copyAet.etapaElaboracao, "Elaboração do AET");
+assert.equal(copyAet.etapaEnvio, "Envio ao cliente");
 assert.equal(
   copyAet.textoElaboracao,
   "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir."
@@ -469,6 +493,10 @@ const copyInsal = copyLaudoPontual("insalubridade");
 assert.equal(copyInsal.titulo, "Laudo de Insalubridade");
 assert.equal(copyInsal.andamento, "Andamento do Laudo de Insalubridade");
 assert.equal(copyInsal.abaElaboracao, "Insalub. em elaboração");
+assert.equal(copyInsal.etapaVisita, "Visita técnica");
+assert.equal(copyInsal.etapaElaboracao, "Elaboração do Laudo");
+assert.equal(copyInsal.etapaEnvio, "Envio ao cliente");
+assert.doesNotMatch(copyInsal.etapaElaboracao, /AET/);
 assert.equal(
   copyInsal.textoElaboracao,
   "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir."
@@ -633,11 +661,96 @@ assert.deepEqual(
   ["visita", "elaboracao", "envio"]
 );
 assert.deepEqual(
+  etapasProgressoLaudosSst(laudosAet).map((e) => e.label),
+  ["Visita técnica", "Elaboração do AET", "Envio ao cliente"]
+);
+assert.deepEqual(
   etapasProgressoLaudosSst(laudosInsal).map((e) => e.id),
   ["visita", "elaboracao", "envio"]
 );
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosInsal).map((e) => e.label),
+  ["Visita técnica", "Elaboração do Laudo", "Envio ao cliente"]
+);
 assert.equal(laudosAet.totalEtapas, 3);
 assert.equal(laudosInsal.totalEtapas, 3);
+
+assert.deepEqual(
+  buildLaudosPontualEtapas("aet").map((e) => e.label),
+  ["Visita técnica", "Elaboração do AET", "Envio ao cliente"]
+);
+assert.deepEqual(
+  buildLaudosPontualEtapas("insalubridade").map((e) => e.label),
+  ["Visita técnica", "Elaboração do Laudo", "Envio ao cliente"]
+);
+assert.ok(
+  !buildLaudosPontualEtapas("insalubridade").some((e) => /AET/i.test(e.label))
+);
+
+assert.equal(isLaudosPontualEtapaConcluida("visita", visitaRealizada), true);
+assert.equal(isLaudosPontualEtapaLiberada("visita", visitaRealizada), true);
+assert.equal(isLaudosPontualEtapaLiberada("elaboracao", visitaRealizada), true);
+assert.equal(isLaudosPontualEtapaConcluida("elaboracao", visitaRealizada), false);
+assert.equal(isLaudosPontualEtapaLiberada("envio", visitaRealizada), false);
+assert.equal(isLaudosPontualEtapaLiberada("envio", elaboracaoConcluida), true);
+assert.equal(
+  isLaudosPontualEtapaConcluida("elaboracao", elaboracaoConcluida),
+  true
+);
+assert.equal(isLaudosPontualEtapaConcluida("envio", elaboracaoConcluida), false);
+assert.equal(isLaudosPontualEtapaConcluida("envio", laudoFinalizado), true);
+assert.equal(resolveLaudosPontualTabInicial(visitaRealizada), "elaboracao");
+assert.equal(resolveLaudosPontualTabInicial(elaboracaoConcluida), "envio");
+assert.equal(resolveLaudosPontualTabInicial(laudoFinalizado), "envio");
+
+assert.equal(laudosAet.implantacao.aet?.visita_status, "realizada");
+assert.equal(laudosAet.implantacao.aet?.visita_data, aetDepois.aet?.visita_data);
+assert.equal(
+  laudosAet.implantacao.aet?.visita_horario,
+  aetDepois.aet?.visita_horario
+);
+assert.equal(
+  laudosAet.implantacao.aet?.visita_responsavel,
+  aetDepois.aet?.visita_responsavel
+);
+assert.equal(
+  laudosAet.implantacao.aet?.visita_observacao,
+  aetDepois.aet?.visita_observacao
+);
+assert.equal(laudosInsal.implantacao.aet?.visita_data, insalDepois.aet?.visita_data);
+
+const envioBloqueado = validateAetEnvioPayload(
+  { enviado_cliente: true, enviado_em: "2026-09-24", envio_observacao: null },
+  visitaRealizada,
+  "aet"
+);
+assert.equal(envioBloqueado, copyAet.concluaAntesEnvio);
+const envioLiberado = validateAetEnvioPayload(
+  { enviado_cliente: true, enviado_em: "2026-09-24", envio_observacao: null },
+  elaboracaoConcluida,
+  "insalubridade"
+);
+assert.equal(envioLiberado, null);
+
+const laudosAetAposElaboracao = buildLaudosSstProcesso(
+  buildImplantacaoProcesso({
+    orcamento: orcamento({ numero: "ORC-2026-0063" }),
+    aprovacao: apAet,
+    contrato: null,
+    fluxoImplantacao: "aet",
+    aet: elaboracaoConcluida,
+  }),
+  null
+);
+assert.equal(laudosAetAposElaboracao.status, "em_andamento");
+assert.equal(laudosAetAposElaboracao.etapasConcluidas, 2);
+assert.equal(labelEtapaAtualLaudosSst(laudosAetAposElaboracao), "Aguardando envio");
+assert.equal(isLaudosPontualEtapaLiberada("envio", elaboracaoConcluida), true);
+
+assert.equal(laudosAetFim.status, "concluido");
+assert.equal(laudosAetFim.etapasConcluidas, 3);
+assert.equal(labelEtapaAtualLaudosSst(laudosAetFim), "Concluído");
+assert.equal(laudosInsalFim.status, "concluido");
 
 const modalImplantacaoSrc = readFileSync(
   join(process.cwd(), "components/orcamentos/OrcamentoAprovarModal.tsx"),
@@ -646,13 +759,41 @@ const modalImplantacaoSrc = readFileSync(
 assert.doesNotMatch(modalImplantacaoSrc, /tab === "elaboracao"/);
 assert.doesNotMatch(modalImplantacaoSrc, /tab === "envio"/);
 assert.match(modalImplantacaoSrc, /permitirElaboracaoEnvio:\s*false/);
+assert.match(modalImplantacaoSrc, /OrcamentoAbaAetVisita/);
+assert.doesNotMatch(modalImplantacaoSrc, /somenteLeitura/);
 
 const modalLaudosSrc = readFileSync(
   join(process.cwd(), "components/laudos-sst/LaudosPontualModal.tsx"),
   "utf8"
 );
 assert.match(modalLaudosSrc, /permitirElaboracaoEnvio:\s*true/);
+assert.match(modalLaudosSrc, /tab === "visita"/);
 assert.match(modalLaudosSrc, /tab === "elaboracao"/);
 assert.match(modalLaudosSrc, /tab === "envio"/);
+assert.match(modalLaudosSrc, /somenteLeitura/);
+assert.match(modalLaudosSrc, /OrcamentoAbaAetVisita/);
+assert.match(modalLaudosSrc, /OrcamentoAbaAetElaboracao/);
+assert.match(modalLaudosSrc, /OrcamentoAbaAetEnvio/);
+assert.doesNotMatch(modalLaudosSrc, /OrcamentoResumoAetStatus/);
+assert.doesNotMatch(modalLaudosSrc, /handleSalvarVisita/);
+assert.doesNotMatch(modalLaudosSrc, /Andamento do Laudo/);
+
+const visitaAbaSrc = readFileSync(
+  join(process.cwd(), "components/orcamentos/OrcamentoAbasAet.tsx"),
+  "utf8"
+);
+assert.match(visitaAbaSrc, /somenteLeitura/);
+assert.match(visitaAbaSrc, /Salvar visita/);
+assert.match(visitaAbaSrc, /Status da elaboração/);
+assert.match(visitaAbaSrc, /Observação/);
+assert.match(visitaAbaSrc, /accept="application\/pdf,\.pdf"/);
+
+const pgrModalSrc = readFileSync(
+  join(process.cwd(), "components/laudos-sst/LaudosSstModal.tsx"),
+  "utf8"
+);
+assert.match(pgrModalSrc, /LAUDOS_SST_ETAPAS\.map/);
+assert.doesNotMatch(pgrModalSrc, /buildLaudosPontualEtapas/);
+assert.doesNotMatch(pgrModalSrc, /OrcamentoAbaAetElaboracao/);
 
 console.log("ok: laudo-pontual-implantacao-fluxo");
