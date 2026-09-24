@@ -8,7 +8,11 @@ import {
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaPayload,
 } from "@/lib/implantacao-aet";
-import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
+import {
+  assertPodeEditarElaboracaoEnvioLaudoPontual,
+  type LaudoPontualEdicaoOrigem,
+  type LaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 
 function mapAet(row: ImplantacaoAetRecord): ImplantacaoAetRecord {
   return row;
@@ -118,7 +122,9 @@ export async function salvarElaboracaoAet(params: {
   payload: ImplantacaoAetElaboracaoPayload;
   usuarioNome: string;
   kind?: LaudoPontualKind;
+  origem: LaudoPontualEdicaoOrigem;
 }): Promise<ImplantacaoAetRecord> {
+  assertPodeEditarElaboracaoEnvioLaudoPontual(params.origem);
   const validationError = validateAetElaboracaoPayload(
     params.payload,
     params.aet,
@@ -147,7 +153,9 @@ export async function salvarLaudoAet(params: {
     tamanho: number;
   };
   usuarioNome: string;
+  origem: LaudoPontualEdicaoOrigem;
 }): Promise<ImplantacaoAetRecord> {
+  assertPodeEditarElaboracaoEnvioLaudoPontual(params.origem);
   const agora = new Date().toISOString();
   const usuario = params.usuarioNome.trim() || "Sistema";
   return updateAetRow(params.aetId, {
@@ -163,7 +171,9 @@ export async function salvarLaudoAet(params: {
 export async function removerLaudoAet(params: {
   aetId: string;
   usuarioNome: string;
+  origem: LaudoPontualEdicaoOrigem;
 }): Promise<ImplantacaoAetRecord> {
+  assertPodeEditarElaboracaoEnvioLaudoPontual(params.origem);
   const agora = new Date().toISOString();
   const usuario = params.usuarioNome.trim() || "Sistema";
   return updateAetRow(params.aetId, {
@@ -183,7 +193,9 @@ export async function salvarEnvioAet(params: {
   payload: ImplantacaoAetEnvioPayload;
   usuarioNome: string;
   kind?: LaudoPontualKind;
+  origem: LaudoPontualEdicaoOrigem;
 }): Promise<ImplantacaoAetRecord> {
+  assertPodeEditarElaboracaoEnvioLaudoPontual(params.origem);
   const validationError = validateAetEnvioPayload(
     params.payload,
     params.aet,

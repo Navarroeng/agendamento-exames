@@ -37,6 +37,20 @@ export function isFluxoLaudoPontual(
   return fluxo === "aet" || fluxo === "insalubridade";
 }
 
+/** Origem da edição operacional do laudo pontual. */
+export type LaudoPontualEdicaoOrigem = "implantacao" | "laudos_sst";
+
+export const LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG =
+  "A elaboração e o envio do laudo pontual são acompanhados somente em Laudos SST.";
+
+export function assertPodeEditarElaboracaoEnvioLaudoPontual(
+  origem: LaudoPontualEdicaoOrigem | null | undefined
+): void {
+  if (origem !== "laudos_sst") {
+    throw new Error(LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG);
+  }
+}
+
 export function fluxoToLaudoPontualKind(
   fluxo: OrcamentoFluxoImplantacao | null | undefined
 ): LaudoPontualKind | null {

@@ -55,11 +55,36 @@ export const ORCAMENTO_ETAPAS_PADRAO: Array<{
 /** @deprecated Prefer buildOrcamentoEtapas(fluxo) */
 export const ORCAMENTO_ETAPAS = ORCAMENTO_ETAPAS_PADRAO;
 
+export function isEtapaLaudoPontualPosVisita(
+  etapa: OrcamentoEtapaId | null | undefined
+): boolean {
+  return etapa === "elaboracao" || etapa === "envio";
+}
+
 /**
- * Montagem dinâmica das abas:
+ * Tab do modal de orçamento/implantação.
+ * Elaboração e envio do laudo pontual não pertencem a esse modal —
+ * vivem em Laudos SST (`etapasProgressoLaudosSst` / `LaudosPontualModal`).
+ */
+export function sanitizeOrcamentoEtapaTab(
+  tab: OrcamentoEtapaId | null | undefined,
+  fluxo: OrcamentoFluxoImplantacao = "padrao"
+): OrcamentoEtapaId | null {
+  if (!tab) return null;
+  if (
+    isFluxoLaudoPontual(fluxo) &&
+    (isEtapaLaudoPontualPosVisita(tab) || tab === "documentos")
+  ) {
+    return "visita_aet";
+  }
+  return tab;
+}
+
+/**
+ * Montagem dinâmica das abas do modal de orçamento / Implantação:
  * - somente_treinamentos: 5 abas (sem docs SST / exames)
  * - combinado: fluxo SST completo + Agendamento do Treinamento (após Financeiro)
- * - aet / insalubridade: laudos pontuais (sem SST ocupacional)
+ * - aet / insalubridade: preparação até a visita (elaboração/envio só em Laudos SST)
  * - padrao: fluxo atual
  */
 export function buildOrcamentoEtapas(
@@ -72,14 +97,6 @@ export function buildOrcamentoEtapas(
       { id: "contrato", label: "Contrato" },
       { id: "financeiro", label: "Financeiro" },
       { id: "visita_aet", label: "Agendamento da visita" },
-      {
-        id: "elaboracao",
-        label:
-          fluxo === "insalubridade"
-            ? "Elaboração do Laudo"
-            : "Elaboração do AET",
-      },
-      { id: "envio", label: "Envio ao cliente" },
     ];
   }
 
@@ -259,11 +276,8 @@ export function isOrcamentoEtapaLiberada(
       if (!isFluxoLaudoPontual(fluxo)) return false;
       return isContratoEtapaConcluida(aprovacao);
     case "elaboracao":
-      if (!isFluxoLaudoPontual(fluxo)) return false;
-      return isAetVisitaRealizada(ctx?.aet);
     case "envio":
-      if (!isFluxoLaudoPontual(fluxo)) return false;
-      return isAetElaboracaoConcluida(ctx?.aet);
+      return false;
     case "procuracao":
       if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
         return false;

@@ -45,9 +45,9 @@ assert.deepEqual(abas, [
   "contrato",
   "financeiro",
   "visita_aet",
-  "elaboracao",
-  "envio",
 ]);
+assert.ok(!abas.includes("elaboracao"));
+assert.ok(!abas.includes("envio"));
 assert.ok(!abas.includes("documentos"));
 assert.ok(!abas.includes("procuracao"));
 assert.ok(!abas.includes("funcionarios"));
@@ -246,7 +246,7 @@ assert.equal(
     fluxo: "aet",
     aet: visitaRealizada,
   }),
-  true
+  false
 );
 assert.equal(
   validateAetElaboracaoPayload(
@@ -340,6 +340,8 @@ assert.equal(
   "visita_aet"
 );
 assert.equal(implantacaoEtapaToModalTab("documentos", "aet"), "visita_aet");
+assert.equal(implantacaoEtapaToModalTab("elaboracao", "aet"), "visita_aet");
+assert.equal(implantacaoEtapaToModalTab("envio", "insalubridade"), "visita_aet");
 assert.equal(implantacaoEtapaToModalTab("concluido", "aet"), "visita_aet");
 assert.equal(
   implantacaoEtapaToModalTab("aguardando_agendamentos", "padrao"),
@@ -485,7 +487,7 @@ assert.equal(
     fluxo: "aet",
     aet: visitaRealizada,
   }),
-  true
+  false
 );
 assert.equal(
   resolveImplantacaoEtapaAtual(pagamentoFuturo, {
@@ -500,7 +502,7 @@ assert.equal(
     fluxo: "aet",
     aet: elaboracaoOk,
   }),
-  true
+  false
 );
 assert.equal(
   resolveImplantacaoEtapaAtual(pagamentoFuturo, {

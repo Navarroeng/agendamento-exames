@@ -100,6 +100,7 @@ function LaudosPontualModalBody({
     aprovacaoId: aprovacao?.id ?? null,
     orcamentoNumero: orcamento.numero,
     kind,
+    permitirElaboracaoEnvio: true,
   });
 
   useEffect(() => {

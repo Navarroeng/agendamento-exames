@@ -25,6 +25,7 @@ import {
 } from "@/services/orcamento-onboarding-storage.service";
 import {
   copyLaudoPontual,
+  LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG,
   type LaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 
@@ -86,15 +87,24 @@ export function useOrcamentoAetEtapas(params: {
   aprovacaoId: string | null;
   orcamentoNumero: string | null;
   kind?: LaudoPontualKind;
+  /** Só Laudos SST edita elaboração/envio. Default: bloqueado. */
+  permitirElaboracaoEnvio?: boolean;
 }) {
   const kind = params.kind ?? "aet";
   const copy = copyLaudoPontual(kind);
+  const permitirElaboracaoEnvio = Boolean(params.permitirElaboracaoEnvio);
   const auditContext = useAuditoriaUsuario();
   const [aet, setAet] = useState<ImplantacaoAetRecord | null>(null);
   const [visitaForm, setVisitaForm] = useState(emptyAetVisitaForm);
   const [elaboracaoForm, setElaboracaoForm] = useState(emptyAetElaboracaoForm);
   const [envioForm, setEnvioForm] = useState(emptyAetEnvioForm);
   const [saving, setSaving] = useState(false);
+
+  function garantirEdicaoLaudosSst() {
+    if (!permitirElaboracaoEnvio) {
+      throw new Error(LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG);
+    }
+  }
 
   const reload = useCallback(async () => {
     if (!params.enabled || !params.orcamentoId || !params.aprovacaoId) {
@@ -203,6 +213,7 @@ export function useOrcamentoAetEtapas(params: {
     if (!file || !aet || !params.aprovacaoId) return;
     setSaving(true);
     try {
+      garantirEdicaoLaudosSst();
       if (aet.laudo_path) {
         await removerArquivoOrcamentoOnboarding(aet.laudo_path);
       }
@@ -211,6 +222,7 @@ export function useOrcamentoAetEtapas(params: {
         aetId: aet.id,
         fileMeta: uploaded,
         usuarioNome: auditContext.usuarioNome,
+        origem: "laudos_sst",
       });
       setAet(saved);
       await audit(
@@ -233,10 +245,12 @@ export function useOrcamentoAetEtapas(params: {
     if (!aet) return;
     setSaving(true);
     try {
+      garantirEdicaoLaudosSst();
       const path = aet.laudo_path;
       const saved = await removerLaudoAet({
         aetId: aet.id,
         usuarioNome: auditContext.usuarioNome,
+        origem: "laudos_sst",
       });
       if (path) await removerArquivoOrcamentoOnboarding(path);
       setAet(saved);
@@ -257,6 +271,7 @@ export function useOrcamentoAetEtapas(params: {
     if (!aet) return;
     setSaving(true);
     try {
+      garantirEdicaoLaudosSst();
       const saved = await salvarElaboracaoAet({
         aet,
         payload: {
@@ -266,6 +281,7 @@ export function useOrcamentoAetEtapas(params: {
         },
         usuarioNome: auditContext.usuarioNome,
         kind,
+        origem: "laudos_sst",
       });
       setAet(saved);
       const acao =
@@ -296,6 +312,7 @@ export function useOrcamentoAetEtapas(params: {
     if (!aet) return;
     setSaving(true);
     try {
+      garantirEdicaoLaudosSst();
       const saved = await salvarEnvioAet({
         aet,
         payload: {
@@ -305,6 +322,7 @@ export function useOrcamentoAetEtapas(params: {
         },
         usuarioNome: auditContext.usuarioNome,
         kind,
+        origem: "laudos_sst",
       });
       setAet(saved);
       if (saved.enviado_cliente) {

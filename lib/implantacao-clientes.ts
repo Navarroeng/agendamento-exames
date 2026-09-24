@@ -582,12 +582,15 @@ export function implantacaoEtapaToModalTab(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): OrcamentoEtapaId {
   if (isFluxoLaudoPontual(fluxo)) {
-    if (etapa === "documentos" || etapa === "visita_aet" || etapa === "visita_agendada") {
-      return "visita_aet";
-    }
-    if (etapa === "elaboracao") return "elaboracao";
-    if (etapa === "envio") return "envio";
-    if (etapa === "concluido" || etapa === "contrato_encerrado") {
+    if (
+      etapa === "documentos" ||
+      etapa === "visita_aet" ||
+      etapa === "visita_agendada" ||
+      etapa === "elaboracao" ||
+      etapa === "envio" ||
+      etapa === "concluido" ||
+      etapa === "contrato_encerrado"
+    ) {
       return "visita_aet";
     }
   }

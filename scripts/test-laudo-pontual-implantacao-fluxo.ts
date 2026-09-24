@@ -6,9 +6,12 @@
  * Executar: npx tsx scripts/test-laudo-pontual-implantacao-fluxo.ts
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildImplantacaoProcesso,
   IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS,
+  implantacaoEtapaToModalTab,
   labelImplantacaoEtapa,
   resolveImplantacaoEtapaAtual,
 } from "../lib/implantacao-clientes";
@@ -21,6 +24,7 @@ import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "../lib/orcamento-types";
 import {
   buildLaudosSstProcesso,
+  etapasProgressoLaudosSst,
   isProcessoElegivelLaudoPontualLaudosSst,
   isProcessoElegivelLaudosSst,
   isProcessoVisivelLaudosSst,
@@ -34,11 +38,18 @@ import {
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import {
+  assertPodeEditarElaboracaoEnvioLaudoPontual,
   copyLaudoPontual,
   resolveLaudoPontualKind,
   resolveLaudoPontualKindFromImplantacao,
   fluxoToLaudoPontualKind,
+  LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG,
 } from "../lib/servico-laudo-pontual";
+import {
+  buildOrcamentoEtapas,
+  isOrcamentoEtapaLiberada,
+  sanitizeOrcamentoEtapaTab,
+} from "../lib/orcamento-etapas";
 import { labelStatusServicoPontual } from "../lib/servicos-pontuais";
 
 function aetRow(
@@ -561,5 +572,87 @@ const laudos0065Envio = buildLaudosSstProcesso(
 assert.equal(laudos0065Envio.status, "concluido");
 assert.equal(labelEtapaAtualLaudosSst(laudos0065Envio), "Concluído");
 assert.equal(isProcessoElegivelRiscosPsicossociais(laudos0065Envio.implantacao), false);
+
+const abasImplantacaoAet = buildOrcamentoEtapas("aet").map((e) => e.id);
+const abasImplantacaoInsal = buildOrcamentoEtapas("insalubridade").map(
+  (e) => e.id
+);
+assert.deepEqual(abasImplantacaoAet, [
+  "resumo",
+  "aprovado",
+  "contrato",
+  "financeiro",
+  "visita_aet",
+]);
+assert.deepEqual(abasImplantacaoInsal, abasImplantacaoAet);
+assert.ok(!abasImplantacaoAet.includes("elaboracao"));
+assert.ok(!abasImplantacaoAet.includes("envio"));
+assert.equal(aetAntes.totalEtapas, IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS);
+assert.equal(insalAntes.totalEtapas, IMPLANTACAO_LAUDO_PONTUAL_TOTAL_ETAPAS);
+assert.equal(aetDepois.progressoLabel, "5 de 5");
+assert.equal(insalDepois.progressoLabel, "5 de 5");
+
+assert.equal(sanitizeOrcamentoEtapaTab("elaboracao", "aet"), "visita_aet");
+assert.equal(
+  sanitizeOrcamentoEtapaTab("envio", "insalubridade"),
+  "visita_aet"
+);
+assert.equal(implantacaoEtapaToModalTab("elaboracao", "aet"), "visita_aet");
+assert.equal(
+  implantacaoEtapaToModalTab("envio", "insalubridade"),
+  "visita_aet"
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("elaboracao", apAet, true, {
+    fluxo: "aet",
+    aet: visitaRealizada,
+  }),
+  false
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("envio", apInsal, true, {
+    fluxo: "insalubridade",
+    aet: laudoFinalizado,
+  }),
+  false
+);
+
+assert.throws(
+  () => assertPodeEditarElaboracaoEnvioLaudoPontual("implantacao"),
+  (err: unknown) =>
+    err instanceof Error &&
+    err.message === LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG
+);
+assert.throws(() => assertPodeEditarElaboracaoEnvioLaudoPontual(undefined));
+assert.doesNotThrow(() =>
+  assertPodeEditarElaboracaoEnvioLaudoPontual("laudos_sst")
+);
+
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosAet).map((e) => e.id),
+  ["visita", "elaboracao", "envio"]
+);
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosInsal).map((e) => e.id),
+  ["visita", "elaboracao", "envio"]
+);
+assert.equal(laudosAet.totalEtapas, 3);
+assert.equal(laudosInsal.totalEtapas, 3);
+
+const modalImplantacaoSrc = readFileSync(
+  join(process.cwd(), "components/orcamentos/OrcamentoAprovarModal.tsx"),
+  "utf8"
+);
+assert.doesNotMatch(modalImplantacaoSrc, /tab === "elaboracao"/);
+assert.doesNotMatch(modalImplantacaoSrc, /tab === "envio"/);
+assert.match(modalImplantacaoSrc, /permitirElaboracaoEnvio:\s*false/);
+
+const modalLaudosSrc = readFileSync(
+  join(process.cwd(), "components/laudos-sst/LaudosPontualModal.tsx"),
+  "utf8"
+);
+assert.match(modalLaudosSrc, /permitirElaboracaoEnvio:\s*true/);
+assert.match(modalLaudosSrc, /tab === "elaboracao"/);
+assert.match(modalLaudosSrc, /tab === "envio"/);
 
 console.log("ok: laudo-pontual-implantacao-fluxo");

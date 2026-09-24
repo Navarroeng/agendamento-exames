@@ -253,23 +253,15 @@ assert.deepEqual(
 const abas = buildOrcamentoEtapas("insalubridade");
 assert.deepEqual(
   abas.map((e) => e.id),
-  [
-    "resumo",
-    "aprovado",
-    "contrato",
-    "financeiro",
-    "visita_aet",
-    "elaboracao",
-    "envio",
-  ]
+  ["resumo", "aprovado", "contrato", "financeiro", "visita_aet"]
 );
 assert.equal(
-  abas.find((e) => e.id === "elaboracao")?.label,
-  "Elaboração do Laudo"
+  abas.find((e) => e.id === "elaboracao"),
+  undefined
 );
 assert.equal(
-  buildOrcamentoEtapas("aet").find((e) => e.id === "elaboracao")?.label,
-  "Elaboração do AET"
+  buildOrcamentoEtapas("aet").find((e) => e.id === "elaboracao"),
+  undefined
 );
 
 const contratoOk = {
@@ -314,7 +306,7 @@ assert.equal(
     fluxo: "insalubridade",
     aet: { visita_status: "realizada" } as ImplantacaoAetRecord,
   }),
-  true
+  false
 );
 assert.equal(
   isOrcamentoEtapaLiberada("envio", contratoOk, true, {
@@ -325,7 +317,7 @@ assert.equal(
       laudo_path: "laudo.pdf",
     } as ImplantacaoAetRecord,
   }),
-  true
+  false
 );
 
 function makeOrcamento(

@@ -60,6 +60,7 @@ import { OrcamentoViewBody } from "./OrcamentoViewBody";
 import { OrcamentoContratoGerarPanel } from "./OrcamentoContratoGerarPanel";
 import {
   isOrcamentoEtapaLiberada,
+  sanitizeOrcamentoEtapaTab,
   type OrcamentoEtapaId,
   type OrcamentoEtapasContexto,
 } from "@/lib/orcamento-etapas";
@@ -87,8 +88,6 @@ import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { isFluxoLaudoPontual, fluxoToLaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
 import {
-  OrcamentoAbaAetElaboracao,
-  OrcamentoAbaAetEnvio,
   OrcamentoAbaAetVisita,
   OrcamentoResumoAetStatus,
 } from "./OrcamentoAbasAet";
@@ -255,10 +254,7 @@ export function OrcamentoAprovarModal({
       fluxo,
       treinamento,
     };
-    const requestedTab: TabId | null | undefined =
-      isFluxoLaudoPontual(fluxo) && initialTab === "documentos"
-        ? "visita_aet"
-        : initialTab;
+    const requestedTab = sanitizeOrcamentoEtapaTab(initialTab, fluxo);
     const tabInicial: TabId =
       requestedTab &&
       isOrcamentoEtapaLiberada(
@@ -411,6 +407,7 @@ export function OrcamentoAprovarModal({
     aprovacaoId: aprovacao?.id ?? null,
     orcamentoNumero: orcamento?.numero ?? null,
     kind: laudoKind,
+    permitirElaboracaoEnvio: false,
   });
   const etapasCtx: OrcamentoEtapasContexto = useMemo(
     () => ({
@@ -441,6 +438,20 @@ export function OrcamentoAprovarModal({
       aprovacao,
     ]
   );
+
+  const handleTabChange = useCallback(
+    (next: OrcamentoEtapaId) => {
+      setTab(sanitizeOrcamentoEtapaTab(next, fluxoImplantacao) ?? next);
+    },
+    [fluxoImplantacao]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const sanitized = sanitizeOrcamentoEtapaTab(tab, fluxoImplantacao);
+    if (sanitized && sanitized !== tab) setTab(sanitized);
+  }, [open, tab, fluxoImplantacao]);
+
   const mensagemVisita = useMemo(
     () =>
       buildMensagemVisitaTecnica({
@@ -877,7 +888,7 @@ export function OrcamentoAprovarModal({
                     }
                   : null
             }
-            onChange={setTab}
+            onChange={handleTabChange}
           />
         </div>
 
@@ -1831,53 +1842,6 @@ export function OrcamentoAprovarModal({
                 aetEtapas.setVisitaForm((prev) => ({ ...prev, ...patch }))
               }
               onSalvar={() => void aetEtapas.handleSalvarVisita()}
-            />
-          ) : null}
-
-          {tab === "elaboracao" &&
-          aprovacao &&
-          isOrcamentoEtapaLiberada(
-            "elaboracao",
-            aprovacao,
-            orcamentoAprovado,
-            etapasCtx
-          ) ? (
-            <OrcamentoAbaAetElaboracao
-              kind={laudoKind}
-              aet={aetEtapas.aet}
-              form={aetEtapas.elaboracaoForm}
-              saving={saving || aetEtapas.saving}
-              onChange={(patch) =>
-                aetEtapas.setElaboracaoForm((prev) => ({ ...prev, ...patch }))
-              }
-              onFileChange={(file) => void aetEtapas.handleUploadLaudo(file)}
-              onRemoverLaudo={() => void aetEtapas.handleRemoverLaudo()}
-              onVisualizarLaudo={() => {
-                if (aetEtapas.aet?.laudo_path) {
-                  void aetEtapas.abrirArquivo(aetEtapas.aet.laudo_path);
-                }
-              }}
-              onSalvar={() => void aetEtapas.handleSalvarElaboracao()}
-            />
-          ) : null}
-
-          {tab === "envio" &&
-          aprovacao &&
-          isOrcamentoEtapaLiberada(
-            "envio",
-            aprovacao,
-            orcamentoAprovado,
-            etapasCtx
-          ) ? (
-            <OrcamentoAbaAetEnvio
-              kind={laudoKind}
-              aet={aetEtapas.aet}
-              form={aetEtapas.envioForm}
-              saving={saving || aetEtapas.saving}
-              onChange={(patch) =>
-                aetEtapas.setEnvioForm((prev) => ({ ...prev, ...patch }))
-              }
-              onSalvar={() => void aetEtapas.handleSalvarEnvio()}
             />
           ) : null}
         </div>
