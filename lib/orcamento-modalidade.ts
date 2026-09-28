@@ -1,4 +1,6 @@
 import { formatCurrency } from "@/lib/money";
+import { isServicoAetNome } from "@/lib/servico-aet";
+import { isServicoInsalubridadeNome } from "@/lib/servico-insalubridade";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { isServicoLtcatNome } from "@/lib/servico-ltcat";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
@@ -136,6 +138,40 @@ export function filterServicosPorModalidade<
   return base.filter(
     (s) => normalizeServicoNome(s.nome) !== GESTAO_COMPLETA_LEGADO_NORMALIZADO
   );
+}
+
+/**
+ * Opções comerciais do campo Serviço em orçamento novo ou em linha nova.
+ * Não remove linhas do catálogo nem altera itens já gravados.
+ */
+const SERVICOS_OFERECIDOS_ORCAMENTO = new Set([
+  normalizeServicoNome("Pacote completo - SST"),
+  GESTAO_COMPLETA_LEGADO_NORMALIZADO,
+  normalizeServicoNome("LTCAT"),
+  normalizeServicoNome("Outros"),
+]);
+
+export function isServicoOferecidoNoOrcamento(
+  nome: string | null | undefined
+): boolean {
+  if (isServicoAetNome(nome) || isServicoInsalubridadeNome(nome)) return true;
+  return SERVICOS_OFERECIDOS_ORCAMENTO.has(normalizeServicoNome(nome));
+}
+
+export function filterServicosSelecaoOrcamento<T extends { nome: string }>(
+  servicos: T[]
+): T[] {
+  return servicos.filter((s) => isServicoOferecidoNoOrcamento(s.nome));
+}
+
+/** Mantém visível o serviço já salvo na linha, mesmo fora da oferta atual. */
+export function opcoesServicoLinhaOrcamento<
+  T extends { id: string; nome: string },
+>(oferecidos: T[], catalogo: T[], servicoId: string | null | undefined): T[] {
+  const id = servicoId?.trim();
+  if (!id || oferecidos.some((s) => s.id === id)) return oferecidos;
+  const atual = catalogo.find((s) => s.id === id);
+  return atual ? [...oferecidos, atual] : oferecidos;
 }
 
 /** Valor mensal formatado. Nunca multiplica por 12. */

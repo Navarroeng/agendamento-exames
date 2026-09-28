@@ -20,7 +20,7 @@ import {
   ORCAMENTO_MODALIDADE_OPTIONS,
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
   ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL,
-  filterServicosPorModalidade,
+  filterServicosSelecaoOrcamento,
   formatValorMensalidade,
   isOrcamentoMensalidade,
   resolveGestaoCompletaSstServico,
@@ -76,8 +76,8 @@ export function OrcamentoForm({
 }: OrcamentoFormProps) {
   const isMensalidade = isOrcamentoMensalidade(form.modalidade);
   const servicosFiltrados = useMemo(
-    () => filterServicosPorModalidade(servicos, form.modalidade),
-    [servicos, form.modalidade]
+    () => filterServicosSelecaoOrcamento(servicos),
+    [servicos]
   );
   const clienteBloqueado = Boolean(form.cliente_id.trim());
   const headerTitle = embeddedInModal
@@ -281,6 +281,7 @@ export function OrcamentoForm({
         <OrcamentoItensSection
           itens={form.itens}
           servicos={servicosFiltrados}
+          servicosCatalogo={servicos}
           servicosLoading={servicosLoading}
           servicosError={servicosError}
           subtotal={subtotal}

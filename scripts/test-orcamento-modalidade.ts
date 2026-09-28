@@ -15,7 +15,10 @@ import {
   ORCAMENTO_MODALIDADE_PONTUAL,
   buildResumoMensalidadeLinhas,
   filterServicosPorModalidade,
+  filterServicosSelecaoOrcamento,
   formatValorMensalidade,
+  isServicoOferecidoNoOrcamento,
+  opcoesServicoLinhaOrcamento,
   formatValorOrcamentoExibicao,
   isGestaoMensalSstNome,
   isOrcamentoMensalidade,
@@ -92,6 +95,53 @@ assert.deepEqual(
 assert.deepEqual(
   filterServicosPorModalidade(servicos, "mensalidade").map((s) => s.nome),
   ["Pacote completo - SST", GESTAO_SST_MENSAL_NOME, "PCMSO"]
+);
+
+const catalogoSelecao = [
+  { id: "pacote", nome: "Pacote completo - SST" },
+  { id: "gestao-legada", nome: "Gestão Completa SST" },
+  { id: "gestao-mensal", nome: "Gestão SST Mensal" },
+  { id: "gestao-canonica", nome: GESTAO_SST_MENSAL_NOME },
+  { id: "ltcat", nome: "LTCAT" },
+  { id: "outros", nome: "Outros" },
+  { id: "aet", nome: "Laudo AET – Análise Ergonômica do Trabalho" },
+  { id: "insal", nome: "Laudo de Insalubridade" },
+  { id: "pgr", nome: "PGR" },
+  { id: "pcmso", nome: "PCMSO" },
+  { id: "lip", nome: "LIP" },
+  { id: "nr01", nome: "NR01 Psicossocial" },
+  { id: "trein", nome: "Treinamentos" },
+  { id: "exames", nome: "Exames Ocupacionais" },
+];
+assert.deepEqual(
+  filterServicosSelecaoOrcamento(catalogoSelecao).map((s) => s.nome),
+  [
+    "Pacote completo - SST",
+    "Gestão Completa SST",
+    "LTCAT",
+    "Outros",
+    "Laudo AET – Análise Ergonômica do Trabalho",
+    "Laudo de Insalubridade",
+  ]
+);
+assert.equal(isServicoOferecidoNoOrcamento("PGR"), false);
+assert.equal(isServicoOferecidoNoOrcamento("Gestão SST Mensal"), false);
+assert.equal(isServicoOferecidoNoOrcamento(GESTAO_SST_MENSAL_NOME), false);
+assert.deepEqual(
+  opcoesServicoLinhaOrcamento(
+    filterServicosSelecaoOrcamento(catalogoSelecao),
+    catalogoSelecao,
+    "pgr"
+  ).map((s) => s.id),
+  ["pacote", "gestao-legada", "ltcat", "outros", "aet", "insal", "pgr"]
+);
+assert.deepEqual(
+  opcoesServicoLinhaOrcamento(
+    filterServicosSelecaoOrcamento(catalogoSelecao),
+    catalogoSelecao,
+    ""
+  ).map((s) => s.id),
+  ["pacote", "gestao-legada", "ltcat", "outros", "aet", "insal"]
 );
 
 assert.deepEqual(

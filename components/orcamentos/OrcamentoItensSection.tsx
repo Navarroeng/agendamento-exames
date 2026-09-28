@@ -9,6 +9,7 @@ import {
   formatValorMensalidade,
   isOrcamentoMensalidade,
   labelValorColunaOrcamento,
+  opcoesServicoLinhaOrcamento,
 } from "@/lib/orcamento-modalidade";
 import {
   laudoPontualOcultaColaboradores,
@@ -19,6 +20,8 @@ import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 interface OrcamentoItensSectionProps {
   itens: OrcamentoItemFormItem[];
   servicos: ServicoSstRecord[];
+  /** Catálogo completo, para exibir na linha um serviço já salvo fora da oferta. */
+  servicosCatalogo?: ServicoSstRecord[];
   servicosLoading: boolean;
   servicosError: string | null;
   subtotal: number;
@@ -41,6 +44,7 @@ const TH =
 export function OrcamentoItensSection({
   itens,
   servicos,
+  servicosCatalogo,
   servicosLoading,
   servicosError,
   subtotal,
@@ -98,7 +102,11 @@ export function OrcamentoItensSection({
               <OrcamentoItemTableRow
                 key={item.id}
                 item={item}
-                servicos={servicos}
+                servicos={opcoesServicoLinhaOrcamento(
+                  servicos,
+                  servicosCatalogo ?? servicos,
+                  item.servico_id
+                )}
                 servicosLoading={servicosLoading}
                 canRemove={!isMensalidade && itens.length > 1}
                 onRemove={() => onRemove(item.id)}
