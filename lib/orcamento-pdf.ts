@@ -49,7 +49,13 @@ import {
   PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE,
 } from "@/lib/servico-insalubridade";
 import {
+  LTCAT_INCLUSOS_ITENS,
+  orcamentoPossuiLtcat,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT,
+} from "@/lib/servico-ltcat";
+import {
   isLaudoPontualExclusivo,
+  laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 import { buscarClientePorId } from "@/services/cliente.service";
@@ -193,9 +199,18 @@ function resolveDescricaoPropostaParagrafos(
   if (kind === "insalubridade") {
     return PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE;
   }
-  return isOrcamentoMensalidade(orcamento.modalidade)
+  if (kind === "ltcat") return PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT;
+  const base = isOrcamentoMensalidade(orcamento.modalidade)
     ? PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
+  if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {
+    return [...PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT, ...base];
+  }
+  return base;
+}
+
+function isNotaLegalDescricao(paragrafo: string): boolean {
+  return paragrafo === PROPOSTA_DESCRICAO_NOTA_LEGAL;
 }
 
 const DESCRICAO_CARD_PADDING_X = 5;
@@ -1100,6 +1115,13 @@ function orcamentoHasLaudoPontual(
   return isLaudoPontualExclusivo(orcamento.orcamento_itens);
 }
 
+/** AET e Insalubridade ocultam colaboradores. O LTCAT mantém a quantidade. */
+function orcamentoOcultaColaboradores(orcamento: OrcamentoComItens): boolean {
+  return laudoPontualOcultaColaboradores(
+    resolveLaudoPontualKind(orcamento.orcamento_itens)
+  );
+}
+
 /** Mesmo card estruturado de “O que está incluso?” do Pacote completo - SST. */
 function orcamentoUsaCardInclusosEstruturado(
   orcamento: OrcamentoComItens,
@@ -1206,7 +1228,7 @@ function drawResumoFinanceiroCard(
     itensRegistroParaDescontoAvista(orcamento.orcamento_itens ?? []),
     resolvePacoteCompletoSstServicoId(catalogo)
   );
-  const isLaudoPontual = orcamentoHasLaudoPontual(orcamento);
+  const isLaudoPontual = orcamentoOcultaColaboradores(orcamento);
 
   if (isLaudoPontual) {
     drawRow(
@@ -1811,7 +1833,7 @@ function drawClientCard(
     ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
   ];
-  if (!orcamentoHasLaudoPontual(orcamento)) {
+  if (!orcamentoOcultaColaboradores(orcamento)) {
     fieldsRight.push([
       "Número de Colaboradores",
       String(resolveNumeroColaboradoresOrcamento(orcamento)),
@@ -1912,7 +1934,7 @@ function measureDescricaoPropostaHeight(
   let h = cardPadding;
 
   paragrafos.forEach((paragrafo, index) => {
-    const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
+    const isNotaLegal = isNotaLegalDescricao(paragrafo);
     doc.setFont("helvetica", isNotaLegal ? "italic" : "normal");
     doc.setFontSize(isNotaLegal ? 7 : 7.5);
     const lines = wrapDescricaoPropostaLines(doc, paragrafo, textWidth);
@@ -1950,7 +1972,7 @@ function drawDescricaoProposta(
   const textWidth = CONTENT_W - DESCRICAO_CARD_PADDING_X * 2;
 
   paragrafos.forEach((paragrafo, index) => {
-    const isNotaLegal = index === paragrafos.length - 1 && paragrafos.length > 1;
+    const isNotaLegal = isNotaLegalDescricao(paragrafo);
     doc.setFont("helvetica", isNotaLegal ? "italic" : "normal");
     doc.setFontSize(isNotaLegal ? 7 : 7.5);
     doc.setTextColor(...(isNotaLegal ? SLATE_500 : SLATE_700));
@@ -2025,7 +2047,7 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
-  const isLaudoPontual = orcamentoHasLaudoPontual(orcamento);
+  const isLaudoPontual = orcamentoOcultaColaboradores(orcamento);
   const colWidths = isLaudoPontual ? [138, 40] : [98, 44, 40];
   const colStarts = isLaudoPontual
     ? [MARGIN, MARGIN + colWidths[0]]
@@ -2133,7 +2155,12 @@ function drawServicesTable(
         doc.text(wrapped, colStarts[0] + 3, detailY);
         detailY += wrapped.length * TABLE_DETAIL_LINE_H;
       });
-    } else if (!isLaudoPontual) {
+    } else if (
+      !isLaudoPontual &&
+      !isLaudoPontualExclusivo([
+        { servico_nome: servico?.nome ?? item.servico_nome },
+      ])
+    ) {
       const descricao = servico?.descricao?.trim();
       if (descricao) {
         doc.setFont("helvetica", "normal");
@@ -2195,7 +2222,8 @@ function drawFinancialAndInclusosRow(
 ): number {
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const laudoKind = resolveLaudoPontualKind(orcamento.orcamento_itens);
-  const isLaudoPontual = laudoKind !== null;
+  const ocultaColaboradores = laudoPontualOcultaColaboradores(laudoKind);
+  const comMarcadorLaudo = laudoKind !== null;
   const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
     orcamento,
     catalogo
@@ -2210,13 +2238,21 @@ function drawFinancialAndInclusosRow(
       ? [...AET_INCLUSOS_ITENS]
       : laudoKind === "insalubridade"
         ? [...INSALUBRIDADE_INCLUSOS_ITENS]
-        : !isMensalidade && usaCardInclusosEstruturado
-          ? buildPacoteCompletoInclusosItens(orcamento)
-          : [];
+        : laudoKind === "ltcat"
+          ? [...LTCAT_INCLUSOS_ITENS]
+          : !isMensalidade && usaCardInclusosEstruturado
+            ? buildPacoteCompletoInclusosItens(orcamento)
+            : [];
+  const inclusosCard =
+    laudoKind == null &&
+    !isMensalidade &&
+    orcamentoPossuiLtcat(orcamento.orcamento_itens)
+      ? [...pacoteInclusosItens, ...LTCAT_INCLUSOS_ITENS]
+      : pacoteInclusosItens;
   const inclusosObservacoes =
     laudoKind === "insalubridade"
       ? INSALUBRIDADE_INCLUSOS_OBSERVACOES
-      : laudoKind === "aet"
+      : laudoKind === "aet" || laudoKind === "ltcat"
         ? []
         : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;
 
@@ -2224,11 +2260,11 @@ function drawFinancialAndInclusosRow(
     doc,
     checklistW,
     usaCardInclusosEstruturado,
-    pacoteInclusosItens,
+    inclusosCard,
     inclusos,
     isMensalidade,
     inclusosObservacoes,
-    isLaudoPontual
+    ocultaColaboradores
   );
   const { needsNewPage, cardH } = resolveCardsBlockPlacement(
     y,
@@ -2248,9 +2284,9 @@ function drawFinancialAndInclusosRow(
       y,
       checklistW,
       cardH,
-      pacoteInclusosItens,
+      inclusosCard,
       inclusosObservacoes,
-      isLaudoPontual
+      comMarcadorLaudo
     );
   } else if (inclusos.length > 0) {
     drawGenericInclusosCard(doc, MARGIN, y, checklistW, cardH, inclusos);

@@ -9,6 +9,10 @@ import {
   PACOTE_COMPLETO_SST_NOME,
 } from "@/lib/servico-sst-pacote";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
+import {
+  isServicoLtcatNome,
+  resolveValorTotalLtcat,
+} from "@/lib/servico-ltcat";
 
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
@@ -273,7 +277,12 @@ export function resolveItemValorServico(item: {
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
+  servico_nome?: string | null;
 }): number {
+  if (isServicoLtcatNome(item.servico_nome)) {
+    return resolveValorTotalLtcat(item);
+  }
+
   const total = Number(item.valor_total);
   const unit = Number(item.valor_unitario);
 

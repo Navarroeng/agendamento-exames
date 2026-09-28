@@ -418,20 +418,23 @@ function latestDefining(fnName: string): { file: string; sql: string } {
 }
 
 const rpc = latestDefining("aprovar_orcamento_integrar_cliente");
-assert.equal(rpc.file, "127_servico_insalubridade.sql");
+assert.equal(rpc.file, "129_servico_ltcat.sql");
 const contratoSkip = rpc.sql.indexOf("v_contrato_id := null");
 assert.ok(contratoSkip >= 0, "RPC deve zerar contrato_id no ramo de laudo pontual");
 const skipWindow = rpc.sql.slice(Math.max(0, contratoSkip - 80), contratoSkip + 220);
-assert.match(skipWindow, /if v_is_laudo_pontual then/);
+assert.match(skipWindow, /if v_is_laudo_pontual or v_is_ltcat then/);
+assert.match(rpc.sql, /is_servico_ltcat_nome/);
+assert.match(rpc.sql, /if v_is_laudo_pontual then\s+v_qtd := 0/);
 assert.doesNotMatch(skipWindow, /insert into public\.cliente_contratos/i);
 assert.match(rpc.sql, /insert into public\.cliente_contratos/i);
 assert.match(rpc.sql, /is_servico_insalubridade_nome/);
 assert.match(rpc.sql, /is_servico_aet_nome/);
 
 const trigger = latestDefining("trg_orcamento_aprovado_exige_contrato");
-assert.equal(trigger.file, "127_servico_insalubridade.sql");
+assert.equal(trigger.file, "129_servico_ltcat.sql");
 assert.match(trigger.sql, /orcamento_eh_exclusivo_aet/);
 assert.match(trigger.sql, /orcamento_eh_exclusivo_insalubridade/);
+assert.match(trigger.sql, /orcamento_eh_exclusivo_ltcat/);
 assert.match(trigger.sql, /cliente_id is null/);
 assert.match(trigger.sql, /from public\.cliente_contratos/);
 

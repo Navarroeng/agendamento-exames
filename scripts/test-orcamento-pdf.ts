@@ -45,6 +45,11 @@ import {
   PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE,
   SERVICO_INSALUBRIDADE_NOME,
 } from "../lib/servico-insalubridade";
+import {
+  LTCAT_INCLUSOS_ITENS,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT,
+  SERVICO_LTCAT_NOME,
+} from "../lib/servico-ltcat";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
@@ -696,6 +701,62 @@ assert.doesNotMatch(insalRaw, /\u2022/);
 fs.writeFileSync(
   path.join(previewDir, "preview-insalubridade.pdf"),
   Buffer.from(insalDoc.output("arraybuffer"))
+);
+
+const ltcatOrc = buildOrcamento({
+  numero: "ORC-2026-0601",
+  modalidade: "pontual",
+  quantidade_parcelas: 1,
+  itens: [{ nome: SERVICO_LTCAT_NOME, quantidade: 20, valor: 2000 }],
+});
+const ltcatDoc = renderPdf(ltcatOrc);
+const ltcatRaw = pdfVisibleText(pdfLatin1(ltcatDoc));
+assert.match(ltcatRaw, /Laudo T[eé]cnico das Condi[cç][oõ]es Ambientais do Trabalho/);
+assert.match(ltcatRaw, /aposentadoria especial/);
+assert.match(ltcatRaw, /enquadramento previdenci[aá]rio/);
+assert.match(ltcatRaw, /Visita t[eé]cnica para levantamento das atividades/);
+assert.match(ltcatRaw, /Entrega do laudo final em formato digital/);
+assert.match(ltcatRaw, /O que est[áa] incluso/i);
+assert.match(ltcatRaw, /Quantidade de/);
+assert.match(ltcatRaw, /Colaboradores/);
+assert.match(ltcatRaw, /20/);
+assert.match(ltcatRaw, /2\.000,00/);
+assert.doesNotMatch(ltcatRaw, /40\.000|40000/);
+assert.doesNotMatch(ltcatRaw, /Valor abaixo equivalente/);
+assert.doesNotMatch(ltcatRaw, /An[aá]lise Ergon[oô]mica/);
+assert.doesNotMatch(ltcatRaw, /NR-17/);
+assert.doesNotMatch(ltcatRaw, /Laudo de Insalubridade/);
+assert.doesNotMatch(ltcatRaw, /Este pacote inclui/i);
+assert.doesNotMatch(ltcatRaw, /Exame complementar ocupacional/);
+assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT.length, 2);
+assert.equal(LTCAT_INCLUSOS_ITENS.length, 6);
+assert.equal(resolveItemValorServico(ltcatOrc.orcamento_itens![0]), 2000);
+
+const mistoOrc = buildOrcamento({
+  numero: "ORC-2026-0602",
+  modalidade: "pontual",
+  quantidade_parcelas: 1,
+  itens: [
+    { nome: SERVICO_LTCAT_NOME, quantidade: 20, valor: 2000 },
+    { nome: "PGR", quantidade: 5, valor: 800 },
+  ],
+});
+const mistoDoc = renderPdf(mistoOrc);
+const mistoRaw = pdfVisibleText(pdfLatin1(mistoDoc));
+assert.equal(mistoOrc.valor_total, 2800);
+assert.match(mistoRaw, /2\.800,00/);
+assert.match(mistoRaw, /2\.000,00/);
+assert.match(mistoRaw, /800,00/);
+assert.match(mistoRaw, /Condi[cç][oõ]es Ambientais do Trabalho/);
+assert.match(mistoRaw, /Valor abaixo equivalente/);
+assert.match(mistoRaw, /PGR/);
+assert.match(mistoRaw, /Visita t[eé]cnica para/);
+assert.match(mistoRaw, /levantamento das atividades/);
+assert.doesNotMatch(mistoRaw, /40\.000|40000/);
+assert.doesNotMatch(mistoRaw, /16\.000|16000/);
+fs.writeFileSync(
+  path.join(previewDir, "preview-ltcat.pdf"),
+  Buffer.from(ltcatDoc.output("arraybuffer"))
 );
 
 console.log("test-orcamento-pdf: OK");

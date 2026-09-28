@@ -10,7 +10,10 @@ import {
   isOrcamentoMensalidade,
   labelValorColunaOrcamento,
 } from "@/lib/orcamento-modalidade";
-import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
+import {
+  laudoPontualOcultaColaboradores,
+  resolveLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -49,7 +52,9 @@ export function OrcamentoItensSection({
   onApplyValorSugerido,
 }: OrcamentoItensSectionProps) {
   const isMensalidade = isOrcamentoMensalidade(modalidade);
-  const isLaudoPontual = isLaudoPontualExclusivo(itens);
+  const isLaudoPontual = laudoPontualOcultaColaboradores(
+    resolveLaudoPontualKind(itens)
+  );
   const colSpanValor = isLaudoPontual ? 1 : 2;
   return (
     <Panel

@@ -9,7 +9,17 @@ import {
   formatValorMensalidade,
   isOrcamentoMensalidade,
 } from "@/lib/orcamento-modalidade";
-import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
+import {
+  laudoPontualOcultaColaboradores,
+  resolveLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
+import type { ServicoItemRef } from "@/lib/servico-treinamentos";
+
+function ocultaQuantidadeColaboradores(
+  itens: ServicoItemRef[] | null | undefined
+): boolean {
+  return laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens));
+}
 import { orcamentoPermitePagamentoAVista } from "@/lib/servico-aet";
 import {
   resolveItemValorServico,
@@ -284,7 +294,7 @@ export function resolveFinanceiroAndamento(
 export function buildResumoComercialOrcamento(
   orcamento: OrcamentoComItens
 ): OrcamentoResumoComercial {
-  const quantidade = isLaudoPontualExclusivo(orcamento.orcamento_itens)
+  const quantidade = ocultaQuantidadeColaboradores(orcamento.orcamento_itens)
     ? 0
     : resolveQuantidadeColaboradoresOrcamento(orcamento) || 1;
   const valorTotal = Number(orcamento.valor_total) || 0;
@@ -505,7 +515,7 @@ export function buildAprovacaoInsertPayload(
     };
   }
 
-  const quantidade = isLaudoPontualExclusivo(orcamento.orcamento_itens)
+  const quantidade = ocultaQuantidadeColaboradores(orcamento.orcamento_itens)
     ? 0
     : Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);
@@ -582,7 +592,7 @@ export function buildAprovacaoDiffs(
       : `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`;
 
   const diffs: OrcamentoAprovacaoDiffItem[] = [];
-  if (!isLaudoPontualExclusivo(orcamento.orcamento_itens)) {
+  if (!ocultaQuantidadeColaboradores(orcamento.orcamento_itens)) {
     diffs.push({
       label: "Quantidade de colaboradores",
       original: String(resumo.quantidadeColaboradores || "—"),
@@ -654,7 +664,7 @@ export function buildCondicoesComerciaisFromForm(
   modalidade?: string | null,
   itens?: { servico_id?: string | null; servico_nome?: string | null }[] | null
 ): OrcamentoCondicoesComerciaisPayload {
-  const quantidade = isLaudoPontualExclusivo(itens)
+  const quantidade = ocultaQuantidadeColaboradores(itens)
     ? 0
     : Number(form.quantidade_colaboradores) || 1;
   const valorFinal = parseMoneyFn(form.valor_final);

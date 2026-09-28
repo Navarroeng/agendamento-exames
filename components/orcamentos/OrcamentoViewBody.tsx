@@ -26,7 +26,10 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
-import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
+import {
+  laudoPontualOcultaColaboradores,
+  resolveLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import {
@@ -93,7 +96,9 @@ export function OrcamentoViewBody({
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isLaudoPontual = isLaudoPontualExclusivo(itens);
+  const isLaudoPontual = laudoPontualOcultaColaboradores(
+    resolveLaudoPontualKind(itens)
+  );
   const valorServico = Number(orcamento.valor_total) || 0;
   const linhasMensalidade = isMensalidade
     ? buildResumoMensalidadeLinhas(valorServico)

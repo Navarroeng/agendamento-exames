@@ -1,5 +1,6 @@
 import { formatCurrency } from "@/lib/money";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
+import { isServicoLtcatNome } from "@/lib/servico-ltcat";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const ORCAMENTO_MODALIDADE_PONTUAL = "pontual";
@@ -156,7 +157,9 @@ export function formatValorOrcamentoExibicao(orcamento: {
 export function labelItensInclusosServico(
   nome: string | null | undefined
 ): string {
-  if (isServicoLaudoPontualNome(nome)) return "O que está incluso?";
+  if (isServicoLaudoPontualNome(nome) || isServicoLtcatNome(nome)) {
+    return "O que está incluso?";
+  }
   return isGestaoCompletaSstNome(nome)
     ? "Essa gestão inclui:"
     : "Este pacote inclui:";

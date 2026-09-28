@@ -21,12 +21,17 @@ import {
   SERVICO_INSALUBRIDADE_EXCLUSIVIDADE_MSG,
   SERVICO_INSALUBRIDADE_QUANTIDADE_INTERNA,
 } from "@/lib/servico-insalubridade";
+import {
+  isServicoLtcat,
+  orcamentoEhExclusivoLtcat,
+  orcamentoPossuiLtcat,
+} from "@/lib/servico-ltcat";
 import type {
   OrcamentoFluxoImplantacao,
   ServicoItemRef,
 } from "@/lib/servico-treinamentos";
 
-export type LaudoPontualKind = "aet" | "insalubridade";
+export type LaudoPontualKind = "aet" | "insalubridade" | "ltcat";
 
 export const SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA =
   SERVICO_AET_QUANTIDADE_INTERNA;
@@ -34,7 +39,7 @@ export const SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA =
 export function isFluxoLaudoPontual(
   fluxo: OrcamentoFluxoImplantacao | null | undefined
 ): boolean {
-  return fluxo === "aet" || fluxo === "insalubridade";
+  return fluxo === "aet" || fluxo === "insalubridade" || fluxo === "ltcat";
 }
 
 /** Origem da edição operacional do laudo pontual. */
@@ -54,7 +59,9 @@ export function assertPodeEditarElaboracaoEnvioLaudoPontual(
 export function fluxoToLaudoPontualKind(
   fluxo: OrcamentoFluxoImplantacao | null | undefined
 ): LaudoPontualKind | null {
-  if (fluxo === "aet" || fluxo === "insalubridade") return fluxo;
+  if (fluxo === "aet" || fluxo === "insalubridade" || fluxo === "ltcat") {
+    return fluxo;
+  }
   return null;
 }
 
@@ -90,7 +97,45 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
   auditElaboracaoConcluida: (usuario: string) => string;
   auditElaboracaoAtualizada: (usuario: string) => string;
   auditEnvioConfirmado: (usuario: string) => string;
+  textoVisitaEdicao: string;
 } {
+  if (kind === "ltcat") {
+    return {
+      titulo: "LTCAT",
+      andamento: "Andamento do LTCAT",
+      abaElaboracao: "LTCAT em elaboração",
+      etapaVisita: "Visita técnica",
+      etapaElaboracao: "Elaboração do LTCAT",
+      etapaEnvio: "Envio ao cliente",
+      textoVisitaConsulta:
+        "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
+      textoVisitaEdicao:
+        "Agende e registre a visita técnica para levantamento das atividades e condições de trabalho.",
+      textoElaboracao:
+        "Acompanhe a elaboração do LTCAT após a visita. Anexe o PDF final antes de concluir.",
+      upload: "LTCAT final (PDF)",
+      nomeCurto: "LTCAT",
+      anexeAntesDeConcluir:
+        "Anexe o LTCAT final antes de concluir esta etapa.",
+      concluaAntesEnvio:
+        "Conclua a elaboração do LTCAT e anexe o PDF final antes de registrar o envio.",
+      textoEnvio:
+        "Registre o envio do LTCAT ao cliente. O envio automático por e-mail não faz parte desta etapa.",
+      toastCarregarErro: "Não foi possível carregar o acompanhamento do LTCAT.",
+      toastAnexado: "LTCAT anexado.",
+      auditVisitaRealizada: (usuario) =>
+        `${usuario} registrou a visita do LTCAT como realizada.`,
+      auditVisitaAgendada: (usuario) =>
+        `${usuario} atualizou o agendamento da visita do LTCAT.`,
+      auditLaudoAnexado: (usuario) => `${usuario} anexou o LTCAT final.`,
+      auditElaboracaoConcluida: (usuario) =>
+        `${usuario} concluiu a elaboração do LTCAT.`,
+      auditElaboracaoAtualizada: (usuario) =>
+        `${usuario} atualizou a elaboração do LTCAT.`,
+      auditEnvioConfirmado: (usuario) =>
+        `${usuario} confirmou o envio do LTCAT ao cliente.`,
+    };
+  }
   if (kind === "insalubridade") {
     return {
       titulo: "Laudo de Insalubridade",
@@ -101,6 +146,8 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
       etapaEnvio: "Envio ao cliente",
       textoVisitaConsulta:
         "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
+      textoVisitaEdicao:
+        "Agende e registre a visita técnica para avaliações quantitativas dos agentes insalubres.",
       textoElaboracao:
         "Acompanhe a elaboração do Laudo de Insalubridade após a visita. Anexe o PDF final antes de concluir.",
       upload: "Laudo de Insalubridade final (PDF)",
@@ -137,6 +184,8 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
     etapaEnvio: "Envio ao cliente",
     textoVisitaConsulta:
       "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
+    textoVisitaEdicao:
+      "Agende e registre a visita técnica para avaliação das atividades e postos de trabalho.",
     textoElaboracao:
       "Acompanhe a elaboração do Laudo AET após a visita. Anexe o PDF final antes de concluir.",
     upload: "Laudo AET final (PDF)",
@@ -174,11 +223,13 @@ export function isServicoLaudoPontual(
   ids?: {
     aetServicoId?: string | null;
     insalubridadeServicoId?: string | null;
+    ltcatServicoId?: string | null;
   }
 ): boolean {
   return (
     isServicoAet(item, ids?.aetServicoId) ||
-    isServicoInsalubridade(item, ids?.insalubridadeServicoId)
+    isServicoInsalubridade(item, ids?.insalubridadeServicoId) ||
+    isServicoLtcat(item, ids?.ltcatServicoId)
   );
 }
 
@@ -187,6 +238,7 @@ export function resolveLaudoPontualKind(
   ids?: {
     aetServicoId?: string | null;
     insalubridadeServicoId?: string | null;
+    ltcatServicoId?: string | null;
   }
 ): LaudoPontualKind | null {
   if (orcamentoEhExclusivoAet(itens, ids?.aetServicoId)) return "aet";
@@ -195,7 +247,18 @@ export function resolveLaudoPontualKind(
   ) {
     return "insalubridade";
   }
+  if (orcamentoEhExclusivoLtcat(itens, ids?.ltcatServicoId)) return "ltcat";
   return null;
+}
+
+/**
+ * AET e Insalubridade não exibem quantidade de colaboradores.
+ * O LTCAT mantém o campo: a quantidade registra a abrangência do laudo.
+ */
+export function laudoPontualOcultaColaboradores(
+  fluxoOrKind: OrcamentoFluxoImplantacao | LaudoPontualKind | null | undefined
+): boolean {
+  return fluxoOrKind === "aet" || fluxoOrKind === "insalubridade";
 }
 
 export function isLaudoPontualExclusivo(
@@ -203,6 +266,7 @@ export function isLaudoPontualExclusivo(
   ids?: {
     aetServicoId?: string | null;
     insalubridadeServicoId?: string | null;
+    ltcatServicoId?: string | null;
   }
 ): boolean {
   return resolveLaudoPontualKind(itens, ids) !== null;
@@ -213,11 +277,13 @@ export function orcamentoPossuiLaudoPontual(
   ids?: {
     aetServicoId?: string | null;
     insalubridadeServicoId?: string | null;
+    ltcatServicoId?: string | null;
   }
 ): boolean {
   return (
     orcamentoPossuiAet(itens, ids?.aetServicoId) ||
-    orcamentoPossuiInsalubridade(itens, ids?.insalubridadeServicoId)
+    orcamentoPossuiInsalubridade(itens, ids?.insalubridadeServicoId) ||
+    orcamentoPossuiLtcat(itens, ids?.ltcatServicoId)
   );
 }
 

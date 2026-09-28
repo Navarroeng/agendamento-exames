@@ -5,6 +5,7 @@
  */
 
 import { orcamentoEhExclusivoInsalubridade } from "@/lib/servico-insalubridade";
+import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const SERVICO_AET_NOME =
@@ -149,6 +150,7 @@ export function bloqueioAetExclusivo(params: {
 export type TipoDocumentoContrato =
   | "aet"
   | "insalubridade"
+  | "ltcat"
   | "mensalidade"
   | "pontual_sst";
 
@@ -158,6 +160,7 @@ export function resolveTipoDocumentoContrato(params: {
   aetServicoId?: string | null;
   insalubridadeServicoId?: string | null;
   isMensalidade?: boolean;
+  ltcatServicoId?: string | null;
 }): TipoDocumentoContrato {
   if (orcamentoEhExclusivoAet(params.itens, params.aetServicoId)) {
     return "aet";
@@ -169,6 +172,9 @@ export function resolveTipoDocumentoContrato(params: {
     )
   ) {
     return "insalubridade";
+  }
+  if (orcamentoEhExclusivoLtcat(params.itens, params.ltcatServicoId)) {
+    return "ltcat";
   }
   if (params.isMensalidade) return "mensalidade";
   return "pontual_sst";

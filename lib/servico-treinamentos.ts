@@ -10,7 +10,8 @@ export type OrcamentoFluxoImplantacao =
   | "somente_treinamentos"
   | "combinado"
   | "aet"
-  | "insalubridade";
+  | "insalubridade"
+  | "ltcat";
 
 export type ServicoItemRef = {
   servico_id?: string | null;
@@ -105,11 +106,24 @@ function isItemInsalubridadeFluxo(
   );
 }
 
+/** Nome canônico do catálogo. Não usa includes — a linha do pacote SST não entra. */
+const LTCAT_NOMES_NORMALIZADOS = new Set([normalizeServicoNome("LTCAT")]);
+
+function isItemLtcatFluxo(
+  item: ServicoItemRef,
+  ltcatServicoId?: string | null
+): boolean {
+  const id = (item.servico_id ?? "").trim();
+  if (ltcatServicoId && id) return id === ltcatServicoId;
+  return LTCAT_NOMES_NORMALIZADOS.has(normalizeServicoNome(item.servico_nome));
+}
+
 export function classifyOrcamentoFluxoImplantacao(
   itens: ServicoItemRef[],
   treinamentosServicoId?: string | null,
   aetServicoId?: string | null,
-  insalubridadeServicoId?: string | null
+  insalubridadeServicoId?: string | null,
+  ltcatServicoId?: string | null
 ): OrcamentoFluxoImplantacao {
   const relevant = itens.filter(
     (item) =>
@@ -128,6 +142,10 @@ export function classifyOrcamentoFluxoImplantacao(
     )
   ) {
     return "insalubridade";
+  }
+
+  if (relevant.every((item) => isItemLtcatFluxo(item, ltcatServicoId))) {
+    return "ltcat";
   }
 
   let hasTreinamentos = false;

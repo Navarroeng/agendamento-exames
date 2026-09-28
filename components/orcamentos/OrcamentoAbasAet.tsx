@@ -66,11 +66,7 @@ export function OrcamentoAbaAetVisita({
   return (
     <div className="space-y-4">
       <p className="text-sm text-[#64748b]">
-        {somenteLeitura
-          ? copy.textoVisitaConsulta
-          : kind === "insalubridade"
-            ? "Agende e registre a visita técnica para avaliações quantitativas dos agentes insalubres."
-            : "Agende e registre a visita técnica para avaliação das atividades e postos de trabalho."}
+        {somenteLeitura ? copy.textoVisitaConsulta : copy.textoVisitaEdicao}
       </p>
       {aet?.visita_status === "realizada" ? (
         <p className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-[12px] font-semibold text-[#166534]">

@@ -20,7 +20,11 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
-import { isLaudoPontualExclusivo } from "@/lib/servico-laudo-pontual";
+import {
+  isLaudoPontualExclusivo,
+  laudoPontualOcultaColaboradores,
+  resolveLaudoPontualKind,
+} from "@/lib/servico-laudo-pontual";
 import { garantirImplantacaoAet } from "@/services/implantacao-aet.service";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
@@ -310,8 +314,13 @@ export async function atualizarCondicoesAprovadas(
   if (beforeError) throw beforeError;
 
   const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
-  const isAet = isLaudoPontualExclusivo(before.orcamento_aprovacao_itens);
-  if (!isAet && payload.quantidade_colaboradores < 1) {
+  const isLaudoPontual = isLaudoPontualExclusivo(
+    before.orcamento_aprovacao_itens
+  );
+  const ocultaColaboradores = laudoPontualOcultaColaboradores(
+    resolveLaudoPontualKind(before.orcamento_aprovacao_itens)
+  );
+  if (!ocultaColaboradores && payload.quantidade_colaboradores < 1) {
     throw new Error("Informe a quantidade de colaboradores.");
   }
   if (payload.valor_final <= 0) {
@@ -341,7 +350,7 @@ export async function atualizarCondicoesAprovadas(
 
   const aprovacao = sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord);
 
-  if (!isAet) {
+  if (!isLaudoPontual) {
   const { data: contratos, error: findContratosError } = await supabase
     .from("cliente_contratos")
     .select("id")

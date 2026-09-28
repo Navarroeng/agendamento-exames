@@ -85,7 +85,12 @@ import {
 } from "@/lib/servico-treinamentos";
 import { resolveAetServicoId } from "@/lib/servico-aet";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
-import { isFluxoLaudoPontual, fluxoToLaudoPontualKind } from "@/lib/servico-laudo-pontual";
+import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
+import {
+  fluxoToLaudoPontualKind,
+  isFluxoLaudoPontual,
+  laudoPontualOcultaColaboradores,
+} from "@/lib/servico-laudo-pontual";
 import { useOrcamentoAetEtapas } from "@/hooks/useOrcamentoAetEtapas";
 import {
   OrcamentoAbaAetVisita,
@@ -246,7 +251,8 @@ export function OrcamentoAprovarModal({
       itens,
       treinamentosId,
       resolveAetServicoId(servicos),
-      resolveInsalubridadeServicoId(servicos)
+      resolveInsalubridadeServicoId(servicos),
+      resolveLtcatServicoId(servicos)
     );
     const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
@@ -394,7 +400,8 @@ export function OrcamentoAprovarModal({
       itens,
       treinamentosId,
       resolveAetServicoId(servicos),
-      resolveInsalubridadeServicoId(servicos)
+      resolveInsalubridadeServicoId(servicos),
+      resolveLtcatServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
   const aetEnabled = Boolean(
@@ -507,7 +514,7 @@ export function OrcamentoAprovarModal({
   async function handleSalvarCondicoesEditadasClick() {
     if (!form || !aprovacao) return;
     if (
-      !isFluxoLaudoPontual(fluxoImplantacao) &&
+      !laudoPontualOcultaColaboradores(fluxoImplantacao) &&
       (!form.quantidade_colaboradores.trim() ||
         Number(form.quantidade_colaboradores) < 1)
     ) {
@@ -524,7 +531,8 @@ export function OrcamentoAprovarModal({
     }
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
-      (form.forma_pagamento === "parcelado" || isFluxoLaudoPontual(fluxoImplantacao)) &&
+      (form.forma_pagamento === "parcelado" ||
+        laudoPontualOcultaColaboradores(fluxoImplantacao)) &&
       (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
     ) {
       toast.error("Informe a quantidade de parcelas.");
@@ -534,8 +542,9 @@ export function OrcamentoAprovarModal({
     await onAtualizarCondicoesAprovadas({
       ...form,
       condicoes_iguais: false,
-      forma_pagamento:
-        isFluxoLaudoPontual(fluxoImplantacao) ? "parcelado" : form.forma_pagamento,
+      forma_pagamento: laudoPontualOcultaColaboradores(fluxoImplantacao)
+        ? "parcelado"
+        : form.forma_pagamento,
     });
     setEditandoCondicoes(false);
     try {
@@ -556,7 +565,7 @@ export function OrcamentoAprovarModal({
 
     if (!form.condicoes_iguais) {
       if (
-        !isFluxoLaudoPontual(fluxoImplantacao) &&
+        !laudoPontualOcultaColaboradores(fluxoImplantacao) &&
         (!form.quantidade_colaboradores.trim() ||
           Number(form.quantidade_colaboradores) < 1)
       ) {
@@ -573,7 +582,8 @@ export function OrcamentoAprovarModal({
       }
       if (
         !isOrcamentoMensalidade(orcamento.modalidade) &&
-        (form.forma_pagamento === "parcelado" || isFluxoLaudoPontual(fluxoImplantacao)) &&
+        (form.forma_pagamento === "parcelado" ||
+          laudoPontualOcultaColaboradores(fluxoImplantacao)) &&
         (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
       ) {
         toast.error("Informe a quantidade de parcelas.");
@@ -586,7 +596,7 @@ export function OrcamentoAprovarModal({
     }
 
     await onSalvarAprovacao(
-      isFluxoLaudoPontual(fluxoImplantacao)
+      laudoPontualOcultaColaboradores(fluxoImplantacao)
         ? { ...form, forma_pagamento: "parcelado" }
         : form
     );
@@ -793,7 +803,7 @@ export function OrcamentoAprovarModal({
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isLaudoPontual = isFluxoLaudoPontual(fluxoImplantacao);
+  const isLaudoPontual = laudoPontualOcultaColaboradores(fluxoImplantacao);
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);
