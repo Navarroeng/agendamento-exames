@@ -42,6 +42,8 @@ import {
   resolveValorTotalLtcat,
   SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG,
   SERVICO_LTCAT_NOME,
+  SERVICO_LTCAT_NOME_EXIBICAO,
+  labelNomeServicoLtcat,
 } from "../lib/servico-ltcat";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
@@ -49,10 +51,26 @@ import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 
 assert.equal(isServicoLtcatNome(SERVICO_LTCAT_NOME), true);
 assert.equal(isServicoLtcatNome("ltcat"), true);
+assert.equal(isServicoLtcatNome(SERVICO_LTCAT_NOME_EXIBICAO), true);
+assert.equal(
+  isServicoLtcatNome(
+    "LTCAT - Laudo Técnico das Condições Ambientais do Trabalho"
+  ),
+  true
+);
 assert.equal(
   isServicoLtcatNome("LTCAT - Laudo técnico das condições do ambiente de trabalho."),
   false
 );
+assert.equal(
+  labelNomeServicoLtcat(SERVICO_LTCAT_NOME),
+  SERVICO_LTCAT_NOME_EXIBICAO
+);
+assert.equal(
+  labelNomeServicoLtcat(SERVICO_LTCAT_NOME_EXIBICAO),
+  SERVICO_LTCAT_NOME_EXIBICAO
+);
+assert.equal(labelNomeServicoLtcat("PGR"), "PGR");
 assert.equal(isServicoLaudoPontualNome(SERVICO_LTCAT_NOME), false);
 assert.equal(isServicoLtcatNome(SERVICO_AET_NOME), false);
 assert.equal(isServicoLtcatNome(SERVICO_INSALUBRIDADE_NOME), false);
@@ -128,6 +146,21 @@ assert.equal(bloqueioLaudoPontualExclusivo({
   novoServicoId: "ltcat-1",
 }), null);
 assert.equal(classifyOrcamentoFluxoImplantacao([ltcatItem]), "ltcat");
+assert.equal(
+  classifyOrcamentoFluxoImplantacao([
+    { servico_nome: SERVICO_LTCAT_NOME_EXIBICAO },
+  ]),
+  "ltcat"
+);
+assert.equal(
+  resolveItemValorServico({
+    servico_nome: SERVICO_LTCAT_NOME_EXIBICAO,
+    quantidade: 20,
+    valor_unitario: 2000,
+    valor_total: 2000,
+  }),
+  2000
+);
 assert.equal(classifyOrcamentoFluxoImplantacao([ltcatItem, pgrItem]), "padrao");
 assert.equal(isFluxoLaudoPontual("ltcat"), true);
 assert.equal(fluxoOperacaoIndependeDoPagamento("ltcat"), true);

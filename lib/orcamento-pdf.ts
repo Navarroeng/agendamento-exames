@@ -49,6 +49,7 @@ import {
   PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE,
 } from "@/lib/servico-insalubridade";
 import {
+  labelNomeServicoLtcat,
   LTCAT_INCLUSOS_ITENS,
   orcamentoPossuiLtcat,
   PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT,
@@ -2003,6 +2004,20 @@ function measureInclusosBlockHeight(
   return height + TABLE_ROW_BOTTOM_PAD;
 }
 
+function serviceNameLines(
+  doc: JsPDF,
+  nome: string,
+  serviceColWidth: number
+): string[] {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(TABLE_SERVICE_FONT);
+  const lines = doc.splitTextToSize(
+    labelNomeServicoLtcat(nome),
+    Math.max(10, serviceColWidth - 6)
+  );
+  return Array.isArray(lines) ? lines : [String(lines)];
+}
+
 function estimateServiceRowHeight(
   doc: JsPDF,
   item: OrcamentoItemRecord,
@@ -2013,16 +2028,21 @@ function estimateServiceRowHeight(
   const listaInclusos =
     !isLaudoPontualExclusivo([{ servico_nome: servico?.nome ?? item.servico_nome }]) &&
     servicoListaInclusosNaTabela(servico?.nome ?? item.servico_nome);
+  const nomeExtra = Math.max(
+    0,
+    serviceNameLines(doc, item.servico_nome, serviceColWidth).length - 1
+  ) * TABLE_SERVICE_LINE_H;
 
   if (listaInclusos && inclusos.length > 0) {
     return (
       TABLE_ROW_TOP +
       TABLE_SERVICE_LINE_H +
+      nomeExtra +
       measureInclusosBlockHeight(doc, inclusos, serviceColWidth - 4)
     );
   }
 
-  let h = 7;
+  let h = 7 + nomeExtra;
   const descricao = servico?.descricao?.trim();
   if (
     descricao &&
@@ -2133,9 +2153,14 @@ function drawServicesTable(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(TABLE_SERVICE_FONT);
     doc.setTextColor(...SLATE_900);
-    doc.text(item.servico_nome, colStarts[0] + 3, y + TABLE_ROW_TOP);
+    const nomeLines = serviceNameLines(doc, item.servico_nome, colWidths[0]);
+    doc.text(nomeLines, colStarts[0] + 3, y + TABLE_ROW_TOP);
 
-    let detailY = y + TABLE_ROW_TOP + TABLE_SERVICE_LINE_H + TABLE_NAME_INCLUI_GAP;
+    let detailY =
+      y +
+      TABLE_ROW_TOP +
+      nomeLines.length * TABLE_SERVICE_LINE_H +
+      TABLE_NAME_INCLUI_GAP;
     if (listaInclusos && inclusos.length > 0) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(TABLE_DETAIL_FONT);

@@ -154,7 +154,13 @@ const SERVICOS_OFERECIDOS_ORCAMENTO = new Set([
 export function isServicoOferecidoNoOrcamento(
   nome: string | null | undefined
 ): boolean {
-  if (isServicoAetNome(nome) || isServicoInsalubridadeNome(nome)) return true;
+  if (
+    isServicoAetNome(nome) ||
+    isServicoInsalubridadeNome(nome) ||
+    isServicoLtcatNome(nome)
+  ) {
+    return true;
+  }
   return SERVICOS_OFERECIDOS_ORCAMENTO.has(normalizeServicoNome(nome));
 }
 

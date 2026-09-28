@@ -26,6 +26,7 @@ import {
   type OrcamentoComItens,
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
+import { labelNomeServicoLtcat } from "@/lib/servico-ltcat";
 import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
@@ -179,7 +180,9 @@ export function OrcamentoViewBody({
                     }`}
                   >
                     <td className="px-4 py-3.5 align-top sm:px-5">
-                      <p className="font-bold text-navy">{item.servico_nome}</p>
+                      <p className="font-bold text-navy">
+                        {labelNomeServicoLtcat(item.servico_nome)}
+                      </p>
                       {itensInclusos.length > 0 ? (
                         <div className="mt-1.5">
                           <p className="text-[10px] font-bold uppercase tracking-wide text-[#64748b]">

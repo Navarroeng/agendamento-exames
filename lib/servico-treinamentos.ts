@@ -106,8 +106,16 @@ function isItemInsalubridadeFluxo(
   );
 }
 
-/** Nome canônico do catálogo. Não usa includes — a linha do pacote SST não entra. */
-const LTCAT_NOMES_NORMALIZADOS = new Set([normalizeServicoNome("LTCAT")]);
+/** Catálogo ("LTCAT") e nome completo da proposta. Sem includes. */
+const LTCAT_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("LTCAT"),
+  normalizeServicoNome(
+    "LTCAT – Laudo Técnico das Condições Ambientais do Trabalho"
+  ),
+  normalizeServicoNome(
+    "LTCAT - Laudo Técnico das Condições Ambientais do Trabalho"
+  ),
+]);
 
 function isItemLtcatFluxo(
   item: ServicoItemRef,

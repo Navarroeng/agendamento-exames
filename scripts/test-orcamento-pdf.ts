@@ -49,6 +49,7 @@ import {
   LTCAT_INCLUSOS_ITENS,
   PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT,
   SERVICO_LTCAT_NOME,
+  SERVICO_LTCAT_NOME_EXIBICAO,
 } from "../lib/servico-ltcat";
 
 const NAVY: [number, number, number] = [8, 43, 99];
@@ -711,7 +712,30 @@ const ltcatOrc = buildOrcamento({
 });
 const ltcatDoc = renderPdf(ltcatOrc);
 const ltcatRaw = pdfVisibleText(pdfLatin1(ltcatDoc));
+const ltcatNomeDoc = new jsPDF({ unit: "mm", format: "a4" });
+ltcatNomeDoc.setFont("helvetica", "bold");
+ltcatNomeDoc.setFontSize(9.5);
+const ltcatColServico = 98;
+const ltcatNomeLines = ltcatNomeDoc.splitTextToSize(
+  SERVICO_LTCAT_NOME_EXIBICAO,
+  ltcatColServico - 6
+);
+const ltcatNomeLista = Array.isArray(ltcatNomeLines)
+  ? ltcatNomeLines
+  : [String(ltcatNomeLines)];
+assert.ok(ltcatNomeLista.length >= 1);
+for (const line of ltcatNomeLista) {
+  assert.ok(
+    ltcatNomeDoc.getTextWidth(line) <= ltcatColServico - 6 + 0.05,
+    `linha do nome ultrapassa a coluna Serviço: ${line}`
+  );
+}
 assert.match(ltcatRaw, /Laudo T[eé]cnico das Condi[cç][oõ]es Ambientais do Trabalho/);
+assert.match(
+  ltcatRaw,
+  /Condi[cç][oõ]es Ambientais do\nTrabalho/,
+  "a tabela deve quebrar o nome completo dentro da coluna Serviço"
+);
 assert.match(ltcatRaw, /aposentadoria especial/);
 assert.match(ltcatRaw, /enquadramento previdenci[aá]rio/);
 assert.match(ltcatRaw, /Visita t[eé]cnica para levantamento das atividades/);

@@ -9,6 +9,10 @@ import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinam
 
 export const SERVICO_LTCAT_NOME = "LTCAT" as const;
 
+/** Nome da linha na proposta e na visualização. O cadastro permanece "LTCAT". */
+export const SERVICO_LTCAT_NOME_EXIBICAO =
+  "LTCAT – Laudo Técnico das Condições Ambientais do Trabalho" as const;
+
 export const SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG =
   "Modelo de contrato do LTCAT ainda não configurado.";
 
@@ -28,6 +32,10 @@ export const LTCAT_INCLUSOS_ITENS: readonly string[] = [
 
 const SERVICO_LTCAT_NOMES_NORMALIZADOS = new Set([
   normalizeServicoNome(SERVICO_LTCAT_NOME),
+  normalizeServicoNome(SERVICO_LTCAT_NOME_EXIBICAO),
+  normalizeServicoNome(
+    "LTCAT - Laudo Técnico das Condições Ambientais do Trabalho"
+  ),
 ]);
 
 export const SERVICO_LTCAT_NOME_NORMALIZADO = normalizeServicoNome(
@@ -36,6 +44,13 @@ export const SERVICO_LTCAT_NOME_NORMALIZADO = normalizeServicoNome(
 
 export function isServicoLtcatNome(nome: string | null | undefined): boolean {
   return SERVICO_LTCAT_NOMES_NORMALIZADOS.has(normalizeServicoNome(nome));
+}
+
+/** Rótulo da tabela. Não altera o nome gravado no item nem no catálogo. */
+export function labelNomeServicoLtcat(nome: string | null | undefined): string {
+  const texto = (nome ?? "").trim();
+  if (!isServicoLtcatNome(texto)) return texto;
+  return SERVICO_LTCAT_NOME_EXIBICAO;
 }
 
 export function resolveLtcatServicoId(
