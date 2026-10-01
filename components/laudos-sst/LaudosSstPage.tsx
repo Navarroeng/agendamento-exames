@@ -31,7 +31,7 @@ export function LaudosSstPage() {
   return (
     <AppShell
       title="Laudos SST"
-      subtitle="Continuidade operacional dos processos com implantação concluída."
+      subtitle="Elaboração dos laudos após a visita técnica concluída, em paralelo com os agendamentos."
       icon={<IconFileText size={20} />}
     >
       <div className="mb-[18px]">

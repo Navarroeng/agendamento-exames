@@ -8,7 +8,7 @@
  * |--------------------------|------------------------------------|
  * | Orçamentos               | orcamentos.data_proposta           |
  * | Implantação              | orcamento_aprovacoes.aprovado_em   |
- * | Laudos SST               | orcamento_laudos_sst.entrada_em (Pacote SST) ou visita realizada (laudo pontual) |
+ * | Laudos SST               | orcamento_laudos_sst.entrada_em (Pacote SST, a partir da visita técnica salva) ou visita realizada (laudo pontual) |
  * | Riscos Psicossociais     | orcamento_riscos_psicossociais.entrada_em (somente Pacote completo - SST; laudo pontual não entra) |
  * | eSocial                  | agendamentos.esocial_entrada_em    |
  * | Periódicos Futuros       | periodicos_futuros.proxima_data    |

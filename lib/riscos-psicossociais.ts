@@ -9,8 +9,8 @@
 
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import {
+  isImplantacaoProntaParaEncaminhamento,
   isLaudosSstConcluido,
-  isProcessoElegivelLaudosSst,
   type LaudosSstProcesso,
   type OrcamentoLaudosSstRecord,
 } from "@/lib/laudos-sst";
@@ -628,14 +628,16 @@ export function calcularProgressoEtapasRiscos(input: {
 
 /**
  * Encaminhamento automático da Implantação para Riscos:
- * mesma regra de Laudos (implantação pronta + Pacote completo - SST).
+ * implantação pronta (concluída ou treinamento agendado) e Pacote completo - SST.
+ * Não acompanha a liberação antecipada de Laudos SST após a visita.
  * Inclusão manual (`origem = manual_cliente`) não usa esta função.
  */
 export function isProcessoElegivelRiscosPsicossociais(
   implantacao: ImplantacaoProcesso
 ): boolean {
   if (isFluxoLaudoPontual(implantacao.fluxoImplantacao)) return false;
-  return isProcessoElegivelLaudosSst(implantacao);
+  if (!isImplantacaoProntaParaEncaminhamento(implantacao)) return false;
+  return Boolean(implantacao.possuiPacoteCompletoSst);
 }
 
 /** Tracking automático com trabalho real (não só lista_presenca vazia). */

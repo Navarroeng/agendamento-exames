@@ -9,12 +9,15 @@ import {
   grupoOrdenacaoLaudosSst,
   isProcessoElegivelLaudoPontualLaudosSst,
   isProcessoElegivelLaudosSst,
+  isProcessoVisivelLaudosSst,
+  isVisitaTecnicaEfetivamenteConcluida,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
   laudosSstEtapaAtualBadgeClass,
   sortLaudosSstProcessos,
 } from "../lib/laudos-sst";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
+import { isProcessoElegivelRiscosPsicossociais } from "../lib/riscos-psicossociais";
 
 assert.equal(LAUDOS_SST_ETAPAS.length, 6);
 assert.equal(LAUDOS_SST_TOTAL_ETAPAS, 6);
@@ -152,6 +155,173 @@ assert.equal(
     })
   ),
   false
+);
+
+function aprovacaoVisita(
+  salvaEm: string | null,
+  necessaria: boolean | null = true
+): ImplantacaoProcesso["aprovacao"] {
+  return {
+    visita_tecnica_necessaria: necessaria,
+    visita_tecnica_salva_em: salvaEm,
+  } as ImplantacaoProcesso["aprovacao"];
+}
+
+const visitaPendente = baseProcesso({
+  etapaAtual: "visita",
+  possuiPacoteCompletoSst: true,
+  aprovacao: aprovacaoVisita(null, null),
+});
+assert.equal(isVisitaTecnicaEfetivamenteConcluida(visitaPendente), false);
+assert.equal(
+  isProcessoElegivelLaudosSst(visitaPendente),
+  false,
+  "visita pendente não libera Laudos SST"
+);
+assert.equal(isProcessoVisivelLaudosSst(visitaPendente, null), false);
+
+const abaAgendamentosSemSalvar = baseProcesso({
+  etapaAtual: "aguardando_agendamentos",
+  possuiPacoteCompletoSst: true,
+  agendamentosRealizados: 0,
+  quantidadeContratada: 10,
+  aprovacao: aprovacaoVisita(null, null),
+});
+assert.equal(
+  isProcessoElegivelLaudosSst(abaAgendamentosSemSalvar),
+  false,
+  "rótulo de Agendamentos sem visita salva não libera"
+);
+
+const visitaConcluidaAgendamentosPendentes = baseProcesso({
+  etapaAtual: "aguardando_agendamentos",
+  possuiPacoteCompletoSst: true,
+  agendamentosRealizados: 2,
+  quantidadeContratada: 10,
+  aprovacao: aprovacaoVisita("2026-09-15T10:00:00Z", false),
+});
+assert.equal(
+  isVisitaTecnicaEfetivamenteConcluida(visitaConcluidaAgendamentosPendentes),
+  true
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(visitaConcluidaAgendamentosPendentes),
+  true,
+  "visita concluída libera com agendamentos ainda pendentes"
+);
+assert.equal(
+  isProcessoVisivelLaudosSst(visitaConcluidaAgendamentosPendentes, null),
+  true
+);
+assert.equal(
+  isProcessoElegivelRiscosPsicossociais(visitaConcluidaAgendamentosPendentes),
+  false,
+  "Riscos não acompanha a liberação antecipada de Laudos"
+);
+
+const laudosParalelo = buildLaudosSstProcesso(
+  visitaConcluidaAgendamentosPendentes,
+  null
+);
+assert.equal(laudosParalelo.status, "em_andamento");
+assert.equal(laudosParalelo.etapaAtual, "epis");
+assert.equal(laudosParalelo.etapasConcluidas, 0);
+assert.equal(laudosParalelo.implantacao.etapaAtual, "aguardando_agendamentos");
+assert.equal(laudosParalelo.workflow.enviadoCliente, null);
+assert.equal(laudosParalelo.workflow.pgrRealizado, null);
+
+assert.equal(
+  isProcessoElegivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "aguardando_agendamentos",
+      possuiPacoteCompletoSst: false,
+      aprovacao: aprovacaoVisita("2026-09-15T10:00:00Z"),
+    })
+  ),
+  false,
+  "sem Pacote completo a visita não entra no fluxo PGR"
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "aguardando_agendamentos",
+      possuiPacoteCompletoSst: true,
+      fluxoImplantacao: "aet",
+      aprovacao: aprovacaoVisita("2026-09-15T10:00:00Z"),
+    })
+  ),
+  false,
+  "AET não usa a visita técnica do fluxo padrão"
+);
+assert.equal(
+  isProcessoElegivelLaudoPontualLaudosSst(
+    baseProcesso({ etapaAtual: "concluido", fluxoImplantacao: "ltcat" })
+  ),
+  true,
+  "LTCAT continua entrando quando a implantação encerra na visita realizada"
+);
+assert.equal(
+  isProcessoElegivelLaudoPontualLaudosSst(
+    baseProcesso({ etapaAtual: "visita_agendada", fluxoImplantacao: "ltcat" })
+  ),
+  false,
+  "LTCAT com visita ainda não realizada não entra em Laudos SST"
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "aguardando_agendamentos",
+      possuiPacoteCompletoSst: true,
+      aprovacao: aprovacaoVisita("2026-09-15T10:00:00Z"),
+      orcamento: {
+        ...baseProcesso({ etapaAtual: "aguardando_agendamentos" }).orcamento,
+        status: "cancelado",
+      } as ImplantacaoProcesso["orcamento"],
+    })
+  ),
+  false,
+  "cancelado com visita salva não entra em Laudos SST"
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "concluido",
+      possuiPacoteCompletoSst: true,
+      aprovacao: null,
+    })
+  ),
+  true,
+  "implantação concluída antiga continua elegível sem novo salvamento da visita"
+);
+assert.equal(
+  isProcessoVisivelLaudosSst(
+    baseProcesso({
+      etapaAtual: "visita",
+      possuiPacoteCompletoSst: true,
+    }),
+    {
+      orcamento_id: "o1",
+      etapa_atual: "processo_inicial",
+      etapas_concluidas: 1,
+      status: "em_andamento",
+    }
+  ),
+  true,
+  "tracking já trabalhado permanece visível"
+);
+
+const serviceSrc = readFileSync(
+  join(process.cwd(), "services/laudos-sst.service.ts"),
+  "utf8"
+);
+assert.match(serviceSrc, /onConflict:\s*"orcamento_id"/);
+assert.match(serviceSrc, /ignoreDuplicates:\s*true/);
+assert.match(serviceSrc, /etapa_atual:\s*"epis"/);
+assert.match(serviceSrc, /visita_tecnica_salva_em/);
+assert.doesNotMatch(
+  serviceSrc,
+  /from\("orcamento_aprovacoes"\)/,
+  "listar Laudos não regrava a visita nem a implantação"
 );
 
 const built = buildLaudosSstProcesso(

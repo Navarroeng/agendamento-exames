@@ -300,4 +300,43 @@ assert.equal(
   false
 );
 
+const aposVisita = processo({
+  etapaAtual: "aguardando_agendamentos",
+  possuiPacoteCompletoSst: true,
+  clienteNome: "VISITA CONCLUIDA AGENDAMENTOS PENDENTES",
+});
+aposVisita.aprovacao = {
+  visita_tecnica_necessaria: true,
+  visita_tecnica_salva_em: "2026-09-20T14:00:00Z",
+} as ImplantacaoProcesso["aprovacao"];
+assert.equal(isProcessoElegivelLaudosSst(aposVisita), true);
+assert.equal(
+  isProcessoVisivelLaudosSst(aposVisita, null),
+  true,
+  "visita salva aparece em Laudos mesmo com agendamentos pendentes"
+);
+assert.equal(
+  isProcessoElegivelRiscosPsicossociais(aposVisita),
+  false,
+  "Riscos continua exigindo implantação pronta"
+);
+
+const visitaPendentePacote = processo({
+  etapaAtual: "visita",
+  possuiPacoteCompletoSst: true,
+});
+assert.equal(isProcessoElegivelLaudosSst(visitaPendentePacote), false);
+assert.equal(isProcessoElegivelRiscosPsicossociais(visitaPendentePacote), false);
+
+const riscosLib = readFileSync(
+  join(process.cwd(), "lib/riscos-psicossociais.ts"),
+  "utf8"
+);
+assert.match(riscosLib, /isImplantacaoProntaParaEncaminhamento/);
+assert.doesNotMatch(
+  riscosLib,
+  /isProcessoElegivelLaudosSst/,
+  "Riscos não herda a liberação de Laudos após a visita"
+);
+
 console.log("ok: encaminhamento-pacote-sst");

@@ -1,5 +1,6 @@
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
 import { labelImplantacaoEtapa } from "@/lib/implantacao-clientes";
+import { isVisitaEtapaConcluida } from "@/lib/orcamento-etapas";
 import {
   isAetElaboracaoConcluida,
   isAetEnvioConcluido,
@@ -191,7 +192,7 @@ export function isImplantacaoProntaParaEncaminhamento(
 }
 
 /**
- * Laudo pontual exclusivo (AET / Insalubridade) entra em Laudos SST
+ * Laudo pontual exclusivo (AET / Insalubridade / LTCAT) entra em Laudos SST
  * quando a Implantação já concluiu na visita realizada.
  * Não cria `orcamento_laudos_sst` (fluxo PGR).
  */
@@ -202,17 +203,45 @@ export function isProcessoElegivelLaudoPontualLaudosSst(
   return isImplantacaoProntaParaEncaminhamento(processo);
 }
 
+function processoImpedidoEmLaudosSst(processo: ImplantacaoProcesso): boolean {
+  return (
+    processo.orcamento.status === "cancelado" ||
+    processo.orcamento.status === "contrato_encerrado" ||
+    processo.etapaAtual === "contrato_encerrado" ||
+    processo.etapaAtual === "treinamento_cancelado"
+  );
+}
+
+/**
+ * Conclusão efetiva da etapa Visita no fluxo padrão/combinado.
+ * Exige o salvamento (`visita_tecnica_necessaria` definido e
+ * `visita_tecnica_salva_em`), o mesmo fato que avança a implantação
+ * para Agendamentos. Abrir ou clicar na aba não preenche esses campos.
+ */
+export function isVisitaTecnicaEfetivamenteConcluida(
+  processo: ImplantacaoProcesso
+): boolean {
+  if (isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
+  if (processo.fluxoImplantacao === "somente_treinamentos") return false;
+  return isVisitaEtapaConcluida(processo.aprovacao ?? null);
+}
+
 /**
  * Elegível ao encaminhamento automático para Laudos SST (fluxo PGR):
- * implantação pronta E orçamento aprovado com "Pacote completo - SST".
- * PGR/LTCAT/PCMSO avulsos não bastam. Laudo pontual exclusivo não entra aqui.
+ * Pacote completo - SST e visita técnica salva (agendamentos podem seguir
+ * pendentes). Implantação concluída ou treinamento agendado continua
+ * elegível para preservar registros antigos. PGR/LTCAT/PCMSO avulsos não
+ * bastam. Laudo pontual exclusivo não entra aqui.
+ * Não conclui a implantação nem marca laudos como elaborados ou enviados.
  */
 export function isProcessoElegivelLaudosSst(
   processo: ImplantacaoProcesso
 ): boolean {
   if (isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
-  if (!isImplantacaoProntaParaEncaminhamento(processo)) return false;
-  return Boolean(processo.possuiPacoteCompletoSst);
+  if (!processo.possuiPacoteCompletoSst) return false;
+  if (processoImpedidoEmLaudosSst(processo)) return false;
+  if (isVisitaTecnicaEfetivamenteConcluida(processo)) return true;
+  return isImplantacaoProntaParaEncaminhamento(processo);
 }
 
 /** Tracking com trabalho real (não só a linha inicial em EPIs). */
@@ -227,21 +256,14 @@ export function laudosTrackingTemTrabalhoReal(
   return workflowTemResposta(mapLaudosWorkflowFromRecord(tracking));
 }
 
-/** Lista: Pacote SST, laudo pontual após visita, ou tracking antigo já trabalhado. */
+/** Lista: Pacote SST após visita salva (ou implantação já pronta), laudo pontual após visita, ou tracking antigo já trabalhado. */
 export function isProcessoVisivelLaudosSst(
   processo: ImplantacaoProcesso,
   tracking: OrcamentoLaudosSstRecord | null | undefined
 ): boolean {
   if (isProcessoElegivelLaudoPontualLaudosSst(processo)) return true;
   if (isProcessoElegivelLaudosSst(processo)) return true;
-  if (
-    processo.orcamento.status === "cancelado" ||
-    processo.orcamento.status === "contrato_encerrado" ||
-    processo.etapaAtual === "contrato_encerrado" ||
-    processo.etapaAtual === "treinamento_cancelado"
-  ) {
-    return false;
-  }
+  if (processoImpedidoEmLaudosSst(processo)) return false;
   return laudosTrackingTemTrabalhoReal(tracking);
 }
 

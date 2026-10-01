@@ -364,7 +364,8 @@ export interface ImplantacaoProcesso {
   etapasOperacionais: Array<{ id: ImplantacaoEtapaOperacionalId; label: string }>;
   /**
    * Orçamento aprovado contém o serviço principal "Pacote completo - SST".
-   * Gatilho do encaminhamento automático para Laudos SST e Riscos.
+   * Exigido no encaminhamento automático para Laudos SST e Riscos.
+   * Laudos SST libera após a visita técnica salva; Riscos segue na implantação pronta.
    */
   possuiPacoteCompletoSst?: boolean;
   /**

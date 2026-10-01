@@ -83,8 +83,11 @@ const LAUDOS_TRACKING_SELECT = [
 
 /**
  * Lista processos de Laudos SST.
- * Cria tracking só com Pacote completo - SST; não apaga linhas antigas.
- * Laudo pontual exclusivo aparece após a visita, reusando implantacao_aet.
+ * Pacote completo - SST entra após a visita técnica salva (agendamentos
+ * podem continuar pendentes) ou, no legado, com a implantação já pronta.
+ * Cria tracking em andamento na etapa EPIs; não conclui a implantação
+ * nem marca laudos como elaborados ou enviados. Não apaga linhas antigas.
+ * Laudo pontual exclusivo aparece após a visita realizada, reusando implantacao_aet.
  */
 export async function listarProcessosLaudosSst(): Promise<LaudosSstProcesso[]> {
   const implantacao = await listarProcessosImplantacao();
@@ -147,7 +150,8 @@ export async function buscarTrackingLaudosSst(
 
 /**
  * Cria tracking ao entrar em Laudos SST, só se for elegível pelo pacote.
- * Não apaga registros existentes.
+ * Um registro por orçamento (`orcamento_id`). Não apaga nem reescreve
+ * linhas existentes e não altera o status da implantação.
  */
 async function garantirTrackingLaudosSst(
   elegiveis: ImplantacaoProcesso[],
@@ -168,6 +172,7 @@ async function garantirTrackingLaudosSst(
   for (const processo of faltantes) {
     const orcamentoId = processo.orcamento.id;
     const entradaEm =
+      processo.aprovacao?.visita_tecnica_salva_em ??
       processo.treinamento?.atualizado_em ??
       processo.treinamento?.criado_em ??
       processo.aprovacao?.updated_at ??
