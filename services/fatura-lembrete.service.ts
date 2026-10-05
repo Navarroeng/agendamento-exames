@@ -83,3 +83,91 @@ export async function enviarLembreteFaturaCliente(
     faturaLembreteUltimoEmail: json.faturaLembreteUltimoEmail,
   };
 }
+
+export type LembretesHojePendenteCliente = {
+  id: string;
+  numero: string;
+  referenciaId: string | null;
+  empresa: string;
+  valor: number;
+  email: string;
+};
+
+export type LembretesHojePainelCliente = {
+  hojeIso: string;
+  elegiveis: number;
+  pendentes: LembretesHojePendenteCliente[];
+  jaLembradas: { id: string; numero: string; empresa: string }[];
+};
+
+export type LembreteHojeItemCliente = {
+  faturaId: string;
+  numero: string;
+  empresa: string;
+  valor: number;
+  tipo: "aceito" | "sem_email" | "ja_lembrada" | "falha";
+  email?: string | null;
+  motivo?: string;
+  enviadoEm?: string;
+  resendMessageId?: string | null;
+};
+
+export async function consultarLembretesHojeCliente(): Promise<LembretesHojePainelCliente> {
+  const res = await fetch("/api/faturas/lembretes-hoje");
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    hojeIso?: string;
+    elegiveis?: number;
+    pendentes?: LembretesHojePendenteCliente[];
+    jaLembradas?: { id: string; numero: string; empresa: string }[];
+  };
+
+  if (
+    !res.ok ||
+    !json.ok ||
+    !json.hojeIso ||
+    json.elegiveis == null ||
+    !json.pendentes ||
+    !json.jaLembradas
+  ) {
+    throw new Error(
+      json.error || "Não foi possível consultar as faturas que vencem hoje."
+    );
+  }
+
+  return {
+    hojeIso: json.hojeIso,
+    elegiveis: json.elegiveis,
+    pendentes: json.pendentes,
+    jaLembradas: json.jaLembradas,
+  };
+}
+
+export async function enviarLembreteHojeCliente(
+  faturaId: string
+): Promise<LembreteHojeItemCliente> {
+  const id = faturaId.trim();
+  if (!id) throw new Error("Fatura inválida.");
+
+  const res = await fetch("/api/faturas/lembretes-hoje/enviar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ faturaId: id }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    item?: LembreteHojeItemCliente;
+  };
+
+  if (!res.ok || !json.ok || !json.item) {
+    throw new Error(
+      json.error ||
+        "Não foi possível enviar o lembrete. O envio não foi registrado."
+    );
+  }
+
+  return json.item;
+}

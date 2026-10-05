@@ -3,25 +3,42 @@
  * Executar: npx tsx scripts/test-fatura-lembrete.ts
  */
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 process.env.AVALIACAO_SESSION_SECRET ??= "test-fatura-lembrete-secret";
 
-import { todayIsoSaoPaulo } from "../lib/agendamento-datetime";
+import { formatDateIsoSaoPaulo, todayIsoSaoPaulo } from "../lib/agendamento-datetime";
 import { buildFaturaClienteLembreteEmailHtml } from "../lib/email/templates/fatura-cliente-lembrete-email";
 import { buildFaturaClienteEnvioEmailHtml } from "../lib/email/templates/fatura-cliente-envio-email";
 import { isFaturasStaffPerfil } from "../lib/faturas-api-auth.server";
 import { buildFaturaLembreteIdempotencyKey } from "../lib/fatura-envio-idempotency";
 import {
   buildLembreteFaturaTexto,
+  classificarVencimentoLembrete,
+  dataVencimentoCivil,
+  decidirReservaLote,
+  explicacaoBotaoLembretesHoje,
+  faturaElegivelLembreteHoje,
   faturaEstaVencidaParaLembrete,
   faturaPermiteLembrete,
+  montarConfirmacaoLembretesHoje,
   motivoBloqueioLembrete,
   textoUltimoLembrete,
   validarConteudoLembrete,
+  type FaturaLembreteHojeAlvo,
 } from "../lib/fatura-lembrete";
 import { nomeArquivoPdfFaturaClienteEmail } from "../lib/fatura-pdf";
 import type { FaturaComItens, FaturaItemRecord } from "../lib/types";
 import { enviarLembreteFaturaClienteResend } from "../services/fatura-lembrete-email.server";
+import {
+  consultarLembretesHoje,
+  executarLembreteHojeUma,
+  executarLembretesHoje,
+  listarPaginas,
+  type LembretesHojeDeps,
+} from "../services/fatura-lembrete-lote.server";
 
 const REQUEST_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -108,7 +125,7 @@ tests.push(
 );
 
 tests.push(
-  run("Texto — a vencer, inclusive no dia do vencimento", () => {
+  run("Texto — vencimento hoje usa a mensagem do próprio dia", () => {
     const texto = buildLembreteFaturaTexto({
       numero: "FAT-CLI-2026-00102",
       clienteNome: "PAVFACIL",
@@ -119,17 +136,48 @@ tests.push(
     assert.equal(texto.vencida, false);
     assert.equal(
       texto.assunto,
+      "Sua fatura vence hoje — Fatura FAT-CLI-2026-00102 | Navarro Engenharia"
+    );
+    assert.equal(
+      texto.mensagem,
+      [
+        "Olá, PAVFACIL.",
+        "",
+        "Lembramos que a fatura FAT-CLI-2026-00102, no valor de R$ 50,00, vence na data de hoje.",
+        "",
+        "Os dados para pagamento estão disponíveis abaixo.",
+        "",
+        "Caso o pagamento já tenha sido realizado, por favor, desconsidere este lembrete e encaminhe o comprovante para conferência.",
+        "",
+        "Atenciosamente,",
+        "Navarro Engenharia",
+      ].join("\n")
+    );
+    assert.doesNotMatch(texto.mensagem, /05\/10\/2026/);
+    assert.doesNotMatch(texto.mensagem, /juros|multa/i);
+  })
+);
+
+tests.push(
+  run("Texto — vencimento futuro informa a data real e não diz hoje", () => {
+    const texto = buildLembreteFaturaTexto({
+      numero: "FAT-CLI-2026-00102",
+      clienteNome: "PAVFACIL",
+      valor: 50,
+      dataVencimento: "2026-10-20",
+      hojeIso: "2026-10-05",
+    });
+    assert.equal(texto.vencida, false);
+    assert.equal(
+      texto.assunto,
       "Lembrete de vencimento — Fatura FAT-CLI-2026-00102 | Navarro Engenharia"
     );
-    assert.match(texto.mensagem, /^Olá, PAVFACIL\./);
     assert.match(
       texto.mensagem,
-      /fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, tem vencimento em 05\/10\/2026/
+      /fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
     );
-    assert.match(texto.mensagem, /Os dados para pagamento estão disponíveis abaixo/);
-    assert.match(texto.mensagem, /desconsidere este lembrete/);
-    assert.match(texto.mensagem, /Atenciosamente,\nNavarro Engenharia$/);
-    assert.doesNotMatch(texto.mensagem, /juros|multa/i);
+    assert.doesNotMatch(texto.assunto, /hoje/i);
+    assert.doesNotMatch(texto.mensagem, /hoje/i);
   })
 );
 
@@ -151,6 +199,35 @@ tests.push(
     assert.match(texto.mensagem, /R\$ 1\.250,50/);
     assert.match(texto.mensagem, /vencimento em 04\/10\/2026/);
     assert.match(texto.mensagem, /regularização do pagamento/);
+    assert.doesNotMatch(texto.assunto, /hoje/i);
+    assert.doesNotMatch(texto.mensagem, /hoje/i);
+  })
+);
+
+tests.push(
+  run("Datas — vencimento civil não desloca meia-noite UTC", () => {
+    assert.equal(formatDateIsoSaoPaulo("2026-10-05T00:00:00.000Z"), "2026-10-04");
+    assert.equal(dataVencimentoCivil("2026-10-05"), "2026-10-05");
+    assert.equal(dataVencimentoCivil("2026-10-05T00:00:00.000Z"), "2026-10-05");
+    assert.equal(
+      classificarVencimentoLembrete("2026-10-05T00:00:00.000Z", "2026-10-05"),
+      "hoje"
+    );
+    assert.equal(
+      classificarVencimentoLembrete("2026-10-06T00:00:00.000Z", "2026-10-05"),
+      "futuro"
+    );
+    const hojeSp = todayIsoSaoPaulo(new Date("2026-10-06T02:30:00.000Z"));
+    assert.equal(hojeSp, "2026-10-05");
+    const texto = buildLembreteFaturaTexto({
+      numero: "FAT-CLI-2026-00102",
+      clienteNome: "PAVFACIL",
+      valor: 50,
+      dataVencimento: "2026-10-05T00:00:00.000Z",
+      hojeIso: hojeSp,
+    });
+    assert.match(texto.assunto, /vence hoje/);
+    assert.match(texto.mensagem, /vence na data de hoje/);
   })
 );
 
@@ -603,6 +680,498 @@ tests.push(
     );
     assert.equal(enviou, false);
     assert.equal(leituras, 2);
+  })
+);
+
+const HOJE = "2026-10-05";
+
+function alvoHoje(
+  overrides: Partial<FaturaLembreteHojeAlvo> = {}
+): FaturaLembreteHojeAlvo {
+  return {
+    id: "fat-a",
+    numero: "FAT-CLI-2026-00102",
+    tipo: "cliente",
+    status: "emitida",
+    pago: false,
+    referencia_id: "cli-a",
+    referencia_nome: "PAVFACIL",
+    data_vencimento: HOJE,
+    valor_total: 50,
+    fatura_enviada_email: "financeiro@pavfacil.com.br",
+    fatura_enviada_em: "2026-09-02T15:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function depsLote(state: {
+  faturas: FaturaLembreteHojeAlvo[];
+  lembretes?: { fatura_id: string; enviado_em: string }[];
+  reservar?: LembretesHojeDeps["reservar"];
+  buscarFatura?: LembretesHojeDeps["buscarFatura"];
+  enviarUm?: LembretesHojeDeps["enviarUm"];
+}): {
+  deps: LembretesHojeDeps;
+  enviados: Parameters<LembretesHojeDeps["enviarUm"]>[0][];
+} {
+  const enviados: Parameters<LembretesHojeDeps["enviarUm"]>[0][] = [];
+  const lembretes = state.lembretes ?? [];
+  const deps: LembretesHojeDeps = {
+    hojeIso: () => HOJE,
+    agoraMs: () => Date.parse("2026-10-05T18:00:00.000Z"),
+    listarCandidatas: async () => state.faturas,
+    listarEnviosEmpresa: async (ids) =>
+      state.faturas
+        .filter(
+          (fatura) =>
+            fatura.referencia_id &&
+            ids.includes(fatura.referencia_id) &&
+            fatura.fatura_enviada_em &&
+            fatura.fatura_enviada_email
+        )
+        .map((fatura) => ({
+          id: fatura.id,
+          referencia_id: fatura.referencia_id,
+          fatura_enviada_email: fatura.fatura_enviada_email,
+          fatura_enviada_em: fatura.fatura_enviada_em,
+        })),
+    listarLembretes: async (ids) =>
+      lembretes.filter((item) => ids.includes(item.fatura_id)),
+    buscarFatura:
+      state.buscarFatura ??
+      (async (id) => state.faturas.find((fatura) => fatura.id === id) ?? null),
+    reservar: state.reservar ?? (async () => "ok"),
+    liberar: async () => undefined,
+    enviarUm:
+      state.enviarUm ??
+      (async (params) => {
+        enviados.push(params);
+        lembretes.push({
+          fatura_id: params.faturaId,
+          enviado_em: "2026-10-05T18:00:00.000Z",
+        });
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: params.email,
+          resendMessageId: `resend-${params.faturaId}`,
+          reutilizado: false,
+        };
+      }),
+  };
+  return { deps, enviados };
+}
+
+tests.push(
+  run("Lote — seleção ignora filtro, página, paga, cancelada e outro dia", async () => {
+    const faturas = [
+      alvoHoje(),
+      alvoHoje({
+        id: "fat-b",
+        numero: "FAT-CLI-2026-00200",
+        referencia_id: "cli-b",
+        referencia_nome: "OUTRA LTDA",
+      }),
+      alvoHoje({ id: "paga", pago: true, numero: "PAGA" }),
+      alvoHoje({ id: "cancelada", status: "cancelada", numero: "CANC" }),
+      alvoHoje({ id: "vencida-status", status: "vencida", numero: "VENC" }),
+      alvoHoje({ id: "amanha", data_vencimento: "2026-10-06", numero: "AMANHA" }),
+      alvoHoje({ id: "ontem", data_vencimento: "2026-10-04", numero: "ONTEM" }),
+      alvoHoje({ id: "clinica", tipo: "clinica", numero: "CLIN" }),
+      alvoHoje({
+        id: "timestamp",
+        numero: "FAT-CLI-TS",
+        data_vencimento: "2026-10-05T00:00:00.000Z",
+        referencia_id: "cli-ts",
+        referencia_nome: "TIMESTAMP",
+        fatura_enviada_email: null,
+      }),
+      ...Array.from({ length: 100 }, (_, indice) =>
+        alvoHoje({
+          id: `extra-${indice}`,
+          numero: `FAT-EXTRA-${indice}`,
+          referencia_id: `cli-extra-${indice}`,
+          referencia_nome: `EMPRESA ${indice}`,
+          fatura_enviada_email: `financeiro${indice}@empresa.com.br`,
+        })
+      ),
+    ];
+    assert.equal(faturaElegivelLembreteHoje(faturas[2], HOJE), false);
+    assert.equal(faturaElegivelLembreteHoje(faturas[3], HOJE), false);
+    assert.equal(faturaElegivelLembreteHoje(faturas[4], HOJE), false);
+    const { deps } = depsLote({ faturas });
+    const painel = await consultarLembretesHoje(deps);
+    const ids = painel.pendentes.map((item) => item.id);
+    assert.equal(painel.elegiveis, 103);
+    assert.ok(ids.includes("fat-a"));
+    assert.ok(ids.includes("fat-b"));
+    assert.ok(ids.includes("timestamp"));
+    assert.ok(ids.includes("extra-99"));
+    assert.equal(ids.includes("paga"), false);
+    assert.equal(ids.includes("cancelada"), false);
+    assert.equal(ids.includes("vencida-status"), false);
+    assert.equal(ids.includes("amanha"), false);
+    assert.equal(ids.includes("ontem"), false);
+    assert.equal(ids.includes("clinica"), false);
+    assert.equal(
+      explicacaoBotaoLembretesHoje(painel.elegiveis, painel.pendentes.length),
+      "103 faturas emitidas vencem hoje e ainda não tiveram lembrete aceito pelo Resend."
+    );
+  })
+);
+
+tests.push(
+  run("Lote — um e-mail e um PDF por empresa, sem compartilhar destinatário", async () => {
+    const faturas = [
+      alvoHoje({ valor_total: 50 }),
+      alvoHoje({
+        id: "fat-b",
+        numero: "FAT-CLI-2026-00200",
+        referencia_id: "cli-b",
+        referencia_nome: "OUTRA LTDA",
+        valor_total: 80,
+        fatura_enviada_email: "financeiro@outra.com.br",
+      }),
+      alvoHoje({
+        id: "sem-email",
+        numero: "FAT-CLI-SEM",
+        referencia_id: "cli-sem",
+        referencia_nome: "SEM EMAIL",
+        valor_total: 10,
+        fatura_enviada_email: null,
+        fatura_enviada_em: null,
+      }),
+    ];
+    const confirmacao = montarConfirmacaoLembretesHoje([
+      {
+        id: "fat-a",
+        numero: "FAT-CLI-2026-00102",
+        empresa: "PAVFACIL",
+        empresaChave: "id:cli-a",
+        valor: 50,
+        email: "financeiro@pavfacil.com.br",
+      },
+      {
+        id: "fat-b",
+        numero: "FAT-CLI-2026-00200",
+        empresa: "OUTRA LTDA",
+        empresaChave: "id:cli-b",
+        valor: 80,
+        email: "financeiro@outra.com.br",
+      },
+      {
+        id: "sem-email",
+        numero: "FAT-CLI-SEM",
+        empresa: "SEM EMAIL",
+        empresaChave: "id:cli-sem",
+        valor: 10,
+        email: "",
+      },
+    ]);
+    assert.equal(confirmacao.faturas, 3);
+    assert.equal(confirmacao.empresas, 3);
+    assert.equal(confirmacao.destinatarios, 2);
+    assert.equal(confirmacao.valorTotal, 130);
+    assert.deepEqual(
+      confirmacao.semEmail.map((item) => item.numero),
+      ["FAT-CLI-SEM"]
+    );
+
+    const { deps, enviados } = depsLote({ faturas });
+    const resultado = await executarLembretesHoje({}, deps);
+    assert.equal(resultado.aceitos.length, 2);
+    assert.equal(resultado.semEmail.length, 1);
+    assert.equal(resultado.semEmail[0]?.numero, "FAT-CLI-SEM");
+    assert.equal(resultado.falhas.length, 0);
+    assert.equal(enviados.length, 2);
+    assert.deepEqual(
+      enviados.map((item) => item.email).sort(),
+      ["financeiro@outra.com.br", "financeiro@pavfacil.com.br"]
+    );
+    const pav = enviados.find((item) => item.faturaId === "fat-a");
+    const outra = enviados.find((item) => item.faturaId === "fat-b");
+    assert.ok(pav);
+    assert.ok(outra);
+    assert.match(pav.assunto, /vence hoje — Fatura FAT-CLI-2026-00102/);
+    assert.match(pav.mensagem, /PAVFACIL/);
+    assert.match(pav.mensagem, /vence na data de hoje/);
+    assert.doesNotMatch(pav.mensagem, /OUTRA LTDA/);
+    assert.doesNotMatch(pav.email, /outra/);
+    assert.match(outra.assunto, /vence hoje — Fatura FAT-CLI-2026-00200/);
+    assert.match(outra.mensagem, /OUTRA LTDA/);
+    assert.doesNotMatch(outra.mensagem, /PAVFACIL/);
+    assert.equal(outra.email, "financeiro@outra.com.br");
+    assert.notEqual(pav.requestId, outra.requestId);
+  })
+);
+
+tests.push(
+  run("Lote — falha parcial segue e a nova tentativa não duplica o aceite", async () => {
+    const faturas = [
+      alvoHoje(),
+      alvoHoje({
+        id: "fat-b",
+        numero: "FAT-CLI-2026-00200",
+        referencia_id: "cli-b",
+        referencia_nome: "OUTRA LTDA",
+        fatura_enviada_email: "financeiro@outra.com.br",
+      }),
+    ];
+    let tentativasB = 0;
+    const { deps, enviados } = depsLote({
+      faturas,
+      enviarUm: async (params) => {
+        if (params.faturaId === "fat-b") {
+          tentativasB += 1;
+          if (tentativasB === 1) {
+            throw new Error("Resend recusou a fatura FAT-CLI-2026-00200.");
+          }
+        }
+        enviados.push(params);
+        deps.listarLembretes = async (ids) =>
+          enviados
+            .filter((item) => ids.includes(item.faturaId))
+            .map((item) => ({
+              fatura_id: item.faturaId,
+              enviado_em: "2026-10-05T18:00:00.000Z",
+            }));
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: params.email,
+          resendMessageId: `resend-${params.faturaId}`,
+          reutilizado: false,
+        };
+      },
+    });
+    const primeiro = await executarLembretesHoje({}, deps);
+    assert.equal(primeiro.aceitos.length, 1);
+    assert.equal(primeiro.aceitos[0]?.faturaId, "fat-a");
+    assert.equal(primeiro.falhas.length, 1);
+    assert.match(primeiro.falhas[0]?.motivo ?? "", /FAT-CLI-2026-00200/);
+    assert.equal(
+      enviados.filter((item) => item.faturaId === "fat-a").length,
+      1
+    );
+
+    const segundo = await executarLembretesHoje({}, deps);
+    assert.equal(
+      segundo.jaLembradas.some((item) => item.faturaId === "fat-a"),
+      true
+    );
+    assert.equal(segundo.aceitos.length, 1);
+    assert.equal(segundo.aceitos[0]?.faturaId, "fat-b");
+    assert.equal(
+      enviados.filter((item) => item.faturaId === "fat-a").length,
+      1
+    );
+    assert.equal(
+      enviados.filter((item) => item.faturaId === "fat-b").length,
+      1
+    );
+  })
+);
+
+tests.push(
+  run("Lote — lembrete individual aceito hoje não entra de novo no lote", async () => {
+    const faturas = [alvoHoje()];
+    const { deps, enviados } = depsLote({
+      faturas,
+      lembretes: [
+        {
+          fatura_id: "fat-a",
+          enviado_em: "2026-10-06T01:30:00.000Z",
+        },
+      ],
+    });
+    const painel = await consultarLembretesHoje(deps);
+    assert.equal(painel.pendentes.length, 0);
+    assert.equal(painel.jaLembradas.length, 1);
+    assert.equal(
+      explicacaoBotaoLembretesHoje(painel.elegiveis, painel.pendentes.length),
+      "Todas as faturas que vencem hoje já tiveram lembrete aceito pelo Resend."
+    );
+    const resultado = await executarLembretesHoje({}, deps);
+    assert.equal(enviados.length, 0);
+    assert.equal(resultado.aceitos.length, 0);
+    assert.equal(resultado.jaLembradas.length, 1);
+  })
+);
+
+tests.push(
+  run("Lote — aceite de ontem em São Paulo não bloqueia o lembrete de hoje", async () => {
+    const faturas = [alvoHoje()];
+    const { deps, enviados } = depsLote({
+      faturas,
+      lembretes: [
+        {
+          fatura_id: "fat-a",
+          enviado_em: "2026-10-05T02:30:00.000Z",
+        },
+      ],
+    });
+    const resultado = await executarLembretesHoje({}, deps);
+    assert.equal(resultado.aceitos.length, 1);
+    assert.equal(enviados.length, 1);
+  })
+);
+
+tests.push(
+  run("Lote — execução simultânea não envia a mesma fatura duas vezes", async () => {
+    const faturas = [alvoHoje()];
+    let ocupada = false;
+    let envios = 0;
+    const { deps } = depsLote({
+      faturas,
+      reservar: async () => {
+        if (ocupada) return "ocupado";
+        ocupada = true;
+        return "ok";
+      },
+      enviarUm: async (params) => {
+        envios += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: params.email,
+          resendMessageId: "resend-fat-a",
+          reutilizado: false,
+        };
+      },
+    });
+    const [primeiro, segundo] = await Promise.all([
+      executarLembreteHojeUma("fat-a", {}, deps),
+      executarLembreteHojeUma("fat-a", {}, deps),
+    ]);
+    const tipos = [primeiro.tipo, segundo.tipo].sort();
+    assert.deepEqual(tipos, ["aceito", "falha"]);
+    const falha = [primeiro, segundo].find((item) => item.tipo === "falha");
+    assert.match(falha?.motivo ?? "", /em andamento/);
+    assert.equal(envios, 1);
+  })
+);
+
+tests.push(
+  run("Lote — trava expirada pode ser assumida e pagamento no meio cancela o envio", () => {
+    const agora = Date.parse("2026-10-05T18:00:00.000Z");
+    assert.equal(decidirReservaLote(null, agora), "livre");
+    assert.equal(
+      decidirReservaLote(
+        { iniciadoEm: new Date(agora - 60_000).toISOString() },
+        agora
+      ),
+      "ocupado"
+    );
+    assert.equal(
+      decidirReservaLote(
+        { iniciadoEm: new Date(agora - 4 * 60_000).toISOString() },
+        agora
+      ),
+      "expirada"
+    );
+  })
+);
+
+tests.push(
+  run("Lote — pagamento revalidado depois da trava impede o Resend", async () => {
+    const aberta = alvoHoje();
+    const paga = alvoHoje({ pago: true });
+    let leituras = 0;
+    let enviou = false;
+    const { deps } = depsLote({
+      faturas: [aberta],
+      buscarFatura: async () => {
+        leituras += 1;
+        return leituras === 1 ? aberta : paga;
+      },
+      enviarUm: async () => {
+        enviou = true;
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: "financeiro@pavfacil.com.br",
+          resendMessageId: "nao",
+          reutilizado: false,
+        };
+      },
+    });
+    const item = await executarLembreteHojeUma("fat-a", {}, deps);
+    assert.equal(item.tipo, "falha");
+    assert.match(item.motivo ?? "", /paga/);
+    assert.equal(enviou, false);
+    assert.equal(leituras, 2);
+  })
+);
+
+tests.push(
+  run("Lote — a consulta percorre todas as páginas e não há agendamento", async () => {
+    const chamadas: Array<[number, number]> = [];
+    const itens = await listarPaginas(async (from, to) => {
+      chamadas.push([from, to]);
+      if (from === 0) return ["a", "b"];
+      if (from === 2) return ["c"];
+      return [];
+    }, 2);
+    assert.deepEqual(itens, ["a", "b", "c"]);
+    assert.deepEqual(chamadas, [
+      [0, 1],
+      [2, 3],
+    ]);
+
+    const raizRepo = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      ".."
+    );
+    const sql = fs.readFileSync(
+      path.join(raizRepo, "supabase/migrations/132_fatura_lembrete_lote_execucao.sql"),
+      "utf8"
+    );
+    assert.match(sql, /fatura_lembrete_lote_execucao/);
+    assert.match(sql, /primary key \(fatura_id, dia_civil\)/);
+    assert.doesNotMatch(sql, /create unique index/i);
+    const rota = fs.readFileSync(
+      path.join(raizRepo, "app/api/faturas/lembretes-hoje/enviar/route.ts"),
+      "utf8"
+    );
+    assert.doesNotMatch(rota, /cron|schedule/i);
+    const barra = fs.readFileSync(
+      path.join(raizRepo, "components/faturas/FaturaLembretesHojeBar.tsx"),
+      "utf8"
+    );
+    assert.match(barra, /Confirmar envio/);
+    assert.doesNotMatch(barra, /setInterval|cron/i);
+  })
+);
+
+tests.push(
+  run("Lote — e-mail sugerido não vaza de outra empresa", async () => {
+    const faturas = [
+      alvoHoje({
+        id: "sem-proprio",
+        numero: "FAT-CLI-SEM-PROPRIO",
+        referencia_id: "cli-a",
+        fatura_enviada_email: null,
+        fatura_enviada_em: null,
+      }),
+      alvoHoje({
+        id: "historico-a",
+        referencia_id: "cli-a",
+        status: "cancelada",
+        data_vencimento: "2026-09-01",
+        fatura_enviada_email: "financeiro@pavfacil.com.br",
+        fatura_enviada_em: "2026-09-02T15:00:00.000Z",
+      }),
+      alvoHoje({
+        id: "historico-b",
+        referencia_id: "cli-b",
+        status: "cancelada",
+        data_vencimento: "2026-09-01",
+        fatura_enviada_email: "financeiro@outra.com.br",
+        fatura_enviada_em: "2026-09-03T15:00:00.000Z",
+      }),
+    ];
+    const { deps, enviados } = depsLote({ faturas });
+    const resultado = await executarLembretesHoje({}, deps);
+    assert.equal(resultado.aceitos.length, 1);
+    assert.equal(enviados[0]?.email, "financeiro@pavfacil.com.br");
+    assert.doesNotMatch(enviados[0]?.email ?? "", /outra/);
   })
 );
 

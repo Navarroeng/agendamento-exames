@@ -8,12 +8,14 @@ import {
 import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaEnvioEmailModal } from "./FaturaEnvioEmailModal";
 import { FaturaLembreteModal } from "./FaturaLembreteModal";
+import { FaturaLembretesHojeBar } from "./FaturaLembretesHojeBar";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
 import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
 import { FaturasMesPanel } from "./FaturasMesPanel";
 import { useFaturasPage } from "@/hooks/useFaturasPage";
 import type { FaturaTipo } from "@/lib/types";
+import { useState } from "react";
 
 const PAGE_META: Record<
   FaturaTipo,
@@ -99,6 +101,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleCloseLembreteModal,
     handleLembreteEnviado,
   } = useFaturasPage(tipo);
+  const [lembreteTick, setLembreteTick] = useState(0);
 
   return (
     <AppShell
@@ -107,6 +110,15 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
       icon={meta.icon}
     >
       <div className="space-y-5">
+        {tipo === "cliente" && (
+          <FaturaLembretesHojeBar
+            atualizarEm={lembreteTick}
+            onEnviado={(params) => {
+              handleLembreteEnviado(params);
+              setLembreteTick((valor) => valor + 1);
+            }}
+          />
+        )}
         <FaturasMesPanel
           variant={tipo}
           filters={filters}
@@ -213,7 +225,10 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           emailSugerido={lembreteEmailSugerido}
           historicoInicial={lembreteHistoricoInicial}
           onClose={handleCloseLembreteModal}
-          onEnviado={handleLembreteEnviado}
+          onEnviado={(params) => {
+            handleLembreteEnviado(params);
+            setLembreteTick((valor) => valor + 1);
+          }}
         />
       )}
     </AppShell>
