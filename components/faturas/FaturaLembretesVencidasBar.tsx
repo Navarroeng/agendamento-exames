@@ -297,24 +297,35 @@ export function FaturaLembretesVencidasBar({
   const rotuloBotao =
     fase === "enviando"
       ? `Enviando ${andamento.atual} de ${andamento.total}`
-      : "Enviar lembretes de vencidas";
+      : "Enviar lembretes";
+  const resumo =
+    carregando
+      ? "…"
+      : pendentesComEmail > 0
+        ? String(pendentesComEmail)
+        : "Nenhuma pendente";
 
   return (
     <>
-      <article className="panel-card flex h-full flex-col border-l-4 border-l-amber-400 p-4">
-        <div className="flex items-center gap-2 text-navy">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fffbeb] text-[#b45309]">
-            <IconReceipt size={16} />
-          </span>
-          <h3 className="text-sm font-semibold">Vencidas</h3>
+      <article className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#e8edf5] py-2 md:border-l md:border-t-0 md:flex-nowrap md:py-0 md:pl-4">
+        <div className="flex shrink-0 items-center gap-2">
+          <IconReceipt size={15} className="shrink-0 text-[#b45309]" />
+          <h3 className="whitespace-nowrap text-sm font-semibold text-navy">
+            Vencidas
+          </h3>
+          <p
+            className={`whitespace-nowrap text-sm tabular-nums ${
+              !carregando && pendentesComEmail === 0
+                ? "text-[#64748b]"
+                : "font-semibold text-navy"
+            }`}
+          >
+            {resumo}
+          </p>
         </div>
-        <p className="mt-3 text-2xl font-extrabold tabular-nums text-navy">
-          {carregando ? "…" : pendentesComEmail}
-        </p>
-        <p className="mt-1 min-h-10 text-sm text-[#52617a]">{explicacao}</p>
         <button
           type="button"
-          className={classeBotaoLembrete(habilitado)}
+          className={`${classeBotaoLembrete(habilitado)} ml-auto`}
           disabled={!habilitado}
           title={habilitado ? undefined : explicacao}
           onClick={() => void abrir()}
