@@ -427,9 +427,82 @@ export function selecionarFaturasLembreteHoje<T extends FaturaLembreteHojeAlvo>(
   return faturas.filter((fatura) => faturaElegivelLembreteHoje(fatura, hojeIso));
 }
 
+const ISO_COMPETENCIA = /^(\d{4})-(\d{2})$/;
+const BR_COMPETENCIA = /^(\d{2})\/(\d{4})$/;
+
+/** Aceita `YYYY-MM` ou `MM/AAAA` e devolve `YYYY-MM`. */
+export function normalizarCompetenciaIso(
+  valor: string | null | undefined
+): string | null {
+  const texto = valor?.trim() ?? "";
+  const iso = texto.match(ISO_COMPETENCIA);
+  if (iso) {
+    const mes = Number(iso[2]);
+    if (mes < 1 || mes > 12) return null;
+    return `${iso[1]}-${iso[2]}`;
+  }
+  const br = texto.match(BR_COMPETENCIA);
+  if (!br) return null;
+  const mes = Number(br[1]);
+  if (mes < 1 || mes > 12) return null;
+  return `${br[2]}-${br[1]}`;
+}
+
+/**
+ * Competência da fatura: `mes_referencia` e, na falta dele, `periodo_inicio`.
+ * Não usa vencimento nem a data do envio.
+ */
+export function competenciaIsoDaFatura(fatura: {
+  mes_referencia?: string | null;
+  periodo_inicio?: string | null;
+}): string | null {
+  const bruto = fatura.mes_referencia?.trim() || fatura.periodo_inicio?.trim() || "";
+  const base = bruto.split("T")[0] ?? "";
+  return normalizarCompetenciaIso(base.slice(0, 7));
+}
+
+export function faturaNaCompetenciaLembrete(
+  fatura: {
+    mes_referencia?: string | null;
+    periodo_inicio?: string | null;
+  },
+  competenciaIso: string
+): boolean {
+  const alvo = normalizarCompetenciaIso(competenciaIso);
+  if (!alvo) return false;
+  return competenciaIsoDaFatura(fatura) === alvo;
+}
+
+/** A prévia só pode ser enviada se ainda for a competência aberta na página. */
+export function previaLembretesVencidasAindaValida(
+  previaCompetencia: string | null | undefined,
+  competenciaAtual: string | null | undefined
+): boolean {
+  const previa = normalizarCompetenciaIso(previaCompetencia);
+  const atual = normalizarCompetenciaIso(competenciaAtual);
+  return Boolean(previa && atual && previa === atual);
+}
+
+export function lembretesVencidasBotaoHabilitado(params: {
+  bloqueado: boolean;
+  carregando: boolean;
+  erro: boolean;
+  enviando: boolean;
+  pendentesComEmail: number;
+}): boolean {
+  return (
+    !params.bloqueado &&
+    !params.carregando &&
+    !params.erro &&
+    !params.enviando &&
+    params.pendentesComEmail > 0
+  );
+}
+
 /**
  * Lote de vencidas: status real `emitida` ou `vencida`, sem pagamento,
  * vencimento civil anterior a hoje. Não depende só do status.
+ * A competência entra em `selecionarFaturasLembreteVencida`.
  */
 export function faturaElegivelLembreteVencida(
   fatura: Pick<
@@ -450,9 +523,16 @@ export function faturaElegivelLembreteVencida(
 
 export function selecionarFaturasLembreteVencida<T extends FaturaLembreteHojeAlvo>(
   faturas: T[],
-  hojeIso: string
+  hojeIso: string,
+  competenciaIso: string
 ): T[] {
-  return faturas.filter((fatura) => faturaElegivelLembreteVencida(fatura, hojeIso));
+  const competencia = normalizarCompetenciaIso(competenciaIso);
+  if (!competencia) return [];
+  return faturas.filter(
+    (fatura) =>
+      faturaElegivelLembreteVencida(fatura, hojeIso) &&
+      faturaNaCompetenciaLembrete(fatura, competencia)
+  );
 }
 
 /** Dias civis de atraso. Não converte o vencimento pelo fuso. */
@@ -470,16 +550,16 @@ export function diasAtrasoCivil(
 }
 
 export function explicacaoBotaoLembretesVencidas(
-  elegiveis: number,
-  pendentes: number
+  pendentes: number,
+  pendentesComEmail: number
 ): string {
-  if (pendentes > 0) {
-    return pendentes === 1
-      ? "1 fatura vencida ainda não teve lembrete aceito pelo Resend hoje."
-      : `${pendentes} faturas vencidas ainda não tiveram lembrete aceito pelo Resend hoje.`;
+  if (pendentesComEmail <= 0) {
+    return "Nenhuma fatura vencida pendente de lembrete nesta competência";
   }
-  if (elegiveis === 0) return "Nenhuma fatura vencida em aberto.";
-  return "Todas as faturas vencidas em aberto já tiveram lembrete aceito pelo Resend hoje.";
+  if (pendentes === 1) {
+    return "1 fatura vencida desta competência ainda não teve lembrete aceito pelo Resend hoje.";
+  }
+  return `${pendentes} faturas vencidas desta competência ainda não tiveram lembrete aceito pelo Resend hoje.`;
 }
 
 /**

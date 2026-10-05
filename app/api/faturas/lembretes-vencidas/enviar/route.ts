@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireFaturasStaffApi } from "@/lib/faturas-api-auth.server";
+import { normalizarCompetenciaIso } from "@/lib/fatura-lembrete";
 import { executarLembreteVencidaUma } from "@/services/fatura-lembrete-lote.server";
 
 export const runtime = "nodejs";
@@ -16,16 +17,25 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as {
       faturaId?: string;
+      competencia?: string;
     };
     const faturaId = String(body.faturaId ?? "").trim();
+    const competenciaIso = normalizarCompetenciaIso(body.competencia);
     if (!faturaId) {
       return NextResponse.json(
         { error: "Informe a fatura do lembrete." },
         { status: 400 }
       );
     }
+    if (!competenciaIso) {
+      return NextResponse.json(
+        { error: "Informe a competência do lote." },
+        { status: 400 }
+      );
+    }
 
     const item = await executarLembreteVencidaUma(faturaId, {
+      competenciaIso,
       request,
       auditContext: auditoriaActorFromAuth(auth),
     });

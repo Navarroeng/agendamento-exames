@@ -103,6 +103,7 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleLembreteEnviado,
   } = useFaturasPage(tipo);
   const [lembreteTick, setLembreteTick] = useState(0);
+  const [pagamentoTick, setPagamentoTick] = useState(0);
   const [loteEmEnvio, setLoteEmEnvio] = useState<"hoje" | "vencidas" | null>(
     null
   );
@@ -128,7 +129,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
               }}
             />
             <FaturaLembretesVencidasBar
+              competencia={filters.mesReferencia}
               atualizarEm={lembreteTick}
+              pagamentoEm={pagamentoTick}
               bloqueado={loteEmEnvio === "hoje"}
               onOcupacaoChange={(ocupado) =>
                 setLoteEmEnvio(ocupado ? "vencidas" : null)
@@ -204,7 +207,14 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         fatura={pagamentoFatura}
         saving={saving}
         onClose={handleClosePagamento}
-        onConfirm={handleConfirmPagamento}
+        onConfirm={async (dataPagamentoIso, observacao, comprovanteFile) => {
+          await handleConfirmPagamento(
+            dataPagamentoIso,
+            observacao,
+            comprovanteFile
+          );
+          if (tipo === "cliente") setPagamentoTick((valor) => valor + 1);
+        }}
         onVerComprovante={handleVerComprovante}
       />
 

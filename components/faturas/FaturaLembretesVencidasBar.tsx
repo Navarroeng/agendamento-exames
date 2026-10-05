@@ -10,7 +10,10 @@ import {
   FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA,
   chaveEmpresaLembrete,
   explicacaoBotaoLembretesVencidas,
+  lembretesVencidasBotaoHabilitado,
   montarConfirmacaoLembretesHoje,
+  normalizarCompetenciaIso,
+  previaLembretesVencidasAindaValida,
 } from "@/lib/fatura-lembrete";
 import { formatCurrency } from "@/lib/money";
 import {
@@ -22,7 +25,9 @@ import {
 } from "@/services/fatura-lembrete.service";
 
 interface FaturaLembretesVencidasBarProps {
+  competencia: string;
   atualizarEm?: number;
+  pagamentoEm?: number;
   bloqueado?: boolean;
   onOcupacaoChange?: (ocupado: boolean) => void;
   onEnviado: (params: {
@@ -62,7 +67,9 @@ function textoAtraso(dias: number): string {
 }
 
 export function FaturaLembretesVencidasBar({
+  competencia,
   atualizarEm = 0,
+  pagamentoEm = 0,
   bloqueado = false,
   onOcupacaoChange,
   onEnviado,
@@ -80,15 +87,29 @@ export function FaturaLembretesVencidasBar({
     null
   );
   const enviandoRef = useRef(false);
+  const pedidoRef = useRef(0);
+  const competenciaIso = normalizarCompetenciaIso(competencia);
+  const escopoRef = useRef({ competenciaIso, pagamentoEm });
 
   const carregar = useCallback(async () => {
+    const iso = normalizarCompetenciaIso(competencia);
+    if (!iso) {
+      setPainel(null);
+      setErroConsulta(null);
+      setCarregando(false);
+      return null;
+    }
+    const pedido = ++pedidoRef.current;
     setCarregando(true);
     setErroConsulta(null);
     try {
-      const dados = await consultarLembretesVencidasCliente();
+      const dados = await consultarLembretesVencidasCliente(iso);
+      if (pedido !== pedidoRef.current) return null;
+      if (dados.competenciaIso !== iso) return null;
       setPainel(dados);
       return dados;
     } catch (err) {
+      if (pedido !== pedidoRef.current) return null;
       setPainel(null);
       setErroConsulta(
         err instanceof Error
@@ -97,37 +118,55 @@ export function FaturaLembretesVencidasBar({
       );
       return null;
     } finally {
-      setCarregando(false);
+      if (pedido === pedidoRef.current) setCarregando(false);
     }
-  }, []);
+  }, [competencia]);
 
   useEffect(() => {
     if (fase === "enviando") return;
+    setCarregando(true);
+    setPainel(null);
     void carregar();
-  }, [atualizarEm, carregar, fase]);
+  }, [atualizarEm, pagamentoEm, carregar, fase]);
+
+  useEffect(() => {
+    const anterior = escopoRef.current;
+    const competenciaMudou = anterior.competenciaIso !== competenciaIso;
+    const pagamentoMudou = anterior.pagamentoEm !== pagamentoEm;
+    escopoRef.current = { competenciaIso, pagamentoEm };
+    if (!competenciaMudou && !pagamentoMudou) return;
+    if (fase === "enviando") return;
+    if (fase === "resultado" && !competenciaMudou) return;
+    setSnapshot(null);
+    setAberto(false);
+  }, [competenciaIso, pagamentoEm, fase]);
 
   const pendentes = painel?.pendentes ?? [];
-  const habilitado =
-    !bloqueado &&
-    !carregando &&
-    !erroConsulta &&
-    pendentes.length > 0 &&
-    fase !== "enviando";
+  const pendentesComEmail = pendentes.filter((item) =>
+    isEmailValido(item.email)
+  ).length;
+  const habilitado = lembretesVencidasBotaoHabilitado({
+    bloqueado,
+    carregando,
+    erro: Boolean(erroConsulta),
+    enviando: fase === "enviando",
+    pendentesComEmail,
+  });
   const explicacao = bloqueado
     ? "Outro lote de lembretes está em andamento."
-    : carregando
-      ? "Verificando faturas vencidas…"
-      : erroConsulta
-        ? erroConsulta
-        : explicacaoBotaoLembretesVencidas(
-            painel?.elegiveis ?? 0,
-            pendentes.length
-          );
+    : !competenciaIso
+      ? "Selecione uma competência válida."
+      : carregando
+        ? "Verificando faturas vencidas…"
+        : erroConsulta
+          ? erroConsulta
+          : explicacaoBotaoLembretesVencidas(pendentes.length, pendentesComEmail);
 
   async function abrir() {
-    if (fase === "enviando" || bloqueado) return;
+    if (fase === "enviando" || bloqueado || !competenciaIso) return;
     const dados = await carregar();
-    if (!dados || dados.pendentes.length === 0) return;
+    if (!dados || dados.competenciaIso !== competenciaIso) return;
+    if (!dados.pendentes.some((item) => isEmailValido(item.email))) return;
     setSnapshot(dados);
     setResultado(null);
     setFase("confirmar");
@@ -141,8 +180,19 @@ export function FaturaLembretesVencidasBar({
 
   async function confirmar() {
     if (!snapshot || enviandoRef.current) return;
+    if (
+      !previaLembretesVencidasAindaValida(
+        snapshot.competenciaIso,
+        competenciaIso
+      )
+    ) {
+      setSnapshot(null);
+      setAberto(false);
+      return;
+    }
     enviandoRef.current = true;
     onOcupacaoChange?.(true);
+    const competenciaConfirmada = snapshot.competenciaIso;
     const fila = snapshot.pendentes;
     setFase("enviando");
     setAndamento({ atual: 0, total: fila.length });
@@ -165,7 +215,10 @@ export function FaturaLembretesVencidasBar({
         const pendente = fila[indice];
         setAndamento({ atual: indice + 1, total: fila.length });
         try {
-          const item = await enviarLembreteVencidaCliente(pendente.id);
+          const item = await enviarLembreteVencidaCliente(
+            pendente.id,
+            competenciaConfirmada
+          );
           if (item.tipo === "aceito") {
             acumulado.aceitos.push(item);
             if (item.enviadoEm && item.email) {
@@ -239,15 +292,20 @@ export function FaturaLembretesVencidasBar({
           <div>
             <p className="text-sm text-[#52617a]">{explicacao}</p>
             <p className="mt-1 text-xs text-[#64748b]">
-              O envio é manual e acontece só depois da confirmação. Cada fatura
-              vencida recebe um e-mail separado, com o destinatário e o PDF da
-              própria empresa. Faturas que vencem hoje ficam no outro lote.{" "}
+              O envio é manual e acontece só depois da confirmação, somente para
+              a competência selecionada na página. Cada fatura vencida recebe
+              um e-mail separado, com o destinatário e o PDF da própria
+              empresa. Faturas que vencem hoje ficam no outro lote.{" "}
               {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
             </p>
           </div>
           <button
             type="button"
-            className="btn btn-primary shrink-0"
+            className={
+              habilitado
+                ? "btn btn-primary shrink-0"
+                : "btn shrink-0 cursor-not-allowed opacity-40 saturate-50"
+            }
             disabled={!habilitado}
             title={habilitado ? undefined : explicacao}
             onClick={() => void abrir()}
@@ -293,6 +351,12 @@ export function FaturaLembretesVencidasBar({
       >
         {fase !== "resultado" && confirmacao && snapshot && (
           <div className="space-y-4 text-sm text-[#1f2937]">
+            <p>
+              Competência:{" "}
+              <span className="font-semibold">
+                {snapshot.competenciaTitulo || snapshot.competenciaIso}
+              </span>
+            </p>
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
                 <dt className="text-xs text-[#64748b]">Faturas</dt>

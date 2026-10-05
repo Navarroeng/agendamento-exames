@@ -7,7 +7,9 @@ import {
   diasAtrasoCivil,
   faturaElegivelLembreteHoje,
   faturaElegivelLembreteVencida,
+  faturaNaCompetenciaLembrete,
   lembreteAceitoNoDia,
+  normalizarCompetenciaIso,
   resolverEmailFaturamentoEmpresa,
   selecionarFaturasLembreteHoje,
   selecionarFaturasLembreteVencida,
@@ -37,6 +39,7 @@ export type PainelLembretesHoje = {
   elegiveis: number;
   pendentes: FaturaLembreteHojePendente[];
   jaLembradas: { id: string; numero: string; empresa: string }[];
+  competenciaIso?: string | null;
 };
 
 export type ResultadoLembreteHojeItem = {
@@ -64,8 +67,12 @@ type ReservaLote = ReservaLembrete;
 export type LembretesHojeDeps = {
   hojeIso: () => string;
   agoraMs: () => number;
-  listarCandidatas: (hojeIso: string) => Promise<FaturaLembreteHojeAlvo[]>;
+  listarCandidatas: (
+    hojeIso: string,
+    competenciaIso?: string | null
+  ) => Promise<FaturaLembreteHojeAlvo[]>;
   modo: ModoLembreteLote;
+  competenciaIso?: string | null;
   listarEnviosEmpresa: (
     referenciaIds: string[]
   ) => Promise<EnvioFaturamentoEmpresa[]>;
@@ -188,8 +195,11 @@ async function listarLembretesAdmin(
 }
 
 async function listarCandidatasVencidasAdmin(
-  hojeIso: string
+  hojeIso: string,
+  competenciaIso?: string | null
 ): Promise<FaturaLembreteHojeAlvo[]> {
+  const competencia = normalizarCompetenciaIso(competenciaIso);
+  if (!competencia) return [];
   const admin = createAdminClient();
   const rows = await listarPaginas(async (from, to) => {
     const { data, error } = await admin
@@ -205,7 +215,11 @@ async function listarCandidatasVencidasAdmin(
     if (error) throw error;
     return (data ?? []) as Record<string, unknown>[];
   });
-  return selecionarFaturasLembreteVencida(rows.map(mapFatura), hojeIso);
+  return selecionarFaturasLembreteVencida(
+    rows.map(mapFatura),
+    hojeIso,
+    competencia
+  );
 }
 
 async function buscarFaturaAdmin(
@@ -228,7 +242,9 @@ function defaultDeps(modo: ModoLembreteLote = "hoje"): LembretesHojeDeps {
     agoraMs: () => Date.now(),
     modo,
     listarCandidatas:
-      modo === "vencidas" ? listarCandidatasVencidasAdmin : listarCandidatasAdmin,
+      modo === "vencidas"
+        ? listarCandidatasVencidasAdmin
+        : (hojeIso) => listarCandidatasAdmin(hojeIso),
     listarEnviosEmpresa: listarEnviosEmpresaAdmin,
     listarLembretes: listarLembretesAdmin,
     buscarFatura: buscarFaturaAdmin,
@@ -251,11 +267,16 @@ function montarPainel(
   envios: EnvioFaturamentoEmpresa[],
   lembretes: { fatura_id: string; enviado_em: string }[],
   hojeIso: string,
-  modo: ModoLembreteLote
+  modo: ModoLembreteLote,
+  competenciaIso: string | null
 ): PainelLembretesHoje {
   const elegiveis =
     modo === "vencidas"
-      ? selecionarFaturasLembreteVencida(candidatas, hojeIso)
+      ? selecionarFaturasLembreteVencida(
+          candidatas,
+          hojeIso,
+          competenciaIso ?? ""
+        )
       : selecionarFaturasLembreteHoje(candidatas, hojeIso);
   const pendentes: FaturaLembreteHojePendente[] = [];
   const jaLembradas: PainelLembretesHoje["jaLembradas"] = [];
@@ -287,6 +308,7 @@ function montarPainel(
     elegiveis: elegiveis.length,
     pendentes,
     jaLembradas,
+    competenciaIso: modo === "vencidas" ? competenciaIso : undefined,
   };
 }
 
@@ -308,7 +330,18 @@ async function consultarLote(
 ): Promise<PainelLembretesHoje> {
   const merged = { ...defaultDeps(modo), ...deps, modo };
   const hojeIso = merged.hojeIso();
-  const candidatas = await merged.listarCandidatas(hojeIso);
+  const competenciaIso =
+    modo === "vencidas" ? normalizarCompetenciaIso(merged.competenciaIso) : null;
+  if (modo === "vencidas" && !competenciaIso) {
+    return {
+      hojeIso,
+      elegiveis: 0,
+      pendentes: [],
+      jaLembradas: [],
+      competenciaIso: null,
+    };
+  }
+  const candidatas = await merged.listarCandidatas(hojeIso, competenciaIso);
   const referenciaIds = Array.from(
     new Set(
       candidatas
@@ -320,13 +353,21 @@ async function consultarLote(
     merged.listarEnviosEmpresa(referenciaIds),
     merged.listarLembretes(candidatas.map((fatura) => fatura.id)),
   ]);
-  return montarPainel(candidatas, envios, lembretes, hojeIso, merged.modo);
+  return montarPainel(
+    candidatas,
+    envios,
+    lembretes,
+    hojeIso,
+    merged.modo,
+    competenciaIso
+  );
 }
 
 function motivoForaDoLote(
   fatura: FaturaLembreteHojeAlvo,
   hojeIso: string,
-  modo: ModoLembreteLote
+  modo: ModoLembreteLote,
+  competenciaIso: string | null
 ): string {
   const vencimento = dataVencimentoCivil(fatura.data_vencimento);
   if (fatura.pago) return "Não é possível enviar lembrete de fatura paga.";
@@ -334,6 +375,9 @@ function motivoForaDoLote(
     return "Não é possível enviar lembrete de fatura cancelada.";
   }
   if (modo === "vencidas") {
+    if (!competenciaIso || !faturaNaCompetenciaLembrete(fatura, competenciaIso)) {
+      return "A fatura não pertence à competência selecionada.";
+    }
     if (fatura.status !== "emitida" && fatura.status !== "vencida") {
       return "A fatura não está emitida nem vencida.";
     }
@@ -381,15 +425,19 @@ async function processarUma(
   }
 
   const modo = merged.modo;
-  if (
+  const competenciaIso =
+    modo === "vencidas" ? normalizarCompetenciaIso(merged.competenciaIso) : null;
+  const entraNoLote =
     modo === "vencidas"
-      ? !faturaElegivelLembreteVencida(fatura, hojeIso)
-      : !faturaElegivelLembreteHoje(fatura, hojeIso)
-  ) {
+      ? Boolean(competenciaIso) &&
+        faturaElegivelLembreteVencida(fatura, hojeIso) &&
+        faturaNaCompetenciaLembrete(fatura, competenciaIso ?? "")
+      : faturaElegivelLembreteHoje(fatura, hojeIso);
+  if (!entraNoLote) {
     return {
       ...itemBase(fatura),
       tipo: "falha",
-      motivo: motivoForaDoLote(fatura, hojeIso, modo),
+      motivo: motivoForaDoLote(fatura, hojeIso, modo, competenciaIso),
     };
   }
 
@@ -424,14 +472,21 @@ async function processarUma(
     reservou = true;
 
     const deNovo = await merged.buscarFatura(fatura.id);
-    if (!deNovo || !(modo === "vencidas"
-      ? faturaElegivelLembreteVencida(deNovo, hojeIso)
-      : faturaElegivelLembreteHoje(deNovo, hojeIso))) {
+    const deNovoEntra =
+      modo === "vencidas"
+        ? Boolean(
+            deNovo &&
+              competenciaIso &&
+              faturaElegivelLembreteVencida(deNovo, hojeIso) &&
+              faturaNaCompetenciaLembrete(deNovo, competenciaIso)
+          )
+        : Boolean(deNovo && faturaElegivelLembreteHoje(deNovo, hojeIso));
+    if (!deNovo || !deNovoEntra) {
       return {
         ...itemBase(deNovo ?? fatura),
         tipo: "falha",
         motivo: deNovo
-          ? motivoForaDoLote(deNovo, hojeIso, modo)
+          ? motivoForaDoLote(deNovo, hojeIso, modo, competenciaIso)
           : "Fatura não encontrada.",
       };
     }
@@ -556,12 +611,16 @@ export async function executarLembretesHoje(
 
 export async function executarLembretesVencidas(
   params: {
+    competenciaIso: string;
     request?: Request;
     auditContext?: AuditoriaUsuarioContext;
-  } = {},
+  },
   deps: Partial<LembretesHojeDeps> = {}
 ): Promise<ResultadoLembretesHoje> {
-  return executarLote("vencidas", params, deps);
+  return executarLote("vencidas", params, {
+    ...deps,
+    competenciaIso: params.competenciaIso,
+  });
 }
 
 export async function executarLembreteHojeUma(
@@ -587,15 +646,17 @@ export async function executarLembreteHojeUma(
 export async function executarLembreteVencidaUma(
   faturaId: string,
   params: {
+    competenciaIso: string;
     request?: Request;
     auditContext?: AuditoriaUsuarioContext;
-  } = {},
+  },
   deps: Partial<LembretesHojeDeps> = {}
 ): Promise<ResultadoLembreteHojeItem> {
   const merged = {
     ...defaultDeps("vencidas"),
     ...deps,
     modo: "vencidas" as const,
+    competenciaIso: params.competenciaIso,
   };
   const hojeIso = merged.hojeIso();
   return processarUma(
