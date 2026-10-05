@@ -106,6 +106,8 @@ function mapFatura(row: Record<string, unknown>): FaturaLembreteHojeAlvo {
     referencia_id: row.referencia_id ? String(row.referencia_id) : null,
     referencia_nome: String(row.referencia_nome ?? ""),
     data_vencimento: String(row.data_vencimento ?? ""),
+    mes_referencia: row.mes_referencia ? String(row.mes_referencia) : null,
+    periodo_inicio: row.periodo_inicio ? String(row.periodo_inicio) : null,
     valor_total: Number(row.valor_total ?? 0),
     fatura_enviada_email: row.fatura_enviada_email
       ? String(row.fatura_enviada_email)
@@ -117,7 +119,7 @@ function mapFatura(row: Record<string, unknown>): FaturaLembreteHojeAlvo {
 }
 
 const COLUNAS_FATURA =
-  "id, numero, tipo, status, pago, referencia_id, referencia_nome, data_vencimento, valor_total, fatura_enviada_email, fatura_enviada_em";
+  "id, numero, tipo, status, pago, referencia_id, referencia_nome, data_vencimento, mes_referencia, periodo_inicio, valor_total, fatura_enviada_email, fatura_enviada_em";
 
 async function listarCandidatasAdmin(hojeIso: string): Promise<FaturaLembreteHojeAlvo[]> {
   const admin = createAdminClient();
@@ -439,6 +441,9 @@ async function processarUma(
       clienteNome: deNovo.referencia_nome,
       valor: Number(deNovo.valor_total),
       dataVencimento: deNovo.data_vencimento,
+      mesReferencia: deNovo.mes_referencia,
+      periodoInicio: deNovo.periodo_inicio,
+      escopo: deNovo.tipo === "cliente" ? "exames_ocupacionais" : "outro",
       hojeIso,
     });
     const enviado = await merged.enviarUm({

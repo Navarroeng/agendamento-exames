@@ -17,6 +17,7 @@ import { buildFaturaLembreteIdempotencyKey } from "../lib/fatura-envio-idempoten
 import {
   buildLembreteFaturaTexto,
   classificarVencimentoLembrete,
+  competenciaLembreteExtenso,
   dataVencimentoCivil,
   decidirReservaLote,
   explicacaoBotaoLembretesHoje,
@@ -125,13 +126,15 @@ tests.push(
 );
 
 tests.push(
-  run("Texto — vencimento hoje usa a mensagem do próprio dia", () => {
+  run("Texto — vencimento hoje descreve os exames do mês de referência", () => {
     const texto = buildLembreteFaturaTexto({
       numero: "FAT-CLI-2026-00102",
       clienteNome: "PAVFACIL",
       valor: 50,
       dataVencimento: "2026-10-05",
       hojeIso: "2026-10-05",
+      mesReferencia: "2026-09",
+      escopo: "exames_ocupacionais",
     });
     assert.equal(texto.vencida, false);
     assert.equal(
@@ -143,7 +146,7 @@ tests.push(
       [
         "Olá, PAVFACIL.",
         "",
-        "Lembramos que a fatura FAT-CLI-2026-00102, no valor de R$ 50,00, vence na data de hoje.",
+        "Passando para lembrar que a fatura referente aos exames ocupacionais realizados no mês de setembro/2026, no valor de R$ 50,00, vence na data de hoje.",
         "",
         "Os dados para pagamento estão disponíveis abaixo.",
         "",
@@ -153,19 +156,22 @@ tests.push(
         "Navarro Engenharia",
       ].join("\n")
     );
-    assert.doesNotMatch(texto.mensagem, /05\/10\/2026/);
+    assert.doesNotMatch(texto.mensagem, /FAT-CLI-2026-00102/);
+    assert.doesNotMatch(texto.mensagem, /05\/10\/2026|outubro\/2026/i);
     assert.doesNotMatch(texto.mensagem, /juros|multa/i);
   })
 );
 
 tests.push(
-  run("Texto — vencimento futuro informa a data real e não diz hoje", () => {
+  run("Texto — vencimento futuro informa a data real e a competência da fatura", () => {
     const texto = buildLembreteFaturaTexto({
       numero: "FAT-CLI-2026-00102",
       clienteNome: "PAVFACIL",
       valor: 50,
       dataVencimento: "2026-10-20",
       hojeIso: "2026-10-05",
+      mesReferencia: "2026-09",
+      escopo: "exames_ocupacionais",
     });
     assert.equal(texto.vencida, false);
     assert.equal(
@@ -174,33 +180,87 @@ tests.push(
     );
     assert.match(
       texto.mensagem,
-      /fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
+      /Passando para lembrar que a fatura referente aos exames ocupacionais realizados no mês de setembro\/2026, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
     );
+    assert.doesNotMatch(texto.mensagem, /FAT-CLI-2026-00102/);
     assert.doesNotMatch(texto.assunto, /hoje/i);
-    assert.doesNotMatch(texto.mensagem, /hoje/i);
+    assert.doesNotMatch(texto.mensagem, /\bhoje\b/i);
+    assert.doesNotMatch(texto.mensagem, /outubro\/2026/i);
   })
 );
 
 tests.push(
-  run("Texto — vencida usa o aviso de pagamento em aberto", () => {
+  run("Texto — vencida descreve os exames e mantém o pagamento em aberto", () => {
     const texto = buildLembreteFaturaTexto({
       numero: "FAT-CLI-2026-00102",
       clienteNome: "PAVFACIL",
       valor: 1250.5,
       dataVencimento: "2026-10-04",
       hojeIso: "2026-10-05",
+      mesReferencia: "2026-09",
+      escopo: "exames_ocupacionais",
     });
     assert.equal(texto.vencida, true);
     assert.equal(
       texto.assunto,
       "Lembrete de pagamento — Fatura FAT-CLI-2026-00102 em aberto | Navarro Engenharia"
     );
-    assert.match(texto.mensagem, /não identificamos o pagamento/);
-    assert.match(texto.mensagem, /R\$ 1\.250,50/);
-    assert.match(texto.mensagem, /vencimento em 04\/10\/2026/);
+    assert.match(
+      texto.mensagem,
+      /Até o momento, não identificamos o pagamento da fatura referente aos exames ocupacionais realizados no mês de setembro\/2026, no valor de R\$ 1\.250,50, com vencimento em 04\/10\/2026/
+    );
     assert.match(texto.mensagem, /regularização do pagamento/);
+    assert.doesNotMatch(texto.mensagem, /FAT-CLI-2026-00102/);
     assert.doesNotMatch(texto.assunto, /hoje/i);
-    assert.doesNotMatch(texto.mensagem, /hoje/i);
+    assert.doesNotMatch(texto.mensagem, /\bhoje\b/i);
+  })
+);
+
+tests.push(
+  run("Texto — competência ausente ou outro serviço conserva o número da fatura", () => {
+    assert.equal(competenciaLembreteExtenso({ mesReferencia: "2026-09" }), "setembro/2026");
+    assert.equal(
+      competenciaLembreteExtenso({
+        mesReferencia: null,
+        periodoInicio: "2026-09-01T00:00:00.000Z",
+      }),
+      "setembro/2026"
+    );
+    assert.equal(
+      competenciaLembreteExtenso({ mesReferencia: "2026-09", periodoInicio: "2026-08-01" }),
+      "setembro/2026"
+    );
+    assert.equal(competenciaLembreteExtenso({}), null);
+
+    const semCompetencia = buildLembreteFaturaTexto({
+      numero: "FAT-CLI-2026-00102",
+      clienteNome: "PAVFACIL",
+      valor: 50,
+      dataVencimento: "2026-10-20",
+      hojeIso: "2026-10-05",
+      escopo: "exames_ocupacionais",
+    });
+    assert.match(
+      semCompetencia.mensagem,
+      /fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
+    );
+    assert.doesNotMatch(semCompetencia.mensagem, /exames ocupacionais|setembro\/2026|outubro\/2026/i);
+
+    const outroServico = buildLembreteFaturaTexto({
+      numero: "FAT-CLI-2026-00102",
+      clienteNome: "PAVFACIL",
+      valor: 50,
+      dataVencimento: "2026-10-05",
+      hojeIso: "2026-10-05",
+      mesReferencia: "2026-09",
+      escopo: "outro",
+    });
+    assert.match(
+      outroServico.mensagem,
+      /Lembramos que a fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, vence na data de hoje/
+    );
+    assert.match(outroServico.assunto, /Fatura FAT-CLI-2026-00102/);
+    assert.doesNotMatch(outroServico.mensagem, /exames ocupacionais|setembro\/2026/i);
   })
 );
 
@@ -271,6 +331,9 @@ tests.push(
       valor: fatura.valor_total,
       dataVencimento: fatura.data_vencimento,
       hojeIso: "2026-10-05",
+      mesReferencia: fatura.mes_referencia,
+      periodoInicio: fatura.periodo_inicio,
+      escopo: "exames_ocupacionais",
     });
     const html = buildFaturaClienteLembreteEmailHtml({
       fatura,
@@ -285,8 +348,10 @@ tests.push(
     assert.match(html, /email\/faturas\/cabecalho\.jpg/);
     assert.match(html, /email\/faturas\/rodape\.jpg/);
     assert.match(html, /FAT-CLI-2026-00102/);
+    assert.match(html, /agosto\/2026/);
     assert.match(html, /R\$ 50,00/);
     assert.match(html, /05\/10\/2026/);
+    assert.doesNotMatch(html, /setembro\/2026/);
     assert.doesNotMatch(html, /<script>/);
     assert.doesNotMatch(html, /juros|multa/i);
     assert.match(
@@ -697,6 +762,8 @@ function alvoHoje(
     referencia_id: "cli-a",
     referencia_nome: "PAVFACIL",
     data_vencimento: HOJE,
+    mes_referencia: "2026-09",
+    periodo_inicio: "2026-09-01",
     valor_total: 50,
     fatura_enviada_email: "financeiro@pavfacil.com.br",
     fatura_enviada_em: "2026-09-02T15:00:00.000Z",
@@ -829,6 +896,8 @@ tests.push(
         referencia_id: "cli-b",
         referencia_nome: "OUTRA LTDA",
         valor_total: 80,
+        mes_referencia: "2026-08",
+        periodo_inicio: "2026-08-01",
         fatura_enviada_email: "financeiro@outra.com.br",
       }),
       alvoHoje({
@@ -893,11 +962,17 @@ tests.push(
     assert.ok(outra);
     assert.match(pav.assunto, /vence hoje — Fatura FAT-CLI-2026-00102/);
     assert.match(pav.mensagem, /PAVFACIL/);
+    assert.match(
+      pav.mensagem,
+      /exames ocupacionais realizados no mês de setembro\/2026/
+    );
     assert.match(pav.mensagem, /vence na data de hoje/);
-    assert.doesNotMatch(pav.mensagem, /OUTRA LTDA/);
+    assert.doesNotMatch(pav.mensagem, /FAT-CLI-2026-00102|agosto\/2026|OUTRA LTDA/);
     assert.doesNotMatch(pav.email, /outra/);
     assert.match(outra.assunto, /vence hoje — Fatura FAT-CLI-2026-00200/);
     assert.match(outra.mensagem, /OUTRA LTDA/);
+    assert.match(outra.mensagem, /agosto\/2026/);
+    assert.doesNotMatch(outra.mensagem, /PAVFACIL|setembro\/2026|FAT-CLI-2026-00200/);
     assert.doesNotMatch(outra.mensagem, /PAVFACIL/);
     assert.equal(outra.email, "financeiro@outra.com.br");
     assert.notEqual(pav.requestId, outra.requestId);

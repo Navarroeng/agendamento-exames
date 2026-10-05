@@ -70,6 +70,9 @@ export function FaturaLembreteModal({
         clienteNome: fatura.referencia_nome,
         valor: Number(fatura.valor_total),
         dataVencimento: fatura.data_vencimento,
+        mesReferencia: fatura.mes_referencia,
+        periodoInicio: fatura.periodo_inicio,
+        escopo: fatura.tipo === "cliente" ? "exames_ocupacionais" : "outro",
       });
       setAssunto(texto.assunto);
       setMensagem(texto.mensagem);

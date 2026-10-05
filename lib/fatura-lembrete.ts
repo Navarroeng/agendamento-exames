@@ -109,12 +109,77 @@ export function faturaEstaVencidaParaLembrete(
   return classificarVencimentoLembrete(dataVencimento, hojeIso) === "vencido";
 }
 
+const MESES_COMPETENCIA = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+] as const;
+
+/**
+ * Competência gravada na fatura, como “setembro/2026”.
+ * Usa `mes_referencia` e, na falta dele, `periodo_inicio`.
+ * Não deriva o mês da data de envio nem do vencimento.
+ */
+export function competenciaLembreteExtenso(params: {
+  mesReferencia?: string | null;
+  periodoInicio?: string | null;
+}): string | null {
+  const bruto = params.mesReferencia?.trim() || params.periodoInicio?.trim() || "";
+  const match = bruto.split("T")[0]?.match(/^(\d{4})-(\d{2})/);
+  if (!match) return null;
+  const mes = Number(match[2]);
+  const nome = MESES_COMPETENCIA[mes - 1];
+  if (!nome) return null;
+  return `${nome}/${match[1]}`;
+}
+
+export type EscopoLembreteFatura = "exames_ocupacionais" | "outro";
+
+function fraseCorpoLembrete(params: {
+  momento: MomentoLembreteFatura;
+  numero: string;
+  valor: string;
+  data: string;
+  competencia: string | null;
+}): string {
+  if (params.competencia) {
+    const referencia = `a fatura referente aos exames ocupacionais realizados no mês de ${params.competencia}, no valor de ${params.valor}`;
+    if (params.momento === "hoje") {
+      return `Passando para lembrar que ${referencia}, vence na data de hoje.`;
+    }
+    if (params.momento === "vencido") {
+      return `Até o momento, não identificamos o pagamento d${referencia}, com vencimento em ${params.data}.`;
+    }
+    return `Passando para lembrar que ${referencia}, tem vencimento em ${params.data}.`;
+  }
+
+  if (params.momento === "hoje") {
+    return `Lembramos que a fatura ${params.numero}, no valor de ${params.valor}, vence na data de hoje.`;
+  }
+  if (params.momento === "vencido") {
+    return `Até o momento, não identificamos o pagamento da fatura ${params.numero}, no valor de ${params.valor}, com vencimento em ${params.data}.`;
+  }
+  return `Passando para lembrar que a fatura ${params.numero}, no valor de ${params.valor}, tem vencimento em ${params.data}.`;
+}
+
 export function buildLembreteFaturaTexto(params: {
   numero: string;
   clienteNome: string;
   valor: number;
   dataVencimento: string;
   hojeIso?: string;
+  mesReferencia?: string | null;
+  periodoInicio?: string | null;
+  escopo?: EscopoLembreteFatura;
 }): { assunto: string; mensagem: string; vencida: boolean } {
   const numero = params.numero.trim() || "—";
   const cliente = params.clienteNome.trim() || "cliente";
@@ -126,6 +191,20 @@ export function buildLembreteFaturaTexto(params: {
 
   const hoje = params.hojeIso?.trim() || todayIsoSaoPaulo();
   const momento = classificarVencimentoLembrete(params.dataVencimento, hoje);
+  const competencia =
+    params.escopo === "exames_ocupacionais"
+      ? competenciaLembreteExtenso({
+          mesReferencia: params.mesReferencia,
+          periodoInicio: params.periodoInicio,
+        })
+      : null;
+  const corpo = fraseCorpoLembrete({
+    momento,
+    numero,
+    valor,
+    data,
+    competencia,
+  });
   const encerramento = [
     "Caso o pagamento já tenha sido realizado, por favor, desconsidere este lembrete e encaminhe o comprovante para conferência.",
     "",
@@ -140,7 +219,7 @@ export function buildLembreteFaturaTexto(params: {
       mensagem: [
         `Olá, ${cliente}.`,
         "",
-        `Lembramos que a fatura ${numero}, no valor de ${valor}, vence na data de hoje.`,
+        corpo,
         "",
         "Os dados para pagamento estão disponíveis abaixo.",
         "",
@@ -156,7 +235,7 @@ export function buildLembreteFaturaTexto(params: {
       mensagem: [
         `Olá, ${cliente}.`,
         "",
-        `Até o momento, não identificamos o pagamento da fatura ${numero}, no valor de ${valor}, com vencimento em ${data}.`,
+        corpo,
         "",
         "Pedimos, por gentileza, a regularização do pagamento. Os dados para pagamento estão disponíveis abaixo.",
         "",
@@ -171,7 +250,7 @@ export function buildLembreteFaturaTexto(params: {
     mensagem: [
       `Olá, ${cliente}.`,
       "",
-      `Passando para lembrar que a fatura ${numero}, no valor de ${valor}, tem vencimento em ${data}.`,
+      corpo,
       "",
       "Os dados para pagamento estão disponíveis abaixo.",
       "",
@@ -252,9 +331,11 @@ export type FaturaLembreteHojeAlvo = {
   status: FaturaStatus;
   pago: boolean;
   referencia_id: string | null;
-  referencia_nome: string;
-  data_vencimento: string;
-  valor_total: number;
+    referencia_nome: string;
+    data_vencimento: string;
+    mes_referencia?: string | null;
+    periodo_inicio?: string | null;
+    valor_total: number;
   fatura_enviada_email?: string | null;
   fatura_enviada_em?: string | null;
 };
