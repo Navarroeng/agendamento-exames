@@ -4,21 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Panel } from "@/components/ui/Panel";
 import { IconReceipt } from "@/components/ui/icons/OutlineIcons";
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { isEmailValido } from "@/lib/email-validacao";
 import {
   FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA,
   chaveEmpresaLembrete,
-  explicacaoBotaoLembretesHoje,
+  explicacaoBotaoLembretesVencidas,
   montarConfirmacaoLembretesHoje,
 } from "@/lib/fatura-lembrete";
 import { formatCurrency } from "@/lib/money";
 import {
-  consultarLembretesHojeCliente,
-  enviarLembreteHojeCliente,
+  consultarLembretesVencidasCliente,
+  enviarLembreteVencidaCliente,
   type LembreteHojeItemCliente,
-  type LembretesHojePainelCliente,
+  type LembretesVencidasPainelCliente,
+  type LembretesVencidasPendenteCliente,
 } from "@/services/fatura-lembrete.service";
 
-interface FaturaLembretesHojeBarProps {
+interface FaturaLembretesVencidasBarProps {
   atualizarEm?: number;
   bloqueado?: boolean;
   onOcupacaoChange?: (ocupado: boolean) => void;
@@ -39,7 +42,7 @@ type ResultadoTela = {
 };
 
 function itemDePendente(
-  pendente: LembretesHojePainelCliente["pendentes"][number],
+  pendente: LembretesVencidasPendenteCliente,
   tipo: LembreteHojeItemCliente["tipo"],
   motivo?: string
 ): LembreteHojeItemCliente {
@@ -54,20 +57,26 @@ function itemDePendente(
   };
 }
 
-export function FaturaLembretesHojeBar({
+function textoAtraso(dias: number): string {
+  return dias === 1 ? "1 dia" : `${dias} dias`;
+}
+
+export function FaturaLembretesVencidasBar({
   atualizarEm = 0,
   bloqueado = false,
   onOcupacaoChange,
   onEnviado,
-}: FaturaLembretesHojeBarProps) {
-  const [painel, setPainel] = useState<LembretesHojePainelCliente | null>(null);
+}: FaturaLembretesVencidasBarProps) {
+  const [painel, setPainel] = useState<LembretesVencidasPainelCliente | null>(
+    null
+  );
   const [erroConsulta, setErroConsulta] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(false);
   const [fase, setFase] = useState<Fase>("confirmar");
   const [andamento, setAndamento] = useState({ atual: 0, total: 0 });
   const [resultado, setResultado] = useState<ResultadoTela | null>(null);
-  const [snapshot, setSnapshot] = useState<LembretesHojePainelCliente | null>(
+  const [snapshot, setSnapshot] = useState<LembretesVencidasPainelCliente | null>(
     null
   );
   const enviandoRef = useRef(false);
@@ -76,7 +85,7 @@ export function FaturaLembretesHojeBar({
     setCarregando(true);
     setErroConsulta(null);
     try {
-      const dados = await consultarLembretesHojeCliente();
+      const dados = await consultarLembretesVencidasCliente();
       setPainel(dados);
       return dados;
     } catch (err) {
@@ -84,7 +93,7 @@ export function FaturaLembretesHojeBar({
       setErroConsulta(
         err instanceof Error
           ? err.message
-          : "Não foi possível consultar as faturas que vencem hoje."
+          : "Não foi possível consultar as faturas vencidas."
       );
       return null;
     } finally {
@@ -107,13 +116,16 @@ export function FaturaLembretesHojeBar({
   const explicacao = bloqueado
     ? "Outro lote de lembretes está em andamento."
     : carregando
-    ? "Verificando faturas que vencem hoje…"
-    : erroConsulta
-      ? erroConsulta
-      : explicacaoBotaoLembretesHoje(painel?.elegiveis ?? 0, pendentes.length);
+      ? "Verificando faturas vencidas…"
+      : erroConsulta
+        ? erroConsulta
+        : explicacaoBotaoLembretesVencidas(
+            painel?.elegiveis ?? 0,
+            pendentes.length
+          );
 
   async function abrir() {
-    if (fase === "enviando") return;
+    if (fase === "enviando" || bloqueado) return;
     const dados = await carregar();
     if (!dados || dados.pendentes.length === 0) return;
     setSnapshot(dados);
@@ -153,7 +165,7 @@ export function FaturaLembretesHojeBar({
         const pendente = fila[indice];
         setAndamento({ atual: indice + 1, total: fila.length });
         try {
-          const item = await enviarLembreteHojeCliente(pendente.id);
+          const item = await enviarLembreteVencidaCliente(pendente.id);
           if (item.tipo === "aceito") {
             acumulado.aceitos.push(item);
             if (item.enviadoEm && item.email) {
@@ -214,12 +226,12 @@ export function FaturaLembretesHojeBar({
   const rotuloBotao =
     fase === "enviando"
       ? `Enviando ${andamento.atual} de ${andamento.total}`
-      : "Enviar lembretes de hoje";
+      : "Enviar lembretes de faturas vencidas";
 
   return (
     <>
       <Panel
-        title="Lembretes de hoje"
+        title="Faturas vencidas"
         icon={<IconReceipt size={16} />}
         clipContent={false}
       >
@@ -228,8 +240,9 @@ export function FaturaLembretesHojeBar({
             <p className="text-sm text-[#52617a]">{explicacao}</p>
             <p className="mt-1 text-xs text-[#64748b]">
               O envio é manual e acontece só depois da confirmação. Cada fatura
-              recebe um e-mail separado, com o destinatário e o PDF da própria
-              empresa. {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
+              vencida recebe um e-mail separado, com o destinatário e o PDF da
+              própria empresa. Faturas que vencem hoje ficam no outro lote.{" "}
+              {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
             </p>
           </div>
           <button
@@ -247,8 +260,9 @@ export function FaturaLembretesHojeBar({
       <Modal
         open={aberto}
         onClose={fechar}
-        title="Enviar lembretes de hoje"
+        title="Enviar lembretes de faturas vencidas"
         subtitle="Um e-mail por fatura, somente para a empresa correspondente."
+        size="wide"
         closeOnOverlayClick={fase !== "enviando"}
         footer={
           fase === "resultado" ? (
@@ -277,7 +291,7 @@ export function FaturaLembretesHojeBar({
           )
         }
       >
-        {fase !== "resultado" && confirmacao && (
+        {fase !== "resultado" && confirmacao && snapshot && (
           <div className="space-y-4 text-sm text-[#1f2937]">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
@@ -302,19 +316,52 @@ export function FaturaLembretesHojeBar({
               </div>
             </dl>
 
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide text-[#64748b]">
+                    <th className="py-2 pr-3 font-semibold">Fatura</th>
+                    <th className="py-2 pr-3 font-semibold">Empresa</th>
+                    <th className="py-2 pr-3 font-semibold">Destinatário</th>
+                    <th className="py-2 pr-3 font-semibold">Valor</th>
+                    <th className="py-2 pr-3 font-semibold">Vencimento</th>
+                    <th className="py-2 font-semibold">Atraso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snapshot.pendentes.map((item) => {
+                    const semEmail = !isEmailValido(item.email);
+                    return (
+                      <tr
+                        key={item.id}
+                        className={
+                          semEmail
+                            ? "bg-amber-50 text-amber-950"
+                            : "border-t border-[#eef2f7]"
+                        }
+                      >
+                        <td className="py-2 pr-3">{item.numero}</td>
+                        <td className="py-2 pr-3">{item.empresa}</td>
+                        <td className="py-2 pr-3">
+                          {semEmail ? "Sem e-mail válido" : item.email}
+                        </td>
+                        <td className="py-2 pr-3">{formatCurrency(item.valor)}</td>
+                        <td className="py-2 pr-3">
+                          {formatDateIsoToBR(item.vencimento)}
+                        </td>
+                        <td className="py-2">{textoAtraso(item.diasAtraso)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
             {confirmacao.semEmail.length > 0 && (
-              <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-3">
-                <p className="font-semibold text-amber-950">
-                  Sem e-mail válido — estas faturas serão ignoradas
-                </p>
-                <ul className="mt-2 space-y-1 text-amber-950">
-                  {confirmacao.semEmail.map((item) => (
-                    <li key={item.id}>
-                      {item.numero} — {item.empresa} — {formatCurrency(item.valor)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="font-semibold text-amber-950">
+                As faturas sem e-mail válido serão ignoradas e não impedem as
+                demais.
+              </p>
             )}
 
             {fase === "enviando" && (
@@ -332,24 +379,20 @@ export function FaturaLembretesHojeBar({
                 : "envios aceitos pelo Resend."}{" "}
               {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
             </p>
-
             <ResultadoBloco
               titulo="Ignoradas por ausência de e-mail válido"
-              vazio="Nenhuma."
               itens={resultado.semEmail.map(
                 (item) => `${item.numero} — ${item.empresa}`
               )}
             />
             <ResultadoBloco
               titulo="Já lembradas hoje"
-              vazio="Nenhuma."
               itens={resultado.jaLembradas.map(
                 (item) => `${item.numero} — ${item.empresa}`
               )}
             />
             <ResultadoBloco
               titulo="Falhas"
-              vazio="Nenhuma."
               itens={resultado.falhas.map(
                 (item) =>
                   `${item.numero} — ${item.empresa}: ${item.motivo || "Falha no envio."}`
@@ -362,22 +405,14 @@ export function FaturaLembretesHojeBar({
   );
 }
 
-function ResultadoBloco({
-  titulo,
-  vazio,
-  itens,
-}: {
-  titulo: string;
-  vazio: string;
-  itens: string[];
-}) {
+function ResultadoBloco({ titulo, itens }: { titulo: string; itens: string[] }) {
   return (
     <div>
       <p className="font-semibold">
         {titulo} ({itens.length})
       </p>
       {itens.length === 0 ? (
-        <p className="text-[#64748b]">{vazio}</p>
+        <p className="text-[#64748b]">Nenhuma.</p>
       ) : (
         <ul className="mt-1 space-y-1">
           {itens.map((linha, indice) => (

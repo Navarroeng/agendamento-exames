@@ -9,6 +9,7 @@ import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaEnvioEmailModal } from "./FaturaEnvioEmailModal";
 import { FaturaLembreteModal } from "./FaturaLembreteModal";
 import { FaturaLembretesHojeBar } from "./FaturaLembretesHojeBar";
+import { FaturaLembretesVencidasBar } from "./FaturaLembretesVencidasBar";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
 import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
@@ -102,6 +103,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleLembreteEnviado,
   } = useFaturasPage(tipo);
   const [lembreteTick, setLembreteTick] = useState(0);
+  const [loteEmEnvio, setLoteEmEnvio] = useState<"hoje" | "vencidas" | null>(
+    null
+  );
 
   return (
     <AppShell
@@ -111,13 +115,30 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     >
       <div className="space-y-5">
         {tipo === "cliente" && (
-          <FaturaLembretesHojeBar
-            atualizarEm={lembreteTick}
-            onEnviado={(params) => {
-              handleLembreteEnviado(params);
-              setLembreteTick((valor) => valor + 1);
-            }}
-          />
+          <>
+            <FaturaLembretesHojeBar
+              atualizarEm={lembreteTick}
+              bloqueado={loteEmEnvio === "vencidas"}
+              onOcupacaoChange={(ocupado) =>
+                setLoteEmEnvio(ocupado ? "hoje" : null)
+              }
+              onEnviado={(params) => {
+                handleLembreteEnviado(params);
+                setLembreteTick((valor) => valor + 1);
+              }}
+            />
+            <FaturaLembretesVencidasBar
+              atualizarEm={lembreteTick}
+              bloqueado={loteEmEnvio === "hoje"}
+              onOcupacaoChange={(ocupado) =>
+                setLoteEmEnvio(ocupado ? "vencidas" : null)
+              }
+              onEnviado={(params) => {
+                handleLembreteEnviado(params);
+                setLembreteTick((valor) => valor + 1);
+              }}
+            />
+          </>
         )}
         <FaturasMesPanel
           variant={tipo}

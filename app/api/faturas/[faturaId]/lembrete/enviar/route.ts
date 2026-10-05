@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auditoriaActorFromAuth } from "@/lib/auditoria";
 import { requireFaturasStaffApi } from "@/lib/faturas-api-auth.server";
-import { enviarLembreteFaturaClienteResend } from "@/services/fatura-lembrete-email.server";
+import { enviarLembreteFaturaClienteComTrava } from "@/services/fatura-lembrete-email.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function POST(
       requestId?: string;
     };
 
-    const result = await enviarLembreteFaturaClienteResend({
+    const result = await enviarLembreteFaturaClienteComTrava({
       faturaId,
       email: String(body.email ?? ""),
       assunto: String(body.assunto ?? ""),
@@ -53,7 +53,9 @@ export async function POST(
       ? 403
       : message.includes("não encontrada")
         ? 404
-        : message.includes("Não foi possível enviar o lembrete")
+        : message.includes("em andamento")
+          ? 409
+          : message.includes("Não foi possível enviar o lembrete")
           ? 502
           : 400;
     return NextResponse.json({ error: message }, { status });

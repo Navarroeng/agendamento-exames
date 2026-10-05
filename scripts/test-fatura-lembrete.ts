@@ -20,8 +20,11 @@ import {
   competenciaLembreteExtenso,
   dataVencimentoCivil,
   decidirReservaLote,
+  diasAtrasoCivil,
   explicacaoBotaoLembretesHoje,
+  explicacaoBotaoLembretesVencidas,
   faturaElegivelLembreteHoje,
+  faturaElegivelLembreteVencida,
   faturaEstaVencidaParaLembrete,
   faturaPermiteLembrete,
   montarConfirmacaoLembretesHoje,
@@ -32,11 +35,14 @@ import {
 } from "../lib/fatura-lembrete";
 import { nomeArquivoPdfFaturaClienteEmail } from "../lib/fatura-pdf";
 import type { FaturaComItens, FaturaItemRecord } from "../lib/types";
-import { enviarLembreteFaturaClienteResend } from "../services/fatura-lembrete-email.server";
+import { enviarLembreteFaturaClienteResend, enviarLembreteFaturaClienteComTrava } from "../services/fatura-lembrete-email.server";
 import {
   consultarLembretesHoje,
+  consultarLembretesVencidas,
   executarLembreteHojeUma,
+  executarLembreteVencidaUma,
   executarLembretesHoje,
+  executarLembretesVencidas,
   listarPaginas,
   type LembretesHojeDeps,
 } from "../services/fatura-lembrete-lote.server";
@@ -787,6 +793,7 @@ function depsLote(state: {
     hojeIso: () => HOJE,
     agoraMs: () => Date.parse("2026-10-05T18:00:00.000Z"),
     listarCandidatas: async () => state.faturas,
+    modo: "hoje",
     listarEnviosEmpresa: async (ids) =>
       state.faturas
         .filter(
@@ -1247,6 +1254,283 @@ tests.push(
     assert.equal(resultado.aceitos.length, 1);
     assert.equal(enviados[0]?.email, "financeiro@pavfacil.com.br");
     assert.doesNotMatch(enviados[0]?.email ?? "", /outra/);
+  })
+);
+
+tests.push(
+  run("Vencidas — seleção usa a data e ignora hoje, futuro, paga e cancelada", async () => {
+    assert.equal(diasAtrasoCivil("2026-10-04", "2026-10-05"), 1);
+    assert.equal(diasAtrasoCivil("2026-09-05", "2026-10-05"), 30);
+    assert.equal(diasAtrasoCivil("2026-10-04T00:00:00.000Z", "2026-10-05"), 1);
+    assert.equal(diasAtrasoCivil("2026-10-05", "2026-10-05"), 0);
+    assert.equal(faturaElegivelLembreteVencida(alvoHoje(), HOJE), false);
+    assert.equal(
+      faturaElegivelLembreteVencida(
+        alvoHoje({ status: "emitida", data_vencimento: "2026-10-04" }),
+        HOJE
+      ),
+      true
+    );
+    assert.equal(
+      faturaElegivelLembreteVencida(
+        alvoHoje({ status: "vencida", data_vencimento: "2026-09-20" }),
+        HOJE
+      ),
+      true
+    );
+
+    const faturas = [
+      alvoHoje({ id: "emitida-atraso", data_vencimento: "2026-10-04" }),
+      alvoHoje({
+        id: "status-vencida",
+        numero: "FAT-VENC",
+        status: "vencida",
+        data_vencimento: "2026-09-20",
+        referencia_id: "cli-b",
+        referencia_nome: "OUTRA LTDA",
+        fatura_enviada_email: "financeiro@outra.com.br",
+      }),
+      alvoHoje({ id: "hoje", data_vencimento: HOJE }),
+      alvoHoje({ id: "futura", data_vencimento: "2026-10-20" }),
+      alvoHoje({ id: "paga", data_vencimento: "2026-10-01", pago: true }),
+      alvoHoje({ id: "cancelada", data_vencimento: "2026-10-01", status: "cancelada" }),
+      alvoHoje({
+        id: "lembrada",
+        data_vencimento: "2026-10-02",
+        numero: "FAT-JA",
+      }),
+    ];
+    const { deps } = depsLote({
+      faturas,
+      lembretes: [
+        { fatura_id: "lembrada", enviado_em: "2026-10-05T18:00:00.000Z" },
+      ],
+    });
+    const painel = await consultarLembretesVencidas(deps);
+    const ids = painel.pendentes.map((item) => item.id);
+    assert.deepEqual(ids.sort(), ["emitida-atraso", "status-vencida"]);
+    assert.equal(painel.jaLembradas[0]?.id, "lembrada");
+    assert.equal(
+      painel.pendentes.find((item) => item.id === "emitida-atraso")?.diasAtraso,
+      1
+    );
+    assert.equal(
+      painel.pendentes.find((item) => item.id === "status-vencida")?.diasAtraso,
+      15
+    );
+    assert.equal(
+      explicacaoBotaoLembretesVencidas(painel.elegiveis, painel.pendentes.length),
+      "2 faturas vencidas ainda não tiveram lembrete aceito pelo Resend hoje."
+    );
+  })
+);
+
+tests.push(
+  run("Vencidas — texto usa o número, separa empresas e segue após falha", async () => {
+    const faturas = [
+      alvoHoje({
+        id: "fat-a",
+        data_vencimento: "2026-10-04",
+        valor_total: 50,
+        mes_referencia: "2026-09",
+      }),
+      alvoHoje({
+        id: "fat-b",
+        numero: "FAT-CLI-2026-00200",
+        referencia_id: "cli-b",
+        referencia_nome: "OUTRA LTDA",
+        data_vencimento: "2026-09-20",
+        status: "vencida",
+        valor_total: 80,
+        fatura_enviada_email: "financeiro@outra.com.br",
+      }),
+      alvoHoje({
+        id: "sem-email",
+        numero: "FAT-CLI-SEM",
+        referencia_id: "cli-sem",
+        referencia_nome: "SEM EMAIL",
+        data_vencimento: "2026-10-01",
+        fatura_enviada_email: null,
+        fatura_enviada_em: null,
+      }),
+    ];
+    let falhou = false;
+    const { deps, enviados } = depsLote({
+      faturas,
+      enviarUm: async (params) => {
+        if (params.faturaId === "fat-b" && !falhou) {
+          falhou = true;
+          throw new Error("Resend recusou FAT-CLI-2026-00200.");
+        }
+        enviados.push(params);
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: params.email,
+          resendMessageId: `resend-${params.faturaId}`,
+          reutilizado: false,
+        };
+      },
+    });
+    deps.listarLembretes = async (ids) =>
+      enviados
+        .filter((item) => ids.includes(item.faturaId))
+        .map((item) => ({
+          fatura_id: item.faturaId,
+          enviado_em: "2026-10-05T18:00:00.000Z",
+        }));
+
+    const primeiro = await executarLembretesVencidas({}, deps);
+    assert.equal(primeiro.aceitos.length, 1);
+    assert.equal(primeiro.aceitos[0]?.faturaId, "fat-a");
+    assert.equal(primeiro.semEmail.length, 1);
+    assert.equal(primeiro.falhas.length, 1);
+    const pav = enviados[0];
+    assert.ok(pav);
+    assert.equal(
+      pav.assunto,
+      "Lembrete de pagamento — Fatura FAT-CLI-2026-00102 em aberto | Navarro Engenharia"
+    );
+    assert.match(
+      pav.mensagem,
+      /Até o momento, não identificamos o pagamento da fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, com vencimento em 04\/10\/2026/
+    );
+    assert.match(pav.mensagem, /regularização do pagamento/);
+    assert.doesNotMatch(pav.mensagem, /juros|multa|exames ocupacionais|hoje/i);
+    assert.equal(pav.email, "financeiro@pavfacil.com.br");
+
+    const segundo = await executarLembretesVencidas({}, deps);
+    assert.equal(segundo.aceitos[0]?.faturaId, "fat-b");
+    assert.equal(enviados.filter((item) => item.faturaId === "fat-a").length, 1);
+    const outra = enviados.find((item) => item.faturaId === "fat-b");
+    assert.equal(outra?.email, "financeiro@outra.com.br");
+    assert.match(outra?.mensagem ?? "", /OUTRA LTDA/);
+    assert.doesNotMatch(outra?.mensagem ?? "", /PAVFACIL/);
+    assert.match(outra?.mensagem ?? "", /vencimento em 20\/09\/2026/);
+  })
+);
+
+tests.push(
+  run("Vencidas — execução simultânea não envia a mesma fatura duas vezes", async () => {
+    const faturas = [
+      alvoHoje({ id: "fat-a", data_vencimento: "2026-10-04" }),
+    ];
+    let ocupada = false;
+    let envios = 0;
+    const { deps } = depsLote({
+      faturas,
+      reservar: async () => {
+        if (ocupada) return "ocupado";
+        ocupada = true;
+        return "ok";
+      },
+      enviarUm: async (params) => {
+        envios += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return {
+          enviadoEm: "2026-10-05T18:00:00.000Z",
+          email: params.email,
+          resendMessageId: "resend-fat-a",
+          reutilizado: false,
+        };
+      },
+    });
+    const [primeiro, segundo] = await Promise.all([
+      executarLembreteVencidaUma("fat-a", {}, deps),
+      executarLembreteVencidaUma("fat-a", {}, deps),
+    ]);
+    const tipos = [primeiro.tipo, segundo.tipo].sort();
+    assert.deepEqual(tipos, ["aceito", "falha"]);
+    assert.match(
+      [primeiro, segundo].find((item) => item.tipo === "falha")?.motivo ?? "",
+      /em andamento/
+    );
+    assert.equal(envios, 1);
+  })
+);
+
+tests.push(
+  run("Individual — trava compartilhada impede envio simultâneo", async () => {
+    let enviou = false;
+    let liberou = false;
+    await assert.rejects(
+      () =>
+        enviarLembreteFaturaClienteComTrava(
+          {
+            faturaId: "fat-a",
+            email: "cliente@empresa.com.br",
+            assunto: "Assunto",
+            mensagem: "Mensagem",
+            requestId: REQUEST_ID,
+          },
+          {
+            hojeIso: () => HOJE,
+            reservar: async () => "ocupado",
+            liberar: async () => {
+              liberou = true;
+            },
+            envio: {
+              enviarEmailResend: async () => {
+                enviou = true;
+                return { id: "nao" };
+              },
+            },
+          }
+        ),
+      /em andamento/
+    );
+    assert.equal(enviou, false);
+    assert.equal(liberou, false);
+
+    let reservou = false;
+    const ok = await enviarLembreteFaturaClienteComTrava(
+      {
+        faturaId: "fat-pavfacil",
+        email: "cliente@empresa.com.br",
+        assunto: "Assunto válido",
+        mensagem: "Mensagem válida",
+        requestId: REQUEST_ID,
+      },
+      {
+        hojeIso: () => HOJE,
+        reservar: async () => {
+          reservou = true;
+          return "ok";
+        },
+        liberar: async () => {
+          liberou = true;
+        },
+        envio: {
+          buscarFatura: async () => faturaBase(),
+          gerarPdfBuffer: async () => ({
+            buffer: Buffer.from("%PDF"),
+            filename: "x.pdf",
+          }),
+          buscarLembretePorIdempotency: async () => null,
+          enviarEmailResend: async () => {
+            enviou = true;
+            return { id: "resend-individual" };
+          },
+          registrarLembreteAceito: async (params) => ({
+            id: "lem-trava",
+            fatura_id: params.faturaId,
+            enviado_em: params.enviadoEm,
+            destinatario: params.email,
+            usuario_id: null,
+            usuario_nome: "Staff",
+            assunto: params.assunto,
+            mensagem: params.mensagem,
+            resend_message_id: params.resendMessageId,
+            situacao: "aceito_resend" as const,
+          }),
+          atualizarUltimoLembrete: async () => undefined,
+          registrarAuditoriaSucesso: async () => undefined,
+        },
+      }
+    );
+    assert.equal(reservou, true);
+    assert.equal(enviou, true);
+    assert.equal(liberou, true);
+    assert.equal(ok.resendMessageId, "resend-individual");
   })
 );
 

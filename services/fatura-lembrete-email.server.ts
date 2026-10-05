@@ -18,8 +18,13 @@ import {
   type FaturaLembreteRegistro,
 } from "@/lib/fatura-lembrete";
 import { nomeArquivoPdfFaturaClienteEmail } from "@/lib/fatura-pdf";
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FaturaComItens } from "@/lib/types";
+import {
+  liberarLembreteExecucao,
+  reservarLembreteExecucao,
+} from "@/services/fatura-lembrete-lock.server";
 
 const ERRO_ENVIO =
   "Não foi possível enviar o lembrete. O envio não foi registrado.";
@@ -500,4 +505,45 @@ export async function listarLembretesFatura(
 
   if (error) throw error;
   return (data ?? []).map((row) => mapLembrete(row as Record<string, unknown>));
+}
+
+/**
+ * Envio individual com a mesma trava dos lotes. Um aceite anterior no dia
+ * não impede este envio; uma execução simultânea da mesma fatura impede.
+ */
+export async function enviarLembreteFaturaClienteComTrava(
+  params: {
+    faturaId: string;
+    email: string;
+    assunto: string;
+    mensagem: string;
+    requestId: string;
+    request?: Request;
+    auditContext?: AuditoriaUsuarioContext;
+  },
+  deps: {
+    envio?: Partial<EnviarLembreteFaturaDeps>;
+    hojeIso?: () => string;
+    reservar?: (
+      faturaId: string,
+      diaCivil: string
+    ) => Promise<"ok" | "ocupado">;
+    liberar?: (faturaId: string, diaCivil: string) => Promise<void>;
+  } = {}
+): Promise<EnviarLembreteFaturaResult> {
+  const hojeIso = (deps.hojeIso ?? (() => todayIsoSaoPaulo()))();
+  const reservar = deps.reservar ?? reservarLembreteExecucao;
+  const liberar = deps.liberar ?? liberarLembreteExecucao;
+  const faturaId = params.faturaId.trim();
+  let reservou = false;
+  try {
+    const reserva = await reservar(faturaId, hojeIso);
+    if (reserva === "ocupado") {
+      throw new Error("Outro envio desta fatura já está em andamento.");
+    }
+    reservou = true;
+    return await enviarLembreteFaturaClienteResend(params, deps.envio);
+  } finally {
+    if (reservou) await liberar(faturaId, hojeIso);
+  }
 }

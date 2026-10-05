@@ -386,6 +386,61 @@ export function selecionarFaturasLembreteHoje<T extends FaturaLembreteHojeAlvo>(
 }
 
 /**
+ * Lote de vencidas: status real `emitida` ou `vencida`, sem pagamento,
+ * vencimento civil anterior a hoje. Não depende só do status.
+ */
+export function faturaElegivelLembreteVencida(
+  fatura: Pick<
+    FaturaLembreteHojeAlvo,
+    "tipo" | "status" | "pago" | "data_vencimento"
+  >,
+  hojeIso: string
+): boolean {
+  if (fatura.tipo !== "cliente") return false;
+  if (fatura.status !== "emitida" && fatura.status !== "vencida") return false;
+  if (fatura.pago) return false;
+  try {
+    return classificarVencimentoLembrete(fatura.data_vencimento, hojeIso) === "vencido";
+  } catch {
+    return false;
+  }
+}
+
+export function selecionarFaturasLembreteVencida<T extends FaturaLembreteHojeAlvo>(
+  faturas: T[],
+  hojeIso: string
+): T[] {
+  return faturas.filter((fatura) => faturaElegivelLembreteVencida(fatura, hojeIso));
+}
+
+/** Dias civis de atraso. Não converte o vencimento pelo fuso. */
+export function diasAtrasoCivil(
+  dataVencimento: string,
+  hojeIso: string
+): number {
+  const vencimento = dataVencimentoCivil(dataVencimento);
+  const hoje = dataIsoCivil(hojeIso);
+  if (!ISO_DATE.test(vencimento) || !ISO_DATE.test(hoje)) return 0;
+  const [anoV, mesV, diaV] = vencimento.split("-").map(Number);
+  const [anoH, mesH, diaH] = hoje.split("-").map(Number);
+  const diff = Date.UTC(anoH, mesH - 1, diaH) - Date.UTC(anoV, mesV - 1, diaV);
+  return Math.max(0, Math.round(diff / 86_400_000));
+}
+
+export function explicacaoBotaoLembretesVencidas(
+  elegiveis: number,
+  pendentes: number
+): string {
+  if (pendentes > 0) {
+    return pendentes === 1
+      ? "1 fatura vencida ainda não teve lembrete aceito pelo Resend hoje."
+      : `${pendentes} faturas vencidas ainda não tiveram lembrete aceito pelo Resend hoje.`;
+  }
+  if (elegiveis === 0) return "Nenhuma fatura vencida em aberto.";
+  return "Todas as faturas vencidas em aberto já tiveram lembrete aceito pelo Resend hoje.";
+}
+
+/**
  * E-mail de faturamento só desta empresa: o da própria fatura ou o último
  * envio confirmado do mesmo `referencia_id`. Nunca o de outra empresa.
  */

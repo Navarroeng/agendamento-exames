@@ -171,3 +171,75 @@ export async function enviarLembreteHojeCliente(
 
   return json.item;
 }
+
+export type LembretesVencidasPendenteCliente = LembretesHojePendenteCliente & {
+  vencimento: string;
+  diasAtraso: number;
+};
+
+export type LembretesVencidasPainelCliente = {
+  hojeIso: string;
+  elegiveis: number;
+  pendentes: LembretesVencidasPendenteCliente[];
+  jaLembradas: { id: string; numero: string; empresa: string }[];
+};
+
+export async function consultarLembretesVencidasCliente(): Promise<LembretesVencidasPainelCliente> {
+  const res = await fetch("/api/faturas/lembretes-vencidas");
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    hojeIso?: string;
+    elegiveis?: number;
+    pendentes?: LembretesVencidasPendenteCliente[];
+    jaLembradas?: { id: string; numero: string; empresa: string }[];
+  };
+
+  if (
+    !res.ok ||
+    !json.ok ||
+    !json.hojeIso ||
+    json.elegiveis == null ||
+    !json.pendentes ||
+    !json.jaLembradas
+  ) {
+    throw new Error(
+      json.error || "Não foi possível consultar as faturas vencidas."
+    );
+  }
+
+  return {
+    hojeIso: json.hojeIso,
+    elegiveis: json.elegiveis,
+    pendentes: json.pendentes,
+    jaLembradas: json.jaLembradas,
+  };
+}
+
+export async function enviarLembreteVencidaCliente(
+  faturaId: string
+): Promise<LembreteHojeItemCliente> {
+  const id = faturaId.trim();
+  if (!id) throw new Error("Fatura inválida.");
+
+  const res = await fetch("/api/faturas/lembretes-vencidas/enviar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ faturaId: id }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    item?: LembreteHojeItemCliente;
+  };
+
+  if (!res.ok || !json.ok || !json.item) {
+    throw new Error(
+      json.error ||
+        "Não foi possível enviar o lembrete. O envio não foi registrado."
+    );
+  }
+
+  return json.item;
+}
