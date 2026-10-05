@@ -20,6 +20,7 @@ import {
   type FaturaMesStatus,
 } from "@/lib/fatura-mes-resumo";
 import { FATURA_ALTERACAO_POS_EMISSAO_MSG } from "@/lib/fatura-alteracao-pos-emissao";
+import { textoUltimoLembrete } from "@/lib/fatura-lembrete";
 import {
   buildCustosClinicaVencimentoView,
   type CustosClinicaVencimentoView,
@@ -165,6 +166,8 @@ interface FaturasMesPanelProps {
   onReemitir?: (id: string) => void;
   onReabrirConferencia?: (id: string) => void;
   onEnviarEmail?: (id: string) => void;
+  onEnviarLembrete?: (id: string) => void;
+  onConsultarLembrete?: (id: string) => void;
 }
 
 export function FaturasMesPanel({
@@ -195,6 +198,8 @@ export function FaturasMesPanel({
   onReemitir,
   onReabrirConferencia,
   onEnviarEmail,
+  onEnviarLembrete,
+  onConsultarLembrete,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
@@ -491,6 +496,20 @@ export function FaturasMesPanel({
                             {FATURA_ALTERACAO_POS_EMISSAO_MSG}
                           </p>
                         )}
+                        {variant === "cliente" &&
+                        row.fatura?.fatura_lembrete_ultimo_em ? (
+                          <button
+                            type="button"
+                            className="max-w-[220px] text-left text-[10px] font-medium leading-snug text-brand-blue hover:underline"
+                            onClick={() =>
+                              onConsultarLembrete?.(row.fatura!.id)
+                            }
+                          >
+                            {textoUltimoLembrete(
+                              row.fatura.fatura_lembrete_ultimo_em
+                            )}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-2.5 py-2">
@@ -511,6 +530,7 @@ export function FaturasMesPanel({
                         onReemitir={onReemitir}
                         onReabrirConferencia={onReabrirConferencia}
                         onEnviarEmail={onEnviarEmail}
+                        onEnviarLembrete={onEnviarLembrete}
                       />
                     </td>
                   </tr>

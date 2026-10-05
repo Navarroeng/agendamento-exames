@@ -646,6 +646,8 @@ export interface FaturaRecord {
   fatura_enviada_por_user_id?: string | null;
   fatura_envio_resend_id?: string | null;
   fatura_envio_reenvio_count?: number;
+  fatura_lembrete_ultimo_em?: string | null;
+  fatura_lembrete_ultimo_email?: string | null;
   created_at: string;
   updated_at: string;
 }

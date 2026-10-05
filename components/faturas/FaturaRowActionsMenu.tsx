@@ -6,6 +6,7 @@ import {
   faturaStatusPermiteEnvioEmail,
   isFaturaEnvioExplicitamenteConfirmado,
 } from "@/lib/fatura-envio";
+import { faturaPermiteLembrete } from "@/lib/fatura-lembrete";
 import {
   faturaStatusEmissaoAtiva,
   faturaStatusHistoricoReemissao,
@@ -23,6 +24,7 @@ interface FaturaRowActionsMenuProps {
   onVerComprovante?: (id: string) => void;
   onReemitir?: (id: string) => void;
   onEnviarEmail?: (id: string) => void;
+  onEnviarLembrete?: (id: string) => void;
 }
 
 type MenuItem = {
@@ -44,6 +46,7 @@ export function FaturaRowActionsMenu({
   onVerComprovante,
   onReemitir,
   onEnviarEmail,
+  onEnviarLembrete,
 }: FaturaRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -104,6 +107,18 @@ export function FaturaRowActionsMenu({
         ? "Reenviar por e-mail"
         : "Enviar por e-mail",
       onClick: () => onEnviarEmail(fatura.id),
+    });
+  }
+
+  if (
+    variant === "cliente" &&
+    onEnviarLembrete &&
+    faturaPermiteLembrete(fatura)
+  ) {
+    items.push({
+      key: "enviar-lembrete",
+      label: "Enviar lembrete",
+      onClick: () => onEnviarLembrete(fatura.id),
     });
   }
 

@@ -244,6 +244,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   );
   const [envioEmailModalOrigem, setEnvioEmailModalOrigem] =
     useState<FaturaEnvioEmailModalOrigem>("pos-emissao");
+  const [lembreteModalOpen, setLembreteModalOpen] = useState(false);
+  const [lembreteFatura, setLembreteFatura] = useState<FaturaRecord | null>(
+    null
+  );
+  const [lembreteEmailSugerido, setLembreteEmailSugerido] = useState<
+    string | null
+  >(null);
+  const [lembreteHistoricoInicial, setLembreteHistoricoInicial] =
+    useState(false);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -916,6 +925,83 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         previewRef.current = nextPreview;
         setPreview(nextPreview);
       }
+    },
+    []
+  );
+
+  const abrirLembreteModalCliente = useCallback(
+    (
+      fatura: FaturaRecord,
+      historicoInicial: boolean,
+      faturasFonte?: FaturaRecord[]
+    ) => {
+      const fonte = faturasFonte ?? faturas;
+      setLembreteFatura(fatura);
+      setLembreteEmailSugerido(
+        obterEmailEnvioSugeridoCliente(fonte, fatura.referencia_id, fatura.id)
+      );
+      setLembreteHistoricoInicial(historicoInicial);
+      setLembreteModalOpen(true);
+    },
+    [faturas]
+  );
+
+  const resolverFaturaCliente = useCallback(
+    async (faturaId: string): Promise<FaturaRecord | null> => {
+      const local = faturas.find((f) => f.id === faturaId);
+      if (local) return local;
+      try {
+        return (await buscarFaturaComItens(faturaId)) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [faturas]
+  );
+
+  const handleAbrirLembrete = useCallback(
+    async (faturaId: string, historicoInicial = false) => {
+      if (pageTipo !== "cliente") return;
+      const local = faturas.find((f) => f.id === faturaId);
+      if (local) {
+        abrirLembreteModalCliente(local, historicoInicial);
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const fatura = await resolverFaturaCliente(faturaId);
+        if (!fatura) {
+          toast.error("Fatura não encontrada.");
+          return;
+        }
+        abrirLembreteModalCliente(fatura, historicoInicial);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [abrirLembreteModalCliente, faturas, pageTipo, resolverFaturaCliente]
+  );
+
+  const handleCloseLembreteModal = useCallback(() => {
+    setLembreteModalOpen(false);
+    setLembreteFatura(null);
+    setLembreteEmailSugerido(null);
+  }, []);
+
+  const handleLembreteEnviado = useCallback(
+    (params: { faturaId: string; enviadoEm: string; email: string }) => {
+      setFaturas((prev) =>
+        prev.map((f) =>
+          f.id === params.faturaId
+            ? {
+                ...f,
+                fatura_lembrete_ultimo_em: params.enviadoEm,
+                fatura_lembrete_ultimo_email: params.email,
+              }
+            : f
+        )
+      );
     },
     []
   );
@@ -1778,5 +1864,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleCloseEnvioEmailModal,
     handleEnviarEmailMenu,
     handleFaturaEnvioEmailEnviado,
+    lembreteModalOpen,
+    lembreteFatura,
+    lembreteEmailSugerido,
+    lembreteHistoricoInicial,
+    handleAbrirLembrete,
+    handleCloseLembreteModal,
+    handleLembreteEnviado,
   };
 }

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/icons/OutlineIcons";
 import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaEnvioEmailModal } from "./FaturaEnvioEmailModal";
+import { FaturaLembreteModal } from "./FaturaLembreteModal";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
 import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
@@ -90,6 +91,13 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleCloseEnvioEmailModal,
     handleEnviarEmailMenu,
     handleFaturaEnvioEmailEnviado,
+    lembreteModalOpen,
+    lembreteFatura,
+    lembreteEmailSugerido,
+    lembreteHistoricoInicial,
+    handleAbrirLembrete,
+    handleCloseLembreteModal,
+    handleLembreteEnviado,
   } = useFaturasPage(tipo);
 
   return (
@@ -131,6 +139,12 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           }
           onEnviarEmail={
             tipo === "cliente" ? handleEnviarEmailMenu : undefined
+          }
+          onEnviarLembrete={
+            tipo === "cliente" ? (id) => void handleAbrirLembrete(id, false) : undefined
+          }
+          onConsultarLembrete={
+            tipo === "cliente" ? (id) => void handleAbrirLembrete(id, true) : undefined
           }
         />
       </div>
@@ -189,6 +203,17 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           auditOptions={auditOptions}
           onClose={handleCloseEnvioEmailModal}
           onEnviado={handleFaturaEnvioEmailEnviado}
+        />
+      )}
+
+      {tipo === "cliente" && (
+        <FaturaLembreteModal
+          open={lembreteModalOpen}
+          fatura={lembreteFatura}
+          emailSugerido={lembreteEmailSugerido}
+          historicoInicial={lembreteHistoricoInicial}
+          onClose={handleCloseLembreteModal}
+          onEnviado={handleLembreteEnviado}
         />
       )}
     </AppShell>
