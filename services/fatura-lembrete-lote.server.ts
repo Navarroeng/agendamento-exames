@@ -444,25 +444,16 @@ async function processarUma(
       return { ...itemBase(deNovo), tipo: "ja_lembrada" };
     }
 
-    const texto =
-      modo === "vencidas"
-        ? buildLembreteFaturaTexto({
-            numero: deNovo.numero,
-            clienteNome: deNovo.referencia_nome,
-            valor: Number(deNovo.valor_total),
-            dataVencimento: deNovo.data_vencimento,
-            hojeIso,
-          })
-        : buildLembreteFaturaTexto({
-            numero: deNovo.numero,
-            clienteNome: deNovo.referencia_nome,
-            valor: Number(deNovo.valor_total),
-            dataVencimento: deNovo.data_vencimento,
-            mesReferencia: deNovo.mes_referencia,
-            periodoInicio: deNovo.periodo_inicio,
-            escopo: deNovo.tipo === "cliente" ? "exames_ocupacionais" : "outro",
-            hojeIso,
-          });
+    const texto = buildLembreteFaturaTexto({
+      numero: deNovo.numero,
+      clienteNome: deNovo.referencia_nome,
+      valor: Number(deNovo.valor_total),
+      dataVencimento: deNovo.data_vencimento,
+      mesReferencia: deNovo.mes_referencia,
+      periodoInicio: deNovo.periodo_inicio,
+      escopo: deNovo.tipo === "cliente" ? "exames_ocupacionais" : "outro",
+      hojeIso,
+    });
     const enviado = await merged.enviarUm({
       faturaId: deNovo.id,
       email,

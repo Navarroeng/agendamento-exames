@@ -144,22 +144,59 @@ export function competenciaLembreteExtenso(params: {
 
 export type EscopoLembreteFatura = "exames_ocupacionais" | "outro";
 
+/** Último grupo numérico do número, com os zeros à esquerda. */
+export function numeroCurtoFatura(numero: string): string {
+  const texto = numero.trim();
+  const match = texto.match(/(\d+)$/);
+  return match?.[1] || texto || "—";
+}
+
+/** “setembro/2026” → “Setembro/2026”, para o assunto. */
+export function competenciaLembreteTitulo(extenso: string): string {
+  const barra = extenso.indexOf("/");
+  if (barra <= 0) return extenso;
+  const mes = extenso.slice(0, barra);
+  const ano = extenso.slice(barra + 1);
+  return `${mes.charAt(0).toUpperCase()}${mes.slice(1)}/${ano}`;
+}
+
+function assuntoLembrete(params: {
+  momento: MomentoLembreteFatura;
+  numeroCurto: string;
+  competenciaTitulo: string | null;
+  examesOcupacionais: boolean;
+}): string {
+  const competencia = params.competenciaTitulo
+    ? ` (${params.competenciaTitulo})`
+    : "";
+  if (params.momento === "vencido") {
+    const servico = params.examesOcupacionais ? "Exames Ocupacionais " : "";
+    return `Fatura vencida — ${servico}nº ${params.numeroCurto}${competencia} | Navarro Engenharia`;
+  }
+  const servico = params.examesOcupacionais ? "Exames Ocupacionais — " : "";
+  return `Lembrete de vencimento — ${servico}Fatura ${params.numeroCurto}${competencia} | Navarro Engenharia`;
+}
+
 function fraseCorpoLembrete(params: {
   momento: MomentoLembreteFatura;
   numero: string;
   valor: string;
   data: string;
   competencia: string | null;
+  examesOcupacionais: boolean;
 }): string {
-  if (params.competencia) {
-    const referencia = `a fatura referente aos exames ocupacionais realizados no mês de ${params.competencia}, no valor de ${params.valor}`;
+  if (params.examesOcupacionais) {
+    const referencia = params.competencia
+      ? `a fatura referente aos exames ocupacionais realizados no mês de ${params.competencia}`
+      : "a fatura referente aos exames ocupacionais realizados";
+    const comValor = `${referencia}, no valor de ${params.valor}`;
     if (params.momento === "hoje") {
-      return `Passando para lembrar que ${referencia}, vence na data de hoje.`;
+      return `Passando para lembrar que ${comValor}, vence na data de hoje.`;
     }
     if (params.momento === "vencido") {
-      return `Até o momento, não identificamos o pagamento d${referencia}, com vencimento em ${params.data}.`;
+      return `Até o momento, não identificamos o pagamento d${comValor}, com vencimento em ${params.data}.`;
     }
-    return `Passando para lembrar que ${referencia}, tem vencimento em ${params.data}.`;
+    return `Passando para lembrar que ${comValor}, tem vencimento em ${params.data}.`;
   }
 
   if (params.momento === "hoje") {
@@ -191,19 +228,24 @@ export function buildLembreteFaturaTexto(params: {
 
   const hoje = params.hojeIso?.trim() || todayIsoSaoPaulo();
   const momento = classificarVencimentoLembrete(params.dataVencimento, hoje);
-  const competencia =
-    params.escopo === "exames_ocupacionais"
-      ? competenciaLembreteExtenso({
-          mesReferencia: params.mesReferencia,
-          periodoInicio: params.periodoInicio,
-        })
-      : null;
+  const examesOcupacionais = params.escopo === "exames_ocupacionais";
+  const competencia = competenciaLembreteExtenso({
+    mesReferencia: params.mesReferencia,
+    periodoInicio: params.periodoInicio,
+  });
   const corpo = fraseCorpoLembrete({
     momento,
     numero,
     valor,
     data,
     competencia,
+    examesOcupacionais,
+  });
+  const assunto = assuntoLembrete({
+    momento,
+    numeroCurto: numeroCurtoFatura(numero),
+    competenciaTitulo: competencia ? competenciaLembreteTitulo(competencia) : null,
+    examesOcupacionais,
   });
   const encerramento = [
     "Caso o pagamento já tenha sido realizado, por favor, desconsidere este lembrete e encaminhe o comprovante para conferência.",
@@ -215,7 +257,7 @@ export function buildLembreteFaturaTexto(params: {
   if (momento === "hoje") {
     return {
       vencida: false,
-      assunto: `Sua fatura vence hoje — Fatura ${numero} | Navarro Engenharia`,
+      assunto,
       mensagem: [
         `Olá, ${cliente}.`,
         "",
@@ -231,7 +273,7 @@ export function buildLembreteFaturaTexto(params: {
   if (momento === "vencido") {
     return {
       vencida: true,
-      assunto: `Lembrete de pagamento — Fatura ${numero} em aberto | Navarro Engenharia`,
+      assunto,
       mensagem: [
         `Olá, ${cliente}.`,
         "",
@@ -246,7 +288,7 @@ export function buildLembreteFaturaTexto(params: {
 
   return {
     vencida: false,
-    assunto: `Lembrete de vencimento — Fatura ${numero} | Navarro Engenharia`,
+    assunto,
     mensagem: [
       `Olá, ${cliente}.`,
       "",

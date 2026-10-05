@@ -29,6 +29,7 @@ import {
   faturaPermiteLembrete,
   montarConfirmacaoLembretesHoje,
   motivoBloqueioLembrete,
+  numeroCurtoFatura,
   textoUltimoLembrete,
   validarConteudoLembrete,
   type FaturaLembreteHojeAlvo,
@@ -145,7 +146,7 @@ tests.push(
     assert.equal(texto.vencida, false);
     assert.equal(
       texto.assunto,
-      "Sua fatura vence hoje — Fatura FAT-CLI-2026-00102 | Navarro Engenharia"
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00102 (Setembro/2026) | Navarro Engenharia"
     );
     assert.equal(
       texto.mensagem,
@@ -182,7 +183,7 @@ tests.push(
     assert.equal(texto.vencida, false);
     assert.equal(
       texto.assunto,
-      "Lembrete de vencimento — Fatura FAT-CLI-2026-00102 | Navarro Engenharia"
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00102 (Setembro/2026) | Navarro Engenharia"
     );
     assert.match(
       texto.mensagem,
@@ -209,7 +210,7 @@ tests.push(
     assert.equal(texto.vencida, true);
     assert.equal(
       texto.assunto,
-      "Lembrete de pagamento — Fatura FAT-CLI-2026-00102 em aberto | Navarro Engenharia"
+      "Fatura vencida — Exames Ocupacionais nº 00102 (Setembro/2026) | Navarro Engenharia"
     );
     assert.match(
       texto.mensagem,
@@ -238,22 +239,31 @@ tests.push(
     );
     assert.equal(competenciaLembreteExtenso({}), null);
 
+    assert.equal(numeroCurtoFatura("FAT-CLI-2026-00132"), "00132");
+    assert.equal(numeroCurtoFatura("FAT-CLI-00007"), "00007");
+    assert.notEqual(numeroCurtoFatura("FAT-CLI-2026-00132"), "132");
+
     const semCompetencia = buildLembreteFaturaTexto({
-      numero: "FAT-CLI-2026-00102",
+      numero: "FAT-CLI-2026-00132",
       clienteNome: "PAVFACIL",
       valor: 50,
       dataVencimento: "2026-10-20",
       hojeIso: "2026-10-05",
       escopo: "exames_ocupacionais",
     });
+    assert.equal(
+      semCompetencia.assunto,
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00132 | Navarro Engenharia"
+    );
     assert.match(
       semCompetencia.mensagem,
-      /fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
+      /fatura referente aos exames ocupacionais realizados, no valor de R\$ 50,00, tem vencimento em 20\/10\/2026/
     );
-    assert.doesNotMatch(semCompetencia.mensagem, /exames ocupacionais|setembro\/2026|outubro\/2026/i);
+    assert.doesNotMatch(semCompetencia.assunto, /\(/);
+    assert.doesNotMatch(semCompetencia.mensagem, /no mês de|setembro\/2026|outubro\/2026/i);
 
     const outroServico = buildLembreteFaturaTexto({
-      numero: "FAT-CLI-2026-00102",
+      numero: "FAT-SRV-2026-00015",
       clienteNome: "PAVFACIL",
       valor: 50,
       dataVencimento: "2026-10-05",
@@ -261,12 +271,16 @@ tests.push(
       mesReferencia: "2026-09",
       escopo: "outro",
     });
+    assert.equal(
+      outroServico.assunto,
+      "Lembrete de vencimento — Fatura 00015 (Setembro/2026) | Navarro Engenharia"
+    );
     assert.match(
       outroServico.mensagem,
-      /Lembramos que a fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, vence na data de hoje/
+      /Lembramos que a fatura FAT-SRV-2026-00015, no valor de R\$ 50,00, vence na data de hoje/
     );
-    assert.match(outroServico.assunto, /Fatura FAT-CLI-2026-00102/);
-    assert.doesNotMatch(outroServico.mensagem, /exames ocupacionais|setembro\/2026/i);
+    assert.doesNotMatch(outroServico.assunto, /Exames Ocupacionais/);
+    assert.doesNotMatch(outroServico.mensagem, /exames ocupacionais/i);
   })
 );
 
@@ -292,7 +306,8 @@ tests.push(
       dataVencimento: "2026-10-05T00:00:00.000Z",
       hojeIso: hojeSp,
     });
-    assert.match(texto.assunto, /vence hoje/);
+    assert.match(texto.assunto, /Lembrete de vencimento — Fatura 00102/);
+    assert.doesNotMatch(texto.assunto, /Fatura vencida/);
     assert.match(texto.mensagem, /vence na data de hoje/);
   })
 );
@@ -967,7 +982,10 @@ tests.push(
     const outra = enviados.find((item) => item.faturaId === "fat-b");
     assert.ok(pav);
     assert.ok(outra);
-    assert.match(pav.assunto, /vence hoje — Fatura FAT-CLI-2026-00102/);
+    assert.equal(
+      pav.assunto,
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00102 (Setembro/2026) | Navarro Engenharia"
+    );
     assert.match(pav.mensagem, /PAVFACIL/);
     assert.match(
       pav.mensagem,
@@ -976,7 +994,10 @@ tests.push(
     assert.match(pav.mensagem, /vence na data de hoje/);
     assert.doesNotMatch(pav.mensagem, /FAT-CLI-2026-00102|agosto\/2026|OUTRA LTDA/);
     assert.doesNotMatch(pav.email, /outra/);
-    assert.match(outra.assunto, /vence hoje — Fatura FAT-CLI-2026-00200/);
+    assert.equal(
+      outra.assunto,
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00200 (Agosto/2026) | Navarro Engenharia"
+    );
     assert.match(outra.mensagem, /OUTRA LTDA/);
     assert.match(outra.mensagem, /agosto\/2026/);
     assert.doesNotMatch(outra.mensagem, /PAVFACIL|setembro\/2026|FAT-CLI-2026-00200/);
@@ -1388,14 +1409,15 @@ tests.push(
     assert.ok(pav);
     assert.equal(
       pav.assunto,
-      "Lembrete de pagamento — Fatura FAT-CLI-2026-00102 em aberto | Navarro Engenharia"
+      "Fatura vencida — Exames Ocupacionais nº 00102 (Setembro/2026) | Navarro Engenharia"
     );
     assert.match(
       pav.mensagem,
-      /Até o momento, não identificamos o pagamento da fatura FAT-CLI-2026-00102, no valor de R\$ 50,00, com vencimento em 04\/10\/2026/
+      /Até o momento, não identificamos o pagamento da fatura referente aos exames ocupacionais realizados no mês de setembro\/2026, no valor de R\$ 50,00, com vencimento em 04\/10\/2026/
     );
     assert.match(pav.mensagem, /regularização do pagamento/);
-    assert.doesNotMatch(pav.mensagem, /juros|multa|exames ocupacionais|hoje/i);
+    assert.doesNotMatch(pav.assunto, /outubro\/2026/i);
+    assert.doesNotMatch(pav.mensagem, /juros|multa|no mês de outubro|hoje/i);
     assert.equal(pav.email, "financeiro@pavfacil.com.br");
 
     const segundo = await executarLembretesVencidas({}, deps);
