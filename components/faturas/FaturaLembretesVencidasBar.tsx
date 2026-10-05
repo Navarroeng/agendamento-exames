@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Panel } from "@/components/ui/Panel";
 import { IconReceipt } from "@/components/ui/icons/OutlineIcons";
-import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { isEmailValido } from "@/lib/email-validacao";
 import {
   FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA,
   chaveEmpresaLembrete,
   explicacaoBotaoLembretesVencidas,
-  lembretesVencidasBotaoHabilitado,
+  lembretesLoteBotaoHabilitado,
   montarConfirmacaoLembretesHoje,
   normalizarCompetenciaIso,
   previaLembretesVencidasAindaValida,
@@ -23,6 +21,10 @@ import {
   type LembretesVencidasPainelCliente,
   type LembretesVencidasPendenteCliente,
 } from "@/services/fatura-lembrete.service";
+import {
+  FaturaLembreteListasConfirmacao,
+  classeBotaoLembrete,
+} from "./FaturaLembreteListasConfirmacao";
 
 interface FaturaLembretesVencidasBarProps {
   competencia: string;
@@ -60,10 +62,6 @@ function itemDePendente(
     email: pendente.email,
     motivo,
   };
-}
-
-function textoAtraso(dias: number): string {
-  return dias === 1 ? "1 dia" : `${dias} dias`;
 }
 
 export function FaturaLembretesVencidasBar({
@@ -145,7 +143,7 @@ export function FaturaLembretesVencidasBar({
   const pendentesComEmail = pendentes.filter((item) =>
     isEmailValido(item.email)
   ).length;
-  const habilitado = lembretesVencidasBotaoHabilitado({
+  const habilitado = lembretesLoteBotaoHabilitado({
     bloqueado,
     carregando,
     erro: Boolean(erroConsulta),
@@ -160,7 +158,11 @@ export function FaturaLembretesVencidasBar({
         ? "Verificando faturas vencidas…"
         : erroConsulta
           ? erroConsulta
-          : explicacaoBotaoLembretesVencidas(pendentes.length, pendentesComEmail);
+          : explicacaoBotaoLembretesVencidas(
+              painel?.elegiveis ?? 0,
+              pendentes.length,
+              pendentesComEmail
+            );
 
   async function abrir() {
     if (fase === "enviando" || bloqueado || !competenciaIso) return;
@@ -190,16 +192,19 @@ export function FaturaLembretesVencidasBar({
       setAberto(false);
       return;
     }
+    const competenciaConfirmada = snapshot.competenciaIso;
+    const fila = snapshot.pendentes.filter((item) => isEmailValido(item.email));
+    if (fila.length === 0) return;
     enviandoRef.current = true;
     onOcupacaoChange?.(true);
-    const competenciaConfirmada = snapshot.competenciaIso;
-    const fila = snapshot.pendentes;
     setFase("enviando");
     setAndamento({ atual: 0, total: fila.length });
 
     const acumulado: ResultadoTela = {
       aceitos: [],
-      semEmail: [],
+      semEmail: snapshot.pendentes
+        .filter((item) => !isEmailValido(item.email))
+        .map((item) => itemDePendente(item, "sem_email")),
       jaLembradas: snapshot.jaLembradas.map((item) => ({
         faturaId: item.id,
         numero: item.numero,
@@ -276,50 +281,57 @@ export function FaturaLembretesVencidasBar({
       )
     : null;
 
+  const tituloCompetencia =
+    snapshot?.competenciaTitulo || snapshot?.competenciaIso || "";
+  const linhas = snapshot
+    ? snapshot.pendentes.map((item) => ({
+        id: item.id,
+        numero: item.numero,
+        empresa: item.empresa,
+        email: item.email || "Sem e-mail válido",
+        valor: item.valor,
+        vencimento: item.vencimento,
+        diasAtraso: item.diasAtraso,
+      }))
+    : [];
   const rotuloBotao =
     fase === "enviando"
       ? `Enviando ${andamento.atual} de ${andamento.total}`
-      : "Enviar lembretes de faturas vencidas";
+      : "Enviar lembretes de vencidas";
 
   return (
     <>
-      <Panel
-        title="Faturas vencidas"
-        icon={<IconReceipt size={16} />}
-        clipContent={false}
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-[#52617a]">{explicacao}</p>
-            <p className="mt-1 text-xs text-[#64748b]">
-              O envio é manual e acontece só depois da confirmação, somente para
-              a competência selecionada na página. Cada fatura vencida recebe
-              um e-mail separado, com o destinatário e o PDF da própria
-              empresa. Faturas que vencem hoje ficam no outro lote.{" "}
-              {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
-            </p>
-          </div>
-          <button
-            type="button"
-            className={
-              habilitado
-                ? "btn btn-primary shrink-0"
-                : "btn shrink-0 cursor-not-allowed opacity-40 saturate-50"
-            }
-            disabled={!habilitado}
-            title={habilitado ? undefined : explicacao}
-            onClick={() => void abrir()}
-          >
-            {rotuloBotao}
-          </button>
+      <article className="panel-card flex h-full flex-col border-l-4 border-l-amber-400 p-4">
+        <div className="flex items-center gap-2 text-navy">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fffbeb] text-[#b45309]">
+            <IconReceipt size={16} />
+          </span>
+          <h3 className="text-sm font-semibold">Vencidas</h3>
         </div>
-      </Panel>
+        <p className="mt-3 text-2xl font-extrabold tabular-nums text-navy">
+          {carregando ? "…" : pendentesComEmail}
+        </p>
+        <p className="mt-1 min-h-10 text-sm text-[#52617a]">{explicacao}</p>
+        <button
+          type="button"
+          className={classeBotaoLembrete(habilitado)}
+          disabled={!habilitado}
+          title={habilitado ? undefined : explicacao}
+          onClick={() => void abrir()}
+        >
+          {rotuloBotao}
+        </button>
+      </article>
 
       <Modal
         open={aberto}
         onClose={fechar}
-        title="Enviar lembretes de faturas vencidas"
-        subtitle="Um e-mail por fatura, somente para a empresa correspondente."
+        title={
+          tituloCompetencia
+            ? `Faturas vencidas — ${tituloCompetencia}`
+            : "Faturas vencidas"
+        }
+        subtitle="Somente faturas da competência selecionada."
         size="wide"
         closeOnOverlayClick={fase !== "enviando"}
         footer={
@@ -340,7 +352,11 @@ export function FaturaLembretesVencidasBar({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={fase === "enviando" || !confirmacao}
+                disabled={
+                  fase === "enviando" ||
+                  !confirmacao ||
+                  confirmacao.destinatarios === 0
+                }
                 onClick={() => void confirmar()}
               >
                 {fase === "enviando" ? rotuloBotao : "Confirmar envio"}
@@ -352,82 +368,20 @@ export function FaturaLembretesVencidasBar({
         {fase !== "resultado" && confirmacao && snapshot && (
           <div className="space-y-4 text-sm text-[#1f2937]">
             <p>
-              Competência:{" "}
-              <span className="font-semibold">
-                {snapshot.competenciaTitulo || snapshot.competenciaIso}
+              <span className="text-[#64748b]">Valor das faturas a enviar</span>
+              <span className="ml-2 text-base font-semibold">
+                {formatCurrency(confirmacao.valorTotal)}
               </span>
             </p>
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div>
-                <dt className="text-xs text-[#64748b]">Faturas</dt>
-                <dd className="text-base font-semibold">{confirmacao.faturas}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Empresas</dt>
-                <dd className="text-base font-semibold">{confirmacao.empresas}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Destinatários</dt>
-                <dd className="text-base font-semibold">
-                  {confirmacao.destinatarios}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Valor total</dt>
-                <dd className="text-base font-semibold">
-                  {formatCurrency(confirmacao.valorTotal)}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wide text-[#64748b]">
-                    <th className="py-2 pr-3 font-semibold">Fatura</th>
-                    <th className="py-2 pr-3 font-semibold">Empresa</th>
-                    <th className="py-2 pr-3 font-semibold">Destinatário</th>
-                    <th className="py-2 pr-3 font-semibold">Valor</th>
-                    <th className="py-2 pr-3 font-semibold">Vencimento</th>
-                    <th className="py-2 font-semibold">Atraso</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {snapshot.pendentes.map((item) => {
-                    const semEmail = !isEmailValido(item.email);
-                    return (
-                      <tr
-                        key={item.id}
-                        className={
-                          semEmail
-                            ? "bg-amber-50 text-amber-950"
-                            : "border-t border-[#eef2f7]"
-                        }
-                      >
-                        <td className="py-2 pr-3">{item.numero}</td>
-                        <td className="py-2 pr-3">{item.empresa}</td>
-                        <td className="py-2 pr-3">
-                          {semEmail ? "Sem e-mail válido" : item.email}
-                        </td>
-                        <td className="py-2 pr-3">{formatCurrency(item.valor)}</td>
-                        <td className="py-2 pr-3">
-                          {formatDateIsoToBR(item.vencimento)}
-                        </td>
-                        <td className="py-2">{textoAtraso(item.diasAtraso)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {confirmacao.semEmail.length > 0 && (
-              <p className="font-semibold text-amber-950">
-                As faturas sem e-mail válido serão ignoradas e não impedem as
-                demais.
-              </p>
-            )}
-
+            <FaturaLembreteListasConfirmacao
+              mostrarPrazo
+              comEmail={linhas.filter((item) =>
+                confirmacao.comEmail.some((envio) => envio.id === item.id)
+              )}
+              semEmail={linhas.filter((item) =>
+                confirmacao.semEmail.some((envio) => envio.id === item.id)
+              )}
+            />
             {fase === "enviando" && (
               <p className="text-[#52617a]">{rotuloBotao}. Aguarde o término.</p>
             )}

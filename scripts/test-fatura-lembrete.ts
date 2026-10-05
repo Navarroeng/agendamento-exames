@@ -28,7 +28,7 @@ import {
   faturaElegivelLembreteVencida,
   faturaEstaVencidaParaLembrete,
   faturaNaCompetenciaLembrete,
-  lembretesVencidasBotaoHabilitado,
+  lembretesLoteBotaoHabilitado,
   normalizarCompetenciaIso,
   previaLembretesVencidasAindaValida,
   faturaPermiteLembrete,
@@ -870,6 +870,12 @@ tests.push(
       alvoHoje({ id: "vencida-status", status: "vencida", numero: "VENC" }),
       alvoHoje({ id: "amanha", data_vencimento: "2026-10-06", numero: "AMANHA" }),
       alvoHoje({ id: "ontem", data_vencimento: "2026-10-04", numero: "ONTEM" }),
+      alvoHoje({
+        id: "maio",
+        numero: "FAT-MAIO",
+        mes_referencia: "2026-05",
+        periodo_inicio: "2026-05-01",
+      }),
       alvoHoje({ id: "clinica", tipo: "clinica", numero: "CLIN" }),
       alvoHoje({
         id: "timestamp",
@@ -892,8 +898,8 @@ tests.push(
     assert.equal(faturaElegivelLembreteHoje(faturas[2], HOJE), false);
     assert.equal(faturaElegivelLembreteHoje(faturas[3], HOJE), false);
     assert.equal(faturaElegivelLembreteHoje(faturas[4], HOJE), false);
-    const { deps } = depsLote({ faturas });
-    const painel = await consultarLembretesHoje(deps);
+    const { deps, enviados } = depsLote({ faturas });
+    const painel = await consultarLembretesHoje({ ...deps, competenciaIso: "2026-09" });
     const ids = painel.pendentes.map((item) => item.id);
     assert.equal(painel.elegiveis, 103);
     assert.ok(ids.includes("fat-a"));
@@ -906,9 +912,28 @@ tests.push(
     assert.equal(ids.includes("amanha"), false);
     assert.equal(ids.includes("ontem"), false);
     assert.equal(ids.includes("clinica"), false);
+    assert.equal(ids.includes("maio"), false);
+    const fora = await executarLembreteHojeUma(
+      "maio",
+      { competenciaIso: "2026-09" },
+      deps
+    );
+    assert.equal(fora.tipo, "falha");
+    assert.match(fora.motivo ?? "", /competência selecionada/);
+    const semEmailHoje = await executarLembreteHojeUma(
+      "timestamp",
+      { competenciaIso: "2026-09" },
+      deps
+    );
+    assert.equal(semEmailHoje.tipo, "sem_email");
+    assert.equal(enviados.length, 0);
     assert.equal(
-      explicacaoBotaoLembretesHoje(painel.elegiveis, painel.pendentes.length),
-      "103 faturas emitidas vencem hoje e ainda não tiveram lembrete aceito pelo Resend."
+      explicacaoBotaoLembretesHoje(
+        painel.elegiveis,
+        painel.pendentes.length,
+        painel.pendentes.length
+      ),
+      "Emitidas, sem pagamento, com vencimento hoje."
     );
   })
 );
@@ -923,8 +948,8 @@ tests.push(
         referencia_id: "cli-b",
         referencia_nome: "OUTRA LTDA",
         valor_total: 80,
-        mes_referencia: "2026-08",
-        periodo_inicio: "2026-08-01",
+        mes_referencia: "2026-09",
+        periodo_inicio: "2026-09-01",
         fatura_enviada_email: "financeiro@outra.com.br",
       }),
       alvoHoje({
@@ -973,7 +998,7 @@ tests.push(
     );
 
     const { deps, enviados } = depsLote({ faturas });
-    const resultado = await executarLembretesHoje({}, deps);
+    const resultado = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(resultado.aceitos.length, 2);
     assert.equal(resultado.semEmail.length, 1);
     assert.equal(resultado.semEmail[0]?.numero, "FAT-CLI-SEM");
@@ -997,15 +1022,15 @@ tests.push(
       /exames ocupacionais realizados no mês de setembro\/2026/
     );
     assert.match(pav.mensagem, /vence na data de hoje/);
-    assert.doesNotMatch(pav.mensagem, /FAT-CLI-2026-00102|agosto\/2026|OUTRA LTDA/);
+    assert.doesNotMatch(pav.mensagem, /FAT-CLI-2026-00102|OUTRA LTDA/);
     assert.doesNotMatch(pav.email, /outra/);
     assert.equal(
       outra.assunto,
-      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00200 (Agosto/2026) | Navarro Engenharia"
+      "Lembrete de vencimento — Exames Ocupacionais — Fatura 00200 (Setembro/2026) | Navarro Engenharia"
     );
     assert.match(outra.mensagem, /OUTRA LTDA/);
-    assert.match(outra.mensagem, /agosto\/2026/);
-    assert.doesNotMatch(outra.mensagem, /PAVFACIL|setembro\/2026|FAT-CLI-2026-00200/);
+    assert.match(outra.mensagem, /setembro\/2026/);
+    assert.doesNotMatch(outra.mensagem, /PAVFACIL|FAT-CLI-2026-00200/);
     assert.doesNotMatch(outra.mensagem, /PAVFACIL/);
     assert.equal(outra.email, "financeiro@outra.com.br");
     assert.notEqual(pav.requestId, outra.requestId);
@@ -1050,7 +1075,7 @@ tests.push(
         };
       },
     });
-    const primeiro = await executarLembretesHoje({}, deps);
+    const primeiro = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(primeiro.aceitos.length, 1);
     assert.equal(primeiro.aceitos[0]?.faturaId, "fat-a");
     assert.equal(primeiro.falhas.length, 1);
@@ -1060,7 +1085,7 @@ tests.push(
       1
     );
 
-    const segundo = await executarLembretesHoje({}, deps);
+    const segundo = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(
       segundo.jaLembradas.some((item) => item.faturaId === "fat-a"),
       true
@@ -1090,14 +1115,14 @@ tests.push(
         },
       ],
     });
-    const painel = await consultarLembretesHoje(deps);
+    const painel = await consultarLembretesHoje({ ...deps, competenciaIso: "2026-09" });
     assert.equal(painel.pendentes.length, 0);
     assert.equal(painel.jaLembradas.length, 1);
     assert.equal(
-      explicacaoBotaoLembretesHoje(painel.elegiveis, painel.pendentes.length),
-      "Todas as faturas que vencem hoje já tiveram lembrete aceito pelo Resend."
+      explicacaoBotaoLembretesHoje(painel.elegiveis, painel.pendentes.length, 0),
+      "Todas as faturas desta competência que vencem hoje já receberam lembrete hoje."
     );
-    const resultado = await executarLembretesHoje({}, deps);
+    const resultado = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(enviados.length, 0);
     assert.equal(resultado.aceitos.length, 0);
     assert.equal(resultado.jaLembradas.length, 1);
@@ -1116,7 +1141,7 @@ tests.push(
         },
       ],
     });
-    const resultado = await executarLembretesHoje({}, deps);
+    const resultado = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(resultado.aceitos.length, 1);
     assert.equal(enviados.length, 1);
   })
@@ -1146,8 +1171,8 @@ tests.push(
       },
     });
     const [primeiro, segundo] = await Promise.all([
-      executarLembreteHojeUma("fat-a", {}, deps),
-      executarLembreteHojeUma("fat-a", {}, deps),
+      executarLembreteHojeUma("fat-a", { competenciaIso: "2026-09" }, deps),
+      executarLembreteHojeUma("fat-a", { competenciaIso: "2026-09" }, deps),
     ]);
     const tipos = [primeiro.tipo, segundo.tipo].sort();
     assert.deepEqual(tipos, ["aceito", "falha"]);
@@ -1200,7 +1225,7 @@ tests.push(
         };
       },
     });
-    const item = await executarLembreteHojeUma("fat-a", {}, deps);
+    const item = await executarLembreteHojeUma("fat-a", { competenciaIso: "2026-09" }, deps);
     assert.equal(item.tipo, "falha");
     assert.match(item.motivo ?? "", /paga/);
     assert.equal(enviou, false);
@@ -1276,7 +1301,7 @@ tests.push(
       }),
     ];
     const { deps, enviados } = depsLote({ faturas });
-    const resultado = await executarLembretesHoje({}, deps);
+    const resultado = await executarLembretesHoje({ competenciaIso: "2026-09" }, deps);
     assert.equal(resultado.aceitos.length, 1);
     assert.equal(enviados[0]?.email, "financeiro@pavfacil.com.br");
     assert.doesNotMatch(enviados[0]?.email ?? "", /outra/);
@@ -1358,8 +1383,12 @@ tests.push(
       15
     );
     assert.equal(
-      explicacaoBotaoLembretesVencidas(painel.pendentes.length, painel.pendentes.length),
-      "2 faturas vencidas desta competência ainda não tiveram lembrete aceito pelo Resend hoje."
+      explicacaoBotaoLembretesVencidas(
+        painel.elegiveis,
+        painel.pendentes.length,
+        painel.pendentes.length
+      ),
+      "Vencimento anterior a hoje, ainda sem pagamento."
     );
   })
 );
@@ -1516,7 +1545,7 @@ tests.push(
     assert.equal(previaLembretesVencidasAindaValida("2026-09", "09/2026"), true);
     assert.equal(previaLembretesVencidasAindaValida("2026-09", "2026-10"), false);
     assert.equal(
-      lembretesVencidasBotaoHabilitado({
+      lembretesLoteBotaoHabilitado({
         bloqueado: false,
         carregando: true,
         erro: false,
@@ -1644,11 +1673,11 @@ tests.push(
     assert.equal(vazio.pendentes.length, 0);
     assert.equal(vazio.elegiveis, 0);
     assert.equal(
-      explicacaoBotaoLembretesVencidas(0, 0),
-      "Nenhuma fatura vencida pendente de lembrete nesta competência"
+      explicacaoBotaoLembretesVencidas(0, 0, 0),
+      "Nenhuma fatura vencida nesta competência."
     );
     assert.equal(
-      lembretesVencidasBotaoHabilitado({
+      lembretesLoteBotaoHabilitado({
         bloqueado: false,
         carregando: false,
         erro: false,
@@ -1680,8 +1709,12 @@ tests.push(
     });
     assert.equal(semDestinatario.pendentes.length, 1);
     assert.equal(
-      explicacaoBotaoLembretesVencidas(semDestinatario.pendentes.length, 0),
-      "Nenhuma fatura vencida pendente de lembrete nesta competência"
+      explicacaoBotaoLembretesVencidas(
+        semDestinatario.elegiveis,
+        semDestinatario.pendentes.length,
+        0
+      ),
+      "Há faturas vencidas pendentes, mas nenhuma tem e-mail válido."
     );
 
     const fora = await executarLembreteVencidaUma(

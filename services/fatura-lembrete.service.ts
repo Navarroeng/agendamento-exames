@@ -95,6 +95,8 @@ export type LembretesHojePendenteCliente = {
 
 export type LembretesHojePainelCliente = {
   hojeIso: string;
+  competenciaIso: string;
+  competenciaTitulo: string | null;
   elegiveis: number;
   pendentes: LembretesHojePendenteCliente[];
   jaLembradas: { id: string; numero: string; empresa: string }[];
@@ -112,12 +114,19 @@ export type LembreteHojeItemCliente = {
   resendMessageId?: string | null;
 };
 
-export async function consultarLembretesHojeCliente(): Promise<LembretesHojePainelCliente> {
-  const res = await fetch("/api/faturas/lembretes-hoje");
+export async function consultarLembretesHojeCliente(
+  competenciaIso: string
+): Promise<LembretesHojePainelCliente> {
+  const competencia = competenciaIso.trim();
+  if (!competencia) throw new Error("Informe a competência do lote.");
+  const params = new URLSearchParams({ competencia });
+  const res = await fetch(`/api/faturas/lembretes-hoje?${params}`);
   const json = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     error?: string;
     hojeIso?: string;
+    competenciaIso?: string;
+    competenciaTitulo?: string | null;
     elegiveis?: number;
     pendentes?: LembretesHojePendenteCliente[];
     jaLembradas?: { id: string; numero: string; empresa: string }[];
@@ -127,6 +136,7 @@ export async function consultarLembretesHojeCliente(): Promise<LembretesHojePain
     !res.ok ||
     !json.ok ||
     !json.hojeIso ||
+    !json.competenciaIso ||
     json.elegiveis == null ||
     !json.pendentes ||
     !json.jaLembradas
@@ -138,6 +148,8 @@ export async function consultarLembretesHojeCliente(): Promise<LembretesHojePain
 
   return {
     hojeIso: json.hojeIso,
+    competenciaIso: json.competenciaIso,
+    competenciaTitulo: json.competenciaTitulo ?? null,
     elegiveis: json.elegiveis,
     pendentes: json.pendentes,
     jaLembradas: json.jaLembradas,
@@ -145,15 +157,18 @@ export async function consultarLembretesHojeCliente(): Promise<LembretesHojePain
 }
 
 export async function enviarLembreteHojeCliente(
-  faturaId: string
+  faturaId: string,
+  competenciaIso: string
 ): Promise<LembreteHojeItemCliente> {
   const id = faturaId.trim();
+  const competencia = competenciaIso.trim();
   if (!id) throw new Error("Fatura inválida.");
+  if (!competencia) throw new Error("Informe a competência do lote.");
 
   const res = await fetch("/api/faturas/lembretes-hoje/enviar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ faturaId: id }),
+    body: JSON.stringify({ faturaId: id, competencia }),
   });
 
   const json = (await res.json().catch(() => ({}))) as {

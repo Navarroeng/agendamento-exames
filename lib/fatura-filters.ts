@@ -119,7 +119,10 @@ export function mesReferenciaIsoFromBR(mesReferencia: string): string | null {
 }
 
 export function faturaMatchesMesReferencia(
-  fatura: FaturaRecord,
+  fatura: {
+    mes_referencia?: string | null;
+    periodo_inicio?: string | null;
+  },
   mesReferencia: string
 ): boolean {
   const mesIso = mesReferenciaIsoFromBR(mesReferencia);

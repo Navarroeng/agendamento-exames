@@ -138,7 +138,10 @@ function mapFatura(row: Record<string, unknown>): FaturaLembreteHojeAlvo {
 const COLUNAS_FATURA =
   "id, numero, tipo, status, pago, referencia_id, referencia_nome, data_vencimento, mes_referencia, periodo_inicio, valor_total, fatura_enviada_email, fatura_enviada_em";
 
-async function listarCandidatasAdmin(hojeIso: string): Promise<FaturaLembreteHojeAlvo[]> {
+async function listarCandidatasAdmin(
+  hojeIso: string,
+  competenciaIso?: string | null
+): Promise<FaturaLembreteHojeAlvo[]> {
   const admin = createAdminClient();
   const rows = await listarPaginas(async (from, to) => {
     const { data, error } = await admin
@@ -153,7 +156,11 @@ async function listarCandidatasAdmin(hojeIso: string): Promise<FaturaLembreteHoj
     if (error) throw error;
     return (data ?? []) as Record<string, unknown>[];
   });
-  return selecionarFaturasLembreteHoje(rows.map(mapFatura), hojeIso);
+  return selecionarFaturasLembreteHoje(
+    rows.map(mapFatura),
+    hojeIso,
+    competenciaIso ?? ""
+  );
 }
 
 async function listarEnviosEmpresaAdmin(
@@ -242,9 +249,7 @@ function defaultDeps(modo: ModoLembreteLote = "hoje"): LembretesHojeDeps {
     agoraMs: () => Date.now(),
     modo,
     listarCandidatas:
-      modo === "vencidas"
-        ? listarCandidatasVencidasAdmin
-        : (hojeIso) => listarCandidatasAdmin(hojeIso),
+      modo === "vencidas" ? listarCandidatasVencidasAdmin : listarCandidatasAdmin,
     listarEnviosEmpresa: listarEnviosEmpresaAdmin,
     listarLembretes: listarLembretesAdmin,
     buscarFatura: buscarFaturaAdmin,
@@ -277,7 +282,11 @@ function montarPainel(
           hojeIso,
           competenciaIso ?? ""
         )
-      : selecionarFaturasLembreteHoje(candidatas, hojeIso);
+      : selecionarFaturasLembreteHoje(
+          candidatas,
+          hojeIso,
+          competenciaIso ?? ""
+        );
   const pendentes: FaturaLembreteHojePendente[] = [];
   const jaLembradas: PainelLembretesHoje["jaLembradas"] = [];
 
@@ -308,7 +317,7 @@ function montarPainel(
     elegiveis: elegiveis.length,
     pendentes,
     jaLembradas,
-    competenciaIso: modo === "vencidas" ? competenciaIso : undefined,
+    competenciaIso,
   };
 }
 
@@ -330,9 +339,8 @@ async function consultarLote(
 ): Promise<PainelLembretesHoje> {
   const merged = { ...defaultDeps(modo), ...deps, modo };
   const hojeIso = merged.hojeIso();
-  const competenciaIso =
-    modo === "vencidas" ? normalizarCompetenciaIso(merged.competenciaIso) : null;
-  if (modo === "vencidas" && !competenciaIso) {
+  const competenciaIso = normalizarCompetenciaIso(merged.competenciaIso);
+  if (!competenciaIso) {
     return {
       hojeIso,
       elegiveis: 0,
@@ -374,10 +382,10 @@ function motivoForaDoLote(
   if (fatura.status === "cancelada") {
     return "Não é possível enviar lembrete de fatura cancelada.";
   }
+  if (!competenciaIso || !faturaNaCompetenciaLembrete(fatura, competenciaIso)) {
+    return "A fatura não pertence à competência selecionada.";
+  }
   if (modo === "vencidas") {
-    if (!competenciaIso || !faturaNaCompetenciaLembrete(fatura, competenciaIso)) {
-      return "A fatura não pertence à competência selecionada.";
-    }
     if (fatura.status !== "emitida" && fatura.status !== "vencida") {
       return "A fatura não está emitida nem vencida.";
     }
@@ -425,14 +433,15 @@ async function processarUma(
   }
 
   const modo = merged.modo;
-  const competenciaIso =
-    modo === "vencidas" ? normalizarCompetenciaIso(merged.competenciaIso) : null;
-  const entraNoLote =
-    modo === "vencidas"
-      ? Boolean(competenciaIso) &&
-        faturaElegivelLembreteVencida(fatura, hojeIso) &&
-        faturaNaCompetenciaLembrete(fatura, competenciaIso ?? "")
-      : faturaElegivelLembreteHoje(fatura, hojeIso);
+  const competenciaIso = normalizarCompetenciaIso(merged.competenciaIso);
+  const entraNoLote = Boolean(
+    competenciaIso &&
+      (modo === "vencidas"
+        ? faturaElegivelLembreteVencida(fatura, hojeIso) &&
+          faturaNaCompetenciaLembrete(fatura, competenciaIso)
+        : faturaElegivelLembreteHoje(fatura, hojeIso) &&
+          faturaNaCompetenciaLembrete(fatura, competenciaIso))
+  );
   if (!entraNoLote) {
     return {
       ...itemBase(fatura),
@@ -472,15 +481,14 @@ async function processarUma(
     reservou = true;
 
     const deNovo = await merged.buscarFatura(fatura.id);
-    const deNovoEntra =
-      modo === "vencidas"
-        ? Boolean(
-            deNovo &&
-              competenciaIso &&
-              faturaElegivelLembreteVencida(deNovo, hojeIso) &&
-              faturaNaCompetenciaLembrete(deNovo, competenciaIso)
-          )
-        : Boolean(deNovo && faturaElegivelLembreteHoje(deNovo, hojeIso));
+    const deNovoEntra = Boolean(
+      deNovo &&
+        competenciaIso &&
+        (modo === "vencidas"
+          ? faturaElegivelLembreteVencida(deNovo, hojeIso)
+          : faturaElegivelLembreteHoje(deNovo, hojeIso)) &&
+        faturaNaCompetenciaLembrete(deNovo, competenciaIso)
+    );
     if (!deNovo || !deNovoEntra) {
       return {
         ...itemBase(deNovo ?? fatura),
@@ -595,18 +603,22 @@ async function executarLote(
 }
 
 /**
- * Envia um lembrete por fatura que vence hoje. A seleção é refeita no
- * servidor e não usa filtro nem página da tela. Não dispara e-mail em lote
- * para várias empresas.
+ * Envia um lembrete por fatura que vence hoje na competência informada.
+ * A seleção é refeita no servidor. Filtros de cliente, status e a página
+ * visível não entram. Não dispara um e-mail único para várias empresas.
  */
 export async function executarLembretesHoje(
   params: {
+    competenciaIso: string;
     request?: Request;
     auditContext?: AuditoriaUsuarioContext;
-  } = {},
+  },
   deps: Partial<LembretesHojeDeps> = {}
 ): Promise<ResultadoLembretesHoje> {
-  return executarLote("hoje", params, deps);
+  return executarLote("hoje", params, {
+    ...deps,
+    competenciaIso: params.competenciaIso,
+  });
 }
 
 export async function executarLembretesVencidas(
@@ -626,12 +638,18 @@ export async function executarLembretesVencidas(
 export async function executarLembreteHojeUma(
   faturaId: string,
   params: {
+    competenciaIso: string;
     request?: Request;
     auditContext?: AuditoriaUsuarioContext;
-  } = {},
+  },
   deps: Partial<LembretesHojeDeps> = {}
 ): Promise<ResultadoLembreteHojeItem> {
-  const merged = { ...defaultDeps("hoje"), ...deps, modo: "hoje" as const };
+  const merged = {
+    ...defaultDeps("hoje"),
+    ...deps,
+    modo: "hoje" as const,
+    competenciaIso: params.competenciaIso,
+  };
   const hojeIso = merged.hojeIso();
   return processarUma(
     faturaId,

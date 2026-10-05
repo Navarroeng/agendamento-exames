@@ -28,6 +28,7 @@ import {
 import type { YearMonth } from "@/lib/listagem-meses";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaTipo } from "@/lib/types";
+import type { ReactNode } from "react";
 import { FaturaEnvioEmailIndicator } from "./FaturaEnvioEmailIndicator";
 import { FaturasMesRowActions } from "./FaturasMesRowActions";
 
@@ -168,6 +169,7 @@ interface FaturasMesPanelProps {
   onEnviarEmail?: (id: string) => void;
   onEnviarLembrete?: (id: string) => void;
   onConsultarLembrete?: (id: string) => void;
+  lembretes?: ReactNode;
 }
 
 export function FaturasMesPanel({
@@ -200,6 +202,7 @@ export function FaturasMesPanel({
   onEnviarEmail,
   onEnviarLembrete,
   onConsultarLembrete,
+  lembretes,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
   const disabled = loading || saving;
@@ -366,6 +369,8 @@ export function FaturasMesPanel({
           {config.helpText}
         </p>
       </Panel>
+
+      {lembretes}
 
       {mesValido && resumo && (
         <Panel title="Resumo do mês" icon={<IconReceipt />} iconTone="green">

@@ -5,6 +5,7 @@ import {
 } from "@/lib/agendamento-datetime";
 import { isEmailValido } from "@/lib/email-validacao";
 import { formatCurrency } from "@/lib/money";
+import { faturaMatchesMesReferencia } from "@/lib/fatura-filters";
 import type { FaturaRecord, FaturaStatus, FaturaTipo } from "@/lib/types";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -401,7 +402,8 @@ export function lembreteAceitoNoDia(
 
 /**
  * Lote de hoje: status real `emitida`, sem pagamento, vencimento civil = hoje.
- * Não olha filtro de tela, mês ou página.
+ * A competência entra em `faturaEntraNoLoteLembrete`. Filtros de cliente,
+ * status e a página visível não restringem o lote.
  */
 export function faturaElegivelLembreteHoje(
   fatura: Pick<
@@ -422,9 +424,12 @@ export function faturaElegivelLembreteHoje(
 
 export function selecionarFaturasLembreteHoje<T extends FaturaLembreteHojeAlvo>(
   faturas: T[],
-  hojeIso: string
+  hojeIso: string,
+  competenciaIso: string
 ): T[] {
-  return faturas.filter((fatura) => faturaElegivelLembreteHoje(fatura, hojeIso));
+  return faturas.filter((fatura) =>
+    faturaEntraNoLoteLembrete(fatura, "hoje", hojeIso, competenciaIso)
+  );
 }
 
 const ISO_COMPETENCIA = /^(\d{4})-(\d{2})$/;
@@ -449,16 +454,17 @@ export function normalizarCompetenciaIso(
 }
 
 /**
- * Competência da fatura: `mes_referencia` e, na falta dele, `periodo_inicio`.
- * Não usa vencimento nem a data do envio.
+ * Competência da fatura, igual à listagem mensal: `mes_referencia` quando
+ * existe e, na falta dele, o mês de `periodo_inicio`. Não usa o vencimento.
  */
 export function competenciaIsoDaFatura(fatura: {
   mes_referencia?: string | null;
   periodo_inicio?: string | null;
 }): string | null {
-  const bruto = fatura.mes_referencia?.trim() || fatura.periodo_inicio?.trim() || "";
-  const base = bruto.split("T")[0] ?? "";
-  return normalizarCompetenciaIso(base.slice(0, 7));
+  const mesRef = fatura.mes_referencia?.trim() ?? "";
+  if (mesRef) return normalizarCompetenciaIso(mesRef);
+  const inicio = fatura.periodo_inicio?.split("T")[0] ?? "";
+  return normalizarCompetenciaIso(inicio.slice(0, 7));
 }
 
 export function faturaNaCompetenciaLembrete(
@@ -470,7 +476,23 @@ export function faturaNaCompetenciaLembrete(
 ): boolean {
   const alvo = normalizarCompetenciaIso(competenciaIso);
   if (!alvo) return false;
-  return competenciaIsoDaFatura(fatura) === alvo;
+  const [ano, mes] = alvo.split("-");
+  return faturaMatchesMesReferencia(fatura, `${mes}/${ano}`);
+}
+
+export function faturaEntraNoLoteLembrete(
+  fatura: Pick<
+    FaturaLembreteHojeAlvo,
+    "tipo" | "status" | "pago" | "data_vencimento" | "mes_referencia" | "periodo_inicio"
+  >,
+  modo: "hoje" | "vencidas",
+  hojeIso: string,
+  competenciaIso: string
+): boolean {
+  if (!faturaNaCompetenciaLembrete(fatura, competenciaIso)) return false;
+  return modo === "vencidas"
+    ? faturaElegivelLembreteVencida(fatura, hojeIso)
+    : faturaElegivelLembreteHoje(fatura, hojeIso);
 }
 
 /** A prévia só pode ser enviada se ainda for a competência aberta na página. */
@@ -483,7 +505,7 @@ export function previaLembretesVencidasAindaValida(
   return Boolean(previa && atual && previa === atual);
 }
 
-export function lembretesVencidasBotaoHabilitado(params: {
+export function lembretesLoteBotaoHabilitado(params: {
   bloqueado: boolean;
   carregando: boolean;
   erro: boolean;
@@ -526,13 +548,46 @@ export function selecionarFaturasLembreteVencida<T extends FaturaLembreteHojeAlv
   hojeIso: string,
   competenciaIso: string
 ): T[] {
-  const competencia = normalizarCompetenciaIso(competenciaIso);
-  if (!competencia) return [];
-  return faturas.filter(
-    (fatura) =>
-      faturaElegivelLembreteVencida(fatura, hojeIso) &&
-      faturaNaCompetenciaLembrete(fatura, competencia)
+  return faturas.filter((fatura) =>
+    faturaEntraNoLoteLembrete(fatura, "vencidas", hojeIso, competenciaIso)
   );
+}
+
+export type SituacaoLembreteLote = "pronto" | "nenhuma" | "ja_lembradas" | "sem_email";
+
+export function situacaoLembreteLote(params: {
+  elegiveis: number;
+  pendentes: number;
+  pendentesComEmail: number;
+}): SituacaoLembreteLote {
+  if (params.pendentesComEmail > 0) return "pronto";
+  if (params.pendentes > 0) return "sem_email";
+  if (params.elegiveis > 0) return "ja_lembradas";
+  return "nenhuma";
+}
+
+export function explicacaoSituacaoLembrete(
+  modo: "hoje" | "vencidas",
+  situacao: SituacaoLembreteLote
+): string {
+  if (situacao === "pronto") {
+    return modo === "hoje"
+      ? "Emitidas, sem pagamento, com vencimento hoje."
+      : "Vencimento anterior a hoje, ainda sem pagamento.";
+  }
+  if (situacao === "sem_email") {
+    return modo === "hoje"
+      ? "Há faturas que vencem hoje, mas nenhuma tem e-mail válido."
+      : "Há faturas vencidas pendentes, mas nenhuma tem e-mail válido.";
+  }
+  if (situacao === "ja_lembradas") {
+    return modo === "hoje"
+      ? "Todas as faturas desta competência que vencem hoje já receberam lembrete hoje."
+      : "Todas as faturas vencidas desta competência já receberam lembrete hoje.";
+  }
+  return modo === "hoje"
+    ? "Nenhuma fatura desta competência vence hoje."
+    : "Nenhuma fatura vencida nesta competência.";
 }
 
 /** Dias civis de atraso. Não converte o vencimento pelo fuso. */
@@ -550,16 +605,14 @@ export function diasAtrasoCivil(
 }
 
 export function explicacaoBotaoLembretesVencidas(
+  elegiveis: number,
   pendentes: number,
   pendentesComEmail: number
 ): string {
-  if (pendentesComEmail <= 0) {
-    return "Nenhuma fatura vencida pendente de lembrete nesta competência";
-  }
-  if (pendentes === 1) {
-    return "1 fatura vencida desta competência ainda não teve lembrete aceito pelo Resend hoje.";
-  }
-  return `${pendentes} faturas vencidas desta competência ainda não tiveram lembrete aceito pelo Resend hoje.`;
+  return explicacaoSituacaoLembrete(
+    "vencidas",
+    situacaoLembreteLote({ elegiveis, pendentes, pendentesComEmail })
+  );
 }
 
 /**
@@ -639,15 +692,13 @@ export function montarConfirmacaoLembretesHoje(pendentes: PendenteLembreteHoje[]
 
 export function explicacaoBotaoLembretesHoje(
   elegiveis: number,
-  pendentes: number
+  pendentes: number,
+  pendentesComEmail: number
 ): string {
-  if (pendentes > 0) {
-    return pendentes === 1
-      ? "1 fatura emitida vence hoje e ainda não teve lembrete aceito pelo Resend."
-      : `${pendentes} faturas emitidas vencem hoje e ainda não tiveram lembrete aceito pelo Resend.`;
-  }
-  if (elegiveis === 0) return "Nenhuma fatura emitida vence hoje.";
-  return "Todas as faturas que vencem hoje já tiveram lembrete aceito pelo Resend.";
+  return explicacaoSituacaoLembrete(
+    "hoje",
+    situacaoLembreteLote({ elegiveis, pendentes, pendentesComEmail })
+  );
 }
 
 /** Trava do lote: livre, ocupada ou expirada para outra tentativa assumir. */

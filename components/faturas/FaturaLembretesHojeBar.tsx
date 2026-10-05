@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Panel } from "@/components/ui/Panel";
-import { IconReceipt } from "@/components/ui/icons/OutlineIcons";
+import { IconClock } from "@/components/ui/icons/OutlineIcons";
+import { isEmailValido } from "@/lib/email-validacao";
 import {
   FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA,
   chaveEmpresaLembrete,
   explicacaoBotaoLembretesHoje,
+  lembretesLoteBotaoHabilitado,
   montarConfirmacaoLembretesHoje,
+  normalizarCompetenciaIso,
+  previaLembretesVencidasAindaValida,
 } from "@/lib/fatura-lembrete";
 import { formatCurrency } from "@/lib/money";
 import {
@@ -17,9 +20,15 @@ import {
   type LembreteHojeItemCliente,
   type LembretesHojePainelCliente,
 } from "@/services/fatura-lembrete.service";
+import {
+  FaturaLembreteListasConfirmacao,
+  classeBotaoLembrete,
+} from "./FaturaLembreteListasConfirmacao";
 
 interface FaturaLembretesHojeBarProps {
+  competencia: string;
   atualizarEm?: number;
+  pagamentoEm?: number;
   bloqueado?: boolean;
   onOcupacaoChange?: (ocupado: boolean) => void;
   onEnviado: (params: {
@@ -55,7 +64,9 @@ function itemDePendente(
 }
 
 export function FaturaLembretesHojeBar({
+  competencia,
   atualizarEm = 0,
+  pagamentoEm = 0,
   bloqueado = false,
   onOcupacaoChange,
   onEnviado,
@@ -71,15 +82,29 @@ export function FaturaLembretesHojeBar({
     null
   );
   const enviandoRef = useRef(false);
+  const pedidoRef = useRef(0);
+  const competenciaIso = normalizarCompetenciaIso(competencia);
+  const escopoRef = useRef({ competenciaIso, pagamentoEm });
 
   const carregar = useCallback(async () => {
+    const iso = normalizarCompetenciaIso(competencia);
+    if (!iso) {
+      setPainel(null);
+      setErroConsulta(null);
+      setCarregando(false);
+      return null;
+    }
+    const pedido = ++pedidoRef.current;
     setCarregando(true);
     setErroConsulta(null);
     try {
-      const dados = await consultarLembretesHojeCliente();
+      const dados = await consultarLembretesHojeCliente(iso);
+      if (pedido !== pedidoRef.current) return null;
+      if (dados.competenciaIso !== iso) return null;
       setPainel(dados);
       return dados;
     } catch (err) {
+      if (pedido !== pedidoRef.current) return null;
       setPainel(null);
       setErroConsulta(
         err instanceof Error
@@ -88,34 +113,59 @@ export function FaturaLembretesHojeBar({
       );
       return null;
     } finally {
-      setCarregando(false);
+      if (pedido === pedidoRef.current) setCarregando(false);
     }
-  }, []);
+  }, [competencia]);
 
   useEffect(() => {
     if (fase === "enviando") return;
+    setCarregando(true);
+    setPainel(null);
     void carregar();
-  }, [atualizarEm, carregar, fase]);
+  }, [atualizarEm, pagamentoEm, carregar, fase]);
+
+  useEffect(() => {
+    const anterior = escopoRef.current;
+    const competenciaMudou = anterior.competenciaIso !== competenciaIso;
+    const pagamentoMudou = anterior.pagamentoEm !== pagamentoEm;
+    escopoRef.current = { competenciaIso, pagamentoEm };
+    if (!competenciaMudou && !pagamentoMudou) return;
+    if (fase === "enviando") return;
+    if (fase === "resultado" && !competenciaMudou) return;
+    setSnapshot(null);
+    setAberto(false);
+  }, [competenciaIso, pagamentoEm, fase]);
 
   const pendentes = painel?.pendentes ?? [];
-  const habilitado =
-    !bloqueado &&
-    !carregando &&
-    !erroConsulta &&
-    pendentes.length > 0 &&
-    fase !== "enviando";
+  const pendentesComEmail = pendentes.filter((item) =>
+    isEmailValido(item.email)
+  ).length;
+  const habilitado = lembretesLoteBotaoHabilitado({
+    bloqueado,
+    carregando,
+    erro: Boolean(erroConsulta),
+    enviando: fase === "enviando",
+    pendentesComEmail,
+  });
   const explicacao = bloqueado
     ? "Outro lote de lembretes está em andamento."
-    : carregando
-    ? "Verificando faturas que vencem hoje…"
-    : erroConsulta
-      ? erroConsulta
-      : explicacaoBotaoLembretesHoje(painel?.elegiveis ?? 0, pendentes.length);
+    : !competenciaIso
+      ? "Selecione uma competência válida."
+      : carregando
+        ? "Verificando faturas que vencem hoje…"
+        : erroConsulta
+          ? erroConsulta
+          : explicacaoBotaoLembretesHoje(
+              painel?.elegiveis ?? 0,
+              pendentes.length,
+              pendentesComEmail
+            );
 
   async function abrir() {
-    if (fase === "enviando") return;
+    if (!habilitado || fase === "enviando" || bloqueado || !competenciaIso) return;
     const dados = await carregar();
-    if (!dados || dados.pendentes.length === 0) return;
+    if (!dados || dados.competenciaIso !== competenciaIso) return;
+    if (!dados.pendentes.some((item) => isEmailValido(item.email))) return;
     setSnapshot(dados);
     setResultado(null);
     setFase("confirmar");
@@ -129,15 +179,26 @@ export function FaturaLembretesHojeBar({
 
   async function confirmar() {
     if (!snapshot || enviandoRef.current) return;
+    if (
+      !previaLembretesVencidasAindaValida(snapshot.competenciaIso, competenciaIso)
+    ) {
+      setSnapshot(null);
+      setAberto(false);
+      return;
+    }
+    const competenciaConfirmada = snapshot.competenciaIso;
+    const fila = snapshot.pendentes.filter((item) => isEmailValido(item.email));
+    if (fila.length === 0) return;
     enviandoRef.current = true;
     onOcupacaoChange?.(true);
-    const fila = snapshot.pendentes;
     setFase("enviando");
     setAndamento({ atual: 0, total: fila.length });
 
     const acumulado: ResultadoTela = {
       aceitos: [],
-      semEmail: [],
+      semEmail: snapshot.pendentes
+        .filter((item) => !isEmailValido(item.email))
+        .map((item) => itemDePendente(item, "sem_email")),
       jaLembradas: snapshot.jaLembradas.map((item) => ({
         faturaId: item.id,
         numero: item.numero,
@@ -153,7 +214,10 @@ export function FaturaLembretesHojeBar({
         const pendente = fila[indice];
         setAndamento({ atual: indice + 1, total: fila.length });
         try {
-          const item = await enviarLembreteHojeCliente(pendente.id);
+          const item = await enviarLembreteHojeCliente(
+            pendente.id,
+            competenciaConfirmada
+          );
           if (item.tipo === "aceito") {
             acumulado.aceitos.push(item);
             if (item.enviadoEm && item.email) {
@@ -210,7 +274,8 @@ export function FaturaLembretesHojeBar({
         }))
       )
     : null;
-
+  const tituloCompetencia =
+    snapshot?.competenciaTitulo || snapshot?.competenciaIso || "";
   const rotuloBotao =
     fase === "enviando"
       ? `Enviando ${andamento.atual} de ${andamento.total}`
@@ -218,37 +283,38 @@ export function FaturaLembretesHojeBar({
 
   return (
     <>
-      <Panel
-        title="Lembretes de hoje"
-        icon={<IconReceipt size={16} />}
-        clipContent={false}
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-[#52617a]">{explicacao}</p>
-            <p className="mt-1 text-xs text-[#64748b]">
-              O envio é manual e acontece só depois da confirmação. Cada fatura
-              recebe um e-mail separado, com o destinatário e o PDF da própria
-              empresa. {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary shrink-0"
-            disabled={!habilitado}
-            title={habilitado ? undefined : explicacao}
-            onClick={() => void abrir()}
-          >
-            {rotuloBotao}
-          </button>
+      <article className="panel-card flex h-full flex-col border-l-4 border-l-[#5668ff] p-4">
+        <div className="flex items-center gap-2 text-navy">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f0f4ff] text-brand-blue">
+            <IconClock size={16} />
+          </span>
+          <h3 className="text-sm font-semibold">Vencem hoje</h3>
         </div>
-      </Panel>
+        <p className="mt-3 text-2xl font-extrabold tabular-nums text-navy">
+          {carregando ? "…" : pendentesComEmail}
+        </p>
+        <p className="mt-1 min-h-10 text-sm text-[#52617a]">{explicacao}</p>
+        <button
+          type="button"
+          className={classeBotaoLembrete(habilitado)}
+          disabled={!habilitado}
+          title={habilitado ? undefined : explicacao}
+          onClick={() => void abrir()}
+        >
+          {rotuloBotao}
+        </button>
+      </article>
 
       <Modal
         open={aberto}
         onClose={fechar}
-        title="Enviar lembretes de hoje"
-        subtitle="Um e-mail por fatura, somente para a empresa correspondente."
+        title={
+          tituloCompetencia
+            ? `Lembretes de hoje — ${tituloCompetencia}`
+            : "Lembretes de hoje"
+        }
+        subtitle="Somente faturas da competência selecionada."
+        size="wide"
         closeOnOverlayClick={fase !== "enviando"}
         footer={
           fase === "resultado" ? (
@@ -268,7 +334,11 @@ export function FaturaLembretesHojeBar({
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={fase === "enviando" || !confirmacao}
+                disabled={
+                  fase === "enviando" ||
+                  !confirmacao ||
+                  confirmacao.destinatarios === 0
+                }
                 onClick={() => void confirmar()}
               >
                 {fase === "enviando" ? rotuloBotao : "Confirmar envio"}
@@ -279,44 +349,16 @@ export function FaturaLembretesHojeBar({
       >
         {fase !== "resultado" && confirmacao && (
           <div className="space-y-4 text-sm text-[#1f2937]">
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div>
-                <dt className="text-xs text-[#64748b]">Faturas</dt>
-                <dd className="text-base font-semibold">{confirmacao.faturas}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Empresas</dt>
-                <dd className="text-base font-semibold">{confirmacao.empresas}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Destinatários</dt>
-                <dd className="text-base font-semibold">
-                  {confirmacao.destinatarios}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[#64748b]">Valor total</dt>
-                <dd className="text-base font-semibold">
-                  {formatCurrency(confirmacao.valorTotal)}
-                </dd>
-              </div>
-            </dl>
-
-            {confirmacao.semEmail.length > 0 && (
-              <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-3">
-                <p className="font-semibold text-amber-950">
-                  Sem e-mail válido — estas faturas serão ignoradas
-                </p>
-                <ul className="mt-2 space-y-1 text-amber-950">
-                  {confirmacao.semEmail.map((item) => (
-                    <li key={item.id}>
-                      {item.numero} — {item.empresa} — {formatCurrency(item.valor)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
+            <p>
+              <span className="text-[#64748b]">Valor das faturas a enviar</span>
+              <span className="ml-2 text-base font-semibold">
+                {formatCurrency(confirmacao.valorTotal)}
+              </span>
+            </p>
+            <FaturaLembreteListasConfirmacao
+              comEmail={confirmacao.comEmail}
+              semEmail={confirmacao.semEmail}
+            />
             {fase === "enviando" && (
               <p className="text-[#52617a]">{rotuloBotao}. Aguarde o término.</p>
             )}
@@ -332,24 +374,20 @@ export function FaturaLembretesHojeBar({
                 : "envios aceitos pelo Resend."}{" "}
               {FATURA_LEMBRETE_ENTREGA_NAO_CONFIRMADA}
             </p>
-
             <ResultadoBloco
               titulo="Ignoradas por ausência de e-mail válido"
-              vazio="Nenhuma."
               itens={resultado.semEmail.map(
                 (item) => `${item.numero} — ${item.empresa}`
               )}
             />
             <ResultadoBloco
               titulo="Já lembradas hoje"
-              vazio="Nenhuma."
               itens={resultado.jaLembradas.map(
                 (item) => `${item.numero} — ${item.empresa}`
               )}
             />
             <ResultadoBloco
               titulo="Falhas"
-              vazio="Nenhuma."
               itens={resultado.falhas.map(
                 (item) =>
                   `${item.numero} — ${item.empresa}: ${item.motivo || "Falha no envio."}`
@@ -362,22 +400,14 @@ export function FaturaLembretesHojeBar({
   );
 }
 
-function ResultadoBloco({
-  titulo,
-  vazio,
-  itens,
-}: {
-  titulo: string;
-  vazio: string;
-  itens: string[];
-}) {
+function ResultadoBloco({ titulo, itens }: { titulo: string; itens: string[] }) {
   return (
     <div>
       <p className="font-semibold">
         {titulo} ({itens.length})
       </p>
       {itens.length === 0 ? (
-        <p className="text-[#64748b]">{vazio}</p>
+        <p className="text-[#64748b]">Nenhuma.</p>
       ) : (
         <ul className="mt-1 space-y-1">
           {itens.map((linha, indice) => (

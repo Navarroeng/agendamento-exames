@@ -9,6 +9,7 @@ import { FaturaDuplicidadeModal } from "./FaturaDuplicidadeModal";
 import { FaturaEnvioEmailModal } from "./FaturaEnvioEmailModal";
 import { FaturaLembreteModal } from "./FaturaLembreteModal";
 import { FaturaLembretesHojeBar } from "./FaturaLembretesHojeBar";
+import { FaturaLembretesSecao } from "./FaturaLembretesSecao";
 import { FaturaLembretesVencidasBar } from "./FaturaLembretesVencidasBar";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
@@ -115,34 +116,6 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
       icon={meta.icon}
     >
       <div className="space-y-5">
-        {tipo === "cliente" && (
-          <>
-            <FaturaLembretesHojeBar
-              atualizarEm={lembreteTick}
-              bloqueado={loteEmEnvio === "vencidas"}
-              onOcupacaoChange={(ocupado) =>
-                setLoteEmEnvio(ocupado ? "hoje" : null)
-              }
-              onEnviado={(params) => {
-                handleLembreteEnviado(params);
-                setLembreteTick((valor) => valor + 1);
-              }}
-            />
-            <FaturaLembretesVencidasBar
-              competencia={filters.mesReferencia}
-              atualizarEm={lembreteTick}
-              pagamentoEm={pagamentoTick}
-              bloqueado={loteEmEnvio === "hoje"}
-              onOcupacaoChange={(ocupado) =>
-                setLoteEmEnvio(ocupado ? "vencidas" : null)
-              }
-              onEnviado={(params) => {
-                handleLembreteEnviado(params);
-                setLembreteTick((valor) => valor + 1);
-              }}
-            />
-          </>
-        )}
         <FaturasMesPanel
           variant={tipo}
           filters={filters}
@@ -181,6 +154,38 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           }
           onConsultarLembrete={
             tipo === "cliente" ? (id) => void handleAbrirLembrete(id, true) : undefined
+          }
+          lembretes={
+            tipo === "cliente" ? (
+              <FaturaLembretesSecao competencia={filters.mesReferencia}>
+                <FaturaLembretesHojeBar
+                  competencia={filters.mesReferencia}
+                  atualizarEm={lembreteTick}
+                  pagamentoEm={pagamentoTick}
+                  bloqueado={loteEmEnvio === "vencidas"}
+                  onOcupacaoChange={(ocupado) =>
+                    setLoteEmEnvio(ocupado ? "hoje" : null)
+                  }
+                  onEnviado={(params) => {
+                    handleLembreteEnviado(params);
+                    setLembreteTick((valor) => valor + 1);
+                  }}
+                />
+                <FaturaLembretesVencidasBar
+                  competencia={filters.mesReferencia}
+                  atualizarEm={lembreteTick}
+                  pagamentoEm={pagamentoTick}
+                  bloqueado={loteEmEnvio === "hoje"}
+                  onOcupacaoChange={(ocupado) =>
+                    setLoteEmEnvio(ocupado ? "vencidas" : null)
+                  }
+                  onEnviado={(params) => {
+                    handleLembreteEnviado(params);
+                    setLembreteTick((valor) => valor + 1);
+                  }}
+                />
+              </FaturaLembretesSecao>
+            ) : undefined
           }
         />
       </div>
