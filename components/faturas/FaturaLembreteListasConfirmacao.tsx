@@ -127,9 +127,7 @@ export function FaturaLembreteListasConfirmacao({
 }
 
 export function classeBotaoLembrete(habilitado: boolean): string {
-  const base =
-    "btn h-8 shrink-0 px-3 py-0 text-xs shadow-none hover:translate-y-0";
   return habilitado
-    ? `${base} btn-primary hover:shadow-none`
-    : `${base} cursor-not-allowed border-[#e2e8f0] bg-[#f1f5f9] text-[#52617a] hover:border-[#e2e8f0] hover:bg-[#f1f5f9] hover:shadow-none disabled:opacity-100`;
+    ? "btn btn-primary mt-auto w-full justify-center"
+    : "btn mt-auto w-full cursor-not-allowed justify-center border-[#e2e8f0] bg-[#f1f5f9] text-[#64748b] shadow-none hover:translate-y-0 hover:border-[#e2e8f0] hover:bg-[#f1f5f9] hover:shadow-none disabled:opacity-100";
 }
