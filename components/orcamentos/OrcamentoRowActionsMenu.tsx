@@ -10,11 +10,13 @@ import type { OrcamentoRecord } from "@/lib/orcamento-types";
 interface OrcamentoRowActionsMenuProps {
   orcamento: OrcamentoRecord;
   podeEncerrarContrato?: boolean;
+  podeReverterAprovacao?: boolean;
   podeAlterarResponsavel?: boolean;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
   onAprovar: (id: string) => void;
+  onReverterAprovacao: (id: string) => void;
   onAlterarResponsavel: (id: string) => void;
 }
 
@@ -29,6 +31,7 @@ const LABELS: Record<OrcamentoAcaoMenu, string> = {
   editar: "Editar",
   gerar_pdf: "Gerar PDF",
   aprovar: "Aprovar",
+  reverter_aprovacao: "Reverter aprovação",
   alterar_responsavel: "Alterar responsável pelo processo",
   cancelar: "Cancelar",
 };
@@ -36,11 +39,13 @@ const LABELS: Record<OrcamentoAcaoMenu, string> = {
 export function OrcamentoRowActionsMenu({
   orcamento,
   podeEncerrarContrato = false,
+  podeReverterAprovacao = false,
   podeAlterarResponsavel = false,
   onEditar,
   onGerarPdf,
   onCancelar,
   onAprovar,
+  onReverterAprovacao,
   onAlterarResponsavel,
 }: OrcamentoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -51,6 +56,7 @@ export function OrcamentoRowActionsMenu({
       editar: () => onEditar(orcamento.id),
       gerar_pdf: () => onGerarPdf(orcamento.id),
       aprovar: () => onAprovar(orcamento.id),
+      reverter_aprovacao: () => onReverterAprovacao(orcamento.id),
       alterar_responsavel: () => onAlterarResponsavel(orcamento.id),
       cancelar: () => onCancelar(orcamento.id),
     }),
@@ -60,6 +66,7 @@ export function OrcamentoRowActionsMenu({
       onCancelar,
       onEditar,
       onGerarPdf,
+      onReverterAprovacao,
       orcamento.id,
     ]
   );
@@ -68,6 +75,7 @@ export function OrcamentoRowActionsMenu({
     () =>
       resolveOrcamentoAcoesMenu(orcamento.status, {
         podeEncerrarContrato,
+        podeReverterAprovacao,
         podeAlterarResponsavel,
       }).map((key) => ({
         key,
@@ -78,7 +86,13 @@ export function OrcamentoRowActionsMenu({
         danger: key === "cancelar",
         onClick: handlers[key],
       })),
-    [handlers, orcamento.status, podeAlterarResponsavel, podeEncerrarContrato]
+    [
+      handlers,
+      orcamento.status,
+      podeAlterarResponsavel,
+      podeEncerrarContrato,
+      podeReverterAprovacao,
+    ]
   );
 
   useEffect(() => {

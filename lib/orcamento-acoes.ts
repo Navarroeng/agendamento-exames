@@ -4,6 +4,7 @@ export type OrcamentoAcaoMenu =
   | "editar"
   | "gerar_pdf"
   | "aprovar"
+  | "reverter_aprovacao"
   | "alterar_responsavel"
   | "cancelar";
 
@@ -12,6 +13,8 @@ export const ORCAMENTO_JA_APROVADO_MSG = "Este orçamento já foi aprovado.";
 export type ResolveOrcamentoAcoesOptions = {
   /** Só ADM pode cancelar/encerrar quando o orçamento já virou contrato (aprovado). */
   podeEncerrarContrato?: boolean;
+  /** Só ADM pode reverter uma aprovação feita por engano. */
+  podeReverterAprovacao?: boolean;
   /** Pode transferir o responsável atual do processo. */
   podeAlterarResponsavel?: boolean;
 };
@@ -38,6 +41,7 @@ export function resolveOrcamentoAcoesMenu(
   options?: ResolveOrcamentoAcoesOptions
 ): OrcamentoAcaoMenu[] {
   const podeEncerrar = options?.podeEncerrarContrato === true;
+  const podeReverter = options?.podeReverterAprovacao === true;
   const podeAlterar = options?.podeAlterarResponsavel === true;
 
   switch (status) {
@@ -52,11 +56,12 @@ export function resolveOrcamentoAcoesMenu(
         ["editar", "gerar_pdf", "aprovar", "cancelar"],
         podeAlterar
       );
-    case "aprovado":
-      return withAlterarResponsavel(
-        podeEncerrar ? ["gerar_pdf", "cancelar"] : ["gerar_pdf"],
-        podeAlterar
-      );
+    case "aprovado": {
+      const acoes: OrcamentoAcaoMenu[] = ["gerar_pdf"];
+      if (podeReverter) acoes.push("reverter_aprovacao");
+      if (podeEncerrar) acoes.push("cancelar");
+      return withAlterarResponsavel(acoes, podeAlterar);
+    }
     case "reprovado":
       return withAlterarResponsavel(["gerar_pdf"], podeAlterar);
     case "cancelado":

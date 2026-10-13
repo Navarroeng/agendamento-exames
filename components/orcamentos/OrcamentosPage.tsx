@@ -6,6 +6,7 @@ import { OrcamentoAprovarModal } from "./OrcamentoAprovarModal";
 import { OrcamentoAlterarResponsavelModal } from "./OrcamentoAlterarResponsavelModal";
 import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
 import { OrcamentoEncerrarContratoModal } from "./OrcamentoEncerrarContratoModal";
+import { OrcamentoReverterAprovacaoModal } from "./OrcamentoReverterAprovacaoModal";
 import { OrcamentoFormModal } from "./OrcamentoFormModal";
 import { OrcamentoSearchPanel } from "./OrcamentoSearchPanel";
 import { OrcamentoTopActions } from "./OrcamentoTopActions";
@@ -47,6 +48,9 @@ export function OrcamentosPage() {
     aprovarSaving,
     usuarioNome,
     podeEncerrarContrato,
+    podeReverterAprovacao,
+    reverterTarget,
+    reverterSaving,
     resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
@@ -76,6 +80,9 @@ export function OrcamentosPage() {
     closeAlterarResponsavel,
     handleConfirmAlterarResponsavel,
     handleOpenAprovar,
+    handleOpenReverterAprovacao,
+    closeReverterAprovacao,
+    handleConfirmReverterAprovacao,
     closeAprovar,
     handleSalvarAprovacao,
     handleAtualizarCondicoesAprovadas,
@@ -123,12 +130,14 @@ export function OrcamentosPage() {
         onMesChange={handleMesChange}
         onYearChange={handleYearChange}
         podeEncerrarContrato={podeEncerrarContrato}
+        podeReverterAprovacao={podeReverterAprovacao}
         resolvePodeAlterarResponsavel={resolvePodeAlterarResponsavel}
         onVisualizar={handleVisualizar}
         onEditar={handleEditar}
         onGerarPdf={handleGerarPdf}
         onCancelar={handleOpenCancelar}
         onAprovar={handleOpenAprovar}
+        onReverterAprovacao={handleOpenReverterAprovacao}
         onAlterarResponsavel={handleOpenAlterarResponsavel}
       />
 
@@ -158,6 +167,16 @@ export function OrcamentosPage() {
         onSave={handleSave}
         onContinueEditing={continueEditing}
         onDiscardAndClose={discardAndClose}
+      />
+
+      <OrcamentoReverterAprovacaoModal
+        open={Boolean(reverterTarget)}
+        numero={reverterTarget?.numero ?? ""}
+        saving={reverterSaving}
+        onClose={closeReverterAprovacao}
+        onConfirm={(motivo) => {
+          void handleConfirmReverterAprovacao(motivo);
+        }}
       />
 
       <OrcamentoCancelarModal
@@ -228,7 +247,7 @@ export function OrcamentosPage() {
         }}
       />
 
-      {(saving || viewLoading || actionLoading || cancelSaving || aprovarSaving || alterarResponsavelSaving) && (
+      {(saving || viewLoading || actionLoading || cancelSaving || aprovarSaving || alterarResponsavelSaving || reverterSaving) && (
         <div
           className="fixed inset-0 z-[70] bg-black/10 backdrop-blur-[1px]"
           aria-hidden

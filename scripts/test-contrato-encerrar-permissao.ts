@@ -33,6 +33,13 @@ assert.deepEqual(
   resolveOrcamentoAcoesMenu("aprovado", { podeEncerrarContrato: true }),
   ["gerar_pdf", "cancelar"]
 );
+assert.deepEqual(
+  resolveOrcamentoAcoesMenu("aprovado", {
+    podeEncerrarContrato: true,
+    podeReverterAprovacao: true,
+  }),
+  ["gerar_pdf", "reverter_aprovacao", "cancelar"]
+);
 
 assert.ok(CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG.includes("administradores"));
 

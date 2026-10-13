@@ -42,6 +42,12 @@ import {
   orcamentoPermiteEditar,
 } from "@/lib/orcamento-acoes";
 import {
+  ORCAMENTO_STATUS_APOS_REVERTER_APROVACAO_LABEL,
+  REVERSAO_SEM_PERMISSAO_MSG,
+  REVERSAO_STATUS_MSG,
+  podeReverterAprovacaoOrcamento,
+} from "@/lib/orcamento-reverter-aprovacao";
+import {
   CONTRATO_ENCERRAR_SEM_PERMISSAO_MSG,
   podeEncerrarContrato as usuarioPodeEncerrarContrato,
 } from "@/lib/contrato-permissoes";
@@ -54,6 +60,10 @@ import {
   alterarResponsavelProcesso,
   listarUsuariosAtivosParaResponsavel,
 } from "@/services/orcamento-responsavel.service";
+import {
+  consultarBloqueioReverterAprovacao,
+  reverterAprovacaoOrcamento,
+} from "@/services/orcamento-reverter-aprovacao.service";
 import type { PerfilUsuario } from "@/lib/types";
 import { formatOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { filterOrcamentos } from "@/lib/orcamento-filters";
@@ -132,6 +142,7 @@ export function useOrcamentosPage() {
   const auditContext = useAuditoriaUsuario();
   const { profile } = useAuth();
   const podeEncerrarContrato = usuarioPodeEncerrarContrato(profile?.perfil);
+  const podeReverterAprovacao = podeReverterAprovacaoOrcamento(profile?.perfil);
   const resolvePodeAlterarResponsavel = useCallback(
     (orcamento: {
       status: OrcamentoComItens["status"];
@@ -178,6 +189,11 @@ export function useOrcamentosPage() {
     useState<OrcamentoComItens | null>(null);
   const [alterarResponsavelSaving, setAlterarResponsavelSaving] =
     useState(false);
+  const [reverterTarget, setReverterTarget] = useState<{
+    id: string;
+    numero: string;
+  } | null>(null);
+  const [reverterSaving, setReverterSaving] = useState(false);
   const [usuariosResponsavel, setUsuariosResponsavel] = useState<
     PerfilUsuario[]
   >([]);
@@ -843,6 +859,79 @@ export function useOrcamentosPage() {
       }
     },
     [auditContext, encerrarContratoTarget, podeEncerrarContrato, refresh]
+  );
+
+  const handleOpenReverterAprovacao = useCallback(
+    async (id: string) => {
+      if (!podeReverterAprovacao) {
+        toast.error(REVERSAO_SEM_PERMISSAO_MSG);
+        return;
+      }
+
+      const atual = orcamentos.find((item) => item.id === id);
+      if (atual && atual.status !== "aprovado") {
+        toast.error(REVERSAO_STATUS_MSG);
+        return;
+      }
+
+      setActionLoading(true);
+      try {
+        const bloqueio = await consultarBloqueioReverterAprovacao(id);
+        if (bloqueio) {
+          toast.error(bloqueio);
+          return;
+        }
+        setReverterTarget({
+          id,
+          numero: atual?.numero ?? "",
+        });
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error && err.message
+            ? err.message
+            : "Não foi possível verificar se a aprovação pode ser revertida."
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [orcamentos, podeReverterAprovacao]
+  );
+
+  const closeReverterAprovacao = useCallback(() => {
+    if (reverterSaving) return;
+    setReverterTarget(null);
+  }, [reverterSaving]);
+
+  const handleConfirmReverterAprovacao = useCallback(
+    async (motivo: string) => {
+      if (!reverterTarget) return;
+      if (!podeReverterAprovacao) {
+        toast.error(REVERSAO_SEM_PERMISSAO_MSG);
+        return;
+      }
+
+      setReverterSaving(true);
+      try {
+        await reverterAprovacaoOrcamento(reverterTarget.id, motivo);
+        toast.success(
+          `Aprovação revertida. O orçamento voltou para ${ORCAMENTO_STATUS_APOS_REVERTER_APROVACAO_LABEL}.`
+        );
+        setReverterTarget(null);
+        refresh();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error && err.message
+            ? err.message
+            : "Não foi possível reverter a aprovação."
+        );
+      } finally {
+        setReverterSaving(false);
+      }
+    },
+    [podeReverterAprovacao, refresh, reverterTarget]
   );
 
   const closeAprovar = useCallback(() => {
@@ -1761,6 +1850,9 @@ export function useOrcamentosPage() {
     aprovarSaving,
     usuarioNome: auditContext.usuarioNome,
     podeEncerrarContrato,
+    podeReverterAprovacao,
+    reverterTarget,
+    reverterSaving,
     resolvePodeAlterarResponsavel,
     funcionariosPreviewUrl,
     logoPreviewUrl,
@@ -1791,6 +1883,9 @@ export function useOrcamentosPage() {
     closeAlterarResponsavel,
     handleConfirmAlterarResponsavel,
     handleOpenAprovar,
+    handleOpenReverterAprovacao,
+    closeReverterAprovacao,
+    handleConfirmReverterAprovacao,
     closeAprovar,
     handleSalvarAprovacao,
     handleAtualizarCondicoesAprovadas,

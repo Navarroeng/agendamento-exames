@@ -25,12 +25,14 @@ interface OrcamentosTableProps {
   onMesChange: (mes: OrcamentoYearMonth) => void;
   onYearChange: (year: number) => void;
   podeEncerrarContrato?: boolean;
+  podeReverterAprovacao?: boolean;
   resolvePodeAlterarResponsavel?: (orcamento: OrcamentoRecord) => boolean;
   onVisualizar: (id: string) => void;
   onEditar: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
   onAprovar: (id: string) => void;
+  onReverterAprovacao: (id: string) => void;
   onAlterarResponsavel: (id: string) => void;
 }
 
@@ -42,12 +44,14 @@ export function OrcamentosTable({
   onMesChange,
   onYearChange,
   podeEncerrarContrato = false,
+  podeReverterAprovacao = false,
   resolvePodeAlterarResponsavel,
   onVisualizar,
   onEditar,
   onGerarPdf,
   onCancelar,
   onAprovar,
+  onReverterAprovacao,
   onAlterarResponsavel,
 }: OrcamentosTableProps) {
   return (
@@ -130,6 +134,7 @@ export function OrcamentosTable({
                       <OrcamentoRowActionsMenu
                         orcamento={orcamento}
                         podeEncerrarContrato={podeEncerrarContrato}
+                        podeReverterAprovacao={podeReverterAprovacao}
                         podeAlterarResponsavel={
                           resolvePodeAlterarResponsavel?.(orcamento) ?? false
                         }
@@ -137,6 +142,7 @@ export function OrcamentosTable({
                         onGerarPdf={onGerarPdf}
                         onCancelar={onCancelar}
                         onAprovar={onAprovar}
+                        onReverterAprovacao={onReverterAprovacao}
                         onAlterarResponsavel={onAlterarResponsavel}
                       />
                     </td>
