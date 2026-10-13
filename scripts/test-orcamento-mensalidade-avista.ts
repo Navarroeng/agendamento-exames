@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import {
+  aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoFormFromRecord,
   buildCondicoesComerciaisFromForm,
   formatCondicaoAprovada,
@@ -22,6 +23,7 @@ import {
   MENSALIDADE_FINAL_INVALIDO_MSG,
   calcularAvistaPorDesconto,
   calcularAvistaPorValorFinal,
+  camposResumoMensalidadeAvista,
   mesesEntreDatas,
   montarBaseMensalidadeAvista,
   resolverMesesVigenciaMensalidade,
@@ -269,5 +271,79 @@ const mensalDoc = buildContratoNavarroDocumento({
 });
 assert.equal(mensalDoc.parcelas.length, CONTRATO_VIGENCIA_MENSALIDADE_MESES);
 assert.match(mensalDoc.texto, /12 \(doze\) mensalidades/);
+
+const referencia = 130;
+const orcamentoReferencia: OrcamentoComItens = {
+  ...orcamento(),
+  subtotal: referencia,
+  valor_total: referencia,
+  orcamento_itens: orcamento().orcamento_itens.map((item) => ({
+    ...item,
+    valor_unitario: referencia,
+    valor_total: referencia,
+  })),
+};
+const mensalIgual = aprovacao({ valor_final: referencia });
+const negociada = aprovacao({
+  valor_final: referencia,
+  mensalidade_pagamento: "avista",
+  mensalidade_valor_mensal: referencia,
+  mensalidade_meses: 12,
+  mensalidade_valor_bruto: 1560,
+  mensalidade_valor_pontual: 0,
+  mensalidade_desconto_valor: 160,
+  mensalidade_desconto_tipo: "valor",
+  mensalidade_vencimento: "2026-10-14",
+  desconto_percentual: 10.2564,
+  valor_avista: 1400,
+  condicao_pagamento: "À vista",
+  quantidade_parcelas: 1,
+  valor_parcela: 1400,
+});
+assert.equal(
+  aprovacaoSegueOrcamentoOriginal(orcamentoReferencia, mensalIgual),
+  true
+);
+assert.equal(
+  aprovacaoSegueOrcamentoOriginal(orcamentoReferencia, negociada),
+  false
+);
+
+const campos = camposResumoMensalidadeAvista(negociada);
+assert.ok(campos);
+const porLabel = Object.fromEntries(campos.map((campo) => [campo.label, campo]));
+assert.equal(porLabel["Valor final à vista"]?.value, "R$ 1.400,00");
+assert.equal(porLabel["Valor final à vista"]?.destaque, true);
+assert.equal(porLabel["Total bruto do período"]?.value, "R$ 1.560,00");
+assert.equal(porLabel["Desconto"]?.value, "R$ 160,00 (10,26%)");
+assert.equal(porLabel["Vencimento"]?.value, "14/10/2026");
+assert.equal(porLabel["Vigência"]?.value, "12 meses");
+assert.equal(porLabel["Valor mensal de referência"]?.value, "R$ 130,00 / mês");
+assert.equal(porLabel["Valor mensal de referência"]?.secundario, true);
+assert.equal(campos.at(-1)?.label, "Valor mensal de referência");
+assert.equal(camposResumoMensalidadeAvista(mensalIgual), null);
+
+const historico = formatCondicaoAprovada(negociada);
+assert.match(historico, /1\.400,00/);
+assert.match(historico, /160,00/);
+assert.match(historico, /14\/10\/2026/);
+assert.match(historico, /Valor mensal de referência/);
+
+const docNegociado = buildContratoNavarroDocumento({
+  orcamento: orcamentoReferencia,
+  aprovacao: negociada,
+  dataContrato: "2026-10-13",
+});
+assert.equal(docNegociado.modalidade, "mensalidade");
+assert.equal(docNegociado.valor, referencia);
+assert.equal(docNegociado.parcelas.length, 1);
+assert.equal(docNegociado.parcelas[0]?.valor, 1400);
+assert.equal(docNegociado.parcelas[0]?.dataIso, "2026-10-14");
+assert.match(docNegociado.texto, /pagamento à vista/i);
+assert.match(docNegociado.texto, /1\.560,00/);
+assert.match(docNegociado.texto, /160,00/);
+assert.match(docNegociado.texto, /1\.400,00/);
+assert.match(docNegociado.texto, /14\/10\/2026/);
+assert.doesNotMatch(docNegociado.texto, /12 \(doze\) mensalidades/);
 
 console.log("OK  mensalidade à vista");

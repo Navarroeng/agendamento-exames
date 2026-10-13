@@ -49,6 +49,7 @@ import { obterMesesVigenciaMensalidade } from "@/services/orcamento-aprovacao.se
 import {
   calcularAvistaPorDesconto,
   calcularAvistaPorValorFinal,
+  camposResumoMensalidadeAvista,
   montarBaseMensalidadeAvista,
   parseDecimalBr,
   validarCalculoMensalidadeAvista,
@@ -877,6 +878,10 @@ export function OrcamentoAprovarModal({
   const aprovadoConformeOriginal = aprovacao
     ? aprovacaoSegueOrcamentoOriginal(orcamento, aprovacao)
     : false;
+  const camposAvista =
+    aprovacao && isMensalidade
+      ? camposResumoMensalidadeAvista(aprovacao)
+      : null;
 
   const tituloModal = consultaMode
     ? `Orçamento · ${orcamento.numero}`
@@ -1210,33 +1215,74 @@ export function OrcamentoAprovarModal({
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                      {aprovadoConformeOriginal ? (
-                        <div className="sm:col-span-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-[12px] font-semibold text-[#166534]">
-                          Aprovado conforme o orçamento original.
-                        </div>
-                      ) : null}
-                      {isLaudoPontual ? null : (
-                      <ResumoItem
-                        label="Quantidade de colaboradores"
-                        value={String(aprovacao.quantidade_colaboradores)}
-                      />
+                      <div
+                        className={
+                          aprovadoConformeOriginal
+                            ? "sm:col-span-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-[12px] font-semibold text-[#166534]"
+                            : "sm:col-span-2 rounded-xl border border-[#f3e6c0] bg-[#fffbeb] px-3 py-2 text-[12px] font-semibold text-[#92400e]"
+                        }
+                      >
+                        {aprovadoConformeOriginal
+                          ? "Aprovado conforme o orçamento original."
+                          : "Aprovado com condições negociadas."}
+                      </div>
+                      {camposAvista ? (
+                        <>
+                          {camposAvista
+                            .filter((campo) => !campo.secundario)
+                            .map((campo) => (
+                              <ResumoItem
+                                key={campo.label}
+                                label={campo.label}
+                                value={campo.value}
+                                tone={campo.destaque ? "emphasis" : "default"}
+                                wide={campo.destaque}
+                              />
+                            ))}
+                          {isLaudoPontual ? null : (
+                            <ResumoItem
+                              label="Quantidade de colaboradores"
+                              value={String(aprovacao.quantidade_colaboradores)}
+                            />
+                          )}
+                          {camposAvista
+                            .filter((campo) => campo.secundario)
+                            .map((campo) => (
+                              <ResumoItem
+                                key={campo.label}
+                                label={campo.label}
+                                value={campo.value}
+                                tone="secondary"
+                                wide
+                              />
+                            ))}
+                        </>
+                      ) : (
+                        <>
+                          {isLaudoPontual ? null : (
+                          <ResumoItem
+                            label="Quantidade de colaboradores"
+                            value={String(aprovacao.quantidade_colaboradores)}
+                          />
+                          )}
+                          <ResumoItem
+                            label={
+                              isMensalidade
+                                ? "Valor da mensalidade"
+                                : "Valor total fechado"
+                            }
+                            value={
+                              isMensalidade
+                                ? formatValorMensalidade(Number(aprovacao.valor_final))
+                                : formatCurrency(Number(aprovacao.valor_final))
+                            }
+                          />
+                          <ResumoItem
+                            label="Pagamento"
+                            value={formatCondicaoAprovada(aprovacao)}
+                          />
+                        </>
                       )}
-                      <ResumoItem
-                        label={
-                          isMensalidade
-                            ? "Valor da mensalidade"
-                            : "Valor total fechado"
-                        }
-                        value={
-                          isMensalidade
-                            ? formatValorMensalidade(Number(aprovacao.valor_final))
-                            : formatCurrency(Number(aprovacao.valor_final))
-                        }
-                      />
-                      <ResumoItem
-                        label="Pagamento"
-                        value={formatCondicaoAprovada(aprovacao)}
-                      />
                       {aprovacao.observacoes ? (
                         <div className="sm:col-span-2">
                           <ResumoItem
@@ -2032,13 +2078,37 @@ function Field({
   );
 }
 
-function ResumoItem({ label, value }: { label: string; value: string }) {
+function ResumoItem({
+  label,
+  value,
+  tone = "default",
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "emphasis" | "secondary";
+  wide?: boolean;
+}) {
+  const box =
+    tone === "emphasis"
+      ? "border-[#dbeafe] bg-white"
+      : tone === "secondary"
+        ? "border-[#eef2f7] bg-white"
+        : "border-[#eef2f7] bg-[#f8fafc]";
+  const valor =
+    tone === "emphasis"
+      ? "text-base font-extrabold text-navy"
+      : tone === "secondary"
+        ? "text-[13px] font-semibold text-[#64748b]"
+        : "text-sm font-semibold text-navy";
   return (
-    <div className="rounded-xl border border-[#eef2f7] bg-[#f8fafc] px-3 py-2.5">
+    <div
+      className={`rounded-xl border px-3 py-2.5 ${box} ${wide ? "sm:col-span-2" : ""}`}
+    >
       <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-navy">{value}</p>
+      <p className={`mt-1 ${valor}`}>{value}</p>
     </div>
   );
 }

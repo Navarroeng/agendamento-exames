@@ -510,16 +510,58 @@ function formatCondicaoParceladaAet(
   return "—";
 }
 
+function pagamentoOuDescontoDivergeDoOriginal(
+  orcamento: OrcamentoComItens,
+  aprovacao: OrcamentoAprovacaoRecord,
+  resumo: OrcamentoResumoComercial
+): boolean {
+  if (isOrcamentoMensalidade(orcamento.modalidade)) {
+    if (aprovacao.mensalidade_pagamento === "avista") return true;
+    if (/à\s*vista|\bavista\b/i.test(aprovacao.condicao_pagamento ?? "")) {
+      return true;
+    }
+    if ((Number(aprovacao.mensalidade_desconto_valor) || 0) > 0.009) return true;
+    if ((Number(aprovacao.desconto_percentual) || 0) > 0.009) return true;
+    return false;
+  }
+
+  const forma = resolveFormaPagamentoFromRecord(
+    aprovacao,
+    orcamento.orcamento_itens
+  );
+  if (forma === "avista") return true;
+  const parcelasSalvas = Number(aprovacao.quantidade_parcelas);
+  if (
+    Number.isFinite(parcelasSalvas) &&
+    parcelasSalvas >= 1 &&
+    resumo.parcelas >= 1 &&
+    parcelasSalvas !== resumo.parcelas
+  ) {
+    return true;
+  }
+  const descontoEsperado = orcamentoPermitePagamentoAVista(
+    orcamento.orcamento_itens
+  )
+    ? 5
+    : 0;
+  return (
+    Math.abs((Number(aprovacao.desconto_percentual) || 0) - descontoEsperado) >
+    0.009
+  );
+}
+
 export function aprovacaoSegueOrcamentoOriginal(
   orcamento: OrcamentoComItens,
   aprovacao: OrcamentoAprovacaoRecord
 ): boolean {
   const resumo = buildResumoComercialOrcamento(orcamento);
   const qtdOk =
+    ocultaQuantidadeColaboradores(orcamento.orcamento_itens) ||
     Number(aprovacao.quantidade_colaboradores) === resumo.quantidadeColaboradores;
   const valorOk =
     Math.abs(Number(aprovacao.valor_final) - resumo.valorTotal) < 0.009;
-  return qtdOk && valorOk;
+  if (!qtdOk || !valorOk) return false;
+  return !pagamentoOuDescontoDivergeDoOriginal(orcamento, aprovacao, resumo);
 }
 
 export function buildAprovacaoFormFromOrcamento(

@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import {
+  aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoInsertPayload,
@@ -81,6 +82,30 @@ assert.equal(payloadIguais.valor_final, 2000);
 assert.equal(payloadIguais.quantidade_colaboradores, 10);
 assert.equal(payloadIguais.itens.length, 1);
 assert.equal(buildAprovacaoDiffs(orcamento, formIguais, parseMoney).length, 0);
+assert.equal(
+  aprovacaoSegueOrcamentoOriginal(orcamento, {
+    quantidade_colaboradores: payloadIguais.quantidade_colaboradores,
+    valor_final: payloadIguais.valor_final,
+    condicao_pagamento: payloadIguais.condicao_pagamento,
+    quantidade_parcelas: payloadIguais.quantidade_parcelas,
+    valor_parcela: payloadIguais.valor_parcela,
+    desconto_percentual: payloadIguais.desconto_percentual,
+    valor_avista: payloadIguais.valor_avista,
+  } as OrcamentoAprovacaoRecord),
+  true
+);
+assert.equal(
+  aprovacaoSegueOrcamentoOriginal(orcamento, {
+    quantidade_colaboradores: payloadIguais.quantidade_colaboradores,
+    valor_final: payloadIguais.valor_final,
+    condicao_pagamento: "À vista",
+    quantidade_parcelas: null,
+    valor_parcela: null,
+    desconto_percentual: 0,
+    valor_avista: payloadIguais.valor_final,
+  } as OrcamentoAprovacaoRecord),
+  false
+);
 
 const formAlterado = {
   ...formIguais,

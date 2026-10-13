@@ -257,6 +257,87 @@ export function textoDescontoNaUnidade(
   return textoMoedaCentavos(calculo.descontoCentavos);
 }
 
+export type CampoResumoMensalidadeAvista = {
+  label: string;
+  value: string;
+  destaque?: boolean;
+  secundario?: boolean;
+};
+
+export type ResumoMensalidadeAvistaSalva = {
+  mensalidade_pagamento?: string | null;
+  mensalidade_valor_mensal?: number | null;
+  mensalidade_meses?: number | null;
+  mensalidade_valor_bruto?: number | null;
+  mensalidade_valor_pontual?: number | null;
+  mensalidade_desconto_valor?: number | null;
+  desconto_percentual?: number | null;
+  valor_avista?: number | null;
+  valor_final?: number | null;
+  mensalidade_vencimento?: string | null;
+};
+
+export function camposResumoMensalidadeAvista(
+  salva: ResumoMensalidadeAvistaSalva
+): CampoResumoMensalidadeAvista[] | null {
+  if (salva.mensalidade_pagamento !== "avista") return null;
+  const meses = resolverMesesVigenciaMensalidade({
+    mesesSalvos: salva.mensalidade_meses,
+  });
+  const valorMensal =
+    Number(salva.mensalidade_valor_mensal ?? salva.valor_final) || 0;
+  const valorPontual = Number(salva.mensalidade_valor_pontual) || 0;
+  const brutoSalvo = Number(salva.mensalidade_valor_bruto) || 0;
+  const valorBruto =
+    brutoSalvo > 0 ? brutoSalvo : valorMensal * meses + valorPontual;
+  const desconto = Number(salva.mensalidade_desconto_valor) || 0;
+  const percentualSalvo = Number(salva.desconto_percentual) || 0;
+  const baseGestao = valorMensal * meses;
+  const percentual =
+    percentualSalvo > 0
+      ? percentualSalvo
+      : baseGestao > 0
+        ? Math.round((desconto * 100 * 10000) / baseGestao) / 10000
+        : 0;
+  const valorFinal = Number(salva.valor_avista) || 0;
+  const vencimento = (salva.mensalidade_vencimento ?? "").slice(0, 10);
+  const campos: CampoResumoMensalidadeAvista[] = [
+    {
+      label: "Valor final à vista",
+      value: formatCurrency(valorFinal),
+      destaque: true,
+    },
+    {
+      label: "Total bruto do período",
+      value: formatCurrency(valorBruto),
+    },
+    {
+      label: "Desconto",
+      value: `${formatCurrency(desconto)} (${textoPercentual(percentual)}%)`,
+    },
+    {
+      label: "Vencimento",
+      value: vencimento ? formatDateIsoToBR(vencimento) : "—",
+    },
+    {
+      label: "Vigência",
+      value: `${meses} ${meses === 1 ? "mês" : "meses"}`,
+    },
+  ];
+  if (valorPontual > 0) {
+    campos.push({
+      label: "Serviços pontuais adicionais",
+      value: formatCurrency(valorPontual),
+    });
+  }
+  campos.push({
+    label: "Valor mensal de referência",
+    value: `${formatCurrency(valorMensal)} / mês`,
+    secundario: true,
+  });
+  return campos;
+}
+
 export function textoCondicoesMensalidadeAvista(params: {
   meses: number;
   valorMensal: number;
