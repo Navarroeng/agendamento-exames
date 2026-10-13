@@ -361,29 +361,87 @@ await run("orçamento antigo sem modalidade explícita usa pontual", () => {
   assert.ok(doc.texto.includes("R$ 100,00"));
 });
 
-await run("nome do PDF segue Contrato_Navarro_cliente_orcamento", () => {
+await run("nome do PDF identifica contrato, serviço e empresa", () => {
   assert.equal(
-    nomeArquivoContratoNavarro("ORC-2026-0007", "NEPPER CONSTRUTORA"),
-    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007.pdf"
+    nomeArquivoContratoNavarro("ALUMINIO FIRENZE", "mensalidade"),
+    "Contrato - Gestão SST - ALUMINIO FIRENZE.pdf"
   );
   assert.equal(
-    nomeArquivoContratoNavarro("ORC-2026-0007", "José & Cia. Ltda"),
-    "Contrato_Navarro_Jose_Cia_Ltda_ORC-2026-0007.pdf"
+    nomeArquivoContratoNavarro("ALUMINIO FIRENZE", "pontual_sst"),
+    "Contrato - Gestão SST - ALUMINIO FIRENZE.pdf"
   );
   assert.equal(
-    nomeArquivoContratoNavarro("ORC-2026-0008", "NEPPER CONSTRUTORA"),
-    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0008.pdf"
+    nomeArquivoContratoNavarro("ALUMINIO FIRENZE", "aet"),
+    "Contrato - AET - ALUMINIO FIRENZE.pdf"
   );
+  assert.equal(
+    nomeArquivoContratoNavarro("NOME DA EMPRESA", "insalubridade"),
+    "Contrato - Laudo de Insalubridade - NOME DA EMPRESA.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("NOME DA EMPRESA", "ltcat"),
+    "Contrato - LTCAT - NOME DA EMPRESA.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("José & Cia. Ltda", "mensalidade"),
+    "Contrato - Gestão SST - José & Cia. Ltda.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("  ALUMINIO FIRENZE.pdf  ", "aet"),
+    "Contrato - AET - ALUMINIO FIRENZE.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("NOME DA EMPRESA.pdf.pdf", "ltcat"),
+    "Contrato - LTCAT - NOME DA EMPRESA.pdf"
+  );
+  const arquivoAntigo = "Contrato_Navarro_ALUMINIO_FIRENZE_ORC-2026-0001.pdf";
+  const nomeAtual = nomeArquivoContratoNavarro("ALUMINIO FIRENZE", "mensalidade");
+  assert.notEqual(nomeAtual, arquivoAntigo);
+  assert.equal(nomeAtual, "Contrato - Gestão SST - ALUMINIO FIRENZE.pdf");
+  assert.equal(
+    nomeArquivoContratoNavarro('ACME: "X"/Y*Z?<>|\\', "ltcat"),
+    "Contrato - LTCAT - ACME X Y Z.pdf"
+  );
+  assert.equal(
+    nomeArquivoContratoNavarro("   ", "pontual_sst"),
+    "Contrato - Gestão SST - Empresa.pdf"
+  );
+  const nome = nomeArquivoContratoNavarro("NEPPER CONSTRUTORA", "pontual_sst");
+  assert.equal(nome, "Contrato - Gestão SST - NEPPER CONSTRUTORA.pdf");
+  assert.equal(nome.toLowerCase().endsWith(".pdf.pdf"), false);
+  assert.doesNotMatch(nome, /Or[cç]amento|Proposta|ORC-|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+
+  const srcPdf = fs.readFileSync(
+    path.join(process.cwd(), "lib", "contrato-pdf.ts"),
+    "utf8"
+  );
+  assert.match(
+    srcPdf,
+    /nomeArquivoContratoNavarro\(\s*documento\.contratante\.razaoSocial,\s*documento\.tipoDocumento\s*\)/
+  );
+  const srcPanel = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "components",
+      "orcamentos",
+      "OrcamentoContratoGerarPanel.tsx"
+    ),
+    "utf8"
+  );
+  assert.match(srcPanel, /nomeArquivoContratoNavarro\(orcamento\.cliente_nome/);
+  assert.doesNotMatch(srcPanel, /a\.download\s*=\s*doc\.arquivo_nome/);
+  assert.match(srcPanel, /download:\s*filename/);
 });
 
 await run("path de storage reutiliza onboarding", () => {
-  const friendly =
-    "Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007.pdf";
-  const p = buildOrcamentoOnboardingPath("ap1", "contrato", friendly);
-  assert.match(
-    p,
-    /^ap1\/\d+\/Contrato_Navarro_NEPPER_CONSTRUTORA_ORC-2026-0007\.pdf$/
+  const friendly = nomeArquivoContratoNavarro(
+    "NEPPER CONSTRUTORA",
+    "pontual_sst"
   );
+  const p = buildOrcamentoOnboardingPath("ap1", "contrato", friendly);
+  assert.match(p, /^ap1\/\d+\/.+\.pdf$/);
+  assert.doesNotMatch(p, /\.pdf\.pdf$/i);
+  assert.doesNotMatch(p, /Or[cç]amento|ORC-/i);
   const logo = buildOrcamentoOnboardingPath("ap1", "logo", "marca.png");
   assert.match(logo, /^ap1\/logo-\d+\.png$/);
 });

@@ -516,8 +516,8 @@ assert.equal(treino.tipoDocumento, "pontual_sst");
 assert.match(treino.texto, /INSTRUMENTO PARTICULAR|DAS PARTES|DO OBJETO/);
 
 assert.equal(
-  nomeArquivoContratoNavarro("ORC-2026-0063", "ALUMINIO FIRENZE", "aet"),
-  "Contrato_Navarro_AET_ALUMINIO_FIRENZE_ORC-2026-0063.pdf"
+  nomeArquivoContratoNavarro("ALUMINIO FIRENZE", "aet"),
+  "Contrato - AET - ALUMINIO FIRENZE.pdf"
 );
 
 const pdfDoc = new jsPDF({ unit: "mm", format: "a4" });

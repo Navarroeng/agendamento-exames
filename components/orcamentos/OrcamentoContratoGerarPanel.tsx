@@ -14,7 +14,10 @@ import {
   resumoConferenciaContrato,
   type ContratoNavarroDocumento,
 } from "@/lib/contrato-modelo";
-import { gerarPdfContratoNavarro } from "@/lib/contrato-pdf";
+import {
+  gerarPdfContratoNavarro,
+  nomeArquivoContratoNavarro,
+} from "@/lib/contrato-pdf";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
 import {
   resolveTipoDocumentoContrato,
@@ -188,6 +191,12 @@ export function OrcamentoContratoGerarPanel({
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (viewUrl?.startsWith("blob:")) URL.revokeObjectURL(viewUrl);
+    };
+  }, [viewUrl]);
+
   const resumo = useMemo(() => {
     if (!podeGerar) return null;
     try {
@@ -282,7 +291,10 @@ export function OrcamentoContratoGerarPanel({
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      const url = URL.createObjectURL(pdf.blob);
+      const file = new File([new Uint8Array(pdf.arrayBuffer)], pdf.filename, {
+        type: "application/pdf",
+      });
+      const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setPreviewDoc(documento);
       setEtapa("preview");
@@ -373,11 +385,37 @@ export function OrcamentoContratoGerarPanel({
     }
   }
 
+  function nomeDownloadContrato(): string {
+    return nomeArquivoContratoNavarro(orcamento.cliente_nome ?? "", tipoDocumento);
+  }
+
+  function substituirVisualizacao(url: string | null) {
+    setViewUrl(url);
+  }
+
+  function fecharVisualizacao() {
+    substituirVisualizacao(null);
+  }
+
   async function abrirDocumento(doc: OrcamentoContratoDocumentoRecord) {
     setWorking(true);
     try {
-      const url = await obterUrlContratoDocumento(doc.storage_path);
-      setViewUrl(url);
+      const filename = nomeDownloadContrato();
+      const signedUrl = await obterUrlContratoDocumento(doc.storage_path);
+      let nextUrl = signedUrl;
+      try {
+        const response = await fetch(signedUrl);
+        if (response.ok) {
+          const bytes = await response.arrayBuffer();
+          const file = new File([new Uint8Array(bytes)], filename, {
+            type: "application/pdf",
+          });
+          nextUrl = URL.createObjectURL(file);
+        }
+      } catch {
+        nextUrl = signedUrl;
+      }
+      substituirVisualizacao(nextUrl);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -390,14 +428,37 @@ export function OrcamentoContratoGerarPanel({
 
   async function baixarDocumento(doc: OrcamentoContratoDocumentoRecord) {
     setWorking(true);
+    const filename = nomeDownloadContrato();
     try {
-      const url = await obterUrlContratoDocumento(doc.storage_path);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = doc.arquivo_nome;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.click();
+      const signedUrl = await obterUrlContratoDocumento(doc.storage_path);
+      try {
+        const response = await fetch(signedUrl);
+        if (!response.ok) throw new Error("download");
+        const bytes = await response.arrayBuffer();
+        const file = new File([new Uint8Array(bytes)], filename, {
+          type: "application/pdf",
+        });
+        const objectUrl = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = file.name;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+      } catch {
+        const fallback = await obterUrlContratoDocumento(doc.storage_path, {
+          download: filename,
+        });
+        const a = document.createElement("a");
+        a.href = fallback;
+        a.download = filename;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     } catch (err) {
       console.error(err);
       toast.error(
@@ -717,7 +778,7 @@ export function OrcamentoContratoGerarPanel({
                 type="button"
                 className="absolute inset-0 bg-black/40"
                 aria-label="Fechar visualização"
-                onClick={() => setViewUrl(null)}
+                onClick={fecharVisualizacao}
               />
               <div className="relative z-[81] flex max-h-[92vh] w-full max-w-[860px] flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
                 <div className="flex items-center justify-between border-b border-[#e4ebf4] px-5 py-3">
@@ -727,7 +788,7 @@ export function OrcamentoContratoGerarPanel({
                   <button
                     type="button"
                     className="btn justify-center text-[12px]"
-                    onClick={() => setViewUrl(null)}
+                    onClick={fecharVisualizacao}
                   >
                     Fechar
                   </button>

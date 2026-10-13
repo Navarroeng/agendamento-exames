@@ -59,38 +59,48 @@ function estiloClausula(documento: ContratoNavarroDocumento): "sst" | "aet" {
 type JsPDFDoc = InstanceType<typeof jsPDF>;
 type LogoAsset = { dataUrl: string; width: number; height: number };
 
-function sanitizarTrechoArquivo(value: string, fallback: string): string {
-  const cleaned = String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
-  return cleaned.slice(0, 80) || fallback;
+type TipoArquivoContrato = ContratoNavarroDocumento["tipoDocumento"];
+
+const CARACTERES_INVALIDOS_ARQUIVO = /[<>:"/\\|?*\u0000-\u001f]/g;
+const MAX_EMPRESA_ARQUIVO = 120;
+
+export function rotuloServicoContratoArquivo(
+  tipoDocumento: TipoArquivoContrato = "pontual_sst"
+): string {
+  switch (tipoDocumento) {
+    case "aet":
+      return "AET";
+    case "insalubridade":
+      return "Laudo de Insalubridade";
+    case "ltcat":
+      return "LTCAT";
+    case "mensalidade":
+    case "pontual_sst":
+      return "Gestão SST";
+  }
 }
 
-/** Número do orçamento: mantém hífens (ex.: ORC-2026-0007). */
-function sanitizarNumeroOrcamentoArquivo(value: string): string {
-  const cleaned = String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
-  return cleaned.slice(0, 40) || "Orcamento";
+function sanitizarNomeEmpresaArquivo(value: string): string {
+  let cleaned = String(value ?? "")
+    .replace(CARACTERES_INVALIDOS_ARQUIVO, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  let anterior = "";
+  while (cleaned && cleaned !== anterior) {
+    anterior = cleaned;
+    cleaned = cleaned.replace(/\.pdf$/i, "").replace(/[. ]+$/g, "").trim();
+  }
+  cleaned = cleaned.slice(0, MAX_EMPRESA_ARQUIVO).replace(/[. ]+$/g, "").trim();
+  return cleaned || "Empresa";
 }
 
 export function nomeArquivoContratoNavarro(
-  numero: string,
   clienteNome: string,
-  tipoDocumento?: ContratoNavarroDocumento["tipoDocumento"]
+  tipoDocumento: TipoArquivoContrato = "pontual_sst"
 ): string {
-  const cliente = sanitizarTrechoArquivo(clienteNome, "Cliente");
-  const orc = sanitizarNumeroOrcamentoArquivo(numero);
-  if (tipoDocumento === "aet") {
-    return `Contrato_Navarro_AET_${cliente}_${orc}.pdf`;
-  }
-  return `Contrato_Navarro_${cliente}_${orc}.pdf`;
+  const servico = rotuloServicoContratoArquivo(tipoDocumento);
+  const empresa = sanitizarNomeEmpresaArquivo(clienteNome);
+  return `Contrato - ${servico} - ${empresa}.pdf`;
 }
 
 function logoDisplaySize(pixelW: number, pixelH: number): { w: number; h: number } {
@@ -624,7 +634,6 @@ export async function gerarPdfContratoNavarro(
 }> {
   const logo = await loadLogoAsset();
   const filename = nomeArquivoContratoNavarro(
-    documento.numeroOrcamento,
     documento.contratante.razaoSocial,
     documento.tipoDocumento
   );
