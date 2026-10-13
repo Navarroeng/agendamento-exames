@@ -44,6 +44,16 @@ import {
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { OrcamentoEtapasNav } from "./OrcamentoEtapasNav";
+import { OrcamentoMensalidadePagamentoEditor } from "./OrcamentoMensalidadePagamentoEditor";
+import { obterMesesVigenciaMensalidade } from "@/services/orcamento-aprovacao.service";
+import {
+  calcularAvistaPorDesconto,
+  calcularAvistaPorValorFinal,
+  montarBaseMensalidadeAvista,
+  parseDecimalBr,
+  validarCalculoMensalidadeAvista,
+  validarVencimentoAvista,
+} from "@/lib/orcamento-mensalidade-pagamento";
 import {
   OrcamentoAbaLogo,
   OrcamentoAbaProcuracao,
@@ -496,11 +506,26 @@ export function OrcamentoAprovarModal({
     );
   }, [fluxoImplantacao]);
 
-  function iniciarEdicaoCondicoes() {
+  async function iniciarEdicaoCondicoes() {
     if (!orcamento || !aprovacao) return;
+    const base = buildAprovacaoFormFromRecord(orcamento, aprovacao);
+    let meses = base.mensalidade_meses;
+    if (isOrcamentoMensalidade(orcamento.modalidade)) {
+      try {
+        meses = String(
+          await obterMesesVigenciaMensalidade(
+            orcamento.id,
+            aprovacao.mensalidade_meses
+          )
+        );
+      } catch (err) {
+        console.error(err);
+      }
+    }
     setForm({
-      ...buildAprovacaoFormFromRecord(orcamento, aprovacao),
+      ...base,
       condicoes_iguais: false,
+      mensalidade_meses: meses,
     });
     setEditandoCondicoes(true);
   }
@@ -528,6 +553,40 @@ export function OrcamentoAprovarModal({
           : "Informe o valor total fechado."
       );
       return;
+    }
+    if (
+      isOrcamentoMensalidade(orcamento?.modalidade) &&
+      form.mensalidade_pagamento === "avista"
+    ) {
+      const meses = Math.max(1, Math.floor(Number(form.mensalidade_meses)) || 1);
+      const base = montarBaseMensalidadeAvista({
+        valorMensal: parseMoney(form.valor_final),
+        meses,
+        itens:
+          aprovacao.orcamento_aprovacao_itens ??
+          orcamento?.orcamento_itens ??
+          [],
+      });
+      const calculo =
+        form.mensalidade_fonte === "final"
+          ? calcularAvistaPorValorFinal(
+              base,
+              parseMoney(form.mensalidade_valor_avista)
+            )
+          : calcularAvistaPorDesconto(
+              base,
+              form.mensalidade_desconto_tipo,
+              form.mensalidade_desconto_tipo === "percentual"
+                ? parseDecimalBr(form.mensalidade_desconto)
+                : parseMoney(form.mensalidade_desconto)
+            );
+      const erro =
+        validarCalculoMensalidadeAvista(calculo, form.mensalidade_fonte) ??
+        validarVencimentoAvista(form.mensalidade_vencimento);
+      if (erro) {
+        toast.error(erro);
+        return;
+      }
     }
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
@@ -1024,6 +1083,8 @@ export function OrcamentoAprovarModal({
                           />
                         </Field>
                         )}
+                        {isMensalidade &&
+                        form.mensalidade_pagamento === "avista" ? null : (
                         <Field
                           label={
                             isMensalidade
@@ -1044,29 +1105,22 @@ export function OrcamentoAprovarModal({
                             }
                           />
                         </Field>
+                        )}
                       </div>
 
                       {isMensalidade ? (
-                        <div className="rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-                            Condição de pagamento
-                          </p>
-                          <p className="mt-1 text-sm font-extrabold text-navy">
-                            {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-navy">
-                            {valorFinalEditado > 0
-                              ? formatValorMensalidade(valorFinalEditado)
-                              : "—"}
-                          </p>
-                          <p className="mt-2 text-[12px] text-[#475569]">
-                            Vigência contratual:{" "}
-                            {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
-                          </p>
-                          <p className="text-[12px] text-[#475569]">
-                            Renovação: {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL}
-                          </p>
-                        </div>
+                        <OrcamentoMensalidadePagamentoEditor
+                          value={form}
+                          itens={
+                            aprovacao?.orcamento_aprovacao_itens ??
+                            orcamento?.orcamento_itens ??
+                            []
+                          }
+                          disabled={saving}
+                          onChange={(next) =>
+                            setForm((prev) => (prev ? { ...prev, ...next } : prev))
+                          }
+                        />
                       ) : (
                       <>
                       {isLaudoPontual ? null : (

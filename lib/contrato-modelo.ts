@@ -1,6 +1,5 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
-  CONTRATO_VIGENCIA_MENSALIDADE_MESES,
   buildClausulasContrato,
   redigirContratada,
   redigirContratante,
@@ -19,10 +18,12 @@ import {
   contratoUsaCronogramaVencimentos,
 } from "@/lib/contrato-vencimentos";
 import {
+  centsToReais,
   montarMensalidades,
   montarParcelasPontual,
   type ContratoParcela,
 } from "@/lib/contrato-pagamento";
+import { reaisParaCentavos, resolverMesesVigenciaMensalidade } from "@/lib/orcamento-mensalidade-pagamento";
 import { resolveQuantidadeColaboradoresOrcamento } from "@/lib/orcamento-calculo";
 import {
   formatValorMensalidade,
@@ -60,6 +61,7 @@ export type ContratoNavarroDocumento = {
   texto: string;
   tituloLinhas: string[];
   qualificacao?: { titulo: string; paragrafos: string[] };
+  pagamentoMensalidade?: ContratoNavarroContexto["pagamentoMensalidade"];
 };
 
 export function hojeIsoLocal(date = new Date()): string {
@@ -216,12 +218,28 @@ export function buildContratoNavarroDocumento(params: {
     tipoDocumento === "aet" || tipoDocumento === "insalubridade"
       ? 0
       : resolveColaboradores(orcamento, aprovacao);
+  const mesesMensalidade = resolverMesesVigenciaMensalidade({
+    mesesSalvos: aprovacao?.mensalidade_meses,
+  });
+  const pagamentoAvista =
+    mensalidade && aprovacao?.mensalidade_pagamento === "avista";
+  const valorAvistaCentavos = reaisParaCentavos(Number(aprovacao?.valor_avista) || 0);
 
-  let parcelas =
-    tipoDocumento === "mensalidade"
+  let parcelas: ContratoParcela[] = pagamentoAvista
+    ? [
+        {
+          indice: 1,
+          dataIso:
+            (aprovacao?.mensalidade_vencimento ?? "").trim().slice(0, 10) ||
+            dataContrato,
+          valorCentavos: valorAvistaCentavos,
+          valor: centsToReais(valorAvistaCentavos),
+        },
+      ]
+    : tipoDocumento === "mensalidade"
       ? montarMensalidades({
           valorMensal: valor,
-          quantidade: CONTRATO_VIGENCIA_MENSALIDADE_MESES,
+          quantidade: mesesMensalidade,
           dataContrato,
         })
       : montarParcelasPontual({
@@ -298,12 +316,28 @@ export function buildContratoNavarroDocumento(params: {
     colaboradores,
     valor,
     condicaoPagamento: mensalidade
-      ? `${CONTRATO_VIGENCIA_MENSALIDADE_MESES} mensalidades`
+      ? pagamentoAvista
+        ? "À vista"
+        : `${mesesMensalidade} mensalidades`
       : aprovacao?.condicao_pagamento?.trim() ||
         orcamento.forma_pagamento?.trim() ||
         null,
     parcelas,
     servicos: resolveServicos(orcamento, aprovacao),
+    pagamentoMensalidade: mensalidade
+      ? {
+          forma: pagamentoAvista ? "avista" : "mensal",
+          meses: mesesMensalidade,
+          valorMensal: valor,
+          valorBruto: Number(aprovacao?.mensalidade_valor_bruto) || 0,
+          desconto: Number(aprovacao?.mensalidade_desconto_valor) || 0,
+          valorFinal: centsToReais(valorAvistaCentavos),
+          vencimentoIso: (aprovacao?.mensalidade_vencimento ?? "")
+            .trim()
+            .slice(0, 10),
+          valorPontual: Number(aprovacao?.mensalidade_valor_pontual) || 0,
+        }
+      : null,
   };
 
   const clausulas = buildClausulasContrato(ctx);
@@ -326,6 +360,13 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
   dataContrato: string;
   contratanteRedacao: string;
   contratadaRedacao: string;
+  pagamentoAvista: {
+    bruto: string;
+    desconto: string;
+    final: string;
+    vencimento: string;
+    meses: string;
+  } | null;
 } {
   return {
     cliente: doc.contratante.razaoSocial,
@@ -345,5 +386,17 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
     dataContrato: formatDateIsoToBR(doc.dataContrato),
     contratanteRedacao: redigirContratante(doc.contratante),
     contratadaRedacao: redigirContratada(),
+    pagamentoAvista:
+      doc.pagamentoMensalidade?.forma === "avista"
+        ? {
+            meses: String(doc.pagamentoMensalidade.meses),
+            bruto: formatCurrency(doc.pagamentoMensalidade.valorBruto ?? 0),
+            desconto: formatCurrency(doc.pagamentoMensalidade.desconto ?? 0),
+            final: formatCurrency(doc.pagamentoMensalidade.valorFinal ?? 0),
+            vencimento: doc.pagamentoMensalidade.vencimentoIso
+              ? formatDateIsoToBR(doc.pagamentoMensalidade.vencimentoIso)
+              : "—",
+          }
+        : null,
   };
 }

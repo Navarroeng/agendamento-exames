@@ -281,6 +281,16 @@ assert.equal(resumo.textoAVista, "");
 assert.equal(resumo.textoParcelado, ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO);
 assertNaoVazaTotalAnual(JSON.stringify(resumo), "resumo comercial");
 
+const camposMensalidade = {
+  mensalidade_pagamento: "mensal" as const,
+  mensalidade_desconto_tipo: "valor" as const,
+  mensalidade_desconto: "",
+  mensalidade_valor_avista: "",
+  mensalidade_vencimento: "",
+  mensalidade_fonte: "desconto" as const,
+  mensalidade_meses: "12",
+};
+
 const payloadIguais = buildAprovacaoInsertPayload(
   orcamentoMensalidade,
   {
@@ -290,6 +300,7 @@ const payloadIguais = buildAprovacaoInsertPayload(
     valor_final: "180,00",
     quantidade_parcelas: "12",
     observacoes: "",
+    ...camposMensalidade,
   },
   "Ágatha",
   parseMoney
@@ -313,6 +324,7 @@ const payloadEditado = buildAprovacaoInsertPayload(
     valor_final: "200,00",
     quantidade_parcelas: "3",
     observacoes: "",
+    ...camposMensalidade,
   },
   "Ágatha",
   parseMoney

@@ -22,6 +22,8 @@ export interface OrcamentoContratoDocumentoRecord {
   gerado_por_user_id: string | null;
   gerado_em: string;
   created_at: string;
+  /** Preenchido quando as condições aprovadas mudam depois desta versão. */
+  desatualizado_em?: string | null;
 }
 
 export interface OrcamentoContratoDocumentoInsert {

@@ -32,11 +32,40 @@ import {
   ORCAMENTO_COM_CONTRATO_USE_ENCERRAR_MSG,
 } from "@/lib/contrato-permissoes";
 import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
+import {
+  mensagemErroMensalidadePagamento,
+  resolverMesesVigenciaMensalidade,
+} from "@/lib/orcamento-mensalidade-pagamento";
 
 const APROVACAO_SELECT = `
   *,
   orcamento_aprovacao_itens (*)
 `;
+
+export async function obterMesesVigenciaMensalidade(
+  orcamentoId: string,
+  mesesSalvos?: number | null
+): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cliente_contratos")
+    .select("data_inicio, data_fim")
+    .eq("orcamento_id", orcamentoId)
+    .not("status", "in", "(encerrado,cancelado)")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    return resolverMesesVigenciaMensalidade({ mesesSalvos });
+  }
+  const row = data?.[0] as
+    | { data_inicio?: string | null; data_fim?: string | null }
+    | undefined;
+  return resolverMesesVigenciaMensalidade({
+    dataInicio: row?.data_inicio,
+    dataFim: row?.data_fim,
+    mesesSalvos,
+  });
+}
 
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
@@ -304,6 +333,59 @@ export async function atualizarCondicoesAprovadas(
   const usuario = alteradoPor.trim();
   if (!usuario) {
     throw new Error("Informe o usuário responsável pela alteração.");
+  }
+
+  if (
+    payload.mensalidade_pagamento === "mensal" ||
+    payload.mensalidade_pagamento === "avista"
+  ) {
+    const { error: rpcError } = await supabase.rpc(
+      "atualizar_condicoes_mensalidade_aprovadas",
+      {
+        p_aprovacao_id: aprovacaoId,
+        p_quantidade: payload.quantidade_colaboradores,
+        p_valor_mensal: payload.valor_final,
+        p_forma: payload.mensalidade_pagamento,
+        p_desconto_tipo: payload.mensalidade_desconto_tipo,
+        p_desconto:
+          payload.mensalidade_pagamento === "avista" &&
+          payload.mensalidade_fonte !== "final"
+            ? payload.mensalidade_desconto_informado ?? 0
+            : 0,
+        p_valor_final:
+          payload.mensalidade_pagamento === "avista"
+            ? payload.valor_avista
+            : payload.valor_final,
+        p_vencimento: payload.mensalidade_vencimento || null,
+        p_observacoes: payload.observacoes,
+        p_alterado_por: usuario,
+        p_fonte: payload.mensalidade_fonte || "desconto",
+      }
+    );
+    if (rpcError) {
+      throw new Error(mensagemErroMensalidadePagamento(rpcError));
+    }
+
+    const { data: updatedRaw, error: reloadError } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(APROVACAO_SELECT)
+      .eq("id", aprovacaoId)
+      .single();
+    if (reloadError) throw reloadError;
+
+    const { data: historicoRaw, error: historicoError } = await supabase
+      .from("orcamento_aprovacao_condicoes_historico")
+      .select("*")
+      .eq("aprovacao_id", aprovacaoId)
+      .order("alterado_em", { ascending: false })
+      .limit(1)
+      .single();
+    if (historicoError) throw historicoError;
+
+    return {
+      aprovacao: sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord),
+      historico: historicoRaw as OrcamentoAprovacaoCondicoesHistoricoRecord,
+    };
   }
 
   const { data: beforeRaw, error: beforeError } = await supabase

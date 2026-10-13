@@ -128,11 +128,20 @@ export function OrcamentoContratoGerarPanel({
     } finally {
       setLoadingDocs(false);
     }
-  }, [aprovacao.id]);
+  }, [aprovacao.id, aprovacao.updated_at]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    setEtapa("idle");
+    setPreviewDoc(null);
+    setPreviewUrl((atualUrl) => {
+      if (atualUrl) URL.revokeObjectURL(atualUrl);
+      return null;
+    });
+  }, [aprovacao.updated_at]);
 
   const carregarVencimentos = useCallback(async () => {
     if (!usaCronograma) {
@@ -421,6 +430,7 @@ export function OrcamentoContratoGerarPanel({
               {" · "}
               {formatDateTimeBR(atual.gerado_em)}
               {atual.gerado_por ? ` · ${atual.gerado_por}` : ""}
+              {atual.desatualizado_em ? " · desatualizado" : ""}
             </p>
           ) : loadingDocs ? (
             <p className="mt-1 text-[12px] text-[#64748b]">Carregando…</p>
@@ -429,6 +439,13 @@ export function OrcamentoContratoGerarPanel({
               Nenhum contrato gerado ainda.
             </p>
           )}
+          {atual?.desatualizado_em ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              Este PDF está desatualizado. As condições aprovadas mudaram.
+              Gere o contrato de novo para usar a versão vigente. O arquivo
+              anterior permanece no histórico.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {motivoBloqueio ? null : !atual ? (
@@ -464,7 +481,9 @@ export function OrcamentoContratoGerarPanel({
                 disabled={busy || !podeGerar || contratoAssinado}
                 onClick={() => void handleAbrirConferencia()}
               >
-                Gerar novamente
+                {atual.desatualizado_em
+                  ? "Gerar contrato atualizado"
+                  : "Gerar novamente"}
               </button>
             </>
           )}
@@ -532,6 +551,7 @@ export function OrcamentoContratoGerarPanel({
                 <span>
                   v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
+                  {doc.desatualizado_em ? " · desatualizado" : ""}
                 </span>
                 <span className="flex gap-2">
                   <button
@@ -574,8 +594,9 @@ export function OrcamentoContratoGerarPanel({
                       : "Prévia do contrato"}
                   </h3>
                   <p className="mt-1 text-[12px] text-[#64748b]">
-                    A data do contrato define o documento, a primeira parcela e
-                    a vigência, quando aplicável.
+                    {resumo?.pagamentoAvista
+                      ? "O vencimento do pagamento único é o das condições aprovadas. A data do contrato não quita o valor."
+                      : "A data do contrato define o documento, a primeira parcela e a vigência, quando aplicável."}
                   </p>
                 </div>
 
@@ -603,6 +624,31 @@ export function OrcamentoContratoGerarPanel({
                         }
                         value={resumo.valor}
                       />
+                      {resumo.pagamentoAvista ? (
+                        <>
+                          <Row label="Pagamento" value="À vista" />
+                          <Row
+                            label="Valor bruto do período"
+                            value={resumo.pagamentoAvista.bruto}
+                          />
+                          <Row
+                            label="Desconto concedido"
+                            value={resumo.pagamentoAvista.desconto}
+                          />
+                          <Row
+                            label="Valor final a pagar"
+                            value={resumo.pagamentoAvista.final}
+                          />
+                          <Row
+                            label="Vencimento do pagamento único"
+                            value={resumo.pagamentoAvista.vencimento}
+                          />
+                          <Row
+                            label="Vigência do atendimento"
+                            value={`${resumo.pagamentoAvista.meses} meses`}
+                          />
+                        </>
+                      ) : null}
                       <label className="block">
                         <span className="mb-1.5 block text-xs font-bold text-navy">
                           Data do contrato
