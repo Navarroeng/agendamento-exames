@@ -1,6 +1,10 @@
 /** Mensalidade aprovada: à vista, desconto e contrato. */
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { jsPDF } from "jspdf";
 import {
   aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoFormFromRecord,
@@ -9,7 +13,13 @@ import {
   type OrcamentoAprovacaoRecord,
 } from "../lib/orcamento-aprovacao";
 import { buildContratoNavarroDocumento } from "../lib/contrato-modelo";
-import { CONTRATO_VIGENCIA_MENSALIDADE_MESES } from "../lib/contrato-navarro";
+import {
+  CAMPOS_PAGAMENTO_CONTRATO_AUSENTES,
+  CONTRATO_VIGENCIA_MENSALIDADE_MESES,
+  linhasDadosPagamentoContrato,
+} from "../lib/contrato-navarro";
+import { drawContratoPdfDocument } from "../lib/contrato-pdf";
+import { NAVARRO_DADOS_BANCARIOS } from "../lib/navarro-pagamento";
 import { parseMoney } from "../lib/money";
 import {
   GESTAO_SST_MENSAL_NOME,
@@ -253,9 +263,12 @@ const texto = doc.texto;
 assert.match(texto, /pagamento à vista/i);
 assert.match(texto, /valor bruto do período/i);
 assert.match(texto, /desconto de R\$ 450,00/);
-assert.match(texto, /valor final a pagar/i);
+assert.match(texto, /após o desconto concedido/i);
+assert.match(texto, /a ser pago à vista até 15\/11\/2026/);
+assert.match(texto, /por Pix ou transferência bancária/i);
+assert.match(texto, /DADOS PARA PAGAMENTO/);
+assert.match(texto, /99729-6/);
 assert.match(texto, /8\.550,00/);
-assert.match(texto, /vencimento do pagamento único é 15\/11\/2026/);
 assert.match(texto, /vigência do atendimento permanece de 12 \(doze\) meses/);
 assert.match(texto, /vigência mínima inicial/);
 assert.doesNotMatch(texto, /12 \(doze\) mensalidades/);
@@ -271,6 +284,8 @@ const mensalDoc = buildContratoNavarroDocumento({
 });
 assert.equal(mensalDoc.parcelas.length, CONTRATO_VIGENCIA_MENSALIDADE_MESES);
 assert.match(mensalDoc.texto, /12 \(doze\) mensalidades/);
+assert.doesNotMatch(mensalDoc.texto, /DADOS PARA PAGAMENTO/);
+assert.doesNotMatch(mensalDoc.texto, /99729-6/);
 
 const referencia = 130;
 const orcamentoReferencia: OrcamentoComItens = {
@@ -344,6 +359,35 @@ assert.match(docNegociado.texto, /1\.560,00/);
 assert.match(docNegociado.texto, /160,00/);
 assert.match(docNegociado.texto, /1\.400,00/);
 assert.match(docNegociado.texto, /14\/10\/2026/);
+assert.match(docNegociado.texto, /DADOS PARA PAGAMENTO/);
+assert.match(docNegociado.texto, /Chave Pix/);
 assert.doesNotMatch(docNegociado.texto, /12 \(doze\) mensalidades/);
+assert.doesNotMatch(docNegociado.texto, /Tipo de conta/);
+assert.deepEqual([...CAMPOS_PAGAMENTO_CONTRATO_AUSENTES], ["Tipo de conta"]);
+const linhas = linhasDadosPagamentoContrato();
+assert.equal(linhas.find((linha) => linha.rotulo === "Banco")?.valor, NAVARRO_DADOS_BANCARIOS.banco);
+assert.equal(linhas.find((linha) => linha.rotulo === "Agência")?.valor, NAVARRO_DADOS_BANCARIOS.agencia);
+assert.equal(linhas.find((linha) => linha.rotulo === "Conta")?.valor, NAVARRO_DADOS_BANCARIOS.conta);
+assert.equal(linhas.find((linha) => linha.rotulo === "Titular")?.valor, NAVARRO_DADOS_BANCARIOS.favorecido);
+assert.equal(linhas.find((linha) => linha.rotulo === "CNPJ")?.valor, NAVARRO_DADOS_BANCARIOS.pixCnpj);
+assert.equal(linhas.find((linha) => linha.rotulo === "Chave Pix")?.valor, NAVARRO_DADOS_BANCARIOS.pixCnpj);
+assert.equal(linhas.some((linha) => linha.rotulo === "Tipo de conta"), false);
+
+const pdfDoc = new jsPDF({ unit: "mm", format: "a4" });
+drawContratoPdfDocument(pdfDoc, docNegociado, null);
+const paginas = pdfDoc.getNumberOfPages();
+assert.ok(paginas >= 2 && paginas <= 6, `paginação inesperada: ${paginas}`);
+const buf = pdfDoc.output("arraybuffer") as ArrayBuffer;
+const raw = Buffer.from(buf).toString("latin1");
+assert.ok(raw.includes("DADOS PARA PAGAMENTO"));
+assert.ok(raw.includes("99729-6"));
+assert.ok(raw.includes("0760"));
+assert.ok(raw.includes("45.206.250"));
+assert.ok(raw.includes("1.400,00") || raw.includes("1400"));
+assert.ok(raw.includes("14/10/2026"));
+assert.ok(!raw.includes("Tipo de conta"));
+const pdfPath = path.join(os.tmpdir(), "contrato-avista-dados-bancarios.pdf");
+fs.writeFileSync(pdfPath, Buffer.from(buf));
+console.log(`PDF à vista: ${pdfPath} (${paginas} págs)`);
 
 console.log("OK  mensalidade à vista");

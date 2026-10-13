@@ -4,6 +4,7 @@ import { dataPorExtensoPtBr } from "@/lib/extenso";
 import {
   NAVARRO_CONTRATO_INSTITUCIONAL,
   rotuloClausulaContrato,
+  type ContratoBlocoPagamento,
   type ContratoClausula,
   type ContratoClausulaTabela,
 } from "@/lib/contrato-navarro";
@@ -47,6 +48,11 @@ const AET_BULLET_INDENT = AET_BULLET_R * 2 + AET_BULLET_GAP;
 const TABLE_HEAD_H = 7.2;
 const TABLE_ROW_H = 6.8;
 const TABLE_GAP_AFTER = 7;
+const PAGAMENTO_LABEL_W = 32;
+const PAGAMENTO_PAD = 2.4;
+const PAGAMENTO_LINE_H = 3.7;
+const PAGAMENTO_HEADER_H = 6.6;
+const PAGAMENTO_GAP_AFTER = 3.2;
 
 function isContratoAet(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "aet";
@@ -302,6 +308,11 @@ function clauseBlockHeight(
   if (clause.tabela) {
     h += tabelaBlockHeight(clause.tabela);
   }
+  if (clause.blocoPagamento) {
+    h += blocoPagamentoHeight(doc, clause.blocoPagamento);
+  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
   for (const p of clause.paragrafosApos ?? []) {
     const lines = paragraphLines(doc, p);
     h += lines.length * PARA_LINE_H + 2.2;
@@ -411,6 +422,99 @@ function drawClausulaTabela(
   }
 
   return startY + tableH + TABLE_GAP_AFTER;
+}
+
+function linhasBlocoPagamento(
+  doc: JsPDFDoc,
+  bloco: ContratoBlocoPagamento
+): { introducao: string[]; linhas: { rotulo: string; valor: string[] }[] } {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  const introducao = paragraphLines(doc, bloco.introducao);
+  const valorW = CONTENT_W - PAGAMENTO_LABEL_W - PAGAMENTO_PAD * 3;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const linhas = bloco.linhas.map((linha) => ({
+    rotulo: linha.rotulo,
+    valor: doc.splitTextToSize(linha.valor, valorW) as string[],
+  }));
+  return { introducao, linhas };
+}
+
+function alturaLinhaPagamento(qtdLinhas: number): number {
+  return Math.max(7.2, qtdLinhas * PAGAMENTO_LINE_H + 3.6);
+}
+
+function blocoPagamentoHeight(
+  doc: JsPDFDoc,
+  bloco: ContratoBlocoPagamento
+): number {
+  const medido = linhasBlocoPagamento(doc, bloco);
+  const introH = medido.introducao.length * PARA_LINE_H + 2.2;
+  const rowsH = medido.linhas.reduce((total, linha) => {
+    return total + alturaLinhaPagamento(linha.valor.length);
+  }, PAGAMENTO_HEADER_H);
+  return introH + rowsH + PAGAMENTO_GAP_AFTER;
+}
+
+function drawBlocoPagamento(
+  doc: JsPDFDoc,
+  bloco: ContratoBlocoPagamento,
+  startY: number
+): number {
+  const medido = linhasBlocoPagamento(doc, bloco);
+  let y = startY;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...SLATE_700);
+  for (const line of medido.introducao) {
+    doc.text(line, MARGIN, y);
+    y += PARA_LINE_H;
+  }
+  y += 2.2;
+
+  const x0 = MARGIN;
+  const tableW = CONTENT_W;
+  const rowsH = medido.linhas.reduce(
+    (total, linha) => total + alturaLinhaPagamento(linha.valor.length),
+    0
+  );
+  const boxH = PAGAMENTO_HEADER_H + rowsH;
+
+  doc.setDrawColor(...TABLE_BORDER);
+  doc.setLineWidth(0.25);
+  doc.setFillColor(...TABLE_HEAD_BG);
+  doc.rect(x0, y, tableW, PAGAMENTO_HEADER_H, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  doc.text("DADOS PARA PAGAMENTO", x0 + PAGAMENTO_PAD, y + 4.4);
+
+  let rowY = y + PAGAMENTO_HEADER_H;
+  for (const linha of medido.linhas) {
+    const rowH = alturaLinhaPagamento(linha.valor.length);
+    doc.setFillColor(...WHITE);
+    doc.setDrawColor(...TABLE_BORDER);
+    doc.rect(x0, rowY, tableW, rowH, "S");
+    doc.line(x0 + PAGAMENTO_LABEL_W, rowY, x0 + PAGAMENTO_LABEL_W, rowY + rowH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...NAVY);
+    doc.text(linha.rotulo, x0 + PAGAMENTO_PAD, rowY + 4.3);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...SLATE_700);
+    let textY = rowY + 4.3;
+    for (const parte of linha.valor) {
+      doc.text(parte, x0 + PAGAMENTO_LABEL_W + PAGAMENTO_PAD, textY);
+      textY += PAGAMENTO_LINE_H;
+    }
+    rowY += rowH;
+  }
+
+  doc.setDrawColor(...TABLE_BORDER);
+  doc.rect(x0, y, tableW, boxH, "S");
+  return rowY + PAGAMENTO_GAP_AFTER;
 }
 
 export function drawContratoPdfDocument(
@@ -529,6 +633,11 @@ export function drawContratoPdfDocument(
     if (clause.tabela) {
       y = ensure(y, tabelaBlockHeight(clause.tabela));
       y = drawClausulaTabela(doc, clause.tabela, y);
+    }
+
+    if (clause.blocoPagamento) {
+      y = ensure(y, blocoPagamentoHeight(doc, clause.blocoPagamento));
+      y = drawBlocoPagamento(doc, clause.blocoPagamento, y);
     }
 
     doc.setFont("helvetica", "normal");

@@ -60,6 +60,16 @@ export type ContratoClausulaTabela = {
   linhas: string[][];
 };
 
+export type ContratoDadoPagamento = {
+  rotulo: string;
+  valor: string;
+};
+
+export type ContratoBlocoPagamento = {
+  introducao: string;
+  linhas: ContratoDadoPagamento[];
+};
+
 export type ContratoClausula = {
   numero: string;
   titulo: string;
@@ -67,8 +77,45 @@ export type ContratoClausula = {
   /** Lista com marcadores (contrato AET, cláusula de inclusos). */
   itens?: string[];
   tabela?: ContratoClausulaTabela;
+  blocoPagamento?: ContratoBlocoPagamento;
   paragrafosApos?: string[];
 };
+
+/** Campo pedido no contrato e ausente na fonte oficial de pagamento. */
+export const CAMPOS_PAGAMENTO_CONTRATO_AUSENTES = ["Tipo de conta"] as const;
+
+function valorPagamentoCadastrado(value: string | null | undefined): string {
+  return String(value ?? "").trim();
+}
+
+/** Linhas disponíveis em NAVARRO_DADOS_BANCARIOS. Omite campo vazio. */
+export function linhasDadosPagamentoContrato(): ContratoDadoPagamento[] {
+  const d = NAVARRO_DADOS_BANCARIOS;
+  const linhas: ContratoDadoPagamento[] = [];
+  const incluir = (rotulo: string, valor: string | null | undefined) => {
+    const texto = valorPagamentoCadastrado(valor);
+    if (texto) linhas.push({ rotulo, valor: texto });
+  };
+  incluir("Banco", d.banco);
+  incluir("Agência", d.agencia);
+  incluir("Conta", d.conta);
+  incluir("Titular", d.favorecido);
+  incluir("CNPJ", d.pixCnpj);
+  incluir("Chave Pix", d.pixCnpj);
+  return linhas;
+}
+
+function fraseMeiosPagamentoContrato(): string | null {
+  const d = NAVARRO_DADOS_BANCARIOS;
+  const transferencia = [d.banco, d.agencia, d.conta].every((item) =>
+    Boolean(valorPagamentoCadastrado(item))
+  );
+  const pix = Boolean(valorPagamentoCadastrado(d.pixCnpj));
+  if (transferencia && pix) return "por Pix ou transferência bancária";
+  if (pix) return "por Pix";
+  if (transferencia) return "por transferência bancária";
+  return null;
+}
 
 export function rotuloClausulaContrato(
   clause: ContratoClausula,
@@ -202,39 +249,73 @@ function mesesVigenciaContexto(ctx: ContratoNavarroContexto): number {
   return CONTRATO_VIGENCIA_MENSALIDADE_MESES;
 }
 
-function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): string[] {
+function redigirInstrucaoPagamentoAvista(
+  valorFinal: number,
+  vencimentoIso: string,
+  temDesconto: boolean
+): string {
+  const valor = formatMoedaComExtenso(valorFinal);
+  const vencimento = formatDateIsoToBR(vencimentoIso);
+  const nucleo = temDesconto
+    ? `O valor total contratado, após o desconto concedido, é de ${valor}`
+    : `O valor total contratado é de ${valor}`;
+  const meios = fraseMeiosPagamentoContrato();
+  const complemento = meios
+    ? `, ${meios}, conforme os dados abaixo`
+    : "";
+  return `${nucleo}, a ser pago à vista até ${vencimento}${complemento}.`;
+}
+
+function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
+  paragrafos: string[];
+  bloco: ContratoBlocoPagamento | null;
+  depois: string[];
+} {
   const pagamento = ctx.pagamentoMensalidade;
   const meses = mesesVigenciaContexto(ctx);
   const bruto = pagamento?.valorBruto ?? 0;
   const desconto = pagamento?.desconto ?? 0;
   const final = pagamento?.valorFinal ?? 0;
   const vencimento = pagamento?.vencimentoIso?.trim() || ctx.dataContrato;
-  const linhas = [
+  const paragrafos = [
     `A CONTRATANTE pagará à CONTRATADA, em pagamento à vista, a remuneração da vigência de ${formatNumeroComExtenso(meses)} meses.`,
     `O valor bruto do período é de ${formatMoedaComExtenso(bruto)}.`,
   ];
   if (desconto > 0) {
-    linhas.push(
+    paragrafos.push(
       `Foi concedido desconto de ${formatMoedaComExtenso(desconto)}.`
     );
   }
-  linhas.push(
-    `O valor final a pagar é de ${formatMoedaComExtenso(final)}.`,
-    `O vencimento do pagamento único é ${formatDateIsoToBR(vencimento)}. A forma à vista não quita o valor; a quitação depende da confirmação do pagamento.`,
-    `A vigência do atendimento permanece de ${formatNumeroComExtenso(meses)} meses.`
-  );
+  const linhas = linhasDadosPagamentoContrato();
+  const bloco =
+    linhas.length > 0
+      ? {
+          introducao: redigirInstrucaoPagamentoAvista(
+            final,
+            vencimento,
+            desconto > 0
+          ),
+          linhas,
+        }
+      : null;
+  if (!bloco) {
+    paragrafos.push(
+      redigirInstrucaoPagamentoAvista(final, vencimento, desconto > 0)
+    );
+  }
+  const depois = [
+    "A forma à vista não quita o valor; a quitação depende da confirmação do pagamento.",
+    `A vigência do atendimento permanece de ${formatNumeroComExtenso(meses)} meses.`,
+  ];
   if ((pagamento?.valorPontual ?? 0) > 0) {
-    linhas.push(
+    depois.push(
       `Serviços pontuais adicionais, no valor de ${formatMoedaComExtenso(pagamento?.valorPontual ?? 0)}, integram o total bruto uma única vez e não recebem desconto automático.`
     );
   }
-  return linhas;
+  return { paragrafos, bloco, depois };
 }
 
 function redigirPagamentoMensalidade(ctx: ContratoNavarroContexto): string[] {
-  if (ctx.pagamentoMensalidade?.forma === "avista") {
-    return redigirPagamentoMensalidadeAvista(ctx);
-  }
   const meses = mesesVigenciaContexto(ctx);
   return [
     `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual.`,
@@ -314,8 +395,14 @@ export const CONTRATO_TEXTOS_PROIBIDOS = [
 export function buildClausulasContrato(
   ctx: ContratoNavarroContexto
 ): ContratoClausula[] {
-  const pagamento =
-    ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE
+  const pagamentoAvista =
+    ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE &&
+    ctx.pagamentoMensalidade?.forma === "avista"
+      ? redigirPagamentoMensalidadeAvista(ctx)
+      : null;
+  const pagamento = pagamentoAvista
+    ? pagamentoAvista.paragrafos
+    : ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE
       ? redigirPagamentoMensalidade(ctx)
       : redigirPagamentoPontual(ctx);
 
@@ -354,7 +441,13 @@ export function buildClausulasContrato(
     {
       numero: "4",
       titulo: "DO PAGAMENTO",
-      paragrafos: [...pagamento, redigirReajuste(ctx)],
+      paragrafos: pagamentoAvista
+        ? pagamento
+        : [...pagamento, redigirReajuste(ctx)],
+      blocoPagamento: pagamentoAvista?.bloco ?? undefined,
+      paragrafosApos: pagamentoAvista
+        ? [...pagamentoAvista.depois, redigirReajuste(ctx)]
+        : undefined,
     },
     {
       numero: "5",
@@ -408,10 +501,20 @@ export function textoPlanoContrato(
             ...c.tabela.linhas.map((linha) => linha.join(" | ")),
           ].join("\n")
         : "";
+      const bloco = c.blocoPagamento
+        ? [
+            c.blocoPagamento.introducao,
+            "DADOS PARA PAGAMENTO",
+            ...c.blocoPagamento.linhas.map(
+              (linha) => `${linha.rotulo}: ${linha.valor}`
+            ),
+          ].join("\n")
+        : "";
       const corpo = [
         ...c.paragrafos,
         itens,
         tabela,
+        bloco,
         ...(c.paragrafosApos ?? []),
       ]
         .filter(Boolean)

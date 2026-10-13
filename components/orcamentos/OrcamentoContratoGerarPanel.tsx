@@ -502,9 +502,9 @@ export function OrcamentoContratoGerarPanel({
           )}
           {atual?.desatualizado_em ? (
             <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
-              Este PDF está desatualizado. As condições aprovadas mudaram.
-              Gere o contrato de novo para usar a versão vigente. O arquivo
-              anterior permanece no histórico.
+              Este PDF está desatualizado. Gere o contrato de novo para
+              usar a versão vigente. O arquivo anterior permanece no
+              histórico.
             </p>
           ) : null}
         </div>
