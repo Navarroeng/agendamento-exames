@@ -12,6 +12,7 @@ import {
   type ImplantacaoAetRecord,
   type ImplantacaoAetVisitaStatus,
 } from "@/lib/implantacao-aet";
+import { AET_LAUDO_PDF_FORMATO_HINT } from "@/lib/orcamento-onboarding-files";
 import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import { copyLaudoPontual } from "@/lib/servico-laudo-pontual";
 
@@ -278,6 +279,11 @@ export function OrcamentoAbaAetElaboracao({
             onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
           />
         )}
+        {kind === "aet" ? (
+          <p className="mt-2 text-[12px] text-[#64748b]">
+            {AET_LAUDO_PDF_FORMATO_HINT}
+          </p>
+        ) : null}
       </div>
 
       {isAetElaboracaoConcluida(aet) ? (

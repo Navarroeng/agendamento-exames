@@ -19,6 +19,11 @@ import {
   salvarVisitaAet,
 } from "@/services/implantacao-aet.service";
 import {
+  AET_LAUDO_PDF_MAX_BYTES,
+  AET_LAUDO_PDF_TAMANHO_MSG,
+  substituirAnexoPreservandoAnterior,
+} from "@/lib/orcamento-onboarding-files";
+import {
   obterUrlOrcamentoOnboarding,
   removerArquivoOrcamentoOnboarding,
   uploadAetLaudoPdf,
@@ -211,20 +216,36 @@ export function useOrcamentoAetEtapas(params: {
 
   async function handleUploadLaudo(file: File | null) {
     if (!file || !aet || !params.aprovacaoId) return;
+    const aprovacaoId = params.aprovacaoId;
     setSaving(true);
     try {
       garantirEdicaoLaudosSst();
-      if (aet.laudo_path) {
-        await removerArquivoOrcamentoOnboarding(aet.laudo_path);
-      }
-      const uploaded = await uploadAetLaudoPdf(params.aprovacaoId, file);
-      const saved = await salvarLaudoAet({
-        aetId: aet.id,
-        fileMeta: uploaded,
-        usuarioNome: auditContext.usuarioNome,
-        origem: "laudos_sst",
+      const uploaded = await substituirAnexoPreservandoAnterior({
+        caminhoAnterior: aet.laudo_path,
+        enviarNovo: () =>
+          uploadAetLaudoPdf(
+            aprovacaoId,
+            file,
+            kind === "aet"
+              ? {
+                  maxBytes: AET_LAUDO_PDF_MAX_BYTES,
+                  oversizeMessage: AET_LAUDO_PDF_TAMANHO_MSG,
+                }
+              : undefined
+          ),
+        persistir: async (meta) => {
+          const saved = await salvarLaudoAet({
+            aetId: aet.id,
+            fileMeta: meta,
+            usuarioNome: auditContext.usuarioNome,
+            origem: "laudos_sst",
+          });
+          setAet(saved);
+        },
+        removerNovoSeFalhar: (path) => removerArquivoOrcamentoOnboarding(path),
+        removerAnteriorAposSucesso: (path) =>
+          removerArquivoOrcamentoOnboarding(path),
       });
-      setAet(saved);
       await audit(
         AUDITORIA_ACOES.implantacao_aet_laudo_anexado,
         copy.auditLaudoAnexado(auditContext.usuarioNome),

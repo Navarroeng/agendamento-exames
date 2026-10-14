@@ -1,5 +1,16 @@
 export const ORCAMENTO_ONBOARDING_BUCKET = "orcamentos-onboarding";
 export const ORCAMENTO_ONBOARDING_MAX_BYTES = 10 * 1024 * 1024;
+/** PDF final do Laudo AET. Os demais anexos do bucket continuam em 10 MB. */
+export const AET_LAUDO_PDF_MAX_BYTES = 20 * 1024 * 1024;
+export const AET_LAUDO_PDF_TAMANHO_MSG =
+  "O Laudo AET deve ter no máximo 20 MB.";
+export const AET_LAUDO_PDF_FORMATO_HINT =
+  "Formato PDF • Tamanho máximo: 20 MB";
+
+export type AetLaudoPdfValidationOptions = {
+  maxBytes?: number;
+  oversizeMessage?: string;
+};
 
 const LISTA_EXT = ["xlsx", "xls", "csv", "pdf", "jpg", "jpeg", "png"] as const;
 const LOGO_EXT = ["png", "jpg", "jpeg", "svg"] as const;
@@ -75,17 +86,69 @@ export function validateAetDocumentoEmpresaFile(file: File): void {
   }
 }
 
-export function validateAetLaudoPdfFile(file: File): void {
+export function validateAetLaudoPdfFile(
+  file: File,
+  options?: AetLaudoPdfValidationOptions
+): void {
   if (!file || file.size <= 0) {
     throw new Error("Selecione o PDF do Laudo AET.");
   }
-  if (file.size > ORCAMENTO_ONBOARDING_MAX_BYTES) {
-    throw new Error("O Laudo AET deve ter no máximo 10 MB.");
+  const maxBytes = options?.maxBytes ?? ORCAMENTO_ONBOARDING_MAX_BYTES;
+  if (file.size > maxBytes) {
+    throw new Error(
+      options?.oversizeMessage ??
+        (maxBytes === AET_LAUDO_PDF_MAX_BYTES
+          ? AET_LAUDO_PDF_TAMANHO_MSG
+          : "O Laudo AET deve ter no máximo 10 MB.")
+    );
   }
   const ext = extensionOf(file.name);
   if (ext !== "pdf") {
     throw new Error("O Laudo AET final deve ser um arquivo PDF.");
   }
+}
+
+/**
+ * Envia o arquivo novo e só então grava o caminho.
+ * Se o envio ou a gravação falhar, o arquivo anterior permanece.
+ * O arquivo anterior só é removido depois da gravação ter sucesso.
+ */
+export async function substituirAnexoPreservandoAnterior<
+  T extends { path: string },
+>(params: {
+  caminhoAnterior: string | null | undefined;
+  enviarNovo: () => Promise<T>;
+  persistir: (arquivo: T) => Promise<void>;
+  removerNovoSeFalhar: (path: string) => Promise<void>;
+  removerAnteriorAposSucesso?: (path: string) => Promise<void>;
+}): Promise<T> {
+  const anterior = params.caminhoAnterior?.trim() || null;
+  const novo = await params.enviarNovo();
+  try {
+    await params.persistir(novo);
+  } catch (error) {
+    const novoPath = novo.path?.trim();
+    if (novoPath && novoPath !== anterior) {
+      try {
+        await params.removerNovoSeFalhar(novoPath);
+      } catch (cleanupError) {
+        console.error(cleanupError);
+      }
+    }
+    throw error;
+  }
+  if (
+    anterior &&
+    anterior !== novo.path?.trim() &&
+    params.removerAnteriorAposSucesso
+  ) {
+    try {
+      await params.removerAnteriorAposSucesso(anterior);
+    } catch (cleanupError) {
+      console.error(cleanupError);
+    }
+  }
+  return novo;
 }
 
 export type OrcamentoOnboardingKind =
