@@ -6,6 +6,7 @@
 
 import { orcamentoEhExclusivoInsalubridade } from "@/lib/servico-insalubridade";
 import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
+import { orcamentoEhExclusivoParecerTecnico } from "@/lib/servico-parecer-tecnico";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const SERVICO_AET_NOME =
@@ -86,7 +87,10 @@ export function orcamentoEhExclusivoAet(
   return relevant.every((item) => isServicoAet(item, aetServicoId));
 }
 
-/** Laudos pontuais exclusivos (AET, Insalubridade) não têm à vista. */
+/**
+ * Laudos pontuais exclusivos (AET, Insalubridade) não têm à vista automático.
+ * O Laudo de Parecer Técnico também não recebe o desconto de 5% do Pacote SST.
+ */
 export function orcamentoPermitePagamentoAVista(
   itens: ServicoItemRef[] | null | undefined,
   aetServicoId?: string | null,
@@ -94,7 +98,8 @@ export function orcamentoPermitePagamentoAVista(
 ): boolean {
   return (
     !orcamentoEhExclusivoAet(itens, aetServicoId) &&
-    !orcamentoEhExclusivoInsalubridade(itens, insalubridadeServicoId)
+    !orcamentoEhExclusivoInsalubridade(itens, insalubridadeServicoId) &&
+    !orcamentoEhExclusivoParecerTecnico(itens)
   );
 }
 

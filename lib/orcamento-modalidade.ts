@@ -3,6 +3,7 @@ import { isServicoAetNome } from "@/lib/servico-aet";
 import { isServicoInsalubridadeNome } from "@/lib/servico-insalubridade";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { isServicoLtcatNome } from "@/lib/servico-ltcat";
+import { isServicoParecerTecnicoNome } from "@/lib/servico-parecer-tecnico";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const ORCAMENTO_MODALIDADE_PONTUAL = "pontual";
@@ -157,7 +158,8 @@ export function isServicoOferecidoNoOrcamento(
   if (
     isServicoAetNome(nome) ||
     isServicoInsalubridadeNome(nome) ||
-    isServicoLtcatNome(nome)
+    isServicoLtcatNome(nome) ||
+    isServicoParecerTecnicoNome(nome)
   ) {
     return true;
   }
@@ -199,7 +201,11 @@ export function formatValorOrcamentoExibicao(orcamento: {
 export function labelItensInclusosServico(
   nome: string | null | undefined
 ): string {
-  if (isServicoLaudoPontualNome(nome) || isServicoLtcatNome(nome)) {
+  if (
+    isServicoLaudoPontualNome(nome) ||
+    isServicoLtcatNome(nome) ||
+    isServicoParecerTecnicoNome(nome)
+  ) {
     return "O que está incluso?";
   }
   return isGestaoCompletaSstNome(nome)

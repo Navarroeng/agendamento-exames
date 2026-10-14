@@ -15,6 +15,7 @@ import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
+import { orcamentoPossuiParecerTecnico } from "@/lib/servico-parecer-tecnico";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -56,9 +57,9 @@ export function OrcamentoItensSection({
   onApplyValorSugerido,
 }: OrcamentoItensSectionProps) {
   const isMensalidade = isOrcamentoMensalidade(modalidade);
-  const isLaudoPontual = laudoPontualOcultaColaboradores(
-    resolveLaudoPontualKind(itens)
-  );
+  const isLaudoPontual =
+    laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
+    orcamentoPossuiParecerTecnico(itens);
   const colSpanValor = isLaudoPontual ? 1 : 2;
   return (
     <Panel

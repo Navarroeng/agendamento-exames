@@ -59,6 +59,14 @@ import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
+import {
+  formatCondicaoParcelasCentavos,
+  orcamentoEhExclusivoParecerTecnico,
+  PARECER_TECNICO_INCLUSOS_ITENS,
+  parecerMostraAlternativaAvista,
+  parseQuantidadeParcelasInteira,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_PARECER_TECNICO,
+} from "@/lib/servico-parecer-tecnico";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
@@ -195,6 +203,9 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE: readonly string[] = [
 function resolveDescricaoPropostaParagrafos(
   orcamento: OrcamentoComItens
 ): readonly string[] {
+  if (orcamentoEhExclusivoParecerTecnico(orcamento.orcamento_itens)) {
+    return PROPOSTA_DESCRICAO_PARAGRAFOS_PARECER_TECNICO;
+  }
   const kind = resolveLaudoPontualKind(orcamento.orcamento_itens);
   if (kind === "aet") return PROPOSTA_DESCRICAO_PARAGRAFOS_AET;
   if (kind === "insalubridade") {
@@ -828,9 +839,37 @@ function drawFinancialRowIcon(
   doc.circle(x + 0.75, y - 1.95, 0.32, "S");
 }
 
+const CONDICAO_LABEL = "Condição de pagamento";
+const CONDICAO_LABEL_FONT = 7.5;
+const CONDICAO_VALUE_FONT = 9.5;
+const CONDICAO_WRAP_LINE_H = 3.6;
+
+function condicaoPagamentoEmpilhada(
+  doc: JsPDF,
+  cardW: number,
+  texto: string
+): string[] | null {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(CONDICAO_VALUE_FONT);
+  const valueW = doc.getTextWidth(texto);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(CONDICAO_LABEL_FONT);
+  const labelW = doc.getTextWidth(CONDICAO_LABEL);
+  const available =
+    cardW - CARD_PAD_X * 2 - FINANCIAL_ROW_ICON_W - 1.2 - labelW - 2.5;
+  if (valueW <= available) return null;
+  const wrapW = cardW - CARD_PAD_X * 2 - FINANCIAL_ROW_ICON_W - 1.2;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(CONDICAO_VALUE_FONT);
+  const lines = doc.splitTextToSize(texto, Math.max(20, wrapW));
+  return Array.isArray(lines) ? lines : [String(lines)];
+}
+
 function measureFinancialCardContentHeight(
   isMensalidade = false,
-  isAet = false
+  isAet = false,
+  mostraAvista = false,
+  extraCondicaoH = 0
 ): number {
   if (isMensalidade) {
     const rowGap =
@@ -850,12 +889,17 @@ function measureFinancialCardContentHeight(
     );
   }
   if (isAet) {
+    const avistaExtra = mostraAvista
+      ? FINANCIAL_DIVIDER_PAD + FINANCIAL_ROW_SPACING + 5.5
+      : 0;
     return (
       FINANCIAL_CARD_BODY_PAD +
       5.5 +
+      extraCondicaoH +
       FINANCIAL_DIVIDER_PAD +
       FINANCIAL_ROW_SPACING +
       6.5 +
+      avistaExtra +
       FINANCIAL_VALIDADE_GAP +
       1.2 +
       3.5 +
@@ -1116,10 +1160,12 @@ function orcamentoHasLaudoPontual(
   return isLaudoPontualExclusivo(orcamento.orcamento_itens);
 }
 
-/** AET e Insalubridade ocultam colaboradores. O LTCAT mantém a quantidade. */
+/** AET, Insalubridade e Parecer Técnico ocultam colaboradores. O LTCAT mantém a quantidade. */
 function orcamentoOcultaColaboradores(orcamento: OrcamentoComItens): boolean {
-  return laudoPontualOcultaColaboradores(
-    resolveLaudoPontualKind(orcamento.orcamento_itens)
+  return (
+    laudoPontualOcultaColaboradores(
+      resolveLaudoPontualKind(orcamento.orcamento_itens)
+    ) || orcamentoEhExclusivoParecerTecnico(orcamento.orcamento_itens)
   );
 }
 
@@ -1128,6 +1174,7 @@ function orcamentoUsaCardInclusosEstruturado(
   orcamento: OrcamentoComItens,
   catalogo: ServicoSstRecord[]
 ): boolean {
+  if (orcamentoEhExclusivoParecerTecnico(orcamento.orcamento_itens)) return true;
   if (orcamentoHasLaudoPontual(orcamento)) return true;
   if (orcamentoHasPacoteCompleto(orcamento, catalogo)) return true;
   return (
@@ -1170,11 +1217,18 @@ function drawChecklistItem(
 
 function measureResumoFinanceiroCardHeight(
   isMensalidade = false,
-  isAet = false
+  isAet = false,
+  mostraAvista = false,
+  extraCondicaoH = 0
 ): number {
   return (
     FINANCIAL_CARD_HEADER_H +
-    measureFinancialCardContentHeight(isMensalidade, isAet)
+    measureFinancialCardContentHeight(
+      isMensalidade,
+      isAet,
+      mostraAvista,
+      extraCondicaoH
+    )
   );
 }
 
@@ -1230,22 +1284,56 @@ function drawResumoFinanceiroCard(
     resolvePacoteCompletoSstServicoId(catalogo)
   );
   const isLaudoPontual = orcamentoOcultaColaboradores(orcamento);
+  const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(
+    orcamento.orcamento_itens
+  );
+  const mostraAvistaParecer = parecerMostraAlternativaAvista(orcamento);
 
   if (isLaudoPontual) {
-    drawRow(
-      "parcel",
-      "Condição de pagamento",
-      formatCondicaoPagamentoParcelas(
-        pagamento.parcelas,
-        pagamento.valorParcela
-      ),
-      {
-        labelFont: 7.5,
-        valueFont: 9.5,
-        rowHeight: 5.5,
-      },
-      true
-    );
+    const textoCondicao = exclusivoParecer
+      ? formatCondicaoParcelasCentavos(
+          valorTotal,
+          parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1
+        )
+      : formatCondicaoPagamentoParcelas(
+          pagamento.parcelas,
+          pagamento.valorParcela
+        );
+    const linhasEmpilhadas = condicaoPagamentoEmpilhada(doc, w, textoCondicao);
+    if (linhasEmpilhadas) {
+      drawRow(
+        "parcel",
+        CONDICAO_LABEL,
+        "",
+        {
+          labelFont: CONDICAO_LABEL_FONT,
+          valueFont: CONDICAO_VALUE_FONT,
+          rowHeight: 4.2,
+        },
+        false
+      );
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(CONDICAO_VALUE_FONT);
+      doc.setTextColor(...NAVY);
+      const textX = x + CARD_PAD_X + FINANCIAL_ROW_ICON_W + 1.2;
+      doc.text(linhasEmpilhadas, textX, lineY);
+      lineY += linhasEmpilhadas.length * CONDICAO_WRAP_LINE_H;
+      lineY += FINANCIAL_DIVIDER_PAD;
+      drawFinancialRowDivider(doc, innerX, lineY, innerW);
+      lineY += FINANCIAL_ROW_SPACING;
+    } else {
+      drawRow(
+        "parcel",
+        CONDICAO_LABEL,
+        textoCondicao,
+        {
+          labelFont: CONDICAO_LABEL_FONT,
+          valueFont: CONDICAO_VALUE_FONT,
+          rowHeight: 5.5,
+        },
+        true
+      );
+    }
     drawRow(
       "total",
       "Valor total",
@@ -1257,8 +1345,23 @@ function drawResumoFinanceiroCard(
         iconColor: GOLD,
         rowHeight: 6.5,
       },
-      false
+      mostraAvistaParecer
     );
+    if (mostraAvistaParecer) {
+      drawRow(
+        "avista",
+        "Pagamento à vista",
+        formatCurrency(Number(orcamento.valor_avista) || 0),
+        {
+          labelFont: 7.5,
+          valueFont: 9.5,
+          valueColor: GOLD_STRONG,
+          iconColor: GOLD_STRONG,
+          rowHeight: 5.5,
+        },
+        false
+      );
+    }
   } else {
   drawRow(
     "total",
@@ -1895,7 +1998,9 @@ function measureDesiredCardsRowHeight(
   inclusos: string[],
   isMensalidade = false,
   inclusosObservacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES,
-  isAet = false
+  isAet = false,
+  mostraAvista = false,
+  extraCondicaoH = 0
 ): { desiredH: number; contentMinH: number } {
   let inclusosH = 0;
   if (isMensalidade) {
@@ -1912,7 +2017,12 @@ function measureDesiredCardsRowHeight(
     inclusosH = measureGenericInclusosCardHeight(doc, checklistW, inclusos);
   }
 
-  const financeiroH = measureResumoFinanceiroCardHeight(isMensalidade, isAet);
+  const financeiroH = measureResumoFinanceiroCardHeight(
+    isMensalidade,
+    isAet,
+    mostraAvista,
+    extraCondicaoH
+  );
   const hasInclusosCard = isMensalidade || hasPacote || inclusos.length > 0;
   const desiredH = hasInclusosCard
     ? Math.max(inclusosH, financeiroH)
@@ -2247,8 +2357,12 @@ function drawFinancialAndInclusosRow(
 ): number {
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const laudoKind = resolveLaudoPontualKind(orcamento.orcamento_itens);
-  const ocultaColaboradores = laudoPontualOcultaColaboradores(laudoKind);
-  const comMarcadorLaudo = laudoKind !== null;
+  const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(
+    orcamento.orcamento_itens
+  );
+  const ocultaColaboradores =
+    laudoPontualOcultaColaboradores(laudoKind) || exclusivoParecer;
+  const comMarcadorLaudo = laudoKind !== null || exclusivoParecer;
   const usaCardInclusosEstruturado = orcamentoUsaCardInclusosEstruturado(
     orcamento,
     catalogo
@@ -2258,8 +2372,9 @@ function drawFinancialAndInclusosRow(
   const checklistW = CONTENT_W - boxW - gap;
   const boxX = MARGIN + CONTENT_W - boxW;
 
-  const pacoteInclusosItens =
-    laudoKind === "aet"
+  const pacoteInclusosItens = exclusivoParecer
+    ? [...PARECER_TECNICO_INCLUSOS_ITENS]
+    : laudoKind === "aet"
       ? [...AET_INCLUSOS_ITENS]
       : laudoKind === "insalubridade"
         ? [...INSALUBRIDADE_INCLUSOS_ITENS]
@@ -2274,12 +2389,25 @@ function drawFinancialAndInclusosRow(
     orcamentoPossuiLtcat(orcamento.orcamento_itens)
       ? [...pacoteInclusosItens, ...LTCAT_INCLUSOS_ITENS]
       : pacoteInclusosItens;
-  const inclusosObservacoes =
-    laudoKind === "insalubridade"
+  const inclusosObservacoes = exclusivoParecer
+    ? []
+    : laudoKind === "insalubridade"
       ? INSALUBRIDADE_INCLUSOS_OBSERVACOES
       : laudoKind === "aet" || laudoKind === "ltcat"
         ? []
         : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;
+  const textoCondicaoParecer = exclusivoParecer
+    ? formatCondicaoParcelasCentavos(
+        Number(orcamento.valor_total) || 0,
+        parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1
+      )
+    : "";
+  const linhasCondicao = textoCondicaoParecer
+    ? condicaoPagamentoEmpilhada(doc, boxW, textoCondicaoParecer)
+    : null;
+  const extraCondicaoH = linhasCondicao
+    ? 4.2 + linhasCondicao.length * CONDICAO_WRAP_LINE_H - 5.5
+    : 0;
 
   const { desiredH, contentMinH } = measureDesiredCardsRowHeight(
     doc,
@@ -2289,7 +2417,9 @@ function drawFinancialAndInclusosRow(
     inclusos,
     isMensalidade,
     inclusosObservacoes,
-    ocultaColaboradores
+    ocultaColaboradores,
+    parecerMostraAlternativaAvista(orcamento),
+    extraCondicaoH
   );
   const { needsNewPage, cardH } = resolveCardsBlockPlacement(
     y,

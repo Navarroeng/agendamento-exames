@@ -14,6 +14,11 @@ import type {
   OrcamentoRecord,
 } from "@/lib/orcamento-types";
 import { mensagemExclusividadeLaudoPontual } from "@/lib/servico-laudo-pontual";
+import {
+  mensagemExclusividadeParecerTecnico,
+  orcamentoEhExclusivoParecerTecnico,
+  parseQuantidadeParcelasInteira,
+} from "@/lib/servico-parecer-tecnico";
 
 const ORCAMENTO_SELECT = `
   *,
@@ -28,7 +33,9 @@ function normalizeOrcamentoPayload(
   if (validationError) {
     throw new Error(validationError);
   }
-  const exclusividade = mensagemExclusividadeLaudoPontual(itens);
+  const exclusividade =
+    mensagemExclusividadeLaudoPontual(itens) ??
+    mensagemExclusividadeParecerTecnico(itens);
   if (exclusividade) {
     throw new Error(exclusividade);
   }
@@ -38,15 +45,26 @@ function normalizeOrcamentoPayload(
     0
   );
   const modalidade = resolveOrcamentoModalidade(payload.modalidade);
+  const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(itens);
+  const valorAvistaInformado = Number(payload.valor_avista);
+  const oferecerAvista =
+    exclusivoParecer &&
+    payload.oferecer_desconto_avista === true &&
+    Number.isFinite(valorAvistaInformado) &&
+    valorAvistaInformado > 0;
 
   return {
     ...payload,
     itens,
     modalidade,
     desconto_percentual: 0,
+    oferecer_desconto_avista: oferecerAvista,
+    valor_avista: oferecerAvista ? valorAvistaInformado : null,
     quantidade_parcelas: isOrcamentoMensalidade(modalidade)
       ? null
-      : payload.quantidade_parcelas,
+      : exclusivoParecer
+        ? parseQuantidadeParcelasInteira(payload.quantidade_parcelas)
+        : payload.quantidade_parcelas,
     validade_proposta: calcValidadePropostaIso(payload.data_proposta),
     subtotal,
     valor_total: subtotal,
@@ -150,6 +168,10 @@ export async function criarOrcamento(
       desconto_percentual: normalized.desconto_percentual,
       forma_pagamento: normalized.forma_pagamento,
       quantidade_parcelas: normalized.quantidade_parcelas,
+      oferecer_desconto_avista: normalized.oferecer_desconto_avista === true,
+      valor_avista: normalized.oferecer_desconto_avista
+        ? normalized.valor_avista ?? null
+        : null,
       validade_proposta: normalized.validade_proposta,
       subtotal: normalized.subtotal,
       valor_total: normalized.valor_total,
@@ -193,6 +215,10 @@ export async function atualizarOrcamento(
       desconto_percentual: normalized.desconto_percentual,
       forma_pagamento: normalized.forma_pagamento,
       quantidade_parcelas: normalized.quantidade_parcelas,
+      oferecer_desconto_avista: normalized.oferecer_desconto_avista === true,
+      valor_avista: normalized.oferecer_desconto_avista
+        ? normalized.valor_avista ?? null
+        : null,
       validade_proposta: normalized.validade_proposta,
       subtotal: normalized.subtotal,
       valor_total: normalized.valor_total,
@@ -243,6 +269,11 @@ export async function duplicarOrcamento(
     desconto_percentual: 0,
     forma_pagamento: original.forma_pagamento,
     quantidade_parcelas: original.quantidade_parcelas ?? null,
+    oferecer_desconto_avista: original.oferecer_desconto_avista === true,
+    valor_avista:
+      original.oferecer_desconto_avista === true
+        ? original.valor_avista ?? null
+        : null,
     validade_proposta: calcValidadePropostaIso(hoje),
     subtotal: Number(original.subtotal),
     valor_total: Number(original.subtotal),

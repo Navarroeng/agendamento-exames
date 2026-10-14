@@ -18,6 +18,8 @@ export function serializeOrcamentoFormSnapshot(
     observacoes: form.observacoes,
     forma_pagamento: form.forma_pagamento,
     quantidade_parcelas: form.quantidade_parcelas,
+    oferecer_desconto_avista: form.oferecer_desconto_avista,
+    valor_avista: form.valor_avista,
     origem_cliente: form.origem_cliente,
     modalidade: form.modalidade,
     itens: form.itens.map((item) => ({

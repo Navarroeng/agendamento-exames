@@ -57,6 +57,16 @@ import {
   mensagemExclusividadeLaudoPontual,
   SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA,
 } from "@/lib/servico-laudo-pontual";
+import {
+  bloqueioParecerTecnicoExclusivo,
+  isServicoParecerTecnicoNome,
+  mensagemExclusividadeParecerTecnico,
+  orcamentoEhExclusivoParecerTecnico,
+  parseQuantidadeParcelasInteira,
+  SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA,
+  validarQuantidadeParcelasParecer,
+  validarValorAvistaParecer,
+} from "@/lib/servico-parecer-tecnico";
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
 
@@ -69,6 +79,14 @@ export function useOrcamentoForm() {
       ? formatUppercaseInput(value)
       : value;
     setForm((prev) => {
+      if (field === "oferecer_desconto_avista") {
+        const oferecer = value === "1";
+        return {
+          ...prev,
+          oferecer_desconto_avista: oferecer,
+          valor_avista: oferecer ? prev.valor_avista : "",
+        };
+      }
       if (field !== "modalidade") {
         return { ...prev, [field]: nextValue };
       }
@@ -97,10 +115,15 @@ export function useOrcamentoForm() {
   const addItem = useCallback(() => {
     setForm((prev) => {
       if (isOrcamentoMensalidade(prev.modalidade)) return prev;
-      const bloqueio = bloqueioLaudoPontualExclusivo({
-        itens: prev.itens,
-        itemIdAlterado: null,
-      });
+      const bloqueio =
+        bloqueioLaudoPontualExclusivo({
+          itens: prev.itens,
+          itemIdAlterado: null,
+        }) ??
+        bloqueioParecerTecnicoExclusivo({
+          itens: prev.itens,
+          itemIdAlterado: null,
+        });
       if (bloqueio) {
         toast.error(bloqueio);
         return prev;
@@ -145,12 +168,19 @@ export function useOrcamentoForm() {
         }
 
         if (field === "servico_id" && servicoNome !== undefined) {
-          const bloqueio = bloqueioLaudoPontualExclusivo({
-            itens: prev.itens,
-            itemIdAlterado: id,
-            novoNome: servicoNome,
-            novoServicoId: value,
-          });
+          const bloqueio =
+            bloqueioLaudoPontualExclusivo({
+              itens: prev.itens,
+              itemIdAlterado: id,
+              novoNome: servicoNome,
+              novoServicoId: value,
+            }) ??
+            bloqueioParecerTecnicoExclusivo({
+              itens: prev.itens,
+              itemIdAlterado: id,
+              novoNome: servicoNome,
+              novoServicoId: value,
+            });
           if (bloqueio) {
             toast.error(bloqueio);
             return prev;
@@ -172,7 +202,12 @@ export function useOrcamentoForm() {
             if (isServicoLaudoPontualNome(servicoNome)) {
               next.quantidade = String(SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA);
             }
-            if (isGestaoMensalSstNome(servicoNome)) {
+            if (isServicoParecerTecnicoNome(servicoNome)) {
+              next.quantidade = String(SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA);
+              next.valor_unitario = "";
+              next.valor_total = "";
+              next.valor_manual = true;
+            } else if (isGestaoMensalSstNome(servicoNome)) {
               next.valor_unitario = "";
               next.valor_total = "";
             } else {
@@ -201,17 +236,34 @@ export function useOrcamentoForm() {
             ...prev,
             modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
             quantidade_parcelas: "",
+            oferecer_desconto_avista: false,
+            valor_avista: "",
             itens: [changed],
+          };
+        }
+        if (isServicoParecerTecnicoNome(nome) && changed) {
+          return {
+            ...prev,
+            modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+            quantidade_parcelas: prev.quantidade_parcelas.trim() || "1",
+            itens,
           };
         }
         if (nome.trim() !== "" && isOrcamentoMensalidade(prev.modalidade)) {
           return {
             ...prev,
             modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
+            oferecer_desconto_avista: false,
+            valor_avista: "",
             itens,
           };
         }
-        return { ...prev, itens };
+        return {
+          ...prev,
+          oferecer_desconto_avista: false,
+          valor_avista: "",
+          itens,
+        };
       });
     },
     []
@@ -297,14 +349,24 @@ export function useOrcamentoForm() {
       modalidade: resolveOrcamentoModalidade(orcamento.modalidade),
       observacoes: orcamento.observacoes ?? "",
       forma_pagamento: orcamento.forma_pagamento ?? "",
-      quantidade_parcelas:
-        orcamento.quantidade_parcelas != null
+      quantidade_parcelas: orcamentoEhExclusivoParecerTecnico(itensDb)
+        ? String(parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1)
+        : orcamento.quantidade_parcelas != null
           ? String(
               resolveQuantidadeParcelasEscolhida(
                 Number(orcamento.valor_total) || 0,
                 orcamento.quantidade_parcelas
               )
             )
+          : "",
+      oferecer_desconto_avista:
+        orcamentoEhExclusivoParecerTecnico(itensDb) &&
+        orcamento.oferecer_desconto_avista === true,
+      valor_avista:
+        orcamentoEhExclusivoParecerTecnico(itensDb) &&
+        orcamento.oferecer_desconto_avista === true &&
+        Number(orcamento.valor_avista) > 0
+          ? maskMoneyInput(String(Math.round(Number(orcamento.valor_avista) * 100)))
           : "",
       itens:
         itensDb.length > 0
@@ -325,11 +387,13 @@ export function useOrcamentoForm() {
                     ? maskMoneyInput(String(Math.round(valor * 100)))
                     : "",
                 valor_total: valor > 0 ? String(valor) : "",
-                valor_manual: inferValorManualOrcamentoItem(
-                  item.servico_nome,
-                  qtd,
-                  valor
-                ),
+                valor_manual: isServicoParecerTecnicoNome(item.servico_nome)
+                  ? true
+                  : inferValorManualOrcamentoItem(
+                      item.servico_nome,
+                      qtd,
+                      valor
+                    ),
               };
             })
           : [createEmptyOrcamentoItem()],
@@ -356,6 +420,7 @@ export function useOrcamentoForm() {
 
   useEffect(() => {
     if (isOrcamentoMensalidade(form.modalidade)) return;
+    if (orcamentoEhExclusivoParecerTecnico(form.itens)) return;
     const max = totals.condicoesPagamento.maxParcelas;
     const raw = form.quantidade_parcelas.trim();
     if (raw === "") return;
@@ -368,6 +433,7 @@ export function useOrcamentoForm() {
     }
   }, [
     form.modalidade,
+    form.itens,
     form.quantidade_parcelas,
     totals.condicoesPagamento.maxParcelas,
   ]);
@@ -379,7 +445,9 @@ export function useOrcamentoForm() {
       .map((item, index) => {
         const quantidade = isServicoLaudoPontualNome(item.servico_nome)
           ? SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA
-          : parseQuantidadeColaboradores(item.quantidade) || 1;
+          : isServicoParecerTecnicoNome(item.servico_nome)
+            ? SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA
+            : parseQuantidadeColaboradores(item.quantidade) || 1;
         const valor = parseMoney(item.valor_unitario);
 
         return {
@@ -399,14 +467,18 @@ export function useOrcamentoForm() {
     const subtotal = itens.reduce((sum, item) => sum + item.valor_total, 0);
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
     const modalidade = resolveOrcamentoModalidade(form.modalidade);
+    const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(itens);
+    const oferecerAvista = exclusivoParecer && form.oferecer_desconto_avista;
     const quantidadeParcelas = isOrcamentoMensalidade(modalidade)
       ? null
-      : resolveQuantidadeParcelasEscolhida(
-          subtotal,
-          form.quantidade_parcelas.trim() === ""
-            ? null
-            : Number(form.quantidade_parcelas)
-        );
+      : exclusivoParecer
+        ? parseQuantidadeParcelasInteira(form.quantidade_parcelas)
+        : resolveQuantidadeParcelasEscolhida(
+            subtotal,
+            form.quantidade_parcelas.trim() === ""
+              ? null
+              : Number(form.quantidade_parcelas)
+          );
 
     if (!isOrcamentoOrigemCliente(form.origem_cliente)) {
       throw new Error("Informe a origem do cliente.");
@@ -432,6 +504,8 @@ export function useOrcamentoForm() {
       desconto_percentual: 0,
       forma_pagamento: null,
       quantidade_parcelas: quantidadeParcelas,
+      oferecer_desconto_avista: oferecerAvista,
+      valor_avista: oferecerAvista ? parseMoney(form.valor_avista) : null,
       validade_proposta: validadeIso,
       subtotal,
       valor_total: subtotal,
@@ -461,7 +535,9 @@ export function useOrcamentoForm() {
     if (itensValidos.length === 0) {
       return "Adicione ao menos um serviço.";
     }
-    const exclusividade = mensagemExclusividadeLaudoPontual(itensValidos);
+    const exclusividade =
+      mensagemExclusividadeLaudoPontual(itensValidos) ??
+      mensagemExclusividadeParecerTecnico(itensValidos);
     if (exclusividade) {
       return exclusividade;
     }
@@ -474,14 +550,35 @@ export function useOrcamentoForm() {
       }
     }
 
-    return validateOrcamentoItensValores(
+    const valoresErro = validateOrcamentoItensValores(
       itensValidos.map((item) => ({
         servico_nome: item.servico_nome,
-        quantidade: parseQuantidadeColaboradores(item.quantidade),
+        quantidade: isServicoParecerTecnicoNome(item.servico_nome)
+          ? SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA
+          : parseQuantidadeColaboradores(item.quantidade),
         valor_unitario: parseMoney(item.valor_unitario),
         valor_manual: item.valor_manual,
       }))
     );
+    if (valoresErro) return valoresErro;
+
+    if (orcamentoEhExclusivoParecerTecnico(itensValidos)) {
+      const parcelasErro = validarQuantidadeParcelasParecer(
+        form.quantidade_parcelas
+      );
+      if (parcelasErro) return parcelasErro;
+      const valorTotal = itensValidos.reduce(
+        (sum, item) => sum + parseMoney(item.valor_unitario),
+        0
+      );
+      return validarValorAvistaParecer({
+        oferecer: form.oferecer_desconto_avista,
+        valorAvistaTexto: form.valor_avista,
+        valorTotal,
+      });
+    }
+
+    return null;
   }, [form]);
 
   const validate = useCallback(

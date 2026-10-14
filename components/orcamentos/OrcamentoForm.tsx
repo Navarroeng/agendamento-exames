@@ -4,7 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { maskCNPJInput } from "@/lib/cnpj";
-import { formatCurrency } from "@/lib/money";
+import { formatCurrency, maskMoneyInput } from "@/lib/money";
 import { VALIDADE_PROPOSTA_DIAS } from "@/lib/orcamento-validade";
 import {
   TEXTO_DESCONTO_AVISTA_PACOTE,
@@ -27,6 +27,12 @@ import {
 } from "@/lib/orcamento-modalidade";
 import type { ClienteRecord } from "@/lib/types";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
+import {
+  formatCondicaoParcelasCentavos,
+  orcamentoEhExclusivoParecerTecnico,
+  parseQuantidadeParcelasInteira,
+  validarValorAvistaParecer,
+} from "@/lib/servico-parecer-tecnico";
 import { OrcamentoItensSection } from "./OrcamentoItensSection";
 
 interface OrcamentoFormProps {
@@ -75,6 +81,19 @@ export function OrcamentoForm({
   onApplyValorSugerido,
 }: OrcamentoFormProps) {
   const isMensalidade = isOrcamentoMensalidade(form.modalidade);
+  const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(form.itens);
+  const parcelasParecer = parseQuantidadeParcelasInteira(form.quantidade_parcelas);
+  const textoParcelasParecer =
+    isParecerTecnico && parcelasParecer != null && valorTotal > 0
+      ? formatCondicaoParcelasCentavos(valorTotal, parcelasParecer)
+      : "";
+  const erroAvistaParecer = isParecerTecnico
+    ? validarValorAvistaParecer({
+        oferecer: form.oferecer_desconto_avista,
+        valorAvistaTexto: form.valor_avista,
+        valorTotal,
+      })
+    : null;
   const servicosFiltrados = useMemo(
     () => filterServicosSelecaoOrcamento(servicos),
     [servicos]
@@ -328,6 +347,67 @@ export function OrcamentoForm({
             <p className="mt-1 text-[12px] text-[#475569]">
               Renovação automática ao final da vigência.
             </p>
+          </div>
+        ) : isParecerTecnico ? (
+          <div className="rounded-[10px] border border-[#eef2f7] bg-[#f8fafc] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+              Condição de pagamento
+            </p>
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <div className="min-w-[140px] flex-1">
+                <label className="mb-1.5 block text-xs font-bold text-navy">
+                  Quantidade de parcelas
+                </label>
+                <input
+                  className="field-input"
+                  inputMode="numeric"
+                  value={form.quantidade_parcelas}
+                  onChange={(e) =>
+                    onChange(
+                      "quantidade_parcelas",
+                      e.target.value.replace(/\D/g, "")
+                    )
+                  }
+                />
+              </div>
+              <div className="pb-2">
+                <p className="text-[11px] text-[#64748b]">Parcelamento</p>
+                <p className="text-sm font-bold text-navy">
+                  {textoParcelasParecer || "—"}
+                </p>
+              </div>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-navy">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#082b63]"
+                checked={form.oferecer_desconto_avista}
+                onChange={(e) =>
+                  onChange("oferecer_desconto_avista", e.target.checked ? "1" : "0")
+                }
+              />
+              Oferecer desconto à vista
+            </label>
+            {form.oferecer_desconto_avista ? (
+              <div className="mt-3 max-w-[240px]">
+                <label className="mb-1.5 block text-xs font-bold text-navy">
+                  Valor à vista com desconto
+                </label>
+                <input
+                  className="field-input"
+                  placeholder="R$ 0,00"
+                  value={form.valor_avista}
+                  onChange={(e) =>
+                    onChange("valor_avista", maskMoneyInput(e.target.value))
+                  }
+                />
+                {erroAvistaParecer && form.valor_avista.trim() !== "" ? (
+                  <p className="mt-1 text-[11px] text-brand-red">
+                    {erroAvistaParecer}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : (
         <div

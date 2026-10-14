@@ -110,8 +110,12 @@ export interface OrcamentoRecord {
   cancelado_por: string | null;
   desconto_percentual: number;
   forma_pagamento: string | null;
-  /** Parcelas escolhidas na proposta (1–10). Null = legado (máximo permitido). */
+  /** Parcelas escolhidas na proposta. Pacote SST: 1–10. Parecer técnico: inteiro >= 1. */
   quantidade_parcelas?: number | null;
+  /** Laudo de Parecer Técnico: oferece pagamento à vista com valor final informado. */
+  oferecer_desconto_avista?: boolean | null;
+  /** Valor final à vista do Laudo de Parecer Técnico. Null quando a opção está desmarcada. */
+  valor_avista?: number | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;
@@ -170,6 +174,10 @@ export interface OrcamentoFormValues {
   forma_pagamento: string;
   /** Quantidade de parcelas escolhida (string do Select). Vazio = máximo permitido. */
   quantidade_parcelas: string;
+  /** Laudo de Parecer Técnico. Começa desmarcada. */
+  oferecer_desconto_avista: boolean;
+  /** Valor final à vista digitado. Ignorado quando a caixa está desmarcada. */
+  valor_avista: string;
   itens: OrcamentoItemFormItem[];
 }
 
@@ -203,6 +211,8 @@ export interface OrcamentoInsertPayload {
   desconto_percentual: number;
   forma_pagamento: string | null;
   quantidade_parcelas: number | null;
+  oferecer_desconto_avista?: boolean;
+  valor_avista?: number | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;

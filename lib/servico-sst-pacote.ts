@@ -8,6 +8,10 @@ import {
   isServicoInsalubridadeNome,
 } from "@/lib/servico-insalubridade";
 import { isServicoLtcatNome, LTCAT_INCLUSOS_ITENS } from "@/lib/servico-ltcat";
+import {
+  isServicoParecerTecnicoNome,
+  PARECER_TECNICO_INCLUSOS_ITENS,
+} from "@/lib/servico-parecer-tecnico";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const PACOTE_COMPLETO_SST_NOME = "Pacote completo - SST";
@@ -112,6 +116,9 @@ export function resolveItensInclusosServico(
   }
   if (isServicoLtcatNome(nome)) {
     return [...LTCAT_INCLUSOS_ITENS];
+  }
+  if (isServicoParecerTecnicoNome(nome)) {
+    return [...PARECER_TECNICO_INCLUSOS_ITENS];
   }
 
   const parsed = parseItensInclusos(servico?.itens_inclusos);

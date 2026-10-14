@@ -689,6 +689,8 @@ assert.doesNotMatch(insalRaw, /PGR/);
 assert.doesNotMatch(insalRaw, /PCMSO/);
 assert.doesNotMatch(insalRaw, /LTCAT/);
 assert.doesNotMatch(insalRaw, /Riscos Psicossociais/);
+assert.doesNotMatch(insalRaw, /Laudo de Parecer T[eé]cnico/);
+assert.doesNotMatch(insalRaw, /quesitos t[eé]cnicos/i);
 assert.match(insalRaw, /2 parcelas de/);
 assert.match(insalRaw, /2\.250,00/);
 assert.match(insalRaw, /4\.500,00/);

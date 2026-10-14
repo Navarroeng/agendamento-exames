@@ -31,6 +31,12 @@ import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
+import {
+  formatCondicaoParcelasCentavos,
+  orcamentoEhExclusivoParecerTecnico,
+  parecerMostraAlternativaAvista,
+  parseQuantidadeParcelasInteira,
+} from "@/lib/servico-parecer-tecnico";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import {
@@ -97,10 +103,18 @@ export function OrcamentoViewBody({
   const validadeIso = resolveValidadePropostaIso(orcamento.data_proposta);
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isLaudoPontual = laudoPontualOcultaColaboradores(
-    resolveLaudoPontualKind(itens)
-  );
+  const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(itens);
+  const isLaudoPontual =
+    laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
+    isParecerTecnico;
   const valorServico = Number(orcamento.valor_total) || 0;
+  const textoParcelasParecer = isParecerTecnico
+    ? formatCondicaoParcelasCentavos(
+        valorServico,
+        parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1
+      )
+    : "";
+  const mostraAvistaParecer = parecerMostraAlternativaAvista(orcamento);
   const linhasMensalidade = isMensalidade
     ? buildResumoMensalidadeLinhas(valorServico)
     : [];
@@ -292,14 +306,32 @@ export function OrcamentoViewBody({
             </span>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
-                Pagamento parcelado
+                {isParecerTecnico ? "Condição de pagamento" : "Pagamento parcelado"}
               </p>
               <p className="mt-0.5 text-base font-extrabold text-[#0a3578]">
-                {condicoesPagamento.textoParcelado}
+                {isParecerTecnico
+                  ? textoParcelasParecer
+                  : condicoesPagamento.textoParcelado}
               </p>
             </div>
           </div>
-          {condicoesPagamento.permitePagamentoAVista ? (
+          {isParecerTecnico ? (
+            mostraAvistaParecer ? (
+          <div className="flex items-start gap-3 py-4">
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#c9972b]/15 text-[#a07820]">
+              <IconTag size={16} />
+            </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748b]">
+                Pagamento à vista
+              </p>
+              <p className="mt-0.5 text-xl font-extrabold tracking-[-0.3px] text-[#a07820]">
+                {formatCurrency(Number(orcamento.valor_avista))}
+              </p>
+            </div>
+          </div>
+            ) : null
+          ) : condicoesPagamento.permitePagamentoAVista ? (
           <div className="flex items-start gap-3 py-4">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#c9972b]/15 text-[#a07820]">
               <IconTag size={16} />

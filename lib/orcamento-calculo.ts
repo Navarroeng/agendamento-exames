@@ -13,6 +13,10 @@ import {
   isServicoLtcatNome,
   resolveValorTotalLtcat,
 } from "@/lib/servico-ltcat";
+import {
+  isServicoParecerTecnicoNome,
+  resolveValorTotalParecerTecnico,
+} from "@/lib/servico-parecer-tecnico";
 
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
@@ -282,6 +286,9 @@ export function resolveItemValorServico(item: {
   if (isServicoLtcatNome(item.servico_nome)) {
     return resolveValorTotalLtcat(item);
   }
+  if (isServicoParecerTecnicoNome(item.servico_nome)) {
+    return resolveValorTotalParecerTecnico(item);
+  }
 
   const total = Number(item.valor_total);
   const unit = Number(item.valor_unitario);
@@ -345,7 +352,13 @@ export function resolveQuantidadeColaboradoresOrcamento(
   );
   if (itens.length === 0) return 0;
 
-  if (itens.every((item) => isServicoLaudoPontualNome(item.servico_nome))) {
+  if (
+    itens.every(
+      (item) =>
+        isServicoLaudoPontualNome(item.servico_nome) ||
+        isServicoParecerTecnicoNome(item.servico_nome)
+    )
+  ) {
     return 0;
   }
 

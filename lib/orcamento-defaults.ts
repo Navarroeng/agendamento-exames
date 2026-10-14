@@ -36,6 +36,8 @@ export function getEmptyOrcamentoForm(): OrcamentoFormValues {
     observacoes: "",
     forma_pagamento: "",
     quantidade_parcelas: "",
+    oferecer_desconto_avista: false,
+    valor_avista: "",
     itens: [createEmptyOrcamentoItem()],
   };
 }
