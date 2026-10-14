@@ -16,6 +16,12 @@ import {
   qualificacaoContratoAet,
 } from "@/lib/contrato-aet";
 import {
+  CONTRATO_PARECER_TITULO_LINHAS,
+  buildClausulasContratoParecer,
+  qualificacaoContratoParecer,
+  resolverPagamentoContratoParecer,
+} from "@/lib/contrato-parecer-tecnico";
+import {
   aplicarDatasNasParcelas,
   contratoUsaCronogramaVencimentos,
 } from "@/lib/contrato-vencimentos";
@@ -27,6 +33,7 @@ import {
 } from "@/lib/contrato-pagamento";
 import { reaisParaCentavos, resolverMesesVigenciaMensalidade } from "@/lib/orcamento-mensalidade-pagamento";
 import { resolveQuantidadeColaboradoresOrcamento } from "@/lib/orcamento-calculo";
+import { formatCondicaoParcelasCentavos } from "@/lib/servico-parecer-tecnico";
 import {
   formatValorMensalidade,
   isOrcamentoMensalidade,
@@ -221,7 +228,9 @@ export function buildContratoNavarroDocumento(params: {
   });
   const valor = resolveValor(orcamento, aprovacao);
   const colaboradores =
-    tipoDocumento === "aet" || tipoDocumento === "insalubridade"
+    tipoDocumento === "aet" ||
+    tipoDocumento === "insalubridade" ||
+    tipoDocumento === "parecer_tecnico"
       ? 0
       : resolveColaboradores(orcamento, aprovacao);
   const mesesMensalidade = resolverMesesVigenciaMensalidade({
@@ -255,6 +264,7 @@ export function buildContratoNavarroDocumento(params: {
         });
 
   if (
+    tipoDocumento !== "parecer_tecnico" &&
     contratoUsaCronogramaVencimentos(tipoDocumento) &&
     params.vencimentosIso &&
     params.vencimentosIso.length > 0
@@ -276,6 +286,58 @@ export function buildContratoNavarroDocumento(params: {
   }
   if (tipoDocumento === "ltcat") {
     throw new Error(SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG);
+  }
+
+  if (tipoDocumento === "parecer_tecnico") {
+    const pagamento = resolverPagamentoContratoParecer({
+      orcamento,
+      dataContrato,
+    });
+    if (pagamento.pendente) {
+      throw new Error(pagamento.pendente);
+    }
+    let parcelasParecer = pagamento.parcelas;
+    if (params.vencimentosIso && params.vencimentosIso.length > 0) {
+      parcelasParecer = aplicarDatasNasParcelas(
+        parcelasParecer,
+        params.vencimentosIso
+      );
+    }
+    const clausulas = buildClausulasContratoParecer({
+      numeroOrcamento: orcamento.numero.trim(),
+      contratante,
+      forma: pagamento.forma,
+      valor: pagamento.valor,
+      parcelas: parcelasParecer,
+    });
+    const qualificacao = qualificacaoContratoParecer(contratante);
+    const textoQualificacao = [
+      qualificacao.titulo,
+      ...qualificacao.paragrafos,
+    ].join("\n");
+    const condicaoPagamento =
+      pagamento.forma === "avista"
+        ? "À vista"
+        : formatCondicaoParcelasCentavos(
+            pagamento.valor,
+            pagamento.parcelas.length
+          );
+    return {
+      modalidade,
+      tipoDocumento,
+      numeroOrcamento: orcamento.numero.trim(),
+      dataContrato,
+      contratante,
+      colaboradores: 0,
+      valor: pagamento.valor,
+      condicaoPagamento,
+      parcelas: parcelasParecer,
+      servicos: resolveServicos(orcamento, aprovacao),
+      clausulas,
+      texto: `${textoQualificacao}\n\n${textoPlanoContrato(clausulas, "aet")}`,
+      tituloLinhas: [...CONTRATO_PARECER_TITULO_LINHAS],
+      qualificacao,
+    };
   }
 
   if (tipoDocumento === "aet") {
@@ -380,6 +442,7 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
   colaboradores: string;
   valor: string;
   dataContrato: string;
+  condicaoPagamento: string | null;
   contratanteRedacao: string;
   contratadaRedacao: string;
   pagamentoAvista: {
@@ -397,15 +460,23 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
     modalidade:
       doc.tipoDocumento === "aet"
         ? "Laudo AET"
-        : doc.modalidade === "mensalidade"
-          ? "Mensalidade"
-          : "Pontual",
+        : doc.tipoDocumento === "parecer_tecnico"
+          ? "Laudo de Parecer Técnico"
+          : doc.modalidade === "mensalidade"
+            ? "Mensalidade"
+            : "Pontual",
     colaboradores:
-      doc.tipoDocumento === "aet" || doc.colaboradores < 1
+      doc.tipoDocumento === "aet" ||
+      doc.tipoDocumento === "parecer_tecnico" ||
+      doc.colaboradores < 1
         ? "—"
         : String(doc.colaboradores),
     valor: formatValorContratoResumo(doc.modalidade, doc.valor),
     dataContrato: formatDateIsoToBR(doc.dataContrato),
+    condicaoPagamento:
+      doc.tipoDocumento === "parecer_tecnico"
+        ? doc.condicaoPagamento
+        : null,
     contratanteRedacao: redigirContratante(doc.contratante),
     contratadaRedacao: redigirContratada(),
     pagamentoAvista:

@@ -19,6 +19,7 @@ import {
   orcamentoEhExclusivoParecerTecnico,
   parseQuantidadeParcelasInteira,
 } from "@/lib/servico-parecer-tecnico";
+import { condicaoAprovadaParecer } from "@/lib/contrato-parecer-tecnico";
 
 const ORCAMENTO_SELECT = `
   *,
@@ -219,6 +220,9 @@ export async function atualizarOrcamento(
       valor_avista: normalized.oferecer_desconto_avista
         ? normalized.valor_avista ?? null
         : null,
+      ...(normalized.oferecer_desconto_avista
+        ? {}
+        : { parecer_pagamento_escolhido: null }),
       validade_proposta: normalized.validade_proposta,
       subtotal: normalized.subtotal,
       valor_total: normalized.valor_total,
@@ -235,6 +239,31 @@ export async function atualizarOrcamento(
   if (deleteError) throw deleteError;
 
   await inserirItens(id, normalized.itens);
+
+  if (
+    orcamentoEhExclusivoParecerTecnico(normalized.itens) &&
+    !normalized.oferecer_desconto_avista
+  ) {
+    const condicao = condicaoAprovadaParecer({
+      forma: "parcelado",
+      valorTotal: Number(normalized.valor_total) || 0,
+      valorAvista: 0,
+      quantidadeParcelas:
+        parseQuantidadeParcelasInteira(normalized.quantidade_parcelas) ?? 1,
+    });
+    const { error: aprovacaoError } = await supabase
+      .from("orcamento_aprovacoes")
+      .update({
+        valor_final: condicao.valor_final,
+        condicao_pagamento: condicao.condicao_pagamento,
+        quantidade_parcelas: condicao.quantidade_parcelas,
+        valor_parcela: condicao.valor_parcela,
+        valor_avista: null,
+        desconto_percentual: 0,
+      })
+      .eq("orcamento_id", id);
+    if (aprovacaoError) throw aprovacaoError;
+  }
 
   const completo = await buscarOrcamentoComItens(id);
   if (!completo) throw new Error("Orçamento não encontrado após atualização.");

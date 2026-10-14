@@ -58,8 +58,16 @@ function isContratoAet(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "aet";
 }
 
+function isContratoParecer(documento: ContratoNavarroDocumento): boolean {
+  return documento.tipoDocumento === "parecer_tecnico";
+}
+
+function isContratoEstiloPontual(documento: ContratoNavarroDocumento): boolean {
+  return isContratoAet(documento) || isContratoParecer(documento);
+}
+
 function estiloClausula(documento: ContratoNavarroDocumento): "sst" | "aet" {
-  return isContratoAet(documento) ? "aet" : "sst";
+  return isContratoEstiloPontual(documento) ? "aet" : "sst";
 }
 
 type JsPDFDoc = InstanceType<typeof jsPDF>;
@@ -80,6 +88,8 @@ export function rotuloServicoContratoArquivo(
       return "Laudo de Insalubridade";
     case "ltcat":
       return "LTCAT";
+    case "parecer_tecnico":
+      return "Laudo de Parecer Técnico";
     case "mensalidade":
     case "pontual_sst":
       return "Gestão SST";
@@ -221,7 +231,12 @@ function drawHeader(
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  if (isContratoAet(documento)) {
+  if (isContratoParecer(documento)) {
+    doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS", textX, 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Assistência técnica e parecer técnico", textX, 16);
+  } else if (isContratoAet(documento)) {
     doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
@@ -242,9 +257,11 @@ function drawHeader(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.text(
-    isContratoAet(documento)
-      ? "Serviço: Laudo AET"
-      : documento.modalidade === "mensalidade"
+    isContratoParecer(documento)
+      ? "Serviço: Parecer técnico"
+      : isContratoAet(documento)
+        ? "Serviço: Laudo AET"
+        : documento.modalidade === "mensalidade"
         ? "Modalidade: Mensalidade"
         : "Modalidade: Pontual",
     PAGE_W - MARGIN,
@@ -523,7 +540,7 @@ export function drawContratoPdfDocument(
   logo: LogoAsset | null
 ): void {
   const contentBottom = calcPdfContentBottomY(PAGE_H, 2);
-  const aet = isContratoAet(documento);
+  const aet = isContratoEstiloPontual(documento);
   const estilo = estiloClausula(documento);
 
   const addPage = (): number => {

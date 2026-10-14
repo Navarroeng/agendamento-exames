@@ -156,6 +156,7 @@ export type TipoDocumentoContrato =
   | "aet"
   | "insalubridade"
   | "ltcat"
+  | "parecer_tecnico"
   | "mensalidade"
   | "pontual_sst";
 
@@ -180,6 +181,9 @@ export function resolveTipoDocumentoContrato(params: {
   }
   if (orcamentoEhExclusivoLtcat(params.itens, params.ltcatServicoId)) {
     return "ltcat";
+  }
+  if (orcamentoEhExclusivoParecerTecnico(params.itens)) {
+    return "parecer_tecnico";
   }
   if (params.isMensalidade) return "mensalidade";
   return "pontual_sst";

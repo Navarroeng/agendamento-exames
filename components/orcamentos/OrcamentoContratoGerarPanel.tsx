@@ -23,7 +23,16 @@ import {
   resolveTipoDocumentoContrato,
 } from "@/lib/servico-aet";
 import { montarParcelasPontual } from "@/lib/contrato-pagamento";
+import {
+  PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG,
+  lerParecerPagamentoEscolhido,
+  type ParecerPagamentoEscolhido,
+} from "@/lib/contrato-parecer-tecnico";
 import { formatCurrency } from "@/lib/money";
+import {
+  parecerMostraAlternativaAvista,
+  parseQuantidadeParcelasInteira,
+} from "@/lib/servico-parecer-tecnico";
 import {
   CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG,
   contratoUsaCronogramaVencimentos,
@@ -40,6 +49,7 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { salvarCondicaoContratoParecer } from "@/services/orcamento-aprovacao.service";
 import { obterVigenciaContratualOrcamento } from "@/services/orcamento-aprovacao.service";
 import {
   listarContratoDocumentos,
@@ -80,6 +90,10 @@ export function OrcamentoContratoGerarPanel({
   const [condicoesRevisaoCapturada, setCondicoesRevisaoCapturada] = useState<
     number | null
   >(null);
+  const [formaLocal, setFormaLocal] = useState<ParecerPagamentoEscolhido | null>(
+    () => lerParecerPagamentoEscolhido(orcamento.parecer_pagamento_escolhido)
+  );
+  const [revisaoVigente, setRevisaoVigente] = useState<number | null>(null);
   const loadSeq = useRef(0);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
@@ -93,7 +107,23 @@ export function OrcamentoContratoGerarPanel({
     isMensalidade: isOrcamentoMensalidade(orcamento.modalidade),
   });
   const isAet = tipoDocumento === "aet";
-  const usaCronograma = contratoUsaCronogramaVencimentos(tipoDocumento);
+  const isParecer = tipoDocumento === "parecer_tecnico";
+  const ofereceAvista =
+    isParecer &&
+    parecerMostraAlternativaAvista({
+      oferecer_desconto_avista: orcamento.oferecer_desconto_avista,
+      valor_avista: orcamento.valor_avista,
+      valor_total: orcamento.valor_total,
+      orcamento_itens: orcamento.orcamento_itens,
+    });
+  const formaEfetiva: ParecerPagamentoEscolhido | null = !isParecer
+    ? null
+    : ofereceAvista
+      ? formaLocal
+      : "parcelado";
+  const parecerAguardandoEscolha = isParecer && ofereceAvista && formaLocal == null;
+  const usaCronograma =
+    contratoUsaCronogramaVencimentos(tipoDocumento) && !parecerAguardandoEscolha;
   const contratoAssinado = Boolean(aprovacao.contrato_assinado);
   const quantidadeParcelas = (() => {
     const fromAprovacao = Number(aprovacao.quantidade_parcelas);
@@ -107,23 +137,50 @@ export function OrcamentoContratoGerarPanel({
     return 1;
   })();
   const valorContrato = (() => {
+    if (isParecer) {
+      if (formaEfetiva === "avista") return Number(orcamento.valor_avista) || 0;
+      return Number(orcamento.valor_total) || 0;
+    }
     const fromAprovacao = Number(aprovacao.valor_final);
     if (Number.isFinite(fromAprovacao) && fromAprovacao > 0) return fromAprovacao;
     return Number(orcamento.valor_total) || 0;
   })();
+  const quantidadeCronograma = isParecer
+    ? formaEfetiva === "avista"
+      ? 1
+      : parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ??
+        quantidadeParcelas
+    : quantidadeParcelas;
+  const orcamentoContrato = useMemo(
+    () =>
+      isParecer
+        ? {
+            ...orcamento,
+            parecer_pagamento_escolhido: formaEfetiva,
+          }
+        : orcamento,
+    [formaEfetiva, isParecer, orcamento]
+  );
+  const aprovacaoContrato = useMemo(
+    () =>
+      revisaoVigente == null
+        ? aprovacao
+        : { ...aprovacao, condicoes_revisao: revisaoVigente },
+    [aprovacao, revisaoVigente]
+  );
   const parcelasValores = useMemo(
     () =>
       montarParcelasPontual({
         valorTotal: valorContrato,
-        quantidadeParcelas,
+        quantidadeParcelas: quantidadeCronograma,
         dataContrato: hojeIsoLocal(),
       }),
-    [quantidadeParcelas, valorContrato]
+    [quantidadeCronograma, valorContrato]
   );
   const atual = documentos[0] ?? null;
   const anteriores = documentos.slice(1);
   const atualDesatualizado = atual
-    ? pdfContratoEstaDesatualizado(atual, aprovacao)
+    ? pdfContratoEstaDesatualizado(atual, aprovacaoContrato)
     : false;
 
   const carregar = useCallback(async () => {
@@ -180,11 +237,11 @@ export function OrcamentoContratoGerarPanel({
       const salvas = await listarContratoVencimentos(aprovacao.id);
       const sugeridas = sugerirDatasVencimento(
         hojeIsoLocal(),
-        quantidadeParcelas
+        quantidadeCronograma
       );
       setVencimentos(
         mesclarVencimentosSalvos({
-          quantidade: quantidadeParcelas,
+          quantidade: quantidadeCronograma,
           sugeridas,
           salvas,
         })
@@ -198,16 +255,26 @@ export function OrcamentoContratoGerarPanel({
         )
       );
       setVencimentos(
-        sugerirDatasVencimento(hojeIsoLocal(), quantidadeParcelas)
+        sugerirDatasVencimento(hojeIsoLocal(), quantidadeCronograma)
       );
     } finally {
       setLoadingVencimentos(false);
     }
-  }, [aprovacao.id, quantidadeParcelas, usaCronograma]);
+  }, [aprovacao.id, quantidadeCronograma, usaCronograma]);
 
   useEffect(() => {
     void carregarVencimentos();
   }, [carregarVencimentos]);
+
+  useEffect(() => {
+    setFormaLocal(
+      lerParecerPagamentoEscolhido(orcamento.parecer_pagamento_escolhido)
+    );
+  }, [orcamento.id, orcamento.parecer_pagamento_escolhido]);
+
+  useEffect(() => {
+    setRevisaoVigente(null);
+  }, [aprovacao.id, aprovacao.condicoes_revisao]);
 
   useEffect(() => {
     return () => {
@@ -226,8 +293,8 @@ export function OrcamentoContratoGerarPanel({
     try {
       return resumoConferenciaContrato(
         buildContratoNavarroDocumento({
-          orcamento,
-          aprovacao,
+          orcamento: orcamentoContrato,
+          aprovacao: aprovacaoContrato,
           dataContrato,
           vencimentosIso: usaCronograma ? vencimentos : null,
         })
@@ -235,7 +302,14 @@ export function OrcamentoContratoGerarPanel({
     } catch {
       return null;
     }
-  }, [aprovacao, dataContrato, orcamento, podeGerar, usaCronograma, vencimentos]);
+  }, [
+    aprovacaoContrato,
+    dataContrato,
+    orcamentoContrato,
+    podeGerar,
+    usaCronograma,
+    vencimentos,
+  ]);
 
   function fecharFluxo() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -247,7 +321,7 @@ export function OrcamentoContratoGerarPanel({
 
   function erroVencimentos(): string | null {
     if (!usaCronograma) return null;
-    return validarCronogramaVencimentos(vencimentos, quantidadeParcelas);
+    return validarCronogramaVencimentos(vencimentos, quantidadeCronograma);
   }
 
   async function persistirVencimentosAtuais(datas: string[]) {
@@ -287,6 +361,10 @@ export function OrcamentoContratoGerarPanel({
       toast.error(CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG);
       return;
     }
+    if (parecerAguardandoEscolha) {
+      toast.error(PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG);
+      return;
+    }
     const erroDatas = erroVencimentos();
     if (erroDatas) {
       toast.error(erroDatas);
@@ -298,12 +376,16 @@ export function OrcamentoContratoGerarPanel({
 
   async function handleVisualizarRascunho() {
     if (!podeGerar) return;
+    if (parecerAguardandoEscolha) {
+      toast.error(PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG);
+      return;
+    }
     const erroDatas = erroVencimentos();
     if (erroDatas) {
       toast.error(erroDatas);
       return;
     }
-    const revisao = revisaoCondicoesAprovacao(aprovacao);
+    const revisao = revisaoCondicoesAprovacao(aprovacaoContrato);
     if (revisao == null) {
       toast.error(
         "Não foi possível identificar a versão das condições aprovadas. Recarregue a tela. Se continuar, execute a migration 136_contrato_condicoes_revisao.sql."
@@ -317,8 +399,8 @@ export function OrcamentoContratoGerarPanel({
       }
       const vigencia = await obterVigenciaContratualOrcamento(orcamento.id);
       const documento = buildContratoNavarroDocumento({
-        orcamento,
-        aprovacao,
+        orcamento: orcamentoContrato,
+        aprovacao: aprovacaoContrato,
         dataContrato,
         vencimentosIso: usaCronograma ? vencimentos : null,
         vigenciaInicio: vigencia?.inicio,
@@ -517,6 +599,35 @@ export function OrcamentoContratoGerarPanel({
     }
   }
 
+  async function handleEscolherPagamento(forma: ParecerPagamentoEscolhido) {
+    if (contratoAssinado || working || forma === formaLocal) return;
+    const anterior = formaLocal;
+    setFormaLocal(forma);
+    try {
+      const atualizada = await salvarCondicaoContratoParecer({
+        orcamentoId: orcamento.id,
+        aprovacaoId: aprovacao.id,
+        forma,
+        valorTotal: Number(orcamento.valor_total) || 0,
+        valorAvista: Number(orcamento.valor_avista) || 0,
+        quantidadeParcelas:
+          parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1,
+        alteradoPor: auditContext.usuarioNome,
+      });
+      const revisao = revisaoCondicoesAprovacao(atualizada);
+      if (revisao != null) setRevisaoVigente(revisao);
+    } catch (err) {
+      console.error(err);
+      setFormaLocal(anterior);
+      toast.error(
+        mensagemErroContratoDocumento(
+          err,
+          "Não foi possível salvar a condição de pagamento. Se a coluna ainda não existir, execute a migration 139_contrato_parecer_tecnico.sql."
+        )
+      );
+    }
+  }
+
   const busy = disabled || working;
 
   return (
@@ -529,9 +640,11 @@ export function OrcamentoContratoGerarPanel({
           <p className="mt-1 text-[12px] text-[#475569]">
             {motivoBloqueio
               ? motivoBloqueio
-              : isAet
-                ? "Contrato específico do Laudo AET – Análise Ergonômica do Trabalho. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
-                : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
+              : isParecer
+                ? "Contrato específico do Laudo de Parecer Técnico. Gera o PDF da contratação. Não marca como enviado nem assinado e não altera o contrato SST."
+                : isAet
+                  ? "Contrato específico do Laudo AET – Análise Ergonômica do Trabalho. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
+                  : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
           </p>
           {atual ? (
             <p className="mt-1 text-[12px] text-[#334155]">
@@ -561,7 +674,9 @@ export function OrcamentoContratoGerarPanel({
             <button
               type="button"
               className="btn btn-primary justify-center text-[12px]"
-              disabled={busy || !podeGerar || contratoAssinado}
+              disabled={
+                busy || !podeGerar || contratoAssinado || parecerAguardandoEscolha
+              }
               onClick={() => void handleAbrirConferencia()}
             >
               Gerar contrato
@@ -587,7 +702,9 @@ export function OrcamentoContratoGerarPanel({
               <button
                 type="button"
                 className="btn justify-center text-[12px]"
-                disabled={busy || !podeGerar || contratoAssinado}
+                disabled={
+                  busy || !podeGerar || contratoAssinado || parecerAguardandoEscolha
+                }
                 onClick={() => void handleAbrirConferencia()}
               >
                 {atualDesatualizado
@@ -598,6 +715,49 @@ export function OrcamentoContratoGerarPanel({
           )}
         </div>
       </div>
+
+      {ofereceAvista ? (
+        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+            Condição de pagamento acordada
+          </p>
+          <p className="mt-1 text-[11px] text-[#64748b]">
+            O orçamento oferece as duas alternativas. O contrato usa somente a
+            condição escolhida.
+          </p>
+          {parecerAguardandoEscolha ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              {PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-col gap-1.5 text-[12px] text-[#334155]">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="parecer-pagamento"
+                checked={formaLocal === "parcelado"}
+                disabled={busy || contratoAssinado}
+                onChange={() => void handleEscolherPagamento("parcelado")}
+              />
+              <span>
+                Parcelado · {formatCurrency(Number(orcamento.valor_total) || 0)}
+              </span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="parecer-pagamento"
+                checked={formaLocal === "avista"}
+                disabled={busy || contratoAssinado}
+                onChange={() => void handleEscolherPagamento("avista")}
+              />
+              <span>
+                À vista · {formatCurrency(Number(orcamento.valor_avista) || 0)}
+              </span>
+            </label>
+          </div>
+        </div>
+      ) : null}
 
       {usaCronograma ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
@@ -660,7 +820,7 @@ export function OrcamentoContratoGerarPanel({
                 <span>
                   v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
-                  {pdfContratoEstaDesatualizado(doc, aprovacao)
+                  {pdfContratoEstaDesatualizado(doc, aprovacaoContrato)
                     ? " · desatualizado"
                     : ""}
                 </span>
@@ -707,7 +867,9 @@ export function OrcamentoContratoGerarPanel({
                   <p className="mt-1 text-[12px] text-[#64748b]">
                     {resumo?.pagamentoAvista
                       ? "O vencimento do pagamento único é o das condições aprovadas. A data do contrato não quita o valor."
-                      : "A data do contrato define o documento, a primeira parcela e a vigência, quando aplicável."}
+                      : isParecer
+                        ? "A data do contrato identifica o documento. Os vencimentos são as datas informadas e não são recalculados pela data de emissão."
+                        : "A data do contrato define o documento, a primeira parcela e a vigência, quando aplicável."}
                   </p>
                 </div>
 
@@ -718,15 +880,18 @@ export function OrcamentoContratoGerarPanel({
                       <Row label="CNPJ" value={resumo.cnpj} />
                       <Row label="Orçamento" value={resumo.orcamento} />
                       <Row
-                        label={isAet ? "Serviço" : "Modalidade"}
+                        label={isAet || isParecer ? "Serviço" : "Modalidade"}
                         value={resumo.modalidade}
                       />
-                      {isAet ? null : (
+                      {isAet || isParecer ? null : (
                         <Row
                           label="Colaboradores"
                           value={resumo.colaboradores}
                         />
                       )}
+                      {resumo.condicaoPagamento ? (
+                        <Row label="Pagamento" value={resumo.condicaoPagamento} />
+                      ) : null}
                       <Row
                         label={
                           isOrcamentoMensalidade(orcamento.modalidade)

@@ -28,18 +28,27 @@ import {
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
-
-function ocultaQuantidadeColaboradores(
-  itens: ServicoItemRef[] | null | undefined
-): boolean {
-  return laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens));
-}
 import { orcamentoPermitePagamentoAVista } from "@/lib/servico-aet";
+import {
+  formatCondicaoParcelasCentavos,
+  orcamentoEhExclusivoParecerTecnico,
+  parcelasCentavosParecerTecnico,
+  parseQuantidadeParcelasInteira,
+} from "@/lib/servico-parecer-tecnico";
 import {
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
 } from "@/lib/orcamento-calculo";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
+
+function ocultaQuantidadeColaboradores(
+  itens: ServicoItemRef[] | null | undefined
+): boolean {
+  return (
+    laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
+    orcamentoEhExclusivoParecerTecnico(itens)
+  );
+}
 
 export type OrcamentoContratoAndamento =
   | "nao_enviado"
@@ -405,6 +414,20 @@ export function buildResumoComercialOrcamento(
       parcelas: 0,
       valorParcela: 0,
       textoParcelado: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
+      textoAVista: "",
+    };
+  }
+  if (orcamentoEhExclusivoParecerTecnico(orcamento.orcamento_itens)) {
+    const parcelas =
+      parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1;
+    const centavos = parcelasCentavosParecerTecnico(valorTotal, parcelas);
+    return {
+      quantidadeColaboradores: 0,
+      valorTotal,
+      valorAVista: 0,
+      parcelas,
+      valorParcela: (centavos[0] ?? 0) / 100,
+      textoParcelado: formatCondicaoParcelasCentavos(valorTotal, parcelas),
       textoAVista: "",
     };
   }

@@ -26,6 +26,8 @@ import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
+import { condicaoAprovadaParecer } from "@/lib/contrato-parecer-tecnico";
+import type { ParecerPagamentoEscolhido } from "@/lib/contrato-parecer-tecnico";
 import { garantirImplantacaoAet } from "@/services/implantacao-aet.service";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
@@ -679,4 +681,90 @@ export async function cancelarOrcamento(params: {
     .not("status", "in", '("cancelado","contrato_encerrado")');
 
   if (error) throw error;
+}
+
+function centavosIguais(a: number | null | undefined, b: number | null | undefined): boolean {
+  return Math.round((Number(a) || 0) * 100) === Math.round((Number(b) || 0) * 100);
+}
+
+/**
+ * Grava a condição escolhida para o contrato do Parecer Técnico.
+ * Não sincroniza cliente_contratos e não inicia implantação de laudo.
+ */
+export async function salvarCondicaoContratoParecer(params: {
+  orcamentoId: string;
+  aprovacaoId: string;
+  forma: ParecerPagamentoEscolhido;
+  valorTotal: number;
+  valorAvista: number;
+  quantidadeParcelas: number;
+  alteradoPor: string;
+}): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const condicao = condicaoAprovadaParecer({
+    forma: params.forma,
+    valorTotal: params.valorTotal,
+    valorAvista: params.valorAvista,
+    quantidadeParcelas: params.quantidadeParcelas,
+  });
+
+  const { error: orcamentoError } = await supabase
+    .from("orcamentos")
+    .update({ parecer_pagamento_escolhido: params.forma })
+    .eq("id", params.orcamentoId);
+  if (orcamentoError) throw orcamentoError;
+
+  const { data: beforeRaw, error: beforeError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(APROVACAO_SELECT)
+    .eq("id", params.aprovacaoId)
+    .single();
+  if (beforeError) throw beforeError;
+  const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+
+  const mudou =
+    !centavosIguais(before.valor_final, condicao.valor_final) ||
+    (before.condicao_pagamento ?? "") !== condicao.condicao_pagamento ||
+    Number(before.quantidade_parcelas) !== condicao.quantidade_parcelas ||
+    !centavosIguais(before.valor_parcela, condicao.valor_parcela) ||
+    !centavosIguais(before.valor_avista, condicao.valor_avista) ||
+    Number(before.desconto_percentual) !== 0;
+
+  if (!mudou) return before;
+
+  const { data: updatedRaw, error: updateError } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      valor_final: condicao.valor_final,
+      condicao_pagamento: condicao.condicao_pagamento,
+      quantidade_parcelas: condicao.quantidade_parcelas,
+      valor_parcela: condicao.valor_parcela,
+      valor_avista: condicao.valor_avista,
+      desconto_percentual: 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.aprovacaoId)
+    .select(APROVACAO_SELECT)
+    .single();
+  if (updateError) throw updateError;
+  const aprovacao = sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord);
+
+  const { error: historicoError } = await supabase
+    .from("orcamento_aprovacao_condicoes_historico")
+    .insert({
+      aprovacao_id: aprovacao.id,
+      orcamento_id: params.orcamentoId,
+      alterado_por: params.alteradoPor.trim() || "Sistema",
+      quantidade_anterior: Number(before.quantidade_colaboradores) || 0,
+      quantidade_nova: Number(before.quantidade_colaboradores) || 0,
+      valor_anterior: Number(before.valor_final) || 0,
+      valor_novo: condicao.valor_final,
+      pagamento_anterior: formatCondicaoAprovada(before),
+      pagamento_novo: condicao.condicao_pagamento,
+      observacoes_anteriores: before.observacoes,
+      observacoes_novas: before.observacoes,
+    });
+  if (historicoError) throw historicoError;
+
+  return aprovacao;
 }

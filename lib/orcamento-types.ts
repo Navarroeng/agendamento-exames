@@ -116,6 +116,8 @@ export interface OrcamentoRecord {
   oferecer_desconto_avista?: boolean | null;
   /** Valor final à vista do Laudo de Parecer Técnico. Null quando a opção está desmarcada. */
   valor_avista?: number | null;
+  /** Condição escolhida para o contrato do Parecer Técnico. Ignorada se a oferta à vista estiver desmarcada. */
+  parecer_pagamento_escolhido?: "parcelado" | "avista" | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;

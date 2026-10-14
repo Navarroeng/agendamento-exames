@@ -95,6 +95,7 @@ import {
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 import { resolveAetServicoId } from "@/lib/servico-aet";
+import { orcamentoEhExclusivoParecerTecnico } from "@/lib/servico-parecer-tecnico";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
 import {
@@ -415,6 +416,9 @@ export function OrcamentoAprovarModal({
       resolveLtcatServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
+  const ocultaColaboradoresComerciais =
+    laudoPontualOcultaColaboradores(fluxoImplantacao) ||
+    orcamentoEhExclusivoParecerTecnico(orcamento?.orcamento_itens);
   const aetEnabled = Boolean(
     open && orcamento && aprovacao && isFluxoLaudoPontual(fluxoImplantacao)
   );
@@ -540,7 +544,7 @@ export function OrcamentoAprovarModal({
   async function handleSalvarCondicoesEditadasClick() {
     if (!form || !aprovacao) return;
     if (
-      !laudoPontualOcultaColaboradores(fluxoImplantacao) &&
+      !ocultaColaboradoresComerciais &&
       (!form.quantidade_colaboradores.trim() ||
         Number(form.quantidade_colaboradores) < 1)
     ) {
@@ -592,7 +596,7 @@ export function OrcamentoAprovarModal({
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
       (form.forma_pagamento === "parcelado" ||
-        laudoPontualOcultaColaboradores(fluxoImplantacao)) &&
+        ocultaColaboradoresComerciais) &&
       (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
     ) {
       toast.error("Informe a quantidade de parcelas.");
@@ -602,7 +606,7 @@ export function OrcamentoAprovarModal({
     await onAtualizarCondicoesAprovadas({
       ...form,
       condicoes_iguais: false,
-      forma_pagamento: laudoPontualOcultaColaboradores(fluxoImplantacao)
+      forma_pagamento: ocultaColaboradoresComerciais
         ? "parcelado"
         : form.forma_pagamento,
     });
@@ -625,7 +629,7 @@ export function OrcamentoAprovarModal({
 
     if (!form.condicoes_iguais) {
       if (
-        !laudoPontualOcultaColaboradores(fluxoImplantacao) &&
+        !ocultaColaboradoresComerciais &&
         (!form.quantidade_colaboradores.trim() ||
           Number(form.quantidade_colaboradores) < 1)
       ) {
@@ -643,7 +647,7 @@ export function OrcamentoAprovarModal({
       if (
         !isOrcamentoMensalidade(orcamento.modalidade) &&
         (form.forma_pagamento === "parcelado" ||
-          laudoPontualOcultaColaboradores(fluxoImplantacao)) &&
+          ocultaColaboradoresComerciais) &&
         (!form.quantidade_parcelas.trim() || Number(form.quantidade_parcelas) < 1)
       ) {
         toast.error("Informe a quantidade de parcelas.");
@@ -656,7 +660,7 @@ export function OrcamentoAprovarModal({
     }
 
     await onSalvarAprovacao(
-      laudoPontualOcultaColaboradores(fluxoImplantacao)
+      ocultaColaboradoresComerciais
         ? { ...form, forma_pagamento: "parcelado" }
         : form
     );
@@ -988,7 +992,7 @@ export function OrcamentoAprovarModal({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                  {isLaudoPontual ? null : (
+                  {ocultaColaboradoresComerciais ? null : (
                   <ResumoItem
                     label="Quantidade de colaboradores"
                     value={String(resumoComercial.quantidadeColaboradores)}
@@ -1023,7 +1027,7 @@ export function OrcamentoAprovarModal({
                     </>
                   ) : (
                     <>
-                  {isLaudoPontual ? null : (
+                  {ocultaColaboradoresComerciais ? null : (
                   <ResumoItem
                     label="À vista"
                     value={
@@ -1073,7 +1077,7 @@ export function OrcamentoAprovarModal({
                   {editandoCondicoes && form ? (
                     <div className="space-y-4 p-4 sm:p-5">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {isLaudoPontual ? null : (
+                        {ocultaColaboradoresComerciais ? null : (
                         <Field label="Quantidade de colaboradores" required>
                           <input
                             className="field-input"
@@ -1128,7 +1132,7 @@ export function OrcamentoAprovarModal({
                         />
                       ) : (
                       <>
-                      {isLaudoPontual ? null : (
+                      {ocultaColaboradoresComerciais ? null : (
                       <div>
                         <p className="mb-2 text-xs font-bold text-navy">
                           Forma de pagamento <RequiredMark />
@@ -1164,7 +1168,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       )}
 
-                      {!isLaudoPontual && form.forma_pagamento === "avista" ? (
+                      {!ocultaColaboradoresComerciais && form.forma_pagamento === "avista" ? (
                         <ResumoItem
                           label="Valor final fechado"
                           value={
@@ -1239,7 +1243,7 @@ export function OrcamentoAprovarModal({
                                 wide={campo.destaque}
                               />
                             ))}
-                          {isLaudoPontual ? null : (
+                          {ocultaColaboradoresComerciais ? null : (
                             <ResumoItem
                               label="Quantidade de colaboradores"
                               value={String(aprovacao.quantidade_colaboradores)}
@@ -1259,7 +1263,7 @@ export function OrcamentoAprovarModal({
                         </>
                       ) : (
                         <>
-                          {isLaudoPontual ? null : (
+                          {ocultaColaboradoresComerciais ? null : (
                           <ResumoItem
                             label="Quantidade de colaboradores"
                             value={String(aprovacao.quantidade_colaboradores)}
@@ -1346,7 +1350,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       <div className="space-y-4 p-4 sm:p-5">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {isLaudoPontual ? null : (
+                          {ocultaColaboradoresComerciais ? null : (
                           <Field label="Quantidade de colaboradores" required>
                             <input
                               className="field-input"
@@ -1406,7 +1410,7 @@ export function OrcamentoAprovarModal({
                           </div>
                         ) : (
                         <>
-                        {isLaudoPontual ? null : (
+                        {ocultaColaboradoresComerciais ? null : (
                         <div>
                           <p className="mb-2 text-xs font-bold text-navy">
                             Forma de pagamento <RequiredMark />
@@ -1445,7 +1449,7 @@ export function OrcamentoAprovarModal({
                         </div>
                         )}
 
-                        {!isLaudoPontual && form.forma_pagamento === "avista" ? (
+                        {!ocultaColaboradoresComerciais && form.forma_pagamento === "avista" ? (
                           <ResumoItem
                             label="Valor final fechado"
                             value={
@@ -1545,7 +1549,7 @@ export function OrcamentoAprovarModal({
                           {formatDateTimeBR(row.alterado_em)} · {row.alterado_por}
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                          {isLaudoPontual ? null : (
+                          {ocultaColaboradoresComerciais ? null : (
                           <p className="text-[#64748b]">
                             Quantidade: {row.quantidade_anterior} →{" "}
                             <span className="font-semibold text-[#334155]">
