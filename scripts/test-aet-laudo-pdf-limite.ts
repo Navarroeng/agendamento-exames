@@ -15,7 +15,9 @@ import {
 import {
   AET_LAUDO_PDF_FORMATO_HINT,
   AET_LAUDO_PDF_MAX_BYTES,
+  AET_LAUDO_PDF_STORAGE_TAMANHO_MSG,
   AET_LAUDO_PDF_TAMANHO_MSG,
+  mensagemErroArmazenamentoLaudoAet,
   ORCAMENTO_ONBOARDING_MAX_BYTES,
   substituirAnexoPreservandoAnterior,
   validateAetDocumentoEmpresaFile,
@@ -43,7 +45,21 @@ assert.equal(AET_LAUDO_PDF_FORMATO_HINT, "Formato PDF • Tamanho máximo: 20 MB
 
 validateAetLaudoPdfFile(arquivo("laudo.pdf", 10 * MB + 1), aetPdf);
 validateAetLaudoPdfFile(arquivo("laudo.pdf", 15 * MB), aetPdf);
+validateAetLaudoPdfFile(arquivo("laudo.pdf", 16726144), aetPdf);
 validateAetLaudoPdfFile(arquivo("LAUDO.PDF", 20 * MB), aetPdf);
+
+assert.equal(
+  mensagemErroArmazenamentoLaudoAet(
+    new Error("The object exceeded the maximum allowed size")
+  ),
+  AET_LAUDO_PDF_STORAGE_TAMANHO_MSG
+);
+assert.equal(
+  mensagemErroArmazenamentoLaudoAet(
+    new Error("O Laudo AET final deve ser um arquivo PDF.")
+  ),
+  null
+);
 
 assert.throws(
   () => validateAetLaudoPdfFile(arquivo("laudo.pdf", 20 * MB + 1), aetPdf),
@@ -242,6 +258,15 @@ const blocoSalvarLaudo = salvarLaudo.slice(
 );
 assert.match(blocoSalvarLaudo, /laudo_path: params\.fileMeta\.path/);
 assert.doesNotMatch(blocoSalvarLaudo, /elaboracao_status/);
+
+const storageService = readFileSync(
+  join(process.cwd(), "services/orcamento-onboarding-storage.service.ts"),
+  "utf8"
+);
+assert.match(storageService, /ORCAMENTO_ONBOARDING_BUCKET/);
+assert.match(storageService, /"aet_laudo"/);
+assert.match(storageService, /mensagemErroArmazenamentoLaudoAet/);
+assert.match(storageService, /options\?\.maxBytes === AET_LAUDO_PDF_MAX_BYTES/);
 
 const migration = readFileSync(
   join(process.cwd(), "supabase/migrations/140_aet_laudo_pdf_20mb.sql"),

@@ -6,6 +6,8 @@ export const AET_LAUDO_PDF_TAMANHO_MSG =
   "O Laudo AET deve ter no máximo 20 MB.";
 export const AET_LAUDO_PDF_FORMATO_HINT =
   "Formato PDF • Tamanho máximo: 20 MB";
+export const AET_LAUDO_PDF_STORAGE_TAMANHO_MSG =
+  "O armazenamento recusou o PDF do Laudo AET por exceder o tamanho máximo permitido. O envio não foi concluído.";
 
 export type AetLaudoPdfValidationOptions = {
   maxBytes?: number;
@@ -106,6 +108,22 @@ export function validateAetLaudoPdfFile(
   if (ext !== "pdf") {
     throw new Error("O Laudo AET final deve ser um arquivo PDF.");
   }
+}
+
+/** Traduz a recusa de tamanho do Supabase Storage no upload do PDF final do AET. */
+export function mensagemErroArmazenamentoLaudoAet(
+  error: unknown
+): string | null {
+  const message =
+    error instanceof Error
+      ? error.message
+      : error && typeof error === "object" && "message" in error
+        ? String((error as { message?: unknown }).message ?? "")
+        : "";
+  if (/exceeded the maximum allowed size/i.test(message)) {
+    return AET_LAUDO_PDF_STORAGE_TAMANHO_MSG;
+  }
+  return null;
 }
 
 /**

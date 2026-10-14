@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import {
+  AET_LAUDO_PDF_MAX_BYTES,
   ORCAMENTO_ONBOARDING_BUCKET,
   buildOrcamentoOnboardingPath,
+  mensagemErroArmazenamentoLaudoAet,
   resolveOnboardingContentType,
   type AetLaudoPdfValidationOptions,
   validateAetLaudoPdfFile,
@@ -57,7 +59,15 @@ export async function uploadAetLaudoPdf(
   options?: AetLaudoPdfValidationOptions
 ) {
   validateAetLaudoPdfFile(file, options);
-  return uploadOnboardingFile(aprovacaoId, "aet_laudo", file);
+  try {
+    return await uploadOnboardingFile(aprovacaoId, "aet_laudo", file);
+  } catch (error) {
+    if (options?.maxBytes === AET_LAUDO_PDF_MAX_BYTES) {
+      const traduzida = mensagemErroArmazenamentoLaudoAet(error);
+      if (traduzida) throw new Error(traduzida);
+    }
+    throw error;
+  }
 }
 
 export async function obterUrlOrcamentoOnboarding(
