@@ -338,12 +338,16 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.match(texto, /1 \(um\) exame clínico periódico/);
   assert.match(texto, /quinto dia útil/);
   assert.match(texto, /boleto bancário/);
-  assert.match(texto, /R\$ 130,00 \(cento e trinta reais\)/);
-  assert.match(texto, /R\$ 10,00 \(dez reais\)/);
+  assert.match(texto, /R\$ 130,00/);
+  assert.doesNotMatch(texto, /cento e trinta reais|dez reais/);
+  assert.match(texto, /R\$ 10,00 por colaborador/);
   assert.match(texto, /R\$ 140,00/);
   assert.match(texto, /R\$ 220,00/);
   assert.match(texto, /R\$ 270,00/);
-  assert.match(texto, /Não há reajuste automático pelo IPCA/);
+  assert.match(texto, /dia 10 de cada mês/);
+  assert.match(texto, /A primeira vencerá no mês seguinte/);
+  assert.match(texto, /totalizando 12 mensalidades por vigência/);
+  assert.doesNotMatch(texto, /IPCA|Essa regra é a da Gestão SST|\{dia escolhido\}|não está definido/);
   assert.doesNotMatch(texto, /critério de cálculo|ainda não está registrado neste instrumento|reajuste anual pelo IPCA|poderão ser reajustados pelo IPCA/);
   assert.doesNotMatch(texto, /pagamento à vista|pago antecipadamente nesta|inclusão de novo funcionário/i);
   assert.doesNotMatch(texto, /permanência mínima|mensalidades correspondentes até o término|não possui valor global anual/i);
@@ -545,7 +549,18 @@ await run("PDF pontual e mensalidade", async () => {
   const rawM = extractPdfLatin1(bufM);
   assert.ok(rawM.includes("INSTRUMENTO PARTICULAR"));
   assert.ok(rawM.includes("Página"));
-  assert.ok(rawM.includes("20/01/2027"));
+  assert.ok(rawM.includes("dia 20"));
+  assert.equal(mensal.parcelas[0]?.dataIso, "2027-01-20");
+  assert.equal(mensal.parcelas.length, 12);
+  assert.ok(!rawM.includes("IPCA"));
+  assert.ok(!rawM.includes("{dia"));
+  assert.ok(rawM.includes("130,00"));
+  assert.ok(rawM.includes("mês seguinte") || rawM.includes("mes seguinte"));
+  const espacamentoMensal = /([0-9.]+) Tc/g;
+  let espacoMensal: RegExpExecArray | null;
+  while ((espacoMensal = espacamentoMensal.exec(rawM))) {
+    assert.ok(Number(espacoMensal[1]) <= 0.05, `espaçamento ${espacoMensal[1]}`);
+  }
   assert.ok(!rawM.includes("4.200"));
   assert.ok(!rawM.includes("4200"));
   assert.ok(!/Eko/i.test(rawM));
@@ -661,8 +676,25 @@ await run("PDF pontual e mensalidade", async () => {
       diaVencimentoMensalidade: 10,
     });
     assert.doesNotMatch(semDatas.texto, /tem início em/);
-    assert.doesNotMatch(semDatas.texto, /13\/10\/2026/);
-    assert.match(semDatas.texto, /14\/10\/2026/);
+    assert.equal(semDatas.parcelas[0]?.dataIso, "2026-10-13");
+    assert.match(semDatas.texto, /pago à vista até 13\/10\/2026/);
+    assert.doesNotMatch(semDatas.texto, /14\/10\/2026/);
+    assert.doesNotMatch(semDatas.texto, /dia 10 de cada mês|dia 20 de cada mês/);
+    assert.match(semDatas.texto, /preparação da renovação/);
+    buildContratoNavarroDocumento({
+      orcamento: orcamentoAvista,
+      aprovacao: makeAprovacao({
+        quantidade_colaboradores: 1,
+        valor_final: 130,
+        mensalidade_pagamento: "avista",
+        mensalidade_valor_mensal: 130,
+        mensalidade_meses: 12,
+        mensalidade_valor_bruto: 1560,
+        mensalidade_desconto_valor: 160,
+        valor_avista: 1400,
+      }),
+      dataContrato: "2026-10-13",
+    });
     assert.match(semDatas.texto, /1 \(um\) colaborador/);
     assert.match(semDatas.texto, /130,00/);
     assert.match(semDatas.texto, /1\.560,00/);
@@ -674,8 +706,8 @@ await run("PDF pontual e mensalidade", async () => {
     assert.doesNotMatch(semDatas.texto, /inclusão de novo funcionário|taxa de inclusão|cadastro do colaborador/i);
     assert.match(semDatas.texto, /quinto dia útil/);
     assert.match(semDatas.texto, /boleto bancário/);
-    assert.match(semDatas.texto, /Não há reajuste automático pelo IPCA/);
-    assert.match(semDatas.texto, /Não há mensalidades no período pago antecipadamente/);
+    assert.doesNotMatch(semDatas.texto, /IPCA|Essa regra é a da Gestão SST/);
+    assert.match(semDatas.texto, /Não haverá mensalidades no período já pago antecipadamente/);
     assert.match(semDatas.texto, /não gera devolução/);
     assert.doesNotMatch(semDatas.texto, /critério de cálculo|reajuste anual pelo IPCA/);
     assert.match(semDatas.texto, /limita-se ao período efetivamente pago antecipadamente/);
@@ -703,7 +735,8 @@ await run("PDF pontual e mensalidade", async () => {
     });
     assert.match(comDatas.texto, /início em 01\/11\/2026/);
     assert.match(comDatas.texto, /término em 31\/10\/2027/);
-    assert.match(comDatas.texto, /dia 10 \(dez\)/);
+    assert.doesNotMatch(comDatas.texto, /dia 10 de cada mês|dia 20 de cada mês/);
+    assert.match(comDatas.texto, /preparação da renovação/);
     assert.doesNotMatch(comDatas.texto, /não está definido nesta contratação/);
 
     const cinco = buildContratoNavarroDocumento({
@@ -739,7 +772,9 @@ await run("PDF pontual e mensalidade", async () => {
     assert.equal(cinco.parcelas.length, 12);
     assert.equal(cinco.parcelas[0]?.dataIso, "2026-11-10");
     assert.equal(cinco.parcelas[11]?.dataIso, "2027-10-10");
-    assert.match(cinco.texto, /primeira mensalidade vence em 10\/11\/2026/);
+    assert.match(cinco.texto, /dia 10 de cada mês/);
+    assert.match(cinco.texto, /A primeira vencerá no mês seguinte/);
+    assert.doesNotMatch(cinco.texto, /10\/11\/2026/);
     assert.match(cinco.texto, /5 \(cinco\) colaboradores/);
     assert.match(cinco.texto, /valor mensal de R\$ 180,00/);
     assert.doesNotMatch(cinco.texto, /pagamento antecipado aplica-se|em pagamento antecipado/i);
@@ -781,7 +816,10 @@ await run("PDF pontual e mensalidade", async () => {
     assert.match(congelado.texto, /R\$ 80,00/);
     assert.doesNotMatch(congelado.texto, /R\$ 50,00/);
     assert.match(congelado.texto, /R\$ 150,00/);
-    assert.match(congelado.texto, /dia 20 \(vinte\)/);
+    assert.match(congelado.texto, /R\$ 170,00/);
+    assert.match(congelado.texto, /pago à vista até 13\/10\/2026/);
+    assert.match(congelado.texto, /preparação da renovação/);
+    assert.doesNotMatch(congelado.texto, /dia 10 de cada mês|dia 20 de cada mês/);
     assert.equal(congelado.parcelas.length, 1);
 
     const proposta = paragrafosPropostaGestaoMensal().join("\n");
@@ -842,7 +880,15 @@ await run("PDF pontual e mensalidade", async () => {
     assert.ok(rawAvista.includes("DADOS PARA PAGAMENTO"));
     assert.ok(rawAvista.includes("1.400,00") || rawAvista.includes("1400"));
     assert.ok(rawAvista.includes("160"));
-    assert.ok(rawAvista.includes("14/10/2026"));
+    assert.ok(rawAvista.includes("13/10/2026"));
+    assert.ok(!rawAvista.includes("14/10/2026"));
+    assert.ok(rawAvista.includes("preparação da renovação") || rawAvista.includes("prepara"));
+    assert.ok(!rawAvista.includes("dia 10"));
+    const espacamento = /([0-9.]+) Tc/g;
+    let espaco: RegExpExecArray | null;
+    while ((espaco = espacamento.exec(rawAvista))) {
+      assert.ok(Number(espaco[1]) <= 0.05, `espaçamento ${espaco[1]}`);
+    }
     const rawOutro = extractPdfLatin1(
       pdfOutro.output("arraybuffer") as ArrayBuffer
     );

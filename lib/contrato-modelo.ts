@@ -249,7 +249,7 @@ export function buildContratoNavarroDocumento(params: {
     ? diaVencimentoMensalidadeValido(params.diaVencimentoMensalidade) ??
       diaVencimentoMensalidadeValido(aprovacao?.mensalidade_dia_vencimento)
     : null;
-  if (tipoDocumento === "mensalidade" && !diaPlano) {
+  if (tipoDocumento === "mensalidade" && !pagamentoAvista && !diaPlano) {
     throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
   }
 
@@ -257,9 +257,7 @@ export function buildContratoNavarroDocumento(params: {
     ? [
         {
           indice: 1,
-          dataIso:
-            (aprovacao?.mensalidade_vencimento ?? "").trim().slice(0, 10) ||
-            dataContrato,
+          dataIso: dataContrato,
           valorCentavos: valorAvistaCentavos,
           valor: centsToReais(valorAvistaCentavos),
         },
@@ -446,9 +444,9 @@ export function buildContratoNavarroDocumento(params: {
           valorBruto: Number(aprovacao?.mensalidade_valor_bruto) || 0,
           desconto: Number(aprovacao?.mensalidade_desconto_valor) || 0,
           valorFinal: centsToReais(valorAvistaCentavos),
-          vencimentoIso: (aprovacao?.mensalidade_vencimento ?? "")
-            .trim()
-            .slice(0, 10),
+          vencimentoIso: pagamentoAvista
+            ? dataContrato
+            : (aprovacao?.mensalidade_vencimento ?? "").trim().slice(0, 10),
           valorPontual: Number(aprovacao?.mensalidade_valor_pontual) || 0,
         }
       : null,
@@ -461,7 +459,7 @@ export function buildContratoNavarroDocumento(params: {
         : null,
     vigenciaInicioIso: vigencia?.inicio ?? null,
     vigenciaFimIso: vigencia?.fim ?? null,
-    diaVencimentoMensalidade: diaPlano,
+    diaVencimentoMensalidade: pagamentoAvista ? null : diaPlano,
     renovacaoBaseReais: renovacaoBase,
     renovacaoIncrementoReais: renovacaoIncremento,
   };

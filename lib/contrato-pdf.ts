@@ -296,6 +296,12 @@ function paragraphLines(doc: JsPDFDoc, text: string): string[] {
   return doc.splitTextToSize(text, CONTENT_W) as string[];
 }
 
+function drawLeftLine(doc: JsPDFDoc, line: string, x: number, y: number): void {
+  const writer = doc as JsPDFDoc & { setCharSpace?: (space: number) => void };
+  writer.setCharSpace?.(0);
+  doc.text(line, x, y, { align: "left" });
+}
+
 function itemLines(doc: JsPDFDoc, text: string): string[] {
   return doc.splitTextToSize(text, CONTENT_W - AET_BULLET_INDENT) as string[];
 }
@@ -626,7 +632,7 @@ export function drawContratoPdfDocument(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9.5);
         doc.setTextColor(...SLATE_700);
-        doc.text(lines[li], MARGIN, y);
+        drawLeftLine(doc, lines[li], MARGIN, y);
         y += PARA_LINE_H;
       }
       y += 2.2;
@@ -641,7 +647,7 @@ export function drawContratoPdfDocument(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9.5);
         doc.setTextColor(...SLATE_700);
-        doc.text(lines[li], MARGIN + AET_BULLET_INDENT, y);
+        drawLeftLine(doc, lines[li], MARGIN + AET_BULLET_INDENT, y);
         y += PARA_LINE_H;
       }
       y += 1.6;
@@ -667,7 +673,7 @@ export function drawContratoPdfDocument(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9.5);
         doc.setTextColor(...SLATE_700);
-        doc.text(lines[li], MARGIN, y);
+        drawLeftLine(doc, lines[li], MARGIN, y);
         y += PARA_LINE_H;
       }
       y += 2.2;
@@ -684,15 +690,15 @@ export function drawContratoPdfDocument(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...NAVY);
-  doc.text(
-    aet
-      ? CONTRATO_AET_FECHO
-      : "E por estarem justas e contratadas, as partes assinam o presente instrumento.",
-    MARGIN,
-    y,
-    { maxWidth: CONTENT_W }
-  );
-  y += aet ? 10 : 8;
+  const fecho = aet
+    ? CONTRATO_AET_FECHO
+    : "E por estarem justas e contratadas, as partes assinam o presente instrumento.";
+  const fechoLines = paragraphLines(doc, fecho);
+  for (const line of fechoLines) {
+    drawLeftLine(doc, line, MARGIN, y);
+    y += 4.2;
+  }
+  y += aet ? 5.8 : 3.8;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);

@@ -189,10 +189,13 @@ export function OrcamentoContratoGerarPanel({
         : { ...aprovacaoBase, condicoes_revisao: revisaoVigente },
     [aprovacaoBase, revisaoVigente]
   );
+  const pagamentoAvistaPlano =
+    isMensalidadeDoc && aprovacaoContrato.mensalidade_pagamento === "avista";
   const diaEfetivo =
     diaVencimentoMensalidadeValido(diaVencimento) ??
     diaVencimentoMensalidadeValido(aprovacaoContrato.mensalidade_dia_vencimento);
-  const diaPendente = isMensalidadeDoc && diaEfetivo == null;
+  const diaPendente =
+    isMensalidadeDoc && !pagamentoAvistaPlano && diaEfetivo == null;
   const parcelasValores = useMemo(
     () =>
       montarParcelasPontual({
@@ -329,7 +332,7 @@ export function OrcamentoContratoGerarPanel({
           aprovacao: aprovacaoContrato,
           dataContrato,
           vencimentosIso: usaCronograma ? vencimentos : null,
-          diaVencimentoMensalidade: diaEfetivo,
+          diaVencimentoMensalidade: pagamentoAvistaPlano ? null : diaEfetivo,
         })
       );
     } catch {
@@ -340,6 +343,7 @@ export function OrcamentoContratoGerarPanel({
     dataContrato,
     diaEfetivo,
     orcamentoContrato,
+    pagamentoAvistaPlano,
     podeGerar,
     usaCronograma,
     vencimentos,
@@ -447,7 +451,7 @@ export function OrcamentoContratoGerarPanel({
         vencimentosIso: usaCronograma ? vencimentos : null,
         vigenciaInicio: vigencia?.inicio,
         vigenciaFim: vigencia?.fim,
-        diaVencimentoMensalidade: diaEfetivo,
+        diaVencimentoMensalidade: pagamentoAvistaPlano ? null : diaEfetivo,
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -799,16 +803,15 @@ export function OrcamentoContratoGerarPanel({
         </div>
       </div>
 
-      {isMensalidadeDoc ? (
+      {isMensalidadeDoc && !pagamentoAvistaPlano ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
             Dia de vencimento das mensalidades
           </p>
           <p className="mt-1 text-[11px] text-[#64748b]">
-            Escolha 10 ou 20 antes de gerar o contrato. A escolha vale também
-            quando o período inicial for pago antecipadamente, porque define as
-            mensalidades das renovações. Não é o prazo do pagamento antecipado
-            nem o quinto dia útil das faturas de exames.
+            Escolha 10 ou 20 antes de gerar o contrato. A primeira mensalidade
+            vence nesse dia, no mês seguinte ao início da vigência. Não é o
+            quinto dia útil das faturas de exames.
           </p>
           {contratoAssinado ? (
             <p className="mt-1 text-[12px] text-[#64748b]">
@@ -987,9 +990,9 @@ export function OrcamentoContratoGerarPanel({
                   </h3>
                   <p className="mt-1 text-[12px] text-[#64748b]">
                     {resumo?.pagamentoAvista
-                      ? "O vencimento do pagamento único é o das condições aprovadas. A data do contrato não quita o valor. O dia escolhido vale para as mensalidades das renovações."
+                      ? "O vencimento do pagamento à vista é a data do contrato. A quitação depende da confirmação do recebimento. O dia das mensalidades da renovação será definido na preparação da renovação."
                       : isMensalidadeDoc
-                        ? "A data do contrato identifica o documento. A primeira mensalidade vence no dia escolhido, no mês seguinte ao início da vigência, quando essa data já estiver registrada."
+                        ? "A data do contrato identifica o documento. A primeira mensalidade vence no dia escolhido, no mês seguinte ao início da vigência."
                       : isParecer
                         ? "A data do contrato identifica o documento. Os vencimentos são as datas informadas e não são recalculados pela data de emissão."
                         : "A data do contrato define o documento, a primeira parcela e a vigência, quando aplicável."}
