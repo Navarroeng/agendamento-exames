@@ -4,6 +4,8 @@ import {
   redigirContratada,
   redigirContratante,
   textoPlanoContrato,
+  valorExameClinicoAvulsoMensalidade,
+  vigenciaContratualConfiavel,
   type ContratoClausula,
   type ContratoNavarroContexto,
   type ContratoParteContratante,
@@ -197,6 +199,10 @@ export function buildContratoNavarroDocumento(params: {
   aprovacao: OrcamentoAprovacaoRecord | null;
   dataContrato: string;
   vencimentosIso?: string[] | null;
+  /** Datas já gravadas na contratação. A data de emissão do PDF não entra no lugar delas. */
+  vigenciaInicio?: string | null;
+  vigenciaFim?: string | null;
+  diaVencimentoMensalidade?: number | null;
 }): ContratoNavarroDocumento {
   const { orcamento, aprovacao, dataContrato } = params;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataContrato)) {
@@ -308,6 +314,11 @@ export function buildContratoNavarroDocumento(params: {
     };
   }
 
+  const vigencia = mensalidade
+    ? vigenciaContratualConfiavel(params.vigenciaInicio, params.vigenciaFim)
+    : null;
+  const exameAvulso = mensalidade ? valorExameClinicoAvulsoMensalidade() : null;
+  const diaVencimento = Number(params.diaVencimentoMensalidade);
   const ctx: ContratoNavarroContexto = {
     modalidade,
     numeroOrcamento: orcamento.numero.trim(),
@@ -338,6 +349,17 @@ export function buildContratoNavarroDocumento(params: {
           valorPontual: Number(aprovacao?.mensalidade_valor_pontual) || 0,
         }
       : null,
+    valorExameClinicoAvulso: exameAvulso?.admissional ?? null,
+    valorExameClinicoDemissional:
+      exameAvulso && exameAvulso.demissional !== exameAvulso.admissional
+        ? exameAvulso.demissional
+        : null,
+    vigenciaInicioIso: vigencia?.inicio ?? null,
+    vigenciaFimIso: vigencia?.fim ?? null,
+    diaVencimentoMensalidade:
+      Number.isInteger(diaVencimento) && diaVencimento >= 1 && diaVencimento <= 31
+        ? diaVencimento
+        : null,
   };
 
   const clausulas = buildClausulasContrato(ctx);

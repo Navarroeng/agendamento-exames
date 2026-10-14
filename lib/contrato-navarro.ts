@@ -149,7 +149,48 @@ export type ContratoNavarroContexto = {
   parcelas: ContratoParcela[];
   servicos: string[];
   pagamentoMensalidade?: ContratoPagamentoMensalidade | null;
+  /** Exame clínico avulso desta contratação. Nulo quando o valor não está configurado. */
+  valorExameClinicoAvulso?: number | null;
+  /** Quando o demissional avulso tem preço próprio, distinto do admissional. */
+  valorExameClinicoDemissional?: number | null;
+  /** Datas da vigência já gravadas na contratação. A emissão do PDF não as substitui. */
+  vigenciaInicioIso?: string | null;
+  vigenciaFimIso?: string | null;
+  /** Dia do mês das mensalidades do plano. Não é o vencimento da fatura de exames. */
+  diaVencimentoMensalidade?: number | null;
 };
+
+const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Início e término só entram no contrato quando os dois já existem e o término é posterior. */
+export function vigenciaContratualConfiavel(
+  inicio: string | null | undefined,
+  fim: string | null | undefined
+): { inicio: string; fim: string } | null {
+  const inicioIso = (inicio ?? "").trim().slice(0, 10);
+  const fimIso = (fim ?? "").trim().slice(0, 10);
+  if (!ISO_DATA.test(inicioIso) || !ISO_DATA.test(fimIso)) return null;
+  if (fimIso <= inicioIso) return null;
+  return { inicio: inicioIso, fim: fimIso };
+}
+
+/** Preço do exame clínico avulso da Gestão SST mensal, a partir da configuração recebida. */
+export function valorExameClinicoAvulsoMensalidade(
+  config: {
+    admissionalCentavos: number;
+    demissionalCentavos: number;
+  } = CONTRATO_ADICIONAL_MENSALIDADE
+): { admissional: number; demissional: number } | null {
+  const admissional = centavosParaReaisExame(config.admissionalCentavos);
+  const demissional = centavosParaReaisExame(config.demissionalCentavos);
+  if (admissional == null || demissional == null) return null;
+  return { admissional, demissional };
+}
+
+function centavosParaReaisExame(centavos: number): number | null {
+  if (!Number.isFinite(centavos) || centavos <= 0) return null;
+  return Math.round(centavos) / 100;
+}
 
 function joinExistentes(partes: Array<string | null | undefined>): string {
   return partes
@@ -196,25 +237,53 @@ function redigirColaboradores(quantidade: number): string {
   return `O valor contratado contempla o atendimento de até ${formatNumeroComExtenso(n)} ${label}, conforme quantidade prevista na proposta comercial.`;
 }
 
-function redigirAdicionais(ctx: ContratoNavarroContexto): string[] {
-  if (
-    ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE &&
-    ctx.pagamentoMensalidade?.forma === "avista"
-  ) {
-    return [
-      `A inclusão de novo funcionário (admissional adicional) será cobrada no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos / 100)}, por colaborador, além do valor da vigência já contratado à vista.`,
-      `O exame demissional adicional será cobrado no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos / 100)}, por colaborador.`,
-    ];
-  }
-  if (ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE) {
-    return [
-      `A inclusão de novo funcionário (admissional adicional) será cobrada no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos / 100)}, por colaborador, além da mensalidade contratada.`,
-      `O exame demissional adicional será cobrado no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos / 100)}, por colaborador.`,
-    ];
-  }
+function redigirAdicionaisPontual(): string[] {
   return [
     `A inclusão de novo funcionário (admissional adicional) será cobrada no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_PONTUAL.admissionalCentavos / 100)}, por colaborador.`,
     `O exame demissional será cobrado no valor de ${formatMoedaComExtenso(CONTRATO_ADICIONAL_PONTUAL.demissionalCentavos / 100)}, por colaborador.`,
+  ];
+}
+
+function fraseQuantitativoColaboradores(quantidade: number): string {
+  if (!Number.isFinite(quantidade) || quantidade < 1) {
+    return "o quantitativo de colaboradores previsto na proposta comercial";
+  }
+  const n = Math.round(quantidade);
+  const label = n === 1 ? "colaborador" : "colaboradores";
+  return `${formatNumeroComExtenso(n)} ${label}`;
+}
+
+function redigirValorExameClinicoAvulso(ctx: ContratoNavarroContexto): string {
+  const admissional = ctx.valorExameClinicoAvulso;
+  const demissional = ctx.valorExameClinicoDemissional ?? admissional;
+  const admissionalOk =
+    admissional != null && Number.isFinite(admissional) && admissional > 0;
+  const demissionalOk =
+    demissional != null && Number.isFinite(demissional) && demissional > 0;
+  if (!admissionalOk || !demissionalOk) {
+    return "O valor do exame clínico avulso, admissional ou demissional, com emissão do respectivo ASO, não está registrado nesta contratação e deverá ser ajustado por escrito antes da assinatura.";
+  }
+  if (admissional === demissional) {
+    return `Para esta contratação, o valor do exame clínico avulso é de ${formatMoedaComExtenso(admissional)}, por exame, tanto admissional quanto demissional, com emissão do respectivo ASO.`;
+  }
+  return `Para esta contratação, o exame clínico admissional avulso é de ${formatMoedaComExtenso(admissional)} e o exame clínico demissional avulso é de ${formatMoedaComExtenso(demissional)}, com emissão do respectivo ASO.`;
+}
+
+function redigirExamesGestaoMensalidade(ctx: ContratoNavarroContexto): string[] {
+  const meses = mesesVigenciaContexto(ctx);
+  const quantitativo = fraseQuantitativoColaboradores(ctx.colaboradores);
+  return [
+    "Exames incluídos e avulsos.",
+    `Cada colaborador abrangido pelo quantitativo contratado de ${quantitativo} tem direito a 1 (um) exame clínico periódico durante a vigência de ${formatNumeroComExtenso(meses)} meses, com emissão do ASO.`,
+    "Se esse colaborador for desligado antes de realizar o periódico, o exame clínico demissional, quando necessário, será realizado utilizando essa cobertura, sem cobrança adicional.",
+    "A cobertura é de um único exame clínico por colaborador contratado em cada vigência: periódico ou demissional nas condições acima.",
+    "Se o periódico já tiver sido realizado, o exame clínico demissional será cobrado separadamente.",
+    "Os exames clínicos admissionais de novos colaboradores durante a vigência serão cobrados separadamente. A admissão de novo colaborador durante a vigência não lhe atribui, por si só, direito a exame clínico incluído no plano nesse período.",
+    "O exame clínico demissional desses novos colaboradores também será cobrado separadamente durante a mesma vigência.",
+    redigirValorExameClinicoAvulso(ctx),
+    "Exames complementares são sempre cobrados à parte, inclusive quando o exame clínico estiver incluído no plano, conforme necessidade prevista no PCMSO e autorização da CONTRATANTE.",
+    "Nas renovações, a cobertura será aplicada aos colaboradores abrangidos pelo plano renovado.",
+    "Essa regra comercial de cobertura não altera a indicação nem a periodicidade médica dos exames.",
   ];
 }
 
@@ -266,6 +335,39 @@ function redigirInstrucaoPagamentoAvista(
   return `${nucleo}, a ser pago à vista até ${vencimento}${complemento}.`;
 }
 
+const FATURAMENTO_EXAMES_MENSALIDADE = [
+  "Os exames clínicos avulsos e os exames complementares serão apurados mensalmente, considerando os atendimentos efetivamente realizados entre o primeiro e o último dia de cada mês.",
+  "A cobrança será realizada mediante emissão de fatura discriminada, encaminhada à CONTRATANTE, com vencimento no quinto dia útil do mês seguinte ao da realização dos exames.",
+  "Essas cobranças são independentes da remuneração do plano de gestão SST e permanecem devidas mesmo quando o plano tiver sido pago antecipadamente. Os exames clínicos incluídos na cobertura contratada não serão cobrados novamente na fatura.",
+  "Esse vencimento refere-se às faturas dos exames e não ao vencimento das mensalidades do plano.",
+] as const;
+
+function redigirRenovacaoValorPlano(): string[] {
+  return [
+    "Na renovação, o valor do plano será recalculado conforme a quantidade de colaboradores ativos no início do novo período. A apuração considerará as admissões e os desligamentos informados pela CONTRATANTE, que deverá manter esses registros atualizados. O novo valor vale para o período renovado, sem cobranças retroativas.",
+    "O critério de cálculo desse valor, em tabela ou fórmula, ainda não está registrado neste instrumento e deverá ser ajustado por escrito antes da assinatura. Enquanto esse critério não constar expressamente do contrato, o valor da renovação não está determinado.",
+    "O reajuste anual pelo IPCA (Índice Nacional de Preços ao Consumidor Amplo), ou por outro índice oficial que legalmente venha a substituí-lo, incidirá uma única vez a cada período de 12 (doze) meses sobre os valores da fórmula ou da tabela que vier a ser acordada. O resultado já reajustado não recebe o mesmo índice outra vez no mesmo período.",
+  ];
+}
+
+function redigirFormaPagamentoRenovacao(avista: boolean, temDesconto: boolean): string {
+  if (!avista) {
+    return "Nas renovações, a cobrança ocorrerá mensalmente por boleto bancário, salvo se as partes ajustarem, por escrito, antes do início do novo período, pagamento antecipado e as respectivas condições de desconto.";
+  }
+  if (temDesconto) {
+    return "O pagamento antecipado e o desconto concedido aplicam-se exclusivamente ao período contratado. Nas renovações, a cobrança ocorrerá mensalmente por boleto bancário, salvo se as partes ajustarem, por escrito, antes do início do novo período, novo pagamento antecipado e as respectivas condições de desconto.";
+  }
+  return "O pagamento antecipado aplica-se exclusivamente ao período contratado. Nas renovações, a cobrança ocorrerá mensalmente por boleto bancário, salvo se as partes ajustarem, por escrito, antes do início do novo período, novo pagamento antecipado e as respectivas condições de desconto.";
+}
+
+function redigirDiaVencimentoMensalidade(ctx: ContratoNavarroContexto): string {
+  const dia = Number(ctx.diaVencimentoMensalidade);
+  if (Number.isInteger(dia) && dia >= 1 && dia <= 31) {
+    return `As mensalidades do plano vencem no dia ${formatNumeroComExtenso(dia)} de cada mês, observando-se o último dia válido do mês quando esse dia não existir. Esse vencimento não se confunde com o quinto dia útil aplicável às faturas dos exames.`;
+  }
+  return "O dia de vencimento das mensalidades do plano não está definido nesta contratação e deverá ser ajustado por escrito antes da assinatura. Esse dia não se confunde com o quinto dia útil do mês seguinte, que se aplica somente às faturas dos exames.";
+}
+
 function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
   paragrafos: string[];
   bloco: ContratoBlocoPagamento | null;
@@ -276,9 +378,10 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
   const bruto = pagamento?.valorBruto ?? 0;
   const desconto = pagamento?.desconto ?? 0;
   const final = pagamento?.valorFinal ?? 0;
-  const vencimento = pagamento?.vencimentoIso?.trim() || ctx.dataContrato;
+  const vencimento = (pagamento?.vencimentoIso ?? "").trim().slice(0, 10);
   const paragrafos = [
-    `A CONTRATANTE pagará à CONTRATADA, em pagamento à vista, a remuneração da vigência de ${formatNumeroComExtenso(meses)} meses.`,
+    `A CONTRATANTE pagará à CONTRATADA, em pagamento antecipado, a remuneração da vigência de ${formatNumeroComExtenso(meses)} meses.`,
+    `O valor mensal de referência é de ${formatMoedaComExtenso(ctx.valor)}, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
     `O valor bruto do período é de ${formatMoedaComExtenso(bruto)}.`,
   ];
   if (desconto > 0) {
@@ -286,29 +389,33 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
       `Foi concedido desconto de ${formatMoedaComExtenso(desconto)}.`
     );
   }
+  paragrafos.push(
+    "Admissões durante essa vigência não alteram o valor do plano já contratado. Os exames clínicos avulsos e os exames complementares permanecem sujeitos à cobrança separada."
+  );
+  const prazoRegistrado = ISO_DATA.test(vencimento);
+  const introducaoPrazo = prazoRegistrado
+    ? redigirInstrucaoPagamentoAvista(final, vencimento, desconto > 0)
+    : "O prazo para o pagamento antecipado não está registrado nesta contratação e deverá ser ajustado por escrito antes da assinatura.";
   const linhas = linhasDadosPagamentoContrato();
   const bloco =
     linhas.length > 0
       ? {
-          introducao: redigirInstrucaoPagamentoAvista(
-            final,
-            vencimento,
-            desconto > 0
-          ),
+          introducao: introducaoPrazo,
           linhas,
         }
       : null;
-  if (!bloco) {
-    paragrafos.push(
-      redigirInstrucaoPagamentoAvista(final, vencimento, desconto > 0)
-    );
-  }
+  if (!bloco) paragrafos.push(introducaoPrazo);
   const depois = [
-    "A forma à vista não quita o valor; a quitação depende da confirmação do pagamento.",
-    `A vigência do atendimento permanece de ${formatNumeroComExtenso(meses)} meses.`,
+    "A quitação depende da confirmação do pagamento.",
+    ...FATURAMENTO_EXAMES_MENSALIDADE,
+    ...redigirRenovacaoValorPlano(),
+    redigirFormaPagamentoRenovacao(true, desconto > 0),
+    redigirDiaVencimentoMensalidade(ctx),
   ];
   if ((pagamento?.valorPontual ?? 0) > 0) {
-    depois.push(
+    depois.splice(
+      1,
+      0,
       `Serviços pontuais adicionais, no valor de ${formatMoedaComExtenso(pagamento?.valorPontual ?? 0)}, integram o total bruto uma única vez e não recebem desconto automático.`
     );
   }
@@ -318,53 +425,52 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
 function redigirPagamentoMensalidade(ctx: ContratoNavarroContexto): string[] {
   const meses = mesesVigenciaContexto(ctx);
   return [
-    `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual.`,
-    `A primeira mensalidade vence na data deste contrato (${formatDateIsoToBR(ctx.dataContrato)}). As demais mensalidades vencem mensalmente, no mesmo dia, nos meses subsequentes, observando-se o último dia válido do mês quando o dia não existir.`,
-    "O presente instrumento não possui valor global anual. A remuneração devida é exclusivamente a mensalidade acima discriminada.",
+    `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
+    "O presente instrumento não possui valor global anual. A remuneração devida no período inicial é exclusivamente a mensalidade acima discriminada.",
+    redigirDiaVencimentoMensalidade(ctx),
+    ...FATURAMENTO_EXAMES_MENSALIDADE,
+    ...redigirRenovacaoValorPlano(),
+    redigirFormaPagamentoRenovacao(false, false),
   ];
 }
 
-function redigirReajuste(ctx: ContratoNavarroContexto): string {
-  if (ctx.modalidade !== ORCAMENTO_MODALIDADE_MENSALIDADE) {
-    return "Havendo continuidade da prestação após 12 (doze) meses da data deste contrato, os valores então vigentes poderão ser reajustados pelo IPCA, ou por outro índice oficial que legalmente venha a substituí-lo.";
-  }
-  if (ctx.pagamentoMensalidade?.forma === "avista") {
-    const meses = mesesVigenciaContexto(ctx);
-    return `Na renovação da vigência, o valor mensal de referência será reajustado a cada período de ${formatNumeroComExtenso(meses)} meses pelo IPCA (Índice Nacional de Preços ao Consumidor Amplo), ou por outro índice oficial que legalmente venha a substituí-lo.`;
-  }
-  return "O valor mensal será reajustado a cada período de 12 (doze) meses pelo IPCA (Índice Nacional de Preços ao Consumidor Amplo), ou por outro índice oficial que legalmente venha a substituí-lo.";
+function redigirReajustePontual(): string {
+  return "Havendo continuidade da prestação após 12 (doze) meses da data deste contrato, os valores então vigentes poderão ser reajustados pelo IPCA, ou por outro índice oficial que legalmente venha a substituí-lo.";
 }
 
 function redigirVigencia(ctx: ContratoNavarroContexto): string[] {
   if (ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE) {
     const meses = mesesVigenciaContexto(ctx);
-    return [
-      `O presente instrumento é celebrado pelo prazo de ${formatNumeroComExtenso(meses)} meses, constituindo vigência mínima inicial.`,
-      `Ao término do prazo inicial, o contrato será automaticamente renovado por iguais e sucessivos períodos de ${formatNumeroComExtenso(meses)} meses, salvo manifestação de qualquer das partes em sentido contrário, mediante comunicação escrita com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias.`,
+    const vigencia = vigenciaContratualConfiavel(
+      ctx.vigenciaInicioIso,
+      ctx.vigenciaFimIso
+    );
+    const paragrafos = [
+      `O presente instrumento é celebrado pelo prazo de ${formatNumeroComExtenso(meses)} meses.`,
     ];
+    if (vigencia) {
+      paragrafos.push(
+        `A vigência inicial tem início em ${formatDateIsoToBR(vigencia.inicio)} e término em ${formatDateIsoToBR(vigencia.fim)}.`
+      );
+    }
+    paragrafos.push(
+      `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência.`
+    );
+    if (ctx.pagamentoMensalidade?.forma === "avista") {
+      paragrafos.push(
+        "A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. Nas renovações, a cobrança do plano segue a forma mensal prevista na cláusula de pagamento, salvo ajuste escrito em contrário antes do início do novo período."
+      );
+    }
+    return paragrafos;
   }
   return [
     "O presente contrato vigorará até a conclusão dos serviços discriminados na proposta comercial que o integra, sem prejuízo das obrigações legais de guarda, disponibilização e atualização dos documentos de SST quando exigidas pela legislação.",
   ];
 }
 
-function redigirRescisao(ctx: ContratoNavarroContexto): string[] {
-  const comum = [
-    "Qualquer das partes poderá rescindir o presente instrumento em caso de descumprimento contratual da outra parte, mediante comunicação escrita, assegurada a possibilidade de saneamento no prazo razoável indicado na notificação, quando a natureza da obrigação o permitir.",
-  ];
-  if (ctx.modalidade !== ORCAMENTO_MODALIDADE_MENSALIDADE) return comum;
-  if (ctx.pagamentoMensalidade?.forma === "avista") {
-    const meses = mesesVigenciaContexto(ctx);
-    return [
-      ...comum,
-      `A vigência inicial de ${formatNumeroComExtenso(meses)} meses permanece integral. A remuneração desse período foi contratada em pagamento único, sem parcelamento e sem vencimentos periódicos da gestão para o período antecipado.`,
-      `Após o período inicial, qualquer das partes poderá impedir a renovação seguinte mediante aviso escrito com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias.`,
-    ];
-  }
+function redigirRescisao(_ctx: ContratoNavarroContexto): string[] {
   return [
-    ...comum,
-    "Durante a vigência inicial de 12 (doze) meses, há permanência mínima contratual. Caso a CONTRATANTE solicite a rescisão antecipada sem justa causa antes do encerramento desse período, permanecerá responsável pelo pagamento das mensalidades correspondentes até o término do período contratual vigente. Essa obrigação não se confunde com multa percentual.",
-    `Após o período inicial, qualquer das partes poderá impedir a renovação seguinte mediante aviso escrito com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias.`,
+    "Qualquer das partes poderá rescindir o presente instrumento em caso de descumprimento contratual da outra parte, mediante comunicação escrita, assegurada a possibilidade de saneamento no prazo razoável indicado na notificação, quando a natureza da obrigação o permitir.",
   ];
 }
 
@@ -427,27 +533,30 @@ export function buildClausulasContrato(
       paragrafos: [
         "O atendimento objeto deste contrato compreende os serviços técnicos de SST discriminados na proposta comercial, observados os itens abaixo, na medida em que integrarem o escopo contratado.",
         "PCMSO. Elaboração e gestão do Programa de Controle Médico de Saúde Ocupacional, nos termos da NR-07, de acordo com as informações prestadas pela CONTRATANTE sobre suas atividades e seus colaboradores.",
-        "Exames ocupacionais. Realização dos exames clínicos ocupacionais previstos no PCMSO e na proposta comercial, incluindo os ASOs correspondentes ao quantitativo contratado.",
         "Rede credenciada. Os exames ocupacionais serão realizados na rede credenciada da CONTRATADA, conforme disponibilidade e regras de atendimento vigentes.",
         "PGR. Elaboração e gerenciamento do Programa de Gerenciamento de Riscos (PGR), nos termos da NR-01, contemplando o inventário de riscos e o plano de ação do estabelecimento da CONTRATANTE, com atualizações quando houver alteração das informações necessárias à execução, devidamente comunicadas pela CONTRATANTE.",
         "LTCAT. Elaboração do Laudo Técnico das Condições do Ambiente de Trabalho, nos termos da legislação previdenciária e de SST aplicável, com base nas informações e nas condições do estabelecimento informadas pela CONTRATANTE.",
         "Avaliação de Riscos Psicossociais – NR-01, conforme metodologia e escopo previstos na proposta comercial.",
         "eSocial. Gestão e envio dos eventos de Saúde e Segurança do Trabalho no eSocial (S-2210, S-2220 e S-2240), nos termos da legislação aplicável e do escopo previsto na proposta comercial.",
-        "Exames complementares não estão incluídos no valor contratado e serão cobrados à parte, mediante necessidade prevista no PCMSO e autorização da CONTRATANTE. Incluem-se, quando aplicáveis, exames tais como audiometria, espirometria, exames laboratoriais e demais exames complementares previstos no PCMSO.",
-        redigirColaboradores(ctx.colaboradores),
-        ...redigirAdicionais(ctx),
+        ...(ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE
+          ? redigirExamesGestaoMensalidade(ctx)
+          : [
+              "Exames ocupacionais. Realização dos exames clínicos ocupacionais previstos no PCMSO e na proposta comercial, incluindo os ASOs correspondentes ao quantitativo contratado.",
+              "Exames complementares não estão incluídos no valor contratado e serão cobrados à parte, mediante necessidade prevista no PCMSO e autorização da CONTRATANTE. Incluem-se, quando aplicáveis, exames tais como audiometria, espirometria, exames laboratoriais e demais exames complementares previstos no PCMSO.",
+              redigirColaboradores(ctx.colaboradores),
+              ...redigirAdicionaisPontual(),
+            ]),
       ],
     },
     {
       numero: "4",
       titulo: "DO PAGAMENTO",
-      paragrafos: pagamentoAvista
-        ? pagamento
-        : [...pagamento, redigirReajuste(ctx)],
+      paragrafos:
+        ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE
+          ? pagamento
+          : [...pagamento, redigirReajustePontual()],
       blocoPagamento: pagamentoAvista?.bloco ?? undefined,
-      paragrafosApos: pagamentoAvista
-        ? [...pagamentoAvista.depois, redigirReajuste(ctx)]
-        : undefined,
+      paragrafosApos: pagamentoAvista?.depois,
     },
     {
       numero: "5",

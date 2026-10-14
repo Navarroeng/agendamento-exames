@@ -40,6 +40,7 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { obterVigenciaContratualOrcamento } from "@/services/orcamento-aprovacao.service";
 import {
   listarContratoDocumentos,
   obterUrlContratoDocumento,
@@ -314,11 +315,14 @@ export function OrcamentoContratoGerarPanel({
       if (usaCronograma) {
         await persistirVencimentosAtuais(vencimentos);
       }
+      const vigencia = await obterVigenciaContratualOrcamento(orcamento.id);
       const documento = buildContratoNavarroDocumento({
         orcamento,
         aprovacao,
         dataContrato,
         vencimentosIso: usaCronograma ? vencimentos : null,
+        vigenciaInicio: vigencia?.inicio,
+        vigenciaFim: vigencia?.fim,
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);

@@ -22,7 +22,10 @@ import {
 import {
   CONTRATO_TEXTOS_PROIBIDOS,
   NAVARRO_CONTRATO_INSTITUCIONAL,
+  buildClausulasContrato,
   redigirContratada,
+  textoPlanoContrato,
+  vigenciaContratualConfiavel,
 } from "../lib/contrato-navarro";
 import {
   buildContratoNavarroDocumento,
@@ -316,16 +319,19 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.ok(!/valor total do contrato/i.test(texto));
   assert.match(texto, /valor mensal de R\$ 350,00 \(trezentos e cinquenta reais\)/);
   assert.match(texto, /12 \(doze\) mensalidades/);
-  assert.match(texto, /vigência mínima inicial/);
+  assert.match(texto, /1 \(um\) exame clínico periódico/);
+  assert.match(texto, /quinto dia útil/);
+  assert.match(texto, /boleto bancário/);
+  assert.match(texto, /critério de cálculo/);
+  assert.doesNotMatch(texto, /pagamento à vista|pago antecipadamente nesta|inclusão de novo funcionário/i);
+  assert.doesNotMatch(texto, /permanência mínima|mensalidades correspondentes até o término/i);
   assert.match(texto, /IPCA/);
   assert.ok(!/IPC-FIPE/i.test(texto));
   assert.match(texto, /automaticamente renovado/);
   assert.match(texto, /30 \(trinta\) dias/);
-  assert.match(texto, /permanência mínima contratual/);
-  assert.match(texto, /mensalidades correspondentes até o término/);
-  assert.ok(!/multa percentual/i.test(texto) || texto.includes("não se confunde com multa percentual"));
   assert.match(texto, /R\$ 50,00 \(cinquenta reais\)/);
   assert.ok(!texto.includes("R$ 100,00"));
+  assert.doesNotMatch(texto, /17\/09\/2026/);
   assert.match(texto, /inadimplência superior a 10 \(dez\) dias/);
   assert.match(texto, /suspender os serviços/);
   assert.match(texto, /nem implica cancelamento automático/);
@@ -526,6 +532,189 @@ await run("PDF pontual e mensalidade", async () => {
     `    PDF mensalidade: ${mensalPath} (${docM.getNumberOfPages()} págs)`
   );
 });
+
+  await run("gestão mensal antecipada, mensal e exames avulsos", () => {
+    assert.equal(vigenciaContratualConfiavel("2026-10-13", "2026-10-13"), null);
+    assert.equal(vigenciaContratualConfiavel("2026-10-13", null), null);
+    assert.deepEqual(
+      vigenciaContratualConfiavel("2026-11-01", "2027-10-31"),
+      { inicio: "2026-11-01", fim: "2027-10-31" }
+    );
+
+    const orcamentoAvista = makeOrcamento({
+      modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
+      valor_total: 130,
+      quantidade_parcelas: null,
+      forma_pagamento: null,
+      cliente_nome: "ATENA EXEMPLO LTDA",
+      orcamento_itens: [
+        {
+          id: "i1",
+          orcamento_id: "o1",
+          servico_id: "s2",
+          servico_nome: GESTAO_SST_MENSAL_NOME,
+          quantidade: 1,
+          valor_unitario: 130,
+          valor_total: 130,
+          ordem: 0,
+        },
+      ],
+    });
+    const semDatas = buildContratoNavarroDocumento({
+      orcamento: orcamentoAvista,
+      aprovacao: makeAprovacao({
+        quantidade_colaboradores: 1,
+        valor_final: 130,
+        quantidade_parcelas: 1,
+        valor_parcela: 1400,
+        condicao_pagamento: "À vista",
+        valor_avista: 1400,
+        mensalidade_pagamento: "avista",
+        mensalidade_valor_mensal: 130,
+        mensalidade_meses: 12,
+        mensalidade_valor_bruto: 1560,
+        mensalidade_desconto_valor: 160,
+        mensalidade_vencimento: "2026-10-14",
+        desconto_percentual: 10.2564,
+      }),
+      dataContrato: "2026-10-13",
+    });
+    assert.doesNotMatch(semDatas.texto, /tem início em/);
+    assert.doesNotMatch(semDatas.texto, /13\/10\/2026/);
+    assert.match(semDatas.texto, /14\/10\/2026/);
+    assert.match(semDatas.texto, /1 \(um\) colaborador/);
+    assert.match(semDatas.texto, /130,00/);
+    assert.match(semDatas.texto, /1\.560,00/);
+    assert.match(semDatas.texto, /160,00/);
+    assert.match(semDatas.texto, /1\.400,00/);
+    assert.match(semDatas.texto, /50,00/);
+    assert.match(semDatas.texto, /periódico ou demissional/);
+    assert.match(semDatas.texto, /não lhe atribui, por si só/);
+    assert.doesNotMatch(semDatas.texto, /inclusão de novo funcionário|taxa de inclusão|cadastro do colaborador/i);
+    assert.match(semDatas.texto, /quinto dia útil/);
+    assert.match(semDatas.texto, /boleto bancário/);
+    assert.match(semDatas.texto, /critério de cálculo/);
+    assert.match(semDatas.texto, /limita-se ao período efetivamente pago antecipadamente/);
+    assert.doesNotMatch(semDatas.texto, /12 \(doze\) mensalidades/);
+    const renovacao = semDatas.texto.match(/automaticamente renovado/g) ?? [];
+    assert.equal(renovacao.length, 1);
+
+    const comDatas = buildContratoNavarroDocumento({
+      orcamento: orcamentoAvista,
+      aprovacao: makeAprovacao({
+        quantidade_colaboradores: 1,
+        valor_final: 130,
+        mensalidade_pagamento: "avista",
+        mensalidade_valor_mensal: 130,
+        mensalidade_meses: 12,
+        mensalidade_valor_bruto: 1560,
+        mensalidade_desconto_valor: 160,
+        mensalidade_vencimento: "2026-10-14",
+        valor_avista: 1400,
+      }),
+      dataContrato: "2026-10-13",
+      vigenciaInicio: "2026-11-01",
+      vigenciaFim: "2027-10-31",
+      diaVencimentoMensalidade: 10,
+    });
+    assert.match(comDatas.texto, /início em 01\/11\/2026/);
+    assert.match(comDatas.texto, /término em 31\/10\/2027/);
+    assert.match(comDatas.texto, /dia 10 \(dez\)/);
+    assert.doesNotMatch(comDatas.texto, /não está definido nesta contratação/);
+
+    const cinco = buildContratoNavarroDocumento({
+      orcamento: makeOrcamento({
+        modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
+        valor_total: 180,
+        quantidade_parcelas: null,
+        orcamento_itens: [
+          {
+            id: "i1",
+            orcamento_id: "o1",
+            servico_id: "s2",
+            servico_nome: GESTAO_SST_MENSAL_NOME,
+            quantidade: 5,
+            valor_unitario: 180,
+            valor_total: 180,
+            ordem: 0,
+          },
+        ],
+      }),
+      aprovacao: makeAprovacao({
+        quantidade_colaboradores: 5,
+        valor_final: 180,
+        quantidade_parcelas: null,
+        valor_parcela: null,
+        condicao_pagamento: "12 mensalidades",
+      }),
+      dataContrato: "2026-09-17",
+    });
+    assert.match(cinco.texto, /5 \(cinco\) colaboradores/);
+    assert.match(cinco.texto, /valor mensal de R\$ 180,00/);
+    assert.doesNotMatch(cinco.texto, /pagamento antecipado aplica-se|em pagamento antecipado/i);
+    assert.match(cinco.texto, /boleto bancário/);
+    assert.doesNotMatch(cinco.texto, /1\.560,00|1\.400,00/);
+
+    const oitenta = textoPlanoContrato(
+      buildClausulasContrato({
+        ...cinco,
+        colaboradores: 2,
+        valorExameClinicoAvulso: 80,
+        valorExameClinicoDemissional: null,
+      })
+    );
+    assert.match(oitenta, /2 \(dois\) colaboradores/);
+    assert.match(oitenta, /R\$ 80,00/);
+    assert.doesNotMatch(oitenta, /R\$ 50,00/);
+
+    const pdfAvista = new jsPDF({ unit: "mm", format: "a4" });
+    drawContratoPdfDocument(pdfAvista, semDatas, null);
+    const pdfMensal = new jsPDF({ unit: "mm", format: "a4" });
+    drawContratoPdfDocument(pdfMensal, cinco, null);
+    const pdfOutro = new jsPDF({ unit: "mm", format: "a4" });
+    drawContratoPdfDocument(
+      pdfOutro,
+      {
+        ...cinco,
+        colaboradores: 2,
+        clausulas: buildClausulasContrato({
+          ...cinco,
+          colaboradores: 2,
+          valorExameClinicoAvulso: 80,
+        }),
+        texto: oitenta,
+      },
+      null
+    );
+    for (const [nome, doc] of [
+      ["antecipado", pdfAvista],
+      ["mensal", pdfMensal],
+      ["exame-80", pdfOutro],
+    ] as const) {
+      const paginas = doc.getNumberOfPages();
+      assert.ok(paginas >= 2 && paginas <= 8, `${nome}: ${paginas} páginas`);
+      const raw = extractPdfLatin1(doc.output("arraybuffer") as ArrayBuffer);
+      assert.ok(raw.includes("INSTRUMENTO PARTICULAR"));
+      assert.ok(raw.includes("Página"));
+      assert.ok(raw.includes("navarroeng.com.br"));
+      assert.ok(!raw.includes("TODO"));
+      assert.ok(!raw.includes("undefined"));
+      assert.ok(!/NaN/.test(raw));
+      assert.ok(!raw.includes("condicoes_revisao"));
+    }
+    const rawAvista = extractPdfLatin1(
+      pdfAvista.output("arraybuffer") as ArrayBuffer
+    );
+    assert.ok(rawAvista.includes("DADOS PARA PAGAMENTO"));
+    assert.ok(rawAvista.includes("1.400,00") || rawAvista.includes("1400"));
+    assert.ok(rawAvista.includes("160"));
+    assert.ok(rawAvista.includes("14/10/2026"));
+    const rawOutro = extractPdfLatin1(
+      pdfOutro.output("arraybuffer") as ArrayBuffer
+    );
+    assert.ok(rawOutro.includes("80,00") || rawOutro.includes("80.00"));
+    assert.ok(!rawOutro.includes("DADOS PARA PAGAMENTO"));
+  });
 
   await run("erro PostgREST plano não vira toast genérico", () => {
     const fallback = "Não foi possível gerar a prévia.";

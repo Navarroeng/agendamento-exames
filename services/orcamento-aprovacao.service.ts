@@ -20,6 +20,7 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
+import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
 import {
   isLaudoPontualExclusivo,
   laudoPontualOcultaColaboradores,
@@ -65,6 +66,25 @@ export async function obterMesesVigenciaMensalidade(
     dataFim: row?.data_fim,
     mesesSalvos,
   });
+}
+
+/** Datas de vigência já gravadas no contrato do cliente. Não usa a data de emissão do PDF. */
+export async function obterVigenciaContratualOrcamento(
+  orcamentoId: string
+): Promise<{ inicio: string; fim: string } | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cliente_contratos")
+    .select("data_inicio, data_fim")
+    .eq("orcamento_id", orcamentoId)
+    .not("status", "in", "(encerrado,cancelado)")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) return null;
+  const row = data?.[0] as
+    | { data_inicio?: string | null; data_fim?: string | null }
+    | undefined;
+  return vigenciaContratualConfiavel(row?.data_inicio, row?.data_fim);
 }
 
 function sortAprovacao(
