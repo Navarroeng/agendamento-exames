@@ -141,4 +141,19 @@ const buscaAtivo = filterOrcamentos(all, {
 assert.equal(buscaAtivo.length, 1);
 assert.equal(buscaAtivo[0].numero, "ORC-2026-0010");
 
+const base = stub({
+  id: "6",
+  numero: "ORC-2026-0020",
+  status: "em_elaboracao",
+  cliente_nome: "Empresa Antiga",
+  origem_cliente: "cliente_base",
+});
+const buscaOrigem = filterOrcamentos([base, elaboracao], {
+  busca: "Cliente da base",
+  status: "",
+});
+assert.equal(buscaOrigem.length, 1);
+assert.equal(buscaOrigem[0].origem_cliente, "cliente_base");
+assert.equal(elaboracao.origem_cliente, null);
+
 console.log("test-orcamento-filters: OK");
