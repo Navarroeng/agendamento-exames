@@ -12,6 +12,7 @@ import {
   formatCondicaoAprovada,
   type OrcamentoAprovacaoRecord,
 } from "../lib/orcamento-aprovacao";
+import { pdfContratoEstaDesatualizado } from "../lib/contrato-documento-revisao";
 import { buildContratoNavarroDocumento } from "../lib/contrato-modelo";
 import {
   CAMPOS_PAGAMENTO_CONTRATO_AUSENTES,
@@ -384,8 +385,23 @@ assert.ok(raw.includes("99729-6"));
 assert.ok(raw.includes("0760"));
 assert.ok(raw.includes("45.206.250"));
 assert.ok(raw.includes("1.400,00") || raw.includes("1400"));
+assert.ok(raw.includes("160,00") || raw.includes("160"));
 assert.ok(raw.includes("14/10/2026"));
 assert.ok(!raw.includes("Tipo de conta"));
+assert.equal(
+  pdfContratoEstaDesatualizado(
+    { condicoes_revisao: 2, desatualizado_em: "2026-10-14T12:00:00.000Z" },
+    { condicoes_revisao: 2 }
+  ),
+  false
+);
+assert.equal(
+  pdfContratoEstaDesatualizado(
+    { condicoes_revisao: 2, desatualizado_em: null },
+    { condicoes_revisao: 3 }
+  ),
+  true
+);
 const pdfPath = path.join(os.tmpdir(), "contrato-avista-dados-bancarios.pdf");
 fs.writeFileSync(pdfPath, Buffer.from(buf));
 console.log(`PDF à vista: ${pdfPath} (${paginas} págs)`);

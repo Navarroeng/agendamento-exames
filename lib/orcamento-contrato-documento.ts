@@ -22,7 +22,9 @@ export interface OrcamentoContratoDocumentoRecord {
   gerado_por_user_id: string | null;
   gerado_em: string;
   created_at: string;
-  /** Preenchido quando as condições aprovadas mudam depois desta versão. */
+  /** Revisão das condições comerciais usada para gerar este PDF. */
+  condicoes_revisao?: number | null;
+  /** Sinal legado. A comparação vigente é condicoes_revisao. */
   desatualizado_em?: string | null;
 }
 

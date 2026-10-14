@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
@@ -32,6 +32,10 @@ import {
   validarCronogramaVencimentos,
 } from "@/lib/contrato-vencimentos";
 import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
+import {
+  pdfContratoEstaDesatualizado,
+  revisaoCondicoesAprovacao,
+} from "@/lib/contrato-documento-revisao";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
@@ -40,7 +44,6 @@ import {
   listarContratoDocumentos,
   obterUrlContratoDocumento,
   persistirContratoDocumentoGerado,
-  proximaVersaoContratoDocumento,
 } from "@/services/orcamento-contrato-documento.service";
 import {
   listarContratoVencimentos,
@@ -73,6 +76,10 @@ export function OrcamentoContratoGerarPanel({
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [vencimentos, setVencimentos] = useState<string[]>([]);
   const [loadingVencimentos, setLoadingVencimentos] = useState(false);
+  const [condicoesRevisaoCapturada, setCondicoesRevisaoCapturada] = useState<
+    number | null
+  >(null);
+  const loadSeq = useRef(0);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
   const motivoBloqueio = motivoBloqueioGeracaoContrato(orcamento, aprovacao);
@@ -114,13 +121,19 @@ export function OrcamentoContratoGerarPanel({
   );
   const atual = documentos[0] ?? null;
   const anteriores = documentos.slice(1);
+  const atualDesatualizado = atual
+    ? pdfContratoEstaDesatualizado(atual, aprovacao)
+    : false;
 
   const carregar = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoadingDocs(true);
     try {
       const rows = await listarContratoDocumentos(aprovacao.id);
+      if (seq !== loadSeq.current) return;
       setDocumentos(rows);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       console.error(err);
       toast.error(
         mensagemErroContratoDocumento(
@@ -129,9 +142,18 @@ export function OrcamentoContratoGerarPanel({
         )
       );
     } finally {
-      setLoadingDocs(false);
+      if (seq === loadSeq.current) setLoadingDocs(false);
     }
-  }, [aprovacao.id, aprovacao.updated_at]);
+  }, [aprovacao.id]);
+
+  function aplicarDocumentoSalvo(saved: OrcamentoContratoDocumentoRecord) {
+    loadSeq.current += 1;
+    setDocumentos((prev) =>
+      [saved, ...prev.filter((doc) => doc.id !== saved.id)].sort(
+        (a, b) => b.versao - a.versao
+      )
+    );
+  }
 
   useEffect(() => {
     void carregar();
@@ -140,6 +162,7 @@ export function OrcamentoContratoGerarPanel({
   useEffect(() => {
     setEtapa("idle");
     setPreviewDoc(null);
+    setCondicoesRevisaoCapturada(null);
     setPreviewUrl((atualUrl) => {
       if (atualUrl) URL.revokeObjectURL(atualUrl);
       return null;
@@ -217,6 +240,7 @@ export function OrcamentoContratoGerarPanel({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setPreviewDoc(null);
+    setCondicoesRevisaoCapturada(null);
     setEtapa("idle");
   }
 
@@ -278,6 +302,13 @@ export function OrcamentoContratoGerarPanel({
       toast.error(erroDatas);
       return;
     }
+    const revisao = revisaoCondicoesAprovacao(aprovacao);
+    if (revisao == null) {
+      toast.error(
+        "Não foi possível identificar a versão das condições aprovadas. Recarregue a tela. Se continuar, execute a migration 136_contrato_condicoes_revisao.sql."
+      );
+      return;
+    }
     setWorking(true);
     try {
       if (usaCronograma) {
@@ -297,6 +328,7 @@ export function OrcamentoContratoGerarPanel({
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setPreviewDoc(documento);
+      setCondicoesRevisaoCapturada(revisao);
       setEtapa("preview");
     } catch (err) {
       console.error(err);
@@ -319,18 +351,24 @@ export function OrcamentoContratoGerarPanel({
       toast.error(erroDatas);
       return;
     }
+    if (condicoesRevisaoCapturada == null) {
+      toast.error(
+        "Não foi possível identificar a versão das condições usadas nesta geração. Feche a prévia e gere o contrato novamente."
+      );
+      return;
+    }
     setWorking(true);
     try {
       if (usaCronograma) {
         await persistirVencimentosAtuais(vencimentos);
       }
-      const versao = await proximaVersaoContratoDocumento(aprovacao.id);
       const pdf = await gerarPdfContratoNavarro(previewDoc);
       const file = new File([new Uint8Array(pdf.arrayBuffer)], pdf.filename, {
         type: "application/pdf",
       });
       const saved = await persistirContratoDocumentoGerado({
         file,
+        condicoesRevisao: condicoesRevisaoCapturada,
         payload: {
           orcamento_id: orcamento.id,
           aprovacao_id: aprovacao.id,
@@ -345,28 +383,34 @@ export function OrcamentoContratoGerarPanel({
         },
       });
 
-      const regenerado = versao > 1;
-      await registrarAuditoria({
-        ...auditContext,
-        modulo: AUDITORIA_MODULOS.implantacao_clientes,
-        acao: regenerado
-          ? AUDITORIA_ACOES.contrato_regenerado
-          : AUDITORIA_ACOES.contrato_gerado,
-        registroId: orcamento.id,
-        registroNome: orcamento.numero,
-        descricao: regenerado
-          ? `${auditContext.usuarioNome} regenerou o contrato (versão ${saved.versao}) do orçamento ${orcamento.numero} (${previewDoc.modalidade}).`
-          : `${auditContext.usuarioNome} gerou o contrato do orçamento ${orcamento.numero} (${previewDoc.modalidade}).`,
-        dadosDepois: {
-          orcamento_id: orcamento.id,
-          cliente_id: orcamento.cliente_id,
-          modalidade: previewDoc.modalidade,
-          tipo_documento: previewDoc.tipoDocumento,
-          data_contrato: previewDoc.dataContrato,
-          versao: saved.versao,
-          vencimentos: usaCronograma ? vencimentos : undefined,
-        },
-      });
+      aplicarDocumentoSalvo(saved);
+      const regenerado = saved.versao > 1;
+      try {
+        await registrarAuditoria({
+          ...auditContext,
+          modulo: AUDITORIA_MODULOS.implantacao_clientes,
+          acao: regenerado
+            ? AUDITORIA_ACOES.contrato_regenerado
+            : AUDITORIA_ACOES.contrato_gerado,
+          registroId: orcamento.id,
+          registroNome: orcamento.numero,
+          descricao: regenerado
+            ? `${auditContext.usuarioNome} regenerou o contrato (versão ${saved.versao}) do orçamento ${orcamento.numero} (${previewDoc.modalidade}).`
+            : `${auditContext.usuarioNome} gerou o contrato do orçamento ${orcamento.numero} (${previewDoc.modalidade}).`,
+          dadosDepois: {
+            orcamento_id: orcamento.id,
+            cliente_id: orcamento.cliente_id,
+            modalidade: previewDoc.modalidade,
+            tipo_documento: previewDoc.tipoDocumento,
+            data_contrato: previewDoc.dataContrato,
+            versao: saved.versao,
+            condicoes_revisao: saved.condicoes_revisao,
+            vencimentos: usaCronograma ? vencimentos : undefined,
+          },
+        });
+      } catch (auditErr) {
+        console.error(auditErr);
+      }
 
       toast.success(
         regenerado
@@ -491,7 +535,7 @@ export function OrcamentoContratoGerarPanel({
               {" · "}
               {formatDateTimeBR(atual.gerado_em)}
               {atual.gerado_por ? ` · ${atual.gerado_por}` : ""}
-              {atual.desatualizado_em ? " · desatualizado" : ""}
+              {atualDesatualizado ? " · desatualizado" : ""}
             </p>
           ) : loadingDocs ? (
             <p className="mt-1 text-[12px] text-[#64748b]">Carregando…</p>
@@ -500,7 +544,7 @@ export function OrcamentoContratoGerarPanel({
               Nenhum contrato gerado ainda.
             </p>
           )}
-          {atual?.desatualizado_em ? (
+          {atualDesatualizado ? (
             <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
               Este PDF está desatualizado. Gere o contrato de novo para
               usar a versão vigente. O arquivo anterior permanece no
@@ -542,7 +586,7 @@ export function OrcamentoContratoGerarPanel({
                 disabled={busy || !podeGerar || contratoAssinado}
                 onClick={() => void handleAbrirConferencia()}
               >
-                {atual.desatualizado_em
+                {atualDesatualizado
                   ? "Gerar contrato atualizado"
                   : "Gerar novamente"}
               </button>
@@ -612,7 +656,9 @@ export function OrcamentoContratoGerarPanel({
                 <span>
                   v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
-                  {doc.desatualizado_em ? " · desatualizado" : ""}
+                  {pdfContratoEstaDesatualizado(doc, aprovacao)
+                    ? " · desatualizado"
+                    : ""}
                 </span>
                 <span className="flex gap-2">
                   <button

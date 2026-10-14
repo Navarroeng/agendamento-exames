@@ -70,12 +70,22 @@ export async function obterMesesVigenciaMensalidade(
 function sortAprovacao(
   data: OrcamentoAprovacaoRecord
 ): OrcamentoAprovacaoRecord {
-  return {
+  const next: OrcamentoAprovacaoRecord = {
     ...data,
     orcamento_aprovacao_itens: [
       ...(data.orcamento_aprovacao_itens ?? []),
     ].sort((a, b) => a.ordem - b.ordem),
   };
+  if ("condicoes_revisao" in data) {
+    const bruta = data.condicoes_revisao as unknown;
+    if (bruta == null || bruta === "") {
+      next.condicoes_revisao = null;
+    } else {
+      const numero = Number(bruta);
+      next.condicoes_revisao = Number.isFinite(numero) ? numero : null;
+    }
+  }
+  return next;
 }
 
 async function encerrarOutrosContratosAtivos(

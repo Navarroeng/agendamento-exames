@@ -140,6 +140,8 @@ export interface OrcamentoAprovacaoRecord {
   mensalidade_desconto_valor?: number | null;
   mensalidade_desconto_tipo?: MensalidadeDescontoTipo | null;
   mensalidade_vencimento?: string | null;
+  /** Versão das condições comerciais vigentes. Sobe só quando elas mudam. */
+  condicoes_revisao?: number | null;
   created_at: string;
   updated_at: string;
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
