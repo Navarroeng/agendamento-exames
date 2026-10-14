@@ -16,6 +16,7 @@ import {
   itensRegistroParaDescontoAvista,
 } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
+import { paragrafosPropostaGestaoMensal } from "@/lib/contrato-navarro";
 import {
   MENSALIDADE_BENEFICIOS_ITENS,
   MENSALIDADE_BENEFICIOS_OBSERVACOES,
@@ -194,14 +195,9 @@ const PROPOSTA_DESCRICAO_PARAGRAFOS: readonly string[] = [
   PROPOSTA_DESCRICAO_NOTA_LEGAL,
 ] as const;
 
-const PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE: readonly string[] = [
-  "A presente proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho (SST) durante a vigência contratual de 12 meses, incluindo elaboração e gestão dos documentos PGR, LTCAT e PCMSO, realização dos ASOs previstos no contrato, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
-  "Durante a vigência, a empresa contará com acompanhamento contínuo da Navarro Engenharia, gestão das obrigações contratadas e disponibilização dos documentos em formato digital.",
-  PROPOSTA_DESCRICAO_NOTA_LEGAL,
-] as const;
-
 function resolveDescricaoPropostaParagrafos(
-  orcamento: OrcamentoComItens
+  orcamento: OrcamentoComItens,
+  propostaMensalidade?: Parameters<typeof paragrafosPropostaGestaoMensal>[0]
 ): readonly string[] {
   if (orcamentoEhExclusivoParecerTecnico(orcamento.orcamento_itens)) {
     return PROPOSTA_DESCRICAO_PARAGRAFOS_PARECER_TECNICO;
@@ -213,7 +209,7 @@ function resolveDescricaoPropostaParagrafos(
   }
   if (kind === "ltcat") return PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT;
   const base = isOrcamentoMensalidade(orcamento.modalidade)
-    ? PROPOSTA_DESCRICAO_PARAGRAFOS_MENSALIDADE
+    ? [...paragrafosPropostaGestaoMensal(propostaMensalidade), PROPOSTA_DESCRICAO_NOTA_LEGAL]
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
   if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {
     return [...PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT, ...base];
@@ -2515,6 +2511,7 @@ export function drawOrcamentoPdfDocument(
     logo?: LogoAsset | null;
     symbolWatermark?: LogoAsset | null;
     GState?: new (opts: { opacity: number }) => object;
+    propostaMensalidade?: Parameters<typeof paragrafosPropostaGestaoMensal>[0];
   }
 ): void {
   const layout: OrcamentoPdfLayout = {
@@ -2536,7 +2533,7 @@ export function drawOrcamentoPdfDocument(
   y = drawDescricaoProposta(
     doc,
     y,
-    resolveDescricaoPropostaParagrafos(orcamento),
+    resolveDescricaoPropostaParagrafos(orcamento, options.propostaMensalidade),
     layout
   );
   y = drawServicesTable(doc, y, orcamento, options.catalogo, layout);
@@ -2575,18 +2572,33 @@ export function drawOrcamentoPdfDocument(
   }
 }
 
+async function carregarParametrosPropostaMensalidade(orcamentoId: string) {
+  try {
+    const { obterParametrosPropostaMensalidade } = await import(
+      "@/services/orcamento-aprovacao.service"
+    );
+    return await obterParametrosPropostaMensalidade(orcamentoId);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function gerarPdfOrcamento(
   orcamento: OrcamentoComItens
 ): Promise<void> {
   const { jsPDF, GState } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-  const [logo, symbolWatermark, catalogo, clienteInfo] = await Promise.all([
-    loadLogoAsset(),
-    loadNavarroSymbolWatermark(),
-    listarServicosSst(),
-    resolveClientePdfInfo(orcamento),
-  ]);
+  const [logo, symbolWatermark, catalogo, clienteInfo, propostaMensalidade] =
+    await Promise.all([
+      loadLogoAsset(),
+      loadNavarroSymbolWatermark(),
+      listarServicosSst(),
+      resolveClientePdfInfo(orcamento),
+      isOrcamentoMensalidade(orcamento.modalidade)
+        ? carregarParametrosPropostaMensalidade(orcamento.id)
+        : Promise.resolve(undefined),
+    ]);
 
   drawOrcamentoPdfDocument(doc, orcamento, {
     catalogo,
@@ -2594,6 +2606,7 @@ export async function gerarPdfOrcamento(
     logo,
     symbolWatermark,
     GState,
+    propostaMensalidade,
   });
 
   doc.save(buildFilename(orcamento));

@@ -4,7 +4,9 @@ import {
   formatMoedaComExtenso,
   formatNumeroComExtenso,
 } from "@/lib/extenso";
+import { formatCurrency } from "@/lib/money";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { montarDatasMensalidadesPlano } from "@/lib/contrato-pagamento";
 import {
   ORCAMENTO_MODALIDADE_MENSALIDADE,
   ORCAMENTO_MODALIDADE_PONTUAL,
@@ -45,6 +47,41 @@ export const CONTRATO_INADIMPLENCIA = {
 
 export const CONTRATO_VIGENCIA_MENSALIDADE_MESES = 12;
 export const CONTRATO_AVISO_PREVIO_DIAS = 30;
+
+/** Mensalidade da Gestão SST na renovação: 130 + 10 × max(colaboradores − 1, 0). */
+export const GESTAO_SST_RENOVACAO_BASE_REAIS = 130;
+export const GESTAO_SST_RENOVACAO_INCREMENTO_REAIS = 10;
+
+export const DIAS_VENCIMENTO_MENSALIDADE = [10, 20] as const;
+export type DiaVencimentoMensalidade =
+  (typeof DIAS_VENCIMENTO_MENSALIDADE)[number];
+
+export const DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG =
+  "Selecione o dia de vencimento das mensalidades (10 ou 20) antes de gerar o contrato.";
+
+export function diaVencimentoMensalidadeValido(
+  value: unknown
+): DiaVencimentoMensalidade | null {
+  const dia = Number(value);
+  return dia === 10 || dia === 20 ? dia : null;
+}
+
+export function valorMensalidadeRenovacaoGestaoSst(
+  colaboradores: number,
+  params?: { baseReais?: number; incrementoReais?: number }
+): number {
+  const base = Number(params?.baseReais);
+  const incremento = Number(params?.incrementoReais);
+  const baseReais =
+    Number.isFinite(base) && base > 0 ? base : GESTAO_SST_RENOVACAO_BASE_REAIS;
+  const incrementoReais =
+    Number.isFinite(incremento) && incremento > 0
+      ? incremento
+      : GESTAO_SST_RENOVACAO_INCREMENTO_REAIS;
+  const quantidade = Math.max(0, Math.floor(Number(colaboradores) || 0));
+  const extras = Math.max(quantidade - 1, 0);
+  return Math.round((baseReais + incrementoReais * extras) * 100) / 100;
+}
 
 export type ContratoParteContratante = {
   razaoSocial: string;
@@ -158,6 +195,9 @@ export type ContratoNavarroContexto = {
   vigenciaFimIso?: string | null;
   /** Dia do mês das mensalidades do plano. Não é o vencimento da fatura de exames. */
   diaVencimentoMensalidade?: number | null;
+  /** Parâmetros da fórmula de renovação gravados nesta contratação. */
+  renovacaoBaseReais?: number | null;
+  renovacaoIncrementoReais?: number | null;
 };
 
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -190,6 +230,61 @@ export function valorExameClinicoAvulsoMensalidade(
 function centavosParaReaisExame(centavos: number): number | null {
   if (!Number.isFinite(centavos) || centavos <= 0) return null;
   return Math.round(centavos) / 100;
+}
+
+export function centavosSalvosParaReais(
+  centavos: number | null | undefined
+): number | null {
+  const valor = Number(centavos);
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  return Math.round(valor) / 100;
+}
+
+/** Textos da proposta de Gestão SST mensal. Usa o parâmetro gravado quando existir. */
+export function paragrafosPropostaGestaoMensal(params?: {
+  dia?: number | null;
+  baseReais?: number | null;
+  incrementoReais?: number | null;
+  exameAdmissional?: number | null;
+  exameDemissional?: number | null;
+}): readonly string[] {
+  const base = Number(params?.baseReais);
+  const incremento = Number(params?.incrementoReais);
+  const formula = {
+    baseReais:
+      Number.isFinite(base) && base > 0 ? base : GESTAO_SST_RENOVACAO_BASE_REAIS,
+    incrementoReais:
+      Number.isFinite(incremento) && incremento > 0
+        ? incremento
+        : GESTAO_SST_RENOVACAO_INCREMENTO_REAIS,
+  };
+  const catalogo = valorExameClinicoAvulsoMensalidade();
+  const admissional =
+    Number(params?.exameAdmissional) > 0
+      ? Number(params?.exameAdmissional)
+      : catalogo?.admissional;
+  const demissional =
+    Number(params?.exameDemissional) > 0
+      ? Number(params?.exameDemissional)
+      : catalogo?.demissional;
+  const preco =
+    admissional != null && demissional != null
+      ? admissional === demissional
+        ? `O exame clínico avulso, admissional ou demissional, com emissão do ASO, é de ${formatCurrency(admissional)} por exame.`
+        : `O exame clínico admissional avulso é de ${formatCurrency(admissional)} e o demissional avulso é de ${formatCurrency(demissional)}, com emissão do ASO.`
+      : "O valor do exame clínico avulso desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura.";
+  const dia = diaVencimentoMensalidadeValido(params?.dia);
+  const vencimento = dia
+    ? `O dia de vencimento das mensalidades desta contratação é ${dia}.`
+    : "O dia de vencimento das mensalidades será 10 ou 20, escolhido no contrato. Nesta proposta esse dia ainda não foi definido.";
+  return [
+    "A presente proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho (SST) durante a vigência contratual de 12 meses, incluindo elaboração e gestão dos documentos PGR, LTCAT e PCMSO, 1 exame clínico periódico por colaborador abrangido pelo plano, com ASO, ou o exame clínico demissional se houver desligamento antes do periódico, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
+    "Durante a vigência, a empresa contará com acompanhamento contínuo da Navarro Engenharia, gestão das obrigações contratadas e disponibilização dos documentos em formato digital.",
+    `${preco} Exames complementares são sempre cobrados à parte. Os exames clínicos avulsos e os complementares são apurados entre o primeiro e o último dia de cada mês e cobrados em fatura discriminada, com vencimento no quinto dia útil do mês seguinte.`,
+    `Na renovação, a mensalidade é recalculada pela quantidade de colaboradores ativos no início da nova vigência: ${formatCurrency(formula.baseReais)} para 0 ou 1 colaborador e mais ${formatCurrency(formula.incrementoReais)} mensais por colaborador a partir do segundo, com mínimo de ${formatCurrency(formula.baseReais)}. Não há reajuste automático pelo IPCA. O desconto do pagamento antecipado não entra nessa base e não altera o preço da vigência em andamento.`,
+    `Nas renovações, a cobrança ocorre mensalmente por boleto bancário, salvo novo acordo escrito de pagamento antecipado antes do novo período. O desconto do pagamento antecipado limita-se ao período contratado. ${vencimento} Esse dia não é o quinto dia útil das faturas de exames.`,
+    "A vigência é de 12 meses e renova-se automaticamente por períodos sucessivos de 12 meses, salvo comunicação escrita com antecedência mínima de 30 dias do término para impedir a próxima renovação. O pagamento mensal é a forma de pagamento de um compromisso anual.",
+  ];
 }
 
 function joinExistentes(partes: Array<string | null | undefined>): string {
@@ -342,11 +437,31 @@ const FATURAMENTO_EXAMES_MENSALIDADE = [
   "Esse vencimento refere-se às faturas dos exames e não ao vencimento das mensalidades do plano.",
 ] as const;
 
-function redigirRenovacaoValorPlano(): string[] {
+function parametrosRenovacao(ctx: ContratoNavarroContexto): {
+  baseReais: number;
+  incrementoReais: number;
+} {
+  const base = Number(ctx.renovacaoBaseReais);
+  const incremento = Number(ctx.renovacaoIncrementoReais);
+  return {
+    baseReais:
+      Number.isFinite(base) && base > 0 ? base : GESTAO_SST_RENOVACAO_BASE_REAIS,
+    incrementoReais:
+      Number.isFinite(incremento) && incremento > 0
+        ? incremento
+        : GESTAO_SST_RENOVACAO_INCREMENTO_REAIS,
+  };
+}
+
+function redigirRenovacaoValorPlano(ctx: ContratoNavarroContexto): string[] {
+  const params = parametrosRenovacao(ctx);
+  const exemplo = (quantidade: number) =>
+    `${formatNumeroComExtenso(quantidade)} colaboradores, ${formatMoedaComExtenso(valorMensalidadeRenovacaoGestaoSst(quantidade, params))}`;
   return [
-    "Na renovação, o valor do plano será recalculado conforme a quantidade de colaboradores ativos no início do novo período. A apuração considerará as admissões e os desligamentos informados pela CONTRATANTE, que deverá manter esses registros atualizados. O novo valor vale para o período renovado, sem cobranças retroativas.",
-    "O critério de cálculo desse valor, em tabela ou fórmula, ainda não está registrado neste instrumento e deverá ser ajustado por escrito antes da assinatura. Enquanto esse critério não constar expressamente do contrato, o valor da renovação não está determinado.",
-    "O reajuste anual pelo IPCA (Índice Nacional de Preços ao Consumidor Amplo), ou por outro índice oficial que legalmente venha a substituí-lo, incidirá uma única vez a cada período de 12 (doze) meses sobre os valores da fórmula ou da tabela que vier a ser acordada. O resultado já reajustado não recebe o mesmo índice outra vez no mesmo período.",
+    "Na renovação, a mensalidade será recalculada pela quantidade de colaboradores ativos no início da nova vigência. A apuração considerará as admissões e os desligamentos informados pela CONTRATANTE, que deverá manter esses registros atualizados. O novo valor vale somente para o período renovado, sem alteração retroativa e sem mudança do preço durante a vigência em andamento.",
+    `Para esta contratação, a mensalidade da renovação tem o mínimo de ${formatMoedaComExtenso(params.baseReais)}. Para 0 (zero) ou 1 (um) colaborador, o valor é de ${formatMoedaComExtenso(params.baseReais)} mensais. A partir do segundo colaborador, acrescenta-se ${formatMoedaComExtenso(params.incrementoReais)} mensais por colaborador, inclusive acima de 10 (dez) colaboradores. A fórmula é ${formatMoedaComExtenso(params.baseReais)} + ${formatMoedaComExtenso(params.incrementoReais)} × (quantidade de colaboradores ativos − 1), quando essa quantidade for maior que 1.`,
+    `Exemplos desta fórmula: ${exemplo(2)}; ${exemplo(10)}; ${exemplo(15)}.`,
+    "Essa regra é a da Gestão SST mensal e não segue a tabela do pacote SST pontual. O desconto concedido para pagamento antecipado não integra a base de cálculo da renovação. Não há reajuste automático pelo IPCA nem por outro índice sobre o valor do plano.",
   ];
 }
 
@@ -360,12 +475,54 @@ function redigirFormaPagamentoRenovacao(avista: boolean, temDesconto: boolean): 
   return "O pagamento antecipado aplica-se exclusivamente ao período contratado. Nas renovações, a cobrança ocorrerá mensalmente por boleto bancário, salvo se as partes ajustarem, por escrito, antes do início do novo período, novo pagamento antecipado e as respectivas condições de desconto.";
 }
 
-function redigirDiaVencimentoMensalidade(ctx: ContratoNavarroContexto): string {
-  const dia = Number(ctx.diaVencimentoMensalidade);
-  if (Number.isInteger(dia) && dia >= 1 && dia <= 31) {
-    return `As mensalidades do plano vencem no dia ${formatNumeroComExtenso(dia)} de cada mês, observando-se o último dia válido do mês quando esse dia não existir. Esse vencimento não se confunde com o quinto dia útil aplicável às faturas dos exames.`;
+function diaPlano(ctx: ContratoNavarroContexto): DiaVencimentoMensalidade | null {
+  return diaVencimentoMensalidadeValido(ctx.diaVencimentoMensalidade);
+}
+
+function redigirCronogramaMensalidades(
+  ctx: ContratoNavarroContexto,
+  avista: boolean
+): string[] {
+  const dia = diaPlano(ctx);
+  const meses = mesesVigenciaContexto(ctx);
+  const diaTexto = dia
+    ? `dia ${formatNumeroComExtenso(dia)}`
+    : "dia ainda não escolhido";
+  const distintivo =
+    "Esse vencimento não se confunde com o quinto dia útil aplicável às faturas dos exames.";
+  if (!dia) {
+    return [
+      "O dia de vencimento das mensalidades do plano não está definido nesta contratação e deverá ser escolhido antes da assinatura. As opções são o dia 10 (dez) ou o dia 20 (vinte). Esse dia não se confunde com o quinto dia útil do mês seguinte, que se aplica somente às faturas dos exames.",
+    ];
   }
-  return "O dia de vencimento das mensalidades do plano não está definido nesta contratação e deverá ser ajustado por escrito antes da assinatura. Esse dia não se confunde com o quinto dia útil do mês seguinte, que se aplica somente às faturas dos exames.";
+  if (avista) {
+    return [
+      `As mensalidades do plano, quando houver cobrança mensal, vencem no ${diaTexto} de cada mês. ${distintivo}`,
+      `Não há mensalidades no período pago antecipadamente. Na renovação, se não houver novo acordo escrito de pagamento antecipado, a primeira mensalidade vence no ${diaTexto} do mês seguinte ao início da vigência renovada. As demais vencem no mesmo dia dos meses subsequentes. São ${formatNumeroComExtenso(meses)} mensalidades por vigência de ${formatNumeroComExtenso(meses)} meses.`,
+    ];
+  }
+  const inicio = vigenciaContratualConfiavel(
+    ctx.vigenciaInicioIso,
+    ctx.vigenciaFimIso
+  )?.inicio;
+  const cabecalho = `As mensalidades do plano vencem no ${diaTexto} de cada mês. ${distintivo}`;
+  if (!inicio) {
+    return [
+      cabecalho,
+      `A primeira mensalidade vence no ${diaTexto} do mês seguinte ao início da vigência cobrada mensalmente. As demais vencem no mesmo dia dos meses subsequentes. São ${formatNumeroComExtenso(meses)} mensalidades por vigência de ${formatNumeroComExtenso(meses)} meses. O início da cobrança no mês seguinte não reduz essa quantidade. A data de início da vigência não está registrada nesta contratação, por isso as datas concretas dos vencimentos não constam deste instrumento.`,
+    ];
+  }
+  const datas = montarDatasMensalidadesPlano({
+    inicioVigenciaIso: inicio,
+    dia,
+    quantidade: meses,
+  });
+  const primeira = datas[0];
+  const ultima = datas[datas.length - 1];
+  return [
+    cabecalho,
+    `A vigência cobrada mensalmente tem início em ${formatDateIsoToBR(inicio)}. A primeira mensalidade vence em ${formatDateIsoToBR(primeira)}, no mês seguinte a esse início. As demais vencem no ${diaTexto} dos meses subsequentes, até ${formatDateIsoToBR(ultima)}. São ${formatNumeroComExtenso(meses)} mensalidades nesta vigência. O início da cobrança no mês seguinte não reduz essa quantidade.`,
+  ];
 }
 
 function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
@@ -408,9 +565,9 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
   const depois = [
     "A quitação depende da confirmação do pagamento.",
     ...FATURAMENTO_EXAMES_MENSALIDADE,
-    ...redigirRenovacaoValorPlano(),
+    ...redigirRenovacaoValorPlano(ctx),
     redigirFormaPagamentoRenovacao(true, desconto > 0),
-    redigirDiaVencimentoMensalidade(ctx),
+    ...redigirCronogramaMensalidades(ctx, true),
   ];
   if ((pagamento?.valorPontual ?? 0) > 0) {
     depois.splice(
@@ -426,10 +583,10 @@ function redigirPagamentoMensalidade(ctx: ContratoNavarroContexto): string[] {
   const meses = mesesVigenciaContexto(ctx);
   return [
     `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
-    "O presente instrumento não possui valor global anual. A remuneração devida no período inicial é exclusivamente a mensalidade acima discriminada.",
-    redigirDiaVencimentoMensalidade(ctx),
+    "O pagamento mensal é a forma de pagamento de um compromisso anual correspondente à vigência contratada. Não há cobrança única do saldo nem antecipação automática das mensalidades.",
+    ...redigirCronogramaMensalidades(ctx, false),
     ...FATURAMENTO_EXAMES_MENSALIDADE,
-    ...redigirRenovacaoValorPlano(),
+    ...redigirRenovacaoValorPlano(ctx),
     redigirFormaPagamentoRenovacao(false, false),
   ];
 }
@@ -454,13 +611,26 @@ function redigirVigencia(ctx: ContratoNavarroContexto): string[] {
       );
     }
     paragrafos.push(
-      `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência.`
+      `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência para impedir a próxima renovação.`
+    );
+    paragrafos.push(
+      "O pagamento mensal é a forma de pagamento de um compromisso anual, inclusive nas vigências renovadas."
+    );
+    paragrafos.push(
+      "A desistência imotivada da CONTRATANTE durante uma vigência não afasta o compromisso financeiro até o término dessa vigência e não gera multa adicional de cancelamento."
     );
     if (ctx.pagamentoMensalidade?.forma === "avista") {
       paragrafos.push(
-        "A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. Nas renovações, a cobrança do plano segue a forma mensal prevista na cláusula de pagamento, salvo ajuste escrito em contrário antes do início do novo período."
+        "No pagamento antecipado, a desistência imotivada não gera devolução do valor daquele período. A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. Nas renovações, a cobrança do plano segue a forma mensal prevista na cláusula de pagamento, salvo ajuste escrito em contrário antes do início do novo período."
+      );
+    } else {
+      paragrafos.push(
+        "No pagamento mensal, permanecem devidas as mensalidades até o fim da vigência, nos vencimentos originalmente previstos, sem antecipação automática do saldo."
       );
     }
+    paragrafos.push(
+      "Essa regra de desistência imotivada não impede a rescisão por descumprimento da CONTRATADA nem afasta direitos de rescisão ou de restituição previstos na legislação aplicável."
+    );
     return paragrafos;
   }
   return [

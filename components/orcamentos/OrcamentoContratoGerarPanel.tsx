@@ -18,6 +18,12 @@ import {
   gerarPdfContratoNavarro,
   nomeArquivoContratoNavarro,
 } from "@/lib/contrato-pdf";
+import {
+  DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
+  DIAS_VENCIMENTO_MENSALIDADE,
+  diaVencimentoMensalidadeValido,
+  type DiaVencimentoMensalidade,
+} from "@/lib/contrato-navarro";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
 import {
   resolveTipoDocumentoContrato,
@@ -50,7 +56,10 @@ import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { salvarCondicaoContratoParecer } from "@/services/orcamento-aprovacao.service";
-import { obterVigenciaContratualOrcamento } from "@/services/orcamento-aprovacao.service";
+import {
+  obterVigenciaContratualOrcamento,
+  salvarParametrosContratoMensalidade,
+} from "@/services/orcamento-aprovacao.service";
 import {
   listarContratoDocumentos,
   obterUrlContratoDocumento,
@@ -67,10 +76,12 @@ export function OrcamentoContratoGerarPanel({
   orcamento,
   aprovacao,
   disabled = false,
+  onAprovacaoAtualizada,
 }: {
   orcamento: OrcamentoComItens;
   aprovacao: OrcamentoAprovacaoRecord;
   disabled?: boolean;
+  onAprovacaoAtualizada?: (aprovacao: OrcamentoAprovacaoRecord) => void;
 }) {
   const auditContext = useAuditoriaUsuario();
   const [documentos, setDocumentos] = useState<
@@ -94,6 +105,11 @@ export function OrcamentoContratoGerarPanel({
     () => lerParecerPagamentoEscolhido(orcamento.parecer_pagamento_escolhido)
   );
   const [revisaoVigente, setRevisaoVigente] = useState<number | null>(null);
+  const [diaVencimento, setDiaVencimento] = useState<DiaVencimentoMensalidade | null>(
+    () => diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
+  );
+  const [parametrosLocais, setParametrosLocais] =
+    useState<OrcamentoAprovacaoRecord | null>(null);
   const loadSeq = useRef(0);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
@@ -108,6 +124,7 @@ export function OrcamentoContratoGerarPanel({
   });
   const isAet = tipoDocumento === "aet";
   const isParecer = tipoDocumento === "parecer_tecnico";
+  const isMensalidadeDoc = tipoDocumento === "mensalidade";
   const ofereceAvista =
     isParecer &&
     parecerMostraAlternativaAvista({
@@ -161,13 +178,21 @@ export function OrcamentoContratoGerarPanel({
         : orcamento,
     [formaEfetiva, isParecer, orcamento]
   );
+  const aprovacaoBase = useMemo(() => {
+    if (!parametrosLocais || parametrosLocais.id !== aprovacao.id) return aprovacao;
+    return { ...aprovacao, ...parametrosLocais };
+  }, [aprovacao, parametrosLocais]);
   const aprovacaoContrato = useMemo(
     () =>
       revisaoVigente == null
-        ? aprovacao
-        : { ...aprovacao, condicoes_revisao: revisaoVigente },
-    [aprovacao, revisaoVigente]
+        ? aprovacaoBase
+        : { ...aprovacaoBase, condicoes_revisao: revisaoVigente },
+    [aprovacaoBase, revisaoVigente]
   );
+  const diaEfetivo =
+    diaVencimentoMensalidadeValido(diaVencimento) ??
+    diaVencimentoMensalidadeValido(aprovacaoContrato.mensalidade_dia_vencimento);
+  const diaPendente = isMensalidadeDoc && diaEfetivo == null;
   const parcelasValores = useMemo(
     () =>
       montarParcelasPontual({
@@ -273,6 +298,13 @@ export function OrcamentoContratoGerarPanel({
   }, [orcamento.id, orcamento.parecer_pagamento_escolhido]);
 
   useEffect(() => {
+    setDiaVencimento(
+      diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
+    );
+    setParametrosLocais(null);
+  }, [aprovacao.id]);
+
+  useEffect(() => {
     setRevisaoVigente(null);
   }, [aprovacao.id, aprovacao.condicoes_revisao]);
 
@@ -297,6 +329,7 @@ export function OrcamentoContratoGerarPanel({
           aprovacao: aprovacaoContrato,
           dataContrato,
           vencimentosIso: usaCronograma ? vencimentos : null,
+          diaVencimentoMensalidade: diaEfetivo,
         })
       );
     } catch {
@@ -305,6 +338,7 @@ export function OrcamentoContratoGerarPanel({
   }, [
     aprovacaoContrato,
     dataContrato,
+    diaEfetivo,
     orcamentoContrato,
     podeGerar,
     usaCronograma,
@@ -365,6 +399,10 @@ export function OrcamentoContratoGerarPanel({
       toast.error(PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG);
       return;
     }
+    if (diaPendente) {
+      toast.error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
+      return;
+    }
     const erroDatas = erroVencimentos();
     if (erroDatas) {
       toast.error(erroDatas);
@@ -378,6 +416,10 @@ export function OrcamentoContratoGerarPanel({
     if (!podeGerar) return;
     if (parecerAguardandoEscolha) {
       toast.error(PARECER_PAGAMENTO_ESCOLHA_PENDENTE_MSG);
+      return;
+    }
+    if (diaPendente) {
+      toast.error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
       return;
     }
     const erroDatas = erroVencimentos();
@@ -405,6 +447,7 @@ export function OrcamentoContratoGerarPanel({
         vencimentosIso: usaCronograma ? vencimentos : null,
         vigenciaInicio: vigencia?.inicio,
         vigenciaFim: vigencia?.fim,
+        diaVencimentoMensalidade: diaEfetivo,
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -599,6 +642,38 @@ export function OrcamentoContratoGerarPanel({
     }
   }
 
+  async function handleEscolherDia(dia: DiaVencimentoMensalidade) {
+    if (contratoAssinado || working || dia === diaEfetivo) return;
+    const anterior = diaVencimento;
+    setDiaVencimento(dia);
+    setWorking(true);
+    try {
+      const atualizada = await salvarParametrosContratoMensalidade({
+        aprovacaoId: aprovacao.id,
+        diaVencimento: dia,
+      });
+      setParametrosLocais(atualizada);
+      onAprovacaoAtualizada?.(atualizada);
+      const revisao = revisaoCondicoesAprovacao(atualizada);
+      if (revisao != null) setRevisaoVigente(revisao);
+    } catch (err) {
+      console.error(err);
+      setDiaVencimento(anterior);
+      const detalhe = mensagemErroContratoDocumento(
+        err,
+        "Não foi possível salvar o dia de vencimento das mensalidades."
+      );
+      const faltaColuna = /mensalidade_dia_vencimento|schema cache/i.test(detalhe);
+      toast.error(
+        faltaColuna
+          ? `${detalhe} Execute a migration 141_mensalidade_dia_vencimento.sql.`
+          : detalhe
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function handleEscolherPagamento(forma: ParecerPagamentoEscolhido) {
     if (contratoAssinado || working || forma === formaLocal) return;
     const anterior = formaLocal;
@@ -675,7 +750,11 @@ export function OrcamentoContratoGerarPanel({
               type="button"
               className="btn btn-primary justify-center text-[12px]"
               disabled={
-                busy || !podeGerar || contratoAssinado || parecerAguardandoEscolha
+                busy ||
+                !podeGerar ||
+                contratoAssinado ||
+                parecerAguardandoEscolha ||
+                diaPendente
               }
               onClick={() => void handleAbrirConferencia()}
             >
@@ -703,7 +782,11 @@ export function OrcamentoContratoGerarPanel({
                 type="button"
                 className="btn justify-center text-[12px]"
                 disabled={
-                  busy || !podeGerar || contratoAssinado || parecerAguardandoEscolha
+                  busy ||
+                  !podeGerar ||
+                  contratoAssinado ||
+                  parecerAguardandoEscolha ||
+                  diaPendente
                 }
                 onClick={() => void handleAbrirConferencia()}
               >
@@ -715,6 +798,44 @@ export function OrcamentoContratoGerarPanel({
           )}
         </div>
       </div>
+
+      {isMensalidadeDoc ? (
+        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+            Dia de vencimento das mensalidades
+          </p>
+          <p className="mt-1 text-[11px] text-[#64748b]">
+            Escolha 10 ou 20 antes de gerar o contrato. A escolha vale também
+            quando o período inicial for pago antecipadamente, porque define as
+            mensalidades das renovações. Não é o prazo do pagamento antecipado
+            nem o quinto dia útil das faturas de exames.
+          </p>
+          {contratoAssinado ? (
+            <p className="mt-1 text-[12px] text-[#64748b]">
+              {CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG}
+            </p>
+          ) : null}
+          {diaPendente && !contratoAssinado ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              {DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-col gap-1.5 text-[12px] text-[#334155]">
+            {DIAS_VENCIMENTO_MENSALIDADE.map((dia) => (
+              <label key={dia} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`mensalidade-dia-vencimento-${aprovacao.id}`}
+                  checked={diaEfetivo === dia}
+                  disabled={busy || contratoAssinado}
+                  onChange={() => void handleEscolherDia(dia)}
+                />
+                <span>Dia {dia}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {ofereceAvista ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
@@ -866,7 +987,9 @@ export function OrcamentoContratoGerarPanel({
                   </h3>
                   <p className="mt-1 text-[12px] text-[#64748b]">
                     {resumo?.pagamentoAvista
-                      ? "O vencimento do pagamento único é o das condições aprovadas. A data do contrato não quita o valor."
+                      ? "O vencimento do pagamento único é o das condições aprovadas. A data do contrato não quita o valor. O dia escolhido vale para as mensalidades das renovações."
+                      : isMensalidadeDoc
+                        ? "A data do contrato identifica o documento. A primeira mensalidade vence no dia escolhido, no mês seguinte ao início da vigência, quando essa data já estiver registrada."
                       : isParecer
                         ? "A data do contrato identifica o documento. Os vencimentos são as datas informadas e não são recalculados pela data de emissão."
                         : "A data do contrato define o documento, a primeira parcela e a vigência, quando aplicável."}

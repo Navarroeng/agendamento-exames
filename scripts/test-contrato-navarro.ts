@@ -14,6 +14,7 @@ import {
 import {
   addCalendarMonths,
   centsToReais,
+  montarDatasMensalidadesPlano,
   montarMensalidades,
   montarParcelasPontual,
   somaParcelasCentavos,
@@ -21,10 +22,13 @@ import {
 } from "../lib/contrato-pagamento";
 import {
   CONTRATO_TEXTOS_PROIBIDOS,
+  DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
   NAVARRO_CONTRATO_INSTITUCIONAL,
   buildClausulasContrato,
+  paragrafosPropostaGestaoMensal,
   redigirContratada,
   textoPlanoContrato,
+  valorMensalidadeRenovacaoGestaoSst,
   vigenciaContratualConfiavel,
 } from "../lib/contrato-navarro";
 import {
@@ -299,17 +303,28 @@ await run("contrato mensalidade nunca mostra anual", () => {
     condicao_pagamento: "12 mensalidades",
   });
 
+  assert.throws(
+    () =>
+      buildContratoNavarroDocumento({
+        orcamento,
+        aprovacao,
+        dataContrato: "2026-09-17",
+      }),
+    (err: unknown) =>
+      err instanceof Error &&
+      err.message === DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG
+  );
+
   const doc = buildContratoNavarroDocumento({
     orcamento,
     aprovacao,
     dataContrato: "2026-09-17",
+    diaVencimentoMensalidade: 10,
   });
   assert.equal(doc.modalidade, "mensalidade");
   assert.equal(doc.valor, 350);
-  assert.equal(doc.parcelas.length, 12);
-  assert.equal(doc.parcelas[0]?.dataIso, "2026-09-17");
-  assert.equal(doc.parcelas[1]?.dataIso, "2026-10-17");
-  assert.equal(doc.parcelas.every((p) => p.valor === 350), true);
+  assert.equal(doc.parcelas.length, 0);
+  assert.doesNotMatch(doc.texto, /17\/09\/2026/);
 
   const texto = doc.texto;
   const anual = formatCurrency(valorMensal * 12);
@@ -319,13 +334,22 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.ok(!/valor total do contrato/i.test(texto));
   assert.match(texto, /valor mensal de R\$ 350,00 \(trezentos e cinquenta reais\)/);
   assert.match(texto, /12 \(doze\) mensalidades/);
+  assert.match(texto, /compromisso anual/);
   assert.match(texto, /1 \(um\) exame clínico periódico/);
   assert.match(texto, /quinto dia útil/);
   assert.match(texto, /boleto bancário/);
-  assert.match(texto, /critério de cálculo/);
+  assert.match(texto, /R\$ 130,00 \(cento e trinta reais\)/);
+  assert.match(texto, /R\$ 10,00 \(dez reais\)/);
+  assert.match(texto, /R\$ 140,00/);
+  assert.match(texto, /R\$ 220,00/);
+  assert.match(texto, /R\$ 270,00/);
+  assert.match(texto, /Não há reajuste automático pelo IPCA/);
+  assert.doesNotMatch(texto, /critério de cálculo|ainda não está registrado neste instrumento|reajuste anual pelo IPCA|poderão ser reajustados pelo IPCA/);
   assert.doesNotMatch(texto, /pagamento à vista|pago antecipadamente nesta|inclusão de novo funcionário/i);
-  assert.doesNotMatch(texto, /permanência mínima|mensalidades correspondentes até o término/i);
-  assert.match(texto, /IPCA/);
+  assert.doesNotMatch(texto, /permanência mínima|mensalidades correspondentes até o término|não possui valor global anual/i);
+  assert.match(texto, /desistência imotivada/);
+  assert.match(texto, /sem antecipação automática do saldo/);
+  assert.match(texto, /legislação aplicável/);
   assert.ok(!/IPC-FIPE/i.test(texto));
   assert.match(texto, /automaticamente renovado/);
   assert.match(texto, /30 \(trinta\) dias/);
@@ -510,6 +534,9 @@ await run("PDF pontual e mensalidade", async () => {
       condicao_pagamento: "12 mensalidades",
     }),
     dataContrato: "2026-09-17",
+    diaVencimentoMensalidade: 20,
+    vigenciaInicio: "2026-12-14",
+    vigenciaFim: "2027-12-14",
   });
   const docM = new jsPDF({ unit: "mm", format: "a4" });
   drawContratoPdfDocument(docM, mensal, null);
@@ -517,6 +544,8 @@ await run("PDF pontual e mensalidade", async () => {
   const bufM = docM.output("arraybuffer") as ArrayBuffer;
   const rawM = extractPdfLatin1(bufM);
   assert.ok(rawM.includes("INSTRUMENTO PARTICULAR"));
+  assert.ok(rawM.includes("Página"));
+  assert.ok(rawM.includes("20/01/2027"));
   assert.ok(!rawM.includes("4.200"));
   assert.ok(!rawM.includes("4200"));
   assert.ok(!/Eko/i.test(rawM));
@@ -560,6 +589,57 @@ await run("PDF pontual e mensalidade", async () => {
         },
       ],
     });
+    assert.equal(valorMensalidadeRenovacaoGestaoSst(0), 130);
+    assert.equal(valorMensalidadeRenovacaoGestaoSst(1), 130);
+    assert.equal(valorMensalidadeRenovacaoGestaoSst(2), 140);
+    assert.equal(valorMensalidadeRenovacaoGestaoSst(10), 220);
+    assert.equal(valorMensalidadeRenovacaoGestaoSst(15), 270);
+    assert.deepEqual(
+      montarDatasMensalidadesPlano({
+        inicioVigenciaIso: "2026-10-14",
+        dia: 10,
+        quantidade: 12,
+      }),
+      [
+        "2026-11-10",
+        "2026-12-10",
+        "2027-01-10",
+        "2027-02-10",
+        "2027-03-10",
+        "2027-04-10",
+        "2027-05-10",
+        "2027-06-10",
+        "2027-07-10",
+        "2027-08-10",
+        "2027-09-10",
+        "2027-10-10",
+      ]
+    );
+    assert.equal(
+      montarDatasMensalidadesPlano({
+        inicioVigenciaIso: "2026-10-14",
+        dia: 20,
+        quantidade: 1,
+      })[0],
+      "2026-11-20"
+    );
+    assert.equal(
+      montarDatasMensalidadesPlano({
+        inicioVigenciaIso: "2026-12-14",
+        dia: 10,
+        quantidade: 1,
+      })[0],
+      "2027-01-10"
+    );
+    assert.equal(
+      montarDatasMensalidadesPlano({
+        inicioVigenciaIso: "2026-12-14",
+        dia: 20,
+        quantidade: 12,
+      })[11],
+      "2027-12-20"
+    );
+
     const semDatas = buildContratoNavarroDocumento({
       orcamento: orcamentoAvista,
       aprovacao: makeAprovacao({
@@ -578,6 +658,7 @@ await run("PDF pontual e mensalidade", async () => {
         desconto_percentual: 10.2564,
       }),
       dataContrato: "2026-10-13",
+      diaVencimentoMensalidade: 10,
     });
     assert.doesNotMatch(semDatas.texto, /tem início em/);
     assert.doesNotMatch(semDatas.texto, /13\/10\/2026/);
@@ -593,9 +674,12 @@ await run("PDF pontual e mensalidade", async () => {
     assert.doesNotMatch(semDatas.texto, /inclusão de novo funcionário|taxa de inclusão|cadastro do colaborador/i);
     assert.match(semDatas.texto, /quinto dia útil/);
     assert.match(semDatas.texto, /boleto bancário/);
-    assert.match(semDatas.texto, /critério de cálculo/);
+    assert.match(semDatas.texto, /Não há reajuste automático pelo IPCA/);
+    assert.match(semDatas.texto, /Não há mensalidades no período pago antecipadamente/);
+    assert.match(semDatas.texto, /não gera devolução/);
+    assert.doesNotMatch(semDatas.texto, /critério de cálculo|reajuste anual pelo IPCA/);
     assert.match(semDatas.texto, /limita-se ao período efetivamente pago antecipadamente/);
-    assert.doesNotMatch(semDatas.texto, /12 \(doze\) mensalidades/);
+    assert.doesNotMatch(semDatas.texto, /mediante 12 \(doze\) mensalidades/);
     const renovacao = semDatas.texto.match(/automaticamente renovado/g) ?? [];
     assert.equal(renovacao.length, 1);
 
@@ -648,7 +732,14 @@ await run("PDF pontual e mensalidade", async () => {
         condicao_pagamento: "12 mensalidades",
       }),
       dataContrato: "2026-09-17",
+      diaVencimentoMensalidade: 10,
+      vigenciaInicio: "2026-10-14",
+      vigenciaFim: "2027-10-14",
     });
+    assert.equal(cinco.parcelas.length, 12);
+    assert.equal(cinco.parcelas[0]?.dataIso, "2026-11-10");
+    assert.equal(cinco.parcelas[11]?.dataIso, "2027-10-10");
+    assert.match(cinco.texto, /primeira mensalidade vence em 10\/11\/2026/);
     assert.match(cinco.texto, /5 \(cinco\) colaboradores/);
     assert.match(cinco.texto, /valor mensal de R\$ 180,00/);
     assert.doesNotMatch(cinco.texto, /pagamento antecipado aplica-se|em pagamento antecipado/i);
@@ -666,6 +757,49 @@ await run("PDF pontual e mensalidade", async () => {
     assert.match(oitenta, /2 \(dois\) colaboradores/);
     assert.match(oitenta, /R\$ 80,00/);
     assert.doesNotMatch(oitenta, /R\$ 50,00/);
+
+    const congelado = buildContratoNavarroDocumento({
+      orcamento: orcamentoAvista,
+      aprovacao: makeAprovacao({
+        quantidade_colaboradores: 1,
+        valor_final: 130,
+        mensalidade_pagamento: "avista",
+        mensalidade_valor_mensal: 130,
+        mensalidade_meses: 12,
+        mensalidade_valor_bruto: 1560,
+        mensalidade_desconto_valor: 160,
+        mensalidade_vencimento: "2026-10-14",
+        valor_avista: 1400,
+        mensalidade_dia_vencimento: 20,
+        mensalidade_exame_avulso_centavos: 8000,
+        mensalidade_exame_demissional_centavos: 8000,
+        mensalidade_renovacao_base_centavos: 15000,
+        mensalidade_renovacao_incremento_centavos: 2000,
+      }),
+      dataContrato: "2026-10-13",
+    });
+    assert.match(congelado.texto, /R\$ 80,00/);
+    assert.doesNotMatch(congelado.texto, /R\$ 50,00/);
+    assert.match(congelado.texto, /R\$ 150,00/);
+    assert.match(congelado.texto, /dia 20 \(vinte\)/);
+    assert.equal(congelado.parcelas.length, 1);
+
+    const proposta = paragrafosPropostaGestaoMensal().join("\n");
+    assert.match(proposta, /1 exame clínico periódico/);
+    assert.match(proposta, /R\$ 50,00/);
+    assert.match(proposta, /quinto dia útil/);
+    assert.match(proposta, /R\$ 130,00/);
+    assert.match(proposta, /R\$ 10,00/);
+    assert.match(proposta, /Não há reajuste automático pelo IPCA/);
+    assert.match(proposta, /boleto bancário/);
+    assert.match(proposta, /limita-se ao período contratado/);
+    assert.match(proposta, /30 dias/);
+    assert.match(proposta, /compromisso anual/);
+    assert.match(proposta, /ainda não foi definido/);
+    assert.doesNotMatch(proposta, /ASOs previstos no contrato|ASOs adicionais/);
+    const propostaDia = paragrafosPropostaGestaoMensal({ dia: 20 }).join("\n");
+    assert.match(propostaDia, /é 20/);
+    assert.doesNotMatch(propostaDia, /ainda não foi definido/);
 
     const pdfAvista = new jsPDF({ unit: "mm", format: "a4" });
     drawContratoPdfDocument(pdfAvista, semDatas, null);

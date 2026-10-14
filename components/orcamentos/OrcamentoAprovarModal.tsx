@@ -1590,6 +1590,7 @@ export function OrcamentoAprovarModal({
                 orcamento={orcamento}
                 aprovacao={aprovacao}
                 disabled={acompanhamentoBloqueado}
+                onAprovacaoAtualizada={onAprovacaoAtualizada}
               />
 
               <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">

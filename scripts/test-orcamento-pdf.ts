@@ -521,18 +521,28 @@ const mensalidadeOrc = buildOrcamento({
 const mensalPdf = renderPdf(mensalidadeOrc);
 assert.equal(
   mensalPdf.getNumberOfPages(),
-  1,
-  "Mensalidade 23 colaboradores / R$ 350 deve caber em 1 página"
+  2,
+  "As condições comerciais da Gestão SST mensal passam para a segunda página"
 );
 const mensalBinary = pdfLatin1(mensalPdf);
-assert.match(mensalBinary, /Página 1 de 1|Pagina 1 de 1/);
-assert.doesNotMatch(mensalBinary, /Página 1 de 2|Pagina 1 de 2/);
+assert.match(mensalBinary, /Página 1 de 2|Pagina 1 de 2/);
+assert.match(mensalBinary, /Página 2 de 2|Pagina 2 de 2/);
 const mensalRaw = pdfVisibleText(mensalBinary);
 assert.match(mensalRaw, /AUTOMNI AUTOMA[CÇ][OÕ]ES INDUSTRIAIS/i);
 assert.match(mensalRaw, /Gest[aã]o Completa de Sa[uú]de e Seguran[cç]a do Trabalho \(SST\)/i);
 assert.match(mensalRaw, /vig[eê]ncia contratual de 12 meses/i);
 assert.match(mensalRaw, /PGR, LTCAT e PCMSO/);
-assert.match(mensalRaw, /ASOs previstos no contrato/);
+assert.match(mensalRaw, /1 exame cl[ií]nico peri[oó]dico/);
+assert.match(mensalRaw, /R\$ 50,00/);
+assert.match(mensalRaw, /quinto dia [uú]til/);
+assert.match(mensalRaw, /R\$ 130,00/);
+assert.match(mensalRaw, /Não há reajuste autom[aá]tico pelo IPCA/);
+assert.match(mensalRaw, /boleto banc[aá]rio/);
+assert.match(mensalRaw, /anteced[eê]ncia m[ií]nima\s+de 30 dias/);
+assert.match(mensalRaw, /compromisso anual/);
+assert.match(mensalRaw, /ainda n[aã]o foi definido/);
+assert.doesNotMatch(mensalRaw, /ASOs previstos no contrato/);
+assert.doesNotMatch(mensalRaw, /ASOs adicionais/);
 assert.match(mensalRaw, /Avalia[cç][aã]o de Riscos Psicossociais/i);
 assert.match(mensalRaw, /S-2210/);
 assert.match(mensalRaw, /S-2220/);
@@ -561,7 +571,7 @@ assert.match(mensalRaw, /Ampla rede de cl[ií]nicas para exames ocupacionais/i);
 assert.match(mensalRaw, /em S[aã]o Paulo e[\s\S]*Grande SP/i);
 assert.match(mensalRaw, /Documentos dispon[ií]veis em formato digital/i);
 assert.match(mensalRaw, /Acompanhamento t[eé]cnico durante o contrato/i);
-assert.match(mensalRaw, /Exames complementares ser[aã]o cobrados [aà] parte/i);
+assert.match(mensalRaw, /Exames cl[ií]nicos avulsos e complementares ser[aã]o cobrados [aà] parte/i);
 assert.doesNotMatch(mensalRaw, /O que est[áa] incluso/i);
 assert.doesNotMatch(mensalRaw, /Todos os Laudos e Servi[cç]os listados acima/i);
 assert.doesNotMatch(mensalRaw, /cl[ií]nicas credenciada/i);
@@ -570,7 +580,7 @@ assert.doesNotMatch(mensalRaw, /Itaquera/i);
 assert.doesNotMatch(mensalRaw, /Se necess[aá]rio, a realiza[cç][aã]o de Exames Complementares/i);
 assert.match(mensalRaw, new RegExp(ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO));
 assert.match(mensalRaw, /12 meses/);
-assert.match(mensalRaw, /Autom[aá]tica ao final da vig[eê]ncia/i);
+assert.match(mensalRaw, /Autom[aá]tica, aviso de 30 dias/i);
 assert.match(mensalRaw, /R\$ 350,00/);
 assert.match(mensalRaw, /\/ m[eê]s|\/ mês/);
 assert.equal(formatValorMensalidade(VALOR_MENSAL_PDF), "R$ 350,00 / mês");

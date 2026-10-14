@@ -149,6 +149,16 @@ export interface OrcamentoAprovacaoRecord {
   mensalidade_desconto_valor?: number | null;
   mensalidade_desconto_tipo?: MensalidadeDescontoTipo | null;
   mensalidade_vencimento?: string | null;
+  /** Dia 10 ou 20 das mensalidades do plano. Não é o prazo do pagamento antecipado. */
+  mensalidade_dia_vencimento?: number | null;
+  /** Base da fórmula de renovação gravada nesta contratação, em centavos. */
+  mensalidade_renovacao_base_centavos?: number | null;
+  /** Acréscimo por colaborador a partir do segundo, em centavos. */
+  mensalidade_renovacao_incremento_centavos?: number | null;
+  /** Exame clínico avulso admissional acordado nesta contratação, em centavos. */
+  mensalidade_exame_avulso_centavos?: number | null;
+  /** Exame clínico avulso demissional acordado nesta contratação, em centavos. */
+  mensalidade_exame_demissional_centavos?: number | null;
   /** Versão das condições comerciais vigentes. Sobe só quando elas mudam. */
   condicoes_revisao?: number | null;
   created_at: string;

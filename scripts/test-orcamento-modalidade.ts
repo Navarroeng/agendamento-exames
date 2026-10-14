@@ -170,8 +170,8 @@ assert.ok(
 assert.deepEqual(
   [...MENSALIDADE_BENEFICIOS_OBSERVACOES],
   [
-    "Exames complementares serão cobrados à parte.",
-    "ASOs adicionais serão cobrados à parte.",
+    "Um exame clínico periódico ou demissional, nas condições da proposta, com ASO.",
+    "Exames clínicos avulsos e complementares serão cobrados à parte.",
   ]
 );
 assert.equal(

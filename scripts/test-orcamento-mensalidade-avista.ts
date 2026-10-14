@@ -253,6 +253,7 @@ const doc = buildContratoNavarroDocumento({
   orcamento: orcamento(),
   aprovacao: salva,
   dataContrato: "2026-10-13",
+  diaVencimentoMensalidade: 10,
 });
 assert.equal(doc.modalidade, "mensalidade");
 assert.equal(doc.valor, MENSAL);
@@ -271,7 +272,8 @@ assert.match(texto, /DADOS PARA PAGAMENTO/);
 assert.match(texto, /99729-6/);
 assert.match(texto, /8\.550,00/);
 assert.match(texto, /prazo de 12 \(doze\) meses/);
-assert.doesNotMatch(texto, /12 \(doze\) mensalidades/);
+assert.match(texto, /Não há mensalidades no período pago antecipadamente/);
+assert.doesNotMatch(texto, /mediante 12 \(doze\) mensalidades/);
 assert.doesNotMatch(texto, /vencem mensalmente/);
 assert.doesNotMatch(texto, /não possui valor global anual/);
 assert.doesNotMatch(texto, /mensalidades correspondentes/);
@@ -281,8 +283,12 @@ const mensalDoc = buildContratoNavarroDocumento({
   orcamento: orcamento(),
   aprovacao: antiga,
   dataContrato: "2026-10-13",
+  diaVencimentoMensalidade: 10,
+  vigenciaInicio: "2026-10-14",
+  vigenciaFim: "2027-10-14",
 });
 assert.equal(mensalDoc.parcelas.length, CONTRATO_VIGENCIA_MENSALIDADE_MESES);
+assert.equal(mensalDoc.parcelas[0]?.dataIso, "2026-11-10");
 assert.match(mensalDoc.texto, /12 \(doze\) mensalidades/);
 assert.doesNotMatch(mensalDoc.texto, /DADOS PARA PAGAMENTO/);
 assert.doesNotMatch(mensalDoc.texto, /99729-6/);
@@ -348,6 +354,7 @@ const docNegociado = buildContratoNavarroDocumento({
   orcamento: orcamentoReferencia,
   aprovacao: negociada,
   dataContrato: "2026-10-13",
+  diaVencimentoMensalidade: 20,
 });
 assert.equal(docNegociado.modalidade, "mensalidade");
 assert.equal(docNegociado.valor, referencia);
@@ -362,7 +369,8 @@ assert.match(docNegociado.texto, /1\.400,00/);
 assert.match(docNegociado.texto, /14\/10\/2026/);
 assert.match(docNegociado.texto, /DADOS PARA PAGAMENTO/);
 assert.match(docNegociado.texto, /Chave Pix/);
-assert.doesNotMatch(docNegociado.texto, /12 \(doze\) mensalidades/);
+assert.match(docNegociado.texto, /Não há mensalidades no período pago antecipadamente/);
+assert.doesNotMatch(docNegociado.texto, /mediante 12 \(doze\) mensalidades/);
 assert.doesNotMatch(docNegociado.texto, /Tipo de conta/);
 assert.deepEqual([...CAMPOS_PAGAMENTO_CONTRATO_AUSENTES], ["Tipo de conta"]);
 const linhas = linhasDadosPagamentoContrato();

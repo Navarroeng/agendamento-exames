@@ -465,6 +465,7 @@ const mensal = buildContratoNavarroDocumento({
     ],
   }),
   dataContrato: "2026-09-17",
+  diaVencimentoMensalidade: 10,
 });
 assert.equal(mensal.tipoDocumento, "mensalidade");
 assert.match(mensal.texto, /automaticamente renovado/);

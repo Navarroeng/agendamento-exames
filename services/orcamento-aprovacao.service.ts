@@ -20,7 +20,16 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
-import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
+import {
+  CONTRATO_ADICIONAL_MENSALIDADE,
+  DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
+  GESTAO_SST_RENOVACAO_BASE_REAIS,
+  GESTAO_SST_RENOVACAO_INCREMENTO_REAIS,
+  centavosSalvosParaReais,
+  diaVencimentoMensalidadeValido,
+  vigenciaContratualConfiavel,
+  type DiaVencimentoMensalidade,
+} from "@/lib/contrato-navarro";
 import {
   isLaudoPontualExclusivo,
   laudoPontualOcultaColaboradores,
@@ -87,6 +96,120 @@ export async function obterVigenciaContratualOrcamento(
     | { data_inicio?: string | null; data_fim?: string | null }
     | undefined;
   return vigenciaContratualConfiavel(row?.data_inicio, row?.data_fim);
+}
+
+function centavosPositivos(value: number | null | undefined): number | null {
+  const numero = Number(value);
+  if (!Number.isFinite(numero) || numero <= 0) return null;
+  return Math.round(numero);
+}
+
+/**
+ * Grava o dia 10 ou 20 e, na primeira vez, congela fórmula e preço de exame
+ * desta contratação. Não altera parâmetros já gravados.
+ */
+export async function salvarParametrosContratoMensalidade(params: {
+  aprovacaoId: string;
+  diaVencimento: DiaVencimentoMensalidade;
+}): Promise<OrcamentoAprovacaoRecord> {
+  const dia = diaVencimentoMensalidadeValido(params.diaVencimento);
+  if (!dia) throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
+
+  const supabase = createClient();
+  const { data: beforeRaw, error: beforeError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(APROVACAO_SELECT)
+    .eq("id", params.aprovacaoId)
+    .single();
+  if (beforeError) throw beforeError;
+  const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+
+  const baseSalva = centavosPositivos(before.mensalidade_renovacao_base_centavos);
+  const incrementoSalvo = centavosPositivos(
+    before.mensalidade_renovacao_incremento_centavos
+  );
+  const exameAdmissional = centavosPositivos(before.mensalidade_exame_avulso_centavos);
+  const exameDemissional = centavosPositivos(
+    before.mensalidade_exame_demissional_centavos
+  );
+  const diaSalvo = diaVencimentoMensalidadeValido(before.mensalidade_dia_vencimento);
+
+  if (
+    diaSalvo === dia &&
+    baseSalva != null &&
+    incrementoSalvo != null &&
+    exameAdmissional != null &&
+    exameDemissional != null
+  ) {
+    return before;
+  }
+
+  const { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      mensalidade_dia_vencimento: dia,
+      mensalidade_renovacao_base_centavos:
+        baseSalva ?? Math.round(GESTAO_SST_RENOVACAO_BASE_REAIS * 100),
+      mensalidade_renovacao_incremento_centavos:
+        incrementoSalvo ?? Math.round(GESTAO_SST_RENOVACAO_INCREMENTO_REAIS * 100),
+      mensalidade_exame_avulso_centavos:
+        exameAdmissional ?? CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos,
+      mensalidade_exame_demissional_centavos:
+        exameDemissional ?? CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.aprovacaoId)
+    .select(APROVACAO_SELECT)
+    .single();
+  if (error) throw error;
+  return sortAprovacao(data as OrcamentoAprovacaoRecord);
+}
+
+/** Dia e parâmetros já gravados na contratação, para a proposta não inventar o vencimento. */
+export async function obterParametrosPropostaMensalidade(
+  orcamentoId: string
+): Promise<{
+  dia: DiaVencimentoMensalidade | null;
+  baseReais: number | null;
+  incrementoReais: number | null;
+  exameAdmissional: number | null;
+  exameDemissional: number | null;
+}> {
+  const vazio = {
+    dia: null,
+    baseReais: null,
+    incrementoReais: null,
+    exameAdmissional: null,
+    exameDemissional: null,
+  };
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(
+      "mensalidade_dia_vencimento, mensalidade_renovacao_base_centavos, mensalidade_renovacao_incremento_centavos, mensalidade_exame_avulso_centavos, mensalidade_exame_demissional_centavos"
+    )
+    .eq("orcamento_id", orcamentoId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error || !data?.length) return vazio;
+  const row = data[0] as {
+    mensalidade_dia_vencimento?: number | null;
+    mensalidade_renovacao_base_centavos?: number | null;
+    mensalidade_renovacao_incremento_centavos?: number | null;
+    mensalidade_exame_avulso_centavos?: number | null;
+    mensalidade_exame_demissional_centavos?: number | null;
+  };
+  return {
+    dia: diaVencimentoMensalidadeValido(row.mensalidade_dia_vencimento),
+    baseReais: centavosSalvosParaReais(row.mensalidade_renovacao_base_centavos),
+    incrementoReais: centavosSalvosParaReais(
+      row.mensalidade_renovacao_incremento_centavos
+    ),
+    exameAdmissional: centavosSalvosParaReais(row.mensalidade_exame_avulso_centavos),
+    exameDemissional: centavosSalvosParaReais(
+      row.mensalidade_exame_demissional_centavos
+    ),
+  };
 }
 
 function sortAprovacao(

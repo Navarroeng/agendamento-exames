@@ -1,6 +1,9 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
+  DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
   buildClausulasContrato,
+  centavosSalvosParaReais,
+  diaVencimentoMensalidadeValido,
   redigirContratada,
   redigirContratante,
   textoPlanoContrato,
@@ -27,7 +30,7 @@ import {
 } from "@/lib/contrato-vencimentos";
 import {
   centsToReais,
-  montarMensalidades,
+  montarDatasMensalidadesPlano,
   montarParcelasPontual,
   type ContratoParcela,
 } from "@/lib/contrato-pagamento";
@@ -239,6 +242,16 @@ export function buildContratoNavarroDocumento(params: {
   const pagamentoAvista =
     mensalidade && aprovacao?.mensalidade_pagamento === "avista";
   const valorAvistaCentavos = reaisParaCentavos(Number(aprovacao?.valor_avista) || 0);
+  const vigencia = mensalidade
+    ? vigenciaContratualConfiavel(params.vigenciaInicio, params.vigenciaFim)
+    : null;
+  const diaPlano = mensalidade
+    ? diaVencimentoMensalidadeValido(params.diaVencimentoMensalidade) ??
+      diaVencimentoMensalidadeValido(aprovacao?.mensalidade_dia_vencimento)
+    : null;
+  if (tipoDocumento === "mensalidade" && !diaPlano) {
+    throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
+  }
 
   let parcelas: ContratoParcela[] = pagamentoAvista
     ? [
@@ -251,17 +264,27 @@ export function buildContratoNavarroDocumento(params: {
           valor: centsToReais(valorAvistaCentavos),
         },
       ]
-    : tipoDocumento === "mensalidade"
-      ? montarMensalidades({
-          valorMensal: valor,
+    : tipoDocumento === "mensalidade" && diaPlano && vigencia
+      ? montarDatasMensalidadesPlano({
+          inicioVigenciaIso: vigencia.inicio,
+          dia: diaPlano,
           quantidade: mesesMensalidade,
-          dataContrato,
+        }).map((dataIso, indice) => {
+          const valorCentavos = Math.round(valor * 100);
+          return {
+            indice: indice + 1,
+            dataIso,
+            valorCentavos,
+            valor: centsToReais(valorCentavos),
+          };
         })
-      : montarParcelasPontual({
-          valorTotal: valor,
-          quantidadeParcelas: resolveParcelasQuantidade(orcamento, aprovacao),
-          dataContrato,
-        });
+      : tipoDocumento === "mensalidade"
+        ? []
+        : montarParcelasPontual({
+            valorTotal: valor,
+            quantidadeParcelas: resolveParcelasQuantidade(orcamento, aprovacao),
+            dataContrato,
+          });
 
   if (
     tipoDocumento !== "parecer_tecnico" &&
@@ -376,11 +399,29 @@ export function buildContratoNavarroDocumento(params: {
     };
   }
 
-  const vigencia = mensalidade
-    ? vigenciaContratualConfiavel(params.vigenciaInicio, params.vigenciaFim)
+  const exameCatalogo = mensalidade ? valorExameClinicoAvulsoMensalidade() : null;
+  const exameAdmissionalSalvo = mensalidade
+    ? centavosSalvosParaReais(aprovacao?.mensalidade_exame_avulso_centavos)
     : null;
-  const exameAvulso = mensalidade ? valorExameClinicoAvulsoMensalidade() : null;
-  const diaVencimento = Number(params.diaVencimentoMensalidade);
+  const exameDemissionalSalvo = mensalidade
+    ? centavosSalvosParaReais(aprovacao?.mensalidade_exame_demissional_centavos)
+    : null;
+  const exameAvulso = mensalidade
+    ? {
+        admissional: exameAdmissionalSalvo ?? exameCatalogo?.admissional ?? null,
+        demissional:
+          exameDemissionalSalvo ??
+          exameCatalogo?.demissional ??
+          exameAdmissionalSalvo ??
+          null,
+      }
+    : null;
+  const renovacaoBase = mensalidade
+    ? centavosSalvosParaReais(aprovacao?.mensalidade_renovacao_base_centavos)
+    : null;
+  const renovacaoIncremento = mensalidade
+    ? centavosSalvosParaReais(aprovacao?.mensalidade_renovacao_incremento_centavos)
+    : null;
   const ctx: ContratoNavarroContexto = {
     modalidade,
     numeroOrcamento: orcamento.numero.trim(),
@@ -413,15 +454,16 @@ export function buildContratoNavarroDocumento(params: {
       : null,
     valorExameClinicoAvulso: exameAvulso?.admissional ?? null,
     valorExameClinicoDemissional:
-      exameAvulso && exameAvulso.demissional !== exameAvulso.admissional
+      exameAvulso &&
+      exameAvulso.demissional != null &&
+      exameAvulso.demissional !== exameAvulso.admissional
         ? exameAvulso.demissional
         : null,
     vigenciaInicioIso: vigencia?.inicio ?? null,
     vigenciaFimIso: vigencia?.fim ?? null,
-    diaVencimentoMensalidade:
-      Number.isInteger(diaVencimento) && diaVencimento >= 1 && diaVencimento <= 31
-        ? diaVencimento
-        : null,
+    diaVencimentoMensalidade: diaPlano,
+    renovacaoBaseReais: renovacaoBase,
+    renovacaoIncrementoReais: renovacaoIncremento,
   };
 
   const clausulas = buildClausulasContrato(ctx);

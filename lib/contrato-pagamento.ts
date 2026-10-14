@@ -72,6 +72,34 @@ export function montarParcelasPontual(params: {
   }));
 }
 
+/**
+ * Vencimentos do plano mensal: o primeiro cai no dia escolhido,
+ * sempre no mês seguinte ao início da vigência. Não usa a data de emissão do PDF.
+ */
+export function montarDatasMensalidadesPlano(params: {
+  inicioVigenciaIso: string;
+  dia: number;
+  quantidade: number;
+}): string[] {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(params.inicioVigenciaIso.trim());
+  if (!match) {
+    throw new Error("Data de início da vigência inválida.");
+  }
+  const dia = Math.floor(Number(params.dia));
+  if (dia !== 10 && dia !== 20) {
+    throw new Error("Dia de vencimento da mensalidade inválido.");
+  }
+  const n = Math.floor(Number(params.quantidade));
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error("Quantidade de mensalidades inválida.");
+  }
+  const ancora = `${match[1]}-${match[2]}-${String(dia).padStart(2, "0")}`;
+  const primeira = addCalendarMonths(ancora, 1);
+  return Array.from({ length: n }, (_, i) =>
+    i === 0 ? primeira : addCalendarMonths(primeira, i)
+  );
+}
+
 export function montarMensalidades(params: {
   valorMensal: number;
   quantidade: number;

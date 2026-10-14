@@ -47,14 +47,14 @@ export const MENSALIDADE_BENEFICIOS_ITENS: readonly string[] = [
 ] as const;
 
 export const MENSALIDADE_BENEFICIOS_OBSERVACOES: readonly string[] = [
-  "Exames complementares serão cobrados à parte.",
-  "ASOs adicionais serão cobrados à parte.",
+  "Um exame clínico periódico ou demissional, nas condições da proposta, com ASO.",
+  "Exames clínicos avulsos e complementares serão cobrados à parte.",
 ] as const;
 
 export const ORCAMENTO_MENSALIDADE_MESES = 12;
 export const ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL = "12 meses";
 export const ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL =
-  "Automática ao final da vigência";
+  "Automática, aviso de 30 dias";
 export const ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO = "12 mensalidades";
 
 export function isOrcamentoModalidade(
