@@ -143,6 +143,17 @@ function extractPdfLatin1(buf: ArrayBuffer): string {
   return Buffer.from(buf).toString("latin1");
 }
 
+function trechoClausula(texto: string, numero: string): string {
+  const marcador = `CLÁUSULA ${numero} —`;
+  const inicio = texto.indexOf(marcador);
+  assert.ok(inicio >= 0, `cláusula ${numero}`);
+  const depois = texto.slice(inicio + marcador.length);
+  const proxima = depois.search(/\nCLÁUSULA \d+ —/);
+  return proxima >= 0
+    ? texto.slice(inicio, inicio + marcador.length + proxima)
+    : texto.slice(inicio);
+}
+
 function assertSemTextosProibidos(texto: string, contexto: string) {
   for (const proibido of CONTRATO_TEXTOS_PROIBIDOS) {
     assert.ok(
@@ -240,6 +251,7 @@ await run("contrato pontual", () => {
     dataContrato: "2026-09-17",
   });
   assert.equal(doc.modalidade, "pontual");
+  assert.doesNotMatch(doc.texto, /Na renovação, o valor mensal será calculado/);
   assert.equal(doc.colaboradores, 23);
   assert.equal(doc.parcelas.length, 3);
   assert.equal(doc.parcelas[0]?.dataIso, "2026-09-17");
@@ -356,6 +368,34 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.match(texto, /legislação aplicável/);
   assert.ok(!/IPC-FIPE/i.test(texto));
   assert.match(texto, /automaticamente renovado/);
+  const clausula4 = trechoClausula(texto, "4");
+  const clausula7 = trechoClausula(texto, "7");
+  assert.doesNotMatch(clausula4, /Na renovação, o valor mensal será calculado/);
+  assert.doesNotMatch(
+    clausula4,
+    /O pagamento antecipado e o desconto são válidos somente para o período contratado/
+  );
+  assert.doesNotMatch(clausula4, /Esse desconto refere-se apenas/);
+  assert.match(clausula4, /valor mensal de R\$ 350,00/);
+  assert.match(clausula4, /quinto dia útil/);
+  assert.match(clausula4, /dia 10 de cada mês/);
+  const ordemRenovacao = [
+    "automaticamente renovado",
+    "Na renovação, o valor mensal será calculado",
+    "Para zero ou um colaborador",
+    "O pagamento antecipado e o desconto são válidos somente para o período contratado",
+    "desistência imotivada",
+  ];
+  let cursor = -1;
+  for (const trecho of ordemRenovacao) {
+    const indice = clausula7.indexOf(trecho);
+    assert.ok(indice > cursor, `ordem da cláusula 7: ${trecho}`);
+    cursor = indice;
+  }
+  assert.equal(
+    (texto.match(/Na renovação, o valor mensal será calculado/g) ?? []).length,
+    1
+  );
   assert.match(texto, /30 \(trinta\) dias/);
   assert.match(texto, /R\$ 50,00 \(cinquenta reais\)/);
   assert.ok(!texto.includes("R$ 100,00"));
@@ -708,6 +748,37 @@ await run("PDF pontual e mensalidade", async () => {
     assert.match(semDatas.texto, /boleto bancário/);
     assert.doesNotMatch(semDatas.texto, /IPCA|Essa regra é a da Gestão SST/);
     assert.match(semDatas.texto, /Não haverá mensalidades no período já pago antecipadamente/);
+    const clausula4Avista = trechoClausula(semDatas.texto, "4");
+    const clausula7Avista = trechoClausula(semDatas.texto, "7");
+    assert.doesNotMatch(
+      clausula4Avista,
+      /Na renovação, o valor mensal será calculado/
+    );
+    assert.doesNotMatch(
+      clausula4Avista,
+      /O pagamento antecipado e o desconto são válidos somente para o período contratado/
+    );
+    assert.match(
+      clausula4Avista,
+      /Esse desconto refere-se apenas ao pagamento antecipado desta vigência/
+    );
+    assert.match(clausula4Avista, /Foi concedido desconto de/);
+    assert.match(clausula4Avista, /preparação da renovação/);
+    assert.match(clausula4Avista, /quinto dia útil/);
+    assert.match(clausula7Avista, /Na renovação, o valor mensal será calculado/);
+    assert.match(
+      clausula7Avista,
+      /O pagamento antecipado e o desconto são válidos somente para o período contratado/
+    );
+    assert.ok(
+      clausula7Avista.indexOf("automaticamente renovado") <
+        clausula7Avista.indexOf("Na renovação, o valor mensal será calculado")
+    );
+    assert.ok(
+      clausula7Avista.indexOf(
+        "O pagamento antecipado e o desconto são válidos somente para o período contratado"
+      ) < clausula7Avista.indexOf("desistência imotivada")
+    );
     assert.match(semDatas.texto, /não gera devolução/);
     assert.doesNotMatch(semDatas.texto, /critério de cálculo|reajuste anual pelo IPCA/);
     assert.match(semDatas.texto, /limita-se ao período efetivamente pago antecipadamente/);

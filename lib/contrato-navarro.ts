@@ -452,20 +452,24 @@ function parametrosRenovacao(ctx: ContratoNavarroContexto): {
   };
 }
 
-function redigirRenovacaoSimplificada(
-  ctx: ContratoNavarroContexto,
-  avista: boolean
-): string[] {
+function redigirCalculoRenovacao(ctx: ContratoNavarroContexto): string[] {
   const params = parametrosRenovacao(ctx);
   const base = formatCurrency(params.baseReais);
   const incremento = formatCurrency(params.incrementoReais);
   const exemplo = (quantidade: number) =>
     formatCurrency(valorMensalidadeRenovacaoGestaoSst(quantidade, params));
-  const paragrafos = [
+  return [
     "Na renovação, o valor mensal será calculado conforme a quantidade de colaboradores ativos no início do novo período, considerando as admissões e os desligamentos informados pela CONTRATANTE.",
     `Para zero ou um colaborador, a mensalidade será de ${base}. A partir do segundo, serão acrescentados ${incremento} por colaborador. Por exemplo: 2 colaboradores, ${exemplo(2)}; 10 colaboradores, ${exemplo(10)}; e 15 colaboradores, ${exemplo(15)} mensais. O novo valor será aplicado somente na renovação, sem alterar as cobranças do período em andamento.`,
     "O pagamento antecipado e o desconto são válidos somente para o período contratado. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito para pagamento antecipado.",
   ];
+}
+
+function redigirRenovacaoSimplificada(
+  ctx: ContratoNavarroContexto,
+  avista: boolean
+): string[] {
+  const paragrafos: string[] = [];
   if (avista) {
     paragrafos.push(
       "O dia de vencimento será definido na preparação da renovação. Não haverá mensalidades no período já pago antecipadamente. Quando houver cobrança mensal, serão 12 mensalidades por vigência, e a primeira vencerá no mês seguinte ao início da vigência renovada."
@@ -503,6 +507,9 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
   if (desconto > 0) {
     paragrafos.push(
       `Foi concedido desconto de ${formatMoedaComExtenso(desconto)}.`
+    );
+    paragrafos.push(
+      "Esse desconto refere-se apenas ao pagamento antecipado desta vigência."
     );
   }
   paragrafos.push(
@@ -568,6 +575,7 @@ function redigirVigencia(ctx: ContratoNavarroContexto): string[] {
     paragrafos.push(
       `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência para impedir a próxima renovação.`
     );
+    paragrafos.push(...redigirCalculoRenovacao(ctx));
     paragrafos.push(
       "O pagamento mensal é a forma de pagamento de um compromisso anual, inclusive nas vigências renovadas."
     );
