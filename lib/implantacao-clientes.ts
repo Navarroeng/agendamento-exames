@@ -35,6 +35,7 @@ import {
   processoBelongsToMesAprovacao,
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
+import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 
 /**
  * Implantação de laudo pontual exclusivo: Resumo, Aprovado, Contrato,
@@ -447,6 +448,7 @@ export function resolveImplantacaoEtapaAtual(
     fluxo?: OrcamentoFluxoImplantacao;
     treinamento?: ImplantacaoTreinamentoRecord | null;
     aet?: ImplantacaoAetRecord | null;
+    controleMensalidades?: boolean;
   }
 ): ImplantacaoEtapaId {
   if (
@@ -463,7 +465,9 @@ export function resolveImplantacaoEtapaAtual(
   if (fluxo === "somente_treinamentos") {
     if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
     if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
-    if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
+    if (!opts?.controleMensalidades && !isFinanceiroEtapaConcluida(aprovacao)) {
+      return "financeiro";
+    }
     if (!isTreinamentoEtapaConcluida(treino)) return "agendamento_treinamento";
     if (treino?.status === "realizado") return "concluido";
     return "treinamento_agendado";
@@ -481,7 +485,9 @@ export function resolveImplantacaoEtapaAtual(
     return "visita_aet";
   }
 
-  if (!isFinanceiroEtapaConcluida(aprovacao)) return "financeiro";
+  if (!opts?.controleMensalidades && !isFinanceiroEtapaConcluida(aprovacao)) {
+    return "financeiro";
+  }
 
   if (fluxo === "combinado") {
     if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
@@ -526,6 +532,7 @@ export function countImplantacaoEtapasConcluidas(
     fluxo?: OrcamentoFluxoImplantacao;
     treinamento?: ImplantacaoTreinamentoRecord | null;
     aet?: ImplantacaoAetRecord | null;
+    controleMensalidades?: boolean;
     /** Para fluxo somente_treinamentos/laudo pontual: conta as abas (inclui resumo/aprovado). */
     orcamentoAprovado?: boolean;
   }
@@ -557,7 +564,7 @@ export function countImplantacaoEtapasConcluidas(
 
   let n = 0;
   if (isContratoEtapaConcluida(aprovacao)) n += 1;
-  if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
+  if (!opts?.controleMensalidades && isFinanceiroEtapaConcluida(aprovacao)) n += 1;
   if (fluxo === "combinado" && isTreinamentoEtapaConcluida(opts?.treinamento)) {
     n += 1;
   }
@@ -668,6 +675,10 @@ export function buildImplantacaoProcesso(params: {
     fluxo,
     treinamento,
     aet,
+    controleMensalidades: usaControleParcelasMensalidade(
+      orcamento.modalidade,
+      aprovacao?.mensalidade_pagamento
+    ),
     orcamentoAprovado:
       orcamento.status === "aprovado" || Boolean(aprovacao),
   };
@@ -735,7 +746,9 @@ export function buildImplantacaoProcesso(params: {
     aet,
     etapasOperacionais,
     possuiPacoteCompletoSst: Boolean(params.possuiPacoteCompletoSst),
-    pagamentoPendente: isOrcamentoPagamentoPendente(aprovacao),
+    pagamentoPendente: contagemOpts.controleMensalidades
+      ? false
+      : isOrcamentoPagamentoPendente(aprovacao),
   };
 }
 
@@ -982,6 +995,7 @@ export function resolveImplantacaoEtapaVisual(
     treinamento?: ImplantacaoTreinamentoRecord | null;
     aet?: ImplantacaoAetRecord | null;
     fluxo?: OrcamentoFluxoImplantacao;
+    controleMensalidades?: boolean;
   }
 ): ImplantacaoEtapaVisualEstado {
   const agendamentosDone = isAgendamentosImplantacaoConcluida(
@@ -1006,6 +1020,14 @@ export function resolveImplantacaoEtapaVisual(
     elaboracao: isAetElaboracaoConcluida(opts?.aet),
     envio: isAetEnvioConcluido(opts?.aet),
   };
+
+  if (
+    opts?.controleMensalidades &&
+    etapa === "financeiro" &&
+    isContratoEtapaConcluida(aprovacao)
+  ) {
+    return "pendente";
+  }
 
   if (doneMap[etapa]) return "concluida";
 

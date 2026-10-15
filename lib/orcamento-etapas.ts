@@ -140,6 +140,8 @@ export type OrcamentoEtapasContexto = {
   treinamento?: ImplantacaoTreinamentoRecord | null;
   aet?: ImplantacaoAetRecord | null;
   contagem?: OrcamentoEtapasContagemAgendamentos | null;
+  /** Gestão SST mensal: o recebimento não trava as etapas seguintes. */
+  controleMensalidades?: boolean;
 };
 
 export function isContratoEtapaConcluida(
@@ -269,6 +271,7 @@ export function isOrcamentoEtapaLiberada(
       return isContratoEtapaConcluida(aprovacao);
     case "treinamento":
       if (isFluxoLaudoPontual(fluxo)) return false;
+      if (ctx?.controleMensalidades) return isContratoEtapaConcluida(aprovacao);
       return isFinanceiroEtapaConcluida(aprovacao);
     case "documentos":
       return false;
@@ -281,6 +284,7 @@ export function isOrcamentoEtapaLiberada(
     case "procuracao":
       if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
         return false;
+      if (ctx?.controleMensalidades) return isContratoEtapaConcluida(aprovacao);
       return isFinanceiroEtapaConcluida(aprovacao);
     case "funcionarios":
       if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
@@ -318,6 +322,7 @@ export function isOrcamentoEtapaConcluida(
     case "contrato":
       return isContratoEtapaConcluida(aprovacao);
     case "financeiro":
+      if (ctx?.controleMensalidades) return false;
       return isFinanceiroEtapaConcluida(aprovacao);
     case "treinamento":
       return isTreinamentoEtapaConcluida(ctx?.treinamento);
@@ -356,6 +361,7 @@ export function resolveOrcamentoEtapaAtual(
   const fluxo = ctx?.fluxo ?? "padrao";
   const etapas = buildOrcamentoEtapas(fluxo);
   for (const etapa of etapas) {
+    if (etapa.id === "financeiro" && ctx?.controleMensalidades) continue;
     if (
       isOrcamentoEtapaLiberada(etapa.id, aprovacao, orcamentoAprovado, ctx) &&
       !isOrcamentoEtapaConcluida(
@@ -401,7 +407,8 @@ export function resolveOrcamentoEtapaEstado(
   const fluxo = ctx?.fluxo ?? "padrao";
   if (
     etapa === "financeiro" &&
-    fluxoOperacaoIndependeDoPagamento(fluxo)
+    (fluxoOperacaoIndependeDoPagamento(fluxo) || ctx?.controleMensalidades) &&
+    isContratoEtapaConcluida(aprovacao)
   ) {
     return tabAtiva === etapa ? "atual" : "pendente";
   }

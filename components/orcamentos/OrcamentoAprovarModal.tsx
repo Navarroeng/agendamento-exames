@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { RequiredMark } from "@/components/ui/Field";
-import { formatDateIsoToBR, isValidHorario24 } from "@/lib/agendamento-datetime";
+import {
+  formatDateIsoToBR,
+  isValidHorario24,
+  todayIsoSaoPaulo,
+} from "@/lib/agendamento-datetime";
 import { emptyToNull, formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
 import { formatDateTimeBR } from "@/lib/format-datetime";
 import {
@@ -45,7 +49,22 @@ import {
 } from "@/lib/orcamento-types";
 import { OrcamentoEtapasNav } from "./OrcamentoEtapasNav";
 import { OrcamentoMensalidadePagamentoEditor } from "./OrcamentoMensalidadePagamentoEditor";
-import { obterMesesVigenciaMensalidade } from "@/services/orcamento-aprovacao.service";
+import {
+  obterMesesVigenciaMensalidade,
+  obterVigenciaContratualOrcamento,
+} from "@/services/orcamento-aprovacao.service";
+import {
+  listarParcelasMensalidade,
+  salvarControleMensalidades,
+  salvarObservacaoMensalidades,
+} from "@/services/mensalidade-parcelas.service";
+import {
+  aplicarPagamentosEditados,
+  resolverGradeMensalidades,
+  usaControleParcelasMensalidade,
+  valorMensalContratado,
+  type ParcelaMensalidadeRegistrada,
+} from "@/lib/mensalidade-parcelas";
 import {
   calcularAvistaPorDesconto,
   calcularAvistaPorValorFinal,
@@ -61,6 +80,7 @@ import {
   OrcamentoAbaVisitaTecnica,
 } from "./OrcamentoEtapasExtras";
 import { OrcamentoAbaFuncionarios } from "./OrcamentoAbaFuncionarios";
+import { OrcamentoAbaFinanceiroMensalidade } from "./OrcamentoAbaFinanceiroMensalidade";
 import { OrcamentoAbaAgendamentos } from "./OrcamentoAbaAgendamentos";
 import {
   emptyTreinamentoForm,
@@ -228,6 +248,18 @@ export function OrcamentoAprovarModal({
   const [observacaoContrato, setObservacaoContrato] = useState("");
   const [boletoVencimento, setBoletoVencimento] = useState("");
   const [boletoPago, setBoletoPago] = useState(false);
+  const [parcelasRegistradas, setParcelasRegistradas] = useState<
+    ParcelaMensalidadeRegistrada[]
+  >([]);
+  const [vigenciaFinanceira, setVigenciaFinanceira] = useState<{
+    inicio: string;
+    fim: string;
+  } | null>(null);
+  const [pagamentosEditados, setPagamentosEditados] = useState<
+    Record<number, string | null>
+  >({});
+  const [parcelasLoading, setParcelasLoading] = useState(false);
+  const [salvandoParcelas, setSalvandoParcelas] = useState(false);
   const [boletoPagoEm, setBoletoPagoEm] = useState("");
   const [observacaoPagamento, setObservacaoPagamento] = useState("");
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
@@ -433,9 +465,43 @@ export function OrcamentoAprovarModal({
     kind: laudoKind,
     permitirElaboracaoEnvio: false,
   });
+  const controleMensalidades = usaControleParcelasMensalidade(
+    orcamento?.modalidade,
+    aprovacao?.mensalidade_pagamento
+  );
+  const gradeMensalidades = useMemo(() => {
+    const base = resolverGradeMensalidades({
+      vigenciaInicio: vigenciaFinanceira?.inicio,
+      vigenciaFim: vigenciaFinanceira?.fim,
+      dia: aprovacao?.mensalidade_dia_vencimento,
+      valorMensal: valorMensalContratado({
+        mensalidadeValorMensal: aprovacao?.mensalidade_valor_mensal,
+        valorFinal: aprovacao?.valor_final,
+      }),
+      registradas: parcelasRegistradas,
+      hojeIso: todayIsoSaoPaulo(),
+    });
+    if (!base.ok) return base;
+    return {
+      ...base,
+      parcelas: aplicarPagamentosEditados(
+        base.parcelas,
+        pagamentosEditados,
+        todayIsoSaoPaulo()
+      ),
+    };
+  }, [
+    aprovacao?.mensalidade_dia_vencimento,
+    aprovacao?.mensalidade_valor_mensal,
+    aprovacao?.valor_final,
+    pagamentosEditados,
+    parcelasRegistradas,
+    vigenciaFinanceira,
+  ]);
   const etapasCtx: OrcamentoEtapasContexto = useMemo(
     () => ({
       fluxo: fluxoImplantacao,
+      controleMensalidades,
       treinamento,
       aet: aetEtapas.aet,
       contagem: agendamentosContagem
@@ -456,6 +522,7 @@ export function OrcamentoAprovarModal({
     }),
     [
       fluxoImplantacao,
+      controleMensalidades,
       treinamento,
       aetEtapas.aet,
       agendamentosContagem,
@@ -469,6 +536,39 @@ export function OrcamentoAprovarModal({
     },
     [fluxoImplantacao]
   );
+
+  useEffect(() => {
+    if (!open || tab !== "financeiro" || !controleMensalidades || !orcamento || !aprovacao) {
+      return;
+    }
+    let cancelado = false;
+    setParcelasLoading(true);
+    void (async () => {
+      try {
+        const [vigencia, registradas] = await Promise.all([
+          obterVigenciaContratualOrcamento(orcamento.id),
+          listarParcelasMensalidade(aprovacao.id),
+        ]);
+        if (cancelado) return;
+        setVigenciaFinanceira(vigencia);
+        setParcelasRegistradas(registradas);
+        setPagamentosEditados({});
+      } catch (err) {
+        if (!cancelado) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar as mensalidades."
+          );
+        }
+      } finally {
+        if (!cancelado) setParcelasLoading(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [aprovacao?.id, controleMensalidades, open, orcamento?.id, tab]);
 
   useEffect(() => {
     if (!open) return;
@@ -698,6 +798,49 @@ export function OrcamentoAprovarModal({
 
   async function handleSalvarFinanceiroClick() {
     if (!aprovacao) return;
+
+    if (controleMensalidades) {
+      if (!orcamento) return;
+      setSalvandoParcelas(true);
+      try {
+        const observacao = emptyToNull(observacaoPagamento);
+        const salva = gradeMensalidades.ok
+          ? await salvarControleMensalidades({
+              aprovacaoId: aprovacao.id,
+              vigenciaInicio: gradeMensalidades.vigenciaInicio,
+              vigenciaFim: gradeMensalidades.vigenciaFim,
+              parcelas: gradeMensalidades.parcelas.map((parcela) => ({
+                numero: parcela.numero,
+                vencimentoIso: parcela.vencimentoIso,
+                valor: parcela.valor,
+                pagoEmIso: parcela.pagoEmIso,
+              })),
+              observacao,
+            })
+          : await salvarObservacaoMensalidades({
+              aprovacaoId: aprovacao.id,
+              observacao,
+            });
+        onAprovacaoAtualizada?.(salva);
+        if (gradeMensalidades.ok) {
+          const registradas = await listarParcelasMensalidade(aprovacao.id);
+          setParcelasRegistradas(registradas);
+          setPagamentosEditados({});
+          toast.success("Financeiro salvo.");
+        } else {
+          toast.success(
+            "Observações salvas. As parcelas não foram criadas porque faltam dados da vigência."
+          );
+        }
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao salvar financeiro."
+        );
+      } finally {
+        setSalvandoParcelas(false);
+      }
+      return;
+    }
 
     if (boletoPago) {
       if (!boletoPagoEm) {
@@ -1677,6 +1820,36 @@ export function OrcamentoAprovarModal({
 
           {tab === "financeiro" &&
           aprovacao &&
+          controleMensalidades &&
+          isOrcamentoEtapaLiberada(
+            "financeiro",
+            aprovacao,
+            orcamentoAprovado,
+            etapasCtx
+          ) ? (
+            <OrcamentoAbaFinanceiroMensalidade
+              loading={parcelasLoading}
+              pendencias={
+                gradeMensalidades.ok ? [] : gradeMensalidades.pendencias
+              }
+              parcelas={gradeMensalidades.ok ? gradeMensalidades.parcelas : []}
+              observacao={observacaoPagamento}
+              disabled={
+                acompanhamentoBloqueado || salvandoParcelas || parcelasLoading
+              }
+              onChangePagoEm={(numero, pagoEm) =>
+                setPagamentosEditados((atual) => ({
+                  ...atual,
+                  [numero]: pagoEm || null,
+                }))
+              }
+              onChangeObservacao={setObservacaoPagamento}
+            />
+          ) : null}
+
+          {tab === "financeiro" &&
+          aprovacao &&
+          !controleMensalidades &&
           isOrcamentoEtapaLiberada(
             "financeiro",
             aprovacao,
@@ -2048,9 +2221,13 @@ export function OrcamentoAprovarModal({
               type="button"
               className="btn btn-primary justify-center sm:w-auto"
               onClick={() => void handleSalvarFinanceiroClick()}
-              disabled={acompanhamentoBloqueado}
+              disabled={
+                acompanhamentoBloqueado ||
+                salvandoParcelas ||
+                (controleMensalidades && parcelasLoading)
+              }
             >
-              {saving ? "Salvando..." : "Salvar financeiro"}
+              {saving || salvandoParcelas ? "Salvando..." : "Salvar financeiro"}
             </button>
           ) : null}
         </div>

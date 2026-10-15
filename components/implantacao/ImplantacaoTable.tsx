@@ -17,6 +17,7 @@ import {
 import { EtapaAtualBadge } from "@/components/implantacao/EtapaAtualBadge";
 import { ImplantacaoMesTabs } from "@/components/implantacao/ImplantacaoMesTabs";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
+import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
@@ -53,6 +54,10 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               treinamento: processo.treinamento,
               aet: processo.aet ?? null,
               fluxo: processo.fluxoImplantacao,
+              controleMensalidades: usaControleParcelasMensalidade(
+                processo.orcamento.modalidade,
+                processo.aprovacao?.mensalidade_pagamento
+              ),
             }
           );
           const tone =
