@@ -252,8 +252,8 @@ export function resolveLaudoPontualKind(
 }
 
 /**
- * AET e Insalubridade não exibem quantidade de colaboradores.
- * O LTCAT mantém o campo: a quantidade registra a abrangência do laudo.
+ * AET e Insalubridade ocultam a quantidade comercial e o à vista automático.
+ * O LTCAT não entra aqui: a coluna some no formulário, mas pagamento e contrato permanecem.
  */
 export function laudoPontualOcultaColaboradores(
   fluxoOrKind: OrcamentoFluxoImplantacao | LaudoPontualKind | null | undefined

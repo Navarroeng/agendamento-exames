@@ -32,6 +32,8 @@ interface OrcamentoItemTableRowProps {
   onApplyValorSugerido: (valor: number | null) => void;
   isMensalidade?: boolean;
   hideQuantidadeColaboradores?: boolean;
+  /** Coluna visível por outro serviço; esta linha não pede quantidade. */
+  ocultarCampoQuantidade?: boolean;
 }
 
 const inputClass = "field-input field-input-compact min-w-0 w-full";
@@ -48,6 +50,7 @@ export function OrcamentoItemTableRow({
   onApplyValorSugerido,
   isMensalidade = false,
   hideQuantidadeColaboradores = false,
+  ocultarCampoQuantidade = false,
 }: OrcamentoItemTableRowProps) {
   const selectedServico = servicos.find((s) => s.id === item.servico_id);
   const isOutros = selectedServico?.nome === "Outros";
@@ -121,12 +124,14 @@ export function OrcamentoItemTableRow({
       </td>
       {hideQuantidadeColaboradores ? null : (
       <td className={TD}>
+        {ocultarCampoQuantidade ? null : (
         <input
           className={`${inputClass} max-w-[80px]`}
           inputMode="numeric"
           value={item.quantidade}
           onChange={(e) => onUpdate("quantidade", e.target.value)}
         />
+        )}
       </td>
       )}
       <td className={TD}>

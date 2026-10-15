@@ -29,6 +29,7 @@ import {
 } from "@/lib/servico-laudo-pontual";
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 import { orcamentoPermitePagamentoAVista } from "@/lib/servico-aet";
+import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
 import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
@@ -768,7 +769,10 @@ export function buildAprovacaoDiffs(
       : `${parcelasAprovadas}x de ${formatCurrency(valorParcelaAprovado)}`;
 
   const diffs: OrcamentoAprovacaoDiffItem[] = [];
-  if (!ocultaQuantidadeColaboradores(orcamento.orcamento_itens)) {
+  if (
+    !ocultaQuantidadeColaboradores(orcamento.orcamento_itens) &&
+    !orcamentoEhExclusivoLtcat(orcamento.orcamento_itens)
+  ) {
     diffs.push({
       label: "Quantidade de colaboradores",
       original: String(resumo.quantidadeColaboradores || "—"),

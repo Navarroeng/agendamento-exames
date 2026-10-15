@@ -12,6 +12,10 @@ import {
   opcoesServicoLinhaOrcamento,
 } from "@/lib/orcamento-modalidade";
 import {
+  exibeColunaQuantidadeColaboradores,
+  servicoOcultaQuantidadeColaboradores,
+} from "@/lib/orcamento-calculo";
+import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
@@ -60,7 +64,8 @@ export function OrcamentoItensSection({
   const isLaudoPontual =
     laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
     orcamentoPossuiParecerTecnico(itens);
-  const colSpanValor = isLaudoPontual ? 1 : 2;
+  const ocultaColunaQuantidade = !exibeColunaQuantidadeColaboradores(itens);
+  const colSpanValor = ocultaColunaQuantidade ? 1 : 2;
   return (
     <Panel
       title="Itens do orçamento"
@@ -91,7 +96,7 @@ export function OrcamentoItensSection({
           <thead>
             <tr>
               <th className={TH}>Serviço</th>
-              {isLaudoPontual ? null : (
+              {ocultaColunaQuantidade ? null : (
               <th className={TH}>Quantidade de colaboradores</th>
               )}
               <th className={TH}>{labelValorColunaOrcamento(modalidade)}</th>
@@ -117,7 +122,10 @@ export function OrcamentoItensSection({
                 onApplyValorSugerido={(valor) =>
                   onApplyValorSugerido(item.id, valor)
                 }
-                hideQuantidadeColaboradores={isLaudoPontual}
+                hideQuantidadeColaboradores={ocultaColunaQuantidade}
+                ocultarCampoQuantidade={servicoOcultaQuantidadeColaboradores(
+                  item.servico_nome
+                )}
               />
             ))}
           </tbody>

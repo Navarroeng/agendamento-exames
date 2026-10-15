@@ -18,6 +18,33 @@ import {
   resolveValorTotalParecerTecnico,
 } from "@/lib/servico-parecer-tecnico";
 
+/** AET, Insalubridade, Parecer Técnico e LTCAT não pedem quantidade de colaboradores. */
+export function servicoOcultaQuantidadeColaboradores(
+  nome: string | null | undefined
+): boolean {
+  return (
+    isServicoLaudoPontualNome(nome) ||
+    isServicoLtcatNome(nome) ||
+    isServicoParecerTecnicoNome(nome)
+  );
+}
+
+/**
+ * A coluna some quando nenhum serviço nomeado precisa de quantidade.
+ * Linha em branco não mantém a coluna; outro serviço no mesmo orçamento mantém.
+ */
+export function exibeColunaQuantidadeColaboradores(
+  itens: Array<{ servico_nome?: string | null }> | null | undefined
+): boolean {
+  const nomeados = (itens ?? []).filter((item) =>
+    (item.servico_nome ?? "").trim()
+  );
+  if (nomeados.length === 0) return true;
+  return nomeados.some(
+    (item) => !servicoOcultaQuantidadeColaboradores(item.servico_nome)
+  );
+}
+
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
 /** Base: 1 colaborador = R$ 1.300,00 */
@@ -228,7 +255,7 @@ export function validateOrcamentoItensValores(
     if (!item.servico_nome.trim()) continue;
     const qtd = Math.round(Number(item.quantidade));
     if (
-      !isServicoLaudoPontualNome(item.servico_nome) &&
+      !servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
       (!Number.isFinite(qtd) || qtd < 1)
     ) {
       return "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços.";
@@ -367,7 +394,10 @@ export function resolveQuantidadeColaboradoresOrcamento(
       isPacoteCompletoSst(item.servico_nome) ||
       isPacoteCompletoNome(item.servico_nome)
   );
-  const referencia = pacoteItem ?? itens[0];
+  const comQuantidade = itens.find(
+    (item) => !servicoOcultaQuantidadeColaboradores(item.servico_nome)
+  );
+  const referencia = pacoteItem ?? comQuantidade ?? itens[0];
   const quantidade = Math.round(Number(referencia.quantidade));
   return Number.isFinite(quantidade) && quantidade >= 1 ? quantidade : 0;
 }

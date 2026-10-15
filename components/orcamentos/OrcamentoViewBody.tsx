@@ -7,7 +7,11 @@ import {
   IconWallet,
 } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { resolveItemValorServico } from "@/lib/orcamento-calculo";
+import {
+  exibeColunaQuantidadeColaboradores,
+  resolveItemValorServico,
+  servicoOcultaQuantidadeColaboradores,
+} from "@/lib/orcamento-calculo";
 import {
   calcCondicoesPagamentoProposta,
   itensRegistroParaDescontoAvista,
@@ -27,10 +31,6 @@ import {
   type ServicoSstRecord,
 } from "@/lib/orcamento-types";
 import { labelNomeServicoLtcat } from "@/lib/servico-ltcat";
-import {
-  laudoPontualOcultaColaboradores,
-  resolveLaudoPontualKind,
-} from "@/lib/servico-laudo-pontual";
 import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
@@ -104,9 +104,7 @@ export function OrcamentoViewBody({
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(itens);
-  const isLaudoPontual =
-    laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
-    isParecerTecnico;
+  const ocultaColunaQuantidade = !exibeColunaQuantidadeColaboradores(itens);
   const valorServico = Number(orcamento.valor_total) || 0;
   const textoParcelasParecer = isParecerTecnico
     ? formatCondicaoParcelasCentavos(
@@ -166,7 +164,7 @@ export function OrcamentoViewBody({
             <thead>
               <tr className="bg-[#082b63] text-left text-[10px] font-semibold uppercase tracking-wide text-white">
                 <th className="px-4 py-3 font-semibold sm:px-5">Serviço</th>
-                {isLaudoPontual ? null : (
+                {ocultaColunaQuantidade ? null : (
                 <th className="px-3 py-3 text-center font-semibold">
                   Quantidade de colaboradores
                 </th>
@@ -213,9 +211,11 @@ export function OrcamentoViewBody({
                         </div>
                       ) : null}
                     </td>
-                    {isLaudoPontual ? null : (
+                    {ocultaColunaQuantidade ? null : (
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
-                      {item.quantidade}
+                      {servicoOcultaQuantidadeColaboradores(item.servico_nome)
+                        ? ""
+                        : item.quantidade}
                     </td>
                     )}
                     <td className="px-4 py-3.5 text-right align-top font-extrabold text-navy sm:px-5">

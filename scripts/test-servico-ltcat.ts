@@ -3,10 +3,14 @@
 import assert from "node:assert/strict";
 import {
   calcSubtotalItens,
+  exibeColunaQuantidadeColaboradores,
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
+  servicoOcultaQuantidadeColaboradores,
+  validateOrcamentoItensValores,
 } from "../lib/orcamento-calculo";
 import {
+  buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
   buildAprovacaoInsertPayload,
   buildResumoComercialOrcamento,
@@ -139,6 +143,23 @@ assert.equal(resolveLaudoPontualKind([ltcatItem, pgrItem]), null);
 assert.equal(isLaudoPontualExclusivo([ltcatItem]), true);
 assert.equal(laudoPontualOcultaColaboradores("ltcat"), false);
 assert.equal(laudoPontualOcultaColaboradores("aet"), true);
+assert.equal(servicoOcultaQuantidadeColaboradores(SERVICO_LTCAT_NOME), true);
+assert.equal(servicoOcultaQuantidadeColaboradores("PGR"), false);
+assert.equal(exibeColunaQuantidadeColaboradores([ltcatItem]), false);
+assert.equal(exibeColunaQuantidadeColaboradores([ltcatItem, pgrItem]), true);
+assert.equal(exibeColunaQuantidadeColaboradores([]), true);
+assert.equal(
+  validateOrcamentoItensValores([
+    { servico_nome: SERVICO_LTCAT_NOME, quantidade: 0, valor_unitario: 2000 },
+  ]),
+  null
+);
+assert.equal(
+  validateOrcamentoItensValores([
+    { servico_nome: "PGR", quantidade: 0, valor_unitario: 800 },
+  ]),
+  "Informe quantidade de colaboradores válida (mínimo 1) para todos os serviços."
+);
 assert.equal(bloqueioLaudoPontualExclusivo({
   itens: [{ id: "1", ...pgrItem }],
   itemIdAlterado: "2",
@@ -235,6 +256,36 @@ assert.equal(payload.valor_final, 2000);
 assert.equal(payload.itens[0]?.quantidade, 20);
 assert.equal(payload.itens[0]?.valor_total, 2000);
 assert.notEqual(payload.itens[0]?.valor_total, 40000);
+const diffsLtcat = buildAprovacaoDiffs(
+  orcamentoLtcat,
+  {
+    ...buildAprovacaoFormFromOrcamento(orcamentoLtcat),
+    condicoes_iguais: false,
+    valor_final: "2.500,00",
+  },
+  parseMoney
+);
+assert.ok(
+  !diffsLtcat.some((diff) => diff.label === "Quantidade de colaboradores")
+);
+assert.equal(
+  resolveQuantidadeColaboradoresOrcamento({
+    orcamento_itens: [
+      ...orcamentoLtcat.orcamento_itens,
+      {
+        id: "i2",
+        orcamento_id: "o-ltcat",
+        servico_id: "pgr-1",
+        servico_nome: "PGR",
+        quantidade: 5,
+        valor_unitario: 800,
+        valor_total: 800,
+        ordem: 1,
+      },
+    ],
+  }),
+  5
+);
 
 assert.equal(
   isAprovacaoIntegracaoCompleta({

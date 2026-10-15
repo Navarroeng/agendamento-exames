@@ -95,8 +95,8 @@ export function orcamentoEhExclusivoLtcat(
 const LEGACY_VALOR_TOLERANCE = 0.01;
 
 /**
- * Valor do LTCAT é o total digitado. Quantidade de colaboradores registra
- * a abrangência e não multiplica o valor. Se um registro antigo gravou
+ * Valor do LTCAT é o total digitado. A quantidade gravada não multiplica
+ * o valor e não é exibida. Se um registro antigo gravou
  * total = quantidade × unitário, devolve o unitário digitado.
  */
 export function resolveValorTotalLtcat(item: {

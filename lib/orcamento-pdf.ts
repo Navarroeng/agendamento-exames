@@ -7,8 +7,10 @@ import {
 } from "@/lib/pdf-navarro-footer";
 import { formatCNPJ } from "@/lib/cnpj";
 import {
+  exibeColunaQuantidadeColaboradores,
   resolveItemValorServico,
   resolveQuantidadeColaboradoresOrcamento,
+  servicoOcultaQuantidadeColaboradores,
 } from "@/lib/orcamento-calculo";
 import {
   calcCondicoesPagamentoProposta,
@@ -1156,7 +1158,7 @@ function orcamentoHasLaudoPontual(
   return isLaudoPontualExclusivo(orcamento.orcamento_itens);
 }
 
-/** AET, Insalubridade e Parecer Técnico ocultam colaboradores. O LTCAT mantém a quantidade. */
+/** Layout financeiro de AET, Insalubridade e Parecer. O LTCAT mantém as condições de pagamento. */
 function orcamentoOcultaColaboradores(orcamento: OrcamentoComItens): boolean {
   return (
     laudoPontualOcultaColaboradores(
@@ -1933,7 +1935,7 @@ function drawClientCard(
     ["E-mail", displayValue(orcamento.email)],
     ["Telefone", displayValue(orcamento.telefone)],
   ];
-  if (!orcamentoOcultaColaboradores(orcamento)) {
+  if (exibeColunaQuantidadeColaboradores(orcamento.orcamento_itens)) {
     fieldsRight.push([
       "Número de Colaboradores",
       String(resolveNumeroColaboradoresOrcamento(orcamento)),
@@ -2173,7 +2175,7 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
-  const isLaudoPontual = orcamentoOcultaColaboradores(orcamento);
+  const isLaudoPontual = !exibeColunaQuantidadeColaboradores(itens);
   const colWidths = isLaudoPontual ? [138, 40] : [98, 44, 40];
   const colStarts = isLaudoPontual
     ? [MARGIN, MARGIN + colWidths[0]]
@@ -2307,7 +2309,10 @@ function drawServicesTable(
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
     const valorColIndex = isLaudoPontual ? 1 : 2;
-    if (!isLaudoPontual) {
+    if (
+      !isLaudoPontual &&
+      !servicoOcultaQuantidadeColaboradores(item.servico_nome)
+    ) {
       doc.text(
         String(Math.round(Number(item.quantidade))),
         colStarts[1] + colWidths[1] / 2,

@@ -727,7 +727,7 @@ const ltcatRaw = pdfVisibleText(pdfLatin1(ltcatDoc));
 const ltcatNomeDoc = new jsPDF({ unit: "mm", format: "a4" });
 ltcatNomeDoc.setFont("helvetica", "bold");
 ltcatNomeDoc.setFontSize(9.5);
-const ltcatColServico = 98;
+const ltcatColServico = 138;
 const ltcatNomeLines = ltcatNomeDoc.splitTextToSize(
   SERVICO_LTCAT_NOME_EXIBICAO,
   ltcatColServico - 6
@@ -743,19 +743,19 @@ for (const line of ltcatNomeLista) {
   );
 }
 assert.match(ltcatRaw, /Laudo T[eé]cnico das Condi[cç][oõ]es Ambientais do Trabalho/);
-assert.match(
-  ltcatRaw,
-  /Condi[cç][oõ]es Ambientais do\nTrabalho/,
-  "a tabela deve quebrar o nome completo dentro da coluna Serviço"
+assert.equal(
+  ltcatNomeLista.join("\n"),
+  "LTCAT – Laudo Técnico das Condições Ambientais do Trabalho",
+  "sem a coluna de quantidade, o nome do LTCAT cabe na coluna Serviço"
 );
 assert.match(ltcatRaw, /aposentadoria especial/);
 assert.match(ltcatRaw, /enquadramento previdenci[aá]rio/);
 assert.match(ltcatRaw, /Visita t[eé]cnica para levantamento das atividades/);
 assert.match(ltcatRaw, /Entrega do laudo final em formato digital/);
 assert.match(ltcatRaw, /O que est[áa] incluso/i);
-assert.match(ltcatRaw, /Quantidade de/);
-assert.match(ltcatRaw, /Colaboradores/);
-assert.match(ltcatRaw, /20/);
+assert.doesNotMatch(ltcatRaw, /Quantidade de Colaboradores/i);
+assert.doesNotMatch(ltcatRaw, /N[uú]mero de Colaboradores/i);
+assert.doesNotMatch(ltcatRaw, /(^|\n)20(\n|$)/);
 assert.match(ltcatRaw, /2\.000,00/);
 assert.doesNotMatch(ltcatRaw, /40\.000|40000/);
 assert.doesNotMatch(ltcatRaw, /Valor abaixo equivalente/);
@@ -786,6 +786,9 @@ assert.match(mistoRaw, /800,00/);
 assert.match(mistoRaw, /Condi[cç][oõ]es Ambientais do Trabalho/);
 assert.match(mistoRaw, /Valor abaixo equivalente/);
 assert.match(mistoRaw, /PGR/);
+assert.match(mistoRaw, /Quantidade de\nColaboradores/i);
+assert.match(mistoRaw, /(^|\n)5(\n|$)/);
+assert.doesNotMatch(mistoRaw, /(^|\n)20(\n|$)/);
 assert.match(mistoRaw, /Visita t[eé]cnica para/);
 assert.match(mistoRaw, /levantamento das atividades/);
 assert.doesNotMatch(mistoRaw, /40\.000|40000/);

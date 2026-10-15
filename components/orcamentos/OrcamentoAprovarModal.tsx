@@ -419,6 +419,8 @@ export function OrcamentoAprovarModal({
   const ocultaColaboradoresComerciais =
     laudoPontualOcultaColaboradores(fluxoImplantacao) ||
     orcamentoEhExclusivoParecerTecnico(orcamento?.orcamento_itens);
+  const ocultaCampoQuantidadeColaboradores =
+    ocultaColaboradoresComerciais || fluxoImplantacao === "ltcat";
   const aetEnabled = Boolean(
     open && orcamento && aprovacao && isFluxoLaudoPontual(fluxoImplantacao)
   );
@@ -544,7 +546,7 @@ export function OrcamentoAprovarModal({
   async function handleSalvarCondicoesEditadasClick() {
     if (!form || !aprovacao) return;
     if (
-      !ocultaColaboradoresComerciais &&
+      !ocultaCampoQuantidadeColaboradores &&
       (!form.quantidade_colaboradores.trim() ||
         Number(form.quantidade_colaboradores) < 1)
     ) {
@@ -629,7 +631,7 @@ export function OrcamentoAprovarModal({
 
     if (!form.condicoes_iguais) {
       if (
-        !ocultaColaboradoresComerciais &&
+        !ocultaCampoQuantidadeColaboradores &&
         (!form.quantidade_colaboradores.trim() ||
           Number(form.quantidade_colaboradores) < 1)
       ) {
@@ -992,7 +994,7 @@ export function OrcamentoAprovarModal({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                  {ocultaColaboradoresComerciais ? null : (
+                  {ocultaCampoQuantidadeColaboradores ? null : (
                   <ResumoItem
                     label="Quantidade de colaboradores"
                     value={String(resumoComercial.quantidadeColaboradores)}
@@ -1077,7 +1079,7 @@ export function OrcamentoAprovarModal({
                   {editandoCondicoes && form ? (
                     <div className="space-y-4 p-4 sm:p-5">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {ocultaColaboradoresComerciais ? null : (
+                        {ocultaCampoQuantidadeColaboradores ? null : (
                         <Field label="Quantidade de colaboradores" required>
                           <input
                             className="field-input"
@@ -1243,7 +1245,7 @@ export function OrcamentoAprovarModal({
                                 wide={campo.destaque}
                               />
                             ))}
-                          {ocultaColaboradoresComerciais ? null : (
+                          {ocultaCampoQuantidadeColaboradores ? null : (
                             <ResumoItem
                               label="Quantidade de colaboradores"
                               value={String(aprovacao.quantidade_colaboradores)}
@@ -1263,7 +1265,7 @@ export function OrcamentoAprovarModal({
                         </>
                       ) : (
                         <>
-                          {ocultaColaboradoresComerciais ? null : (
+                          {ocultaCampoQuantidadeColaboradores ? null : (
                           <ResumoItem
                             label="Quantidade de colaboradores"
                             value={String(aprovacao.quantidade_colaboradores)}
@@ -1350,7 +1352,7 @@ export function OrcamentoAprovarModal({
                       </div>
                       <div className="space-y-4 p-4 sm:p-5">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {ocultaColaboradoresComerciais ? null : (
+                          {ocultaCampoQuantidadeColaboradores ? null : (
                           <Field label="Quantidade de colaboradores" required>
                             <input
                               className="field-input"
@@ -1549,7 +1551,7 @@ export function OrcamentoAprovarModal({
                           {formatDateTimeBR(row.alterado_em)} · {row.alterado_por}
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                          {ocultaColaboradoresComerciais ? null : (
+                          {ocultaCampoQuantidadeColaboradores ? null : (
                           <p className="text-[#64748b]">
                             Quantidade: {row.quantidade_anterior} →{" "}
                             <span className="font-semibold text-[#334155]">
