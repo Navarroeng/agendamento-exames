@@ -253,6 +253,23 @@ export function isAgendamentosEtapaConcluida(
   return feitos >= qtd;
 }
 
+/** Contexto usado pela barra de abas do modal. A navegação não pode omitir o plano mensal. */
+export function montarContextoAbasOrcamento(params: {
+  fluxo?: OrcamentoFluxoImplantacao;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
+  aet?: ImplantacaoAetRecord | null;
+  contagem?: OrcamentoEtapasContagemAgendamentos | null;
+  controleMensalidades?: boolean;
+}): OrcamentoEtapasContexto {
+  return {
+    fluxo: params.fluxo ?? "padrao",
+    treinamento: params.treinamento ?? null,
+    aet: params.aet ?? null,
+    contagem: params.contagem ?? null,
+    controleMensalidades: params.controleMensalidades === true,
+  };
+}
+
 export function isOrcamentoEtapaLiberada(
   etapa: OrcamentoEtapaId,
   aprovacao: OrcamentoAprovacaoRecord | null,

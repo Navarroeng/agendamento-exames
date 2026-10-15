@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { formatDateIsoToBR } from "../lib/agendamento-datetime";
 import {
   isOrcamentoEtapaLiberada,
+  montarContextoAbasOrcamento,
   resolveOrcamentoEtapaAtual,
+  resolveOrcamentoEtapaEstado,
 } from "../lib/orcamento-etapas";
 import { resolveImplantacaoEtapaAtual } from "../lib/implantacao-clientes";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
@@ -282,6 +284,71 @@ if (vencidaNaoBloqueia.ok) {
 assert.equal(
   resolveImplantacaoEtapaAtual(contrato, { controleMensalidades: true }),
   "procuracao"
+);
+
+function abaBloqueada(
+  etapa: "procuracao" | "funcionarios" | "logo" | "visita" | "agendamentos",
+  registro: OrcamentoAprovacaoRecord,
+  controleMensalidades: boolean
+): boolean {
+  const ctx = montarContextoAbasOrcamento({
+    fluxo: "padrao",
+    controleMensalidades,
+  });
+  const estado = resolveOrcamentoEtapaEstado(
+    etapa,
+    registro,
+    true,
+    "financeiro",
+    null,
+    ctx
+  );
+  return estado === "bloqueada";
+}
+
+const mensalAberto = aprovacao({
+  mensalidade_pagamento: "mensal",
+  boleto_pago: false,
+  boleto_pago_em: null,
+});
+assert.equal(abaBloqueada("procuracao", mensalAberto, true), false);
+assert.equal(abaBloqueada("funcionarios", mensalAberto, true), true);
+assert.equal(abaBloqueada("logo", mensalAberto, true), true);
+assert.equal(abaBloqueada("visita", mensalAberto, true), true);
+assert.equal(abaBloqueada("agendamentos", mensalAberto, true), true);
+assert.equal(abaBloqueada("procuracao", mensalAberto, false), true);
+
+const procuracaoConcluida = aprovacao({
+  ...mensalAberto,
+  procuracao_status: "ativa",
+  procuracao_salva_em: "2026-10-14T15:00:00.000Z",
+});
+assert.equal(abaBloqueada("funcionarios", procuracaoConcluida, true), false);
+assert.equal(abaBloqueada("logo", procuracaoConcluida, true), true);
+
+const avista = aprovacao({ mensalidade_pagamento: "avista", boleto_pago: false });
+assert.equal(abaBloqueada("procuracao", avista, false), true);
+
+const pontual = aprovacao({ boleto_pago: false });
+assert.equal(
+  abaBloqueada("procuracao", pontual, usaControleParcelasMensalidade("pontual", null)),
+  true
+);
+
+const reaberto = montarContextoAbasOrcamento({
+  fluxo: "padrao",
+  controleMensalidades: usaControleParcelasMensalidade("mensalidade", "mensal"),
+});
+assert.equal(
+  resolveOrcamentoEtapaEstado(
+    "procuracao",
+    mensalAberto,
+    true,
+    "financeiro",
+    null,
+    reaberto
+  ) === "bloqueada",
+  false
 );
 
 console.log("test-mensalidade-parcelas: OK");

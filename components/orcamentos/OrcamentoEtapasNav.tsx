@@ -8,6 +8,7 @@ import type {
 } from "@/lib/orcamento-etapas";
 import {
   buildOrcamentoEtapas,
+  montarContextoAbasOrcamento,
   resolveOrcamentoEtapaEstado,
 } from "@/lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
@@ -24,6 +25,7 @@ interface OrcamentoEtapasNavProps {
   treinamento?: ImplantacaoTreinamentoRecord | null;
   aet?: ImplantacaoAetRecord | null;
   contagemAgendamentos?: OrcamentoEtapasContagemAgendamentos | null;
+  controleMensalidades?: boolean;
   onChange: (tab: OrcamentoEtapaId) => void;
 }
 
@@ -44,15 +46,17 @@ export function OrcamentoEtapasNav({
   treinamento = null,
   aet = null,
   contagemAgendamentos = null,
+  controleMensalidades = false,
   onChange,
 }: OrcamentoEtapasNavProps) {
   const etapas = buildOrcamentoEtapas(fluxo);
-  const ctx: OrcamentoEtapasContexto = {
+  const ctx: OrcamentoEtapasContexto = montarContextoAbasOrcamento({
     fluxo,
     treinamento,
     aet,
     contagem: contagemAgendamentos,
-  };
+    controleMensalidades,
+  });
 
   return (
     <div className="mt-4 flex gap-1 overflow-x-auto pb-1">

@@ -1094,6 +1094,7 @@ export function OrcamentoAprovarModal({
             fluxo={fluxoImplantacao}
             treinamento={treinamento}
             aet={aetEtapas.aet}
+            controleMensalidades={controleMensalidades}
             contagemAgendamentos={
               agendamentosContagem
                 ? {
