@@ -1,7 +1,7 @@
 import {
   clienteContratoBadgeClassExibicao,
   formatReajusteContrato,
-  formatValorContrato,
+  formatValorContratoExibicao,
   formatVigenciaContrato,
   labelAgendamentoContrato,
   labelClienteContratoStatusExibicao,
@@ -105,7 +105,7 @@ export function ClienteContratoAtualCard({
         />
         <Metric
           label="Valor"
-          value={formatValorContrato(contrato.valor_contrato)}
+          value={formatValorContratoExibicao(contrato)}
         />
         <Metric
           label="Colaboradores"

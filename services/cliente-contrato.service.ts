@@ -1,4 +1,6 @@
+import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
 import { createClient } from "@/lib/supabase/client";
+import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
 import type {
   ClienteContratoInsert,
   ClienteContratoRecord,
@@ -36,6 +38,111 @@ export async function listarContratosPorCliente(
 
   if (error) throw error;
   return (data ?? []) as ClienteContratoRecord[];
+}
+
+function isoData(value: string | null | undefined): string | null {
+  const texto = (value ?? "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
+}
+
+/**
+ * Anexa modalidade, forma de pagamento e parcelas da mesma contratação.
+ * Não cria outra linha de contrato e não altera o registro antigo.
+ */
+export async function complementarContratosComCobranca(
+  contratos: ClienteContratoRecord[]
+): Promise<ClienteContratoConsulta[]> {
+  const orcamentoIds = Array.from(
+    new Set(
+      contratos
+        .map((contrato) => contrato.orcamento_id?.trim())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (orcamentoIds.length === 0) return contratos;
+
+  const supabase = createClient();
+  const [orcamentosRes, aprovacoesRes] = await Promise.all([
+    supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
+    supabase
+      .from("orcamento_aprovacoes")
+      .select(
+        "id, orcamento_id, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal"
+      )
+      .in("orcamento_id", orcamentoIds),
+  ]);
+  if (orcamentosRes.error) throw orcamentosRes.error;
+  if (aprovacoesRes.error) throw aprovacoesRes.error;
+
+  const modalidadePorOrcamento = new Map<string, string | null>();
+  for (const row of orcamentosRes.data ?? []) {
+    modalidadePorOrcamento.set(
+      String(row.id),
+      (row.modalidade as string | null) ?? null
+    );
+  }
+
+  type AprovacaoCobranca = {
+    id: string;
+    orcamento_id: string;
+    mensalidade_pagamento: string | null;
+    mensalidade_dia_vencimento: number | null;
+    mensalidade_valor_mensal: number | null;
+  };
+  const aprovacaoPorOrcamento = new Map<string, AprovacaoCobranca>();
+  for (const row of (aprovacoesRes.data ?? []) as AprovacaoCobranca[]) {
+    aprovacaoPorOrcamento.set(row.orcamento_id, row);
+  }
+
+  const aprovacaoIds = Array.from(aprovacaoPorOrcamento.values()).map(
+    (row) => row.id
+  );
+  const parcelasPorAprovacao = new Map<string, ParcelaMensalidadeRegistrada[]>();
+  if (aprovacaoIds.length > 0) {
+    const parcelasRes = await supabase
+      .from("orcamento_mensalidade_parcelas")
+      .select(
+        "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+      )
+      .in("aprovacao_id", aprovacaoIds);
+    if (
+      parcelasRes.error &&
+      parcelasRes.error.code !== "42P01" &&
+      parcelasRes.error.code !== "PGRST205"
+    ) {
+      throw parcelasRes.error;
+    }
+    for (const row of parcelasRes.data ?? []) {
+      const aprovacaoId = String(row.aprovacao_id);
+      const lista = parcelasPorAprovacao.get(aprovacaoId) ?? [];
+      lista.push({
+        vigenciaInicio: isoData(String(row.vigencia_inicio ?? "")) ?? "",
+        vigenciaFim: isoData(
+          row.vigencia_fim == null ? null : String(row.vigencia_fim)
+        ),
+        numero: Number(row.numero),
+        vencimentoIso: isoData(String(row.vencimento ?? "")) ?? "",
+        valor: Number(row.valor),
+        pagoEmIso: isoData(row.pago_em == null ? null : String(row.pago_em)),
+      });
+      parcelasPorAprovacao.set(aprovacaoId, lista);
+    }
+  }
+
+  return contratos.map((contrato) => {
+    const orcamentoId = contrato.orcamento_id?.trim();
+    if (!orcamentoId) return contrato;
+    const aprovacao = aprovacaoPorOrcamento.get(orcamentoId);
+    return {
+      ...contrato,
+      modalidadeOrcamento: modalidadePorOrcamento.get(orcamentoId) ?? null,
+      mensalidadePagamento: aprovacao?.mensalidade_pagamento ?? null,
+      mensalidadeDiaVencimento: aprovacao?.mensalidade_dia_vencimento ?? null,
+      parcelasMensalidade: aprovacao
+        ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
+        : [],
+    };
+  });
 }
 
 export async function buscarContratoAtivo(

@@ -1,3 +1,4 @@
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import type { ClienteContratoStatus } from "@/lib/types";
 import {
   calcularFimVigencia,
@@ -48,7 +49,7 @@ export type ContratoOrcamentoSyncPayload = {
   liberado_para_agendamento: boolean;
   data_inicio?: string;
   data_fim?: string;
-  tipo_contrato?: "anual";
+  tipo_contrato?: "anual" | "mensal";
   meses_vigencia?: number;
 };
 
@@ -62,6 +63,9 @@ export function buildClienteContratoSyncFromAprovacao(params: {
     boleto_pago_em?: string | null;
   };
   mesesVigencia?: number;
+  /** Gestão SST mês a mês. A primeira parcela em aberto não segura o status. */
+  cobrancaMensal?: boolean;
+  hojeIso?: string;
 }): ContratoOrcamentoSyncPayload {
   const { aprovacao } = params;
   const meses =
@@ -80,14 +84,28 @@ export function buildClienteContratoSyncFromAprovacao(params: {
     liberado_para_agendamento: liberado,
   };
 
+  if (params.cobrancaMensal) {
+    payload.tipo_contrato = "mensal";
+  }
+
   if (aprovacao.contrato_assinado) {
     const inicio = toIsoDateOnly(aprovacao.contrato_assinado_em);
     if (inicio) {
       payload.data_inicio = inicio;
       payload.data_fim = calcularFimVigencia(inicio, meses);
-      payload.tipo_contrato = "anual";
+      if (!params.cobrancaMensal) payload.tipo_contrato = "anual";
       payload.meses_vigencia = meses;
     }
+  }
+
+  if (params.cobrancaMensal && aprovacao.contrato_assinado) {
+    const hoje = (params.hojeIso ?? todayIsoSaoPaulo()).slice(0, 10);
+    const inicio = payload.data_inicio;
+    const fim = payload.data_fim;
+    const vigente =
+      Boolean(inicio && fim) && inicio! <= hoje && hoje <= fim!;
+    payload.status = vigente ? "ativo" : "assinado";
+    payload.liberado_para_agendamento = Boolean(aprovacao.boleto_pago);
   }
 
   return payload;

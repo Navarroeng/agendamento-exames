@@ -11,6 +11,16 @@ import {
   resolveContratoStatusVisual,
   contratoStatusVisualBadgeClass,
 } from "@/lib/contrato-status-visual";
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import {
+  contratoAssinado,
+  contratoCobrancaMensal,
+  contratoVigenciaCobreData,
+  labelFinanceiroMensalidade,
+  ordenarContratosRecentes,
+  selecionarContratoAtual,
+  type ClienteContratoConsulta,
+} from "@/lib/cliente-contrato-atual";
 import { formatDateBR } from "@/lib/format";
 import { formatCurrency, formatCurrencyBRL } from "@/lib/money";
 import type {
@@ -33,10 +43,32 @@ export function labelClienteContratoStatus(status: ClienteContratoStatus): strin
 export function labelClienteContratoStatusExibicao(
   contrato: Pick<
     ClienteContratoRecord,
-    "status" | "data_inicio" | "data_fim" | "encerrado_em"
-  >
+    | "status"
+    | "data_inicio"
+    | "data_fim"
+    | "encerrado_em"
+    | "tipo_contrato"
+    | "condicao_pagamento"
+    | "contrato_assinado_em"
+  > &
+    Partial<ClienteContratoConsulta>,
+  hojeIso: string = todayIsoSaoPaulo()
 ): string {
-  const visual = resolveContratoStatusVisual(contrato);
+  if (mensalidadeAssinadaEmAndamento(contrato)) {
+    if (contratoVigenciaCobreData(contrato, hojeIso)) {
+      return labelContratoStatusVisual(
+        resolveContratoStatusVisual({ ...contrato, status: "ativo" }, hojeIso),
+        "ativo"
+      );
+    }
+    const visual = resolveContratoStatusVisual(
+      { ...contrato, status: "ativo" },
+      hojeIso
+    );
+    if (visual === "expirado") return labelContratoStatusVisual(visual, "ativo");
+    return "Assinado";
+  }
+  const visual = resolveContratoStatusVisual(contrato, hojeIso);
   if (visual === "pipeline") {
     return labelClienteContratoStatus(contrato.status);
   }
@@ -80,14 +112,58 @@ export function clienteContratoStatusBadgeClass(
 export function clienteContratoBadgeClassExibicao(
   contrato: Pick<
     ClienteContratoRecord,
-    "status" | "data_inicio" | "data_fim" | "encerrado_em"
-  >
+    | "status"
+    | "data_inicio"
+    | "data_fim"
+    | "encerrado_em"
+    | "tipo_contrato"
+    | "condicao_pagamento"
+    | "contrato_assinado_em"
+  > &
+    Partial<ClienteContratoConsulta>,
+  hojeIso: string = todayIsoSaoPaulo()
 ): string {
-  const visual = resolveContratoStatusVisual(contrato);
+  if (
+    mensalidadeAssinadaEmAndamento(contrato) &&
+    contratoVigenciaCobreData(contrato, hojeIso)
+  ) {
+    return contratoStatusVisualBadgeClass(
+      resolveContratoStatusVisual({ ...contrato, status: "ativo" }, hojeIso)
+    );
+  }
+  if (mensalidadeAssinadaEmAndamento(contrato)) {
+    const visual = resolveContratoStatusVisual(
+      { ...contrato, status: "ativo" },
+      hojeIso
+    );
+    if (visual === "expirado") return contratoStatusVisualBadgeClass(visual);
+    return clienteContratoStatusBadgeClass("assinado");
+  }
+  const visual = resolveContratoStatusVisual(contrato, hojeIso);
   if (visual === "pipeline") {
     return clienteContratoStatusBadgeClass(contrato.status);
   }
   return contratoStatusVisualBadgeClass(visual);
+}
+
+function mensalidadeAssinadaEmAndamento(
+  contrato: Pick<
+    ClienteContratoRecord,
+    | "status"
+    | "encerrado_em"
+    | "tipo_contrato"
+    | "condicao_pagamento"
+    | "contrato_assinado_em"
+  > &
+    Partial<ClienteContratoConsulta>
+): boolean {
+  return (
+    contratoCobrancaMensal(contrato) &&
+    contratoAssinado(contrato) &&
+    contrato.status !== "encerrado" &&
+    contrato.status !== "cancelado" &&
+    !contrato.encerrado_em
+  );
 }
 
 export function labelPagamentoContrato(
@@ -109,8 +185,42 @@ export function labelFinanceiroContrato(
   contrato: Pick<
     ClienteContratoRecord,
     "status" | "boleto_pago" | "boleto_vencimento"
-  >
+  > &
+    Partial<
+      Pick<
+        ClienteContratoConsulta,
+        | "tipo_contrato"
+        | "condicao_pagamento"
+        | "modalidadeOrcamento"
+        | "mensalidadePagamento"
+        | "data_inicio"
+        | "data_fim"
+        | "valor_contrato"
+        | "mensalidadeDiaVencimento"
+        | "parcelasMensalidade"
+      >
+    >,
+  hojeIso: string = todayIsoSaoPaulo()
 ): string {
+  if (
+    contratoCobrancaMensal({
+      tipo_contrato: contrato.tipo_contrato ?? null,
+      condicao_pagamento: contrato.condicao_pagamento ?? null,
+      modalidadeOrcamento: contrato.modalidadeOrcamento,
+      mensalidadePagamento: contrato.mensalidadePagamento,
+    })
+  ) {
+    return labelFinanceiroMensalidade(
+      {
+        data_inicio: contrato.data_inicio ?? "",
+        data_fim: contrato.data_fim ?? null,
+        valor_contrato: contrato.valor_contrato ?? null,
+        mensalidadeDiaVencimento: contrato.mensalidadeDiaVencimento,
+        parcelasMensalidade: contrato.parcelasMensalidade,
+      },
+      hojeIso
+    );
+  }
   if (contrato.boleto_pago || contrato.status === "pago") return "Pago";
   if (contrato.boleto_vencimento || contrato.status === "aguardando_pagamento") {
     return "Aguardando pagamento";
@@ -141,16 +251,6 @@ export function labelVencimentoBoletoContrato(
   return formatDateBR(vencimento);
 }
 
-const STATUS_CONTRATO_ATUAL: ClienteContratoStatus[] = [
-  "ativo",
-  "em_renovacao",
-  "pago",
-  "aguardando_pagamento",
-  "assinado",
-  "enviado",
-  "aguardando_envio",
-];
-
 export function formatVigenciaContrato(
   inicio: string,
   fim: string | null | undefined
@@ -163,6 +263,18 @@ export function formatVigenciaContrato(
 export function formatValorContrato(valor: number | null | undefined): string {
   if (valor == null || Number.isNaN(Number(valor))) return "—";
   return formatCurrencyBRL(Number(valor));
+}
+
+export function formatValorContratoExibicao(
+  contrato: Pick<
+    ClienteContratoRecord,
+    "valor_contrato" | "tipo_contrato" | "condicao_pagamento"
+  > &
+    Partial<ClienteContratoConsulta>
+): string {
+  const valor = formatValorContrato(contrato.valor_contrato);
+  if (valor === "—") return valor;
+  return contratoCobrancaMensal(contrato) ? `${valor}/mês` : valor;
 }
 
 export function formatReajusteContrato(
@@ -200,25 +312,16 @@ export function contratoToFormValues(
   };
 }
 
-export function getContratoAtual(
-  contratos: ClienteContratoRecord[]
-): ClienteContratoRecord | null {
-  const sorted = [...contratos].sort((a, b) => {
-    const da = a.aprovado_em ?? a.created_at ?? a.data_inicio;
-    const db = b.aprovado_em ?? b.created_at ?? b.data_inicio;
-    return db.localeCompare(da);
-  });
-
-  for (const status of STATUS_CONTRATO_ATUAL) {
-    const found = sorted.find((item) => item.status === status);
-    if (found) return found;
-  }
-  return null;
+export function getContratoAtual<T extends ClienteContratoConsulta>(
+  contratos: T[],
+  hojeIso?: string
+): T | null {
+  return selecionarContratoAtual(contratos, hojeIso);
 }
 
-export function getHistoricoContratos(
-  contratos: ClienteContratoRecord[],
-  contratoAtualId?: string | null
-): ClienteContratoRecord[] {
-  return contratos.filter((item) => item.id !== contratoAtualId);
+/** Histórico completo, do mais recente ao mais antigo, inclusive o vigente. */
+export function getHistoricoContratos<T extends ClienteContratoConsulta>(
+  contratos: T[]
+): T[] {
+  return ordenarContratosRecentes(contratos);
 }

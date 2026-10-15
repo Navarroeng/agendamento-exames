@@ -1,6 +1,6 @@
 import {
   clienteContratoBadgeClassExibicao,
-  formatValorContrato,
+  formatValorContratoExibicao,
   labelAgendamentoContrato,
   labelClienteContratoStatusExibicao,
   labelFinanceiroContrato,
@@ -10,6 +10,7 @@ import type { ClienteContratoRecord } from "@/lib/types";
 
 interface ClienteContratosHistoricoTableProps {
   contratos: ClienteContratoRecord[];
+  contratoAtualId?: string | null;
   loading: boolean;
   podeEncerrarContrato?: boolean;
   onEditar: (contrato: ClienteContratoRecord) => void;
@@ -18,6 +19,7 @@ interface ClienteContratosHistoricoTableProps {
 
 export function ClienteContratosHistoricoTable({
   contratos,
+  contratoAtualId,
   loading,
   podeEncerrarContrato = false,
   onEditar,
@@ -34,7 +36,7 @@ export function ClienteContratosHistoricoTable({
   if (contratos.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-app-muted">
-        Nenhum contrato anterior registrado.
+        Nenhum contrato SST registrado.
       </p>
     );
   }
@@ -64,7 +66,14 @@ export function ClienteContratosHistoricoTable({
             return (
               <tr key={contrato.id}>
                 <td className="font-bold text-navy">
-                  {contrato.numero?.trim() || "—"}
+                  <span className="inline-flex items-center gap-2">
+                    {contrato.numero?.trim() || "—"}
+                    {contrato.id === contratoAtualId ? (
+                      <span className="rounded-full bg-[#e8edff] px-2 py-0.5 text-[10px] font-extrabold text-brand-blue">
+                        Atual
+                      </span>
+                    ) : null}
+                  </span>
                 </td>
                 <td className="font-semibold text-navy">
                   {contrato.numero_orcamento?.trim() || "—"}
@@ -75,7 +84,7 @@ export function ClienteContratosHistoricoTable({
                     : formatDateBR(contrato.data_inicio)}
                 </td>
                 <td className="tabular-nums">
-                  {formatValorContrato(contrato.valor_contrato)}
+                  {formatValorContratoExibicao(contrato)}
                 </td>
                 <td>
                   <span

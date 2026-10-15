@@ -70,6 +70,39 @@ assert.equal(syncPago.status, "ativo");
 assert.equal(syncPago.liberado_para_agendamento, true);
 assert.notEqual(syncPago.status, "pago");
 
+const syncMensal = buildClienteContratoSyncFromAprovacao({
+  aprovacao: {
+    contrato_enviado: true,
+    contrato_assinado: true,
+    contrato_assinado_em: "2026-10-14",
+    boleto_pago: false,
+    boleto_vencimento: "2026-11-10",
+  },
+  cobrancaMensal: true,
+  hojeIso: "2026-10-15",
+});
+assert.equal(syncMensal.status, "ativo");
+assert.equal(syncMensal.boleto_pago, false);
+assert.equal(syncMensal.liberado_para_agendamento, false);
+assert.equal(syncMensal.tipo_contrato, "mensal");
+assert.equal(syncMensal.data_inicio, "2026-10-14");
+assert.notEqual(syncMensal.status, "aguardando_pagamento");
+
+const syncMensalFuturo = buildClienteContratoSyncFromAprovacao({
+  aprovacao: {
+    contrato_enviado: true,
+    contrato_assinado: true,
+    contrato_assinado_em: "2026-11-01",
+    boleto_pago: false,
+    boleto_vencimento: "2026-12-10",
+  },
+  cobrancaMensal: true,
+  hojeIso: "2026-10-15",
+});
+assert.equal(syncMensalFuturo.status, "assinado");
+assert.equal(syncMensalFuturo.data_inicio, "2026-11-01");
+assert.equal(syncMensalFuturo.boleto_pago, false);
+
 assert.equal(
   contratoEstaVigenteNaData(
     {

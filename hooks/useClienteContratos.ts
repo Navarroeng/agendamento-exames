@@ -17,6 +17,7 @@ import {
   atualizarContrato,
   criarContrato,
   encerrarContrato,
+  complementarContratosComCobranca,
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -59,7 +60,12 @@ export function useClienteContratos(
     setLoading(true);
     try {
       const data = await listarContratosPorCliente(clienteId);
-      setContratos(data);
+      try {
+        setContratos(await complementarContratosComCobranca(data));
+      } catch (contextoErr) {
+        console.error(contextoErr);
+        setContratos(data);
+      }
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar contratos do cliente.");
@@ -75,8 +81,8 @@ export function useClienteContratos(
   const contratoAtual = useMemo(() => getContratoAtual(contratos), [contratos]);
 
   const historico = useMemo(
-    () => getHistoricoContratos(contratos, contratoAtual?.id),
-    [contratos, contratoAtual?.id]
+    () => getHistoricoContratos(contratos),
+    [contratos]
   );
 
   const closeForm = useCallback(() => {

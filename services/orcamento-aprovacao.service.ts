@@ -19,7 +19,9 @@ import {
   parseAprovacaoIntegracaoError,
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
+import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
@@ -235,25 +237,17 @@ function sortAprovacao(
 
 async function encerrarOutrosContratosAtivos(
   clienteId: string,
-  excludeContratoId: string,
-  dataReferencia: string
+  excludeContratoId: string
 ): Promise<void> {
   const supabase = createClient();
-  const ref = dataReferencia.slice(0, 10);
-  // Dia anterior ao início do novo contrato (quando possível).
-  const fimAnterior = (() => {
-    const d = new Date(`${ref}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return ref;
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
-  })();
+  const agora = new Date().toISOString();
 
   const { error } = await supabase
     .from("cliente_contratos")
     .update({
       status: "encerrado" satisfies ClienteContratoStatus,
-      data_fim: fimAnterior,
-      updated_at: new Date().toISOString(),
+      encerrado_em: agora,
+      updated_at: agora,
     })
     .eq("cliente_id", clienteId)
     .eq("status", "ativo")
@@ -272,6 +266,11 @@ async function syncClienteContratoFromAprovacao(
     return;
   }
   const supabase = createClient();
+  const { data: orcamentoModalidade } = await supabase
+    .from("orcamentos")
+    .select("modalidade")
+    .eq("id", aprovacao.orcamento_id)
+    .maybeSingle();
   const syncPayload = buildClienteContratoSyncFromAprovacao({
     aprovacao: {
       contrato_enviado: aprovacao.contrato_enviado,
@@ -282,6 +281,11 @@ async function syncClienteContratoFromAprovacao(
       boleto_vencimento: aprovacao.boleto_vencimento,
       boleto_pago_em: aprovacao.boleto_pago_em,
     },
+    cobrancaMensal: usaControleParcelasMensalidade(
+      orcamentoModalidade?.modalidade,
+      aprovacao.mensalidade_pagamento
+    ),
+    hojeIso: todayIsoSaoPaulo(),
   });
 
   const { data: targets, error: findError } = await supabase
@@ -302,19 +306,13 @@ async function syncClienteContratoFromAprovacao(
     );
   }
 
-  const dataRef =
-    (syncPayload.data_inicio as string | undefined) ||
-    (targets[0].data_inicio as string | undefined) ||
-    new Date().toISOString().slice(0, 10);
-
   // Crítico: encerrar outro ativo ANTES de promover este para ativo
-  // (idx_cliente_contratos_um_ativo).
+  // (idx_cliente_contratos_um_ativo). Datas, valor e vínculo do anterior ficam.
   if (syncPayload.status === "ativo") {
     for (const row of targets) {
       await encerrarOutrosContratosAtivos(
         row.cliente_id as string,
-        row.id as string,
-        dataRef
+        row.id as string
       );
     }
   }
@@ -331,14 +329,18 @@ async function syncClienteContratoFromAprovacao(
       updated_at: new Date().toISOString(),
     };
 
-    // Preserva vigência já definida no contrato.
+    if (syncPayload.tipo_contrato === "mensal") {
+      update.tipo_contrato = "mensal";
+    }
+
+    // Preserva vigência já definida. Não troca o início pela data de aprovação ou do PDF.
     const temVigencia =
       Boolean(String(row.data_inicio ?? "").trim()) &&
       Boolean(String(row.data_fim ?? "").trim());
     if (!temVigencia) {
       if (syncPayload.data_inicio) update.data_inicio = syncPayload.data_inicio;
       if (syncPayload.data_fim) update.data_fim = syncPayload.data_fim;
-      if (syncPayload.tipo_contrato) {
+      if (syncPayload.tipo_contrato && update.tipo_contrato == null) {
         update.tipo_contrato = syncPayload.tipo_contrato;
       }
     }

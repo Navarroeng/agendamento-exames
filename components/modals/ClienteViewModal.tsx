@@ -415,6 +415,7 @@ export function ClienteViewModal({
                 </p>
                 <ClienteContratosHistoricoTable
                   contratos={historico}
+                  contratoAtualId={contratoAtual?.id}
                   loading={loading}
                   podeEncerrarContrato={podeEncerrarContrato}
                   onEditar={handleEditarContrato}
