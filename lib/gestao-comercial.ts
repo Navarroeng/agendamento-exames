@@ -2,17 +2,26 @@
  * Gestão Comercial — camada única de cálculo (cards = gráfico = tabela).
  * Valores = contratados/fechados (aprovação), não recebimento/faturamento.
  */
+import {
+  labelClienteContratoStatusExibicao,
+  labelPagamentoContrato,
+} from "@/lib/cliente-contrato-mappers";
+import {
+  labelPagamentoFechamento,
+  resolverContratacaoComercial,
+  type FormaContratacaoComercial,
+} from "@/lib/contratacao-comercial";
 import { formatCurrency } from "@/lib/money";
 import {
   formatOrcamentoOrigemCliente,
   type OrcamentoOrigemCliente,
 } from "@/lib/orcamento-origem";
-import type { ClienteContratoStatus } from "@/lib/types";
+import type { ClienteContratoStatus, ClienteContratoTipo } from "@/lib/types";
 
 export const GESTAO_COMERCIAL_DISCLAIMER =
   "Valores comerciais fechados de contratos ativos (contabilizáveis), independentemente do recebimento. Encerrados e cancelados ficam fora dos totais principais.";
 
-export type GestaoComercialFormaPagamento = "avista" | "parcelado";
+export type GestaoComercialFormaPagamento = "avista" | "parcelado" | "indefinido";
 
 export type GestaoComercialTipoContratoFiltro = "novo" | "renovacao" | "";
 
@@ -50,8 +59,14 @@ export interface GestaoComercialFechamentoRow {
   valorFechado: number;
   usouValorOriginalFallback: boolean;
   formaPagamento: GestaoComercialFormaPagamento;
+  /** Condição exibida. Mensal não é abreviado para “À vista” nem “Parcelado”. */
+  pagamentoLabel: string;
   condicaoPagamento: string | null;
   statusContrato: ClienteContratoStatus | null;
+  /** Status operacional legível. A parcela em aberto não substitui este rótulo. */
+  statusExibicao: string;
+  /** Pendência ou quitação, separada do status operacional. */
+  statusFinanceiro: string | null;
   orcamentoStatus: string | null;
 }
 
@@ -219,25 +234,136 @@ export function defaultGestaoComercialFilters(
   };
 }
 
-export function resolveFormaPagamentoFechamento(params: {
-  quantidade_parcelas?: number | null;
-  valor_parcela?: number | null;
-  condicao_pagamento?: string | null;
-}): GestaoComercialFormaPagamento {
-  if (
-    params.quantidade_parcelas != null &&
-    Number(params.quantidade_parcelas) > 1
-  ) {
-    return "parcelado";
-  }
-  if (params.valor_parcela != null && Number(params.valor_parcela) > 0) {
-    return "parcelado";
-  }
-  const condicao = (params.condicao_pagamento ?? "").toLowerCase();
-  if (condicao.includes("x de") || /^\d+x\b/.test(condicao)) {
-    return "parcelado";
-  }
-  return "avista";
+export function formaPagamentoGestao(
+  forma: FormaContratacaoComercial
+): GestaoComercialFormaPagamento {
+  if (forma === "avista") return "avista";
+  if (forma === "mensal" || forma === "parcelado") return "parcelado";
+  return "indefinido";
+}
+
+export type FechamentoGestaoComercialFonte = {
+  aprovacaoId: string;
+  orcamentoId: string;
+  aprovadoEm: string;
+  numeroOrcamento: string;
+  clienteNome: string;
+  clienteCnpj: string;
+  origem: OrcamentoOrigemCliente | null;
+  responsavelNoFechamento: string;
+  responsavelAproximado: boolean;
+  quantidadeColaboradores: number;
+  orcamentoStatus: string | null;
+  modalidade?: string | null;
+  mensalidadePagamento?: string | null;
+  valorMensal?: number | null;
+  valorMensalOriginal?: number | null;
+  meses?: number | null;
+  condicaoPagamento?: string | null;
+  valorBruto?: number | null;
+  valorPontual?: number | null;
+  descontoValor?: number | null;
+  valorAvista?: number | null;
+  valorFinal?: number | null;
+  valorTotalOrcamento?: number | null;
+  quantidadeParcelas?: number | null;
+  valorParcela?: number | null;
+  contrato?: {
+    id: string;
+    numero: string | null;
+    status: ClienteContratoStatus | null;
+    dataInicio?: string | null;
+    dataFim?: string | null;
+    encerradoEm?: string | null;
+    tipoContrato?: ClienteContratoTipo | null;
+    condicaoPagamento?: string | null;
+    contratoAssinadoEm?: string | null;
+    boletoPago?: boolean | null;
+  } | null;
+};
+
+/**
+ * Uma aprovação vira uma linha. O total da vigência entra uma vez;
+ * parcelas pagas não são somadas de novo.
+ */
+export function montarFechamentoGestaoComercial(
+  fonte: FechamentoGestaoComercialFonte,
+  hojeIso?: string
+): GestaoComercialFechamentoRow {
+  const resolvido = resolverContratacaoComercial({
+    modalidade: fonte.modalidade,
+    mensalidadePagamento: fonte.mensalidadePagamento,
+    valorMensal: fonte.valorMensal,
+    valorMensalOriginal: fonte.valorMensalOriginal,
+    meses: fonte.meses,
+    condicaoPagamento: fonte.condicaoPagamento,
+    valorBruto: fonte.valorBruto,
+    valorPontual: fonte.valorPontual,
+    descontoValor: fonte.descontoValor,
+    valorAvista: fonte.valorAvista,
+    valorRegistrado: fonte.valorFinal,
+    valorOriginalRegistrado: fonte.valorTotalOrcamento,
+    quantidadeParcelas: fonte.quantidadeParcelas,
+    valorParcela: fonte.valorParcela,
+  });
+  const valorFinal = resolvido.valorFinal;
+  const valorOriginal = resolvido.valorOriginal ?? valorFinal ?? 0;
+  const contrato = fonte.contrato;
+  const statusExibicao = contrato?.status
+    ? labelClienteContratoStatusExibicao(
+        {
+          status: contrato.status,
+          data_inicio: contrato.dataInicio ?? "",
+          data_fim: contrato.dataFim ?? null,
+          encerrado_em: contrato.encerradoEm ?? null,
+          tipo_contrato: contrato.tipoContrato ?? null,
+          condicao_pagamento:
+            contrato.condicaoPagamento ?? fonte.condicaoPagamento ?? "",
+          contrato_assinado_em: contrato.contratoAssinadoEm ?? null,
+          modalidadeOrcamento: fonte.modalidade,
+          mensalidadePagamento: fonte.mensalidadePagamento,
+        },
+        hojeIso
+      )
+    : "—";
+  const financeiro = contrato?.status
+    ? labelPagamentoContrato({
+        status: contrato.status,
+        boleto_pago: contrato.boletoPago === true,
+      })
+    : "—";
+  const statusFinanceiro =
+    financeiro !== "—" &&
+    financeiro !== statusExibicao &&
+    statusExibicao !== "Aguardando pagamento"
+      ? financeiro
+      : null;
+
+  return {
+    aprovacaoId: fonte.aprovacaoId,
+    orcamentoId: fonte.orcamentoId,
+    contratoId: contrato?.id ?? null,
+    aprovadoEm: fonte.aprovadoEm,
+    numeroOrcamento: fonte.numeroOrcamento,
+    numeroContrato: contrato?.numero ?? null,
+    clienteNome: fonte.clienteNome,
+    clienteCnpj: fonte.clienteCnpj,
+    origem: fonte.origem,
+    responsavelNoFechamento: fonte.responsavelNoFechamento,
+    responsavelAproximado: fonte.responsavelAproximado,
+    quantidadeColaboradores: fonte.quantidadeColaboradores,
+    valorOriginalOrcamento: valorOriginal,
+    valorFinalAprovado: valorFinal,
+    valorFechado: valorFinal ?? valorOriginal,
+    usouValorOriginalFallback: valorFinal == null && valorOriginal > 0,
+    formaPagamento: formaPagamentoGestao(resolvido.forma),
+    pagamentoLabel: labelPagamentoFechamento(resolvido),
+    condicaoPagamento: fonte.condicaoPagamento ?? null,
+    statusContrato: contrato?.status ?? null,
+    statusExibicao,
+    statusFinanceiro,
+    orcamentoStatus: fonte.orcamentoStatus,
+  };
 }
 
 /** valor_final válido; senão fallback no valor original do orçamento. */

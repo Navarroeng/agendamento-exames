@@ -1,14 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import {
-  resolveFormaPagamentoFechamento,
-  resolveValorFechado,
+  montarFechamentoGestaoComercial,
   type GestaoComercialFechamentoRow,
   type GestaoComercialHistoricoMensal,
 } from "@/lib/gestao-comercial";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { normalizePerfilUsuario } from "@/lib/contrato-permissoes";
-import type { ClienteContratoStatus } from "@/lib/types";
+import type { ClienteContratoStatus, ClienteContratoTipo } from "@/lib/types";
 
 export class GestaoComercialForbiddenError extends Error {
   constructor(message = "Acesso restrito a administradores.") {
@@ -37,6 +36,19 @@ async function assertAdminGestaoComercial(): Promise<void> {
   }
 }
 
+type ContratoQueryRow = {
+  id: string;
+  numero: string | null;
+  status: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+  encerrado_em: string | null;
+  tipo_contrato: string | null;
+  condicao_pagamento: string | null;
+  contrato_assinado_em: string | null;
+  boleto_pago: boolean | null;
+};
+
 type AprovacaoQueryRow = {
   id: string;
   orcamento_id: string;
@@ -46,6 +58,13 @@ type AprovacaoQueryRow = {
   condicao_pagamento: string | null;
   quantidade_parcelas: number | null;
   valor_parcela: number | null;
+  valor_avista: number | null;
+  mensalidade_pagamento: string | null;
+  mensalidade_valor_mensal: number | null;
+  mensalidade_meses: number | null;
+  mensalidade_valor_bruto: number | null;
+  mensalidade_valor_pontual: number | null;
+  mensalidade_desconto_valor: number | null;
   responsavel_no_fechamento: string | null;
   responsavel_no_fechamento_aproximado: boolean | null;
   orcamentos: {
@@ -57,11 +76,8 @@ type AprovacaoQueryRow = {
     responsavel: string | null;
     valor_total: number | null;
     status: string | null;
-    cliente_contratos: Array<{
-      id: string;
-      numero: string | null;
-      status: string | null;
-    }> | null;
+    modalidade: string | null;
+    cliente_contratos: ContratoQueryRow[] | ContratoQueryRow | null;
   } | null;
 };
 
@@ -87,6 +103,13 @@ export async function listarFechamentosGestaoComercial(): Promise<
       condicao_pagamento,
       quantidade_parcelas,
       valor_parcela,
+      valor_avista,
+      mensalidade_pagamento,
+      mensalidade_valor_mensal,
+      mensalidade_meses,
+      mensalidade_valor_bruto,
+      mensalidade_valor_pontual,
+      mensalidade_desconto_valor,
       responsavel_no_fechamento,
       responsavel_no_fechamento_aproximado,
       orcamentos!inner (
@@ -98,10 +121,18 @@ export async function listarFechamentosGestaoComercial(): Promise<
         responsavel,
         valor_total,
         status,
+        modalidade,
         cliente_contratos (
           id,
           numero,
-          status
+          status,
+          data_inicio,
+          data_fim,
+          encerrado_em,
+          tipo_contrato,
+          condicao_pagamento,
+          contrato_assinado_em,
+          boleto_pago
         )
       )
       `
@@ -122,12 +153,6 @@ export async function listarFechamentosGestaoComercial(): Promise<
         : [];
     const contrato = contratos[0] ?? null;
 
-    const valorOriginal = Number(orc.valor_total) || 0;
-    const { valor, usouFallback } = resolveValorFechado(
-      raw.valor_final,
-      valorOriginal
-    );
-
     const origem = isOrcamentoOrigemCliente(orc.origem_cliente)
       ? orc.origem_cliente
       : null;
@@ -137,37 +162,51 @@ export async function listarFechamentosGestaoComercial(): Promise<
       (orc.responsavel ?? "").trim() ||
       "Não informado";
 
-    rows.push({
-      aprovacaoId: raw.id,
-      orcamentoId: orc.id,
-      contratoId: contrato?.id ?? null,
-      aprovadoEm: raw.aprovado_em,
-      numeroOrcamento: orc.numero,
-      numeroContrato: contrato?.numero ?? null,
-      clienteNome: orc.cliente_nome,
-      clienteCnpj: orc.cliente_cnpj,
-      origem,
-      responsavelNoFechamento: responsavel,
-      responsavelAproximado:
-        raw.responsavel_no_fechamento_aproximado === true ||
-        !(raw.responsavel_no_fechamento ?? "").trim(),
-      quantidadeColaboradores: Number(raw.quantidade_colaboradores) || 0,
-      valorOriginalOrcamento: valorOriginal,
-      valorFinalAprovado:
-        raw.valor_final != null && Number(raw.valor_final) > 0
-          ? Number(raw.valor_final)
+    rows.push(
+      montarFechamentoGestaoComercial({
+        aprovacaoId: raw.id,
+        orcamentoId: orc.id,
+        aprovadoEm: raw.aprovado_em,
+        numeroOrcamento: orc.numero,
+        clienteNome: orc.cliente_nome,
+        clienteCnpj: orc.cliente_cnpj,
+        origem,
+        responsavelNoFechamento: responsavel,
+        responsavelAproximado:
+          raw.responsavel_no_fechamento_aproximado === true ||
+          !(raw.responsavel_no_fechamento ?? "").trim(),
+        quantidadeColaboradores: Number(raw.quantidade_colaboradores) || 0,
+        orcamentoStatus: orc.status,
+        modalidade: orc.modalidade,
+        mensalidadePagamento: raw.mensalidade_pagamento,
+        valorMensal: raw.mensalidade_valor_mensal ?? raw.valor_final,
+        valorMensalOriginal: orc.valor_total,
+        meses: raw.mensalidade_meses,
+        condicaoPagamento: raw.condicao_pagamento,
+        valorBruto: raw.mensalidade_valor_bruto,
+        valorPontual: raw.mensalidade_valor_pontual,
+        descontoValor: raw.mensalidade_desconto_valor,
+        valorAvista: raw.valor_avista,
+        valorFinal: raw.valor_final,
+        valorTotalOrcamento: orc.valor_total,
+        quantidadeParcelas: raw.quantidade_parcelas,
+        valorParcela: raw.valor_parcela,
+        contrato: contrato
+          ? {
+              id: contrato.id,
+              numero: contrato.numero,
+              status: (contrato.status as ClienteContratoStatus | null) ?? null,
+              dataInicio: contrato.data_inicio,
+              dataFim: contrato.data_fim,
+              encerradoEm: contrato.encerrado_em,
+              tipoContrato: (contrato.tipo_contrato as ClienteContratoTipo | null) ?? null,
+              condicaoPagamento: contrato.condicao_pagamento,
+              contratoAssinadoEm: contrato.contrato_assinado_em,
+              boletoPago: contrato.boleto_pago,
+            }
           : null,
-      valorFechado: valor,
-      usouValorOriginalFallback: usouFallback,
-      formaPagamento: resolveFormaPagamentoFechamento({
-        quantidade_parcelas: raw.quantidade_parcelas,
-        valor_parcela: raw.valor_parcela,
-        condicao_pagamento: raw.condicao_pagamento,
-      }),
-      condicaoPagamento: raw.condicao_pagamento,
-      statusContrato: (contrato?.status as ClienteContratoStatus | null) ?? null,
-      orcamentoStatus: orc.status,
-    });
+      })
+    );
   }
 
   return rows;

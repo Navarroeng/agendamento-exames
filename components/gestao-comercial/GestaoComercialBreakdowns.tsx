@@ -98,7 +98,7 @@ export function GestaoComercialBreakdowns({
           </div>
           <div className="rounded-xl bg-[#f7f9fc] p-3">
             <p className="text-[10px] font-bold uppercase text-[#8b95a8]">
-              Parcelado
+              Parcelado / mensal
             </p>
             <p className="mt-1 font-extrabold text-navy">
               {dashboard.pagamento.parceladoQtd} contratos

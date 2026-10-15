@@ -1,4 +1,5 @@
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import { resolverContratacaoComercial } from "@/lib/contratacao-comercial";
 import { formatCurrency } from "@/lib/money";
 import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
 import {
@@ -328,24 +329,21 @@ export function resumoComercialContrato(
     };
   }
 
-  if (
-    contratoCobrancaMensal(contrato) &&
-    meses &&
-    Number.isFinite(valorRegistrado) &&
-    valorRegistrado > 0
-  ) {
-    return {
-      total: (centavos(valorRegistrado) * meses) / 100,
-      condicao: `${meses}x de ${formatCurrency(valorRegistrado)}`,
-    };
-  }
-
+  const resolvido = resolverContratacaoComercial({
+    modalidade: contrato.modalidadeOrcamento,
+    mensalidadePagamento: contrato.mensalidadePagamento,
+    valorMensal: valorRegistrado,
+    valorMensalOriginal: valorRegistrado,
+    condicaoPagamento: contrato.condicao_pagamento,
+    valorAvista: contrato.valor_avista,
+    valorRegistrado,
+    valorOriginalRegistrado: valorRegistrado,
+    quantidadeParcelas: contrato.quantidade_parcelas,
+    valorParcela: contrato.valor_parcela,
+  });
   return {
-    total:
-      Number.isFinite(valorRegistrado) && valorRegistrado > 0
-        ? valorRegistrado
-        : null,
-    condicao: contrato.condicao_pagamento?.trim() || "—",
+    total: resolvido.valorFinal,
+    condicao: resolvido.pagamento,
   };
 }
 

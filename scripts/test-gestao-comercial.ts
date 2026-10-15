@@ -7,8 +7,10 @@ import {
   indexHistoricoMensal,
   isContratoContabilizavel,
   labelPeriodoAteMes,
+  montarFechamentoGestaoComercial,
   resolveValorFechado,
   resolveValorMesGestaoComercial,
+  type FechamentoGestaoComercialFonte,
   type GestaoComercialFechamentoRow,
   type GestaoComercialHistoricoMensal,
 } from "../lib/gestao-comercial";
@@ -33,8 +35,11 @@ const base = (
   valorFechado: partial.valorFechado ?? 1400,
   usouValorOriginalFallback: partial.usouValorOriginalFallback ?? false,
   formaPagamento: partial.formaPagamento ?? "avista",
+  pagamentoLabel: partial.pagamentoLabel ?? "À vista",
   condicaoPagamento: "À vista",
   statusContrato: partial.statusContrato ?? "ativo",
+  statusExibicao: partial.statusExibicao ?? "Ativo",
+  statusFinanceiro: partial.statusFinanceiro ?? null,
   orcamentoStatus: partial.orcamentoStatus ?? "aprovado",
 });
 
@@ -308,5 +313,257 @@ assert.equal(fev2025.porAno[2025], 25910 + 25646);
 const set2026 = evo.acumuladoMensal.find((m) => m.mes === 9)!;
 assert.equal(set2026.porAno[2026], null);
 assert.ok(set2026.porAno[2025] != null);
+
+function fonte(
+  partial: Partial<FechamentoGestaoComercialFonte> &
+    Pick<FechamentoGestaoComercialFonte, "aprovacaoId">
+): FechamentoGestaoComercialFonte {
+  return {
+    orcamentoId: partial.aprovacaoId,
+    aprovadoEm: "2026-10-14T15:00:00.000Z",
+    numeroOrcamento: "ORC-2026-0075",
+    clienteNome: "Cliente",
+    clienteCnpj: "45724418000180",
+    origem: "google",
+    responsavelNoFechamento: "Bruna",
+    responsavelAproximado: false,
+    quantidadeColaboradores: 8,
+    orcamentoStatus: "aprovado",
+    ...partial,
+  };
+}
+
+const jet = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "jet",
+    numeroOrcamento: "ORC-2026-0075",
+    clienteNome: "JET SERVICE BOMBAS",
+    modalidade: "mensalidade",
+    mensalidadePagamento: "mensal",
+    valorMensal: 170,
+    valorMensalOriginal: 170,
+    meses: 12,
+    condicaoPagamento: "12 mensalidades",
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    quantidadeParcelas: null,
+    valorParcela: null,
+    contrato: {
+      id: "ctr-43",
+      numero: "CTR-2026-0043",
+      status: "aguardando_pagamento",
+      dataInicio: "2026-10-14",
+      dataFim: "2027-10-14",
+      tipoContrato: "anual",
+      condicaoPagamento: "12 mensalidades",
+      contratoAssinadoEm: "2026-10-14",
+      boletoPago: false,
+    },
+  }),
+  "2026-10-15"
+);
+assert.equal(jet.valorOriginalOrcamento, 2040);
+assert.equal(jet.valorFinalAprovado, 2040);
+assert.equal(jet.valorFechado, 2040);
+assert.equal(jet.pagamentoLabel, "Mensal — 12x de R$ 170,00");
+assert.equal(jet.formaPagamento, "parcelado");
+assert.notEqual(jet.formaPagamento, "avista");
+assert.equal(jet.statusContrato, "aguardando_pagamento");
+assert.equal(jet.statusExibicao, "Ativo");
+assert.equal(jet.statusFinanceiro, "Pendente");
+assert.notEqual(jet.statusExibicao, "Aguardando pagamento");
+
+const jetSemCamposNovos = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "jet-antigo",
+    modalidade: "mensalidade",
+    mensalidadePagamento: null,
+    condicaoPagamento: "12 mensalidades",
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    quantidadeParcelas: null,
+    valorParcela: null,
+  }),
+  "2026-10-15"
+);
+assert.equal(jetSemCamposNovos.valorFechado, 2040);
+assert.equal(jetSemCamposNovos.pagamentoLabel, "Mensal — 12x de R$ 170,00");
+assert.equal(jetSemCamposNovos.formaPagamento, "parcelado");
+
+const mensalSemPrazo = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "sem-prazo",
+    modalidade: "mensalidade",
+    mensalidadePagamento: null,
+    condicaoPagamento: null,
+    meses: null,
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    quantidadeParcelas: null,
+    valorParcela: null,
+  })
+);
+assert.equal(mensalSemPrazo.valorFechado, 170);
+assert.equal(mensalSemPrazo.pagamentoLabel, "Mensal");
+assert.notEqual(mensalSemPrazo.formaPagamento, "avista");
+
+const avistaComDesconto = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "avista",
+    aprovadoEm: "2026-10-16T12:00:00.000Z",
+    numeroOrcamento: "ORC-2026-0080",
+    clienteNome: "Pagamento antecipado",
+    responsavelNoFechamento: "Ana",
+    modalidade: "mensalidade",
+    mensalidadePagamento: "avista",
+    valorMensal: 170,
+    valorMensalOriginal: 170,
+    meses: 12,
+    condicaoPagamento: "À vista",
+    valorBruto: 2040,
+    descontoValor: 204,
+    valorAvista: 1836,
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    quantidadeParcelas: 1,
+    valorParcela: 1836,
+    contrato: {
+      id: "ctr-avista",
+      numero: "CTR-2026-0080",
+      status: "assinado",
+      dataInicio: "2026-10-16",
+      dataFim: "2027-10-16",
+      tipoContrato: "mensal",
+      condicaoPagamento: "À vista",
+      contratoAssinadoEm: "2026-10-16",
+      boletoPago: false,
+    },
+  }),
+  "2026-10-15"
+);
+assert.equal(avistaComDesconto.valorOriginalOrcamento, 2040);
+assert.equal(avistaComDesconto.valorFinalAprovado, 1836);
+assert.equal(avistaComDesconto.valorFechado, 1836);
+assert.equal(avistaComDesconto.pagamentoLabel, "À vista");
+assert.equal(avistaComDesconto.formaPagamento, "avista");
+assert.notEqual(avistaComDesconto.valorFechado, 170);
+
+const avistaSemBruto = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "avista-calc",
+    modalidade: "mensalidade",
+    mensalidadePagamento: "avista",
+    valorMensal: 170,
+    meses: 12,
+    condicaoPagamento: "À vista",
+    valorAvista: 1836,
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    quantidadeParcelas: 1,
+    valorParcela: 1836,
+  })
+);
+assert.equal(avistaSemBruto.valorOriginalOrcamento, 2040);
+assert.equal(avistaSemBruto.valorFechado, 1836);
+
+const pontual = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "pontual",
+    aprovadoEm: "2026-10-18T12:00:00.000Z",
+    numeroOrcamento: "ORC-2026-0090",
+    clienteNome: "Laudo pontual",
+    responsavelNoFechamento: "Ana",
+    modalidade: "pontual",
+    condicaoPagamento: "2x de R$ 450,00",
+    valorFinal: 900,
+    valorTotalOrcamento: 1000,
+    quantidadeParcelas: 2,
+    valorParcela: 450,
+    contrato: {
+      id: "ctr-pontual",
+      numero: "CTR-2026-0090",
+      status: "aguardando_pagamento",
+      dataInicio: "2026-10-18",
+      dataFim: "2027-10-18",
+      tipoContrato: "avulso",
+      condicaoPagamento: "2x de R$ 450,00",
+      boletoPago: false,
+    },
+  }),
+  "2026-10-15"
+);
+assert.equal(pontual.valorOriginalOrcamento, 1000);
+assert.equal(pontual.valorFinalAprovado, 900);
+assert.equal(pontual.valorFechado, 900);
+assert.equal(pontual.pagamentoLabel, "2x de R$ 450,00");
+assert.equal(pontual.formaPagamento, "parcelado");
+assert.notEqual(pontual.valorFechado, 1800);
+assert.equal(pontual.statusExibicao, "Aguardando pagamento");
+assert.equal(pontual.statusFinanceiro, null);
+
+const encerrado = montarFechamentoGestaoComercial(
+  fonte({
+    aprovacaoId: "encerrado",
+    modalidade: "mensalidade",
+    mensalidadePagamento: "mensal",
+    valorMensal: 170,
+    meses: 12,
+    condicaoPagamento: "12 mensalidades",
+    valorFinal: 170,
+    valorTotalOrcamento: 170,
+    contrato: {
+      id: "ctr-enc",
+      numero: "CTR-ENC",
+      status: "encerrado",
+      dataInicio: "2026-10-01",
+      dataFim: "2027-10-01",
+      tipoContrato: "mensal",
+      condicaoPagamento: "12 mensalidades",
+    },
+  }),
+  "2026-10-15"
+);
+assert.equal(encerrado.valorFechado, 2040);
+assert.equal(encerrado.statusExibicao, "Encerrado");
+
+const dashOutubro = buildGestaoComercialDashboard(
+  [jet, avistaComDesconto, pontual, encerrado],
+  {
+    ano: 2026,
+    mes: 10,
+    periodoInicio: "",
+    periodoFim: "",
+    responsavel: "",
+    origem: "",
+    tipo: "",
+    statusContrato: "ativos",
+    usarPeriodoPersonalizado: false,
+  }
+);
+const somaTabela = dashOutubro.rows.reduce((s, row) => s + row.valorFechado, 0);
+assert.equal(dashOutubro.rows.length, 3);
+assert.equal(somaTabela, 2040 + 1836 + 900);
+assert.equal(dashOutubro.valorFechado, somaTabela);
+assert.equal(dashOutubro.ticketMedio, somaTabela / 3);
+assert.equal(dashOutubro.pagamento.avistaQtd, 1);
+assert.equal(dashOutubro.pagamento.avistaValor, 1836);
+assert.equal(dashOutubro.pagamento.parceladoQtd, 2);
+assert.equal(dashOutubro.pagamento.parceladoValor, 2040 + 900);
+assert.equal(
+  dashOutubro.pagamento.avistaValor + dashOutubro.pagamento.parceladoValor,
+  dashOutubro.valorFechado
+);
+const outubro = dashOutubro.serieMensalAno.find((mes) => mes.mes === 10);
+assert.equal(outubro?.valorFechado, somaTabela);
+const bruna = dashOutubro.porResponsavel.find((item) => item.chave === "Bruna");
+const ana = dashOutubro.porResponsavel.find((item) => item.chave === "Ana");
+assert.equal(bruna?.quantidade, 1);
+assert.equal(bruna?.valorFechado, 2040);
+assert.equal(ana?.quantidade, 2);
+assert.equal(ana?.valorFechado, 1836 + 900);
+assert.equal(
+  (bruna?.valorFechado ?? 0) + (ana?.valorFechado ?? 0),
+  dashOutubro.valorFechado
+);
 
 console.log("test-gestao-comercial: OK");

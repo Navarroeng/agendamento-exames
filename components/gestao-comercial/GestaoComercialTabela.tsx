@@ -175,10 +175,15 @@ export function GestaoComercialTabela({
                       </span>
                     ) : null}
                   </td>
+                  <td className="px-2 py-2">{row.pagamentoLabel}</td>
                   <td className="px-2 py-2">
-                    {row.formaPagamento === "avista" ? "À vista" : "Parcelado"}
+                    <div>{row.statusExibicao}</div>
+                    {row.statusFinanceiro ? (
+                      <div className="text-[10px] font-semibold text-app-muted">
+                        {row.statusFinanceiro}
+                      </div>
+                    ) : null}
                   </td>
-                  <td className="px-2 py-2">{row.statusContrato ?? "—"}</td>
                   <td className="px-2 py-2">
                     <a
                       className="text-xs font-bold text-[#4354e8] hover:underline"
