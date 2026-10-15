@@ -1,4 +1,5 @@
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import { formatCurrency } from "@/lib/money";
 import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
 import {
   resolverGradeMensalidades,
@@ -231,6 +232,121 @@ export function ordenarContratosRecentes<T extends ClienteContratoConsulta>(
     if (porRecencia !== 0) return porRecencia;
     return (b.numero ?? "").localeCompare(a.numero ?? "");
   });
+}
+
+function centavos(valor: number): number {
+  return Math.round(Number(valor) * 100);
+}
+
+function mesesNaCondicao(condicao: string | null | undefined): number | null {
+  const match = (condicao ?? "").match(/(\d+)\s*mensalidades?/i);
+  if (!match) return null;
+  const quantidade = Number(match[1]);
+  return Number.isInteger(quantidade) && quantidade > 0 ? quantidade : null;
+}
+
+function pagamentoAvista(
+  contrato: Pick<ClienteContratoRecord, "condicao_pagamento"> &
+    ContextoCobrancaContrato
+): boolean {
+  if (contrato.mensalidadePagamento === "avista") return true;
+  return /à\s*vista|\bavista\b/i.test(contrato.condicao_pagamento ?? "");
+}
+
+function parcelasDaContratacao(
+  contrato: Pick<ClienteContratoConsulta, "parcelasMensalidade">
+): Array<{ valorCentavos: number }> {
+  return (contrato.parcelasMensalidade ?? [])
+    .filter((parcela) => Number(parcela.valor) > 0)
+    .map((parcela) => ({ valorCentavos: centavos(Number(parcela.valor)) }));
+}
+
+/**
+ * Total da vigência e condição, só com o que foi gravado na contratação.
+ * Parcela incompleta não reduz o total quando a condição já informa a quantidade.
+ * Não usa a fórmula de renovação.
+ */
+export function resumoComercialContrato(
+  contrato: Pick<
+    ClienteContratoRecord,
+    | "valor_contrato"
+    | "condicao_pagamento"
+    | "tipo_contrato"
+    | "quantidade_parcelas"
+    | "valor_parcela"
+    | "valor_avista"
+  > &
+    ContextoCobrancaContrato
+): { total: number | null; condicao: string } {
+  if (pagamentoAvista(contrato)) {
+    const liquido = Number(contrato.valor_avista);
+    const parcela = Number(contrato.valor_parcela);
+    const contratado = Number(contrato.valor_contrato);
+    const total =
+      Number.isFinite(liquido) && liquido > 0
+        ? liquido
+        : Number(contrato.quantidade_parcelas) === 1 && parcela > 0
+          ? parcela
+          : Number.isFinite(contratado) && contratado > 0
+            ? contratado
+            : null;
+    return { total, condicao: "À vista" };
+  }
+
+  const parcelas = parcelasDaContratacao(contrato);
+  const meses = mesesNaCondicao(contrato.condicao_pagamento);
+  const quantidadeSalva = Number(contrato.quantidade_parcelas);
+  const valorParcela = Number(contrato.valor_parcela);
+  const valorRegistrado = Number(contrato.valor_contrato);
+  const parcelasCompletas =
+    parcelas.length > 0 && (meses == null || parcelas.length === meses);
+
+  if (parcelasCompletas) {
+    const totalCentavos = parcelas.reduce(
+      (soma, parcela) => soma + parcela.valorCentavos,
+      0
+    );
+    const iguais = parcelas.every(
+      (parcela) => parcela.valorCentavos === parcelas[0].valorCentavos
+    );
+    return {
+      total: totalCentavos / 100,
+      condicao: iguais
+        ? `${parcelas.length}x de ${formatCurrency(parcelas[0].valorCentavos / 100)}`
+        : contrato.condicao_pagamento?.trim() || `${parcelas.length} parcelas`,
+    };
+  }
+
+  if (
+    Number.isInteger(quantidadeSalva) &&
+    quantidadeSalva > 1 &&
+    valorParcela > 0
+  ) {
+    return {
+      total: (centavos(valorParcela) * quantidadeSalva) / 100,
+      condicao: `${quantidadeSalva}x de ${formatCurrency(valorParcela)}`,
+    };
+  }
+
+  if (
+    contratoCobrancaMensal(contrato) &&
+    meses &&
+    Number.isFinite(valorRegistrado) &&
+    valorRegistrado > 0
+  ) {
+    return {
+      total: (centavos(valorRegistrado) * meses) / 100,
+      condicao: `${meses}x de ${formatCurrency(valorRegistrado)}`,
+    };
+  }
+
+  return {
+    total:
+      Number.isFinite(valorRegistrado) && valorRegistrado > 0
+        ? valorRegistrado
+        : null,
+    condicao: contrato.condicao_pagamento?.trim() || "—",
+  };
 }
 
 export function labelFinanceiroMensalidade(

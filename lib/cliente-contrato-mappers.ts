@@ -18,6 +18,7 @@ import {
   contratoVigenciaCobreData,
   labelFinanceiroMensalidade,
   ordenarContratosRecentes,
+  resumoComercialContrato,
   selecionarContratoAtual,
   type ClienteContratoConsulta,
 } from "@/lib/cliente-contrato-atual";
@@ -268,13 +269,32 @@ export function formatValorContrato(valor: number | null | undefined): string {
 export function formatValorContratoExibicao(
   contrato: Pick<
     ClienteContratoRecord,
-    "valor_contrato" | "tipo_contrato" | "condicao_pagamento"
+    | "valor_contrato"
+    | "tipo_contrato"
+    | "condicao_pagamento"
+    | "quantidade_parcelas"
+    | "valor_parcela"
+    | "valor_avista"
   > &
     Partial<ClienteContratoConsulta>
 ): string {
-  const valor = formatValorContrato(contrato.valor_contrato);
-  if (valor === "—") return valor;
-  return contratoCobrancaMensal(contrato) ? `${valor}/mês` : valor;
+  const total = resumoComercialContrato(contrato).total;
+  return formatValorContrato(total);
+}
+
+export function condicaoPagamentoExibicao(
+  contrato: Pick<
+    ClienteContratoRecord,
+    | "valor_contrato"
+    | "tipo_contrato"
+    | "condicao_pagamento"
+    | "quantidade_parcelas"
+    | "valor_parcela"
+    | "valor_avista"
+  > &
+    Partial<ClienteContratoConsulta>
+): string {
+  return resumoComercialContrato(contrato).condicao;
 }
 
 export function formatReajusteContrato(

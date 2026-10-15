@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import {
+  condicaoPagamentoExibicao,
   formatValorContratoExibicao,
   getContratoAtual,
   getHistoricoContratos,
@@ -91,11 +92,13 @@ assert.equal(
   labelClienteContratoStatusExibicao(mensalVigente, hoje),
   "Ativo"
 );
-assert.equal(formatValorContratoExibicao(mensalVigente), "R$ 170,00/mês");
+assert.equal(formatValorContratoExibicao(mensalVigente), "R$ 2.040,00");
+assert.equal(condicaoPagamentoExibicao(mensalVigente), "12x de R$ 170,00");
 assert.equal(
   labelFinanceiroContrato(mensalVigente, hoje),
   "Parcelas a vencer"
 );
+assert.equal(formatValorContratoExibicao(antigo), "R$ 1.602,00");
 assert.notEqual(
   labelClienteContratoStatusExibicao(mensalVigente, hoje),
   "Aguardando pagamento"
@@ -175,5 +178,40 @@ const duplicado = getContratoAtual(
 );
 assert.equal(duplicado?.id, "novo");
 assert.equal(duplicado?.valor_contrato, 170);
+
+const dozeParcelas = Array.from({ length: 12 }, (_, indice) => ({
+  vigenciaInicio: "2026-10-14",
+  numero: indice + 1,
+  vencimentoIso: "2026-11-10",
+  valor: 170,
+  pagoEmIso: null,
+}));
+const comParcelas = contrato({
+  ...mensalVigente,
+  id: "parcelas",
+  valor_contrato: 999,
+  parcelasMensalidade: dozeParcelas,
+});
+assert.equal(formatValorContratoExibicao(comParcelas), "R$ 2.040,00");
+assert.equal(condicaoPagamentoExibicao(comParcelas), "12x de R$ 170,00");
+
+const avista = contrato({
+  id: "avista",
+  status: "assinado",
+  tipo_contrato: "mensal",
+  condicao_pagamento: "À vista",
+  modalidadeOrcamento: "mensalidade",
+  mensalidadePagamento: "avista",
+  valor_contrato: 170,
+  valor_avista: 1800,
+  quantidade_parcelas: 1,
+  valor_parcela: 1800,
+  boleto_pago: false,
+  data_inicio: "2026-10-14",
+  data_fim: "2027-10-14",
+});
+assert.equal(formatValorContratoExibicao(avista), "R$ 1.800,00");
+assert.equal(condicaoPagamentoExibicao(avista), "À vista");
+assert.equal(labelFinanceiroContrato(avista, hoje), "Aguardando vencimento");
 
 console.log("test-cliente-contrato-acompanhamento: OK");

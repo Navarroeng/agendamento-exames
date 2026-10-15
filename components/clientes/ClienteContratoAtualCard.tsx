@@ -1,6 +1,7 @@
 import {
   clienteContratoBadgeClassExibicao,
   formatReajusteContrato,
+  condicaoPagamentoExibicao,
   formatValorContratoExibicao,
   formatVigenciaContrato,
   labelAgendamentoContrato,
@@ -18,9 +19,11 @@ interface ClienteContratoAtualCardProps {
 function Metric({
   label,
   value,
+  detail,
 }: {
   label: string;
   value: string;
+  detail?: string | null;
 }) {
   return (
     <div className="rounded-xl border border-[#e8edf5] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
@@ -28,6 +31,9 @@ function Metric({
         {label}
       </p>
       <p className="mt-1 text-sm font-extrabold text-[#1f2937]">{value}</p>
+      {detail ? (
+        <p className="mt-0.5 text-[11px] font-semibold text-[#64748b]">{detail}</p>
+      ) : null}
     </div>
   );
 }
@@ -52,6 +58,10 @@ export function ClienteContratoAtualCard({
 
   const agendamentoLabel = labelAgendamentoContrato(contrato);
   const statusLabel = labelClienteContratoStatusExibicao(contrato);
+  const condicao = condicaoPagamentoExibicao(contrato);
+  const situacao = labelFinanceiroContrato(contrato);
+  const detalheFinanceiro =
+    situacao !== "—" && situacao !== condicao ? situacao : null;
 
   return (
     <div className="rounded-2xl border border-[#dbe4f4] bg-gradient-to-br from-white via-[#fbfdff] to-[#f0f4ff] p-5 shadow-[0_8px_28px_rgba(67,84,232,0.08)]">
@@ -101,7 +111,8 @@ export function ClienteContratoAtualCard({
         ) : null}
         <Metric
           label="Financeiro"
-          value={labelFinanceiroContrato(contrato)}
+          value={condicao}
+          detail={detalheFinanceiro}
         />
         <Metric
           label="Valor"

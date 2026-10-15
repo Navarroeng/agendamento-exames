@@ -1,5 +1,6 @@
 import {
   clienteContratoBadgeClassExibicao,
+  condicaoPagamentoExibicao,
   formatValorContratoExibicao,
   labelAgendamentoContrato,
   labelClienteContratoStatusExibicao,
@@ -63,6 +64,8 @@ export function ClienteContratosHistoricoTable({
         <tbody>
           {contratos.map((contrato) => {
             const agendamento = labelAgendamentoContrato(contrato);
+            const condicao = condicaoPagamentoExibicao(contrato);
+            const situacao = labelFinanceiroContrato(contrato);
             return (
               <tr key={contrato.id}>
                 <td className="font-bold text-navy">
@@ -94,7 +97,12 @@ export function ClienteContratosHistoricoTable({
                   </span>
                 </td>
                 <td className="text-xs font-semibold text-[#52617a]">
-                  {labelFinanceiroContrato(contrato)}
+                  <div>{condicao}</div>
+                  {situacao !== "—" && situacao !== condicao ? (
+                    <div className="mt-0.5 text-[10px] font-semibold text-[#8b95a8]">
+                      {situacao}
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   <span
