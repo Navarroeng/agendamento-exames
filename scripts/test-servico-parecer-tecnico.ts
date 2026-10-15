@@ -52,7 +52,7 @@ assert.equal(
   false
 );
 assert.equal(isServicoInsalubridadeNome(SERVICO_PARECER_TECNICO_NOME), false);
-assert.equal(isServicoLaudoPontualNome(SERVICO_PARECER_TECNICO_NOME), false);
+assert.equal(isServicoLaudoPontualNome(SERVICO_PARECER_TECNICO_NOME), true);
 assert.equal(isServicoOferecidoNoOrcamento(SERVICO_PARECER_TECNICO_NOME), true);
 assert.equal(isServicoOferecidoNoOrcamento(SERVICO_INSALUBRIDADE_NOME), true);
 
@@ -75,6 +75,28 @@ const itemParecer = {
 };
 assert.equal(
   classifyOrcamentoFluxoImplantacao([itemParecer], null, null, "insal", null),
+  "parecer_tecnico"
+);
+assert.equal(
+  classifyOrcamentoFluxoImplantacao(
+    [{ servico_id: "parecer", servico_nome: "Serviço interno" }],
+    null,
+    null,
+    "insal",
+    null,
+    "parecer"
+  ),
+  "parecer_tecnico"
+);
+assert.equal(
+  classifyOrcamentoFluxoImplantacao(
+    [itemParecer, { servico_id: "pgr", servico_nome: "PGR" }],
+    null,
+    null,
+    "insal",
+    null,
+    "parecer"
+  ),
   "padrao"
 );
 assert.equal(

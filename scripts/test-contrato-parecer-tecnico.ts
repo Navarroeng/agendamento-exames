@@ -154,7 +154,7 @@ assert.equal(
 );
 assert.equal(
   classifyOrcamentoFluxoImplantacao(itens, null, "aet-1", "insal-1", "ltcat-1"),
-  "padrao"
+  "parecer_tecnico"
 );
 assert.equal(contratoUsaCronogramaVencimentos("parecer_tecnico"), true);
 assert.equal(contratoUsaCronogramaVencimentos("aet"), true);

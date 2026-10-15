@@ -139,15 +139,17 @@ export function isImplantacaoAetConcluida(
 }
 
 export function validateAetVisitaPayload(
-  payload: ImplantacaoAetVisitaPayload
+  payload: ImplantacaoAetVisitaPayload,
+  kind: LaudoPontualKind = "aet"
 ): string | null {
+  const dataLabel = kind === "parecer_tecnico" ? "perícia" : "visita";
   if (payload.visita_status === "aguardando_agendamento") return null;
-  if (!payload.visita_data) return "Informe a data da visita.";
+  if (!payload.visita_data) return `Informe a data da ${dataLabel}.`;
   if (payload.visita_status === "agendada" && !payload.visita_horario?.trim()) {
-    return "Informe o horário da visita.";
+    return `Informe o horário da ${dataLabel}.`;
   }
   if (payload.visita_status === "realizada" && !payload.visita_data) {
-    return "Informe a data da visita realizada.";
+    return `Informe a data da ${dataLabel} realizada.`;
   }
   return null;
 }

@@ -98,8 +98,12 @@ export async function salvarVisitaAet(params: {
   aetId: string;
   payload: ImplantacaoAetVisitaPayload;
   usuarioNome: string;
+  kind?: LaudoPontualKind;
 }): Promise<ImplantacaoAetRecord> {
-  const validationError = validateAetVisitaPayload(params.payload);
+  const validationError = validateAetVisitaPayload(
+    params.payload,
+    params.kind ?? "aet"
+  );
   if (validationError) throw new Error(validationError);
 
   const agora = new Date().toISOString();

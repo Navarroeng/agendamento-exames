@@ -11,7 +11,10 @@ import {
   isTreinamentoEtapaConcluida,
   type ImplantacaoTreinamentoRecord,
 } from "@/lib/implantacao-treinamento";
-import { isFluxoLaudoPontual } from "@/lib/servico-laudo-pontual";
+import {
+  copyLaudoPontual,
+  isFluxoLaudoPontual,
+} from "@/lib/servico-laudo-pontual";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 
 export type OrcamentoEtapaId =
@@ -84,7 +87,7 @@ export function sanitizeOrcamentoEtapaTab(
  * Montagem dinâmica das abas do modal de orçamento / Implantação:
  * - somente_treinamentos: 5 abas (sem docs SST / exames)
  * - combinado: fluxo SST completo + Agendamento do Treinamento (após Financeiro)
- * - aet / insalubridade: preparação até a visita (elaboração/envio só em Laudos SST)
+ * - aet / insalubridade / ltcat / parecer_tecnico: preparação até a visita (elaboração/envio só em Laudos SST)
  * - padrao: fluxo atual
  */
 export function buildOrcamentoEtapas(
@@ -96,7 +99,13 @@ export function buildOrcamentoEtapas(
       { id: "aprovado", label: "Orçamento aprovado" },
       { id: "contrato", label: "Contrato" },
       { id: "financeiro", label: "Financeiro" },
-      { id: "visita_aet", label: "Agendamento da visita" },
+      {
+        id: "visita_aet",
+        label:
+          fluxo === "parecer_tecnico"
+            ? copyLaudoPontual("parecer_tecnico").etapaVisita
+            : "Agendamento da visita",
+      },
     ];
   }
 

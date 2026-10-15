@@ -1,7 +1,8 @@
 /**
  * Serviço pontual exclusivo: Laudo de Parecer Técnico.
  * Identificação pelo nome canônico do catálogo (match exato, sem includes).
- * Não faz parte do fluxo operacional do Laudo de Insalubridade.
+ * O acompanhamento operacional reutiliza o fluxo dos laudos pontuais.
+ * Contrato, proposta, parcelas e desconto à vista continuam próprios deste serviço.
  */
 
 import { formatCurrency, parseMoney } from "@/lib/money";

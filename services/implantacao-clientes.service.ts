@@ -20,6 +20,7 @@ import {
 import { resolveAetServicoId } from "@/lib/servico-aet";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
+import { resolveParecerTecnicoServicoId } from "@/lib/servico-parecer-tecnico";
 import { buscarTreinamentosPorOrcamentoIds } from "@/services/implantacao-treinamento.service";
 import { buscarAetPorOrcamentoIds } from "@/services/implantacao-aet.service";
 import { contarColaboradoresPorContratos } from "@/services/contrato-agendamentos.service";
@@ -75,6 +76,7 @@ export async function listarProcessosImplantacao(): Promise<
   const aetServicoId = resolveAetServicoId(catalogoServicos);
   const insalubridadeServicoId = resolveInsalubridadeServicoId(catalogoServicos);
   const ltcatServicoId = resolveLtcatServicoId(catalogoServicos);
+  const parecerServicoId = resolveParecerTecnicoServicoId(catalogoServicos);
   const pacoteCompletoServicoId =
     resolvePacoteCompletoSstServicoId(catalogoServicos);
 
@@ -265,7 +267,8 @@ export async function listarProcessosImplantacao(): Promise<
       treinamentosServicoId,
       aetServicoId,
       insalubridadeServicoId,
-      ltcatServicoId
+      ltcatServicoId,
+      parecerServicoId
     );
     const treinamento = treinamentosByOrcamento.get(id) ?? null;
     const aet = aetByOrcamento.get(id) ?? null;

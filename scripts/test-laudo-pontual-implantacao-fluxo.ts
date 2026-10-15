@@ -41,13 +41,17 @@ import {
 } from "../lib/riscos-psicossociais";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
+import { SERVICO_PARECER_TECNICO_NOME } from "../lib/servico-parecer-tecnico";
+import { classifyOrcamentoFluxoImplantacao } from "../lib/servico-treinamentos";
 import {
   assertPodeEditarElaboracaoEnvioLaudoPontual,
   copyLaudoPontual,
+  fluxoToLaudoPontualKind,
+  isFluxoLaudoPontual,
+  LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG,
+  laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
   resolveLaudoPontualKindFromImplantacao,
-  fluxoToLaudoPontualKind,
-  LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG,
 } from "../lib/servico-laudo-pontual";
 import {
   buildOrcamentoEtapas,
@@ -686,6 +690,162 @@ assert.deepEqual(
 assert.ok(
   !buildLaudosPontualEtapas("insalubridade").some((e) => /AET/i.test(e.label))
 );
+
+const itemParecer = {
+  servico_id: "parecer-1",
+  servico_nome: SERVICO_PARECER_TECNICO_NOME,
+};
+assert.equal(
+  classifyOrcamentoFluxoImplantacao([itemParecer]),
+  "parecer_tecnico"
+);
+assert.equal(isFluxoLaudoPontual("parecer_tecnico"), true);
+assert.equal(laudoPontualOcultaColaboradores("parecer_tecnico"), false);
+assert.equal(resolveLaudoPontualKind([itemParecer]), "parecer_tecnico");
+assert.equal(
+  resolveLaudoPontualKind([
+    itemParecer,
+    { servico_id: "pgr-1", servico_nome: "PGR" },
+  ]),
+  null
+);
+assert.equal(fluxoToLaudoPontualKind("parecer_tecnico"), "parecer_tecnico");
+assert.equal(fluxoToLaudoPontualKind("ltcat"), "ltcat");
+assert.equal(isFluxoLaudoPontual("ltcat"), true);
+assert.equal(laudoPontualOcultaColaboradores("ltcat"), false);
+assert.equal(laudoPontualOcultaColaboradores("aet"), true);
+
+const abasParecer = buildOrcamentoEtapas("parecer_tecnico");
+assert.deepEqual(
+  abasParecer.map((etapa) => etapa.id),
+  abasImplantacaoAet
+);
+assert.equal(
+  abasParecer.find((etapa) => etapa.id === "visita_aet")?.label,
+  "Perícia / visita técnica"
+);
+assert.equal(
+  buildOrcamentoEtapas("aet").find((etapa) => etapa.id === "visita_aet")?.label,
+  "Agendamento da visita"
+);
+assert.equal(
+  buildOrcamentoEtapas("insalubridade").find((etapa) => etapa.id === "visita_aet")
+    ?.label,
+  "Agendamento da visita"
+);
+assert.equal(
+  buildOrcamentoEtapas("ltcat").find((etapa) => etapa.id === "visita_aet")?.label,
+  "Agendamento da visita"
+);
+
+const apParecer = aprovacao(SERVICO_PARECER_TECNICO_NOME, {
+  orcamento_aprovacao_itens: [
+    {
+      id: "ai-parecer",
+      aprovacao_id: "ap1",
+      servico_id: "parecer-1",
+      servico_nome: SERVICO_PARECER_TECNICO_NOME,
+      quantidade: 1,
+      valor_unitario: 2500,
+      valor_total: 2500,
+      ordem: 0,
+    },
+  ],
+});
+const parecerSemRegistro = buildImplantacaoProcesso({
+  orcamento: orcamento({ numero: "ORC-2026-PARECER" }),
+  aprovacao: apParecer,
+  contrato: null,
+  fluxoImplantacao: "parecer_tecnico",
+  aet: null,
+});
+assert.equal(parecerSemRegistro.etapaAtual, "visita_aet");
+assert.equal(parecerSemRegistro.totalEtapas, 5);
+assert.equal(isProcessoElegivelLaudoPontualLaudosSst(parecerSemRegistro), false);
+assert.equal(isProcessoElegivelLaudosSst(parecerSemRegistro), false);
+
+const parecerAgendada = buildImplantacaoProcesso({
+  orcamento: orcamento({ numero: "ORC-2026-PARECER" }),
+  aprovacao: apParecer,
+  contrato: null,
+  fluxoImplantacao: "parecer_tecnico",
+  aet: visitaAgendada,
+});
+assert.equal(parecerAgendada.etapaAtual, "visita_agendada");
+assert.equal(isProcessoElegivelLaudoPontualLaudosSst(parecerAgendada), false);
+assert.equal(
+  labelImplantacaoEtapa("visita_agendada", "parecer_tecnico"),
+  "Perícia agendada"
+);
+
+const parecerRealizada = buildImplantacaoProcesso({
+  orcamento: orcamento({ numero: "ORC-2026-PARECER" }),
+  aprovacao: apParecer,
+  contrato: null,
+  fluxoImplantacao: "parecer_tecnico",
+  aet: visitaRealizada,
+});
+assert.equal(parecerRealizada.etapaAtual, "concluido");
+assert.equal(parecerRealizada.etapasConcluidas, 5);
+assert.equal(parecerRealizada.progressoLabel, "5 de 5");
+assert.equal(isProcessoElegivelLaudoPontualLaudosSst(parecerRealizada), true);
+assert.equal(isProcessoElegivelLaudosSst(parecerRealizada), false);
+
+const laudosParecer = buildLaudosSstProcesso(parecerRealizada, null);
+assert.equal(laudosParecer.laudoPontualKind, "parecer_tecnico");
+assert.equal(laudosParecer.etapasConcluidas, 1);
+assert.equal(laudosParecer.status, "em_andamento");
+assert.equal(isLaudosPontualEtapaConcluida("elaboracao", visitaRealizada), false);
+assert.equal(isLaudosPontualEtapaConcluida("envio", visitaRealizada), false);
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosParecer).map((etapa) => etapa.label),
+  [
+    "Perícia / visita técnica",
+    "Elaboração do Parecer",
+    "Envio ao cliente",
+  ]
+);
+for (const etapa of etapasProgressoLaudosSst(laudosParecer)) {
+  assert.equal(/AET|Insalubridade/i.test(etapa.label), false);
+}
+
+const copyParecer = copyLaudoPontual("parecer_tecnico");
+assert.equal(copyParecer.titulo, "Laudo de Parecer Técnico");
+assert.equal(copyParecer.etapaVisita, "Perícia / visita técnica");
+for (const value of Object.values(copyParecer)) {
+  if (typeof value !== "string") continue;
+  assert.equal(/AET|Insalubridade/i.test(value), false);
+}
+
+const apParecerSemAssinatura = aprovacao(SERVICO_PARECER_TECNICO_NOME, {
+  contrato_assinado: false,
+  contrato_assinado_em: null,
+  boleto_pago: false,
+});
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", apParecerSemAssinatura, true, {
+    fluxo: "parecer_tecnico",
+  }),
+  false
+);
+assert.equal(
+  isOrcamentoEtapaLiberada("visita_aet", apParecer, true, {
+    fluxo: "parecer_tecnico",
+    aet: visitaAguardando,
+  }),
+  true
+);
+assert.equal(
+  isOrcamentoEtapaLiberada(
+    "visita_aet",
+    { ...apParecer, boleto_pago: false, boleto_pago_em: null },
+    true,
+    { fluxo: "parecer_tecnico" }
+  ),
+  true
+);
+assert.equal(sanitizeOrcamentoEtapaTab("elaboracao", "parecer_tecnico"), "visita_aet");
+assert.equal(sanitizeOrcamentoEtapaTab("envio", "parecer_tecnico"), "visita_aet");
 
 assert.equal(isLaudosPontualEtapaConcluida("visita", visitaRealizada), true);
 assert.equal(isLaudosPontualEtapaLiberada("visita", visitaRealizada), true);

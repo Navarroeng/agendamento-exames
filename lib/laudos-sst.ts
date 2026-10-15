@@ -192,7 +192,7 @@ export function isImplantacaoProntaParaEncaminhamento(
 }
 
 /**
- * Laudo pontual exclusivo (AET / Insalubridade / LTCAT) entra em Laudos SST
+ * Laudo pontual exclusivo (AET / Insalubridade / LTCAT / Parecer Técnico) entra em Laudos SST
  * quando a Implantação já concluiu na visita realizada.
  * Não cria `orcamento_laudos_sst` (fluxo PGR).
  */

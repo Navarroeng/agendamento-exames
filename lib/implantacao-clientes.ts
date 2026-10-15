@@ -109,7 +109,20 @@ export function buildImplantacaoEtapasOperacionais(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): Array<{ id: ImplantacaoEtapaOperacionalId; label: string }> {
   if (isFluxoLaudoPontual(fluxo)) {
-    return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_AET];
+    const etapas = IMPLANTACAO_ETAPAS_OPERACIONAIS_AET.map((etapa) => ({
+      ...etapa,
+    }));
+    if (fluxo === "parecer_tecnico") {
+      return etapas.map((etapa) =>
+        etapa.id === "visita_aet"
+          ? {
+              ...etapa,
+              label: copyLaudoPontual("parecer_tecnico").etapaVisita,
+            }
+          : etapa
+      );
+    }
+    return etapas;
   }
   if (fluxo === "somente_treinamentos") {
     return [...IMPLANTACAO_ETAPAS_OPERACIONAIS_TREINAMENTOS];
@@ -174,8 +187,15 @@ export function labelImplantacaoEtapa(
   fluxo: OrcamentoFluxoImplantacao = "padrao"
 ): string {
   const kind = fluxoToLaudoPontualKind(fluxo);
-  if (etapa === "elaboracao" && kind) {
-    return copyLaudoPontual(kind).abaElaboracao;
+  if (kind) {
+    const copy = copyLaudoPontual(kind);
+    if (etapa === "elaboracao") return copy.abaElaboracao;
+    if (kind === "parecer_tecnico" && (etapa === "visita_aet" || etapa === "visita")) {
+      return copy.etapaVisita;
+    }
+    if (kind === "parecer_tecnico" && etapa === "visita_agendada") {
+      return "Perícia agendada";
+    }
   }
   return IMPLANTACAO_ETAPA_LABELS[etapa] ?? etapa;
 }

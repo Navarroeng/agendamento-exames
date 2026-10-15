@@ -1078,6 +1078,12 @@ export function useOrcamentosPage() {
               ? "Aprovação salva. Cliente vinculado e implantação do Laudo de Insalubridade iniciada."
               : "Aprovação salva. Implantação do Laudo de Insalubridade iniciada."
           );
+        } else if (laudoKind === "parecer_tecnico") {
+          toast.success(
+            integracao.cliente_criado
+              ? "Aprovação salva. Cliente vinculado e acompanhamento do Laudo de Parecer Técnico iniciado."
+              : "Aprovação salva. Acompanhamento do Laudo de Parecer Técnico iniciado."
+          );
         } else {
           toast.success(
             integracao.cliente_criado

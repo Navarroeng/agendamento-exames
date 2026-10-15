@@ -71,7 +71,7 @@ export function OrcamentoAbaAetVisita({
       </p>
       {aet?.visita_status === "realizada" ? (
         <p className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-[12px] font-semibold text-[#166534]">
-          Visita realizada
+          {copy.bannerRealizada}
           {aet.visita_data
             ? ` em ${formatDateIsoToBR(aet.visita_data)}`
             : ""}
@@ -82,7 +82,7 @@ export function OrcamentoAbaAetVisita({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-xs font-bold text-navy">
-            Status da visita
+            {copy.rotuloStatus}
           </span>
           <select
             className="field-input"
@@ -103,7 +103,7 @@ export function OrcamentoAbaAetVisita({
         </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-bold text-navy">
-            Data da visita {exigeData && !somenteLeitura ? <RequiredMark /> : null}
+            {copy.rotuloData} {exigeData && !somenteLeitura ? <RequiredMark /> : null}
           </span>
           <input
             type="date"
@@ -418,7 +418,7 @@ export function OrcamentoResumoAetStatus({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-start">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-            Visita
+            {copy.rotuloColunaVisita}
           </p>
           <p className="mt-1 text-sm font-bold text-navy">
             {aet

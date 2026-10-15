@@ -115,7 +115,10 @@ import {
   resolveTreinamentosServicoId,
 } from "@/lib/servico-treinamentos";
 import { resolveAetServicoId } from "@/lib/servico-aet";
-import { orcamentoEhExclusivoParecerTecnico } from "@/lib/servico-parecer-tecnico";
+import {
+  orcamentoEhExclusivoParecerTecnico,
+  resolveParecerTecnicoServicoId,
+} from "@/lib/servico-parecer-tecnico";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
 import {
@@ -296,7 +299,8 @@ export function OrcamentoAprovarModal({
       treinamentosId,
       resolveAetServicoId(servicos),
       resolveInsalubridadeServicoId(servicos),
-      resolveLtcatServicoId(servicos)
+      resolveLtcatServicoId(servicos),
+      resolveParecerTecnicoServicoId(servicos)
     );
     const orcamentoAprovadoInit =
       orcamento.status === "aprovado" || Boolean(aprovacao);
@@ -445,7 +449,8 @@ export function OrcamentoAprovarModal({
       treinamentosId,
       resolveAetServicoId(servicos),
       resolveInsalubridadeServicoId(servicos),
-      resolveLtcatServicoId(servicos)
+      resolveLtcatServicoId(servicos),
+      resolveParecerTecnicoServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
   const ocultaColaboradoresComerciais =
@@ -1012,7 +1017,9 @@ export function OrcamentoAprovarModal({
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
-  const isLaudoPontual = laudoPontualOcultaColaboradores(fluxoImplantacao);
+  const isLaudoPontual =
+    laudoPontualOcultaColaboradores(fluxoImplantacao) ||
+    fluxoImplantacao === "parecer_tecnico";
   const resumoComercial = buildResumoComercialOrcamento(orcamento);
   const valorFinalEditado = parseMoney(form.valor_final);
   const parcelasEditadas = Math.max(1, Number(form.quantidade_parcelas) || 1);

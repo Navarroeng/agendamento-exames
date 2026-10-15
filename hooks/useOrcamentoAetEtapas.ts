@@ -182,6 +182,7 @@ export function useOrcamentoAetEtapas(params: {
     try {
       const saved = await salvarVisitaAet({
         aetId: aet.id,
+        kind,
         payload: {
           visita_status: visitaForm.visita_status,
           visita_data: visitaForm.visita_data || null,
