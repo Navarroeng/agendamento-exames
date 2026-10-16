@@ -1,8 +1,18 @@
 -- Aplicar no SQL Editor do Supabase (produção), o script inteiro de uma vez.
+-- No aviso de RLS, escolha Run without RLS: a tabela criada é temporária.
 -- Espelha supabase/migrations/143_agendamento_mensal_sem_primeira_parcela.sql.
 -- Gestão SST mês a mês: vigência assinada libera agendamento sem a primeira parcela.
 -- À vista, pontual e contrato sem orçamento continuam na regra anterior.
 -- Não quita boleto, não altera datas, valor, número ou vínculo, e não conclui etapas.
+--
+-- A execução anterior parou no primeiro UPDATE de dados, ao preencher encerrado_em.
+-- Esse campo é encerramento manual e o trigger exige auth.uid() de um administrador.
+-- O SQL Editor não tem esse uid. Funções e permissões podem ter ficado gravadas
+-- se o editor confirmou cada comando; os contratos não foram encerrados nem promovidos,
+-- porque o comando que falhou era o primeiro que alterava linhas e os seguintes não rodaram.
+-- Este script repete funções e permissões e só então altera dados, tudo na mesma transação.
+
+begin;
 
 create or replace function public.contrato_mensal_operacional_na_data(
   p_modalidade text,
@@ -253,10 +263,13 @@ where cc.encerrado_em is null
       and vigente.data_fim >= current_date
   );
 
+-- Substituição automática da vigência anterior: só o status.
+-- trg_cliente_contratos_encerrar_somente_admin trata encerrado_em preenchido
+-- como encerramento manual e exige is_admin_user() via auth.uid().
+-- Não preencher encerrado_em mantém o trigger e não simula administrador.
 update public.cliente_contratos antigo
 set
   status = 'encerrado',
-  encerrado_em = coalesce(antigo.encerrado_em, now()),
   updated_at = now()
 from contrato_mensal_operacional novo
 where antigo.cliente_id = novo.cliente_id
@@ -298,3 +311,47 @@ begin
   end loop;
 end;
 $$;
+
+commit;
+
+-- Conferência da JET SERVICE depois do commit. Só leitura.
+select
+  c.nome,
+  c.cnpj,
+  c.disponivel_agendamento,
+  c.agendamento_bloqueio_manual,
+  c.agendamento_bloqueio_motivo,
+  cc.numero as contrato,
+  cc.numero_orcamento,
+  cc.status,
+  cc.tipo_contrato,
+  cc.contrato_assinado_em,
+  a.contrato_assinado,
+  cc.data_inicio,
+  cc.data_fim,
+  current_date between cc.data_inicio and cc.data_fim as vigencia_cobre_hoje,
+  cc.boleto_pago,
+  cc.liberado_para_agendamento,
+  cc.encerrado_em,
+  o.modalidade,
+  a.mensalidade_pagamento,
+  public.contrato_mensal_operacional_na_data(
+    o.modalidade,
+    a.mensalidade_pagamento,
+    cc.tipo_contrato,
+    cc.condicao_pagamento,
+    cc.orcamento_id,
+    cc.status,
+    cc.contrato_assinado_em,
+    coalesce(a.contrato_assinado, false),
+    cc.data_inicio,
+    cc.data_fim,
+    cc.encerrado_em,
+    current_date
+  ) as mensal_operacional_hoje
+from public.clientes c
+join public.cliente_contratos cc on cc.cliente_id = c.id
+left join public.orcamentos o on o.id = cc.orcamento_id
+left join public.orcamento_aprovacoes a on a.orcamento_id = cc.orcamento_id
+where regexp_replace(coalesce(c.cnpj, ''), '[^0-9]', '', 'g') = '45724418000180'
+order by cc.data_inicio desc nulls last, cc.created_at desc;

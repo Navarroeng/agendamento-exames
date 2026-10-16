@@ -51,6 +51,12 @@ for (const sql of [migration, aplicar]) {
     sql,
     /revoke all on function public\.contrato_mensal_operacional_na_data\([\s\S]+?\) from anon/
   );
+  assert.match(sql, /status = 'encerrado'/);
+  assert.doesNotMatch(sql, /encerrado_em = coalesce\(antigo\.encerrado_em, now\(\)\)/);
 }
+
+assert.match(aplicar, /^begin;/m);
+assert.match(aplicar, /^commit;/m);
+assert.match(aplicar, /45724418000180/);
 
 console.log("test-agendamento-mensal-assinatura-sql: OK");

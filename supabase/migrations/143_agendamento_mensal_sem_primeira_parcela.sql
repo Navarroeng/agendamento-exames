@@ -251,10 +251,13 @@ where cc.encerrado_em is null
       and vigente.data_fim >= current_date
   );
 
+-- Substituição automática da vigência anterior: só o status.
+-- trg_cliente_contratos_encerrar_somente_admin trata encerrado_em preenchido
+-- como encerramento manual e exige is_admin_user() via auth.uid().
+-- Não preencher encerrado_em mantém o trigger e não simula administrador.
 update public.cliente_contratos antigo
 set
   status = 'encerrado',
-  encerrado_em = coalesce(antigo.encerrado_em, now()),
   updated_at = now()
 from contrato_mensal_operacional novo
 where antigo.cliente_id = novo.cliente_id
