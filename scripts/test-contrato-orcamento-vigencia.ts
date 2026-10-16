@@ -172,6 +172,29 @@ const jet = {
 
 assert.equal(contratoMensalOperacionalNaData(jet, "2026-10-16"), true);
 assert.equal(contratoEstaVigenteNaData(jet, "2026-10-16"), true);
+assert.equal(
+  contratoMensalOperacionalNaData(
+    {
+      ...jet,
+      contrato_assinado_em: null,
+      contrato_assinado: false,
+    },
+    "2026-10-16"
+  ),
+  false,
+  "status aguardando_pagamento sem assinatura não libera"
+);
+assert.equal(
+  contratoMensalOperacionalNaData(
+    {
+      ...jet,
+      contrato_assinado_em: null,
+      contrato_assinado: true,
+    },
+    "2026-10-16"
+  ),
+  true
+);
 assert.equal(contratoLiberaAgendamento(jet, "2026-10-16"), true);
 assert.equal(contratoEstaVigenteNaData(jet, "2026-10-13"), false);
 assert.equal(

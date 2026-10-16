@@ -43,6 +43,7 @@ export type ContratoParaDisponibilidadeAgendamento = Pick<
   > & {
     modalidadeOrcamento?: string | null;
     mensalidadePagamento?: string | null;
+    contrato_assinado?: boolean | null;
   };
 
 export type DisponibilidadeAgendamentoResult = {

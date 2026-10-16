@@ -15,6 +15,8 @@ export type ContextoCobrancaContrato = {
   mensalidadePagamento?: string | null;
   mensalidadeDiaVencimento?: number | null;
   parcelasMensalidade?: ParcelaMensalidadeRegistrada[];
+  /** Flag gravada na aprovação. Não substitui a data quando ela existe. */
+  contrato_assinado?: boolean | null;
 };
 
 export type ClienteContratoConsulta = ClienteContratoRecord &

@@ -67,7 +67,7 @@ export async function complementarContratosComCobranca(
     supabase
       .from("orcamento_aprovacoes")
       .select(
-        "id, orcamento_id, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal"
+        "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal"
       )
       .in("orcamento_id", orcamentoIds),
   ]);
@@ -85,6 +85,7 @@ export async function complementarContratosComCobranca(
   type AprovacaoCobranca = {
     id: string;
     orcamento_id: string;
+    contrato_assinado: boolean | null;
     mensalidade_pagamento: string | null;
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
@@ -136,6 +137,7 @@ export async function complementarContratosComCobranca(
     return {
       ...contrato,
       modalidadeOrcamento: modalidadePorOrcamento.get(orcamentoId) ?? null,
+      contrato_assinado: aprovacao?.contrato_assinado ?? null,
       mensalidadePagamento: aprovacao?.mensalidade_pagamento ?? null,
       mensalidadeDiaVencimento: aprovacao?.mensalidade_dia_vencimento ?? null,
       parcelasMensalidade: aprovacao

@@ -164,6 +164,22 @@ run("pontual sem boleto continua bloqueado mesmo com contrato antigo encerrado",
   assert.equal(r.motivo, CONTRATO_VIGENTE_ERROR_MESSAGE);
 });
 
+run("mensal no status operacional sem assinatura registrada continua bloqueado", () => {
+  const r = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {},
+    contratos: [
+      {
+        ...mensalJet,
+        contrato_assinado_em: null,
+        contrato_assinado: false,
+      },
+    ],
+    dataReferenciaIso: "2026-10-16",
+  });
+  assert.equal(r.disponivel, false);
+  assert.equal(r.motivo, CONTRATO_VIGENTE_ERROR_MESSAGE);
+});
+
 run("bloqueio manual continua acima da mensalidade vigente", () => {
   const r = resolveDisponibilidadeAgendamentoCliente({
     cliente: { agendamento_bloqueio_manual: true },

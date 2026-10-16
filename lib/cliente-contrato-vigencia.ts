@@ -15,7 +15,6 @@ import {
   selecionarContratoVigenteParaAgendamento,
 } from "@/lib/agendamento-cliente-lookup";
 import {
-  contratoAssinado,
   contratoCobrancaMensal,
   type ClienteContratoConsulta,
 } from "@/lib/cliente-contrato-atual";
@@ -50,6 +49,14 @@ function isDateWithinVigencia(
   return dataAgendamento >= dataInicio && dataAgendamento <= dataFim;
 }
 
+function assinaturaEfetiva(
+  contrato: Pick<ContratoMensalAgendamento, "contrato_assinado_em" | "contrato_assinado">
+): boolean {
+  const assinadaEm = (contrato.contrato_assinado_em ?? "").trim().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(assinadaEm)) return true;
+  return contrato.contrato_assinado === true;
+}
+
 const STATUS_MENSAL_OPERACIONAL: ClienteContratoStatus[] = [
   "ativo",
   "em_renovacao",
@@ -74,7 +81,10 @@ export type ContratoMensalAgendamento = Pick<
   > &
   Partial<
     Pick<ClienteContratoConsulta, "modalidadeOrcamento" | "mensalidadePagamento">
-  >;
+  > & {
+    /** Flag da aprovação. Status do contrato não comprova assinatura. */
+    contrato_assinado?: boolean | null;
+  };
 
 /**
  * Gestão SST mês a mês, vinculada a orçamento, assinada e com vigência na data.
@@ -100,14 +110,7 @@ export function contratoMensalOperacionalNaData(
   ) {
     return false;
   }
-  if (
-    !contratoAssinado({
-      status: contrato.status,
-      contrato_assinado_em: contrato.contrato_assinado_em ?? null,
-    })
-  ) {
-    return false;
-  }
+  if (!assinaturaEfetiva(contrato)) return false;
   const inicio = contrato.data_inicio?.trim() ?? "";
   const fim = contrato.data_fim?.trim() ?? "";
   if (!inicio || !fim) return false;

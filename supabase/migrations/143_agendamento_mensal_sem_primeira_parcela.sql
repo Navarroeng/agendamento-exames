@@ -28,10 +28,10 @@ as $$
     and p_data_fim is not null
     and p_data >= p_data_inicio
     and p_data <= p_data_fim
+    -- Status operacional não comprova assinatura.
     and (
       p_contrato_assinado_em is not null
       or coalesce(p_contrato_assinado, false)
-      or p_status in ('ativo', 'em_renovacao', 'assinado', 'aguardando_pagamento')
     )
     and (
       (
@@ -211,6 +211,9 @@ grant execute on function public.contrato_mensal_operacional_na_data(
   text, text, text, text, uuid, text, timestamptz, boolean, date, date, timestamptz, date
 ) to service_role;
 
+revoke all on function public.recompute_cliente_disponivel_agendamento(uuid) from public;
+revoke all on function public.recompute_cliente_disponivel_agendamento(uuid) from anon;
+revoke all on function public.recompute_cliente_disponivel_agendamento(uuid) from authenticated;
 grant execute on function public.recompute_cliente_disponivel_agendamento(uuid)
   to authenticated;
 grant execute on function public.recompute_cliente_disponivel_agendamento(uuid)
