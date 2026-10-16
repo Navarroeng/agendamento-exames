@@ -11,6 +11,7 @@ import {
   matchesClienteAgendamentoFilter,
   type ClienteAgendamentoFilter,
 } from "@/lib/cliente-disponivel-agendamento";
+import type { DisponibilidadeAgendamentoResult } from "@/lib/cliente-disponibilidade-agendamento";
 import {
   CLIENTE_CNPJ_DUPLICADO_MSG,
   normalizeCnpjDigits,
@@ -24,6 +25,7 @@ import {
 import { sortByNome } from "@/lib/sort-by-label";
 import type {
   ClienteComContratos,
+  ClienteContratoRecord,
   ClienteInsert,
   ClienteRecord,
   ClienteUpdate,
@@ -104,12 +106,17 @@ export async function assertClienteDisponivelParaAgendamento(
     id: string;
     nome: string;
     disponivel_agendamento: boolean | null;
+    agendamento_bloqueio_manual?: boolean | null;
+    agendamento_bloqueio_motivo?: string | null;
   } | null = null;
+
+  const colunasCliente =
+    "id, nome, disponivel_agendamento, agendamento_bloqueio_manual, agendamento_bloqueio_motivo";
 
   if (plan.by === "id") {
     const res = await supabase
       .from("clientes")
-      .select("id, nome, disponivel_agendamento")
+      .select(colunasCliente)
       .eq("id", plan.value)
       .maybeSingle();
     if (res.error) throw res.error;
@@ -117,7 +124,7 @@ export async function assertClienteDisponivelParaAgendamento(
   } else if (plan.by === "cnpj") {
     const res = await supabase
       .from("clientes")
-      .select("id, nome, disponivel_agendamento")
+      .select(colunasCliente)
       .eq("cnpj_digits", plan.value)
       .maybeSingle();
     if (res.error) throw res.error;
@@ -125,7 +132,7 @@ export async function assertClienteDisponivelParaAgendamento(
   } else {
     const res = await supabase
       .from("clientes")
-      .select("id, nome, disponivel_agendamento")
+      .select(colunasCliente)
       .eq("nome", plan.value);
     if (res.error) throw res.error;
     const rows = res.data ?? [];
@@ -137,32 +144,130 @@ export async function assertClienteDisponivelParaAgendamento(
 
   if (!data) return;
 
-  if (!isClienteDisponivelAgendamento(data.disponivel_agendamento)) {
-    if (options?.agendamentoIdAtual) {
-      const { data: agendamento, error: agError } = await supabase
-        .from("agendamentos")
-        .select("cliente_nome, cliente_id")
-        .eq("id", options.agendamentoIdAtual)
-        .maybeSingle();
+  if (options?.agendamentoIdAtual) {
+    const { data: agendamento, error: agError } = await supabase
+      .from("agendamentos")
+      .select("cliente_nome, cliente_id")
+      .eq("id", options.agendamentoIdAtual)
+      .maybeSingle();
 
-      if (agError) throw agError;
-      if (agendamento) {
-        const agClienteId = String(agendamento.cliente_id ?? "").trim();
-        if (plan.by === "id" && agClienteId && agClienteId === plan.value) {
-          return;
-        }
-        if (
-          plan.by !== "id" &&
-          agendamento.cliente_nome.trim().toLowerCase() ===
-            (data.nome ?? clienteNome).trim().toLowerCase()
-        ) {
-          return;
-        }
+    if (agError) throw agError;
+    if (agendamento) {
+      const agClienteId = String(agendamento.cliente_id ?? "").trim();
+      if (plan.by === "id" && agClienteId && agClienteId === plan.value) {
+        return;
+      }
+      if (
+        plan.by !== "id" &&
+        agendamento.cliente_nome.trim().toLowerCase() ===
+          (data.nome ?? clienteNome).trim().toLowerCase()
+      ) {
+        return;
       }
     }
-
-    throw new ClienteIndisponivelAgendamentoError();
   }
+
+  const { resolveDisponibilidadeAgendamentoCliente } = await import(
+    "@/lib/cliente-disponibilidade-agendamento"
+  );
+  const { complementarContratosComCobranca, listarContratosPorCliente } =
+    await import("@/services/cliente-contrato.service");
+  const contratos = await complementarContratosComCobranca(
+    await listarContratosPorCliente(data.id)
+  );
+  const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      agendamento_bloqueio_manual: data.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: data.agendamento_bloqueio_motivo,
+    },
+    contratos,
+  });
+  if (!disponibilidade.disponivel) {
+    throw new ClienteIndisponivelAgendamentoError(
+      disponibilidade.motivo ?? CLIENTE_DISPONIVEL_AGENDAMENTO_MSG
+    );
+  }
+}
+
+export async function avaliarDisponibilidadeAgendamentoCliente(
+  clienteId: string,
+  dataReferenciaIso?: string
+): Promise<DisponibilidadeAgendamentoResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .select(
+      "id, agendamento_bloqueio_manual, agendamento_bloqueio_motivo"
+    )
+    .eq("id", clienteId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const { resolveDisponibilidadeAgendamentoCliente } = await import(
+    "@/lib/cliente-disponibilidade-agendamento"
+  );
+  const { complementarContratosComCobranca, listarContratosPorCliente } =
+    await import("@/services/cliente-contrato.service");
+  const contratos = await complementarContratosComCobranca(
+    await listarContratosPorCliente(clienteId)
+  );
+  return resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      agendamento_bloqueio_manual: data?.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: data?.agendamento_bloqueio_motivo,
+    },
+    contratos,
+    dataReferenciaIso,
+  });
+}
+
+export async function listarIdsClientesLiberadosParaAgendamento(
+  clientes: Array<{
+    id: string;
+    agendamento_bloqueio_manual?: boolean | null;
+    agendamento_bloqueio_motivo?: string | null;
+  }>
+): Promise<Set<string>> {
+  const supabase = createClient();
+  const contratosBrutos: ClienteContratoRecord[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("cliente_contratos")
+      .select("*")
+      .range(from, from + SELECT_BATCH_SIZE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as ClienteContratoRecord[];
+    contratosBrutos.push(...batch);
+    if (batch.length < SELECT_BATCH_SIZE) break;
+    from += SELECT_BATCH_SIZE;
+  }
+
+  const { resolveDisponibilidadeAgendamentoCliente } = await import(
+    "@/lib/cliente-disponibilidade-agendamento"
+  );
+  const { complementarContratosComCobranca } = await import(
+    "@/services/cliente-contrato.service"
+  );
+  const contratos = await complementarContratosComCobranca(contratosBrutos);
+  const porCliente = new Map<string, typeof contratos>();
+  for (const contrato of contratos) {
+    const clienteId = contrato.cliente_id;
+    if (!clienteId) continue;
+    const lista = porCliente.get(clienteId) ?? [];
+    lista.push(contrato);
+    porCliente.set(clienteId, lista);
+  }
+
+  const liberados = new Set<string>();
+  for (const cliente of clientes) {
+    const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
+      cliente,
+      contratos: porCliente.get(cliente.id) ?? [],
+    });
+    if (disponibilidade.disponivel) liberados.add(cliente.id);
+  }
+  return liberados;
 }
 
 export class ClienteIndisponivelAgendamentoError extends Error {

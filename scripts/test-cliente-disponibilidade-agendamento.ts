@@ -96,4 +96,82 @@ run("mensagem padrão de bloqueio manual", () => {
   assert.equal(r.motivo, BLOQUEIO_MANUAL_AGENDAMENTO_MSG);
 });
 
+const mensalJet = {
+  id: "jet-novo",
+  status: "aguardando_pagamento" as const,
+  data_inicio: "2026-10-14",
+  data_fim: "2027-10-14",
+  orcamento_id: "orc-jet" as string | null,
+  boleto_pago: false,
+  liberado_para_agendamento: false,
+  encerrado_em: null as string | null,
+  contrato_assinado_em: "2026-10-14",
+  modalidadeOrcamento: "mensalidade",
+  mensalidadePagamento: "mensal",
+};
+
+const antigoEncerrado = {
+  ...encerrado,
+  id: "jet-antigo",
+  data_inicio: "2025-10-02",
+  data_fim: "2026-10-02",
+};
+
+run("JET mensal sem primeira parcela, com contrato antigo encerrado → liberado", () => {
+  const r = resolveDisponibilidadeAgendamentoCliente({
+    cliente: { disponivel_agendamento: false },
+    contratos: [antigoEncerrado, mensalJet],
+    dataReferenciaIso: "2026-10-16",
+  });
+  assert.equal(r.disponivel, true);
+  assert.equal(r.motivo, null);
+  assert.equal(
+    clientePodeAgendar(
+      { disponivel_agendamento: false },
+      [antigoEncerrado, mensalJet],
+      "2026-10-16"
+    ),
+    true
+  );
+});
+
+run("mensal à vista sem pagamento continua bloqueado", () => {
+  const r = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {},
+    contratos: [{ ...mensalJet, mensalidadePagamento: "avista", status: "ativo" }],
+    dataReferenciaIso: "2026-10-16",
+  });
+  assert.equal(r.disponivel, false);
+  assert.equal(r.motivo, CONTRATO_VIGENTE_ERROR_MESSAGE);
+});
+
+run("pontual sem boleto continua bloqueado mesmo com contrato antigo encerrado", () => {
+  const r = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {},
+    contratos: [
+      antigoEncerrado,
+      {
+        ...vigente,
+        id: "pontual",
+        boleto_pago: false,
+        liberado_para_agendamento: false,
+        modalidadeOrcamento: "pontual",
+      },
+    ],
+    dataReferenciaIso: "2026-08-11",
+  });
+  assert.equal(r.disponivel, false);
+  assert.equal(r.motivo, CONTRATO_VIGENTE_ERROR_MESSAGE);
+});
+
+run("bloqueio manual continua acima da mensalidade vigente", () => {
+  const r = resolveDisponibilidadeAgendamentoCliente({
+    cliente: { agendamento_bloqueio_manual: true },
+    contratos: [mensalJet],
+    dataReferenciaIso: "2026-10-16",
+  });
+  assert.equal(r.disponivel, false);
+  assert.equal(r.motivo, BLOQUEIO_MANUAL_AGENDAMENTO_MSG);
+});
+
 console.log("\nTodos os testes de disponibilidade central passaram.");

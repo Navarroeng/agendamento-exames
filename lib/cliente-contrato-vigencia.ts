@@ -1,5 +1,7 @@
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import {
   buscarContratoAtivo,
+  complementarContratosComCobranca,
   listarContratosPorCliente,
 } from "@/services/cliente-contrato.service";
 import {
@@ -12,8 +14,13 @@ import {
   planClienteLookup,
   selecionarContratoVigenteParaAgendamento,
 } from "@/lib/agendamento-cliente-lookup";
+import {
+  contratoAssinado,
+  contratoCobrancaMensal,
+  type ClienteContratoConsulta,
+} from "@/lib/cliente-contrato-atual";
 import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
-import type { ClienteContratoRecord } from "@/lib/types";
+import type { ClienteContratoRecord, ClienteContratoStatus } from "@/lib/types";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
   "Cliente sem contrato vigente. Não é possível agendar exames até renovar o contrato.";
@@ -31,6 +38,8 @@ export type ContratoVigenciaResult = {
   dataFim?: string;
   clienteId?: string;
   contratoId?: string;
+  /** Motivo quando não está vigente. */
+  motivo?: string | null;
 };
 
 function isDateWithinVigencia(
@@ -39,6 +48,71 @@ function isDateWithinVigencia(
   dataFim: string
 ): boolean {
   return dataAgendamento >= dataInicio && dataAgendamento <= dataFim;
+}
+
+const STATUS_MENSAL_OPERACIONAL: ClienteContratoStatus[] = [
+  "ativo",
+  "em_renovacao",
+  "assinado",
+  "aguardando_pagamento",
+];
+
+export type ContratoMensalAgendamento = Pick<
+  ClienteContratoRecord,
+  "status" | "orcamento_id"
+> &
+  Partial<
+    Pick<
+      ClienteContratoRecord,
+      | "data_inicio"
+      | "data_fim"
+      | "encerrado_em"
+      | "tipo_contrato"
+      | "condicao_pagamento"
+      | "contrato_assinado_em"
+    >
+  > &
+  Partial<
+    Pick<ClienteContratoConsulta, "modalidadeOrcamento" | "mensalidadePagamento">
+  >;
+
+/**
+ * Gestão SST mês a mês, vinculada a orçamento, assinada e com vigência na data.
+ * A primeira parcela em aberto não segura o agendamento. À vista continua exigindo pagamento.
+ */
+export function contratoMensalOperacionalNaData(
+  contrato: ContratoMensalAgendamento,
+  dataReferenciaIso?: string
+): boolean {
+  if (!contrato.orcamento_id) return false;
+  if (contrato.status === "cancelado" || contrato.status === "encerrado") {
+    return false;
+  }
+  if (contrato.encerrado_em) return false;
+  if (!STATUS_MENSAL_OPERACIONAL.includes(contrato.status)) return false;
+  if (
+    !contratoCobrancaMensal({
+      tipo_contrato: contrato.tipo_contrato ?? null,
+      condicao_pagamento: contrato.condicao_pagamento ?? null,
+      modalidadeOrcamento: contrato.modalidadeOrcamento,
+      mensalidadePagamento: contrato.mensalidadePagamento,
+    })
+  ) {
+    return false;
+  }
+  if (
+    !contratoAssinado({
+      status: contrato.status,
+      contrato_assinado_em: contrato.contrato_assinado_em ?? null,
+    })
+  ) {
+    return false;
+  }
+  const inicio = contrato.data_inicio?.trim() ?? "";
+  const fim = contrato.data_fim?.trim() ?? "";
+  if (!inicio || !fim) return false;
+  const data = (dataReferenciaIso ?? todayIsoSaoPaulo()).slice(0, 10);
+  return isDateWithinVigencia(data, inicio, fim);
 }
 
 /**
@@ -54,20 +128,34 @@ export function contratoEstaVigenteNaData(
     "status" | "orcamento_id" | "boleto_pago" | "liberado_para_agendamento"
   > &
     Partial<
-      Pick<ClienteContratoRecord, "id" | "data_inicio" | "data_fim">
+      Pick<
+        ClienteContratoRecord,
+        | "id"
+        | "data_inicio"
+        | "data_fim"
+        | "encerrado_em"
+        | "tipo_contrato"
+        | "condicao_pagamento"
+        | "contrato_assinado_em"
+      >
+    > &
+    Partial<
+      Pick<ClienteContratoConsulta, "modalidadeOrcamento" | "mensalidadePagamento">
     >,
   dataAgendamento: string
 ): boolean {
   if (contrato.status === "cancelado" || contrato.status === "encerrado") {
     return false;
   }
-  if (contrato.status !== "ativo" && contrato.status !== "em_renovacao") {
-    return false;
-  }
+  if (contrato.encerrado_em) return false;
   const inicio = contrato.data_inicio?.trim() ?? "";
   const fim = contrato.data_fim?.trim() ?? "";
   if (!inicio || !fim) return false;
   if (!isDateWithinVigencia(dataAgendamento, inicio, fim)) return false;
+  if (contratoMensalOperacionalNaData(contrato, dataAgendamento)) return true;
+  if (contrato.status !== "ativo" && contrato.status !== "em_renovacao") {
+    return false;
+  }
   // Liberação financeira / manual (mesmo critério de contratoLiberaAgendamento)
   if (contrato.orcamento_id) {
     if (contrato.boleto_pago !== true) return false;
@@ -103,12 +191,36 @@ export function clienteTemContratoVigente(
   return contratos.some((c) => contratoEstaVigenteNaData(c, data));
 }
 
+async function motivoSemContratoVigente(
+  clienteId: string,
+  contratos: ClienteContratoRecord[],
+  dataAgendamento: string,
+  contratoIdPreferido: string | null
+): Promise<string> {
+  const clientes = await listarClientesParaSelect();
+  const cliente = clientes.find((item) => item.id === clienteId);
+  const alvo = contratoIdPreferido
+    ? contratos.filter((contrato) => contrato.id === contratoIdPreferido)
+    : contratos;
+  const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      agendamento_bloqueio_manual: cliente?.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: cliente?.agendamento_bloqueio_motivo,
+    },
+    contratos: alvo,
+    dataReferenciaIso: dataAgendamento,
+  });
+  return disponibilidade.motivo ?? CONTRATO_VIGENTE_ERROR_MESSAGE;
+}
+
 export async function verificarContratoVigente(
   clienteId: string,
   dataAgendamento: string,
   options?: { contratoId?: string | null }
 ): Promise<ContratoVigenciaResult> {
-  const contratos = await listarContratosPorCliente(clienteId);
+  const contratos = await complementarContratosComCobranca(
+    await listarContratosPorCliente(clienteId)
+  );
   const contratoIdPreferido = options?.contratoId?.trim() || null;
 
   const vigente = selecionarContratoVigenteParaAgendamento(
@@ -123,29 +235,48 @@ export async function verificarContratoVigente(
       dataFim: vigente.data_fim ?? undefined,
       clienteId,
       contratoId: vigente.id,
+      motivo: null,
     };
   }
 
+  const motivo = await motivoSemContratoVigente(
+    clienteId,
+    contratos,
+    dataAgendamento,
+    contratoIdPreferido
+  );
+
   if (contratoIdPreferido) {
-    return { vigente: false, clienteId, contratoId: contratoIdPreferido };
+    return {
+      vigente: false,
+      clienteId,
+      contratoId: contratoIdPreferido,
+      motivo,
+    };
   }
 
   // Fallback: único ativo com datas (compatível com busca antiga)
   const contratoAtivo = await buscarContratoAtivo(clienteId);
+  const ativoCompleto = contratoAtivo
+    ? (
+        await complementarContratosComCobranca([contratoAtivo])
+      )[0]
+    : null;
   if (
-    contratoAtivo &&
-    contratoEstaVigenteNaData(contratoAtivo, dataAgendamento)
+    ativoCompleto &&
+    contratoEstaVigenteNaData(ativoCompleto, dataAgendamento)
   ) {
     return {
       vigente: true,
-      dataInicio: contratoAtivo.data_inicio,
-      dataFim: contratoAtivo.data_fim ?? undefined,
+      dataInicio: ativoCompleto.data_inicio,
+      dataFim: ativoCompleto.data_fim ?? undefined,
       clienteId,
-      contratoId: contratoAtivo.id,
+      contratoId: ativoCompleto.id,
+      motivo: null,
     };
   }
 
-  return { vigente: false, clienteId };
+  return { vigente: false, clienteId, motivo };
 }
 
 export async function verificarContratoVigentePorNome(
@@ -240,7 +371,9 @@ export async function assertContratoVigenteDoAgendamento(input: {
     throw new Error(CONTRATO_VIGENTE_ERROR_MESSAGE);
   }
 
-  const contratos = await listarContratosPorCliente(cliente.id);
+  const contratos = await complementarContratosComCobranca(
+    await listarContratosPorCliente(cliente.id)
+  );
   const contratoId = input.contratoId?.trim() || "";
   const contratosAlvo = contratoId
     ? contratos.filter((contrato) => contrato.id === contratoId)

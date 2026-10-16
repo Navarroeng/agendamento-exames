@@ -3,6 +3,10 @@ import {
   clienteDisponivelParaAgendamento,
   resolveDisponibilidadeAgendamentoCliente,
 } from "@/lib/cliente-disponibilidade-agendamento";
+import {
+  contratoMensalOperacionalNaData,
+  type ContratoMensalAgendamento,
+} from "@/lib/cliente-contrato-vigencia";
 
 export type ContratoParaAgendamento = Pick<
   ClienteContratoRecord,
@@ -12,8 +16,18 @@ export type ContratoParaAgendamento = Pick<
   | "status"
 > &
   Partial<
-    Pick<ClienteContratoRecord, "id" | "data_inicio" | "data_fim" | "encerrado_em">
-  >;
+    Pick<
+      ClienteContratoRecord,
+      | "id"
+      | "data_inicio"
+      | "data_fim"
+      | "encerrado_em"
+      | "tipo_contrato"
+      | "condicao_pagamento"
+      | "contrato_assinado_em"
+    >
+  > &
+  ContratoMensalAgendamento;
 
 export type ClienteParaAgendamento = {
   disponivel_agendamento?: boolean | null;
@@ -26,10 +40,15 @@ export type ClienteParaAgendamento = {
  * Para disponibilidade completa use resolveDisponibilidadeAgendamentoCliente.
  */
 export function contratoLiberaAgendamento(
-  contrato: ContratoParaAgendamento
+  contrato: ContratoParaAgendamento,
+  dataReferenciaIso?: string
 ): boolean {
   if (contrato.status === "encerrado" || contrato.status === "cancelado") {
     return false;
+  }
+  if (contrato.encerrado_em) return false;
+  if (contratoMensalOperacionalNaData(contrato, dataReferenciaIso)) {
+    return true;
   }
   if (contrato.status !== "ativo" && contrato.status !== "em_renovacao") {
     return false;

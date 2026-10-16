@@ -42,6 +42,13 @@ assert.deepEqual(
 
 assert.deepEqual(
   filterClientesParaNovoAgendamento([liberado, bloqueado], {
+    liberadosIds: new Set(["2"]),
+  }),
+  [bloqueado]
+);
+
+assert.deepEqual(
+  filterClientesParaNovoAgendamento([liberado, bloqueado], {
     editingId: "ag-1",
     clienteNomeAtual: "FILIAL X",
   }),

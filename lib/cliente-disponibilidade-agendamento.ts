@@ -32,9 +32,18 @@ export type ContratoParaDisponibilidadeAgendamento = Pick<
   Partial<
     Pick<
       ClienteContratoRecord,
-      "id" | "data_inicio" | "data_fim" | "encerrado_em"
+      | "id"
+      | "data_inicio"
+      | "data_fim"
+      | "encerrado_em"
+      | "tipo_contrato"
+      | "condicao_pagamento"
+      | "contrato_assinado_em"
     >
-  >;
+  > & {
+    modalidadeOrcamento?: string | null;
+    mensalidadePagamento?: string | null;
+  };
 
 export type DisponibilidadeAgendamentoResult = {
   disponivel: boolean;
@@ -81,13 +90,19 @@ export function resolveDisponibilidadeAgendamentoCliente(input: {
     };
   }
 
+  const aberto = input.contratos.some(
+    (c) =>
+      c.status !== "encerrado" &&
+      c.status !== "cancelado" &&
+      !c.encerrado_em
+  );
   const encerrado = input.contratos.find(
     (c) =>
       c.status === "encerrado" ||
       c.status === "cancelado" ||
       Boolean(c.encerrado_em)
   );
-  if (encerrado) {
+  if (encerrado && !aberto) {
     return {
       disponivel: false,
       motivo: CONTRATO_ENCERRADO_ERROR_MESSAGE,

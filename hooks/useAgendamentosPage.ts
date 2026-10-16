@@ -107,11 +107,12 @@ import { clienteProcuracaoRequerAtencao } from "@/lib/cliente-procuracao";
 import {
   CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
   filterClientesParaNovoAgendamento,
-  isClienteDisponivelAgendamento,
 } from "@/lib/cliente-disponivel-agendamento";
 import {
   assertClienteDisponivelParaAgendamento,
+  avaliarDisponibilidadeAgendamentoCliente,
   isClienteIndisponivelAgendamentoError,
+  listarIdsClientesLiberadosParaAgendamento,
 } from "@/services/cliente.service";
 import { buildMensagemClinicaWhatsApp } from "@/lib/agendamento-mensagem-clinica";
 import { escolherUnicoPorNome, mensagemErroSalvarAgendamento } from "@/lib/agendamento-cliente-lookup";
@@ -373,14 +374,33 @@ export function useAgendamentosPage() {
 
   const { clinicas: clinicasList } = useClinicasList();
   const { clientes, loading: clientesLoading } = useClientesList();
+  const [clientesLiberadosIds, setClientesLiberadosIds] =
+    useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (clientesLoading) return;
+    let cancelled = false;
+    void listarIdsClientesLiberadosParaAgendamento(clientes)
+      .then((ids) => {
+        if (!cancelled) setClientesLiberadosIds(ids);
+      })
+      .catch((err) => {
+        console.error("Erro ao avaliar liberação de agendamento:", err);
+        if (!cancelled) setClientesLiberadosIds(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientes, clientesLoading]);
 
   const clientesParaAgendamento = useMemo(
     () =>
       filterClientesParaNovoAgendamento(clientes, {
         editingId,
         clienteNomeAtual: form.cliente_nome,
+        liberadosIds: clientesLiberadosIds,
       }),
-    [clientes, editingId, form.cliente_nome]
+    [clientes, clientesLiberadosIds, editingId, form.cliente_nome]
   );
   const contratoVigencia = useContratoVigenciaCheck(
     form.cliente_nome,
@@ -916,16 +936,30 @@ export function useAgendamentosPage() {
         form.cliente_nome.trim().toLowerCase() ===
           cliente.nome.trim().toLowerCase();
 
-      if (
-        !isClienteDisponivelAgendamento(cliente.disponivel_agendamento) &&
-        !mesmoClienteEmEdicao
-      ) {
-        toast.error(CLIENTE_DISPONIVEL_AGENDAMENTO_MSG);
-        return false;
-      }
-
       const seq = ++clienteValidacaoSeqRef.current;
       setClienteValidacaoLoading(true);
+
+      if (!mesmoClienteEmEdicao) {
+        try {
+          const disponibilidade = await avaliarDisponibilidadeAgendamentoCliente(
+            cliente.id
+          );
+          if (seq !== clienteValidacaoSeqRef.current) return false;
+          if (!disponibilidade.disponivel) {
+            setClienteValidacaoLoading(false);
+            toast.error(
+              disponibilidade.motivo ?? CLIENTE_DISPONIVEL_AGENDAMENTO_MSG
+            );
+            return false;
+          }
+        } catch (dispErr) {
+          if (seq !== clienteValidacaoSeqRef.current) return false;
+          setClienteValidacaoLoading(false);
+          console.error("Erro ao avaliar liberação de agendamento:", dispErr);
+          toast.error(CLIENTE_DISPONIVEL_AGENDAMENTO_MSG);
+          return false;
+        }
+      }
 
       try {
         const pendencias = await validarClienteParaNovoAgendamento(
@@ -2486,7 +2520,7 @@ export function useAgendamentosPage() {
           contratoId: vagaContratoIdRef.current,
         });
         if (!contrato.vigente) {
-          toast.error(CONTRATO_VIGENTE_ERROR_MESSAGE);
+          toast.error(contrato.motivo ?? CONTRATO_VIGENTE_ERROR_MESSAGE);
           return;
         }
       }

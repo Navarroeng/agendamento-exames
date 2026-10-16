@@ -6,12 +6,10 @@ import {
   parseDateBRToIso,
 } from "@/lib/agendamento-datetime";
 import {
-  CONTRATO_ENCERRADO_ERROR_MESSAGE,
   CONTRATO_VIGENTE_ERROR_MESSAGE,
   verificarContratoVigenteDoAgendamento,
   type ContratoVigenciaResult,
 } from "@/lib/cliente-contrato-vigencia";
-import { listarContratosPorCliente } from "@/services/cliente-contrato.service";
 
 export type ContratoVigenciaCheckState =
   | { status: "idle" }
@@ -19,27 +17,15 @@ export type ContratoVigenciaCheckState =
   | { status: "valid"; dataFim: string }
   | { status: "invalid"; message: string };
 
-async function toCheckState(
-  result: ContratoVigenciaResult
-): Promise<ContratoVigenciaCheckState> {
+function toCheckState(result: ContratoVigenciaResult): ContratoVigenciaCheckState {
   if (result.vigente && result.dataFim) {
     return { status: "valid", dataFim: result.dataFim };
   }
 
-  if (result.clienteId) {
-    const contratos = await listarContratosPorCliente(result.clienteId);
-    const hasEncerrado = contratos.some(
-      (c) => c.status === "encerrado" || Boolean(c.encerrado_em)
-    );
-    if (hasEncerrado) {
-      return {
-        status: "invalid",
-        message: CONTRATO_ENCERRADO_ERROR_MESSAGE,
-      };
-    }
-  }
-
-  return { status: "invalid", message: CONTRATO_VIGENTE_ERROR_MESSAGE };
+  return {
+    status: "invalid",
+    message: result.motivo?.trim() || CONTRATO_VIGENTE_ERROR_MESSAGE,
+  };
 }
 
 export function useContratoVigenciaCheck(

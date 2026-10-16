@@ -7,7 +7,11 @@ import {
   buildClienteContratoSyncFromAprovacao,
   resolveStatusContratoFromAprovacao,
 } from "../lib/cliente-contrato-orcamento-sync";
-import { contratoEstaVigenteNaData } from "../lib/cliente-contrato-vigencia";
+import {
+  contratoEstaVigenteNaData,
+  contratoMensalOperacionalNaData,
+} from "../lib/cliente-contrato-vigencia";
+import { contratoLiberaAgendamento } from "../lib/cliente-pode-agendar";
 
 assert.equal(calcularFimVigencia("2026-07-28"), "2027-07-28");
 assert.equal(calcularFimVigencia("2026-01-31"), "2027-01-31");
@@ -83,7 +87,7 @@ const syncMensal = buildClienteContratoSyncFromAprovacao({
 });
 assert.equal(syncMensal.status, "ativo");
 assert.equal(syncMensal.boleto_pago, false);
-assert.equal(syncMensal.liberado_para_agendamento, false);
+assert.equal(syncMensal.liberado_para_agendamento, true);
 assert.equal(syncMensal.tipo_contrato, "mensal");
 assert.equal(syncMensal.data_inicio, "2026-10-14");
 assert.notEqual(syncMensal.status, "aguardando_pagamento");
@@ -102,6 +106,7 @@ const syncMensalFuturo = buildClienteContratoSyncFromAprovacao({
 assert.equal(syncMensalFuturo.status, "assinado");
 assert.equal(syncMensalFuturo.data_inicio, "2026-11-01");
 assert.equal(syncMensalFuturo.boleto_pago, false);
+assert.equal(syncMensalFuturo.liberado_para_agendamento, false);
 
 assert.equal(
   contratoEstaVigenteNaData(
@@ -148,6 +153,38 @@ assert.equal(
       liberado_para_agendamento: true,
     },
     "2027-08-01"
+  ),
+  false
+);
+
+const jet = {
+  id: "jet",
+  status: "aguardando_pagamento" as const,
+  data_inicio: "2026-10-14",
+  data_fim: "2027-10-14",
+  orcamento_id: "orc-jet",
+  boleto_pago: false,
+  liberado_para_agendamento: false,
+  contrato_assinado_em: "2026-10-14",
+  modalidadeOrcamento: "mensalidade",
+  mensalidadePagamento: "mensal",
+};
+
+assert.equal(contratoMensalOperacionalNaData(jet, "2026-10-16"), true);
+assert.equal(contratoEstaVigenteNaData(jet, "2026-10-16"), true);
+assert.equal(contratoLiberaAgendamento(jet, "2026-10-16"), true);
+assert.equal(contratoEstaVigenteNaData(jet, "2026-10-13"), false);
+assert.equal(
+  contratoEstaVigenteNaData(
+    { ...jet, mensalidadePagamento: "avista", status: "ativo" },
+    "2026-10-16"
+  ),
+  false
+);
+assert.equal(
+  contratoEstaVigenteNaData(
+    { ...jet, modalidadeOrcamento: "pontual", status: "ativo" },
+    "2026-10-16"
   ),
   false
 );

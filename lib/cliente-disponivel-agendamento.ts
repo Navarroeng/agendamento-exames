@@ -73,13 +73,22 @@ export function filterClientesParaNovoAgendamento<
   options?: {
     editingId?: string | null;
     clienteNomeAtual?: string;
+    /**
+     * Quando informado, substitui o cache `disponivel_agendamento`.
+     * Null mantém o cache enquanto a regra ao vivo ainda carrega.
+     */
+    liberadosIds?: Set<string> | null;
   }
 ): T[] {
   const nomeAtual = options?.clienteNomeAtual?.trim() ?? "";
   const isEditing = Boolean(options?.editingId);
+  const liberadosIds = options?.liberadosIds;
 
   return clientes.filter((cliente) => {
-    if (isClienteDisponivelAgendamento(cliente.disponivel_agendamento)) {
+    const liberado = liberadosIds
+      ? liberadosIds.has(cliente.id)
+      : isClienteDisponivelAgendamento(cliente.disponivel_agendamento);
+    if (liberado) {
       return true;
     }
     if (

@@ -105,7 +105,8 @@ export function buildClienteContratoSyncFromAprovacao(params: {
     const vigente =
       Boolean(inicio && fim) && inicio! <= hoje && hoje <= fim!;
     payload.status = vigente ? "ativo" : "assinado";
-    payload.liberado_para_agendamento = Boolean(aprovacao.boleto_pago);
+    payload.liberado_para_agendamento =
+      vigente || Boolean(aprovacao.boleto_pago);
   }
 
   return payload;
