@@ -13,6 +13,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
+import { assertProcessoRiscosNaoPausadoNoServidor } from "@/services/riscos-processo-pausa.server";
 
 const CAMPANHA_SELECT = RISCOS_CAMPANHA_SELECT;
 const CAMPANHA_SELECT_LEGACY = RISCOS_CAMPANHA_SELECT_LEGACY;
@@ -88,6 +89,10 @@ export async function abrirCampanhaRiscosNoServidor(
   if (!before) throw new Error("Campanha não encontrada.");
 
   await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: before.orcamento_id,
+    campanhaId: before.id,
+  });
+  await assertProcessoRiscosNaoPausadoNoServidor({
     orcamentoId: before.orcamento_id,
     campanhaId: before.id,
   });

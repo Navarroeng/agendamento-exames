@@ -195,7 +195,9 @@ export function RiscosPainelPreRequisitos({
           campanha={campanha ?? processo.campanha ?? null}
           saving={savingLogo}
           somenteConsulta={
-            processo.status === "cancelado" || processo.etapaAtual === "cancelado"
+            processo.status === "cancelado" ||
+            processo.etapaAtual === "cancelado" ||
+            Boolean(processo.pausaSituacao)
           }
           onUpload={onUploadLogoCampanha}
           onRemove={onRemoverLogoCampanha}

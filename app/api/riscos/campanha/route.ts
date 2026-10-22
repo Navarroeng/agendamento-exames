@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     const status =
       message.includes("Já existe") ||
       message.includes("cancelado") ||
+      message.includes("pausado") ||
       message.includes("Informe") ||
       message.includes("inválid")
         ? 400

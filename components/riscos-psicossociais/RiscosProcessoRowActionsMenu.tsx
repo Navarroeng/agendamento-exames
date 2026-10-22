@@ -13,9 +13,13 @@ type RiscosProcessoRowActionsMenuProps = {
   isAdmin: boolean;
   savingRemover?: boolean;
   savingCancelar?: boolean;
+  savingPausa?: boolean;
   onAbrir: (processo: RiscosPsicossociaisProcesso) => void;
   onVisualizarRelatorio: (processo: RiscosPsicossociaisProcesso) => void;
   onCancelarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
+  onPausarSemRetorno?: (processo: RiscosPsicossociaisProcesso) => void;
+  onAdiarCliente?: (processo: RiscosPsicossociaisProcesso) => void;
+  onRetomarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
   onRemoverProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
 };
 
@@ -24,9 +28,13 @@ export function RiscosProcessoRowActionsMenu({
   isAdmin,
   savingRemover = false,
   savingCancelar = false,
+  savingPausa = false,
   onAbrir,
   onVisualizarRelatorio,
   onCancelarProcesso,
+  onPausarSemRetorno,
+  onAdiarCliente,
+  onRetomarProcesso,
   onRemoverProcesso,
 }: RiscosProcessoRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -36,6 +44,7 @@ export function RiscosProcessoRowActionsMenu({
   const campanha = processo.campanha;
   const processoCancelado =
     processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+  const processoPausado = Boolean(processo.pausaSituacao);
   const acoes = acoesMenuListagemProcessoRiscos({
     campanhaStatus: campanha?.status,
     codigoPublico: campanha?.codigo_publico,
@@ -47,6 +56,7 @@ export function RiscosProcessoRowActionsMenu({
     processoCancelado,
     processoConcluido:
       processo.status === "concluido" || processo.etapaAtual === "finalizado",
+    processoPausado,
   });
 
   useEffect(() => {
@@ -68,7 +78,7 @@ export function RiscosProcessoRowActionsMenu({
   useLayoutEffect(() => {
     if (!open || !rootRef.current) return;
     const btn = rootRef.current.getBoundingClientRect();
-    const estimatedHeight = 220;
+    const estimatedHeight = 280;
     setOpenUp(btn.bottom + estimatedHeight > window.innerHeight - 8);
   }, [open]);
 
@@ -147,6 +157,44 @@ export function RiscosProcessoRowActionsMenu({
                 }
               }}
             />
+          ) : null}
+          {acoes.mostrarPausarSemRetorno || acoes.mostrarAdiarCliente ? (
+            <>
+              <div className="my-1 border-t border-[#eef2f7]" />
+              {acoes.mostrarPausarSemRetorno ? (
+                <MenuItem
+                  label="Marcar como sem retorno"
+                  disabled={savingPausa}
+                  onClick={() => {
+                    setOpen(false);
+                    onPausarSemRetorno?.(processo);
+                  }}
+                />
+              ) : null}
+              {acoes.mostrarAdiarCliente ? (
+                <MenuItem
+                  label="Adiar a pedido do cliente"
+                  disabled={savingPausa}
+                  onClick={() => {
+                    setOpen(false);
+                    onAdiarCliente?.(processo);
+                  }}
+                />
+              ) : null}
+            </>
+          ) : null}
+          {acoes.mostrarRetomarProcesso ? (
+            <>
+              <div className="my-1 border-t border-[#eef2f7]" />
+              <MenuItem
+                label="Retomar processo"
+                disabled={savingPausa}
+                onClick={() => {
+                  setOpen(false);
+                  onRetomarProcesso?.(processo);
+                }}
+              />
+            </>
           ) : null}
           {acoes.mostrarCancelar ? (
             <>

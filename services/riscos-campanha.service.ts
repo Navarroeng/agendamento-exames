@@ -538,6 +538,99 @@ export async function cancelarProcessoListagemRiscos(input: {
   };
 }
 
+export async function pausarProcessoListagemRiscos(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+  situacao: "sem_retorno" | "adiado_cliente";
+  observacao?: string | null;
+  auditOptions?: CampanhaAuditOptions;
+}): Promise<{
+  pausa_situacao: "sem_retorno" | "adiado_cliente";
+  pausa_em: string;
+  pausa_por: string;
+  pausa_observacao: string | null;
+}> {
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  const campanhaId = String(input.campanhaId ?? "").trim();
+  if (!orcamentoId && !campanhaId) {
+    throw new Error("Informe o processo a pausar.");
+  }
+
+  const res = await fetch("/api/riscos/processo/pausa", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orcamentoId: orcamentoId || undefined,
+      campanhaId: campanhaId || undefined,
+      situacao: input.situacao,
+      observacao: input.observacao ?? "",
+    }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    pausa_situacao?: "sem_retorno" | "adiado_cliente";
+    pausa_em?: string;
+    pausa_por?: string;
+    pausa_observacao?: string | null;
+  };
+
+  if (!res.ok || !json.ok || !json.pausa_situacao) {
+    throw new Error(json.error || "Não foi possível pausar o processo.");
+  }
+
+  return {
+    pausa_situacao: json.pausa_situacao,
+    pausa_em: json.pausa_em ?? new Date().toISOString(),
+    pausa_por: json.pausa_por ?? "",
+    pausa_observacao: json.pausa_observacao ?? null,
+  };
+}
+
+export async function retomarProcessoListagemRiscos(input: {
+  orcamentoId?: string | null;
+  campanhaId?: string | null;
+  auditOptions?: CampanhaAuditOptions;
+}): Promise<{
+  retomado_em: string;
+  retomado_por: string;
+  situacao_anterior: "sem_retorno" | "adiado_cliente" | null;
+}> {
+  const orcamentoId = String(input.orcamentoId ?? "").trim();
+  const campanhaId = String(input.campanhaId ?? "").trim();
+  if (!orcamentoId && !campanhaId) {
+    throw new Error("Informe o processo a retomar.");
+  }
+
+  const res = await fetch("/api/riscos/processo/retomar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      orcamentoId: orcamentoId || undefined,
+      campanhaId: campanhaId || undefined,
+    }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    retomado_em?: string;
+    retomado_por?: string;
+    situacao_anterior?: "sem_retorno" | "adiado_cliente" | null;
+  };
+
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error || "Não foi possível retomar o processo.");
+  }
+
+  return {
+    retomado_em: json.retomado_em ?? new Date().toISOString(),
+    retomado_por: json.retomado_por ?? "",
+    situacao_anterior: json.situacao_anterior ?? null,
+  };
+}
+
 export async function excluirCampanhaRiscos(
   campanhaId: string,
   confirmacaoCodigo: string,

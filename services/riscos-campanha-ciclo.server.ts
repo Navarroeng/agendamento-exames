@@ -36,6 +36,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
+import { assertProcessoRiscosNaoPausadoNoServidor } from "@/services/riscos-processo-pausa.server";
 
 type CampanhaAuditOptions = {
   auditContext?: AuditoriaUsuarioContext;
@@ -118,6 +119,10 @@ export async function criarCampanhaRiscosNoServidor(
   if (validationError) throw new Error(validationError);
 
   await assertProcessoRiscosNaoCanceladoNoServidor({
+    orcamentoId: input.orcamentoId,
+    campanhaId: null,
+  });
+  await assertProcessoRiscosNaoPausadoNoServidor({
     orcamentoId: input.orcamentoId,
     campanhaId: null,
   });

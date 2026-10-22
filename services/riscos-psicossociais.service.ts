@@ -21,6 +21,9 @@ import { listarProcessosImplantacao } from "@/services/implantacao-clientes.serv
 import { buscarTrackingLaudosSst } from "@/services/laudos-sst.service";
 
 const RISCOS_TRACKING_SELECT =
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento, pausa_situacao, pausa_em, pausa_por, pausa_observacao";
+
+const RISCOS_TRACKING_SELECT_SEM_PAUSA =
   "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
 
 const RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO =
@@ -228,15 +231,22 @@ async function garantirTrackingRiscosPsicossociais(
     .in("orcamento_id", ids);
 
   const trackingError =
-    error &&
-    /cancelado_em|cancelado_por|motivo_cancelamento/i.test(error.message ?? "")
+    error && /pausa_situacao|pausa_em|pausa_por|pausa_observacao/i.test(error.message ?? "")
       ? (
           await supabase
             .from("orcamento_riscos_psicossociais")
-            .select(RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO)
+            .select(RISCOS_TRACKING_SELECT_SEM_PAUSA)
             .in("orcamento_id", ids)
         )
-      : { data, error };
+      : error &&
+          /cancelado_em|cancelado_por|motivo_cancelamento/i.test(error.message ?? "")
+        ? (
+            await supabase
+              .from("orcamento_riscos_psicossociais")
+              .select(RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO)
+              .in("orcamento_id", ids)
+          )
+        : { data, error };
 
   if (trackingError.error) {
     console.warn(

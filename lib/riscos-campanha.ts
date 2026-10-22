@@ -320,6 +320,7 @@ export function acoesMenuListagemProcessoRiscos(input: {
   participantesRespondidos?: number;
   processoCancelado?: boolean;
   processoConcluido?: boolean;
+  processoPausado?: boolean;
 }): {
   podeAbrir: boolean;
   podeCopiarLink: boolean;
@@ -329,11 +330,22 @@ export function acoesMenuListagemProcessoRiscos(input: {
   mostrarVisualizarRelatorio: boolean;
   mostrarRemoverProcesso: boolean;
   mostrarCancelar: boolean;
+  mostrarPausarSemRetorno: boolean;
+  mostrarAdiarCliente: boolean;
+  mostrarRetomarProcesso: boolean;
 } {
   const codigo = String(input.codigoPublico ?? "").trim();
   const processoCancelado = input.processoCancelado === true;
+  const processoPausado = input.processoPausado === true;
+  const pesquisaAberta = isPesquisaEfetivamenteAberta(input.campanhaStatus);
+  const podePausar =
+    !processoCancelado &&
+    input.processoConcluido !== true &&
+    !processoPausado &&
+    !pesquisaAberta;
   const podeCopiar =
     !processoCancelado &&
+    !processoPausado &&
     Boolean(input.hasCampanha) &&
     Boolean(codigo) &&
     campanhaPermiteCopiarLink(input.campanhaStatus);
@@ -347,6 +359,8 @@ export function acoesMenuListagemProcessoRiscos(input: {
     gerarMotivo = "Apenas administradores podem gerar relatório.";
   } else if (processoCancelado) {
     gerarMotivo = "Não é possível gerar relatório de processo cancelado.";
+  } else if (processoPausado) {
+    gerarMotivo = "Retome o processo antes de gerar o relatório.";
   } else if (!input.hasCampanha) {
     gerarMotivo = "Crie a pesquisa antes de gerar o relatório.";
   } else if (status === "cancelada") {
@@ -366,15 +380,20 @@ export function acoesMenuListagemProcessoRiscos(input: {
     podeCopiarLink: podeCopiar,
     copiarLinkMotivoDesabilitado: processoCancelado
       ? "Processo cancelado."
-      : podeCopiar
-        ? ""
-        : "Disponível após abrir a pesquisa.",
+      : processoPausado
+        ? "Processo pausado."
+        : podeCopiar
+          ? ""
+          : "Disponível após abrir a pesquisa.",
     podeGerarRelatorio: podeGerar,
     gerarRelatorioMotivoDesabilitado: gerarMotivo,
     mostrarVisualizarRelatorio: input.isAdmin && input.relatorioGerado === true,
     mostrarRemoverProcesso:
       input.isAdmin && input.hasCampanha && Boolean(codigo) && !processoCancelado,
     mostrarCancelar: !processoCancelado && input.processoConcluido !== true,
+    mostrarPausarSemRetorno: podePausar,
+    mostrarAdiarCliente: podePausar,
+    mostrarRetomarProcesso: processoPausado && !processoCancelado,
   };
 }
 

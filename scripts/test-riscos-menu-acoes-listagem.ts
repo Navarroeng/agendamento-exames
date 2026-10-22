@@ -122,4 +122,40 @@ run("processo concluído: Cancelar oculto", () => {
   assert.equal(a.mostrarCancelar, false);
 });
 
+run("em_preparacao: pausar visível, retomar oculto", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "em_preparacao",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+  });
+  assert.equal(a.mostrarPausarSemRetorno, true);
+  assert.equal(a.mostrarAdiarCliente, true);
+  assert.equal(a.mostrarRetomarProcesso, false);
+});
+
+run("pesquisa aberta: pausar oculto", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "aberta",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+  });
+  assert.equal(a.mostrarPausarSemRetorno, false);
+  assert.equal(a.mostrarAdiarCliente, false);
+});
+
+run("processo pausado: retomar visível, pausar oculto", () => {
+  const a = acoesMenuListagemProcessoRiscos({
+    campanhaStatus: "em_preparacao",
+    codigoPublico: "ABC123",
+    isAdmin: true,
+    hasCampanha: true,
+    processoPausado: true,
+  });
+  assert.equal(a.mostrarRetomarProcesso, true);
+  assert.equal(a.mostrarPausarSemRetorno, false);
+  assert.equal(a.mostrarCancelar, true);
+});
+
 console.log("\nTodos os testes do menu de ações passaram.");

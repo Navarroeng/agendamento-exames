@@ -40,6 +40,10 @@ interface RiscosPsicossociaisTableProps {
   savingRemover?: boolean;
   onCancelarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
   savingCancelar?: boolean;
+  onPausarSemRetorno?: (processo: RiscosPsicossociaisProcesso) => void;
+  onAdiarCliente?: (processo: RiscosPsicossociaisProcesso) => void;
+  onRetomarProcesso?: (processo: RiscosPsicossociaisProcesso) => void;
+  savingPausa?: boolean;
 }
 
 function ProgressoRiscos({
@@ -112,6 +116,10 @@ export function RiscosPsicossociaisTable({
   savingRemover = false,
   onCancelarProcesso,
   savingCancelar = false,
+  onPausarSemRetorno,
+  onAdiarCliente,
+  onRetomarProcesso,
+  savingPausa = false,
 }: RiscosPsicossociaisTableProps) {
   return (
     <Panel
@@ -135,7 +143,7 @@ export function RiscosPsicossociaisTable({
             </label>
             <CheckboxMultiSelect
               id="riscos-listagem-status"
-              className="field-input field-input-compact w-[min(100%,220px)] text-sm"
+              className="field-input field-input-compact w-[min(100%,280px)] text-sm"
               ariaLabel="Filtrar por status"
               closedLabel={labelRiscosListagemStatusFiltro(statusListagem)}
               todosLabel="Marcar todos"
@@ -227,8 +235,12 @@ export function RiscosPsicossociaisTable({
                         onAbrir={onVisualizar}
                         onVisualizarRelatorio={onVisualizarRelatorio}
                         onCancelarProcesso={onCancelarProcesso}
+                        onPausarSemRetorno={onPausarSemRetorno}
+                        onAdiarCliente={onAdiarCliente}
+                        onRetomarProcesso={onRetomarProcesso}
                         onRemoverProcesso={onRemoverProcesso}
                         savingCancelar={savingCancelar}
+                        savingPausa={savingPausa}
                       />
                     </td>
                   </tr>

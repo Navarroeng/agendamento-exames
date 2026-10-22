@@ -1,6 +1,11 @@
 "use client";
 
 import { formatCreatedAtBR } from "@/lib/format-datetime";
+import {
+  isPausaAdministrativaAtiva,
+  labelPausaSituacaoRiscos,
+  MSG_PAUSA_CONTROLE_ADMINISTRATIVO,
+} from "@/lib/riscos-processo-pausa";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import type { RiscosCampanhaParticipanteRecord } from "@/lib/riscos-campanha-participantes";
@@ -147,6 +152,42 @@ export function RiscosPsicossociaisPainel({
         </p>
       </header>
 
+      {isPausaAdministrativaAtiva(processo.pausaSituacao) ? (
+        <section className="rounded-2xl border border-[#fcd34d] bg-[#fffbeb] px-4 py-3.5 sm:px-5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#c2410c]">
+            {labelPausaSituacaoRiscos(processo.pausaSituacao)}
+          </p>
+          <dl className="mt-2 space-y-1.5 text-sm text-[#475569]">
+            {processo.pausaObservacao?.trim() ? (
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                  Observação
+                </dt>
+                <dd className="font-semibold text-navy">
+                  {processo.pausaObservacao.trim()}
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                Registrado em
+              </dt>
+              <dd>{formatCreatedAtBR(processo.pausaEm)}</dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                Registrado por
+              </dt>
+              <dd>{processo.pausaPor?.trim() || "—"}</dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-[11px] leading-snug text-[#94a3b8]">
+            {MSG_PAUSA_CONTROLE_ADMINISTRATIVO} Use Retomar processo na listagem
+            para continuar o fluxo. A pesquisa não será aberta automaticamente.
+          </p>
+        </section>
+      ) : null}
+
       {processo.status === "cancelado" || processo.etapaAtual === "cancelado" ? (
         <section className="rounded-2xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3.5 sm:px-5">
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand-red">
@@ -240,7 +281,8 @@ export function RiscosPsicossociaisPainel({
         podeGerenciarParticipante={
           podeGerenciarParticipante &&
           processo.status !== "cancelado" &&
-          processo.etapaAtual !== "cancelado"
+          processo.etapaAtual !== "cancelado" &&
+          !isPausaAdministrativaAtiva(processo.pausaSituacao)
         }
         campanhaStatusSincronizado={campanhaStatusSincronizado}
         auditContext={auditContext}

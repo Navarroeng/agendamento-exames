@@ -9,6 +9,7 @@ import {
   isSolicitacaoListaConcluida,
   type RiscosListaPresencaDados,
 } from "@/lib/riscos-lista-presenca";
+import { isPausaAdministrativaAtiva } from "@/lib/riscos-processo-pausa";
 import type { RiscosPsicossociaisProcesso } from "@/lib/riscos-psicossociais";
 
 interface RiscosListaPresencaTabProps {
@@ -70,7 +71,9 @@ export function RiscosListaPresencaTab({
 }: RiscosListaPresencaTabProps) {
   const dados: RiscosListaPresencaDados = processo.listaPresenca;
   const somenteConsulta =
-    processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+    processo.status === "cancelado" ||
+    processo.etapaAtual === "cancelado" ||
+    isPausaAdministrativaAtiva(processo.pausaSituacao);
   const savingOuConsulta = saving || somenteConsulta;
 
   const [solicitadaSim, setSolicitadaSim] = useState(dados.lista_solicitada);
@@ -100,7 +103,9 @@ export function RiscosListaPresencaTab({
   const handleSalvarSolicitacao = async () => {
     if (somenteConsulta) {
       toast.error(
-        "Processo cancelado. O histórico permanece disponível somente para consulta."
+        processo.status === "cancelado" || processo.etapaAtual === "cancelado"
+          ? "Processo cancelado. O histórico permanece disponível somente para consulta."
+          : "Este processo está pausado. Retome o processo para continuar o fluxo."
       );
       return;
     }
@@ -120,7 +125,9 @@ export function RiscosListaPresencaTab({
   const handleSalvarRecebimento = async () => {
     if (somenteConsulta) {
       toast.error(
-        "Processo cancelado. O histórico permanece disponível somente para consulta."
+        processo.status === "cancelado" || processo.etapaAtual === "cancelado"
+          ? "Processo cancelado. O histórico permanece disponível somente para consulta."
+          : "Este processo está pausado. Retome o processo para continuar o fluxo."
       );
       return;
     }

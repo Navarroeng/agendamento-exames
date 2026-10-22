@@ -36,6 +36,12 @@ import {
 } from "@/lib/riscos-campanha-ciclo";
 import { identidadeCancelamentoProcessoRiscos } from "@/lib/riscos-processo-cancelamento";
 import {
+  isPausaAdministrativaAtiva,
+  labelPausaSituacaoRiscos,
+  MSG_PROCESSO_RISCOS_PAUSADO,
+  type RiscosPausaSituacao,
+} from "@/lib/riscos-processo-pausa";
+import {
   resolveInitialMesListagem,
   resolveMesParaAno,
   type YearMonth,
@@ -45,6 +51,8 @@ import {
   abrirCampanhaRiscos,
   buscarCampanhaPorCodigoPublico,
   cancelarProcessoListagemRiscos,
+  pausarProcessoListagemRiscos,
+  retomarProcessoListagemRiscos,
   criarCampanhaRiscos,
   exclusaoDefinitivaDisponivelNoClient,
   excluirCampanhaRiscos,
@@ -119,6 +127,11 @@ export function useRiscosPsicossociaisPage() {
     useState<RiscosPsicossociaisProcesso | null>(null);
   const [processoParaCancelar, setProcessoParaCancelar] =
     useState<RiscosPsicossociaisProcesso | null>(null);
+  const [processoParaPausar, setProcessoParaPausar] =
+    useState<RiscosPsicossociaisProcesso | null>(null);
+  const [pausaSituacaoSelecionada, setPausaSituacaoSelecionada] =
+    useState<RiscosPausaSituacao | null>(null);
+  const [savingPausa, setSavingPausa] = useState(false);
   const [modalParticipantes, setModalParticipantes] = useState<
     RiscosCampanhaParticipanteRecord[]
   >([]);
@@ -886,6 +899,10 @@ export function useRiscosPsicossociaisPage() {
       dataEncerramentoIso: string;
     }) => {
       if (!modalProcesso) return;
+      if (isPausaAdministrativaAtiva(modalProcesso.pausaSituacao)) {
+        toast.error(MSG_PROCESSO_RISCOS_PAUSADO);
+        return;
+      }
       if (!modalProcesso.exigeLaudosSst) {
         toast.error("Esta pesquisa já foi criada pela inclusão manual.");
         return;
@@ -945,6 +962,10 @@ export function useRiscosPsicossociaisPage() {
   const handleAbrirCampanha = useCallback(async () => {
     const campanhaId = modalProcesso?.campanha?.id;
     if (!campanhaId) return;
+    if (isPausaAdministrativaAtiva(modalProcesso?.pausaSituacao)) {
+      toast.error(MSG_PROCESSO_RISCOS_PAUSADO);
+      return;
+    }
     if (!podeAutorizarAbrirPesquisa) {
       throw new Error(RISCOS_ABRIR_PESQUISA_SEM_PERMISSAO_MSG);
     }
@@ -1199,6 +1220,120 @@ export function useRiscosPsicossociaisPage() {
     if (savingCampanha) return;
     setProcessoParaCancelar(null);
   }, [savingCampanha]);
+
+  const openPausarProcesso = useCallback(
+    (processo: RiscosPsicossociaisProcesso, situacao: RiscosPausaSituacao) => {
+      if (
+        processo.status === "cancelado" ||
+        processo.etapaAtual === "cancelado"
+      ) {
+        toast.error("Processo cancelado não pode ser pausado.");
+        return;
+      }
+      if (
+        processo.status === "concluido" ||
+        processo.etapaAtual === "finalizado"
+      ) {
+        toast.error("Processo concluído não pode ser pausado.");
+        return;
+      }
+      if (isPausaAdministrativaAtiva(processo.pausaSituacao)) {
+        toast.error("Este processo já está pausado. Retome-o para continuar.");
+        return;
+      }
+      setProcessoParaPausar(processo);
+      setPausaSituacaoSelecionada(situacao);
+    },
+    []
+  );
+
+  const closePausarProcesso = useCallback(() => {
+    if (savingPausa) return;
+    setProcessoParaPausar(null);
+    setPausaSituacaoSelecionada(null);
+  }, [savingPausa]);
+
+  const handlePausarProcesso = useCallback(
+    async (observacao: string) => {
+      const alvo = processoParaPausar;
+      const situacao = pausaSituacaoSelecionada;
+      if (!alvo || !situacao) return;
+      const ids = identidadeCancelamentoProcessoRiscos({
+        origem: alvo.origem,
+        processoKey: alvo.processoKey,
+        orcamentoId: alvo.implantacao.orcamento.id,
+        campanhaId: alvo.campanha?.id ?? null,
+      });
+      if (!ids.orcamentoId && !ids.campanhaId) {
+        toast.error("Não foi possível identificar o processo.");
+        return;
+      }
+      setSavingPausa(true);
+      try {
+        await pausarProcessoListagemRiscos({
+          orcamentoId: ids.orcamentoId,
+          campanhaId: ids.campanhaId,
+          situacao,
+          observacao,
+          auditOptions: { auditContext },
+        });
+        setProcessoParaPausar(null);
+        setPausaSituacaoSelecionada(null);
+        await refresh();
+        toast.success(
+          `Situação registrada: ${labelPausaSituacaoRiscos(situacao)}.`
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao registrar a situação."
+        );
+        throw err;
+      } finally {
+        setSavingPausa(false);
+      }
+    },
+    [processoParaPausar, pausaSituacaoSelecionada, auditContext, refresh]
+  );
+
+  const handleRetomarProcesso = useCallback(
+    async (processo: RiscosPsicossociaisProcesso) => {
+      if (!isPausaAdministrativaAtiva(processo.pausaSituacao)) {
+        toast.error("Este processo não está pausado.");
+        return;
+      }
+      const ids = identidadeCancelamentoProcessoRiscos({
+        origem: processo.origem,
+        processoKey: processo.processoKey,
+        orcamentoId: processo.implantacao.orcamento.id,
+        campanhaId: processo.campanha?.id ?? null,
+      });
+      if (!ids.orcamentoId && !ids.campanhaId) {
+        toast.error("Não foi possível identificar o processo.");
+        return;
+      }
+      setSavingPausa(true);
+      try {
+        await retomarProcessoListagemRiscos({
+          orcamentoId: ids.orcamentoId,
+          campanhaId: ids.campanhaId,
+          auditOptions: { auditContext },
+        });
+        await refresh();
+        toast.success(
+          "Processo retomado. Os dados foram preservados; a pesquisa não foi aberta."
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao retomar o processo."
+        );
+      } finally {
+        setSavingPausa(false);
+      }
+    },
+    [auditContext, refresh]
+  );
 
   const handleExcluirCampanha = useCallback(
     async (confirmacaoCodigo: string) => {
@@ -1542,6 +1677,13 @@ export function useRiscosPsicossociaisPage() {
     openCancelarProcesso,
     closeCancelarProcesso,
     processoParaCancelar,
+    processoParaPausar,
+    pausaSituacaoSelecionada,
+    savingPausa,
+    openPausarProcesso,
+    closePausarProcesso,
+    handlePausarProcesso,
+    handleRetomarProcesso,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel: exclusaoDefinitivaDisponivelNoClient(),
     isAdmin,

@@ -33,6 +33,12 @@ import {
   resolverCancelamentoProcessoRiscos,
 } from "@/lib/riscos-processo-cancelamento";
 import {
+  isPausaAdministrativaAtiva,
+  labelPausaSituacaoRiscos,
+  resolverPausaProcessoRiscos,
+  type RiscosPausaSituacao,
+} from "@/lib/riscos-processo-pausa";
+import {
   exigeLaudosSstPorOrigem,
   isOrigemManualCliente,
   normalizeRiscosCampanhaOrigem,
@@ -175,10 +181,24 @@ export const RISCOS_PSICOSSOCIAIS_ETAPA_BADGE_TONE: Record<
   cancelado: "bg-[#fef2f2] text-brand-red",
 };
 
+/** Tons do overlay administrativo (não entram na ordem de etapas). */
+export const RISCOS_PAUSA_BADGE_TONE: Record<RiscosPausaSituacao, string> = {
+  sem_retorno: "bg-[#fde68a] text-[#92400e]",
+  adiado_cliente: "bg-[#e2e8f0] text-[#475569]",
+};
+
 export function riscosPsicossociaisEtapaAtualBadgeClass(
   etapaAtual: RiscosPsicossociaisEtapaAtualId,
-  status: RiscosPsicossociaisStatus
+  status: RiscosPsicossociaisStatus,
+  pausaSituacao?: RiscosPausaSituacao | null
 ): string {
+  if (
+    status !== "cancelado" &&
+    etapaAtual !== "cancelado" &&
+    isPausaAdministrativaAtiva(pausaSituacao)
+  ) {
+    return `${RISCOS_ETAPA_BADGE_BASE} ${RISCOS_PAUSA_BADGE_TONE[pausaSituacao]}`;
+  }
   const toneKey: RiscosPsicossociaisEtapaAtualId =
     status === "cancelado" || etapaAtual === "cancelado"
       ? "cancelado"
@@ -216,6 +236,10 @@ export interface OrcamentoRiscosPsicossociaisRecord {
   cancelado_em?: string | null;
   cancelado_por?: string | null;
   motivo_cancelamento?: string | null;
+  pausa_situacao?: RiscosPausaSituacao | string | null;
+  pausa_em?: string | null;
+  pausa_por?: string | null;
+  pausa_observacao?: string | null;
 }
 
 export interface RiscosPsicossociaisProcesso {
@@ -268,6 +292,11 @@ export interface RiscosPsicossociaisProcesso {
   canceladoEm: string | null;
   canceladoPor: string | null;
   motivoCancelamento: string | null;
+  /** Overlay administrativo — não altera etapas nem status operacional. */
+  pausaSituacao: RiscosPausaSituacao | null;
+  pausaEm: string | null;
+  pausaPor: string | null;
+  pausaObservacao: string | null;
 }
 
 export type RiscosProgressoParticipanteInput = {
@@ -379,10 +408,14 @@ export function isEtapaBarraProgressoAtual(
 export function labelEtapaAtualProcessoRiscos(
   processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual"> & {
     campanha?: RiscosPsicossociaisProcesso["campanha"];
+    pausaSituacao?: RiscosPsicossociaisProcesso["pausaSituacao"];
   }
 ): string {
   if (processo.status === "cancelado" || processo.etapaAtual === "cancelado") {
     return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.cancelado;
+  }
+  if (isPausaAdministrativaAtiva(processo.pausaSituacao)) {
+    return labelPausaSituacaoRiscos(processo.pausaSituacao);
   }
   if (processo.status === "concluido" || processo.etapaAtual === "finalizado") {
     return RISCOS_PSICOSSOCIAIS_ETAPA_LABELS.finalizado;
@@ -769,6 +802,10 @@ export function aplicarEstadoCanceladoProcesso(
     canceladoEm: cancelamento.canceladoEm,
     canceladoPor: cancelamento.canceladoPor,
     motivoCancelamento: cancelamento.motivoCancelamento,
+    pausaSituacao: null,
+    pausaEm: null,
+    pausaPor: null,
+    pausaObservacao: null,
   };
 }
 
@@ -862,14 +899,50 @@ export function buildRiscosPsicossociaisProcesso(
     canceladoEm: cancelamento.canceladoEm,
     canceladoPor: cancelamento.canceladoPor,
     motivoCancelamento: cancelamento.motivoCancelamento,
+    pausaSituacao: null,
+    pausaEm: null,
+    pausaPor: null,
+    pausaObservacao: null,
   };
 
-  if (!cancelamento.cancelado) return processo;
-  return aplicarEstadoCanceladoProcesso(
+  if (cancelamento.cancelado) {
+    return aplicarEstadoCanceladoProcesso(
+      processo,
+      cancelamento,
+      campanhaExibida
+    );
+  }
+  return aplicarEstadoPausaAdministrativaProcesso(
     processo,
-    cancelamento,
-    campanhaExibida
+    resolverPausaProcessoRiscos(tracking)
   );
+}
+
+export function aplicarEstadoPausaAdministrativaProcesso(
+  processo: RiscosPsicossociaisProcesso,
+  pausa: {
+    pausaSituacao: RiscosPausaSituacao | null;
+    pausaEm: string | null;
+    pausaPor: string | null;
+    pausaObservacao: string | null;
+  }
+): RiscosPsicossociaisProcesso {
+  if (!isPausaAdministrativaAtiva(pausa.pausaSituacao)) {
+    return {
+      ...processo,
+      pausaSituacao: null,
+      pausaEm: null,
+      pausaPor: null,
+      pausaObservacao: null,
+    };
+  }
+  return {
+    ...processo,
+    pausaSituacao: pausa.pausaSituacao,
+    pausaEm: pausa.pausaEm,
+    pausaPor: pausa.pausaPor,
+    pausaObservacao: pausa.pausaObservacao,
+  };
 }
 
 /** Recalcula etapa/progresso mantendo o restante do processo. */
@@ -948,16 +1021,23 @@ export function withRiscosProgressoAtualizado(
     status: progresso.status,
   };
 
-  if (!processoJaCancelado) return next;
-  return aplicarEstadoCanceladoProcesso(
-    next,
-    {
-      canceladoEm: processo.canceladoEm,
-      canceladoPor: processo.canceladoPor,
-      motivoCancelamento: processo.motivoCancelamento,
-    },
-    campanha
-  );
+  if (processoJaCancelado) {
+    return aplicarEstadoCanceladoProcesso(
+      next,
+      {
+        canceladoEm: processo.canceladoEm,
+        canceladoPor: processo.canceladoPor,
+        motivoCancelamento: processo.motivoCancelamento,
+      },
+      campanha
+    );
+  }
+  return aplicarEstadoPausaAdministrativaProcesso(next, {
+    pausaSituacao: processo.pausaSituacao ?? null,
+    pausaEm: processo.pausaEm ?? null,
+    pausaPor: processo.pausaPor ?? null,
+    pausaObservacao: processo.pausaObservacao ?? null,
+  });
 }
 
 /**
@@ -1100,6 +1180,8 @@ export function filterRiscosPsicossociaisProcessos(
       isOrigemManualCliente(p.origem) ? "Inclusão manual" : "",
       p.status === "cancelado" || p.etapaAtual === "cancelado"
         ? "Cancelado"
+        : isPausaAdministrativaAtiva(p.pausaSituacao)
+        ? labelPausaSituacaoRiscos(p.pausaSituacao)
         : p.status === "concluido"
         ? "Concluído"
         : RISCOS_PSICOSSOCIAIS_ETAPA_LABELS[p.etapaAtual],
@@ -1136,10 +1218,12 @@ export function sortRiscosPsicossociaisProcessos(
   });
 }
 
-/** Filtro da listagem: multi-seleção Aberto / Relatório gerado / Concluído / Cancelado. */
+/** Filtro da listagem: multi-seleção Aberto / Relatório gerado / pausas / Concluído / Cancelado. */
 export type RiscosPsicossociaisListagemStatus =
   | "aberto"
   | "relatorio_gerado"
+  | "sem_retorno"
+  | "adiado_cliente"
   | "concluido"
   | "cancelado";
 
@@ -1149,6 +1233,8 @@ export const RISCOS_PSICOSSOCIAIS_LISTAGEM_STATUS_OPTIONS: Array<{
 }> = [
   { value: "aberto", label: "Aberto" },
   { value: "relatorio_gerado", label: "Relatório gerado" },
+  { value: "sem_retorno", label: "Sem retorno" },
+  { value: "adiado_cliente", label: "Adiado pelo cliente" },
   { value: "concluido", label: "Concluído" },
   { value: "cancelado", label: "Cancelado" },
 ];
@@ -1165,9 +1251,12 @@ export function classificarStatusListagemRiscos(
     | "totalEtapas"
     | "progressoPercentual"
     | "relatorioGerado"
+    | "pausaSituacao"
   >
 ): RiscosPsicossociaisListagemStatus {
   if (isRiscosProcessoListagemCancelado(processo)) return "cancelado";
+  if (processo.pausaSituacao === "sem_retorno") return "sem_retorno";
+  if (processo.pausaSituacao === "adiado_cliente") return "adiado_cliente";
   if (isRiscosProcessoListagemConcluido(processo)) return "concluido";
   if (isRiscosProcessoListagemRelatorioGerado(processo)) {
     return "relatorio_gerado";

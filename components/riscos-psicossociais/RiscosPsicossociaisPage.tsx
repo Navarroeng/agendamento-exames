@@ -7,6 +7,7 @@ import { RiscosPsicossociaisModal } from "@/components/riscos-psicossociais/Risc
 import { RiscosPsicossociaisSearchPanel } from "@/components/riscos-psicossociais/RiscosPsicossociaisSearchPanel";
 import { RiscosPsicossociaisTable } from "@/components/riscos-psicossociais/RiscosPsicossociaisTable";
 import { RiscosCancelarProcessoModal } from "@/components/riscos-psicossociais/RiscosCancelarProcessoModal";
+import { RiscosPausaProcessoModal } from "@/components/riscos-psicossociais/RiscosPausaProcessoModal";
 import { RiscosRemoverProcessoModal } from "@/components/riscos-psicossociais/RiscosRemoverProcessoModal";
 import { RiscosRelatorioViewerModal } from "@/components/riscos-psicossociais/RiscosRelatorioViewerModal";
 import { RiscosMapaQuestionarioModal } from "@/components/riscos-psicossociais/RiscosMapaQuestionarioModal";
@@ -58,6 +59,13 @@ export function RiscosPsicossociaisPage() {
     openCancelarProcesso,
     closeCancelarProcesso,
     processoParaCancelar,
+    processoParaPausar,
+    pausaSituacaoSelecionada,
+    savingPausa,
+    openPausarProcesso,
+    closePausarProcesso,
+    handlePausarProcesso,
+    handleRetomarProcesso,
     handleExcluirCampanha,
     exclusaoDefinitivaDisponivel,
     isAdmin,
@@ -123,6 +131,10 @@ export function RiscosPsicossociaisPage() {
         savingRemover={savingRemoverProcesso}
         onCancelarProcesso={openCancelarProcesso}
         savingCancelar={savingCampanha}
+        onPausarSemRetorno={(p) => openPausarProcesso(p, "sem_retorno")}
+        onAdiarCliente={(p) => openPausarProcesso(p, "adiado_cliente")}
+        onRetomarProcesso={(p) => void handleRetomarProcesso(p)}
+        savingPausa={savingPausa}
       />
 
       <RiscosMapaQuestionarioModal
@@ -136,6 +148,15 @@ export function RiscosPsicossociaisPage() {
         saving={savingCampanha}
         onClose={closeCancelarProcesso}
         onConfirm={(motivo) => handleCancelarProcesso(motivo)}
+      />
+
+      <RiscosPausaProcessoModal
+        open={Boolean(processoParaPausar && pausaSituacaoSelecionada)}
+        situacao={pausaSituacaoSelecionada}
+        processo={processoParaPausar}
+        saving={savingPausa}
+        onClose={closePausarProcesso}
+        onConfirm={(observacao) => handlePausarProcesso(observacao)}
       />
 
       <RiscosRemoverProcessoModal

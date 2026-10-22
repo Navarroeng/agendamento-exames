@@ -17,10 +17,28 @@ import {
 } from "@/services/riscos-lista-presenca-storage.service";
 
 const RISCOS_TRACKING_SELECT =
+  "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento, pausa_situacao, pausa_em, pausa_por, pausa_observacao";
+
+const RISCOS_TRACKING_SELECT_SEM_PAUSA =
   "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
 
 const FLUXO_SELECT =
+  "campanha_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento, pausa_situacao, pausa_em, pausa_por, pausa_observacao";
+
+const FLUXO_SELECT_SEM_PAUSA =
   "campanha_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at, lista_solicitada, lista_solicitada_em, lista_solicitada_email, lista_solicitada_por, lista_solicitada_registrado_em, lista_recebida, lista_anexo_path, lista_anexo_nome, lista_anexo_tipo, lista_anexo_tamanho, lista_recebida_em, lista_recebida_por, cancelado_em, cancelado_por, motivo_cancelamento";
+
+function isMissingPausaColumn(error: {
+  message?: string;
+  code?: string;
+} | null): boolean {
+  if (!error) return false;
+  return (
+    /pausa_situacao|pausa_em|pausa_por|pausa_observacao/i.test(
+      error.message ?? ""
+    ) || error.code === "42703"
+  );
+}
 
 export type ListaPresencaTarget =
   | { kind: "orcamento"; orcamentoId: string }
@@ -53,6 +71,12 @@ function mapFluxoToTracking(
     cancelado_por: row.cancelado_por ? String(row.cancelado_por) : null,
     motivo_cancelamento: row.motivo_cancelamento
       ? String(row.motivo_cancelamento)
+      : null,
+    pausa_situacao: row.pausa_situacao ? String(row.pausa_situacao) : null,
+    pausa_em: row.pausa_em ? String(row.pausa_em) : null,
+    pausa_por: row.pausa_por ? String(row.pausa_por) : null,
+    pausa_observacao: row.pausa_observacao
+      ? String(row.pausa_observacao)
       : null,
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
@@ -94,11 +118,19 @@ async function buscarTracking(
   orcamentoId: string
 ): Promise<OrcamentoRiscosPsicossociaisRecord | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("orcamento_riscos_psicossociais")
     .select(RISCOS_TRACKING_SELECT)
     .eq("orcamento_id", orcamentoId)
     .maybeSingle();
+
+  const { data, error } = isMissingPausaColumn(primary.error)
+    ? await supabase
+        .from("orcamento_riscos_psicossociais")
+        .select(RISCOS_TRACKING_SELECT_SEM_PAUSA)
+        .eq("orcamento_id", orcamentoId)
+        .maybeSingle()
+    : primary;
 
   if (error) throw error;
   return (data as OrcamentoRiscosPsicossociaisRecord | null) ?? null;
@@ -108,11 +140,19 @@ export async function buscarFluxoCampanha(
   campanhaId: string
 ): Promise<OrcamentoRiscosPsicossociaisRecord | null> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("riscos_campanha_fluxo")
     .select(FLUXO_SELECT)
     .eq("campanha_id", campanhaId)
     .maybeSingle();
+
+  const { data, error } = isMissingPausaColumn(primary.error)
+    ? await supabase
+        .from("riscos_campanha_fluxo")
+        .select(FLUXO_SELECT_SEM_PAUSA)
+        .eq("campanha_id", campanhaId)
+        .maybeSingle()
+    : primary;
 
   if (error) {
     if (

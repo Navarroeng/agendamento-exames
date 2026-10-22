@@ -236,6 +236,8 @@ export function RiscosPainelCards({
 
   const processoCancelado =
     processo.status === "cancelado" || processo.etapaAtual === "cancelado";
+  const processoPausado = Boolean(processo.pausaSituacao);
+  const processoBloqueado = processoCancelado || processoPausado;
   const podeCancelarProcesso =
     !processoCancelado &&
     processo.status !== "concluido" &&
@@ -366,7 +368,7 @@ export function RiscosPainelCards({
         </PanelCard>
 
         <PanelCard title="Pesquisa" className="min-w-0">
-          {!campanha && !criarAberto && !processoCancelado ? (
+          {!campanha && !criarAberto && !processoBloqueado ? (
             <div className="flex h-full flex-col justify-between gap-3">
               <PlaceholderNote>
                 Nenhuma pesquisa criada ainda. Cadastre o período de início e
@@ -383,7 +385,7 @@ export function RiscosPainelCards({
             </div>
           ) : null}
 
-        {!campanha && criarAberto && !processoCancelado ? (
+        {!campanha && criarAberto && !processoBloqueado ? (
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
@@ -562,7 +564,7 @@ export function RiscosPainelCards({
                 </>
               ) : null}
               {campanhaStatusSincronizado &&
-              !processoCancelado &&
+              !processoBloqueado &&
               acoesPesquisa.exibirAbrir &&
               podeAutorizarAbrirPesquisa ? (
                 <button
@@ -579,7 +581,7 @@ export function RiscosPainelCards({
                 </button>
               ) : null}
               {campanhaStatusSincronizado &&
-              !processoCancelado &&
+              !processoBloqueado &&
               acoesPesquisa.exibirEncerrar ? (
                 <button
                   type="button"
@@ -592,7 +594,7 @@ export function RiscosPainelCards({
                 </button>
               ) : null}
               {campanhaStatusSincronizado &&
-              !processoCancelado &&
+              !processoBloqueado &&
               acoesPesquisa.exibirEditarPeriodo &&
               podeAutorizarAbrirPesquisa ? (
                 <button
@@ -616,7 +618,7 @@ export function RiscosPainelCards({
                 </button>
               ) : null}
               {campanhaStatusSincronizado &&
-              !processoCancelado &&
+              !processoBloqueado &&
               acoesPesquisa.exibirProrrogar &&
               podeAutorizarAbrirPesquisa ? (
                 <button
@@ -634,7 +636,7 @@ export function RiscosPainelCards({
                 </button>
               ) : null}
               {campanhaStatusSincronizado &&
-              !processoCancelado &&
+              !processoBloqueado &&
               acoesPesquisa.exibirReabrir &&
               podeAutorizarAbrirPesquisa ? (
                 <button
@@ -701,9 +703,9 @@ export function RiscosPainelCards({
             onRemover={onRemoverParticipante}
             podeGerenciarParticipante={
               (podeGerenciarParticipante || podeGerenciarParticipanteAuth) &&
-              !processoCancelado
+              !processoBloqueado
             }
-            somenteConsulta={processoCancelado}
+            somenteConsulta={processoBloqueado}
             avisoCadastro={avisoParticipante}
           />
         ) : (
@@ -727,8 +729,8 @@ export function RiscosPainelCards({
           <RiscosRelatorioPanel
             campanha={campanha}
             participantes={participantes}
-            isAdmin={isAdmin && !processoCancelado}
-            processoCancelado={processoCancelado}
+            isAdmin={isAdmin && !processoBloqueado}
+            processoCancelado={processoBloqueado}
             auditContext={auditContext}
             emailEnvioSugerido={
               isOrigemManualCliente(processo.origem)

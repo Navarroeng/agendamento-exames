@@ -7,8 +7,12 @@ import {
 } from "@/lib/riscos-psicossociais";
 
 type RiscosEtapaAtualBadgeProps = {
-  processo: Pick<RiscosPsicossociaisProcesso, "status" | "etapaAtual"> & {
+  processo: Pick<
+    RiscosPsicossociaisProcesso,
+    "status" | "etapaAtual" | "pausaSituacao"
+  > & {
     campanha?: RiscosPsicossociaisProcesso["campanha"];
+    pausaSituacao?: RiscosPsicossociaisProcesso["pausaSituacao"];
   };
 };
 
@@ -19,7 +23,8 @@ export function RiscosEtapaAtualBadge({ processo }: RiscosEtapaAtualBadgeProps) 
     <span
       className={riscosPsicossociaisEtapaAtualBadgeClass(
         processo.etapaAtual,
-        processo.status
+        processo.status,
+        processo.pausaSituacao
       )}
       title={label}
     >
