@@ -18,6 +18,7 @@ import { EtapaAtualBadge } from "@/components/implantacao/EtapaAtualBadge";
 import { ImplantacaoMesTabs } from "@/components/implantacao/ImplantacaoMesTabs";
 import { formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
+import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
 
 interface ImplantacaoTableProps {
   processos: ImplantacaoProcesso[];
@@ -32,6 +33,9 @@ interface ImplantacaoTableProps {
 
 const AGENDAMENTO_BADGE_BASE =
   "inline-flex h-6 min-w-[5.5rem] items-center justify-center rounded-full px-2.5 text-[10px] font-extrabold leading-none whitespace-nowrap";
+
+const ORCAMENTO_MARCA_BASE =
+  "inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-extrabold leading-none";
 
 function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
   return (
@@ -146,9 +150,20 @@ export function ImplantacaoTable({
                     <td className="font-bold text-navy">
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                         <span>{processo.orcamento.numero}</span>
+                        {isOrcamentoMensalidade(
+                          processo.orcamento.modalidade
+                        ) && (
+                          <span
+                            className={`${ORCAMENTO_MARCA_BASE} border-brand-blue bg-brand-blue-soft text-brand-blue`}
+                            title="Gestão SST mensal"
+                            aria-label="Gestão SST mensal"
+                          >
+                            M
+                          </span>
+                        )}
                         {processo.orcamento.origem_cliente === "renovacao" && (
                           <span
-                            className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-[#c2410c] bg-[#ffedd5] text-[11px] font-extrabold leading-none text-[#c2410c]"
+                            className={`${ORCAMENTO_MARCA_BASE} border-[#c2410c] bg-[#ffedd5] text-[#c2410c]`}
                             title="Cliente em renovação de contrato"
                             aria-label="Cliente em renovação de contrato"
                           >
