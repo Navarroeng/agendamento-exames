@@ -20,7 +20,11 @@ import {
   type OrcamentoAprovacaoIntegracaoResult,
 } from "@/lib/orcamento-aprovacao-integracao";
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
-import { buildClienteContratoSyncFromAprovacao } from "@/lib/cliente-contrato-orcamento-sync";
+import {
+  buildClienteContratoSyncFromAprovacao,
+  deveEncerrarAtivoAnteriorNaSincronizacao,
+  statusContratoAposSyncComAtivoExistente,
+} from "@/lib/cliente-contrato-orcamento-sync";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
@@ -235,6 +239,10 @@ function sortAprovacao(
   return next;
 }
 
+/**
+ * Substituição automática de vigência: só status, sem encerrado_em.
+ * Preencher encerrado_em dispara trg_cliente_contratos_encerrar_somente_admin.
+ */
 async function encerrarOutrosContratosAtivos(
   clienteId: string,
   excludeContratoId: string
@@ -246,7 +254,6 @@ async function encerrarOutrosContratosAtivos(
     .from("cliente_contratos")
     .update({
       status: "encerrado" satisfies ClienteContratoStatus,
-      encerrado_em: agora,
       updated_at: agora,
     })
     .eq("cliente_id", clienteId)
@@ -259,8 +266,29 @@ async function encerrarOutrosContratosAtivos(
   }
 }
 
+async function temOutroContratoAtivo(
+  clienteId: string,
+  excludeContratoId: string
+): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cliente_contratos")
+    .select("id")
+    .eq("cliente_id", clienteId)
+    .eq("status", "ativo")
+    .neq("id", excludeContratoId)
+    .limit(1);
+  if (error) {
+    throw new Error(
+      `Falha ao verificar contrato ativo anterior: ${error.message}`
+    );
+  }
+  return Boolean(data?.length);
+}
+
 async function syncClienteContratoFromAprovacao(
-  aprovacao: OrcamentoAprovacaoRecord
+  aprovacao: OrcamentoAprovacaoRecord,
+  opts?: { permitirEncerrarAtivoAnterior?: boolean }
 ): Promise<void> {
   if (isLaudoPontualExclusivo(aprovacao.orcamento_aprovacao_itens)) {
     return;
@@ -271,6 +299,10 @@ async function syncClienteContratoFromAprovacao(
     .select("modalidade")
     .eq("id", aprovacao.orcamento_id)
     .maybeSingle();
+  const cobrancaMensal = usaControleParcelasMensalidade(
+    orcamentoModalidade?.modalidade,
+    aprovacao.mensalidade_pagamento
+  );
   const syncPayload = buildClienteContratoSyncFromAprovacao({
     aprovacao: {
       contrato_enviado: aprovacao.contrato_enviado,
@@ -281,10 +313,7 @@ async function syncClienteContratoFromAprovacao(
       boleto_vencimento: aprovacao.boleto_vencimento,
       boleto_pago_em: aprovacao.boleto_pago_em,
     },
-    cobrancaMensal: usaControleParcelasMensalidade(
-      orcamentoModalidade?.modalidade,
-      aprovacao.mensalidade_pagamento
-    ),
+    cobrancaMensal,
     hojeIso: todayIsoSaoPaulo(),
   });
 
@@ -306,20 +335,52 @@ async function syncClienteContratoFromAprovacao(
     );
   }
 
-  // Crítico: encerrar outro ativo ANTES de promover este para ativo
-  // (idx_cliente_contratos_um_ativo). Datas, valor e vínculo do anterior ficam.
-  if (syncPayload.status === "ativo") {
-    for (const row of targets) {
+  const outroAtivoPorContrato = new Map<string, boolean>();
+  for (const row of targets) {
+    const encerrarOutro = deveEncerrarAtivoAnteriorNaSincronizacao({
+      statusDestino: syncPayload.status,
+      statusAtual: String(row.status ?? ""),
+      permitirEncerrarAtivoAnterior: Boolean(
+        opts?.permitirEncerrarAtivoAnterior
+      ),
+      cobrancaMensal,
+    });
+    if (encerrarOutro) {
+      // idx_cliente_contratos_um_ativo: encerra o anterior só na substituição mensal.
       await encerrarOutrosContratosAtivos(
         row.cliente_id as string,
         row.id as string
       );
+      outroAtivoPorContrato.set(row.id as string, false);
+      continue;
+    }
+    if (syncPayload.status === "ativo" && row.status !== "ativo") {
+      outroAtivoPorContrato.set(
+        row.id as string,
+        await temOutroContratoAtivo(row.cliente_id as string, row.id as string)
+      );
+    } else {
+      outroAtivoPorContrato.set(row.id as string, false);
     }
   }
 
   for (const row of targets) {
+    const encerrarOutro = deveEncerrarAtivoAnteriorNaSincronizacao({
+      statusDestino: syncPayload.status,
+      statusAtual: String(row.status ?? ""),
+      permitirEncerrarAtivoAnterior: Boolean(
+        opts?.permitirEncerrarAtivoAnterior
+      ),
+      cobrancaMensal,
+    });
+    const statusFinal = statusContratoAposSyncComAtivoExistente({
+      statusDestino: syncPayload.status,
+      statusAtual: String(row.status ?? ""),
+      outroAtivoExiste: Boolean(outroAtivoPorContrato.get(row.id as string)),
+      encerrarOutroAtivo: encerrarOutro,
+    });
     const update: Record<string, unknown> = {
-      status: syncPayload.status,
+      status: statusFinal,
       contrato_enviado_em: syncPayload.contrato_enviado_em,
       contrato_assinado_em: syncPayload.contrato_assinado_em,
       boleto_vencimento: syncPayload.boleto_vencimento,
@@ -685,7 +746,9 @@ export async function atualizarAcompanhamentoDocumentalContrato(
   if (error) throw error;
 
   const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
-  await syncClienteContratoFromAprovacao(aprovacao);
+  await syncClienteContratoFromAprovacao(aprovacao, {
+    permitirEncerrarAtivoAnterior: true,
+  });
   return aprovacao;
 }
 
@@ -736,7 +799,9 @@ export async function atualizarAcompanhamentoFinanceiro(
   if (error) throw error;
 
   const aprovacao = sortAprovacao(data as OrcamentoAprovacaoRecord);
-  await syncClienteContratoFromAprovacao(aprovacao);
+  await syncClienteContratoFromAprovacao(aprovacao, {
+    permitirEncerrarAtivoAnterior: false,
+  });
   return aprovacao;
 }
 

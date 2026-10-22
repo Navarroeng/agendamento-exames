@@ -111,3 +111,38 @@ export function buildClienteContratoSyncFromAprovacao(params: {
 
   return payload;
 }
+
+/**
+ * Encerramento automático (substituição de vigência) só quando este contrato
+ * está passando a ativo e a origem do sync autoriza — típico da mensalidade.
+ * Anexar/substituir comprovante na aba Financeiro não autoriza.
+ * Nunca preenche encerrado_em: isso é encerramento manual de administrador.
+ */
+export function deveEncerrarAtivoAnteriorNaSincronizacao(params: {
+  statusDestino: ClienteContratoStatus | string;
+  statusAtual: string | null | undefined;
+  permitirEncerrarAtivoAnterior: boolean;
+  cobrancaMensal: boolean;
+}): boolean {
+  if (!params.permitirEncerrarAtivoAnterior) return false;
+  if (!params.cobrancaMensal) return false;
+  if (params.statusDestino !== "ativo") return false;
+  return params.statusAtual !== "ativo";
+}
+
+/**
+ * Se outro contrato já ocupa o slot único `ativo` e não vamos encerrá-lo,
+ * este vínculo permanece no status atual. Pagamento e liberação ainda sincronizam.
+ */
+export function statusContratoAposSyncComAtivoExistente(params: {
+  statusDestino: ClienteContratoStatus | string;
+  statusAtual: string | null | undefined;
+  outroAtivoExiste: boolean;
+  encerrarOutroAtivo: boolean;
+}): string {
+  if (params.statusDestino !== "ativo") return String(params.statusDestino);
+  if (params.statusAtual === "ativo") return "ativo";
+  if (params.encerrarOutroAtivo) return "ativo";
+  if (!params.outroAtivoExiste) return "ativo";
+  return String(params.statusAtual || params.statusDestino);
+}

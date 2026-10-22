@@ -5,7 +5,9 @@ import {
 } from "../lib/cliente-contrato-vigencia-calc";
 import {
   buildClienteContratoSyncFromAprovacao,
+  deveEncerrarAtivoAnteriorNaSincronizacao,
   resolveStatusContratoFromAprovacao,
+  statusContratoAposSyncComAtivoExistente,
 } from "../lib/cliente-contrato-orcamento-sync";
 import {
   contratoEstaVigenteNaData,
@@ -210,6 +212,25 @@ assert.equal(
     "2026-10-16"
   ),
   false
+);
+
+assert.equal(
+  deveEncerrarAtivoAnteriorNaSincronizacao({
+    statusDestino: "ativo",
+    statusAtual: "aguardando_pagamento",
+    permitirEncerrarAtivoAnterior: false,
+    cobrancaMensal: false,
+  }),
+  false
+);
+assert.equal(
+  statusContratoAposSyncComAtivoExistente({
+    statusDestino: "ativo",
+    statusAtual: "aguardando_pagamento",
+    outroAtivoExiste: true,
+    encerrarOutroAtivo: false,
+  }),
+  "aguardando_pagamento"
 );
 
 console.log("ok: contrato-orcamento-vigencia");
