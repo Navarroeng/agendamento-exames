@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ConsultaVencimentoContrato } from "@/lib/cliente-contrato-vencimentos";
+import { useEffect, useMemo, useState } from "react";
 import {
-  listarVencimentosContratos,
+  colunasVencimentos,
+  fimPrevistoNoMes,
+  quantidadesVencimentosPorMes,
+  type ConsultaVencimentoContrato,
+} from "@/lib/cliente-contrato-vencimentos";
+import {
+  listarVencimentosDoAno,
   type VencimentoContratoLinha,
 } from "@/services/cliente-contrato-vencimentos.service";
 
@@ -12,7 +17,10 @@ export function useClienteContratoVencimentos(
   mes: number,
   consulta: ConsultaVencimentoContrato
 ) {
-  const [linhas, setLinhas] = useState<VencimentoContratoLinha[]>([]);
+  const [linhasAno, setLinhasAno] = useState<VencimentoContratoLinha[]>([]);
+  const [anoCarregado, setAnoCarregado] = useState<number | null>(null);
+  const [consultaCarregada, setConsultaCarregada] =
+    useState<ConsultaVencimentoContrato | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,14 +28,19 @@ export function useClienteContratoVencimentos(
     let ativo = true;
     setLoading(true);
     setError(null);
-    listarVencimentosContratos({ ano, mes, consulta })
+    listarVencimentosDoAno({ ano, consulta })
       .then((rows) => {
-        if (ativo) setLinhas(rows);
+        if (!ativo) return;
+        setLinhasAno(rows);
+        setAnoCarregado(ano);
+        setConsultaCarregada(consulta);
       })
       .catch((err) => {
         console.error(err);
         if (!ativo) return;
-        setLinhas([]);
+        setLinhasAno([]);
+        setAnoCarregado(ano);
+        setConsultaCarregada(consulta);
         setError("Erro ao carregar vencimentos de contratos.");
       })
       .finally(() => {
@@ -36,7 +49,24 @@ export function useClienteContratoVencimentos(
     return () => {
       ativo = false;
     };
-  }, [ano, mes, consulta]);
+  }, [ano, consulta]);
 
-  return { linhas, loading, error };
+  const sincronizado = anoCarregado === ano && consultaCarregada === consulta;
+
+  const linhas = useMemo(() => {
+    if (!sincronizado) return [];
+    return linhasAno.filter((linha) =>
+      fimPrevistoNoMes(linha.fimPrevisto, ano, mes)
+    );
+  }, [sincronizado, linhasAno, ano, mes]);
+  const colunas = useMemo(
+    () =>
+      colunasVencimentos(
+        quantidadesVencimentosPorMes(sincronizado ? linhasAno : [], ano),
+        mes
+      ),
+    [sincronizado, linhasAno, ano, mes]
+  );
+
+  return { linhas, colunas, loading: loading || !sincronizado, error };
 }

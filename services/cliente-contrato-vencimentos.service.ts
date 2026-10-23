@@ -158,29 +158,29 @@ function aplicarCobranca(
   });
 }
 
-export async function listarVencimentosContratos(params: {
+export async function listarVencimentosDoAno(params: {
   ano: number;
-  mes: number;
   consulta?: ConsultaVencimentoContrato;
   hojeIso?: string;
 }): Promise<VencimentoContratoLinha[]> {
-  const limites = limitesDoMes(params.ano, params.mes);
-  const doMes = await listarFaixa(limites.inicio, limites.fim);
-  if (doMes.length === 0) return [];
+  const inicio = limitesDoMes(params.ano, 1).inicio;
+  const fim = limitesDoMes(params.ano, 12).fim;
+  const doAno = await listarFaixa(inicio, fim);
+  if (doAno.length === 0) return [];
 
   const orcamentoIds = Array.from(
     new Set(
-      doMes
+      doAno
         .map((contrato) => contrato.orcamento_id?.trim())
         .filter((id): id is string => Boolean(id))
     )
   );
-  const clienteIds = Array.from(new Set(doMes.map((contrato) => contrato.cliente_id)));
+  const clienteIds = Array.from(new Set(doAno.map((contrato) => contrato.cliente_id)));
   const [irmaos, sucessores] = await Promise.all([
     listarPorColuna("orcamento_id", orcamentoIds),
-    listarPorColuna("cliente_id", clienteIds, limites.inicio),
+    listarPorColuna("cliente_id", clienteIds, inicio),
   ]);
-  const contratos = unirPorId([doMes, irmaos, sucessores]);
+  const contratos = unirPorId([doAno, irmaos, sucessores]);
   const origemIds = Array.from(
     new Set(
       contratos
@@ -190,14 +190,16 @@ export async function listarVencimentosContratos(params: {
   );
   const hojeIso = params.hojeIso ?? todayIsoSaoPaulo();
   const origemPorOrcamentoId = await origensPorOrcamento(origemIds);
-  const montadas = montarVencimentosDoMes({
-    ano: params.ano,
-    mes: params.mes,
-    contratos,
-    origemPorOrcamentoId,
-    consulta: params.consulta,
-    hojeIso,
-  });
+  const montadas = Array.from({ length: 12 }, (_, index) =>
+    montarVencimentosDoMes({
+      ano: params.ano,
+      mes: index + 1,
+      contratos,
+      origemPorOrcamentoId,
+      consulta: params.consulta,
+      hojeIso,
+    })
+  ).flat();
   const enriquecidas = aplicarCobranca(
     montadas,
     await complementarContratosComCobranca(

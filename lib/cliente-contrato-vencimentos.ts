@@ -230,6 +230,70 @@ export function montarVencimentosDoMes(params: {
   return linhas;
 }
 
+export type ColunaVencimentoMes = {
+  mes: number;
+  quantidade: number;
+  selecionado: boolean;
+  /** Mês com a maior quantidade do ano. Empates também recebem a marca. Zero não marca o ano inteiro. */
+  maior: boolean;
+};
+
+/** Doze quantidades, janeiro no índice 0, a partir das mesmas linhas da listagem. */
+export function quantidadesVencimentosPorMes(
+  linhas: readonly { fimPrevisto: string }[],
+  ano: number
+): number[] {
+  const quantidades = Array.from({ length: 12 }, () => 0);
+  for (const linha of linhas) {
+    const fim = fimPrevistoIso(linha.fimPrevisto);
+    if (!fim || Number(fim.slice(0, 4)) !== ano) continue;
+    const mes = Number(fim.slice(5, 7));
+    if (mes < 1 || mes > 12) continue;
+    quantidades[mes - 1] += 1;
+  }
+  return quantidades;
+}
+
+export function colunasVencimentos(
+  quantidades: readonly number[],
+  mesSelecionado: number
+): ColunaVencimentoMes[] {
+  if (quantidades.length !== 12) {
+    throw new Error("O gráfico de vencimentos precisa dos 12 meses.");
+  }
+  const pico = Math.max(...quantidades);
+  return quantidades.map((quantidade, index) => ({
+    mes: index + 1,
+    quantidade,
+    selecionado: index + 1 === mesSelecionado,
+    maior: pico > 0 && quantidade === pico,
+  }));
+}
+
+/** Marcas inteiras do eixo, da maior para a base. */
+export function eixoQuantidadeVencimentos(maximo: number): number[] {
+  const max = Math.max(0, Math.floor(maximo));
+  if (max <= 4) {
+    return Array.from({ length: max + 1 }, (_, index) => max - index);
+  }
+  const passo = Math.ceil(max / 4);
+  const valores: number[] = [];
+  for (let valor = 0; valor < max; valor += passo) valores.push(valor);
+  valores.push(max);
+  return Array.from(new Set(valores)).sort((a, b) => b - a);
+}
+
+export function rotuloColunaVencimento(
+  ano: number,
+  mes: number,
+  quantidade: number
+): string {
+  const periodo = `${formatMesLabel({ year: ano, month: mes })}/${ano}`;
+  const contratos =
+    quantidade === 1 ? "1 contrato" : `${quantidade} contratos`;
+  return `${periodo} — ${contratos}`;
+}
+
 export function resumoVencimentos(params: {
   ano: number;
   mes: number;

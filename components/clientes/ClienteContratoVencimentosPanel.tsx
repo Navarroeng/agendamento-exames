@@ -1,5 +1,6 @@
 "use client";
 
+import { ClienteContratoVencimentosChart } from "./ClienteContratoVencimentosChart";
 import { Panel } from "@/components/ui/Panel";
 import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 import { useClienteContratoVencimentos } from "@/hooks/useClienteContratoVencimentos";
@@ -37,7 +38,7 @@ export function ClienteContratoVencimentosPanel({
   onConsultaChange,
   onAbrir,
 }: ClienteContratoVencimentosPanelProps) {
-  const { linhas, loading, error } = useClienteContratoVencimentos(
+  const { linhas, colunas, loading, error } = useClienteContratoVencimentos(
     ano,
     mes,
     consulta
@@ -103,9 +104,16 @@ export function ClienteContratoVencimentosPanel({
       </div>
 
       {!loading && !error ? (
-        <p className="mb-4 text-sm font-extrabold text-navy">
-          {resumoVencimentos({ ano, mes, total: linhas.length, consulta })}
-        </p>
+        <>
+          <ClienteContratoVencimentosChart
+            ano={ano}
+            colunas={colunas}
+            onSelecionarMes={onMesChange}
+          />
+          <p className="mb-4 text-sm font-extrabold text-navy">
+            {resumoVencimentos({ ano, mes, total: linhas.length, consulta })}
+          </p>
+        </>
       ) : null}
 
       {loading ? (

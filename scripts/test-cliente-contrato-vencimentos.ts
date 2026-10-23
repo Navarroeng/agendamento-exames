@@ -7,12 +7,16 @@ import {
   VENCIMENTOS_ENCERRADOS_VAZIO,
   VENCIMENTOS_VAZIO,
   anosDoSeletor,
+  colunasVencimentos,
   contratoCanceladoOuEncerradoAntecipadamente,
+  eixoQuantidadeVencimentos,
   fimPrevistoNoMes,
   limitesDoMes,
   montarVencimentosDoMes,
   periodoInicialVencimentos,
+  quantidadesVencimentosPorMes,
   resumoVencimentos,
+  rotuloColunaVencimento,
 } from "../lib/cliente-contrato-vencimentos";
 import type { ClienteContratoConsulta } from "../lib/cliente-contrato-atual";
 
@@ -446,6 +450,136 @@ run("resumo e vazio", () => {
   assert.match(VENCIMENTOS_ENCERRADOS_VAZIO, /cancelado ou encerrado/);
 });
 
+function linhasDoAno(
+  contratos: ClienteContratoConsulta[],
+  ano: number,
+  consulta: "principal" | "encerrados" = "principal"
+) {
+  return Array.from({ length: 12 }, (_, index) =>
+    montarVencimentosDoMes({
+      ano,
+      mes: index + 1,
+      contratos,
+      consulta,
+      hojeIso: HOJE,
+    })
+  ).flat();
+}
+
+run("gráfico do ano corresponde à listagem de cada mês", () => {
+  const contratos = [
+    contrato({
+      id: "fev",
+      status: "ativo",
+      numero: "CTR-FEV",
+      data_fim: "2026-02-19",
+    }),
+    contrato({
+      id: "out-a",
+      status: "ativo",
+      numero: "CTR-OUT-A",
+      data_fim: "2026-10-02",
+    }),
+    contrato({
+      id: "out-b",
+      status: "ativo",
+      numero: "CTR-OUT-B",
+      data_inicio: "2025-10-20",
+      data_fim: "2026-10-20",
+    }),
+    contrato({
+      id: "jun-dup-a",
+      status: "aguardando_envio",
+      orcamento_id: "orc-jun",
+      numero: "CTR-JUN-A",
+      data_inicio: "",
+      data_fim: "2026-06-10",
+    }),
+    contrato({
+      id: "jun-dup-b",
+      status: "ativo",
+      orcamento_id: "orc-jun",
+      numero: "CTR-JUN-B",
+      data_inicio: "2025-06-10",
+      data_fim: "2026-06-10",
+    }),
+    contrato({
+      id: "mar-cancelado",
+      status: "cancelado",
+      numero: "CTR-MAR",
+      data_fim: "2026-03-15",
+    }),
+    contrato({
+      id: "outro-ano",
+      status: "ativo",
+      numero: "CTR-2027",
+      data_fim: "2027-02-19",
+    }),
+  ];
+
+  const linhas = linhasDoAno(contratos, 2026);
+  const quantidades = quantidadesVencimentosPorMes(linhas, 2026);
+  assert.equal(quantidades.length, 12);
+  assert.equal(quantidades[0], 0);
+  assert.equal(quantidades[11], 0);
+  for (let mes = 1; mes <= 12; mes += 1) {
+    const lista = linhas.filter((linha) =>
+      fimPrevistoNoMes(linha.fimPrevisto, 2026, mes)
+    );
+    const colunas = colunasVencimentos(quantidades, mes);
+    assert.equal(colunas[mes - 1].quantidade, lista.length);
+    assert.equal(colunas[mes - 1].selecionado, true);
+    assert.equal(
+      colunas.filter((coluna) => coluna.selecionado).length,
+      1
+    );
+  }
+  assert.equal(quantidades[1], 1);
+  assert.equal(quantidades[5], 1);
+  assert.equal(quantidades[9], 2);
+  assert.equal(quantidades[2], 0);
+  assert.deepEqual(
+    quantidadesVencimentosPorMes(linhasDoAno(contratos, 2027), 2027),
+    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  );
+
+  const encerrados = quantidadesVencimentosPorMes(
+    linhasDoAno(contratos, 2026, "encerrados"),
+    2026
+  );
+  assert.equal(encerrados[2], 1);
+  assert.equal(encerrados[9], 0);
+
+  const colunas = colunasVencimentos(quantidades, 10);
+  assert.equal(colunas[5].maior, false);
+  assert.equal(colunas[9].maior, true);
+  const empate = colunasVencimentos(
+    [2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    1
+  );
+  assert.equal(empate[0].maior, true);
+  assert.equal(empate[2].maior, true);
+  assert.equal(empate[1].maior, false);
+  const vazio = colunasVencimentos(Array.from({ length: 12 }, () => 0), 4);
+  assert.ok(vazio.every((coluna) => !coluna.maior));
+  assert.equal(vazio[3].selecionado, true);
+
+  for (const maximo of [0, 1, 4, 5, 17]) {
+    const eixo = eixoQuantidadeVencimentos(maximo);
+    assert.ok(eixo.every((valor) => Number.isInteger(valor)));
+    assert.equal(eixo[0], maximo);
+    assert.equal(eixo[eixo.length - 1], 0);
+  }
+  assert.equal(
+    rotuloColunaVencimento(2027, 2, 1),
+    "Fevereiro/2027 — 1 contrato"
+  );
+  assert.equal(
+    rotuloColunaVencimento(2026, 1, 0),
+    "Janeiro/2026 — 0 contratos"
+  );
+});
+
 run("a tela preserva o mês e abre o contrato SST", () => {
   const pagina = readFileSync(
     "components/clientes/ClientesPage.tsx",
@@ -471,9 +605,33 @@ run("a tela preserva o mês e abre o contrato SST", () => {
   );
   assert.match(servico, /\.gte\("data_fim", inicio\)/);
   assert.match(servico, /\.lte\("data_fim", fim\)/);
+  assert.match(servico, /limitesDoMes\(params\.ano, 1\)/);
+  assert.match(servico, /limitesDoMes\(params\.ano, 12\)/);
   assert.match(servico, /while \(true\)/);
   assert.doesNotMatch(servico, /\.eq\("status", "ativo"\)/);
   assert.doesNotMatch(servico, /aprovado_em/);
+
+  const grafico = readFileSync(
+    "components/clientes/ClienteContratoVencimentosChart.tsx",
+    "utf8"
+  );
+  assert.match(grafico, /Vencimentos por mês — \{ano\}/);
+  assert.match(grafico, /onSelecionarMes\(coluna\.mes\)/);
+  assert.match(grafico, /title=\{descricao\}/);
+
+  const painel = readFileSync(
+    "components/clientes/ClienteContratoVencimentosPanel.tsx",
+    "utf8"
+  );
+  assert.match(painel, /onSelecionarMes=\{onMesChange\}/);
+
+  const hook = readFileSync(
+    "hooks/useClienteContratoVencimentos.ts",
+    "utf8"
+  );
+  assert.match(hook, /listarVencimentosDoAno/);
+  assert.match(hook, /\}, \[ano, consulta\]\);/);
+  assert.doesNotMatch(hook, /\}, \[ano, mes, consulta\]\);/);
 });
 
 console.log("test-cliente-contrato-vencimentos: ok");
