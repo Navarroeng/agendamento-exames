@@ -27,10 +27,9 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import type { OrcamentoRecord, OrcamentoStatus } from "@/lib/orcamento-types";
 import type { ClienteContratoRecord } from "@/lib/types";
-import {
-  contratoLiberaAgendamento,
-  labelAgendamentoLiberacao,
-} from "@/lib/cliente-pode-agendar";
+import { labelAgendamentoLiberacao } from "@/lib/cliente-pode-agendar";
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import { contratoEstaVigenteNaData } from "@/lib/cliente-contrato-vigencia";
 import {
   processoBelongsToMesAprovacao,
   type ImplantacaoYearMonth,
@@ -721,7 +720,15 @@ export function buildImplantacaoProcesso(params: {
       : fluxo === "somente_treinamentos"
         ? false
         : contrato
-          ? contratoLiberaAgendamento(contrato)
+          ? contratoEstaVigenteNaData(
+              {
+                ...contrato,
+                modalidadeOrcamento: orcamento.modalidade,
+                mensalidadePagamento: aprovacao?.mensalidade_pagamento,
+                contrato_assinado: aprovacao?.contrato_assinado,
+              },
+              todayIsoSaoPaulo()
+            )
           : false;
   const cancelado =
     orcamento.status === "cancelado" ||

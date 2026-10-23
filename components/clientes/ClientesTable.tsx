@@ -4,7 +4,10 @@ import { IconClipboard } from "@/components/ui/icons/OutlineIcons";
 
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
-import { formatClienteAgendamentoBadgeLabel } from "@/lib/cliente-disponivel-agendamento";
+import {
+  formatClienteAgendamentoBadgeLabel,
+  isClienteAgendamentoLiberadoNaExibicao,
+} from "@/lib/cliente-disponivel-agendamento";
 import type { ClienteRecord } from "@/lib/types";
 
 import { ClientesPagination } from "./ClientesPagination";
@@ -90,7 +93,7 @@ export function ClientesTable({
                   <td>
                     {(() => {
                       const label = formatClienteAgendamentoBadgeLabel(
-                        cliente.disponivel_agendamento
+                        isClienteAgendamentoLiberadoNaExibicao(cliente)
                       );
                       const liberado = label === "Agendamento liberado";
                       return (

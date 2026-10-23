@@ -2,10 +2,8 @@ import {
   CLIENTE_CONTRATO_STATUS_OPTIONS,
   CLIENTE_CONTRATO_TIPO_OPTIONS,
 } from "@/lib/cliente-contrato-constants";
-import {
-  contratoLiberaAgendamento,
-  labelAgendamentoLiberacao,
-} from "@/lib/cliente-pode-agendar";
+import { contratoLiberaAgendamento, labelAgendamentoLiberacao } from "@/lib/cliente-pode-agendar";
+import { contratoEstaVigenteNaData } from "@/lib/cliente-contrato-vigencia";
 import {
   labelContratoStatusVisual,
   resolveContratoStatusVisual,
@@ -237,12 +235,31 @@ export function labelFinanceiroContrato(
 }
 
 export function labelAgendamentoContrato(
-  contrato: Pick<
-    ClienteContratoRecord,
-    "orcamento_id" | "boleto_pago" | "liberado_para_agendamento" | "status"
-  >
+  contrato: Parameters<typeof contratoEstaVigenteNaData>[0],
+  hojeIso?: string
 ): "Liberado" | "Bloqueado" {
-  return labelAgendamentoLiberacao(contratoLiberaAgendamento(contrato));
+  const data = (hojeIso ?? todayIsoSaoPaulo()).slice(0, 10);
+  return labelAgendamentoLiberacao(contratoEstaVigenteNaData(contrato, data));
+}
+
+/**
+ * Liberação registrada naquele contrato, olhada no último dia da vigência dele.
+ * Não responde se o cliente pode agendar hoje.
+ */
+export function labelLiberacaoNaVigenciaContrato(
+  contrato: Parameters<typeof contratoLiberaAgendamento>[0]
+): "Liberado" | "Bloqueado" {
+  const inicio = (contrato.data_inicio ?? "").slice(0, 10);
+  const fim = (contrato.data_fim ?? "").slice(0, 10);
+  const dentroDaVigencia =
+    /^\d{4}-\d{2}-\d{2}$/.test(inicio) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(fim) &&
+    fim >= inicio
+      ? fim
+      : undefined;
+  return labelAgendamentoLiberacao(
+    contratoLiberaAgendamento(contrato, dentroDaVigencia)
+  );
 }
 
 export function labelVencimentoBoletoContrato(

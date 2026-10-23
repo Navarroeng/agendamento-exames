@@ -2,7 +2,7 @@ import {
   clienteContratoBadgeClassExibicao,
   condicaoPagamentoExibicao,
   formatValorContratoExibicao,
-  labelAgendamentoContrato,
+  labelLiberacaoNaVigenciaContrato,
   labelClienteContratoStatusExibicao,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
@@ -54,7 +54,7 @@ export function ClienteContratosHistoricoTable({
               "Valor",
               "Status",
               "Financeiro",
-              "Agendamento",
+              "Liberação na vigência",
               "Ações",
             ].map((h) => (
               <th key={h}>{h}</th>
@@ -63,7 +63,7 @@ export function ClienteContratosHistoricoTable({
         </thead>
         <tbody>
           {contratos.map((contrato) => {
-            const agendamento = labelAgendamentoContrato(contrato);
+            const agendamento = labelLiberacaoNaVigenciaContrato(contrato);
             const condicao = condicaoPagamentoExibicao(contrato);
             const situacao = labelFinanceiroContrato(contrato);
             return (
@@ -106,6 +106,7 @@ export function ClienteContratosHistoricoTable({
                 </td>
                 <td>
                   <span
+                    title="Liberação registrada neste contrato durante a vigência. Não indica se novos agendamentos estão liberados hoje."
                     className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                       agendamento === "Liberado"
                         ? "bg-brand-green-soft text-brand-green"

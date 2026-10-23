@@ -9,6 +9,7 @@
  * Não duplicar esta lógica em telas.
  */
 
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import {
   CONTRATO_ENCERRADO_ERROR_MESSAGE,
   CONTRATO_VIGENTE_ERROR_MESSAGE,
@@ -54,12 +55,20 @@ export type DisponibilidadeAgendamentoResult = {
 };
 
 function hojeIso(data?: string): string {
-  return (data ?? new Date().toISOString()).slice(0, 10);
+  return (data ?? todayIsoSaoPaulo()).slice(0, 10);
 }
 
 /**
  * Determina se o cliente pode receber novos agendamentos na data.
- * Prioridade: bloqueio manual → contrato vigente → bloqueado.
+ * Prioridade: bloqueio manual → vigência efetiva → bloqueado.
+ *
+ * A vigência efetiva é a janela já reconhecida em data_inicio/data_fim
+ * (e o status operacional), a mesma que o card usa para Ativo ou Expirado.
+ * Gestão SST mensal e contrato em renovação continuam liberados enquanto
+ * essa janela cobre a data — a falta de um novo registro de renovação não
+ * encerra a vigência. Um contrato seguinte só libera quando a data de
+ * início dele já chegou. O flag disponivel_agendamento não entra na conta:
+ * ele é cache e fica desatualizado depois que a data de fim passa.
  */
 export function resolveDisponibilidadeAgendamentoCliente(input: {
   cliente: ClienteParaDisponibilidadeAgendamento;

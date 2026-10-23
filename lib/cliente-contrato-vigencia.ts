@@ -22,7 +22,7 @@ import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponib
 import type { ClienteContratoRecord, ClienteContratoStatus } from "@/lib/types";
 
 export const CONTRATO_VIGENTE_ERROR_MESSAGE =
-  "Cliente sem contrato vigente. Não é possível agendar exames até renovar o contrato.";
+  "Agendamento indisponível. O cliente não possui contrato SST vigente e ativo. Verifique a renovação contratual.";
 
 export const CONTRATO_ENCERRADO_ERROR_MESSAGE =
   "O contrato desta empresa está encerrado. Não é possível criar novos agendamentos.";
@@ -144,7 +144,9 @@ export function contratoEstaVigenteNaData(
     > &
     Partial<
       Pick<ClienteContratoConsulta, "modalidadeOrcamento" | "mensalidadePagamento">
-    >,
+    > & {
+      contrato_assinado?: boolean | null;
+    },
   dataAgendamento: string
 ): boolean {
   if (contrato.status === "cancelado" || contrato.status === "encerrado") {
@@ -187,10 +189,7 @@ export function clienteTemContratoVigente(
   >,
   dataReferenciaIso?: string
 ): boolean {
-  const data = (dataReferenciaIso ?? new Date().toISOString().slice(0, 10)).slice(
-    0,
-    10
-  );
+  const data = (dataReferenciaIso ?? todayIsoSaoPaulo()).slice(0, 10);
   return contratos.some((c) => contratoEstaVigenteNaData(c, data));
 }
 

@@ -252,10 +252,70 @@ async function carregarPortalContrato(
 
   if (contratosError) throw contratosError;
 
+  const contratos = await complementarCobrancaPortal(
+    admin,
+    (contratosRaw ?? []) as unknown as PortalContratoFonte[]
+  );
+
   return montarPortalContratoResumo({
     clienteId,
     cliente: (clienteRaw ?? null) as PortalClienteContratoFonte | null,
-    contratos: (contratosRaw ?? []) as unknown as PortalContratoFonte[],
+    contratos,
+  });
+}
+
+async function complementarCobrancaPortal(
+  admin: ReturnType<typeof createAdminClient>,
+  contratos: PortalContratoFonte[]
+): Promise<PortalContratoFonte[]> {
+  const orcamentoIds = Array.from(
+    new Set(
+      contratos
+        .map((contrato) => contrato.orcamento_id?.trim())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (orcamentoIds.length === 0) return contratos;
+
+  const [orcamentosRes, aprovacoesRes] = await Promise.all([
+    admin.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
+    admin
+      .from("orcamento_aprovacoes")
+      .select("orcamento_id, contrato_assinado, mensalidade_pagamento")
+      .in("orcamento_id", orcamentoIds),
+  ]);
+  if (orcamentosRes.error) throw orcamentosRes.error;
+  if (aprovacoesRes.error) throw aprovacoesRes.error;
+
+  const modalidadePorOrcamento = new Map<string, string | null>();
+  for (const row of orcamentosRes.data ?? []) {
+    modalidadePorOrcamento.set(
+      String(row.id),
+      (row.modalidade as string | null) ?? null
+    );
+  }
+  const cobrancaPorOrcamento = new Map<
+    string,
+    { contrato_assinado: boolean | null; mensalidade_pagamento: string | null }
+  >();
+  for (const row of aprovacoesRes.data ?? []) {
+    cobrancaPorOrcamento.set(String(row.orcamento_id), {
+      contrato_assinado:
+        typeof row.contrato_assinado === "boolean" ? row.contrato_assinado : null,
+      mensalidade_pagamento:
+        (row.mensalidade_pagamento as string | null) ?? null,
+    });
+  }
+
+  return contratos.map((contrato) => {
+    const orcamentoId = contrato.orcamento_id?.trim() ?? "";
+    const cobranca = cobrancaPorOrcamento.get(orcamentoId);
+    return {
+      ...contrato,
+      modalidadeOrcamento: modalidadePorOrcamento.get(orcamentoId) ?? null,
+      mensalidadePagamento: cobranca?.mensalidade_pagamento ?? null,
+      contrato_assinado: cobranca?.contrato_assinado ?? null,
+    };
   });
 }
 

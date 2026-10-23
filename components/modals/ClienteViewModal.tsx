@@ -407,7 +407,10 @@ export function ClienteViewModal({
                 </div>
               </div>
 
-              <ClienteContratoAtualCard contrato={contratoAtual} />
+              <ClienteContratoAtualCard
+                contrato={contratoAtual}
+                disponibilidade={disponibilidadeAgendamento}
+              />
 
               <div className="mt-5">
                 <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#8b95a8]">

@@ -27,6 +27,27 @@ export function isClienteDisponivelAgendamento(
   return value === true;
 }
 
+/**
+ * Badge e filtro da listagem.
+ * Só vale `disponivel_agendamento_efetivo`, calculado pela regra central na leitura.
+ * O cache `disponivel_agendamento` não libera a linha sozinho.
+ */
+export function isClienteAgendamentoLiberadoNaExibicao(
+  record:
+    | boolean
+    | null
+    | undefined
+    | {
+        disponivel_agendamento?: boolean | null;
+        disponivel_agendamento_efetivo?: boolean | null;
+      }
+): boolean {
+  if (typeof record !== "object" || record == null) {
+    return isClienteDisponivelAgendamento(record);
+  }
+  return record.disponivel_agendamento_efetivo === true;
+}
+
 export function boolToDisponivelAgendamentoForm(
   value: boolean | null | undefined
 ): (typeof SIM_NAO)[number] {
@@ -56,11 +77,14 @@ export function formatDisponibilidadeAgendamentoLabel(
 }
 
 export function matchesClienteAgendamentoFilter(
-  record: Pick<{ disponivel_agendamento?: boolean | null }, "disponivel_agendamento">,
+  record: {
+    disponivel_agendamento?: boolean | null;
+    disponivel_agendamento_efetivo?: boolean | null;
+  },
   filter: ClienteAgendamentoFilter
 ): boolean {
   if (!filter) return true;
-  const disponivel = isClienteDisponivelAgendamento(record.disponivel_agendamento);
+  const disponivel = isClienteAgendamentoLiberadoNaExibicao(record);
   if (filter === "liberado") return disponivel;
   if (filter === "bloqueado") return !disponivel;
   return true;

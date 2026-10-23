@@ -4,12 +4,11 @@
  *
  * Apresentação simplificada no Portal:
  * Vigência | Procuração | Colaboradores contratados | Agendamento
- * (Agendamento = cache disponivel_agendamento, mesma regra do admin “pode agendar”)
+ * (Agendamento = resolveDisponibilidadeAgendamentoCliente, mesma regra do admin)
  */
 
 import { getContratoAtual } from "@/lib/cliente-contrato-mappers";
-import { isClienteDisponivelAgendamento } from "@/lib/cliente-disponivel-agendamento";
-import { contratoLiberaAgendamento } from "@/lib/cliente-pode-agendar";
+import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
 import {
   formatProcuracaoStatusLabel,
   normalizeProcuracaoStatus,
@@ -37,7 +36,7 @@ export type PortalContratoResumo = {
   colaboradoresContratadosLabel: string;
   /**
    * Label único do card: Liberado / Não liberado.
-   * Fonte: clientes.disponivel_agendamento (inclui bloqueio manual via cache admin).
+   * Fonte: vigência efetiva do contrato SST + bloqueio manual.
    */
   agendamentoLabel: string;
   agendamentoTone: PortalContratoBadgeTone;
@@ -65,18 +64,38 @@ const CONTRATO_SELECT_FIELDS = [
   "created_at",
 ] as const;
 
-export const PORTAL_CONTRATO_SELECT = CONTRATO_SELECT_FIELDS.join(", ");
+const CONTRATO_SELECT_VIGENCIA = [
+  "tipo_contrato",
+  "condicao_pagamento",
+  "contrato_assinado_em",
+] as const;
+
+export const PORTAL_CONTRATO_SELECT = [
+  ...CONTRATO_SELECT_FIELDS,
+  ...CONTRATO_SELECT_VIGENCIA,
+].join(", ");
 
 export type PortalContratoFonte = Pick<
   ClienteContratoRecord,
   (typeof CONTRATO_SELECT_FIELDS)[number]
->;
+> &
+  Partial<
+    Pick<
+      ClienteContratoRecord,
+      "tipo_contrato" | "condicao_pagamento" | "contrato_assinado_em"
+    >
+  > & {
+    modalidadeOrcamento?: string | null;
+    mensalidadePagamento?: string | null;
+    contrato_assinado?: boolean | null;
+  };
 
 export type PortalClienteContratoFonte = Pick<
   ClienteRecord,
   "id" | "procuracao" | "agendamento_bloqueio_manual"
 > & {
   disponivel_agendamento?: boolean | null;
+  agendamento_bloqueio_motivo?: string | null;
 };
 
 export function formatColaboradoresContratadosLabel(
@@ -215,12 +234,15 @@ export function montarPortalContratoResumo(input: {
     ? normalizeProcuracaoStatus(cliente.procuracao)
     : "pendente";
 
-  const disponivelRaw = cliente?.disponivel_agendamento;
-  const disponivelInformado = disponivelRaw === true || disponivelRaw === false;
-  const disponivel = disponivelInformado
-    ? isClienteDisponivelAgendamento(disponivelRaw)
-    : null;
   const bloqueioManual = cliente?.agendamento_bloqueio_manual === true;
+  const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
+    cliente: {
+      agendamento_bloqueio_manual: cliente?.agendamento_bloqueio_manual,
+      agendamento_bloqueio_motivo: cliente?.agendamento_bloqueio_motivo,
+    },
+    contratos,
+  });
+  const disponivel = disponibilidade.disponivel;
 
   const temContrato = Boolean(contratoAtual);
   const vigenciaResumo = contratoAtual
@@ -229,9 +251,6 @@ export function montarPortalContratoResumo(input: {
         contratoAtual.data_fim
       )
     : { titulo: "Contrato", valor: PORTAL_CONTRATO_FALLBACK };
-  const liberado = contratoAtual
-    ? contratoLiberaAgendamento(contratoAtual)
-    : null;
 
   const qtdRaw = contratoAtual?.quantidade_colaboradores;
   const colaboradoresContratados =
@@ -264,29 +283,13 @@ export function montarPortalContratoResumo(input: {
     colaboradoresContratadosLabel: formatColaboradoresContratadosLabel(
       colaboradoresContratados
     ),
-    // Card Portal: mesma regra do admin (cache disponivel_agendamento)
-    agendamentoLabel:
-      disponivel == null
-        ? PORTAL_CONTRATO_FALLBACK
-        : disponivel
-          ? "Liberado"
-          : "Não liberado",
+    agendamentoLabel: disponivel ? "Liberado" : "Não liberado",
     agendamentoTone: disponivelTone,
     disponivelAgendamento: disponivel,
-    disponivelAgendamentoLabel:
-      disponivel == null
-        ? PORTAL_CONTRATO_FALLBACK
-        : disponivel
-          ? "Disponível"
-          : "Indisponível",
+    disponivelAgendamentoLabel: disponivel ? "Disponível" : "Indisponível",
     disponivelAgendamentoTone: disponivelTone,
-    agendamentoLiberado: liberado,
-    agendamentoLiberadoLabel:
-      liberado == null
-        ? PORTAL_CONTRATO_FALLBACK
-        : liberado
-          ? "Liberado"
-          : "Não liberado",
-    agendamentoLiberadoTone: toneBool(liberado),
+    agendamentoLiberado: disponivel,
+    agendamentoLiberadoLabel: disponivel ? "Liberado" : "Não liberado",
+    agendamentoLiberadoTone: disponivelTone,
   };
 }

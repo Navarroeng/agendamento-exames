@@ -75,7 +75,9 @@ assert.equal(
     boleto_pago: true,
     liberado_para_agendamento: true,
     status: "ativo",
-  }),
+    data_inicio: "2026-01-01",
+    data_fim: "2026-12-31",
+  }, "2026-08-11"),
   "Liberado"
 );
 assert.equal(

@@ -4,16 +4,21 @@ import {
   condicaoPagamentoExibicao,
   formatValorContratoExibicao,
   formatVigenciaContrato,
-  labelAgendamentoContrato,
   labelClienteContratoStatusExibicao,
   labelClienteContratoTipo,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
+import {
+  resolveDisponibilidadeAgendamentoCliente,
+  type DisponibilidadeAgendamentoResult,
+} from "@/lib/cliente-disponibilidade-agendamento";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord } from "@/lib/types";
 
 interface ClienteContratoAtualCardProps {
   contrato: ClienteContratoRecord | null;
+  /** Mesmo resultado da listagem e do campo do cliente. */
+  disponibilidade?: Pick<DisponibilidadeAgendamentoResult, "label"> | null;
 }
 
 function Metric({
@@ -40,6 +45,7 @@ function Metric({
 
 export function ClienteContratoAtualCard({
   contrato,
+  disponibilidade,
 }: ClienteContratoAtualCardProps) {
   if (!contrato) {
     return (
@@ -56,7 +62,12 @@ export function ClienteContratoAtualCard({
     );
   }
 
-  const agendamentoLabel = labelAgendamentoContrato(contrato);
+  const agendamentoLabel =
+    disponibilidade?.label ??
+    resolveDisponibilidadeAgendamentoCliente({
+      cliente: {},
+      contratos: [contrato],
+    }).label;
   const statusLabel = labelClienteContratoStatusExibicao(contrato);
   const condicao = condicaoPagamentoExibicao(contrato);
   const situacao = labelFinanceiroContrato(contrato);

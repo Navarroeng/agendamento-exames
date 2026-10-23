@@ -352,6 +352,11 @@ export interface ClienteRecord extends ClienteInsert {
   agendamento_bloqueio_motivo?: string | null;
   agendamento_bloqueado_em?: string | null;
   agendamento_bloqueado_por?: string | null;
+  /**
+   * Resultado ao vivo da regra de agendamento na listagem.
+   * Não é coluna de clientes. disponivel_agendamento continua sendo cache.
+   */
+  disponivel_agendamento_efetivo?: boolean;
 }
 
 export type ClienteContratoStatus =

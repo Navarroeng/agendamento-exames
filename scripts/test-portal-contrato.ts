@@ -169,7 +169,7 @@ run("cliente sem procuração → Não informado", () => {
 
 console.log("\n== Disponível para agendamento (interno) ==");
 
-run("flag true → Disponível (interno) e Liberado no card", () => {
+run("flag true com contrato vigente → Disponível e Liberado no card", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: cliente({ id: "cli-a", disponivel_agendamento: true }),
@@ -181,7 +181,7 @@ run("flag true → Disponível (interno) e Liberado no card", () => {
   assert.equal(r.agendamentoTone, "ok");
 });
 
-run("flag false → Indisponível (interno) e Não liberado no card", () => {
+run("cache falso não bloqueia contrato vigente", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: cliente({
@@ -190,7 +190,27 @@ run("flag false → Indisponível (interno) e Não liberado no card", () => {
     }),
     contratos: [contrato({ id: "c1", cliente_id: "cli-a" })],
   });
-  assert.equal(r.disponivelAgendamentoLabel, "Indisponível");
+  assert.equal(r.disponivelAgendamentoLabel, "Disponível");
+  assert.equal(r.agendamentoLabel, "Liberado");
+});
+
+run("cache verdadeiro não libera contrato expirado", () => {
+  const r = montarPortalContratoResumo({
+    clienteId: "cli-a",
+    cliente: cliente({
+      id: "cli-a",
+      disponivel_agendamento: true,
+    }),
+    contratos: [
+      contrato({
+        id: "c1",
+        cliente_id: "cli-a",
+        data_inicio: "2025-09-22",
+        data_fim: "2026-09-22",
+      }),
+    ],
+  });
+  assert.equal(r.disponivelAgendamento, false);
   assert.equal(r.agendamentoLabel, "Não liberado");
 });
 
@@ -202,14 +222,14 @@ run("bloqueio manual + indisponível → tom de bloqueio no card Agendamento", (
       disponivel_agendamento: false,
       agendamento_bloqueio_manual: true,
     }),
-    contratos: [],
+    contratos: [contrato({ id: "c1", cliente_id: "cli-a" })],
   });
   assert.equal(r.disponivelAgendamentoTone, "bloqueio");
   assert.equal(r.agendamentoTone, "bloqueio");
   assert.equal(r.agendamentoLabel, "Não liberado");
 });
 
-run("disponivel_agendamento ausente → Não informado", () => {
+run("sem contrato vigente → indisponível", () => {
   const r = montarPortalContratoResumo({
     clienteId: "cli-a",
     cliente: {
@@ -220,8 +240,9 @@ run("disponivel_agendamento ausente → Não informado", () => {
     },
     contratos: [],
   });
-  assert.equal(r.disponivelAgendamentoLabel, PORTAL_CONTRATO_FALLBACK);
-  assert.equal(r.agendamentoLabel, PORTAL_CONTRATO_FALLBACK);
+  assert.equal(r.disponivelAgendamentoLabel, "Indisponível");
+  assert.equal(r.agendamentoLabel, "Não liberado");
+  assert.equal(r.agendamentoTone, "neutro");
 });
 
 console.log("\n== Colaboradores contratados ==");
@@ -300,7 +321,8 @@ run("sem contrato → Não informado", () => {
     cliente: cliente({ id: "cli-a" }),
     contratos: [],
   });
-  assert.equal(r.agendamentoLiberadoLabel, PORTAL_CONTRATO_FALLBACK);
+  assert.equal(r.agendamentoLiberadoLabel, "Não liberado");
+  assert.equal(r.agendamentoLiberado, false);
 });
 
 console.log("\n== Isolamento entre empresas ==");
@@ -345,7 +367,7 @@ run("cliente de outro id não preenche procuração/disponibilidade", () => {
     contratos: [],
   });
   assert.equal(r.procuracaoLabel, PORTAL_CONTRATO_FALLBACK);
-  assert.equal(r.disponivelAgendamentoLabel, PORTAL_CONTRATO_FALLBACK);
+  assert.equal(r.disponivelAgendamentoLabel, "Indisponível");
 });
 
 run("troca de empresa troca vigência", () => {

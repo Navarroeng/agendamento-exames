@@ -404,10 +404,12 @@ export async function listarClientesPaginados(
   const busca = params.busca?.trim() ?? "";
   const agendamento = params.agendamento ?? "";
 
-  if (busca) {
-    const all = await listarTodosClientesParaBusca();
+  if (busca || agendamento) {
+    const all = await anotarDisponibilidadeEfetiva(
+      await listarTodosClientesParaBusca()
+    );
     const filtered = all.filter((record) => {
-      if (!clienteRecordMatchesBusca(record, busca)) return false;
+      if (busca && !clienteRecordMatchesBusca(record, busca)) return false;
       if (!matchesClienteAgendamentoFilter(record, agendamento)) return false;
       return true;
     });
@@ -429,16 +431,10 @@ export async function listarClientesPaginados(
   const to = from + pageSize - 1;
 
   const supabase = createClient();
-  let query = supabase
+  const query = supabase
     .from("clientes")
     .select(CLIENTE_DB_COLUMNS, { count: "exact" })
     .order("nome", { ascending: true });
-
-  if (agendamento === "liberado") {
-    query = query.eq("disponivel_agendamento", true);
-  } else if (agendamento === "bloqueado") {
-    query = query.eq("disponivel_agendamento", false);
-  }
 
   const { data, error, count } = await query.range(from, to);
 
@@ -448,12 +444,29 @@ export async function listarClientesPaginados(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return {
-    records: (data ?? []) as ClienteRecord[],
+    records: await anotarDisponibilidadeEfetiva(
+      (data ?? []) as ClienteRecord[]
+    ),
     total,
     page,
     pageSize,
     totalPages,
   };
+}
+
+async function anotarDisponibilidadeEfetiva<
+  T extends {
+    id: string;
+    agendamento_bloqueio_manual?: boolean | null;
+    agendamento_bloqueio_motivo?: string | null;
+  },
+>(clientes: T[]): Promise<Array<T & { disponivel_agendamento_efetivo: boolean }>> {
+  if (clientes.length === 0) return [];
+  const liberados = await listarIdsClientesLiberadosParaAgendamento(clientes);
+  return clientes.map((cliente) => ({
+    ...cliente,
+    disponivel_agendamento_efetivo: liberados.has(cliente.id),
+  }));
 }
 
 async function listarTodosClientesParaBusca(): Promise<ClienteRecord[]> {
