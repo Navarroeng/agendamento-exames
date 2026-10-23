@@ -15,6 +15,8 @@ import { ClienteFormActions } from "./ClienteFormActions";
 
 import { ClienteTopActions } from "./ClienteTopActions";
 
+import { ClienteContratoVencimentosPanel } from "./ClienteContratoVencimentosPanel";
+
 import { ClientesSearchPanel } from "./ClientesSearchPanel";
 
 import { ClientesTable } from "./ClientesTable";
@@ -28,6 +30,10 @@ import { useClientesPage } from "@/hooks/useClientesPage";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { hasActiveClientesListFilters } from "@/lib/cliente-filters";
+import {
+  periodoInicialVencimentos,
+  type ConsultaVencimentoContrato,
+} from "@/lib/cliente-contrato-vencimentos";
 import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { salvarCliente } from "@/services/cliente.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -35,9 +41,18 @@ import { registrarAuditoria } from "@/services/auditoria.service";
 const VALIDATION_MESSAGE =
   "Preencha Nome da empresa e CNPJ antes de salvar.";
 
+type AbaClientes = "cadastro" | "vencimentos";
+
 export function ClientesPage() {
   const auditContext = useAuditoriaUsuario();
   const [showForm, setShowForm] = useState(false);
+  const [aba, setAba] = useState<AbaClientes>("cadastro");
+  const periodoInicial = periodoInicialVencimentos();
+  const [vencimentoAno, setVencimentoAno] = useState(periodoInicial.ano);
+  const [vencimentoMes, setVencimentoMes] = useState(periodoInicial.mes);
+  const [vencimentoConsulta, setVencimentoConsulta] =
+    useState<ConsultaVencimentoContrato>("principal");
+  const [scrollToContratoSst, setScrollToContratoSst] = useState(false);
 
   const {
     form,
@@ -69,6 +84,16 @@ export function ClientesPage() {
 
   const { viewCliente, viewLoading, handleAbrir, closeView, updateViewCliente } =
     useClientesPage();
+
+  const abrirCliente = (id: string, focoContratoSst = false) => {
+    setScrollToContratoSst(focoContratoSst);
+    void handleAbrir(id);
+  };
+
+  const fecharCliente = () => {
+    closeView();
+    setScrollToContratoSst(false);
+  };
 
   const resetForm = () => {
     reset();
@@ -171,35 +196,81 @@ export function ClientesPage() {
         </>
       )}
 
-      <div className="mb-[18px]">
-        <ClientesSearchPanel
-          filters={filters}
-          totalFiltrados={total}
-          onChangeBusca={(value) => setFilter("busca", value)}
-          onChangeAgendamento={(value) => setFilter("agendamento", value)}
-          onClear={clearFilters}
-        />
+      <div
+        className="mb-[18px] flex flex-wrap gap-2"
+        role="tablist"
+        aria-label="Seções de clientes"
+      >
+        {(
+          [
+            ["cadastro", "Clientes"],
+            ["vencimentos", "Vencimentos de contratos"],
+          ] as const
+        ).map(([id, label]) => {
+          const ativa = aba === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={ativa}
+              className={`rounded-xl px-4 py-2 text-sm font-bold ${
+                ativa
+                  ? "bg-white text-navy shadow-sm ring-1 ring-[#e8edf5]"
+                  : "text-[#64748b]"
+              }`}
+              onClick={() => setAba(id)}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
-      <div id="clientes-cadastrados">
-        <ClientesTable
-          clientes={clientes}
-          loading={loading || viewLoading}
-          error={error}
-          page={page}
-          total={total}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          hasActiveSearch={hasActiveClientesListFilters(filters)}
-          highlightClienteId={highlightClienteId}
-          onAbrir={handleAbrir}
-          onPageChange={setPage}
+      {aba === "cadastro" ? (
+        <>
+          <div className="mb-[18px]">
+            <ClientesSearchPanel
+              filters={filters}
+              totalFiltrados={total}
+              onChangeBusca={(value) => setFilter("busca", value)}
+              onChangeAgendamento={(value) => setFilter("agendamento", value)}
+              onClear={clearFilters}
+            />
+          </div>
+
+          <div id="clientes-cadastrados">
+            <ClientesTable
+              clientes={clientes}
+              loading={loading || viewLoading}
+              error={error}
+              page={page}
+              total={total}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              hasActiveSearch={hasActiveClientesListFilters(filters)}
+              highlightClienteId={highlightClienteId}
+              onAbrir={(id) => abrirCliente(id)}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
+      ) : (
+        <ClienteContratoVencimentosPanel
+          ano={vencimentoAno}
+          mes={vencimentoMes}
+          consulta={vencimentoConsulta}
+          onAnoChange={setVencimentoAno}
+          onMesChange={setVencimentoMes}
+          onConsultaChange={setVencimentoConsulta}
+          onAbrir={(id) => abrirCliente(id, true)}
         />
-      </div>
+      )}
 
       <ClienteViewModal
         cliente={viewCliente}
-        onClose={closeView}
+        scrollToContratoSst={scrollToContratoSst}
+        onClose={fecharCliente}
         onUpdated={(updated) => {
           updateViewCliente(updated);
           refresh();

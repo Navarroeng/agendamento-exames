@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ClienteContratoAtualCard } from "@/components/clientes/ClienteContratoAtualCard";
@@ -46,6 +46,8 @@ interface ClienteViewModalProps {
   cliente: ClienteRecord | null;
   onClose: () => void;
   onUpdated?: (cliente: ClienteRecord) => void;
+  /** Rola até a seção Contrato SST depois que os contratos carregam. */
+  scrollToContratoSst?: boolean;
 }
 
 const VALIDATION_MESSAGE =
@@ -76,9 +78,12 @@ export function ClienteViewModal({
   cliente,
   onClose,
   onUpdated,
+  scrollToContratoSst = false,
 }: ClienteViewModalProps) {
   const auditContext = useAuditoriaUsuario();
   const [incluirRiscosOpen, setIncluirRiscosOpen] = useState(false);
+  const contratoSectionRef = useRef<HTMLDivElement>(null);
+  const aguardandoRolagemContrato = useRef(false);
 
   const {
     editing: editingCliente,
@@ -133,6 +138,20 @@ export function ClienteViewModal({
       setIncluirRiscosOpen(false);
     }
   }, [podeIncluirRiscos, incluirRiscosOpen]);
+
+  useEffect(() => {
+    if (!cliente || !scrollToContratoSst) {
+      aguardandoRolagemContrato.current = false;
+      return;
+    }
+    if (loading) {
+      aguardandoRolagemContrato.current = true;
+      return;
+    }
+    if (!aguardandoRolagemContrato.current) return;
+    aguardandoRolagemContrato.current = false;
+    contratoSectionRef.current?.scrollIntoView({ block: "start" });
+  }, [cliente, scrollToContratoSst, loading]);
 
   if (!cliente) return null;
 
@@ -365,7 +384,15 @@ export function ClienteViewModal({
               )}
             </div>
 
-            <div className="mt-5 rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] p-5 shadow-[0_6px_22px_rgba(15,23,42,0.04)]">
+            <div
+              id="cliente-contrato-sst"
+              ref={contratoSectionRef}
+              className={`mt-5 scroll-mt-4 rounded-[20px] border bg-gradient-to-b from-white to-[#fbfdff] p-5 shadow-[0_6px_22px_rgba(15,23,42,0.04)] ${
+                scrollToContratoSst
+                  ? "border-brand-blue/40 ring-2 ring-brand-blue/20"
+                  : "border-[#e8edf5]"
+              }`}
+            >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-[15px] font-extrabold text-[#2d2a4a]">
