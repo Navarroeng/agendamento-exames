@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { GestaoComercialMensalidadesModal } from "@/components/gestao-comercial/GestaoComercialMensalidadesModal";
 import { formatCurrency } from "@/lib/money";
 import {
   formatComparacaoDiferenca,
@@ -8,6 +10,7 @@ import {
   MESES_PT,
   type GestaoComercialDashboard,
 } from "@/lib/gestao-comercial";
+import type { ResumoMensalidadesPrevistas } from "@/lib/gestao-comercial-mensalidades";
 
 function Card({
   label,
@@ -42,13 +45,55 @@ function Card({
   );
 }
 
+function CardMensalidades({
+  resumo,
+  onOpen,
+}: {
+  resumo: ResumoMensalidadesPrevistas;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="rounded-2xl border border-[#e8edf5] bg-white p-4 text-left shadow-[0_4px_18px_rgba(15,23,42,0.04)] transition hover:border-[#c5d4ea] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1d4e89]"
+      aria-haspopup="dialog"
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b95a8]">
+        Mensalidades previstas — {resumo.periodoLabel}
+      </p>
+      <p className="mt-1.5 text-2xl font-extrabold tracking-tight text-navy">
+        {resumo.disponivel ? formatCurrency(resumo.valor) : "Sem dados"}
+      </p>
+      <p className="mt-1.5 text-xs font-semibold text-[#5b6577]">
+        {resumo.disponivel
+          ? resumo.contratosLabel
+          : resumo.mensagemIndisponivel}
+      </p>
+      <p className="mt-1 text-[11px] font-medium text-app-muted">
+        Por vencimento da mensalidade · inclui pagas e em aberto
+      </p>
+      {resumo.disponivel && resumo.pendencias > 0 ? (
+        <p className="mt-1 text-[11px] font-semibold text-[#92400e]">
+          {resumo.pendencias === 1
+            ? "1 contratação sem dados para calcular as parcelas"
+            : `${resumo.pendencias} contratações sem dados para calcular as parcelas`}
+        </p>
+      ) : null}
+    </button>
+  );
+}
+
 export function GestaoComercialCards({
   dashboard,
   statusFiltro,
+  mensalidades,
 }: {
   dashboard: GestaoComercialDashboard;
   statusFiltro: "ativos" | "encerrados" | "todos";
+  mensalidades: ResumoMensalidadesPrevistas;
 }) {
+  const [mensalidadesAbertas, setMensalidadesAbertas] = useState(false);
   const { comparacao, indicadoresDetalhadosDisponiveis } = dashboard;
   const tone =
     comparacao.tendencia === "alta"
@@ -88,6 +133,10 @@ export function GestaoComercialCards({
               : ""
           }`}
           tone={tone}
+        />
+        <CardMensalidades
+          resumo={mensalidades}
+          onOpen={() => setMensalidadesAbertas(true)}
         />
         <Card
           label="Contratos fechados"
@@ -149,6 +198,11 @@ export function GestaoComercialCards({
           tone="muted"
         />
       </div>
+      <GestaoComercialMensalidadesModal
+        open={mensalidadesAbertas}
+        onClose={() => setMensalidadesAbertas(false)}
+        resumo={mensalidades}
+      />
     </section>
   );
 }

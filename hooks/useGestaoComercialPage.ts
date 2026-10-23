@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import {
   buildGestaoComercialDashboard,
   defaultGestaoComercialFilters,
@@ -9,10 +10,18 @@ import {
   type GestaoComercialFilters,
   type GestaoComercialHistoricoMensal,
 } from "@/lib/gestao-comercial";
+import {
+  montarMensalidadesPrevistas,
+  periodoVencimentoGestaoComercial,
+  resumoMensalidadesIndisponivel,
+  type FonteMensalidadePrevista,
+  type ResumoMensalidadesPrevistas,
+} from "@/lib/gestao-comercial-mensalidades";
 import { ORCAMENTO_ORIGEM_OPTIONS } from "@/lib/orcamento-origem";
 import {
   GestaoComercialForbiddenError,
   listarFechamentosGestaoComercial,
+  listarFontesMensalidadesPrevistas,
   listarHistoricoMensalGestaoComercial,
 } from "@/services/gestao-comercial.service";
 
@@ -24,6 +33,10 @@ export function useGestaoComercialPage() {
   const [historico, setHistorico] = useState<GestaoComercialHistoricoMensal[]>(
     []
   );
+  const [fontesMensalidades, setFontesMensalidades] = useState<
+    FonteMensalidadePrevista[]
+  >([]);
+  const [erroMensalidades, setErroMensalidades] = useState<string | null>(null);
   const [filters, setFilters] = useState<GestaoComercialFilters>(() =>
     defaultGestaoComercialFilters()
   );
@@ -32,18 +45,38 @@ export function useGestaoComercialPage() {
     setLoading(true);
     setError(null);
     setForbidden(false);
+    setErroMensalidades(null);
     try {
-      const [rows, hist] = await Promise.all([
+      const [rows, hist, cargaMensalidades] = await Promise.all([
         listarFechamentosGestaoComercial(),
         listarHistoricoMensalGestaoComercial(),
+        listarFontesMensalidadesPrevistas().catch((err: unknown) => {
+          if (err instanceof GestaoComercialForbiddenError) throw err;
+          return {
+            fontes: [] as FonteMensalidadePrevista[],
+            mensagem:
+              err instanceof Error
+                ? err.message
+                : "Falha ao carregar as mensalidades previstas.",
+          };
+        }),
       ]);
       setAllRows(rows);
       setHistorico(hist);
+      if ("mensagem" in cargaMensalidades) {
+        setFontesMensalidades([]);
+        setErroMensalidades(cargaMensalidades.mensagem);
+      } else {
+        setFontesMensalidades(cargaMensalidades.fontes);
+        setErroMensalidades(null);
+      }
     } catch (err) {
       if (err instanceof GestaoComercialForbiddenError) {
         setForbidden(true);
         setAllRows([]);
         setHistorico([]);
+        setFontesMensalidades([]);
+        setErroMensalidades(null);
       } else {
         setError(
           err instanceof Error ? err.message : "Falha ao carregar Gestão Comercial."
@@ -62,6 +95,15 @@ export function useGestaoComercialPage() {
     () => buildGestaoComercialDashboard(allRows, filters, historico),
     [allRows, filters, historico]
   );
+
+  const hojeIso = todayIsoSaoPaulo();
+  const mensalidades: ResumoMensalidadesPrevistas = useMemo(() => {
+    const periodo = periodoVencimentoGestaoComercial(filters);
+    if (erroMensalidades) {
+      return resumoMensalidadesIndisponivel(periodo, erroMensalidades);
+    }
+    return montarMensalidadesPrevistas(fontesMensalidades, periodo, hojeIso);
+  }, [erroMensalidades, filters, fontesMensalidades, hojeIso]);
 
   const responsaveisOptions = useMemo(() => {
     const set = new Set<string>();
@@ -105,6 +147,7 @@ export function useGestaoComercialPage() {
     forbidden,
     filters,
     dashboard,
+    mensalidades,
     responsaveisOptions,
     anosOptions,
     origemOptions: ORCAMENTO_ORIGEM_OPTIONS,

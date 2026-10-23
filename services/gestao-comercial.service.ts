@@ -4,6 +4,14 @@ import {
   type GestaoComercialFechamentoRow,
   type GestaoComercialHistoricoMensal,
 } from "@/lib/gestao-comercial";
+import type {
+  FonteMensalidadePrevista,
+  VigenciaMensalidadePrevista,
+} from "@/lib/gestao-comercial-mensalidades";
+import {
+  MENSALIDADE_PARCELAS_MIGRATION_MSG,
+  type ParcelaMensalidadeRegistrada,
+} from "@/lib/mensalidade-parcelas";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { normalizePerfilUsuario } from "@/lib/contrato-permissoes";
@@ -210,6 +218,175 @@ export async function listarFechamentosGestaoComercial(): Promise<
   }
 
   return rows;
+}
+
+const SELECT_PAGE_SIZE = 1000;
+
+function isoData(value: string | null | undefined): string | null {
+  const texto = (value ?? "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
+}
+
+function numeroOuNulo(value: number | string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const numero = Number(value);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function parcelasAusentes(error: { message?: string; code?: string }): boolean {
+  const message = error.message ?? "";
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    /orcamento_mensalidade_parcelas/i.test(message)
+  );
+}
+
+type AprovacaoMensalidadeQueryRow = {
+  id: string;
+  mensalidade_pagamento: string | null;
+  mensalidade_valor_mensal: number | string | null;
+  mensalidade_dia_vencimento: number | null;
+  valor_final: number | string | null;
+  orcamentos: {
+    numero: string;
+    cliente_nome: string;
+    modalidade: string | null;
+    cliente_contratos:
+      | ContratoMensalidadeQueryRow[]
+      | ContratoMensalidadeQueryRow
+      | null;
+  } | null;
+};
+
+type ContratoMensalidadeQueryRow = {
+  id: string;
+  numero: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+};
+
+export type CargaFontesMensalidadesPrevistas = {
+  fontes: FonteMensalidadePrevista[];
+  leituraParcelasOk: boolean;
+  mensagemLeitura: string | null;
+};
+
+/**
+ * Contratações para o card de mensalidades previstas.
+ * Lê todas as vigências vinculadas, inclusive de contrato depois encerrado.
+ * Não filtra por status ativo e não grava parcela.
+ */
+export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMensalidadesPrevistas> {
+  await assertAdminGestaoComercial();
+  const supabase = createClient();
+
+  const aprovacoes: AprovacaoMensalidadeQueryRow[] = [];
+  for (let from = 0; ; from += SELECT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(
+        `
+        id,
+        mensalidade_pagamento,
+        mensalidade_valor_mensal,
+        mensalidade_dia_vencimento,
+        valor_final,
+        orcamentos!inner (
+          numero,
+          cliente_nome,
+          modalidade,
+          cliente_contratos (
+            id,
+            numero,
+            data_inicio,
+            data_fim
+          )
+        )
+        `
+      )
+      .order("id", { ascending: true })
+      .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as unknown as AprovacaoMensalidadeQueryRow[];
+    aprovacoes.push(...batch);
+    if (batch.length < SELECT_PAGE_SIZE) break;
+  }
+
+  const parcelasPorAprovacao = new Map<string, ParcelaMensalidadeRegistrada[]>();
+  for (let from = 0; ; from += SELECT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("orcamento_mensalidade_parcelas")
+      .select(
+        "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+      )
+      .order("id", { ascending: true })
+      .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (error) {
+      if (parcelasAusentes(error)) {
+        throw new Error(MENSALIDADE_PARCELAS_MIGRATION_MSG);
+      }
+      throw error;
+    }
+    const batch = data ?? [];
+    for (const row of batch) {
+      const aprovacaoId = String(row.aprovacao_id ?? "");
+      if (!aprovacaoId) continue;
+      const lista = parcelasPorAprovacao.get(aprovacaoId) ?? [];
+      lista.push({
+        vigenciaInicio: isoData(String(row.vigencia_inicio ?? "")) ?? "",
+        vigenciaFim: isoData(
+          row.vigencia_fim == null ? null : String(row.vigencia_fim)
+        ),
+        numero: Number(row.numero),
+        vencimentoIso: isoData(String(row.vencimento ?? "")) ?? "",
+        valor: Number(row.valor),
+        pagoEmIso: isoData(row.pago_em == null ? null : String(row.pago_em)),
+      });
+      parcelasPorAprovacao.set(aprovacaoId, lista);
+    }
+    if (batch.length < SELECT_PAGE_SIZE) break;
+  }
+
+  const fontes: FonteMensalidadePrevista[] = [];
+  for (const raw of aprovacoes) {
+    const orc = raw.orcamentos;
+    if (!orc) continue;
+    const contratos = Array.isArray(orc.cliente_contratos)
+      ? orc.cliente_contratos
+      : orc.cliente_contratos
+        ? [orc.cliente_contratos]
+        : [];
+    const vigencias: VigenciaMensalidadePrevista[] = [];
+    for (const contrato of contratos) {
+      const inicio = isoData(contrato.data_inicio);
+      if (!inicio) continue;
+      vigencias.push({
+        inicio,
+        fim: isoData(contrato.data_fim),
+        contratoId: contrato.id,
+        numeroContrato: (contrato.numero ?? "").trim() || null,
+      });
+    }
+    fontes.push({
+      aprovacaoId: raw.id,
+      clienteNome: orc.cliente_nome,
+      numeroOrcamento: orc.numero,
+      modalidade: orc.modalidade,
+      mensalidadePagamento: raw.mensalidade_pagamento,
+      diaVencimento: numeroOuNulo(raw.mensalidade_dia_vencimento),
+      valorMensal: numeroOuNulo(raw.mensalidade_valor_mensal),
+      valorFinal: numeroOuNulo(raw.valor_final),
+      vigencias,
+      parcelasRegistradas: parcelasPorAprovacao.get(raw.id) ?? [],
+    });
+  }
+
+  return {
+    fontes,
+    leituraParcelasOk: true,
+    mensagemLeitura: null,
+  };
 }
 
 export async function listarHistoricoMensalGestaoComercial(): Promise<

@@ -17,6 +17,7 @@ export function GestaoComercialPage() {
     forbidden,
     filters,
     dashboard,
+    mensalidades,
     responsaveisOptions,
     anosOptions,
     origemOptions,
@@ -61,6 +62,7 @@ export function GestaoComercialPage() {
                 <GestaoComercialCards
                   dashboard={dashboard}
                   statusFiltro={filters.statusContrato}
+                  mensalidades={mensalidades}
                 />
                 <GestaoComercialEvolucaoChart
                   data={dashboard.serieMensalAno}
