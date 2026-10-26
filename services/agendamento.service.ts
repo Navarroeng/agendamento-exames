@@ -1,3 +1,7 @@
+import {
+  aplicarValorAdmissionalNoPayload,
+  resolverValorAdmissionalDoAtendimento,
+} from "@/lib/agendamento-admissional-preco";
 import { assertExamesValorClientePermitido } from "@/lib/agendamento-clinico-zero-demissional";
 import { assertDataAgendamentoPermitida } from "@/lib/agendamento-datetime";
 import { assertContratoVigenteDoAgendamento } from "@/lib/cliente-contrato-vigencia";
@@ -91,9 +95,24 @@ async function inserirExamesAgendamento(
 
 export async function salvarAgendamentoComExames(
   agendamento: AgendamentoInsert,
-  exames: ExamePayload[]
+  exames: ExamePayload[],
+  options?: { contratoIdPreferido?: string | null }
 ): Promise<string> {
-  validarExamesPayload(agendamento.aso, exames);
+  let examesParaSalvar = exames;
+  if ((agendamento.aso ?? "").trim() === "Admissional") {
+    const valor = await resolverValorAdmissionalDoAtendimento({
+      clienteId: agendamento.cliente_id,
+      clienteNome: agendamento.cliente_nome,
+      dataAgendamento: agendamento.data_agendamento,
+      contratoId: options?.contratoIdPreferido ?? agendamento.contrato_id,
+    });
+    examesParaSalvar = aplicarValorAdmissionalNoPayload(
+      exames,
+      agendamento.aso ?? "",
+      valor
+    );
+  }
+  validarExamesPayload(agendamento.aso, examesParaSalvar);
   assertDataAgendamentoPermitida({
     dataIso: agendamento.data_agendamento,
   });
@@ -143,7 +162,7 @@ export async function salvarAgendamentoComExames(
   }
 
   try {
-    await inserirExamesAgendamento(data.id, exames);
+    await inserirExamesAgendamento(data.id, examesParaSalvar);
   } catch (examesError) {
     await excluirAgendamentoOrfao(data.id);
     const detail =

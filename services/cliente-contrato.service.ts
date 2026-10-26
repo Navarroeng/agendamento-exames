@@ -1,4 +1,5 @@
 import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
+import { centavosSalvosParaReais } from "@/lib/contrato-navarro";
 import { createClient } from "@/lib/supabase/client";
 import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
 import type {
@@ -67,7 +68,7 @@ export async function complementarContratosComCobranca(
     supabase
       .from("orcamento_aprovacoes")
       .select(
-        "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal"
+        "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos"
       )
       .in("orcamento_id", orcamentoIds),
   ]);
@@ -89,6 +90,7 @@ export async function complementarContratosComCobranca(
     mensalidade_pagamento: string | null;
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
+    mensalidade_exame_avulso_centavos: number | null;
   };
   const aprovacaoPorOrcamento = new Map<string, AprovacaoCobranca>();
   for (const row of (aprovacoesRes.data ?? []) as AprovacaoCobranca[]) {
@@ -140,6 +142,9 @@ export async function complementarContratosComCobranca(
       contrato_assinado: aprovacao?.contrato_assinado ?? null,
       mensalidadePagamento: aprovacao?.mensalidade_pagamento ?? null,
       mensalidadeDiaVencimento: aprovacao?.mensalidade_dia_vencimento ?? null,
+      exameAdmissionalReais: centavosSalvosParaReais(
+        aprovacao?.mensalidade_exame_avulso_centavos
+      ),
       parcelasMensalidade: aprovacao
         ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
         : [],

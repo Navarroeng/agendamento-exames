@@ -143,6 +143,11 @@ import {
   verificarContratoVigenteDoAgendamento,
 } from "@/lib/cliente-contrato-vigencia";
 import {
+  aplicarValorAdmissionalNoPayload,
+  resolverValorAdmissionalDoAtendimento,
+} from "@/lib/agendamento-admissional-preco";
+import { CLINICO_VALOR_ASO_ADMISSIONAL } from "@/lib/exame-pricing";
+import {
   atualizarAgendamentoComExames,
   atualizarDocumentacaoAgendamento,
   buscarAgendamentoComExamesPorId,
@@ -342,6 +347,19 @@ export function useAgendamentosPage() {
   const vagaDecisionRef = useRef<"none" | "skip" | "link">("none");
   const vagaEmUsoIdRef = useRef<string | null>(null);
   const vagaContratoIdRef = useRef<string | null>(null);
+  const [contratoPreferidoId, setContratoPreferidoId] = useState<string | null>(
+    null
+  );
+  const [valorAdmissionalAuto, setValorAdmissionalAuto] = useState(
+    CLINICO_VALOR_ASO_ADMISSIONAL
+  );
+  const editPrecoSnapshotRef = useRef<{
+    id: string;
+    clienteId: string;
+    contratoId: string;
+  } | null>(null);
+  const admissionalPrecoSeqRef = useRef(0);
+  const chaveClienteContratoRef = useRef("");
   const vagaContratoNumeroRef = useRef<string | null>(null);
   const vagaAlertKeyRef = useRef<string | null>(null);
   const vagaLockRef = useRef(false);
@@ -437,7 +455,74 @@ export function useAgendamentosPage() {
     replaceExamesFromCargo,
     appendExamesFromNomes,
     enforceRetornoTrabalhoExames,
-  } = useExams(form.clinica_nome, form.aso);
+    reaplicarValorClinicoAutomatico,
+  } = useExams(form.clinica_nome, form.aso, valorAdmissionalAuto);
+
+  const reaplicarValorClinicoRef = useRef(reaplicarValorClinicoAutomatico);
+  reaplicarValorClinicoRef.current = reaplicarValorClinicoAutomatico;
+
+  useEffect(() => {
+    if (!showForm) return;
+
+    const snapshot = editPrecoSnapshotRef.current;
+    const contratoId = (contratoPreferidoId ?? "").trim();
+    const preservarPrecoCarregado =
+      Boolean(editingId) &&
+      snapshot?.id === editingId &&
+      snapshot.clienteId === clienteId &&
+      snapshot.contratoId === contratoId;
+
+    const chave = `${clienteId}|${contratoId}`;
+    if (preservarPrecoCarregado) {
+      chaveClienteContratoRef.current = chave;
+    } else if (chaveClienteContratoRef.current !== chave) {
+      chaveClienteContratoRef.current = chave;
+      setValorAdmissionalAuto(CLINICO_VALOR_ASO_ADMISSIONAL);
+      reaplicarValorClinicoRef.current(CLINICO_VALOR_ASO_ADMISSIONAL);
+    }
+
+    const dataIso = isValidDateBR(form.data_agendamento)
+      ? parseDateBRToIso(form.data_agendamento)
+      : "";
+    if (!dataIso || (!clienteId.trim() && !form.cliente_nome.trim())) return;
+
+    let cancelled = false;
+    const seq = ++admissionalPrecoSeqRef.current;
+    void resolverValorAdmissionalDoAtendimento({
+      clienteId: clienteId || null,
+      clienteNome: form.cliente_nome,
+      clienteCnpj: clientes.find((item) => item.id === clienteId)?.cnpj ?? null,
+      dataAgendamento: dataIso,
+      contratoId: contratoPreferidoId,
+    })
+      .then((valor) => {
+        if (cancelled || seq !== admissionalPrecoSeqRef.current) return;
+        setValorAdmissionalAuto(valor);
+        if (!preservarPrecoCarregado) {
+          reaplicarValorClinicoRef.current(valor);
+        }
+      })
+      .catch((err) => {
+        console.error("Erro ao resolver o valor do admissional:", err);
+        if (cancelled || seq !== admissionalPrecoSeqRef.current) return;
+        setValorAdmissionalAuto(CLINICO_VALOR_ASO_ADMISSIONAL);
+        if (!preservarPrecoCarregado) {
+          reaplicarValorClinicoRef.current(CLINICO_VALOR_ASO_ADMISSIONAL);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    clienteId,
+    clientes,
+    contratoPreferidoId,
+    editingId,
+    form.cliente_nome,
+    form.data_agendamento,
+    showForm,
+  ]);
 
   const handleRemoveExam = useCallback(
     (id: string) => {
@@ -868,6 +953,9 @@ export function useAgendamentosPage() {
     vagaDecisionRef.current = "none";
     vagaEmUsoIdRef.current = null;
     vagaContratoIdRef.current = null;
+    setContratoPreferidoId(null);
+    editPrecoSnapshotRef.current = null;
+    chaveClienteContratoRef.current = "";
     vagaContratoNumeroRef.current = null;
     vagaAlertKeyRef.current = null;
     vagaLockRef.current = false;
@@ -1015,6 +1103,7 @@ export function useAgendamentosPage() {
           vagaDecisionRef.current = "none";
           vagaEmUsoIdRef.current = null;
           vagaContratoIdRef.current = null;
+          setContratoPreferidoId(null);
           vagaAlertKeyRef.current = null;
           setVagaComprometida(null);
           setVagaComprometidaModalOpen(false);
@@ -1116,6 +1205,7 @@ export function useAgendamentosPage() {
         vagaDecisionRef.current = "link";
         vagaEmUsoIdRef.current = staged.vaga_id;
         vagaContratoIdRef.current = staged.contrato_id ?? null;
+        setContratoPreferidoId(staged.contrato_id ?? null);
         vagaContratoNumeroRef.current = staged.contrato_numero ?? null;
         vagaLockRef.current = true;
         creditoDecisionRef.current = "skip";
@@ -1527,6 +1617,7 @@ export function useAgendamentosPage() {
         vagaDecisionRef.current = "none";
         vagaEmUsoIdRef.current = null;
         vagaContratoIdRef.current = null;
+        setContratoPreferidoId(null);
         vagaAlertKeyRef.current = null;
         vagaLockRef.current = false;
         setVagaComprometida(null);
@@ -1680,6 +1771,7 @@ export function useAgendamentosPage() {
     vagaDecisionRef.current = "skip";
     vagaEmUsoIdRef.current = null;
     vagaContratoIdRef.current = null;
+    setContratoPreferidoId(null);
     vagaLockRef.current = false;
     setVagaComprometidaModalOpen(false);
     creditoDecisionRef.current = "skip";
@@ -1704,6 +1796,7 @@ export function useAgendamentosPage() {
     vagaDecisionRef.current = "link";
     vagaEmUsoIdRef.current = vaga.id;
     vagaContratoIdRef.current = vaga.contrato_id;
+    setContratoPreferidoId(vaga.contrato_id);
     vagaContratoNumeroRef.current = vaga.contrato_numero;
     vagaLockRef.current = true;
     creditoDecisionRef.current = "skip";
@@ -1885,11 +1978,16 @@ export function useAgendamentosPage() {
       const examesForm = agendamentoToExams(agendamento);
       loadExams(examesForm);
       prevAsoRef.current = agendamento.aso ?? "";
-      setClienteId(
+      const clienteEdicaoId =
         (agendamento.cliente_id ?? "").trim() ||
-          (escolherUnicoPorNome(clientes, agendamento.cliente_nome ?? "").item
-            ?.id ?? "")
-      );
+        (escolherUnicoPorNome(clientes, agendamento.cliente_nome ?? "").item
+          ?.id ?? "");
+      editPrecoSnapshotRef.current = {
+        id,
+        clienteId: clienteEdicaoId,
+        contratoId: (vagaContratoIdRef.current ?? "").trim(),
+      };
+      setClienteId(clienteEdicaoId);
       setCargoId(agendamento.cargo_id ?? "");
       setCargoNomeSalvo(agendamento.cargo_nome ?? "");
       examsManuallyModifiedRef.current = false;
@@ -2744,8 +2842,28 @@ export function useAgendamentosPage() {
           examesIndicamUsoDeCreditoContrato(exams);
         if (aplicarValoresCredito) {
           examesPayload = applyValoresCreditoContratoNosExamesPayload(
-            examesPayloadRaw
+            examesPayload
           );
+        }
+
+        if (!editingId && (payload.aso ?? "").trim() === "Admissional" && dataIso) {
+          const valorAdmissional = await resolverValorAdmissionalDoAtendimento({
+            clienteId: payload.cliente_id,
+            clienteNome: payload.cliente_nome,
+            clienteCnpj:
+              clientes.find((item) => item.id === clienteId)?.cnpj ?? null,
+            dataAgendamento: dataIso,
+            contratoId: vagaContratoIdRef.current,
+          });
+          examesPayload = aplicarValorAdmissionalNoPayload(
+            examesPayload,
+            payload.aso ?? "",
+            valorAdmissional
+          );
+          if (!aplicarValoresCredito) {
+            setValorAdmissionalAuto(valorAdmissional);
+            reaplicarValorClinicoAutomatico(valorAdmissional);
+          }
         }
 
         if (editingId) {
@@ -2820,7 +2938,11 @@ export function useAgendamentosPage() {
 
           toast.success("Agendamento atualizado com sucesso!");
         } else {
-          const novoId = await salvarAgendamentoComExames(payload, examesPayload);
+          const novoId = await salvarAgendamentoComExames(
+            payload,
+            examesPayload,
+            { contratoIdPreferido: vagaContratoIdRef.current }
+          );
           await auditarClinicoZeroDemissionalSeNecessario(auditContext, {
             aso: payload.aso,
             exams,
@@ -3032,6 +3154,7 @@ export function useAgendamentosPage() {
       setSaving,
       buildPayload,
       getExamesPayload,
+      reaplicarValorClinicoAutomatico,
       cargoId,
       cargoNomeSalvo,
       cargosAtivos,

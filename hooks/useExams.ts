@@ -18,7 +18,9 @@ import {
 } from "@/lib/agendamento-aso-retorno-trabalho";
 import { ordenarExamesAgendamentoComClinicoPrimeiro } from "@/lib/agendamento-exames-order";
 import { resolveMotivoValorZeroPayload } from "@/lib/agendamento-clinico-zero-demissional";
+import { exameTemMotivoCreditoContrato } from "@/lib/contrato-creditos-aso";
 import {
+  CLINICO_VALOR_ASO_ADMISSIONAL,
   CLINICO_VALOR_ASO_RETORNO_TRABALHO,
   EXAME_CLINICO_NOME,
   EXAME_SEM_CUSTO_CLINICA_MSG,
@@ -38,11 +40,12 @@ function calcLucro(valor: string, custo: string): string {
 function applyAsoValorClinico(
   patch: Partial<ExameFormItem>,
   asoTipo: string,
-  manual: boolean
+  manual: boolean,
+  valorAdmissional: number
 ): Partial<ExameFormItem> {
   if (manual) return patch;
 
-  const auto = getClinicoValorNavarroAuto(asoTipo);
+  const auto = getClinicoValorNavarroAuto(asoTipo, valorAdmissional);
   if (auto === null) return patch;
 
   const valor = formatMoney(auto);
@@ -178,7 +181,11 @@ async function fetchPrecoClinicoRetornoTrabalho(
   };
 }
 
-export function useExams(clinicaNome: string, asoTipo: string) {
+export function useExams(
+  clinicaNome: string,
+  asoTipo: string,
+  valorAdmissional: number = CLINICO_VALOR_ASO_ADMISSIONAL
+) {
   const [exams, setExams] = useState<ExameFormItem[]>([createEmptyExam()]);
   const [pricingLoading, setPricingLoading] = useState(false);
   const examsSyncGenerationRef = useRef(0);
@@ -258,7 +265,8 @@ export function useExams(clinicaNome: string, asoTipo: string) {
           const enriched = applyAsoValorClinico(
             { ...patch, clinicoValorManual: false },
             asoTipo,
-            false
+            false,
+            valorAdmissional
           );
           setExams((prev) => {
             if (
@@ -316,7 +324,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         setPricingLoading(false);
       }
     },
-    [asoTipo, clinicaNome, hasDuplicateExam]
+    [asoTipo, clinicaNome, hasDuplicateExam, valorAdmissional]
   );
 
   const refreshAllPricing = useCallback(async () => {
@@ -351,7 +359,8 @@ export function useExams(clinicaNome: string, asoTipo: string) {
                 custo_clinica: patch.custo_clinica ?? "",
               },
               asoTipo,
-              manual
+              manual,
+              valorAdmissional
             );
             const valor = manual
               ? exam.valor_cliente
@@ -376,7 +385,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         setPricingLoading(false);
       }
     }
-  }, [asoTipo, clinicaNome]);
+  }, [asoTipo, clinicaNome, valorAdmissional]);
 
   useEffect(() => {
     refreshAllPricing();
@@ -384,7 +393,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
   }, [clinicaNome]);
 
   useEffect(() => {
-    const auto = getClinicoValorNavarroAuto(asoTipo);
+    const auto = getClinicoValorNavarroAuto(asoTipo, valorAdmissional);
     if (auto === null) return;
 
     setExams((prev) =>
@@ -401,7 +410,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
         };
       })
     );
-  }, [asoTipo]);
+  }, [asoTipo, valorAdmissional]);
 
   const buildExamesFromNomes = useCallback(
     async (exameNomes: string[]): Promise<ExameFormItem[]> => {
@@ -432,7 +441,8 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             const enriched = applyAsoValorClinico(
               { ...patch, clinicoValorManual: false },
               asoTipo,
-              false
+              false,
+              valorAdmissional
             );
             novos.push({ ...createEmptyExam(), ...enriched });
           } else {
@@ -443,7 +453,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
             };
             novos.push({
               ...base,
-              ...applyAsoValorClinico(base, asoTipo, false),
+              ...applyAsoValorClinico(base, asoTipo, false, valorAdmissional),
             });
           }
           continue;
@@ -468,7 +478,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
 
       return ordenarExamesAgendamentoComClinicoPrimeiro(novos);
     },
-    [asoTipo, clinicaNome]
+    [asoTipo, clinicaNome, valorAdmissional]
   );
 
   const replaceExamesFromCargo = useCallback(
@@ -693,6 +703,29 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     [exams]
   );
 
+  const reaplicarValorClinicoAutomatico = useCallback(
+    (valor?: number) => {
+      const preco = valor ?? valorAdmissional;
+      setExams((prev) =>
+        prev.map((exam) => {
+          if (!isExameClinicoManual(exam.tipo_exame)) return exam;
+          if (exameTemMotivoCreditoContrato(exam.motivo_valor_zero)) return exam;
+          if (isAsoRetornoAoTrabalho(asoTipo)) return exam;
+          const auto = getClinicoValorNavarroAuto(asoTipo, preco);
+          if (auto === null) return exam;
+          const texto = formatMoney(auto);
+          return {
+            ...exam,
+            valor_cliente: texto,
+            lucro: calcLucro(texto, exam.custo_clinica),
+            clinicoValorManual: false,
+          };
+        })
+      );
+    },
+    [asoTipo, valorAdmissional]
+  );
+
   return {
     exams,
     totals,
@@ -707,6 +740,7 @@ export function useExams(clinicaNome: string, asoTipo: string) {
     replaceExamesFromCargo,
     appendExamesFromNomes,
     enforceRetornoTrabalhoExames,
+    reaplicarValorClinicoAutomatico,
   };
 }
 

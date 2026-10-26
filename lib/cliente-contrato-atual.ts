@@ -17,6 +17,11 @@ export type ContextoCobrancaContrato = {
   parcelasMensalidade?: ParcelaMensalidadeRegistrada[];
   /** Flag gravada na aprovação. Não substitui a data quando ela existe. */
   contrato_assinado?: boolean | null;
+  /**
+   * Exame clínico admissional avulso acordado na contratação mensal, em reais.
+   * Ausente em contratos antigos: a tela usa o catálogo da modalidade.
+   */
+  exameAdmissionalReais?: number | null;
 };
 
 export type ClienteContratoConsulta = ClienteContratoRecord &
