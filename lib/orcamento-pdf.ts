@@ -211,7 +211,7 @@ function resolveDescricaoPropostaParagrafos(
   }
   if (kind === "ltcat") return PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT;
   const base = isOrcamentoMensalidade(orcamento.modalidade)
-    ? [...paragrafosPropostaGestaoMensal(propostaMensalidade), PROPOSTA_DESCRICAO_NOTA_LEGAL]
+    ? paragrafosPropostaGestaoMensal(propostaMensalidade)
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
   if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {
     return [...PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT, ...base];

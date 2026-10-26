@@ -894,21 +894,33 @@ await run("PDF pontual e mensalidade", async () => {
     assert.equal(congelado.parcelas.length, 1);
 
     const proposta = paragrafosPropostaGestaoMensal().join("\n");
-    assert.match(proposta, /1 exame clínico periódico/);
+    assert.match(proposta, /A proposta contempla a Gestão Completa/);
+    assert.match(proposta, /por 12 meses/);
+    assert.match(proposta, /PGR, LTCAT, PCMSO/);
+    assert.match(proposta, /um exame clínico periódico/);
     assert.match(proposta, /R\$ 50,00/);
-    assert.match(proposta, /quinto dia útil/);
-    assert.match(proposta, /R\$ 130,00/);
-    assert.match(proposta, /R\$ 10,00/);
-    assert.match(proposta, /Não há reajuste automático pelo IPCA/);
-    assert.match(proposta, /boleto bancário/);
-    assert.match(proposta, /limita-se ao período contratado/);
-    assert.match(proposta, /30 dias/);
+    assert.match(proposta, /Exames complementares são cobrados à parte/);
     assert.match(proposta, /compromisso anual/);
-    assert.match(proposta, /ainda não foi definido/);
+    assert.match(proposta, /renovação automática/);
+    assert.match(proposta, /30 dias/);
+    assert.match(proposta, /detalhados no contrato/);
+    assert.doesNotMatch(
+      proposta,
+      /IPCA|quinto dia útil|R\$ 130,00|R\$ 10,00|boleto|pagamento antecipado|ainda não foi definido|Ministério do trabalho|A presente proposta/
+    );
     assert.doesNotMatch(proposta, /ASOs previstos no contrato|ASOs adicionais/);
-    const propostaDia = paragrafosPropostaGestaoMensal({ dia: 20 }).join("\n");
-    assert.match(propostaDia, /é 20/);
-    assert.doesNotMatch(propostaDia, /ainda não foi definido/);
+    const propostaPreco = paragrafosPropostaGestaoMensal({
+      exameAdmissional: 80,
+      exameDemissional: 80,
+    }).join("\n");
+    assert.match(propostaPreco, /custam R\$ 80,00 cada/);
+    assert.doesNotMatch(propostaPreco, /R\$ 50,00/);
+    const propostaPrecosDistintos = paragrafosPropostaGestaoMensal({
+      exameAdmissional: 80,
+      exameDemissional: 60,
+    }).join("\n");
+    assert.match(propostaPrecosDistintos, /admissionais custam R\$ 80,00 cada/);
+    assert.match(propostaPrecosDistintos, /demissionais custam R\$ 60,00 cada/);
 
     const pdfAvista = new jsPDF({ unit: "mm", format: "a4" });
     drawContratoPdfDocument(pdfAvista, semDatas, null);

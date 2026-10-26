@@ -239,24 +239,16 @@ export function centavosSalvosParaReais(
   return Math.round(valor) / 100;
 }
 
-/** Textos da proposta de Gestão SST mensal. Usa o parâmetro gravado quando existir. */
+/**
+ * Descrição da proposta comercial de Gestão SST mensal.
+ * Não compõe cláusulas nem o PDF do contrato.
+ * O preço do exame avulso sai do parâmetro gravado na contratação, ou da
+ * configuração da modalidade quando a contratação ainda não o registrou.
+ */
 export function paragrafosPropostaGestaoMensal(params?: {
-  dia?: number | null;
-  baseReais?: number | null;
-  incrementoReais?: number | null;
   exameAdmissional?: number | null;
   exameDemissional?: number | null;
 }): readonly string[] {
-  const base = Number(params?.baseReais);
-  const incremento = Number(params?.incrementoReais);
-  const formula = {
-    baseReais:
-      Number.isFinite(base) && base > 0 ? base : GESTAO_SST_RENOVACAO_BASE_REAIS,
-    incrementoReais:
-      Number.isFinite(incremento) && incremento > 0
-        ? incremento
-        : GESTAO_SST_RENOVACAO_INCREMENTO_REAIS,
-  };
   const catalogo = valorExameClinicoAvulsoMensalidade();
   const admissional =
     Number(params?.exameAdmissional) > 0
@@ -269,20 +261,14 @@ export function paragrafosPropostaGestaoMensal(params?: {
   const preco =
     admissional != null && demissional != null
       ? admissional === demissional
-        ? `O exame clínico avulso, admissional ou demissional, com emissão do ASO, é de ${formatCurrency(admissional)} por exame.`
-        : `O exame clínico admissional avulso é de ${formatCurrency(admissional)} e o demissional avulso é de ${formatCurrency(demissional)}, com emissão do ASO.`
-      : "O valor do exame clínico avulso desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura.";
-  const dia = diaVencimentoMensalidadeValido(params?.dia);
-  const vencimento = dia
-    ? `O dia de vencimento das mensalidades desta contratação é ${dia}.`
-    : "O dia de vencimento das mensalidades será 10 ou 20, escolhido no contrato. Nesta proposta esse dia ainda não foi definido.";
+        ? `Exames clínicos avulsos admissionais e demissionais custam ${formatCurrency(admissional)} cada. Exames complementares são cobrados à parte.`
+        : `Exames clínicos avulsos admissionais custam ${formatCurrency(admissional)} cada e demissionais custam ${formatCurrency(demissional)} cada. Exames complementares são cobrados à parte.`
+      : "O valor dos exames clínicos avulsos desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura. Exames complementares são cobrados à parte.";
   return [
-    "A presente proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho (SST) durante a vigência contratual de 12 meses, incluindo elaboração e gestão dos documentos PGR, LTCAT e PCMSO, 1 exame clínico periódico por colaborador abrangido pelo plano, com ASO, ou o exame clínico demissional se houver desligamento antes do periódico, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
-    "Durante a vigência, a empresa contará com acompanhamento contínuo da Navarro Engenharia, gestão das obrigações contratadas e disponibilização dos documentos em formato digital.",
-    `${preco} Exames complementares são sempre cobrados à parte. Os exames clínicos avulsos e os complementares são apurados entre o primeiro e o último dia de cada mês e cobrados em fatura discriminada, com vencimento no quinto dia útil do mês seguinte.`,
-    `Na renovação, a mensalidade é recalculada pela quantidade de colaboradores ativos no início da nova vigência: ${formatCurrency(formula.baseReais)} para 0 ou 1 colaborador e mais ${formatCurrency(formula.incrementoReais)} mensais por colaborador a partir do segundo, com mínimo de ${formatCurrency(formula.baseReais)}. Não há reajuste automático pelo IPCA. O desconto do pagamento antecipado não entra nessa base e não altera o preço da vigência em andamento.`,
-    `Nas renovações, a cobrança ocorre mensalmente por boleto bancário, salvo novo acordo escrito de pagamento antecipado antes do novo período. O desconto do pagamento antecipado limita-se ao período contratado. ${vencimento} Esse dia não é o quinto dia útil das faturas de exames.`,
-    "A vigência é de 12 meses e renova-se automaticamente por períodos sucessivos de 12 meses, salvo comunicação escrita com antecedência mínima de 30 dias do término para impedir a próxima renovação. O pagamento mensal é a forma de pagamento de um compromisso anual.",
+    "A proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho por 12 meses, incluindo PGR, LTCAT, PCMSO, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
+    "Inclui um exame clínico periódico por colaborador abrangido pelo plano, com ASO, ou demissional quando o desligamento ocorrer antes da realização do periódico.",
+    preco,
+    "A contratação tem compromisso anual e renovação automática, salvo aviso escrito com antecedência mínima de 30 dias do término. Valores e condições de renovação, estão detalhados no contrato.",
   ];
 }
 

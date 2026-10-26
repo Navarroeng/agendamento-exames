@@ -264,10 +264,17 @@ function catalogoDe(itens: OrcamentoComItens["orcamento_itens"]): ServicoSstReco
   }));
 }
 
-function renderPdf(orcamento: OrcamentoComItens) {
+function renderPdf(
+  orcamento: OrcamentoComItens,
+  propostaMensalidade?: {
+    exameAdmissional?: number | null;
+    exameDemissional?: number | null;
+  }
+) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   drawOrcamentoPdfDocument(doc, orcamento, {
     catalogo: catalogoDe(orcamento.orcamento_itens),
+    propostaMensalidade,
   });
   return doc;
 }
@@ -519,37 +526,61 @@ const mensalidadeOrc = buildOrcamento({
   ],
 });
 const mensalPdf = renderPdf(mensalidadeOrc);
-assert.equal(
-  mensalPdf.getNumberOfPages(),
-  2,
-  "As condições comerciais da Gestão SST mensal passam para a segunda página"
+const mensalPropostaPages = mensalPdf.getNumberOfPages();
+assert.ok(
+  mensalPropostaPages >= 1 && mensalPropostaPages <= 2,
+  `A proposta mensal cabe em até 2 páginas, gerou ${mensalPropostaPages}`
 );
 const mensalBinary = pdfLatin1(mensalPdf);
-assert.match(mensalBinary, /Página 1 de 2|Pagina 1 de 2/);
-assert.match(mensalBinary, /Página 2 de 2|Pagina 2 de 2/);
+assert.match(
+  mensalBinary,
+  new RegExp(`P[áa]gina 1 de ${mensalPropostaPages}`)
+);
+assert.match(
+  mensalBinary,
+  new RegExp(`P[áa]gina ${mensalPropostaPages} de ${mensalPropostaPages}`)
+);
+const espacamentoMensal = /([0-9.]+) Tc/g;
+let espacoMensal: RegExpExecArray | null;
+while ((espacoMensal = espacamentoMensal.exec(mensalBinary))) {
+  assert.ok(
+    Number(espacoMensal[1]) <= 0.05,
+    `espaçamento da proposta mensal ${espacoMensal[1]}`
+  );
+}
 const mensalRaw = pdfVisibleText(mensalBinary);
 assert.match(mensalRaw, /AUTOMNI AUTOMA[CÇ][OÕ]ES INDUSTRIAIS/i);
-assert.match(mensalRaw, /Gest[aã]o Completa de Sa[uú]de e Seguran[cç]a do Trabalho \(SST\)/i);
-assert.match(mensalRaw, /vig[eê]ncia contratual de 12 meses/i);
-assert.match(mensalRaw, /PGR, LTCAT e PCMSO/);
-assert.match(mensalRaw, /1 exame cl[ií]nico peri[oó]dico/);
-assert.match(mensalRaw, /R\$ 50,00/);
-assert.match(mensalRaw, /quinto dia [uú]til/);
-assert.match(mensalRaw, /R\$ 130,00/);
-assert.match(mensalRaw, /Não há reajuste autom[aá]tico pelo IPCA/);
-assert.match(mensalRaw, /boleto banc[aá]rio/);
-assert.match(mensalRaw, /anteced[eê]ncia m[ií]nima\s+de 30 dias/);
-assert.match(mensalRaw, /compromisso anual/);
-assert.match(mensalRaw, /ainda n[aã]o foi definido/);
+assert.match(
+  mensalRaw,
+  /A proposta contempla a Gest[aã]o Completa de Sa[uú]de e Seguran[cç]a do Trabalho por 12 meses/i
+);
+assert.match(mensalRaw, /PGR, LTCAT, PCMSO/);
+assert.match(mensalRaw, /um exame cl[ií]nico peri[oó]dico por colaborador/i);
+assert.match(mensalRaw, /demissional quando o desligamento ocorrer antes/i);
+assert.match(
+  mensalRaw,
+  /Exames cl[ií]nicos avulsos admissionais e demissionais custam R\$ 50,00 cada/
+);
+assert.match(mensalRaw, /Exames complementares s[aã]o cobrados [aà] parte/);
+assert.match(mensalRaw, /compromisso anual e renova[cç][aã]o autom[aá]tica/);
+assert.match(mensalRaw, /anteced[eê]ncia m[ií]nima de 30 dias do t[eé]rmino/);
+assert.match(mensalRaw, /detalhados no contrato/);
+assert.doesNotMatch(mensalRaw, /quinto dia [uú]til/);
+assert.doesNotMatch(mensalRaw, /R\$ 130,00/);
+assert.doesNotMatch(mensalRaw, /IPCA/);
+assert.doesNotMatch(mensalRaw, /boleto banc[aá]rio/);
+assert.doesNotMatch(mensalRaw, /pagamento antecipado/i);
+assert.doesNotMatch(mensalRaw, /ainda n[aã]o foi definido/);
 assert.doesNotMatch(mensalRaw, /ASOs previstos no contrato/);
 assert.doesNotMatch(mensalRaw, /ASOs adicionais/);
-assert.match(mensalRaw, /Avalia[cç][aã]o de Riscos Psicossociais/i);
+assert.match(mensalRaw, /Avalia[cç][aã]o de Riscos\s+Psicossociais/i);
 assert.match(mensalRaw, /S-2210/);
 assert.match(mensalRaw, /S-2220/);
 assert.match(mensalRaw, /S-2240/);
-assert.match(mensalRaw, /acompanhamento cont[ií]nuo da Navarro Engenharia/i);
+assert.doesNotMatch(mensalRaw, /acompanhamento cont[ií]nuo da Navarro Engenharia/i);
 assert.match(mensalRaw, /formato digital/i);
-assert.match(mensalRaw, /Laudos obrigat[oó]rios por lei/i);
+assert.doesNotMatch(mensalRaw, /Laudos obrigat[oó]rios por lei/i);
+assert.doesNotMatch(mensalRaw, /Minist[eé]rio do trabalho/i);
 assert.doesNotMatch(mensalRaw, /Valor abaixo equivalente/i);
 assert.match(mensalRaw, /Essa gest[aã]o inclui/i);
 assert.match(mensalRaw, /PGR - Programa de Gerenciamento de Riscos/i);
@@ -589,6 +620,22 @@ assert.doesNotMatch(mensalRaw, /4\.200|4200/);
 assert.doesNotMatch(mensalRaw, /vista/i);
 assert.doesNotMatch(mensalRaw, /5%/);
 assert.doesNotMatch(mensalRaw, /Este pacote inclui/i);
+
+const mensalPrecoProprio = pdfVisibleText(
+  pdfLatin1(
+    renderPdf(mensalidadeOrc, {
+      exameAdmissional: 80,
+      exameDemissional: 60,
+    })
+  )
+);
+assert.match(
+  mensalPrecoProprio,
+  /admissionais custam R\$ 80,00 cada e demissionais custam R\$ 60,00 cada/
+);
+assert.doesNotMatch(mensalPrecoProprio, /R\$ 50,00/);
+assert.match(mensalPrecoProprio, /R\$ 350,00/);
+assert.match(mensalPrecoProprio, /12 mensalidades/);
 
 const mensalPaginado = renderPdf(
   buildOrcamento({
