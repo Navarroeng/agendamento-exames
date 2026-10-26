@@ -335,11 +335,15 @@ function computeResumo(
     if (!row.fatura || !faturaStatusContaNoResumoEmitido(row.fatura.status)) {
       return;
     }
-    valorEmitido += valor;
+    // Emitido, pago e em aberto usam o valor gravado na fatura.
+    // O previsto continua sendo o total atual dos agendamentos.
+    const valorRegistrado = Number(row.fatura.valor_total);
+    if (!Number.isFinite(valorRegistrado)) return;
+    valorEmitido += valorRegistrado;
     if (row.fatura.pago) {
-      valorPago += valor;
+      valorPago += valorRegistrado;
     } else {
-      valorEmAberto += valor;
+      valorEmAberto += valorRegistrado;
     }
   });
 

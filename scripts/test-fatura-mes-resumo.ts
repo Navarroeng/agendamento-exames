@@ -93,7 +93,10 @@ const ags = [
 ];
 
 const faturas = [
-  fatura("f1", "Empresa X", "2026-06", "emitida", true),
+  {
+    ...fatura("f1", "Empresa X", "2026-06", "emitida", true),
+    valor_total: 50,
+  },
 ];
 
 const result = buildResumoClientesMes(ags, faturas, "06/2026");
@@ -207,7 +210,11 @@ const junhoMultiplas = buildResumoClientesMes(
 assert.ok(junhoMultiplas);
 assert.equal(junhoMultiplas.rows.length, 1);
 assert.equal(junhoMultiplas.rows[0].fatura?.id, "f-new");
-assert.equal(junhoMultiplas.resumo.valorEmitido, 50);
+assert.equal(
+  junhoMultiplas.resumo.valorEmitido,
+  100,
+  "emitido usa o valor gravado na fatura, não o total atual dos agendamentos"
+);
 assert.equal(junhoMultiplas.resumo.valorPrevisto, 50);
 
 const periodoCompleto = buildResumoClientesMes(

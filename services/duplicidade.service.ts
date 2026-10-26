@@ -19,12 +19,15 @@ import {
   assertExamesSemDuplicidade,
   FATURA_CLINICA_DUPLICADA_MSG,
   FATURA_DUPLICADA_MSG,
-  mesReferenciaIsoFromBR,
-  mesReferenciaIsoFromPeriodoInicio,
   verificarDuplicidadeExamesNoFormulario,
 } from "@/lib/duplicidade-validations";
+import {
+  competenciaIsoFromTexto,
+  encontrarFaturaQueImpedeEmissao,
+} from "@/lib/fatura-competencia";
 import type { AgendamentoStatus, FaturaRecord, FaturaTipo } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { listarFaturasDaCompetencia } from "@/services/fatura-competencia.service";
 
 export { verificarDuplicidadeExamesNoFormulario, assertExamesSemDuplicidade };
 export type { AgendamentoDuplicidade90DiasInfo };
@@ -40,31 +43,6 @@ export interface FaturaExistenteInfo {
   data_emissao: string | null;
   valor_total: number;
   referencia_nome: string;
-}
-
-function normalizeText(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function faturaMatchesMesReferencia(
-  fatura: Pick<FaturaRecord, "mes_referencia" | "periodo_inicio">,
-  mesReferenciaIso: string
-): boolean {
-  if (fatura.mes_referencia === mesReferenciaIso) return true;
-  return mesReferenciaIsoFromPeriodoInicio(fatura.periodo_inicio) === mesReferenciaIso;
-}
-
-function referenciaMatches(
-  fatura: Pick<FaturaRecord, "referencia_nome" | "referencia_id">,
-  referenciaNome: string,
-  referenciaId?: string | null
-): boolean {
-  if (referenciaId?.trim() && fatura.referencia_id?.trim()) {
-    return fatura.referencia_id === referenciaId;
-  }
-  return (
-    normalizeText(fatura.referencia_nome) === normalizeText(referenciaNome)
-  );
 }
 
 function toDuplicidadeInfo(
@@ -265,39 +243,22 @@ export async function verificarFaturaExistenteMes(params: {
   ignorarFaturaId?: string | null;
 }): Promise<FaturaExistenteInfo | null> {
   const mesReferenciaIso =
-    params.mesReferenciaIso ??
-    (params.mesReferencia ? mesReferenciaIsoFromBR(params.mesReferencia) : null);
+    competenciaIsoFromTexto(params.mesReferenciaIso) ??
+    competenciaIsoFromTexto(params.mesReferencia);
   if (!mesReferenciaIso) return null;
 
   const referencia = params.referenciaNome.trim();
   if (!referencia) return null;
 
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("faturas")
-    .select(
-      "id, numero, status, data_emissao, valor_total, referencia_nome, referencia_id, mes_referencia, periodo_inicio"
-    )
-    .eq("tipo", params.tipo)
-    .in("status", ["rascunho", "emitida", "vencida", "necessita_reemissao"]);
-
-  if (error) throw error;
-
-  const found = (data ?? []).find((row) => {
-    if (params.ignorarFaturaId && row.id === params.ignorarFaturaId) {
-      return false;
-    }
-    return (
-      referenciaMatches(
-        row as Pick<FaturaRecord, "referencia_nome" | "referencia_id">,
-        referencia,
-        params.referenciaId
-      ) &&
-      faturaMatchesMesReferencia(
-        row as Pick<FaturaRecord, "mes_referencia" | "periodo_inicio">,
-        mesReferenciaIso
-      )
-    );
+  const faturas = await listarFaturasDaCompetencia(
+    params.tipo,
+    mesReferenciaIso
+  );
+  const found = encontrarFaturaQueImpedeEmissao(faturas, {
+    referenciaNome: referencia,
+    referenciaId: params.referenciaId,
+    mesReferencia: mesReferenciaIso,
+    ignorarFaturaId: params.ignorarFaturaId,
   });
 
   if (!found) return null;

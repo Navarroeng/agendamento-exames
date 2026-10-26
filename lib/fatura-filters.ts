@@ -8,6 +8,7 @@ import {
   isAgendamentoDaEmpresa,
   type ClienteCatalogItem,
 } from "@/lib/fatura-empresa-match";
+import { competenciaIsoFromTexto, faturaPertenceACompetencia } from "@/lib/fatura-competencia";
 import { faturaStatusEmissaoAtiva } from "@/lib/fatura-reemissao";
 import { formatDateBR } from "@/lib/format";
 import type { AgendamentoWithExames, FaturaRecord } from "@/lib/types";
@@ -118,6 +119,10 @@ export function mesReferenciaIsoFromBR(mesReferencia: string): string | null {
   return range.inicio.slice(0, 7);
 }
 
+/**
+ * Mesma regra da emissão: `mes_referencia` e, na falta dele, `periodo_inicio`.
+ * Aceita `MM/AAAA` e `YYYY-MM`. Filtro ilegível não esconde linhas.
+ */
 export function faturaMatchesMesReferencia(
   fatura: {
     mes_referencia?: string | null;
@@ -125,15 +130,8 @@ export function faturaMatchesMesReferencia(
   },
   mesReferencia: string
 ): boolean {
-  const mesIso = mesReferenciaIsoFromBR(mesReferencia);
-  if (!mesIso) return true;
-
-  const mesRef = fatura.mes_referencia?.trim();
-  if (mesRef) return mesRef === mesIso;
-
-  const inicio = fatura.periodo_inicio?.split("T")[0];
-  if (!inicio) return false;
-  return inicio.slice(0, 7) === mesIso;
+  if (!competenciaIsoFromTexto(mesReferencia)) return true;
+  return faturaPertenceACompetencia(fatura, mesReferencia);
 }
 
 export function filterAgendamentosFatura(

@@ -59,7 +59,6 @@ import {
 import {
   buscarFaturaComItens,
   cancelarFatura,
-  listarFaturas,
   marcarConferenciaCustosClinica,
   marcarFaturaPendente,
   atualizarPagamentoFatura,
@@ -75,6 +74,7 @@ import { sincronizarFaturasVencidas } from "@/services/fatura-inadimplencia.serv
 import { listarFaturasClienteComAlteracaoPosEmissao } from "@/services/agendamento-fatura-bloqueio.service";
 import { obterUrlComprovantePagamento } from "@/services/fatura-comprovante.service";
 import { obterUrlFaturaClinicaConferencia } from "@/services/fatura-conferencia-clinica.service";
+import { listarFaturasDaCompetencia } from "@/services/fatura-competencia.service";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
@@ -203,9 +203,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>(
     []
   );
-  const [faturas, setFaturas] = useState<Awaited<ReturnType<typeof listarFaturas>>>(
-    []
-  );
+  const [faturas, setFaturas] = useState<FaturaRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [historicoLoading, setHistoricoLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -272,20 +270,29 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     }
   }, []);
 
+  const historicoRequestRef = useRef(0);
+
   const reloadHistorico = useCallback(async (): Promise<FaturaRecord[]> => {
+    const requestId = ++historicoRequestRef.current;
+    const mesReferencia = filters.mesReferencia;
     setHistoricoLoading(true);
     try {
-      const data = await listarFaturas();
+      const data = await listarFaturasDaCompetencia(pageTipo, mesReferencia);
+      if (requestId !== historicoRequestRef.current) return data;
       setFaturas(data);
       return data;
     } catch (err) {
-      console.error("Erro ao carregar histórico de faturas:", err);
-      toast.error("Erro ao carregar histórico de faturas.");
+      console.error("Erro ao carregar faturas da competência:", err);
+      if (requestId !== historicoRequestRef.current) return [];
+      toast.error("Erro ao carregar faturas da competência.");
+      setFaturas([]);
       return [];
     } finally {
-      setHistoricoLoading(false);
+      if (requestId === historicoRequestRef.current) {
+        setHistoricoLoading(false);
+      }
     }
-  }, []);
+  }, [filters.mesReferencia, pageTipo]);
 
   const reloadHistoricoRef = useRef(reloadHistorico);
   reloadHistoricoRef.current = reloadHistorico;
@@ -334,8 +341,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       try {
         const atualizadas = await sincronizarFaturasVencidas(auditOptions);
         if (cancelled || atualizadas === 0) return;
-        const data = await listarFaturas();
-        if (!cancelled) setFaturas(data);
+        await reloadHistoricoRef.current();
       } catch (err) {
         console.error("Erro ao sincronizar faturas vencidas:", err);
         if (!cancelled && !syncVencidasToastShownRef.current) {

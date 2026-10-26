@@ -453,19 +453,7 @@ export function normalizarCompetenciaIso(
   return `${br[2]}-${br[1]}`;
 }
 
-/**
- * Competência da fatura, igual à listagem mensal: `mes_referencia` quando
- * existe e, na falta dele, o mês de `periodo_inicio`. Não usa o vencimento.
- */
-export function competenciaIsoDaFatura(fatura: {
-  mes_referencia?: string | null;
-  periodo_inicio?: string | null;
-}): string | null {
-  const mesRef = fatura.mes_referencia?.trim() ?? "";
-  if (mesRef) return normalizarCompetenciaIso(mesRef);
-  const inicio = fatura.periodo_inicio?.split("T")[0] ?? "";
-  return normalizarCompetenciaIso(inicio.slice(0, 7));
-}
+export { competenciaIsoDaFatura } from "@/lib/fatura-competencia";
 
 export function faturaNaCompetenciaLembrete(
   fatura: {

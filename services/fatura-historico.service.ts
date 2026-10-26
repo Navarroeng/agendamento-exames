@@ -76,6 +76,10 @@ async function gerarNumeroFatura(tipo: FaturaTipo): Promise<string> {
   return `${prefix}-${year}-${seq}`;
 }
 
+/**
+ * Histórico recente, com teto. A listagem por competência não usa esta função:
+ * ver `listarFaturasDaCompetencia`.
+ */
 export async function listarFaturas(limit = 100): Promise<FaturaRecord[]> {
   const supabase = createClient();
   const { data, error } = await supabase
