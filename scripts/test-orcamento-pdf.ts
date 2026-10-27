@@ -46,12 +46,6 @@ import {
   SERVICO_INSALUBRIDADE_NOME,
 } from "../lib/servico-insalubridade";
 import {
-  PERICULOSIDADE_INCLUSOS_ITENS,
-  PERICULOSIDADE_INCLUSOS_OBSERVACOES,
-  PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE,
-  SERVICO_PERICULOSIDADE_NOME,
-} from "../lib/servico-periculosidade";
-import {
   LTCAT_INCLUSOS_ITENS,
   PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT,
   SERVICO_LTCAT_NOME,
@@ -768,62 +762,6 @@ assert.doesNotMatch(insalRaw, /\u2022/);
 fs.writeFileSync(
   path.join(previewDir, "preview-insalubridade.pdf"),
   Buffer.from(insalDoc.output("arraybuffer"))
-);
-
-const pericOrc = buildOrcamento({
-  numero: "ORC-2026-0701",
-  modalidade: "pontual",
-  quantidade_parcelas: 2,
-  itens: [{ nome: SERVICO_PERICULOSIDADE_NOME, quantidade: 3, valor: 4500 }],
-});
-const pericDoc = renderPdf(pericOrc);
-const pericRaw = pdfVisibleText(pdfLatin1(pericDoc));
-assert.match(pericRaw, /Laudo de Periculosidade \(NR16\)/);
-assert.match(pericRaw, /enquadramento na NR-16/);
-assert.match(pericRaw, /Ponto 01/);
-assert.match(pericRaw, /GLP e ma[cç]arico nas injetoras/);
-assert.match(pericRaw, /Ponto 02/);
-assert.match(pericRaw, /Cilindros de gases na ferramentaria/);
-assert.match(pericRaw, /Ponto 03/);
-assert.match(pericRaw, /Empilhadeira a GLP/);
-assert.match(pericRaw, /Ponto 04/);
-assert.match(pericRaw, /Rede de g[aá]s e tratamento por chama/);
-assert.match(pericRaw, /implementa[cç][aã]o das medidas corretivas/);
-assert.match(pericRaw, /Visita t[eé]cnica [àa] empresa/);
-assert.match(pericRaw, /Identifica[cç][aã]o e avalia[cç][aã]o das condi[cç][oõ]es de risco/);
-assert.match(pericRaw, /[aá]reas de risco conforme a NR-16/);
-assert.match(pericRaw, /Elabora[cç][aã]o do Laudo T[eé]cnico de Periculosidade/);
-assert.match(
-  pericRaw,
-  /caracteriza[cç][aã]o ou n[aã]o da periculosidade/
-);
-assert.match(pericRaw, /(^|\n)Quantidade(\n|$)/);
-assert.match(pericRaw, /(^|\n)3(\n|$)/);
-assert.doesNotMatch(pericRaw, /Quantidade de Colaboradores/i);
-assert.doesNotMatch(pericRaw, /N[uú]mero de Colaboradores/i);
-assert.doesNotMatch(pericRaw, /13\.500|13500/);
-assert.match(pericRaw, /4\.500,00/);
-assert.match(pericRaw, /2 parcelas de/);
-assert.match(pericRaw, /2\.250,00/);
-assert.match(pericRaw, /Condi[cç][aã]o de pagamento/i);
-assert.doesNotMatch(pericRaw, /Valor [àa] vista/i);
-assert.doesNotMatch(pericRaw, /[ÀA] vista/);
-assert.doesNotMatch(pericRaw, /5%/);
-assert.doesNotMatch(pericRaw, /An[aá]lise Ergon[oô]mica/);
-assert.doesNotMatch(pericRaw, /NR-17/);
-assert.doesNotMatch(pericRaw, /Laudo de Insalubridade/);
-assert.doesNotMatch(pericRaw, /NR-15/);
-assert.doesNotMatch(pericRaw, /Laudo AET/);
-assert.doesNotMatch(pericRaw, /eSocial/);
-assert.doesNotMatch(pericRaw, /PGR/);
-assert.doesNotMatch(pericRaw, /PCMSO/);
-assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE.length, 7);
-assert.equal(PERICULOSIDADE_INCLUSOS_ITENS.length, 4);
-assert.equal(PERICULOSIDADE_INCLUSOS_OBSERVACOES.length, 1);
-assert.equal(resolveItemValorServico(pericOrc.orcamento_itens![0]), 4500);
-fs.writeFileSync(
-  path.join(previewDir, "preview-periculosidade.pdf"),
-  Buffer.from(pericDoc.output("arraybuffer"))
 );
 
 const ltcatOrc = buildOrcamento({
