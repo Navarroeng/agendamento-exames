@@ -914,7 +914,11 @@ await run("PDF pontual e mensalidade", async () => {
     assert.match(proposta, /compromisso anual/);
     assert.match(proposta, /renovação automática/);
     assert.match(proposta, /30 dias/);
-    assert.match(proposta, /detalhados no contrato/);
+    assert.doesNotMatch(proposta, /detalhados no contrato/);
+    assert.doesNotMatch(
+      proposta,
+      /Valores e condições de renovação/
+    );
     assert.doesNotMatch(
       proposta,
       /IPCA|quinto dia útil|R\$ 130,00|R\$ 10,00|boleto|pagamento antecipado|ainda não foi definido|Ministério do trabalho|A presente proposta/

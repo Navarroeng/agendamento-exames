@@ -311,7 +311,7 @@ export function paragrafosPropostaGestaoMensal(params?: {
     "A proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho por 12 meses, incluindo PGR, LTCAT, PCMSO, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
     "Inclui um exame clínico periódico por colaborador abrangido pelo plano, com ASO, ou demissional quando o desligamento ocorrer antes da realização do periódico.",
     preco,
-    "A contratação tem compromisso anual e renovação automática, salvo aviso escrito com antecedência mínima de 30 dias do término. Valores e condições de renovação, estão detalhados no contrato.",
+    "A contratação tem compromisso anual e renovação automática, salvo aviso escrito com antecedência mínima de 30 dias do término.",
   ];
 }
 
