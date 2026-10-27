@@ -244,6 +244,17 @@ await run("contrato pontual", () => {
   });
   const aprovacao = makeAprovacao();
   assert.equal(podeGerarContratoNavarro(orcamento, aprovacao), true);
+  assert.equal(
+    podeGerarContratoNavarro({ ...orcamento, status: "enviado" }, aprovacao),
+    false
+  );
+  assert.equal(
+    podeGerarContratoNavarro(orcamento, {
+      ...aprovacao,
+      revertida_em: "2026-10-27T12:00:00Z",
+    }),
+    false
+  );
 
   const doc = buildContratoNavarroDocumento({
     orcamento,

@@ -445,6 +445,15 @@ assert.match(
   sql146,
   /idx_cliente_contratos_orcamento_vigente/
 );
+const aprovar146 = sql146.slice(
+  sql146.indexOf("function public.aprovar_orcamento_integrar_cliente(")
+);
+assert.match(aprovar146, /status = 'aprovado'/);
+assert.match(
+  aprovar146,
+  /revertida_em = case when revertida_em is not null then null else revertida_em end/
+);
+assert.match(aprovar146, /and aprovacao_revertida_em is null/);
 
 function contratoConsulta(
   patch: Partial<ClienteContratoConsulta>

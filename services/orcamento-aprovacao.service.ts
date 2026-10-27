@@ -9,6 +9,8 @@ import type {
   OrcamentoFinanceiroUpdatePayload,
 } from "@/lib/orcamento-aprovacao";
 import {
+  APROVACAO_NAO_PERSISTIDA_MSG,
+  APROVACAO_REVERTIDA_NAO_VIGENTE_MSG,
   condicoesComerciaisMudaram,
   formatCondicaoAprovada,
   formatPagamentoFromCondicoes,
@@ -130,6 +132,9 @@ export async function salvarParametrosContratoMensalidade(params: {
     .single();
   if (beforeError) throw beforeError;
   const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+  if (before.revertida_em) {
+    throw new Error(APROVACAO_REVERTIDA_NAO_VIGENTE_MSG);
+  }
 
   const baseSalva = centavosPositivos(before.mensalidade_renovacao_base_centavos);
   const incrementoSalvo = centavosPositivos(
@@ -185,6 +190,9 @@ export async function salvarRenovacaoContratoMensalidade(params: {
     .single();
   if (beforeError) throw beforeError;
   const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+  if (before.revertida_em) {
+    throw new Error(APROVACAO_REVERTIDA_NAO_VIGENTE_MSG);
+  }
   if (before.contrato_assinado) {
     throw new Error(CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG);
   }
@@ -550,6 +558,19 @@ export async function salvarAprovacaoOrcamento(
     throw new Error("Aprovação não encontrada após salvar.");
   }
 
+  const { data: statusDepois, error: statusDepoisError } = await supabase
+    .from("orcamentos")
+    .select("status")
+    .eq("id", orcamentoId)
+    .maybeSingle();
+  if (statusDepoisError) throw statusDepoisError;
+  if (
+    statusDepois?.status !== "aprovado" ||
+    aprovacao.revertida_em
+  ) {
+    throw new Error(APROVACAO_NAO_PERSISTIDA_MSG);
+  }
+
   if (isLaudoPontualExclusivo(aprovacao.orcamento_aprovacao_itens)) {
     try {
       await garantirImplantacaoAet({
@@ -584,6 +605,16 @@ export async function atualizarCondicoesAprovadas(
   const usuario = alteradoPor.trim();
   if (!usuario) {
     throw new Error("Informe o usuário responsável pela alteração.");
+  }
+
+  const { data: cicloRaw, error: cicloError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select("revertida_em")
+    .eq("id", aprovacaoId)
+    .maybeSingle();
+  if (cicloError) throw cicloError;
+  if (cicloRaw?.revertida_em) {
+    throw new Error(APROVACAO_REVERTIDA_NAO_VIGENTE_MSG);
   }
 
   if (

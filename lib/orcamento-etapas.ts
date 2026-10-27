@@ -292,7 +292,11 @@ export function isOrcamentoEtapaLiberada(
     case "aprovado":
       return true;
     case "contrato":
-      return Boolean(aprovacao) || orcamentoAprovado;
+      return (
+        orcamentoAprovado &&
+        Boolean(aprovacao) &&
+        !aprovacao?.revertida_em
+      );
     case "financeiro":
       return isContratoEtapaConcluida(aprovacao);
     case "treinamento":
@@ -344,7 +348,11 @@ export function isOrcamentoEtapaConcluida(
     case "resumo":
       return true;
     case "aprovado":
-      return Boolean(aprovacao) || orcamentoAprovado;
+      return (
+        orcamentoAprovado &&
+        Boolean(aprovacao) &&
+        !aprovacao?.revertida_em
+      );
     case "contrato":
       return isContratoEtapaConcluida(aprovacao);
     case "financeiro":

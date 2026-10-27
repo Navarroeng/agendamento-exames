@@ -176,6 +176,27 @@ export interface OrcamentoAprovacaoRecord {
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
 }
 
+export const CONTRATO_EXIGE_ORCAMENTO_APROVADO_MSG =
+  "Só é possível gerar o contrato de um orçamento aprovado.";
+
+export const APROVACAO_REVERTIDA_NAO_VIGENTE_MSG =
+  "A aprovação anterior foi revertida. Confirme a nova aprovação antes de alterar o contrato.";
+
+export const APROVACAO_NAO_PERSISTIDA_MSG =
+  "A nova aprovação não foi gravada. O orçamento continua sem o status Aprovado.";
+
+/** Ciclo usado pelo cabeçalho, pelas etapas e pelo gerador. Aprovação revertida fica só no histórico. */
+export function aprovacaoCicloVigente(
+  aprovacao: { revertida_em?: string | null } | null | undefined,
+  orcamentoStatus: string | null | undefined
+): boolean {
+  return (
+    Boolean(aprovacao) &&
+    !aprovacao?.revertida_em &&
+    orcamentoStatus === "aprovado"
+  );
+}
+
 export interface OrcamentoAprovacaoFormValues {
   /** true = aprovar conforme o orçamento original (sem alterações). */
   condicoes_iguais: boolean;

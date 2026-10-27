@@ -43,7 +43,10 @@ import {
   resolveOrcamentoModalidade,
   type OrcamentoModalidade,
 } from "@/lib/orcamento-modalidade";
-import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import {
+  CONTRATO_EXIGE_ORCAMENTO_APROVADO_MSG,
+  type OrcamentoAprovacaoRecord,
+} from "@/lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import { SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-insalubridade";
 import { SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-ltcat";
@@ -156,7 +159,8 @@ export function podeGerarContratoNavarro(
   aprovacao: OrcamentoAprovacaoRecord | null | undefined
 ): boolean {
   if (!orcamento?.id || !orcamento.numero?.trim()) return false;
-  if (!aprovacao?.id) return false;
+  if (!aprovacao?.id || aprovacao.revertida_em) return false;
+  if (orcamento.status !== "aprovado") return false;
   if (!orcamento.cliente_nome?.trim()) return false;
   const tipo = resolveTipoDocumentoFromAprovacao(orcamento, aprovacao);
   if (tipo === "insalubridade" || tipo === "ltcat") {
@@ -175,6 +179,13 @@ export function motivoBloqueioGeracaoContrato(
   }
   if (tipo === "ltcat") {
     return SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG;
+  }
+  if (
+    orcamento &&
+    aprovacao &&
+    (orcamento.status !== "aprovado" || aprovacao.revertida_em)
+  ) {
+    return CONTRATO_EXIGE_ORCAMENTO_APROVADO_MSG;
   }
   return null;
 }

@@ -564,7 +564,7 @@ export function countImplantacaoEtapasConcluidas(
     }
     let n = 0;
     n += 1;
-    if (opts?.orcamentoAprovado || aprovacao) n += 1;
+    if (opts?.orcamentoAprovado && !aprovacao?.revertida_em) n += 1;
     if (isContratoEtapaConcluida(aprovacao)) n += 1;
     if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
     return n;
@@ -574,7 +574,7 @@ export function countImplantacaoEtapasConcluidas(
     let n = 0;
     // Resumo + Orçamento aprovado (sempre contam no progresso 5 etapas)
     n += 1;
-    if (opts?.orcamentoAprovado || aprovacao) n += 1;
+    if (opts?.orcamentoAprovado && !aprovacao?.revertida_em) n += 1;
     if (isContratoEtapaConcluida(aprovacao)) n += 1;
     if (isFinanceiroEtapaConcluida(aprovacao)) n += 1;
     if (isTreinamentoEtapaConcluida(opts?.treinamento)) n += 1;
@@ -699,7 +699,7 @@ export function buildImplantacaoProcesso(params: {
       aprovacao?.mensalidade_pagamento
     ),
     orcamentoAprovado:
-      orcamento.status === "aprovado" || Boolean(aprovacao),
+      orcamento.status === "aprovado" && !aprovacao?.revertida_em,
   };
   const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao, contagemOpts);
   const etapasConcluidas =

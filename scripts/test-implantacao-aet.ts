@@ -392,6 +392,7 @@ assert.equal(
 const orcAet = {
   id: "o1",
   numero: "ORC-2026-0099",
+  status: "aprovado",
   cliente_nome: "EMPRESA AET",
   orcamento_itens: [
     {

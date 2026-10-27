@@ -17,6 +17,7 @@ import {
   aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
+  aprovacaoCicloVigente,
   buildAprovacaoFormFromRecord,
   buildResumoComercialOrcamento,
   formatCondicaoAprovada,
@@ -314,8 +315,10 @@ export function OrcamentoAprovarModal({
       resolveLtcatServicoId(servicos),
       resolveParecerTecnicoServicoId(servicos)
     );
-    const orcamentoAprovadoInit =
-      orcamento.status === "aprovado" || Boolean(aprovacao);
+    const orcamentoAprovadoInit = aprovacaoCicloVigente(
+      aprovacao,
+      orcamento.status
+    );
     const ctxInit: OrcamentoEtapasContexto = {
       fluxo,
       treinamento,
@@ -444,11 +447,11 @@ export function OrcamentoAprovarModal({
   const andamentoDocumental = resolveContratoDocumentalAndamento(aprovacao);
   const andamentoFinanceiro = resolveFinanceiroAndamento(aprovacao);
   const consultaMode = mode === "consulta";
-  const aprovadoLocked = Boolean(aprovacao) || consultaMode;
+  const cicloVigente = aprovacaoCicloVigente(aprovacao, orcamento?.status);
+  const aprovadoLocked = cicloVigente || consultaMode;
   const camposSomenteLeitura = consultaMode || saving;
   const acompanhamentoBloqueado = saving;
-  const orcamentoAprovado =
-    orcamento?.status === "aprovado" || Boolean(aprovacao);
+  const orcamentoAprovado = cicloVigente;
   const fluxoImplantacao = useMemo(() => {
     if (!orcamento) return "padrao" as const;
     const treinamentosId = resolveTreinamentosServicoId(servicos);
@@ -1084,7 +1087,7 @@ export function OrcamentoAprovarModal({
                 >
                   {ORCAMENTO_STATUS_LABELS[orcamento.status]}
                 </span>
-                {aprovacao ? (
+                {cicloVigente ? (
                   <span className="inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold text-white">
                     {ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS[andamentoDocumental]}
                   </span>
@@ -1222,7 +1225,7 @@ export function OrcamentoAprovarModal({
                 </p>
               ) : null}
 
-              {aprovacao ? (
+              {cicloVigente && aprovacao ? (
                 <section className="overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#f8fbff]">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e0eaff] px-4 py-3">
                     <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
@@ -1465,6 +1468,14 @@ export function OrcamentoAprovarModal({
                 </section>
               ) : (
                 <>
+                  {aprovacao?.revertida_em ? (
+                    <p className="rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-[12px] font-medium text-[#92400e]">
+                      A aprovação anterior foi revertida e permanece no
+                      histórico. Confirme as condições para gravar a nova
+                      aprovação. O contrato só poderá ser gerado depois que
+                      essa aprovação for salva.
+                    </p>
+                  ) : null}
                   <section className="rounded-2xl border border-[#dbe3ef] bg-white p-4 sm:p-5">
                     <p className="mb-3 text-sm font-extrabold text-navy">
                       As condições finais ficaram iguais às do orçamento?
@@ -1749,7 +1760,7 @@ export function OrcamentoAprovarModal({
             </div>
           ) : null}
 
-          {tab === "contrato" && aprovacao ? (
+          {tab === "contrato" && cicloVigente && aprovacao ? (
             <div className="space-y-4">
               <OrcamentoContratoGerarPanel
                 orcamento={orcamento}
@@ -2219,7 +2230,7 @@ export function OrcamentoAprovarModal({
               Voltar à edição
             </button>
           ) : null}
-          {tab === "contrato" && aprovacao ? (
+          {tab === "contrato" && cicloVigente && aprovacao ? (
             <button
               type="button"
               className="btn btn-primary justify-center sm:w-auto"

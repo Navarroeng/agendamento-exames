@@ -1,14 +1,19 @@
 /** Smoke test: gating das etapas do orçamento. */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   isContratoEtapaConcluida,
   isFinanceiroEtapaConcluida,
+  isOrcamentoEtapaConcluida,
   isOrcamentoEtapaLiberada,
   isProcuracaoEtapaConcluida,
 } from "../lib/orcamento-etapas";
 import { buildMensagemVisitaTecnica } from "../lib/orcamento-visita-mensagem";
-import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
+import {
+  aprovacaoCicloVigente,
+  type OrcamentoAprovacaoRecord,
+} from "../lib/orcamento-aprovacao";
 
 function aprovacao(
   partial: Partial<OrcamentoAprovacaoRecord>
@@ -51,6 +56,25 @@ assert.equal(
   isOrcamentoEtapaLiberada("contrato", aprovacao({}), true),
   true
 );
+assert.equal(
+  isOrcamentoEtapaLiberada("contrato", aprovacao({}), false),
+  false
+);
+const revertida = aprovacao({ revertida_em: "2026-10-27T12:00:00Z" });
+assert.equal(aprovacaoCicloVigente(revertida, "enviado"), false);
+assert.equal(aprovacaoCicloVigente(aprovacao({}), "enviado"), false);
+assert.equal(aprovacaoCicloVigente(aprovacao({}), "aprovado"), true);
+assert.equal(aprovacaoCicloVigente(null, "aprovado"), false);
+assert.equal(isOrcamentoEtapaLiberada("contrato", revertida, true), false);
+assert.equal(isOrcamentoEtapaConcluida("aprovado", revertida, true), false);
+assert.equal(isOrcamentoEtapaConcluida("aprovado", aprovacao({}), true), true);
+assert.equal(isOrcamentoEtapaConcluida("aprovado", aprovacao({}), false), false);
+const modal = readFileSync(
+  "components/orcamentos/OrcamentoAprovarModal.tsx",
+  "utf8"
+);
+assert.match(modal, /const aprovadoLocked = cicloVigente \|\| consultaMode/);
+assert.match(modal, /tab === "contrato" && cicloVigente && aprovacao/);
 assert.equal(
   isOrcamentoEtapaLiberada("financeiro", aprovacao({}), true),
   false
