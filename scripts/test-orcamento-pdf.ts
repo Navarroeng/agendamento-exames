@@ -11,6 +11,9 @@ import {
 } from "../lib/orcamento-calculo";
 import {
   ORCAMENTO_PDF_CONTENT_BOTTOM_Y,
+  ORCAMENTO_PDF_CONTENT_FOOTER_GAP,
+  ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN,
+  ORCAMENTO_PDF_MARGIN_TOP,
   ORCAMENTO_WATERMARK_OPACITY,
   ORCAMENTO_WATERMARK_WIDTH_RATIO,
   blockFitsOnPage,
@@ -19,7 +22,12 @@ import {
   ensureSpace,
   resolveCardsBlockPlacement,
 } from "../lib/orcamento-pdf";
-import { calcPdfContentBottomY, calcPdfFooterTopY } from "../lib/pdf-navarro-footer";
+import {
+  PDF_FOOTER_BOTTOM_MARGIN,
+  PDF_FOOTER_H,
+  calcPdfContentBottomY,
+  calcPdfFooterTopY,
+} from "../lib/pdf-navarro-footer";
 import { formatCurrency } from "../lib/money";
 import type { OrcamentoComItens, ServicoSstRecord } from "../lib/orcamento-types";
 import {
@@ -165,8 +173,27 @@ assert.equal(watermark.x + watermark.w / 2, PAGE_W / 2);
 assert.ok(watermark.h <= (265 - 95) * 0.92 + 0.1);
 assert.ok(watermark.y >= 95);
 
-const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(297);
+assert.equal(ORCAMENTO_PDF_MARGIN_TOP, 8.4);
+assert.ok(Math.abs(12 - ORCAMENTO_PDF_MARGIN_TOP - 12 * 0.3) < 0.05);
+assert.equal(ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN, 5.6);
+assert.ok(ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN < PDF_FOOTER_BOTTOM_MARGIN);
+assert.equal(ORCAMENTO_PDF_CONTENT_FOOTER_GAP, 1.4);
+const orcamentoFooterTop = calcPdfFooterTopY(
+  297,
+  ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN
+);
+const FIRST_PAGE_CONTENT_BOTTOM = calcPdfContentBottomY(
+  297,
+  ORCAMENTO_PDF_CONTENT_FOOTER_GAP,
+  ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN
+);
 assert.equal(ORCAMENTO_PDF_CONTENT_BOTTOM_Y, FIRST_PAGE_CONTENT_BOTTOM);
+assert.ok(ORCAMENTO_PDF_CONTENT_BOTTOM_Y > calcPdfContentBottomY(297));
+assert.ok(ORCAMENTO_PDF_CONTENT_BOTTOM_Y < orcamentoFooterTop);
+assert.ok(
+  orcamentoFooterTop + PDF_FOOTER_H <=
+    297 - ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN + 0.01
+);
 
 const cardsFit = resolveCardsBlockPlacement(180, 58);
 assert.equal(cardsFit.cardH, 58);
@@ -182,7 +209,7 @@ assert.ok(248 + 58 > FIRST_PAGE_CONTENT_BOTTOM);
 const cardsTightFit = resolveCardsBlockPlacement(225, 54, 45);
 assert.equal(cardsTightFit.needsNewPage, false);
 assert.ok(cardsTightFit.cardH <= 54);
-assert.ok(225 + cardsTightFit.cardH <= calcPdfFooterTopY(297) - 1);
+assert.ok(225 + cardsTightFit.cardH <= orcamentoFooterTop - 1);
 
 function buildOrcamento(params: {
   numero: string;
@@ -299,6 +326,36 @@ function pdfVisibleText(raw: string): string {
   return chunks.join("\n");
 }
 
+function pageContentStreams(doc: InstanceType<typeof jsPDF>): string[] {
+  const pages = (
+    doc as unknown as {
+      internal: { pages: Array<{ join?: (sep: string) => string } | undefined> };
+    }
+  ).internal.pages;
+  const streams: string[] = [];
+  for (let index = 1; index < pages.length; index += 1) {
+    const page = pages[index];
+    if (page && typeof page.join === "function") streams.push(page.join("\n"));
+  }
+  return streams;
+}
+
+function textPositions(stream: string): Array<{ xMm: number; yMm: number; text: string }> {
+  const items: Array<{ xMm: number; yMm: number; text: string }> = [];
+  const re = /([\d.]+) ([\d.]+) Td\s*\(((?:\\.|[^\\)])*)\)\s*Tj/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(stream))) {
+    const xPt = Number(match[1]);
+    const yPt = Number(match[2]);
+    items.push({
+      xMm: (xPt * 25.4) / 72,
+      yMm: 297 - (yPt * 25.4) / 72,
+      text: match[3].replace(/\\([()\\])/g, "$1"),
+    });
+  }
+  return items;
+}
+
 const layoutDummy = {
   logo: null,
   orcamento: buildOrcamento({
@@ -337,14 +394,14 @@ const casoImagem = renderPdf(
     ],
   })
 );
-assert.ok(
-  casoImagem.getNumberOfPages() >= 2,
-  "Pacote SST + Audiometria nao deve comprimir os cards na pagina 1"
+assert.equal(
+  casoImagem.getNumberOfPages(),
+  1,
+  "Pacote SST + Audiometria cabe inteiro na primeira página, sem comprimir os cards"
 );
 const casoRaw = pdfLatin1(casoImagem);
-assert.match(casoRaw, /Página 1 de 2|Pagina 1 de 2/);
-assert.match(casoRaw, /Página 2 de 2|Pagina 2 de 2/);
-assert.doesNotMatch(casoRaw, /Página 1 de 1|Pagina 1 de 1/);
+assert.match(casoRaw, /Página 1 de 1|Pagina 1 de 1/);
+assert.doesNotMatch(casoRaw, /Página 2 de /);
 
 const qtdsIndividuaisOrcamento = buildOrcamento({
   numero: "ORC-2026-0300",
@@ -907,5 +964,62 @@ fs.writeFileSync(
   path.join(previewDir, "preview-ltcat.pdf"),
   Buffer.from(ltcatDoc.output("arraybuffer"))
 );
+
+const variasPaginas = renderPdf(
+  buildOrcamento({
+    numero: "ORC-2026-9099",
+    observacoes:
+      "Observacao de validacao das margens, com texto suficiente para ocupar a base da ultima pagina do orcamento.",
+    itens: Array.from({ length: 24 }, (_, index) => ({
+      nome: `Item de servico ${String(index + 1).padStart(2, "0")}`,
+      quantidade: 3,
+      valor: 200,
+    })),
+  })
+);
+const paginas = pageContentStreams(variasPaginas);
+assert.ok(paginas.length >= 2, "orçamento de validação precisa de várias páginas");
+const headerBottom = ORCAMENTO_PDF_MARGIN_TOP + 46;
+const footerBottom = orcamentoFooterTop + PDF_FOOTER_H;
+paginas.forEach((stream, pageIndex) => {
+  const items = textPositions(stream);
+  assert.ok(items.length > 8, `página ${pageIndex + 1} sem texto`);
+  const proposta = items.filter((item) => item.text === "PROPOSTA COMERCIAL");
+  assert.equal(proposta.length, 1, `cabeçalho da página ${pageIndex + 1}`);
+  assert.ok(
+    Math.abs(proposta[0].yMm - (ORCAMENTO_PDF_MARGIN_TOP + 16)) < 0.4,
+    `topo do cabeçalho na página ${pageIndex + 1}`
+  );
+  let noRodape = 0;
+  for (const item of items) {
+    assert.ok(
+      item.xMm >= 11.5,
+      `margem lateral de "${item.text}" na página ${pageIndex + 1}`
+    );
+    assert.ok(
+      item.yMm >= ORCAMENTO_PDF_MARGIN_TOP - 0.3,
+      `"${item.text}" acima do cabeçalho`
+    );
+    if (item.yMm >= orcamentoFooterTop - 0.35) {
+      assert.ok(
+        item.yMm <= footerBottom + 0.35,
+        `"${item.text}" atravessa o rodapé (${item.yMm.toFixed(2)} mm)`
+      );
+      noRodape += 1;
+      continue;
+    }
+    if (item.yMm <= headerBottom + 0.6) continue;
+    assert.ok(
+      item.yMm <= ORCAMENTO_PDF_CONTENT_BOTTOM_Y + 0.8,
+      `"${item.text}" em ${item.yMm.toFixed(2)} mm invade a reserva do rodapé`
+    );
+  }
+  assert.ok(noRodape >= 4, `rodapé incompleto na página ${pageIndex + 1}`);
+});
+const dadosCliente = textPositions(paginas[0]).find(
+  (item) => item.text === "DADOS DO CLIENTE"
+);
+assert.ok(dadosCliente);
+assert.ok(Math.abs(dadosCliente.xMm - 12) < 0.4);
 
 console.log("test-orcamento-pdf: OK");

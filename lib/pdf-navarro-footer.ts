@@ -15,13 +15,20 @@ export interface NavarroPdfFooterInfo {
   agradecimento: string;
 }
 
-export function calcPdfFooterTopY(pageHeight: number): number {
-  return pageHeight - PDF_FOOTER_BOTTOM_MARGIN - PDF_FOOTER_H;
+export function calcPdfFooterTopY(
+  pageHeight: number,
+  bottomMargin = PDF_FOOTER_BOTTOM_MARGIN
+): number {
+  return pageHeight - bottomMargin - PDF_FOOTER_H;
 }
 
 /** Limite superior do conteúdo útil acima do rodapé premium. */
-export function calcPdfContentBottomY(pageHeight: number, buffer = 2): number {
-  return calcPdfFooterTopY(pageHeight) - buffer;
+export function calcPdfContentBottomY(
+  pageHeight: number,
+  buffer = 2,
+  bottomMargin = PDF_FOOTER_BOTTOM_MARGIN
+): number {
+  return calcPdfFooterTopY(pageHeight, bottomMargin) - buffer;
 }
 
 /** Rodapé premium compartilhado (Faturas, Propostas e demais PDFs Navarro). */
@@ -35,6 +42,8 @@ export function drawNavarroPremiumFooter(
     margin: number;
     contentWidth: number;
     navarro: NavarroPdfFooterInfo;
+    /** Distância da base da página até o rodapé. O padrão vale para os demais PDFs. */
+    footerBottomMargin?: number;
   }
 ): void {
   const {
@@ -45,9 +54,10 @@ export function drawNavarroPremiumFooter(
     margin,
     contentWidth,
     navarro,
+    footerBottomMargin = PDF_FOOTER_BOTTOM_MARGIN,
   } = options;
 
-  const y = calcPdfFooterTopY(pageHeight);
+  const y = calcPdfFooterTopY(pageHeight, footerBottomMargin);
   const h = PDF_FOOTER_H;
   const pageLabel = `Página ${pageNumber} de ${totalPages}`;
 

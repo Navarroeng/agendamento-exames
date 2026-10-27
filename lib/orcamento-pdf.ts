@@ -144,11 +144,21 @@ const CARDS_AFTER_TABLE_GAP_MENSAL = 4.5;
 const CARDS_FOOTER_SAFETY_MM = 1;
 
 const MARGIN = 12;
+/** Espaço entre o topo e o cabeçalho: cerca de 30% menor que a margem lateral. */
+export const ORCAMENTO_PDF_MARGIN_TOP = 8.4;
+/** Margem sob o rodapé, cerca de 30% menor que os 8 mm dos demais PDFs. */
+export const ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN = 5.6;
+/** Folga entre o conteúdo e o topo do rodapé, cerca de 30% menor que os 2 mm padrão. */
+export const ORCAMENTO_PDF_CONTENT_FOOTER_GAP = 1.4;
 const PAGE_W = 210;
 const PAGE_H = 297;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 /** Limite inferior da área útil (acima do rodapé + margem de segurança). */
-const CONTENT_BOTTOM_Y = calcPdfContentBottomY(PAGE_H);
+const CONTENT_BOTTOM_Y = calcPdfContentBottomY(
+  PAGE_H,
+  ORCAMENTO_PDF_CONTENT_FOOTER_GAP,
+  ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN
+);
 export const ORCAMENTO_PDF_CONTENT_BOTTOM_Y = CONTENT_BOTTOM_Y;
 
 /** Opacidade da marca d'água sobreposta (4–8%). */
@@ -561,7 +571,10 @@ export function blockFitsOnPage(y: number, needed: number): boolean {
 }
 
 function cardsContentBottomY(): number {
-  return calcPdfFooterTopY(PAGE_H) - CARDS_FOOTER_SAFETY_MM;
+  return (
+    calcPdfFooterTopY(PAGE_H, ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN) -
+    CARDS_FOOTER_SAFETY_MM
+  );
 }
 
 function cardsBlockFitsOnPage(y: number, needed: number): boolean {
@@ -1850,22 +1863,23 @@ function drawHeader(
   orcamento: OrcamentoComItens
 ): number {
   const headerH = 46;
+  const top = ORCAMENTO_PDF_MARGIN_TOP;
   doc.setFillColor(...NAVY);
-  doc.roundedRect(MARGIN, MARGIN, CONTENT_W, headerH, 3, 3, "F");
+  doc.roundedRect(MARGIN, top, CONTENT_W, headerH, 3, 3, "F");
 
   doc.setFillColor(...GOLD);
   doc.triangle(
     MARGIN + CONTENT_W * 0.68,
-    MARGIN,
+    top,
     MARGIN + CONTENT_W,
-    MARGIN,
+    top,
     MARGIN + CONTENT_W,
-    MARGIN + headerH * 0.55,
+    top + headerH * 0.55,
     "F"
   );
 
   const logoX = MARGIN + 5;
-  const logoY = MARGIN + 7;
+  const logoY = top + 7;
   if (logo) {
     doc.addImage(logo.dataUrl, "PNG", logoX, logoY, logo.width, logo.height);
   } else {
@@ -1878,14 +1892,14 @@ function drawHeader(
   doc.setTextColor(...WHITE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("PROPOSTA COMERCIAL", MARGIN + CONTENT_W - 5, MARGIN + 16, {
+  doc.text("PROPOSTA COMERCIAL", MARGIN + CONTENT_W - 5, top + 16, {
     align: "right",
   });
 
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...GOLD_LIGHT);
-  const metaY = MARGIN + 24;
+  const metaY = top + 24;
   doc.text(`Nº ${orcamento.numero}`, MARGIN + CONTENT_W - 5, metaY, {
     align: "right",
   });
@@ -1903,10 +1917,10 @@ function drawHeader(
   );
 
   doc.setFillColor(...NAVY_SOFT);
-  doc.rect(MARGIN, MARGIN + headerH - 11, CONTENT_W, 11, "F");
+  doc.rect(MARGIN, top + headerH - 11, CONTENT_W, 11, "F");
   doc.setFontSize(6.5);
   doc.setTextColor(...GOLD_LIGHT);
-  const contactY = MARGIN + headerH - 4;
+  const contactY = top + headerH - 4;
   doc.text(
     `${NAVARRO.telefone}  ·  ${NAVARRO.email}  ·  ${NAVARRO.site}`,
     MARGIN + 5,
@@ -1916,7 +1930,7 @@ function drawHeader(
     align: "right",
   });
 
-  return MARGIN + headerH + 6;
+  return top + headerH + 6;
 }
 
 /* ── Card do cliente ───────────────────────────────────────────── */
@@ -2516,6 +2530,7 @@ function drawFooter(doc: JsPDF, pageNumber: number, totalPages: number) {
     margin: MARGIN,
     contentWidth: CONTENT_W,
     navarro: NAVARRO,
+    footerBottomMargin: ORCAMENTO_PDF_FOOTER_BOTTOM_MARGIN,
   });
 }
 
