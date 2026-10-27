@@ -221,8 +221,10 @@ export function OrcamentoContratoGerarPanel({
       }),
     [quantidadeCronograma, valorContrato]
   );
-  const atual = documentos[0] ?? null;
-  const anteriores = documentos.slice(1);
+  const vigentes = documentos.filter((doc) => !doc.sem_validade_em);
+  const semValidade = documentos.filter((doc) => Boolean(doc.sem_validade_em));
+  const atual = vigentes[0] ?? null;
+  const anteriores = vigentes.slice(1);
   const atualDesatualizado = atual
     ? pdfContratoEstaDesatualizado(atual, aprovacaoContrato)
     : false;
@@ -813,7 +815,9 @@ export function OrcamentoContratoGerarPanel({
             <p className="mt-1 text-[12px] text-[#64748b]">Carregando…</p>
           ) : (
             <p className="mt-1 text-[12px] text-[#64748b]">
-              Nenhum contrato gerado ainda.
+              {semValidade.length > 0
+                ? "Nenhum contrato vigente. O PDF da aprovação revertida permanece no histórico, sem validade."
+                : "Nenhum contrato gerado ainda."}
             </p>
           )}
           {atualDesatualizado ? (
@@ -1061,6 +1065,46 @@ export function OrcamentoContratoGerarPanel({
                   {pdfContratoEstaDesatualizado(doc, aprovacaoContrato)
                     ? " · desatualizado"
                     : ""}
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    className="font-semibold text-brand-blue hover:underline"
+                    disabled={busy}
+                    onClick={() => void abrirDocumento(doc)}
+                  >
+                    Visualizar
+                  </button>
+                  <button
+                    type="button"
+                    className="font-semibold text-brand-blue hover:underline"
+                    disabled={busy}
+                    onClick={() => void baixarDocumento(doc)}
+                  >
+                    Baixar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      {semValidade.length > 0 ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[12px] font-semibold text-navy">
+            Aprovação revertida, sem validade ({semValidade.length})
+          </summary>
+          <ul className="mt-2 space-y-1.5">
+            {semValidade.map((doc) => (
+              <li
+                key={doc.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2 text-[12px] text-[#475569]"
+              >
+                <span>
+                  v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
+                  {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
+                  {" · sem validade"}
                 </span>
                 <span className="flex gap-2">
                   <button

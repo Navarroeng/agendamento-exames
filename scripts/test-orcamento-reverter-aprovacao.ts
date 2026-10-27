@@ -3,6 +3,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  deduplicarContratos,
+  selecionarContratoAtual,
+  type ClienteContratoConsulta,
+} from "../lib/cliente-contrato-atual";
 import { resolveOrcamentoAcoesMenu } from "../lib/orcamento-acoes";
 import { AUDITORIA_ACAO_LABELS, AUDITORIA_ACOES } from "../lib/auditoria";
 import {
@@ -10,9 +15,11 @@ import {
   REVERSAO_AET_MSG,
   REVERSAO_AGENDAMENTO_MSG,
   REVERSAO_CONDICOES_MSG,
-  REVERSAO_CONTRATO_ACOMPANHADO_MSG,
+  REVERSAO_CONTRATO_ASSINADO_MSG,
   REVERSAO_CONTRATO_GERADO_MSG,
   REVERSAO_CONTRATO_VINCULADO_MSG,
+  REVERSAO_CONFIRMACAO_MSG,
+  REVERSAO_RECEBIMENTO_MENSALIDADE_MSG,
   REVERSAO_ETAPAS_MSG,
   REVERSAO_FINANCEIRO_MSG,
   REVERSAO_LAUDOS_MSG,
@@ -21,7 +28,6 @@ import {
   REVERSAO_SEM_PERMISSAO_MSG,
   REVERSAO_STATUS_MSG,
   REVERSAO_TREINAMENTO_MSG,
-  REVERSAO_VENCIMENTOS_MSG,
   REVERSAO_VISITA_MSG,
   avaliarReversaoAprovacao,
   mensagemErroReverterAprovacao,
@@ -104,36 +110,49 @@ assert.equal(shells.permitido, true);
 assert.equal(shells.desfazerLaudosShellVazio, true);
 assert.equal(shells.desfazerRiscosShellVazio, true);
 
-assert.equal(
-  avaliarReversaoAprovacao(base({ documentosContrato: 1 })).mensagem,
-  REVERSAO_CONTRATO_GERADO_MSG
+const pdfGerado = avaliarReversaoAprovacao(base({ documentosContrato: 1 }));
+assert.equal(pdfGerado.permitido, true);
+assert.equal(pdfGerado.statusNovo, "enviado");
+
+const pdfEnviado = avaliarReversaoAprovacao(
+  base({
+    documentosContrato: 2,
+    vencimentosContrato: 3,
+    contratos: [{ ...shell, status: "enviado", enviadoEm: "2026-10-20" }],
+    aprovacao: {
+      procuracaoStatus: "pendente",
+      contratoEnviado: true,
+      contratoEnviadoEm: "2026-10-20",
+      contratoSalvoEm: "2026-10-20T12:00:00Z",
+      contratoAssinado: false,
+    },
+  })
 );
+assert.equal(pdfEnviado.permitido, true);
+assert.equal(pdfEnviado.desfazerContratosAutomaticos, true);
+
 assert.equal(
-  avaliarReversaoAprovacao(
-    base({
-      documentosContrato: 1,
-      contratos: [{ ...shell, assinadoEm: null }],
-    })
-  ).mensagem,
-  REVERSAO_CONTRATO_GERADO_MSG
+  avaliarReversaoAprovacao(base({ parcelasRecebidas: 1 })).mensagem,
+  REVERSAO_RECEBIMENTO_MENSALIDADE_MSG
 );
 
 assert.equal(
-  avaliarReversaoAprovacao(base({ vencimentosContrato: 2 })).mensagem,
-  REVERSAO_VENCIMENTOS_MSG
-);
-
-assert.equal(
   avaliarReversaoAprovacao(
-    base({ contratos: [{ ...shell, status: "enviado" }] })
-  ).mensagem,
-  REVERSAO_CONTRATO_VINCULADO_MSG
+    base({ contratos: [{ ...shell, status: "enviado", enviadoEm: "2026-10-01" }] })
+  ).permitido,
+  true
 );
 assert.equal(
   avaliarReversaoAprovacao(
     base({ contratos: [{ ...shell, status: "assinado" }] })
   ).mensagem,
-  REVERSAO_CONTRATO_VINCULADO_MSG
+  REVERSAO_CONTRATO_ASSINADO_MSG
+);
+assert.equal(
+  avaliarReversaoAprovacao(
+    base({ contratos: [{ ...shell, assinadoEm: "2026-10-01" }] })
+  ).mensagem,
+  REVERSAO_CONTRATO_ASSINADO_MSG
 );
 assert.equal(
   avaliarReversaoAprovacao(
@@ -161,7 +180,19 @@ assert.equal(
       },
     })
   ).mensagem,
-  REVERSAO_CONTRATO_ACOMPANHADO_MSG
+  REVERSAO_CONTRATO_ASSINADO_MSG
+);
+assert.equal(
+  avaliarReversaoAprovacao(
+    base({
+      aprovacao: {
+        procuracaoStatus: "pendente",
+        contratoAssinado: false,
+        contratoAssinadoEm: "2026-10-02",
+      },
+    })
+  ).mensagem,
+  REVERSAO_CONTRATO_ASSINADO_MSG
 );
 assert.equal(
   avaliarReversaoAprovacao(
@@ -236,7 +267,7 @@ assert.equal(
   mensagemErroReverterAprovacao(
     new Error(`REVERSAO_BLOQUEADA: ${REVERSAO_CONTRATO_GERADO_MSG}`)
   ),
-  REVERSAO_CONTRATO_GERADO_MSG
+  `${REVERSAO_CONTRATO_GERADO_MSG} Execute a migration 146_reverter_aprovacao_contrato_nao_assinado.sql para permitir a reversão de contrato ainda não assinado.`
 );
 assert.equal(
   mensagemErroReverterAprovacao({
@@ -245,10 +276,7 @@ assert.equal(
   REVERSAO_SEM_PERMISSAO_MSG
 );
 
-assert.equal(
-  textoConfirmacaoReverterAprovacao(),
-  "O orçamento voltará para o status ‘Enviado’ e poderá ser editado e aprovado novamente."
-);
+assert.equal(textoConfirmacaoReverterAprovacao(), REVERSAO_CONFIRMACAO_MSG);
 
 assert.deepEqual(
   resolveOrcamentoAcoesMenu("aprovado", { podeReverterAprovacao: true }),
@@ -373,5 +401,124 @@ assert.match(hookSrc, /reverterAprovacaoOrcamento/);
 assert.match(serviceSrc, /reverter_aprovacao_orcamento/);
 assert.match(serviceSrc, /motivo_bloqueio_reverter_aprovacao_orcamento/);
 assert.doesNotMatch(serviceSrc, /\.from\("orcamentos"\)\s*\.update/);
+
+const sql146 = readFileSync(
+  join(root, "supabase/migrations/146_reverter_aprovacao_contrato_nao_assinado.sql"),
+  "utf8"
+);
+const inicioReverter146 = sql146.search(
+  /function public\.reverter_aprovacao_orcamento\(\s*p_orcamento_id uuid,\s*p_motivo text/
+);
+assert.ok(inicioReverter146 > 0, "funcao de reversao nao encontrada na migration 146");
+const impedimento146 = sql146.slice(
+  sql146.indexOf("function public.reverter_aprovacao_orcamento_impedimento("),
+  inicioReverter146
+);
+assert.doesNotMatch(impedimento146, /já existe um contrato gerado/);
+assert.match(impedimento146, /já foi assinado/);
+assert.match(impedimento146, /recebimento registrado nas mensalidades/);
+assert.doesNotMatch(impedimento146, /contrato_enviado/);
+assert.doesNotMatch(impedimento146, /orcamento_contrato_documentos/);
+
+const reverter146 = sql146.slice(
+  inicioReverter146,
+  sql146.indexOf("function public.trg_parcela_exige_aprovacao_vigente(")
+);
+assert.doesNotMatch(reverter146, /delete from public\.orcamento_aprovacoes/);
+assert.doesNotMatch(reverter146, /delete from public\.orcamento_contrato_documentos/);
+assert.doesNotMatch(reverter146, /delete from public\.cliente_contratos/);
+assert.match(reverter146, /sem_validade_em = now\(\)/);
+assert.match(reverter146, /status = 'cancelado'/);
+assert.match(reverter146, /aprovacao_revertida_em = now\(\)/);
+assert.match(reverter146, /revertida_em = now\(\)/);
+assert.match(reverter146, /status = 'enviado'/);
+assert.match(reverter146, /orcamento_aprovacao_revertida/);
+assert.ok(
+  reverter146.indexOf("reverter_aprovacao_orcamento_impedimento") <
+    reverter146.indexOf("sem_validade_em = now()")
+);
+
+assert.match(sql146, /aprovacao_revertida_em is null/);
+assert.match(sql146, /when revertida_em is not null then false else contrato_assinado end/);
+assert.match(sql146, /and oa\.revertida_em is null/);
+assert.match(
+  sql146,
+  /idx_cliente_contratos_orcamento_vigente/
+);
+
+function contratoConsulta(
+  patch: Partial<ClienteContratoConsulta>
+): ClienteContratoConsulta {
+  return {
+    id: "c1",
+    cliente_id: "cli",
+    data_inicio: "2026-01-01",
+    data_fim: "2026-12-31",
+    quantidade_colaboradores: "10",
+    valor_contrato: "1000",
+    condicao_pagamento: "Mensalidade",
+    tipo_contrato: "mensal",
+    reajuste_percentual: "",
+    observacoes: "",
+    status: "aguardando_envio",
+    orcamento_id: "orc-1",
+    numero: "CT-1",
+    ...patch,
+  };
+}
+
+const revertido = contratoConsulta({
+  id: "antigo",
+  numero: "CT-79",
+  status: "cancelado",
+  encerrado_em: "2026-10-27T12:00:00Z",
+  aprovacao_revertida_em: "2026-10-27T12:00:00Z",
+  data_inicio: "2026-02-01",
+  data_fim: "2027-01-31",
+});
+const novo = contratoConsulta({
+  id: "novo",
+  numero: "CT-80",
+  status: "aguardando_envio",
+  data_inicio: "2026-10-27",
+  data_fim: null,
+  aprovado_em: "2026-10-27T15:00:00Z",
+});
+const anteriorValido = contratoConsulta({
+  id: "anterior",
+  orcamento_id: "orc-antigo",
+  numero: "CT-10",
+  status: "ativo",
+  data_inicio: "2026-01-01",
+  data_fim: "2026-12-31",
+});
+const dedupe = deduplicarContratos([revertido, novo]);
+assert.equal(dedupe.length, 1);
+assert.equal(dedupe[0]?.id, "novo");
+assert.equal(dedupe[0]?.numero, "CT-80");
+
+const atual = selecionarContratoAtual(
+  [anteriorValido, revertido],
+  "2026-10-27"
+);
+assert.equal(atual?.id, "anterior");
+assert.equal(atual?.status, "ativo");
+assert.equal(
+  selecionarContratoAtual([revertido], "2026-10-27"),
+  null
+);
+
+const expirado = contratoConsulta({
+  id: "expirado",
+  orcamento_id: "orc-exp",
+  numero: "CT-01",
+  status: "ativo",
+  data_inicio: "2024-01-01",
+  data_fim: "2024-12-31",
+});
+const aposReversao = selecionarContratoAtual([expirado, revertido], "2026-10-27");
+assert.equal(aposReversao?.id, "expirado");
+assert.equal(aposReversao?.status, "ativo");
+assert.equal(aposReversao?.data_fim, "2024-12-31");
 
 console.log("test-orcamento-reverter-aprovacao: OK");

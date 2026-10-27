@@ -8,6 +8,7 @@ import {
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
+import type { ClienteContratoRecord } from "@/lib/types";
 import { RenovacaoContratoBadge } from "./RenovacaoContratoBadge";
 
 interface ClienteContratosHistoricoTableProps {
@@ -76,6 +77,11 @@ export function ClienteContratosHistoricoTable({
                     {contrato.id === contratoAtualId ? (
                       <span className="rounded-full bg-[#e8edff] px-2 py-0.5 text-[10px] font-extrabold text-brand-blue">
                         Atual
+                      </span>
+                    ) : null}
+                    {contrato.aprovacao_revertida_em ? (
+                      <span className="rounded-full bg-[#f3efe6] px-2 py-0.5 text-[10px] font-extrabold text-[#8a6232]">
+                        Aprovação revertida
                       </span>
                     ) : null}
                   </span>

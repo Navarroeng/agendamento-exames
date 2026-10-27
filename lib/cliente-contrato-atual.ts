@@ -62,12 +62,15 @@ function isoData(value: string | null | undefined): string {
 }
 
 export function contratoEncerrado(
-  contrato: Pick<ClienteContratoRecord, "status" | "encerrado_em">
+  contrato: Pick<ClienteContratoRecord, "status" | "encerrado_em"> & {
+    aprovacao_revertida_em?: string | null;
+  }
 ): boolean {
   return (
     contrato.status === "encerrado" ||
     contrato.status === "cancelado" ||
-    Boolean(contrato.encerrado_em)
+    Boolean(contrato.encerrado_em) ||
+    Boolean(contrato.aprovacao_revertida_em)
   );
 }
 
@@ -170,6 +173,18 @@ function preferirMesmaContratacao<T extends ClienteContratoConsulta>(
   return recencia(candidato) >= recencia(atual) ? candidato : atual;
 }
 
+/** Contrato revertido ou encerrado não substitui a contratação ainda aberta do mesmo orçamento. */
+function preferirContratoOperacional<T extends ClienteContratoConsulta>(
+  atual: T,
+  candidato: T
+): T {
+  const atualAberto = !contratoEncerrado(atual);
+  const candidatoAberto = !contratoEncerrado(candidato);
+  if (candidatoAberto && !atualAberto) return candidato;
+  if (atualAberto && !candidatoAberto) return atual;
+  return preferirMesmaContratacao(atual, candidato);
+}
+
 /** Uma linha por contratação. Não descarta o vínculo antigo de outro orçamento. */
 export function deduplicarContratos<T extends ClienteContratoConsulta>(
   contratos: T[]
@@ -187,7 +202,7 @@ export function deduplicarContratos<T extends ClienteContratoConsulta>(
     const anterior = porOrcamento.get(orcamentoId);
     porOrcamento.set(
       orcamentoId,
-      anterior ? preferirMesmaContratacao(anterior, contrato) : contrato
+      anterior ? preferirContratoOperacional(anterior, contrato) : contrato
     );
   }
   return semOrcamento.concat(Array.from(porOrcamento.values()));

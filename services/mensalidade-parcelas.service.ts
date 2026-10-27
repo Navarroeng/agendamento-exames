@@ -52,14 +52,25 @@ export async function listarParcelasMensalidade(
   aprovacaoId: string
 ): Promise<ParcelaMensalidadeRegistrada[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("orcamento_mensalidade_parcelas")
     .select(
       "id, aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
     )
     .eq("aprovacao_id", aprovacaoId)
+    .is("sem_vigencia_em", null)
     .order("vigencia_inicio", { ascending: true })
     .order("numero", { ascending: true });
+  if (error && /sem_vigencia_em|schema cache|42703/i.test(error.message ?? "")) {
+    ({ data, error } = await supabase
+      .from("orcamento_mensalidade_parcelas")
+      .select(
+        "id, aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+      )
+      .eq("aprovacao_id", aprovacaoId)
+      .order("vigencia_inicio", { ascending: true })
+      .order("numero", { ascending: true }));
+  }
   if (error) throw erroParcelas(error);
   return ((data ?? []) as ParcelaRow[]).map(mapRow);
 }
@@ -105,13 +116,26 @@ export async function salvarControleMensalidades(params: {
     throw new Error("Informe o início da vigência antes de salvar as parcelas.");
   }
 
-  const { data: existentesRaw, error: listError } = await supabase
+  let { data: existentesRaw, error: listError } = await supabase
     .from("orcamento_mensalidade_parcelas")
     .select(
       "id, aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
     )
     .eq("aprovacao_id", params.aprovacaoId)
-    .eq("vigencia_inicio", inicio);
+    .eq("vigencia_inicio", inicio)
+    .is("sem_vigencia_em", null);
+  if (
+    listError &&
+    /sem_vigencia_em|schema cache|42703/i.test(listError.message ?? "")
+  ) {
+    ({ data: existentesRaw, error: listError } = await supabase
+      .from("orcamento_mensalidade_parcelas")
+      .select(
+        "id, aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+      )
+      .eq("aprovacao_id", params.aprovacaoId)
+      .eq("vigencia_inicio", inicio));
+  }
   if (listError) throw erroParcelas(listError);
 
   const existentes = ((existentesRaw ?? []) as ParcelaRow[]).map(mapRow);
@@ -146,8 +170,22 @@ export async function salvarControleMensalidades(params: {
       })
       .eq("aprovacao_id", params.aprovacaoId)
       .eq("vigencia_inicio", inicio)
-      .eq("numero", item.numero);
-    if (error) throw erroParcelas(error);
+      .eq("numero", item.numero)
+      .is("sem_vigencia_em", null);
+    if (error && /sem_vigencia_em|schema cache|42703/i.test(error.message ?? "")) {
+      const retry = await supabase
+        .from("orcamento_mensalidade_parcelas")
+        .update({
+          pago_em: item.pagoEmIso,
+          updated_at: agora,
+        })
+        .eq("aprovacao_id", params.aprovacaoId)
+        .eq("vigencia_inicio", inicio)
+        .eq("numero", item.numero);
+      if (retry.error) throw erroParcelas(retry.error);
+    } else if (error) {
+      throw erroParcelas(error);
+    }
   }
 
   return salvarObservacao({

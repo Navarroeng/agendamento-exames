@@ -28,11 +28,19 @@ export async function listarContratoVencimentos(
   aprovacaoId: string
 ): Promise<OrcamentoContratoVencimentoRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("orcamento_contrato_vencimentos")
     .select("*")
     .eq("aprovacao_id", aprovacaoId)
+    .is("sem_vigencia_em", null)
     .order("indice", { ascending: true });
+  if (error && /sem_vigencia_em|schema cache|42703/i.test(error.message ?? "")) {
+    ({ data, error } = await supabase
+      .from("orcamento_contrato_vencimentos")
+      .select("*")
+      .eq("aprovacao_id", aprovacaoId)
+      .order("indice", { ascending: true }));
+  }
   throwOnError(error, "Não foi possível carregar as datas de vencimento.");
   return (data ?? []).map((row) =>
     mapRow(row as OrcamentoContratoVencimentoRecord)
@@ -55,10 +63,17 @@ export async function salvarContratoVencimentos(params: {
     }));
 
   const supabase = createClient();
-  const { error: delError } = await supabase
+  let { error: delError } = await supabase
     .from("orcamento_contrato_vencimentos")
     .delete()
-    .eq("aprovacao_id", params.aprovacaoId);
+    .eq("aprovacao_id", params.aprovacaoId)
+    .is("sem_vigencia_em", null);
+  if (delError && /sem_vigencia_em|schema cache|42703/i.test(delError.message ?? "")) {
+    ({ error: delError } = await supabase
+      .from("orcamento_contrato_vencimentos")
+      .delete()
+      .eq("aprovacao_id", params.aprovacaoId));
+  }
   throwOnError(delError, "Não foi possível atualizar as datas de vencimento.");
 
   if (rows.length === 0) return [];

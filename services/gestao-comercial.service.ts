@@ -55,6 +55,7 @@ type ContratoQueryRow = {
   condicao_pagamento: string | null;
   contrato_assinado_em: string | null;
   boleto_pago: boolean | null;
+  aprovacao_revertida_em?: string | null;
 };
 
 type AprovacaoQueryRow = {
@@ -75,6 +76,7 @@ type AprovacaoQueryRow = {
   mensalidade_desconto_valor: number | null;
   responsavel_no_fechamento: string | null;
   responsavel_no_fechamento_aproximado: boolean | null;
+  revertida_em?: string | null;
   orcamentos: {
     id: string;
     numero: string;
@@ -93,16 +95,20 @@ type AprovacaoQueryRow = {
  * Carrega todos os fechamentos (aprovações) para a camada única de cálculo.
  * Backend valida ADM.
  */
+function colunaReversaoAindaNaoExiste(error: { message?: string } | null): boolean {
+  const message = error?.message ?? "";
+  return /revertida_em|aprovacao_revertida_em|sem_vigencia_em|schema cache|42703/i.test(
+    message
+  );
+}
+
 export async function listarFechamentosGestaoComercial(): Promise<
   GestaoComercialFechamentoRow[]
 > {
   await assertAdminGestaoComercial();
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("orcamento_aprovacoes")
-    .select(
-      `
+  const selectFechamentos = `
       id,
       orcamento_id,
       aprovado_em,
@@ -120,6 +126,7 @@ export async function listarFechamentosGestaoComercial(): Promise<
       mensalidade_desconto_valor,
       responsavel_no_fechamento,
       responsavel_no_fechamento_aproximado,
+      revertida_em,
       orcamentos!inner (
         id,
         numero,
@@ -140,17 +147,32 @@ export async function listarFechamentosGestaoComercial(): Promise<
           tipo_contrato,
           condicao_pagamento,
           contrato_assinado_em,
-          boleto_pago
+          boleto_pago,
+          aprovacao_revertida_em
         )
       )
-      `
-    )
+      `;
+  const selectFechamentosLegado = selectFechamentos
+    .replace(/\n\s*revertida_em,/, "")
+    .replace(/\n\s*aprovacao_revertida_em/, "");
+
+  let { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(selectFechamentos)
     .order("aprovado_em", { ascending: false });
+
+  if (error && colunaReversaoAindaNaoExiste(error)) {
+    ({ data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(selectFechamentosLegado)
+      .order("aprovado_em", { ascending: false }));
+  }
 
   if (error) throw error;
 
   const rows: GestaoComercialFechamentoRow[] = [];
   for (const raw of (data ?? []) as unknown as AprovacaoQueryRow[]) {
+    if (raw.revertida_em) continue;
     const orc = raw.orcamentos;
     if (!orc) continue;
 
@@ -159,7 +181,15 @@ export async function listarFechamentosGestaoComercial(): Promise<
       : orc.cliente_contratos
         ? [orc.cliente_contratos]
         : [];
-    const contrato = contratos[0] ?? null;
+    const contrato =
+      contratos.find(
+        (item) =>
+          !item.aprovacao_revertida_em &&
+          item.status !== "cancelado" &&
+          item.status !== "encerrado"
+      ) ??
+      contratos.find((item) => !item.aprovacao_revertida_em) ??
+      null;
 
     const origem = isOrcamentoOrigemCliente(orc.origem_cliente)
       ? orc.origem_cliente
@@ -248,6 +278,7 @@ type AprovacaoMensalidadeQueryRow = {
   mensalidade_valor_mensal: number | string | null;
   mensalidade_dia_vencimento: number | null;
   valor_final: number | string | null;
+  revertida_em?: string | null;
   orcamentos: {
     numero: string;
     cliente_nome: string;
@@ -264,6 +295,7 @@ type ContratoMensalidadeQueryRow = {
   numero: string | null;
   data_inicio: string | null;
   data_fim: string | null;
+  aprovacao_revertida_em?: string | null;
 };
 
 export type CargaFontesMensalidadesPrevistas = {
@@ -281,17 +313,13 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
   await assertAdminGestaoComercial();
   const supabase = createClient();
 
-  const aprovacoes: AprovacaoMensalidadeQueryRow[] = [];
-  for (let from = 0; ; from += SELECT_PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from("orcamento_aprovacoes")
-      .select(
-        `
+  const selectMensalidades = `
         id,
         mensalidade_pagamento,
         mensalidade_valor_mensal,
         mensalidade_dia_vencimento,
         valor_final,
+        revertida_em,
         orcamentos!inner (
           numero,
           cliente_nome,
@@ -300,13 +328,30 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
             id,
             numero,
             data_inicio,
-            data_fim
+            data_fim,
+            aprovacao_revertida_em
           )
         )
-        `
-      )
+        `;
+  const selectMensalidadesLegado = selectMensalidades
+    .replace(/\n\s*revertida_em,/, "")
+    .replace(/\n\s*aprovacao_revertida_em/, "");
+  const aprovacoes: AprovacaoMensalidadeQueryRow[] = [];
+  let selectMensalidadesUsado = selectMensalidades;
+  for (let from = 0; ; from += SELECT_PAGE_SIZE) {
+    let { data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(selectMensalidadesUsado)
       .order("id", { ascending: true })
       .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (error && colunaReversaoAindaNaoExiste(error)) {
+      selectMensalidadesUsado = selectMensalidadesLegado;
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectMensalidadesUsado)
+        .order("id", { ascending: true })
+        .range(from, from + SELECT_PAGE_SIZE - 1));
+    }
     if (error) throw error;
     const batch = (data ?? []) as unknown as AprovacaoMensalidadeQueryRow[];
     aprovacoes.push(...batch);
@@ -315,13 +360,22 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
 
   const parcelasPorAprovacao = new Map<string, ParcelaMensalidadeRegistrada[]>();
   for (let from = 0; ; from += SELECT_PAGE_SIZE) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("orcamento_mensalidade_parcelas")
       .select(
-        "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+        "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em, sem_vigencia_em"
       )
       .order("id", { ascending: true })
       .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (error && colunaReversaoAindaNaoExiste(error)) {
+      ({ data, error } = await supabase
+        .from("orcamento_mensalidade_parcelas")
+        .select(
+          "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+        )
+        .order("id", { ascending: true })
+        .range(from, from + SELECT_PAGE_SIZE - 1));
+    }
     if (error) {
       if (parcelasAusentes(error)) {
         throw new Error(MENSALIDADE_PARCELAS_MIGRATION_MSG);
@@ -332,6 +386,7 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
     for (const row of batch) {
       const aprovacaoId = String(row.aprovacao_id ?? "");
       if (!aprovacaoId) continue;
+      if (row.sem_vigencia_em) continue;
       const lista = parcelasPorAprovacao.get(aprovacaoId) ?? [];
       lista.push({
         vigenciaInicio: isoData(String(row.vigencia_inicio ?? "")) ?? "",
@@ -350,6 +405,7 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
 
   const fontes: FonteMensalidadePrevista[] = [];
   for (const raw of aprovacoes) {
+    if (raw.revertida_em) continue;
     const orc = raw.orcamentos;
     if (!orc) continue;
     const contratos = Array.isArray(orc.cliente_contratos)
@@ -359,6 +415,7 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
         : [];
     const vigencias: VigenciaMensalidadePrevista[] = [];
     for (const contrato of contratos) {
+      if (contrato.aprovacao_revertida_em) continue;
       const inicio = isoData(contrato.data_inicio);
       if (!inicio) continue;
       vigencias.push({

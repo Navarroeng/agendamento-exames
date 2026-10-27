@@ -26,6 +26,15 @@ export const REVERSAO_NAO_ENCONTRADO_MSG = "Orçamento não encontrado.";
 export const REVERSAO_CONTRATO_GERADO_MSG =
   "Não é possível reverter a aprovação porque já existe um contrato gerado para este orçamento.";
 
+export const REVERSAO_CONTRATO_ASSINADO_MSG =
+  "Não é possível reverter a aprovação porque o contrato deste orçamento já foi assinado.";
+
+export const REVERSAO_RECEBIMENTO_MENSALIDADE_MSG =
+  "Não é possível reverter a aprovação porque já existe recebimento registrado nas mensalidades deste orçamento.";
+
+export const REVERSAO_CONFIRMACAO_MSG =
+  "A aprovação será revertida e o orçamento voltará para Enviado. O contrato gerado será mantido no histórico, sem validade para continuidade deste processo. O orçamento poderá ser aprovado novamente.";
+
 export const REVERSAO_VENCIMENTOS_MSG =
   "Não é possível reverter a aprovação porque já existem vencimentos de contrato registrados para este orçamento.";
 
@@ -78,7 +87,7 @@ export function podeReverterAprovacaoOrcamento(
 }
 
 export function textoConfirmacaoReverterAprovacao(): string {
-  return `O orçamento voltará para o status ‘${ORCAMENTO_STATUS_APOS_REVERTER_APROVACAO_LABEL}’ e poderá ser editado e aprovado novamente.`;
+  return REVERSAO_CONFIRMACAO_MSG;
 }
 
 export function motivoReversaoInvalido(
@@ -142,8 +151,12 @@ export interface ReversaoAprovacaoContexto {
   isAdmin: boolean;
   encontrado: boolean;
   status: OrcamentoStatus | null;
+  /** PDF gerado não impede a reversão. A RPC conserva o arquivo no histórico. */
   documentosContrato?: number;
+  /** Parcelas só previstas não impedem a reversão. */
   vencimentosContrato?: number;
+  /** Mensalidades com data de recebimento. */
+  parcelasRecebidas?: number;
   contratos?: ReversaoContratoVinculo[];
   aprovacao?: ReversaoAprovacaoEtapas | null;
   /** ausente | vazia (criada na aprovação, sem preenchimento) | iniciada */
@@ -175,21 +188,35 @@ function count(value: number | null | undefined): number {
   return Math.max(0, Number(value) || 0);
 }
 
+const STATUS_CONTRATO_ASSINADO = [
+  "assinado",
+  "aguardando_pagamento",
+  "ativo",
+  "em_renovacao",
+  "pago",
+];
+
+/** Assinatura em qualquer evidência já gravada, não só no checkbox. */
+export function contratoTemAssinatura(
+  contrato: ReversaoContratoVinculo
+): boolean {
+  if (preenchido(contrato.assinadoEm)) return true;
+  return STATUS_CONTRATO_ASSINADO.includes(contrato.status);
+}
+
 /**
- * Contrato criado pela aprovação e ainda sem envio, assinatura, cobrança ou uso.
- * PDF gerado é outra verificação (orcamento_contrato_documentos).
+ * Contrato da aprovação ainda sem assinatura, encerramento ou dispensa.
+ * Envio e PDF não iniciam uso operacional. Liberação sem agendamento é desfeita na reversão.
  */
 export function contratoAutomaticoAindaNaoIniciado(
   contrato: ReversaoContratoVinculo
 ): boolean {
   return (
-    contrato.status === "aguardando_envio" &&
-    !preenchido(contrato.enviadoEm) &&
-    !preenchido(contrato.assinadoEm) &&
+    (contrato.status === "aguardando_envio" || contrato.status === "enviado") &&
+    !contratoTemAssinatura(contrato) &&
     !preenchido(contrato.boletoVencimento) &&
     contrato.boletoPago !== true &&
     !preenchido(contrato.boletoPagoEm) &&
-    contrato.liberadoParaAgendamento !== true &&
     !preenchido(contrato.encerradoEm) &&
     contrato.agendamentosIniciaisDispensados !== true &&
     count(contrato.agendamentos) === 0 &&
@@ -230,6 +257,9 @@ function mensagemContratos(
     }
   }
   for (const contrato of contratos) {
+    if (contratoTemAssinatura(contrato)) return REVERSAO_CONTRATO_ASSINADO_MSG;
+  }
+  for (const contrato of contratos) {
     if (!contratoAutomaticoAindaNaoIniciado(contrato)) {
       return REVERSAO_CONTRATO_VINCULADO_MSG;
     }
@@ -249,16 +279,10 @@ function aprovacaoTemFinanceiro(aprovacao: ReversaoAprovacaoEtapas): boolean {
   );
 }
 
-function aprovacaoTemContratoAcompanhado(
-  aprovacao: ReversaoAprovacaoEtapas
-): boolean {
+function aprovacaoTemAssinatura(aprovacao: ReversaoAprovacaoEtapas): boolean {
   return (
-    aprovacao.contratoEnviado === true ||
-    preenchido(aprovacao.contratoEnviadoEm) ||
     aprovacao.contratoAssinado === true ||
-    preenchido(aprovacao.contratoAssinadoEm) ||
-    preenchido(aprovacao.contratoSalvoEm) ||
-    preenchido(aprovacao.observacaoContrato)
+    preenchido(aprovacao.contratoAssinadoEm)
   );
 }
 
@@ -302,9 +326,9 @@ function planoBloqueado(mensagem: string): PlanoReversaoAprovacao {
 }
 
 /**
- * Decide se a reversão simples é segura.
- * Contrato gerado (PDF) bloqueia mesmo sem assinatura.
- * Contrato SST automático ainda em aguardando_envio, sem uso, pode ser desfeito.
+ * Decide se a reversão é segura.
+ * PDF gerado ou enviado não impede, desde que não haja assinatura nem movimentação efetiva.
+ * O contrato e o PDF permanecem no histórico, sem validade operacional.
  */
 export function avaliarReversaoAprovacao(
   ctx: ReversaoAprovacaoContexto
@@ -313,11 +337,8 @@ export function avaliarReversaoAprovacao(
   if (!ctx.encontrado) return planoBloqueado(REVERSAO_NAO_ENCONTRADO_MSG);
   if (ctx.status !== "aprovado") return planoBloqueado(REVERSAO_STATUS_MSG);
 
-  if (count(ctx.documentosContrato) > 0) {
-    return planoBloqueado(REVERSAO_CONTRATO_GERADO_MSG);
-  }
-  if (count(ctx.vencimentosContrato) > 0) {
-    return planoBloqueado(REVERSAO_VENCIMENTOS_MSG);
+  if (count(ctx.parcelasRecebidas) > 0) {
+    return planoBloqueado(REVERSAO_RECEBIMENTO_MENSALIDADE_MSG);
   }
 
   const contratos = ctx.contratos ?? [];
@@ -332,8 +353,8 @@ export function avaliarReversaoAprovacao(
     if (aprovacaoTemFinanceiro(aprovacao)) {
       return planoBloqueado(REVERSAO_FINANCEIRO_MSG);
     }
-    if (aprovacaoTemContratoAcompanhado(aprovacao)) {
-      return planoBloqueado(REVERSAO_CONTRATO_ACOMPANHADO_MSG);
+    if (aprovacaoTemAssinatura(aprovacao)) {
+      return planoBloqueado(REVERSAO_CONTRATO_ASSINADO_MSG);
     }
     if (aprovacaoTemVisita(aprovacao)) {
       return planoBloqueado(REVERSAO_VISITA_MSG);
@@ -378,7 +399,13 @@ export function mensagemErroReverterAprovacao(error: unknown): string {
   }
 
   const match = raw.match(/REVERSAO_[A-Z0-9_]+:\s*([\s\S]+)/);
-  if (match?.[1]?.trim()) return match[1].trim();
+  if (match?.[1]?.trim()) {
+    const detalhe = match[1].trim();
+    if (detalhe === REVERSAO_CONTRATO_GERADO_MSG) {
+      return `${detalhe} Execute a migration 146_reverter_aprovacao_contrato_nao_assinado.sql para permitir a reversão de contrato ainda não assinado.`;
+    }
+    return detalhe;
+  }
 
   const conhecidas = [
     REVERSAO_SEM_PERMISSAO_MSG,
@@ -386,6 +413,8 @@ export function mensagemErroReverterAprovacao(error: unknown): string {
     REVERSAO_STATUS_MSG,
     REVERSAO_NAO_ENCONTRADO_MSG,
     REVERSAO_CONTRATO_GERADO_MSG,
+    REVERSAO_CONTRATO_ASSINADO_MSG,
+    REVERSAO_RECEBIMENTO_MENSALIDADE_MSG,
     REVERSAO_VENCIMENTOS_MSG,
     REVERSAO_CONTRATO_VINCULADO_MSG,
     REVERSAO_CONTRATO_ACOMPANHADO_MSG,

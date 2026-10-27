@@ -26,6 +26,8 @@ export interface OrcamentoContratoDocumentoRecord {
   condicoes_revisao?: number | null;
   /** Sinal legado. A comparação vigente é condicoes_revisao. */
   desatualizado_em?: string | null;
+  /** PDF conservado após reversão da aprovação. Não é o contrato vigente do processo. */
+  sem_validade_em?: string | null;
 }
 
 export interface OrcamentoContratoDocumentoInsert {

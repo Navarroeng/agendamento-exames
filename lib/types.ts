@@ -431,6 +431,8 @@ export interface ClienteContratoRecord extends Omit<ClienteContratoInsert, "clie
   liberado_para_agendamento?: boolean;
   encerrado_em?: string | null;
   encerrado_por?: string | null;
+  /** Preenchido quando a aprovação deste contrato foi revertida. O número permanece. */
+  aprovacao_revertida_em?: string | null;
   motivo_encerramento?: string | null;
   agendamentos_iniciais_dispensados?: boolean;
   motivo_dispensa_agendamentos?: string | null;

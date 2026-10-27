@@ -165,6 +165,10 @@ export interface OrcamentoAprovacaoRecord {
    * Null ou ausente não é evidência de renovação automática.
    */
   mensalidade_renovacao_automatica?: boolean | null;
+  /** Preenchido enquanto esta aprovação está revertida e fora dos indicadores. */
+  revertida_em?: string | null;
+  revertida_por?: string | null;
+  motivo_reversao?: string | null;
   /** Versão das condições comerciais vigentes. Sobe só quando elas mudam. */
   condicoes_revisao?: number | null;
   created_at: string;

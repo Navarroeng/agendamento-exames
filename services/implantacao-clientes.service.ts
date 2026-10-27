@@ -80,10 +80,12 @@ export async function listarProcessosImplantacao(): Promise<
   const pacoteCompletoServicoId =
     resolvePacoteCompletoSstServicoId(catalogoServicos);
 
-  const aprovacoes = (aprovacoesRes.data ?? []).map((row) =>
-    sortAprovacao(row as OrcamentoAprovacaoRecord)
+  const aprovacoes = (aprovacoesRes.data ?? [])
+    .map((row) => sortAprovacao(row as OrcamentoAprovacaoRecord))
+    .filter((row) => !row.revertida_em);
+  const contratos = ((contratosRes.data ?? []) as ClienteContratoRecord[]).filter(
+    (row) => !row.aprovacao_revertida_em
   );
-  const contratos = (contratosRes.data ?? []) as ClienteContratoRecord[];
   const orcamentosAprovados = (orcamentosAprovadosRes.data ??
     []) as OrcamentoRecord[];
 
