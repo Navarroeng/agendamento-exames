@@ -137,6 +137,7 @@ export function OrcamentoContratoGerarPanel({
   });
   const isAet = tipoDocumento === "aet";
   const isParecer = tipoDocumento === "parecer_tecnico";
+  const isPericulosidade = tipoDocumento === "periculosidade";
   const isMensalidadeDoc = tipoDocumento === "mensalidade";
   const ofereceAvista =
     isParecer &&
@@ -803,6 +804,8 @@ export function OrcamentoContratoGerarPanel({
               ? motivoBloqueio
               : isParecer
                 ? "Contrato específico do Laudo de Parecer Técnico. Gera o PDF da contratação. Não marca como enviado nem assinado e não altera o contrato SST."
+                : isPericulosidade
+                  ? "Contrato específico do Laudo Técnico de Periculosidade (NR-16). Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
                 : isAet
                   ? "Contrato específico do Laudo AET – Análise Ergonômica do Trabalho. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
                   : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
@@ -1178,10 +1181,14 @@ export function OrcamentoContratoGerarPanel({
                       <Row label="CNPJ" value={resumo.cnpj} />
                       <Row label="Orçamento" value={resumo.orcamento} />
                       <Row
-                        label={isAet || isParecer ? "Serviço" : "Modalidade"}
+                        label={
+                          isAet || isParecer || isPericulosidade
+                            ? "Serviço"
+                            : "Modalidade"
+                        }
                         value={resumo.modalidade}
                       />
-                      {isAet || isParecer ? null : (
+                      {isAet || isParecer || isPericulosidade ? null : (
                         <Row
                           label="Colaboradores"
                           value={resumo.colaboradores}

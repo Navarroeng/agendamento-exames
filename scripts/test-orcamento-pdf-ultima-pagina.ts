@@ -244,9 +244,10 @@ async function validar(
   );
   assert.ok(bruto.includes(orcamento.numero));
   assert.ok(bruto.includes(orcamento.observacoes ?? ""));
+  const brutoLegivel = bruto.replace(/\\([()\\])/g, "$1");
   for (const item of orcamento.orcamento_itens) {
     assert.ok(
-      bruto.includes(item.servico_nome),
+      brutoLegivel.includes(item.servico_nome),
       `${nome}: serviço ${item.servico_nome} permanece no PDF`
     );
   }
@@ -305,6 +306,22 @@ async function main() {
         { nome: "Gestao documental SST", quantidade: 1, valor: 1500 },
         { nome: "Audiometria ocupacional", quantidade: 4, valor: 450 },
         { nome: "Treinamento NR-35", quantidade: 2, valor: 80 },
+      ],
+    }),
+    { minPaginas: 1 }
+  );
+
+  await validar(
+    "periculosidade",
+    buildOrcamento({
+      numero: "ORC-2026-9016",
+      observacoes: "OBS-VALIDACAO-9016",
+      itens: [
+        {
+          nome: "Laudo de Periculosidade (NR16)",
+          quantidade: 2,
+          valor: 3600,
+        },
       ],
     }),
     { minPaginas: 1 }

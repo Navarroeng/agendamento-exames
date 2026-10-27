@@ -12,6 +12,10 @@ import {
   isServicoParecerTecnicoNome,
   PARECER_TECNICO_INCLUSOS_ITENS,
 } from "@/lib/servico-parecer-tecnico";
+import {
+  isServicoPericulosidadeNome,
+  PERICULOSIDADE_INCLUSOS_ITENS,
+} from "@/lib/servico-periculosidade";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const PACOTE_COMPLETO_SST_NOME = "Pacote completo - SST";
@@ -119,6 +123,9 @@ export function resolveItensInclusosServico(
   }
   if (isServicoParecerTecnicoNome(nome)) {
     return [...PARECER_TECNICO_INCLUSOS_ITENS];
+  }
+  if (isServicoPericulosidadeNome(nome)) {
+    return [...PERICULOSIDADE_INCLUSOS_ITENS];
   }
 
   const parsed = parseItensInclusos(servico?.itens_inclusos);

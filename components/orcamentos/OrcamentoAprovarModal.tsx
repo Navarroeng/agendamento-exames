@@ -123,6 +123,7 @@ import {
 } from "@/lib/servico-parecer-tecnico";
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
+import { resolvePericulosidadeServicoId } from "@/lib/servico-periculosidade";
 import {
   fluxoToLaudoPontualKind,
   isFluxoLaudoPontual,
@@ -313,7 +314,8 @@ export function OrcamentoAprovarModal({
       resolveAetServicoId(servicos),
       resolveInsalubridadeServicoId(servicos),
       resolveLtcatServicoId(servicos),
-      resolveParecerTecnicoServicoId(servicos)
+      resolveParecerTecnicoServicoId(servicos),
+      resolvePericulosidadeServicoId(servicos)
     );
     const orcamentoAprovadoInit = aprovacaoCicloVigente(
       aprovacao,
@@ -465,7 +467,8 @@ export function OrcamentoAprovarModal({
       resolveAetServicoId(servicos),
       resolveInsalubridadeServicoId(servicos),
       resolveLtcatServicoId(servicos),
-      resolveParecerTecnicoServicoId(servicos)
+      resolveParecerTecnicoServicoId(servicos),
+      resolvePericulosidadeServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
   const ocultaColaboradoresComerciais =

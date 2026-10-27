@@ -32,6 +32,10 @@ import {
 } from "@/lib/orcamento-types";
 import { labelNomeServicoLtcat } from "@/lib/servico-ltcat";
 import {
+  isServicoPericulosidadeNome,
+  orcamentoEhExclusivoPericulosidade,
+} from "@/lib/servico-periculosidade";
+import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   parecerMostraAlternativaAvista,
@@ -104,7 +108,12 @@ export function OrcamentoViewBody({
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(itens);
-  const ocultaColunaQuantidade = !exibeColunaQuantidadeColaboradores(itens);
+  const exibeQuantidadeServico = orcamentoEhExclusivoPericulosidade(itens);
+  const ocultaColunaQuantidade =
+    !exibeColunaQuantidadeColaboradores(itens) && !exibeQuantidadeServico;
+  const labelQuantidade = exibeQuantidadeServico
+    ? "Quantidade"
+    : "Quantidade de colaboradores";
   const valorServico = Number(orcamento.valor_total) || 0;
   const textoParcelasParecer = isParecerTecnico
     ? formatCondicaoParcelasCentavos(
@@ -166,7 +175,7 @@ export function OrcamentoViewBody({
                 <th className="px-4 py-3 font-semibold sm:px-5">Serviço</th>
                 {ocultaColunaQuantidade ? null : (
                 <th className="px-3 py-3 text-center font-semibold">
-                  Quantidade de colaboradores
+                  {labelQuantidade}
                 </th>
                 )}
                 <th className="px-4 py-3 text-right font-semibold sm:px-5">
@@ -213,7 +222,8 @@ export function OrcamentoViewBody({
                     </td>
                     {ocultaColunaQuantidade ? null : (
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
-                      {servicoOcultaQuantidadeColaboradores(item.servico_nome)
+                      {servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
+                      !isServicoPericulosidadeNome(item.servico_nome)
                         ? ""
                         : item.quantidade}
                     </td>

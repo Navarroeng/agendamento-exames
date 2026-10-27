@@ -4,6 +4,7 @@ import { isServicoInsalubridadeNome } from "@/lib/servico-insalubridade";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { isServicoLtcatNome } from "@/lib/servico-ltcat";
 import { isServicoParecerTecnicoNome } from "@/lib/servico-parecer-tecnico";
+import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
 
 export const ORCAMENTO_MODALIDADE_PONTUAL = "pontual";
@@ -159,7 +160,8 @@ export function isServicoOferecidoNoOrcamento(
     isServicoAetNome(nome) ||
     isServicoInsalubridadeNome(nome) ||
     isServicoLtcatNome(nome) ||
-    isServicoParecerTecnicoNome(nome)
+    isServicoParecerTecnicoNome(nome) ||
+    isServicoPericulosidadeNome(nome)
   ) {
     return true;
   }

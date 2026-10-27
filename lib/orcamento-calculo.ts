@@ -17,6 +17,7 @@ import {
   isServicoParecerTecnicoNome,
   resolveValorTotalParecerTecnico,
 } from "@/lib/servico-parecer-tecnico";
+import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
 
 /** AET, Insalubridade, Parecer Técnico e LTCAT não pedem quantidade de colaboradores. */
 export function servicoOcultaQuantidadeColaboradores(
@@ -254,7 +255,11 @@ export function validateOrcamentoItensValores(
   for (const item of itens) {
     if (!item.servico_nome.trim()) continue;
     const qtd = Math.round(Number(item.quantidade));
-    if (
+    if (isServicoPericulosidadeNome(item.servico_nome)) {
+      if (!Number.isFinite(qtd) || qtd < 1) {
+        return "Informe a quantidade do serviço (mínimo 1).";
+      }
+    } else if (
       !servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
       (!Number.isFinite(qtd) || qtd < 1)
     ) {

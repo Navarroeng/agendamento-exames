@@ -49,6 +49,11 @@ import {
 } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import { SERVICO_INSALUBRIDADE_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-insalubridade";
+import {
+  buildClausulasContratoPericulosidade,
+  CONTRATO_PERICULOSIDADE_TITULO_LINHAS,
+  qualificacaoContratoPericulosidade,
+} from "@/lib/contrato-periculosidade";
 import { SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-ltcat";
 import {
   resolveTipoDocumentoContrato,
@@ -244,7 +249,8 @@ export function buildContratoNavarroDocumento(params: {
   const colaboradores =
     tipoDocumento === "aet" ||
     tipoDocumento === "insalubridade" ||
-    tipoDocumento === "parecer_tecnico"
+    tipoDocumento === "parecer_tecnico" ||
+    tipoDocumento === "periculosidade"
       ? 0
       : resolveColaboradores(orcamento, aprovacao);
   const mesesMensalidade = resolverMesesVigenciaMensalidade({
@@ -368,6 +374,42 @@ export function buildContratoNavarroDocumento(params: {
       clausulas,
       texto: `${textoQualificacao}\n\n${textoPlanoContrato(clausulas, "aet")}`,
       tituloLinhas: [...CONTRATO_PARECER_TITULO_LINHAS],
+      qualificacao,
+    };
+  }
+
+  if (tipoDocumento === "periculosidade") {
+    const quantidadeParcelas = Math.max(1, parcelas.length);
+    const clausulas = buildClausulasContratoPericulosidade({
+      numeroOrcamento: orcamento.numero.trim(),
+      contratante,
+      valor,
+      quantidadeParcelas,
+      valorParcela: resolveValorParcela(aprovacao, parcelas, valor),
+      parcelas,
+    });
+    const qualificacao = qualificacaoContratoPericulosidade(contratante);
+    const textoQualificacao = [
+      qualificacao.titulo,
+      ...qualificacao.paragrafos,
+    ].join("\n");
+    return {
+      modalidade,
+      tipoDocumento,
+      numeroOrcamento: orcamento.numero.trim(),
+      dataContrato,
+      contratante,
+      colaboradores: 0,
+      valor,
+      condicaoPagamento:
+        aprovacao?.condicao_pagamento?.trim() ||
+        orcamento.forma_pagamento?.trim() ||
+        null,
+      parcelas,
+      servicos: resolveServicos(orcamento, aprovacao),
+      clausulas,
+      texto: `${textoQualificacao}\n\n${textoPlanoContrato(clausulas, "aet")}`,
+      tituloLinhas: [...CONTRATO_PERICULOSIDADE_TITULO_LINHAS],
       qualificacao,
     };
   }
@@ -517,12 +559,15 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
         ? "Laudo AET"
         : doc.tipoDocumento === "parecer_tecnico"
           ? "Laudo de Parecer Técnico"
+          : doc.tipoDocumento === "periculosidade"
+            ? "Laudo de Periculosidade (NR16)"
           : doc.modalidade === "mensalidade"
             ? "Mensalidade"
             : "Pontual",
     colaboradores:
       doc.tipoDocumento === "aet" ||
       doc.tipoDocumento === "parecer_tecnico" ||
+      doc.tipoDocumento === "periculosidade" ||
       doc.colaboradores < 1
         ? "—"
         : String(doc.colaboradores),

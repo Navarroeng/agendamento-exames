@@ -1,6 +1,6 @@
 /**
  * Família de laudos pontuais exclusivos
- * (AET, Insalubridade, LTCAT e Laudo de Parecer Técnico).
+ * (AET, Insalubridade, LTCAT, Laudo de Parecer Técnico e Laudo de Periculosidade).
  * Identificação canônica; nunca includes().
  */
 
@@ -33,6 +33,14 @@ import {
   orcamentoEhExclusivoParecerTecnico,
   orcamentoPossuiParecerTecnico,
 } from "@/lib/servico-parecer-tecnico";
+import {
+  bloqueioPericulosidadeExclusivo,
+  isServicoPericulosidade,
+  isServicoPericulosidadeNome,
+  orcamentoEhExclusivoPericulosidade,
+  orcamentoPossuiPericulosidade,
+  SERVICO_PERICULOSIDADE_EXCLUSIVIDADE_MSG,
+} from "@/lib/servico-periculosidade";
 import type {
   OrcamentoFluxoImplantacao,
   ServicoItemRef,
@@ -42,7 +50,8 @@ export type LaudoPontualKind =
   | "aet"
   | "insalubridade"
   | "ltcat"
-  | "parecer_tecnico";
+  | "parecer_tecnico"
+  | "periculosidade";
 
 export const SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA =
   SERVICO_AET_QUANTIDADE_INTERNA;
@@ -54,7 +63,8 @@ export function isFluxoLaudoPontual(
     fluxo === "aet" ||
     fluxo === "insalubridade" ||
     fluxo === "ltcat" ||
-    fluxo === "parecer_tecnico"
+    fluxo === "parecer_tecnico" ||
+    fluxo === "periculosidade"
   );
 }
 
@@ -79,7 +89,8 @@ export function fluxoToLaudoPontualKind(
     fluxo === "aet" ||
     fluxo === "insalubridade" ||
     fluxo === "ltcat" ||
-    fluxo === "parecer_tecnico"
+    fluxo === "parecer_tecnico" ||
+    fluxo === "periculosidade"
   ) {
     return fluxo;
   }
@@ -208,6 +219,49 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
       rotuloColunaVisita: "Visita",
     };
   }
+  if (kind === "periculosidade") {
+    return {
+      titulo: "Laudo de Periculosidade",
+      andamento: "Andamento do Laudo de Periculosidade",
+      abaElaboracao: "Peric. em elaboração",
+      etapaVisita: "Visita técnica",
+      etapaElaboracao: "Elaboração do Laudo",
+      etapaEnvio: "Envio ao cliente",
+      textoVisitaConsulta:
+        "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
+      textoVisitaEdicao:
+        "Agende e registre a visita técnica para avaliação das atividades, instalações e condições de trabalho.",
+      textoElaboracao:
+        "Acompanhe a elaboração do Laudo Técnico de Periculosidade após a visita. Anexe o PDF final antes de concluir.",
+      upload: "Laudo Técnico de Periculosidade final (PDF)",
+      nomeCurto: "Laudo de Periculosidade",
+      anexeAntesDeConcluir:
+        "Anexe o Laudo Técnico de Periculosidade final antes de concluir esta etapa.",
+      concluaAntesEnvio:
+        "Conclua a elaboração do Laudo Técnico de Periculosidade e anexe o PDF final antes de registrar o envio.",
+      textoEnvio:
+        "Registre o envio do Laudo Técnico de Periculosidade ao cliente. O envio automático por e-mail não faz parte desta etapa.",
+      toastCarregarErro:
+        "Não foi possível carregar o acompanhamento do Laudo de Periculosidade.",
+      toastAnexado: "Laudo Técnico de Periculosidade anexado.",
+      auditVisitaRealizada: (usuario) =>
+        `${usuario} registrou a visita do Laudo de Periculosidade como realizada.`,
+      auditVisitaAgendada: (usuario) =>
+        `${usuario} atualizou o agendamento da visita do Laudo de Periculosidade.`,
+      auditLaudoAnexado: (usuario) =>
+        `${usuario} anexou o Laudo Técnico de Periculosidade final.`,
+      auditElaboracaoConcluida: (usuario) =>
+        `${usuario} concluiu a elaboração do Laudo Técnico de Periculosidade.`,
+      auditElaboracaoAtualizada: (usuario) =>
+        `${usuario} atualizou a elaboração do Laudo Técnico de Periculosidade.`,
+      auditEnvioConfirmado: (usuario) =>
+        `${usuario} confirmou o envio do Laudo Técnico de Periculosidade ao cliente.`,
+      rotuloStatus: "Status da visita",
+      rotuloData: "Data da visita",
+      bannerRealizada: "Visita realizada",
+      rotuloColunaVisita: "Visita",
+    };
+  }
   if (kind === "parecer_tecnico") {
     return {
       titulo: "Laudo de Parecer Técnico",
@@ -298,7 +352,8 @@ export function isServicoLaudoPontualNome(
   return (
     isServicoAetNome(nome) ||
     isServicoInsalubridadeNome(nome) ||
-    isServicoParecerTecnicoNome(nome)
+    isServicoParecerTecnicoNome(nome) ||
+    isServicoPericulosidadeNome(nome)
   );
 }
 
@@ -309,13 +364,15 @@ export function isServicoLaudoPontual(
     insalubridadeServicoId?: string | null;
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
+    periculosidadeServicoId?: string | null;
   }
 ): boolean {
   return (
     isServicoAet(item, ids?.aetServicoId) ||
     isServicoInsalubridade(item, ids?.insalubridadeServicoId) ||
     isServicoLtcat(item, ids?.ltcatServicoId) ||
-    isServicoParecerTecnico(item, ids?.parecerServicoId)
+    isServicoParecerTecnico(item, ids?.parecerServicoId) ||
+    isServicoPericulosidade(item, ids?.periculosidadeServicoId)
   );
 }
 
@@ -326,6 +383,7 @@ export function resolveLaudoPontualKind(
     insalubridadeServicoId?: string | null;
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
+    periculosidadeServicoId?: string | null;
   }
 ): LaudoPontualKind | null {
   if (orcamentoEhExclusivoAet(itens, ids?.aetServicoId)) return "aet";
@@ -338,18 +396,28 @@ export function resolveLaudoPontualKind(
   if (orcamentoEhExclusivoParecerTecnico(itens, ids?.parecerServicoId)) {
     return "parecer_tecnico";
   }
+  if (
+    orcamentoEhExclusivoPericulosidade(itens, ids?.periculosidadeServicoId)
+  ) {
+    return "periculosidade";
+  }
   return null;
 }
 
 /**
- * AET e Insalubridade ocultam a quantidade comercial e o à vista automático.
+ * AET, Insalubridade e Periculosidade ocultam a quantidade de colaboradores
+ * e o à vista automático. A Periculosidade mantém a coluna Quantidade do serviço.
  * LTCAT e Laudo de Parecer Técnico ficam de fora: cada um mantém as próprias
  * regras de pagamento e de contrato.
  */
 export function laudoPontualOcultaColaboradores(
   fluxoOrKind: OrcamentoFluxoImplantacao | LaudoPontualKind | null | undefined
 ): boolean {
-  return fluxoOrKind === "aet" || fluxoOrKind === "insalubridade";
+  return (
+    fluxoOrKind === "aet" ||
+    fluxoOrKind === "insalubridade" ||
+    fluxoOrKind === "periculosidade"
+  );
 }
 
 export function isLaudoPontualExclusivo(
@@ -371,13 +439,15 @@ export function orcamentoPossuiLaudoPontual(
     insalubridadeServicoId?: string | null;
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
+    periculosidadeServicoId?: string | null;
   }
 ): boolean {
   return (
     orcamentoPossuiAet(itens, ids?.aetServicoId) ||
     orcamentoPossuiInsalubridade(itens, ids?.insalubridadeServicoId) ||
     orcamentoPossuiLtcat(itens, ids?.ltcatServicoId) ||
-    orcamentoPossuiParecerTecnico(itens, ids?.parecerServicoId)
+    orcamentoPossuiParecerTecnico(itens, ids?.parecerServicoId) ||
+    orcamentoPossuiPericulosidade(itens, ids?.periculosidadeServicoId)
   );
 }
 
@@ -395,6 +465,7 @@ export function mensagemExclusividadeLaudoPontual(
   ids?: {
     aetServicoId?: string | null;
     insalubridadeServicoId?: string | null;
+    periculosidadeServicoId?: string | null;
   }
 ): string | null {
   if (
@@ -409,6 +480,12 @@ export function mensagemExclusividadeLaudoPontual(
   ) {
     return SERVICO_AET_EXCLUSIVIDADE_MSG;
   }
+  if (
+    orcamentoPossuiPericulosidade(itens, ids?.periculosidadeServicoId) &&
+    !orcamentoEhExclusivoPericulosidade(itens, ids?.periculosidadeServicoId)
+  ) {
+    return SERVICO_PERICULOSIDADE_EXCLUSIVIDADE_MSG;
+  }
   return null;
 }
 
@@ -419,25 +496,36 @@ export function bloqueioLaudoPontualExclusivo(params: {
   novoServicoId?: string | null;
   aetServicoId?: string | null;
   insalubridadeServicoId?: string | null;
+  periculosidadeServicoId?: string | null;
 }): string | null {
   const novoItem: ServicoItemRef = {
     servico_id: params.novoServicoId ?? "",
     servico_nome: params.novoNome ?? "",
   };
+  if (isServicoPericulosidade(novoItem, params.periculosidadeServicoId)) {
+    return (
+      bloqueioPericulosidadeExclusivo(params) ??
+      bloqueioInsalubridadeExclusivo(params) ??
+      bloqueioAetExclusivo(params)
+    );
+  }
   if (isServicoInsalubridade(novoItem, params.insalubridadeServicoId)) {
     return (
       bloqueioInsalubridadeExclusivo(params) ??
-      bloqueioAetExclusivo(params)
+      bloqueioAetExclusivo(params) ??
+      bloqueioPericulosidadeExclusivo(params)
     );
   }
   if (isServicoAet(novoItem, params.aetServicoId)) {
     return (
       bloqueioAetExclusivo(params) ??
-      bloqueioInsalubridadeExclusivo(params)
+      bloqueioInsalubridadeExclusivo(params) ??
+      bloqueioPericulosidadeExclusivo(params)
     );
   }
   return (
     bloqueioAetExclusivo(params) ??
-    bloqueioInsalubridadeExclusivo(params)
+    bloqueioInsalubridadeExclusivo(params) ??
+    bloqueioPericulosidadeExclusivo(params)
   );
 }

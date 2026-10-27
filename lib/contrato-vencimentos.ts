@@ -20,7 +20,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export function contratoUsaCronogramaVencimentos(
   tipoDocumento: TipoDocumentoContrato
 ): boolean {
-  return tipoDocumento === "aet" || tipoDocumento === "parecer_tecnico";
+  return (
+    tipoDocumento === "aet" ||
+    tipoDocumento === "parecer_tecnico" ||
+    tipoDocumento === "periculosidade"
+  );
 }
 
 export function isDataIsoValida(value: string | null | undefined): boolean {

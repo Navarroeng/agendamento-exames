@@ -20,6 +20,10 @@ import {
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 import { orcamentoPossuiParecerTecnico } from "@/lib/servico-parecer-tecnico";
+import {
+  isServicoPericulosidadeNome,
+  orcamentoEhExclusivoPericulosidade,
+} from "@/lib/servico-periculosidade";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -64,7 +68,12 @@ export function OrcamentoItensSection({
   const isLaudoPontual =
     laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
     orcamentoPossuiParecerTecnico(itens);
-  const ocultaColunaQuantidade = !exibeColunaQuantidadeColaboradores(itens);
+  const exibeQuantidadeServico = orcamentoEhExclusivoPericulosidade(itens);
+  const ocultaColunaQuantidade =
+    !exibeColunaQuantidadeColaboradores(itens) && !exibeQuantidadeServico;
+  const labelQuantidade = exibeQuantidadeServico
+    ? "Quantidade"
+    : "Quantidade de colaboradores";
   const colSpanValor = ocultaColunaQuantidade ? 1 : 2;
   return (
     <Panel
@@ -97,7 +106,7 @@ export function OrcamentoItensSection({
             <tr>
               <th className={TH}>Serviço</th>
               {ocultaColunaQuantidade ? null : (
-              <th className={TH}>Quantidade de colaboradores</th>
+              <th className={TH}>{labelQuantidade}</th>
               )}
               <th className={TH}>{labelValorColunaOrcamento(modalidade)}</th>
               <th className={`${TH} w-10 text-center`}>Ação</th>
@@ -123,9 +132,10 @@ export function OrcamentoItensSection({
                   onApplyValorSugerido(item.id, valor)
                 }
                 hideQuantidadeColaboradores={ocultaColunaQuantidade}
-                ocultarCampoQuantidade={servicoOcultaQuantidadeColaboradores(
-                  item.servico_nome
-                )}
+                ocultarCampoQuantidade={
+                  servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
+                  !isServicoPericulosidadeNome(item.servico_nome)
+                }
               />
             ))}
           </tbody>

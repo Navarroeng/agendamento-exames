@@ -63,6 +63,12 @@ import {
   resolveLaudoPontualKind,
 } from "@/lib/servico-laudo-pontual";
 import {
+  orcamentoEhExclusivoPericulosidade,
+  PERICULOSIDADE_INCLUSOS_ITENS,
+  PERICULOSIDADE_INCLUSOS_OBSERVACOES,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE,
+} from "@/lib/servico-periculosidade";
+import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   PARECER_TECNICO_INCLUSOS_ITENS,
@@ -211,6 +217,9 @@ function resolveDescricaoPropostaParagrafos(
     return PROPOSTA_DESCRICAO_PARAGRAFOS_INSALUBRIDADE;
   }
   if (kind === "ltcat") return PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT;
+  if (kind === "periculosidade") {
+    return PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE;
+  }
   const base = isOrcamentoMensalidade(orcamento.modalidade)
     ? paragrafosPropostaGestaoMensal(propostaMensalidade)
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
@@ -2176,17 +2185,25 @@ function drawServicesTable(
   );
   if (itens.length === 0) return y;
 
+  const exclusivoPericulosidade = orcamentoEhExclusivoPericulosidade(itens);
   const isLaudoPontual = !exibeColunaQuantidadeColaboradores(itens);
-  const colWidths = isLaudoPontual ? [138, 40] : [98, 44, 40];
-  const colStarts = isLaudoPontual
+  const semColunaQuantidade = isLaudoPontual && !exclusivoPericulosidade;
+  const colWidths = semColunaQuantidade
+    ? [138, 40]
+    : exclusivoPericulosidade
+      ? [118, 28, 40]
+      : [98, 44, 40];
+  const colStarts = semColunaQuantidade
     ? [MARGIN, MARGIN + colWidths[0]]
     : [
         MARGIN,
         MARGIN + colWidths[0],
         MARGIN + colWidths[0] + colWidths[1],
       ];
-  const headers = isLaudoPontual
+  const headers = semColunaQuantidade
     ? ["Serviço", labelValorColunaOrcamento(orcamento.modalidade)]
+    : exclusivoPericulosidade
+      ? ["Serviço", "Quantidade", labelValorColunaOrcamento(orcamento.modalidade)]
     : [
         "Serviço",
         "Quantidade de Colaboradores",
@@ -2309,10 +2326,11 @@ function drawServicesTable(
     doc.setFontSize(TABLE_CELL_FONT);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE_900);
-    const valorColIndex = isLaudoPontual ? 1 : 2;
+    const valorColIndex = semColunaQuantidade ? 1 : 2;
     if (
-      !isLaudoPontual &&
-      !servicoOcultaQuantidadeColaboradores(item.servico_nome)
+      !semColunaQuantidade &&
+      (exclusivoPericulosidade ||
+        !servicoOcultaQuantidadeColaboradores(item.servico_nome))
     ) {
       doc.text(
         String(Math.round(Number(item.quantidade))),
@@ -2380,6 +2398,8 @@ function drawFinancialAndInclusosRow(
       ? [...AET_INCLUSOS_ITENS]
       : laudoKind === "insalubridade"
         ? [...INSALUBRIDADE_INCLUSOS_ITENS]
+        : laudoKind === "periculosidade"
+          ? [...PERICULOSIDADE_INCLUSOS_ITENS]
         : laudoKind === "ltcat"
           ? [...LTCAT_INCLUSOS_ITENS]
           : !isMensalidade && usaCardInclusosEstruturado
@@ -2395,6 +2415,8 @@ function drawFinancialAndInclusosRow(
     ? []
     : laudoKind === "insalubridade"
       ? INSALUBRIDADE_INCLUSOS_OBSERVACOES
+      : laudoKind === "periculosidade"
+        ? PERICULOSIDADE_INCLUSOS_OBSERVACOES
       : laudoKind === "aet" || laudoKind === "ltcat"
         ? []
         : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;

@@ -7,6 +7,7 @@
 import { orcamentoEhExclusivoInsalubridade } from "@/lib/servico-insalubridade";
 import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
 import { orcamentoEhExclusivoParecerTecnico } from "@/lib/servico-parecer-tecnico";
+import { orcamentoEhExclusivoPericulosidade } from "@/lib/servico-periculosidade";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const SERVICO_AET_NOME =
@@ -99,7 +100,8 @@ export function orcamentoPermitePagamentoAVista(
   return (
     !orcamentoEhExclusivoAet(itens, aetServicoId) &&
     !orcamentoEhExclusivoInsalubridade(itens, insalubridadeServicoId) &&
-    !orcamentoEhExclusivoParecerTecnico(itens)
+    !orcamentoEhExclusivoParecerTecnico(itens) &&
+    !orcamentoEhExclusivoPericulosidade(itens)
   );
 }
 
@@ -157,6 +159,7 @@ export type TipoDocumentoContrato =
   | "insalubridade"
   | "ltcat"
   | "parecer_tecnico"
+  | "periculosidade"
   | "mensalidade"
   | "pontual_sst";
 
@@ -184,6 +187,9 @@ export function resolveTipoDocumentoContrato(params: {
   }
   if (orcamentoEhExclusivoParecerTecnico(params.itens)) {
     return "parecer_tecnico";
+  }
+  if (orcamentoEhExclusivoPericulosidade(params.itens)) {
+    return "periculosidade";
   }
   if (params.isMensalidade) return "mensalidade";
   return "pontual_sst";

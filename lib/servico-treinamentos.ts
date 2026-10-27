@@ -12,7 +12,8 @@ export type OrcamentoFluxoImplantacao =
   | "aet"
   | "insalubridade"
   | "ltcat"
-  | "parecer_tecnico";
+  | "parecer_tecnico"
+  | "periculosidade";
 
 export type ServicoItemRef = {
   servico_id?: string | null;
@@ -132,6 +133,22 @@ const PARECER_TECNICO_NOMES_NORMALIZADOS = new Set([
   normalizeServicoNome("Laudo de Parecer Técnico"),
 ]);
 
+/** Igual a SERVICO_PERICULOSIDADE_NOME. Match exato, sem includes. */
+const PERICULOSIDADE_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("Laudo de Periculosidade (NR16)"),
+]);
+
+function isItemPericulosidadeFluxo(
+  item: ServicoItemRef,
+  periculosidadeServicoId?: string | null
+): boolean {
+  const id = (item.servico_id ?? "").trim();
+  if (periculosidadeServicoId && id) return id === periculosidadeServicoId;
+  return PERICULOSIDADE_NOMES_NORMALIZADOS.has(
+    normalizeServicoNome(item.servico_nome)
+  );
+}
+
 function isItemParecerTecnicoFluxo(
   item: ServicoItemRef,
   parecerServicoId?: string | null
@@ -149,7 +166,8 @@ export function classifyOrcamentoFluxoImplantacao(
   aetServicoId?: string | null,
   insalubridadeServicoId?: string | null,
   ltcatServicoId?: string | null,
-  parecerServicoId?: string | null
+  parecerServicoId?: string | null,
+  periculosidadeServicoId?: string | null
 ): OrcamentoFluxoImplantacao {
   const relevant = itens.filter(
     (item) =>
@@ -178,6 +196,14 @@ export function classifyOrcamentoFluxoImplantacao(
     relevant.every((item) => isItemParecerTecnicoFluxo(item, parecerServicoId))
   ) {
     return "parecer_tecnico";
+  }
+
+  if (
+    relevant.every((item) =>
+      isItemPericulosidadeFluxo(item, periculosidadeServicoId)
+    )
+  ) {
+    return "periculosidade";
   }
 
   let hasTreinamentos = false;

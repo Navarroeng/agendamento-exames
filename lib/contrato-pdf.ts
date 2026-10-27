@@ -58,12 +58,20 @@ function isContratoAet(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "aet";
 }
 
+function isContratoPericulosidade(documento: ContratoNavarroDocumento): boolean {
+  return documento.tipoDocumento === "periculosidade";
+}
+
 function isContratoParecer(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "parecer_tecnico";
 }
 
 function isContratoEstiloPontual(documento: ContratoNavarroDocumento): boolean {
-  return isContratoAet(documento) || isContratoParecer(documento);
+  return (
+    isContratoAet(documento) ||
+    isContratoParecer(documento) ||
+    isContratoPericulosidade(documento)
+  );
 }
 
 function estiloClausula(documento: ContratoNavarroDocumento): "sst" | "aet" {
@@ -90,6 +98,8 @@ export function rotuloServicoContratoArquivo(
       return "LTCAT";
     case "parecer_tecnico":
       return "Laudo de Parecer Técnico";
+    case "periculosidade":
+      return "Laudo de Periculosidade (NR16)";
     case "mensalidade":
     case "pontual_sst":
       return "Gestão SST";
@@ -236,6 +246,11 @@ function drawHeader(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("Assistência técnica e parecer técnico", textX, 16);
+  } else if (isContratoPericulosidade(documento)) {
+    doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Laudo Técnico de Periculosidade – NR-16", textX, 16);
   } else if (isContratoAet(documento)) {
     doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
     doc.setFont("helvetica", "normal");
@@ -259,6 +274,8 @@ function drawHeader(
   doc.text(
     isContratoParecer(documento)
       ? "Serviço: Parecer técnico"
+      : isContratoPericulosidade(documento)
+        ? "Serviço: Periculosidade (NR16)"
       : isContratoAet(documento)
         ? "Serviço: Laudo AET"
         : documento.modalidade === "mensalidade"
