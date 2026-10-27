@@ -12,10 +12,15 @@ import type {
 import type { ContratoParcela } from "@/lib/contrato-pagamento";
 import { formatMoedaComExtenso, numeroPorExtenso } from "@/lib/extenso";
 import { formatCurrency } from "@/lib/money";
-import {
-  PERICULOSIDADE_INCLUSOS_ITENS,
-  SERVICO_PERICULOSIDADE_NOME,
-} from "@/lib/servico-periculosidade";
+import { SERVICO_PERICULOSIDADE_NOME } from "@/lib/servico-periculosidade";
+
+/** Escopo do contrato pontual. Não reutiliza o card da proposta nem o pacote de Gestão SST. */
+export const CONTRATO_PERICULOSIDADE_SERVICOS = [
+  "Visita técnica.",
+  "Identificação e avaliação das condições de risco.",
+  "Análise das atividades e áreas de risco conforme a NR-16.",
+  "Elaboração e entrega do Laudo Técnico de Periculosidade, com conclusão fundamentada sobre a caracterização ou não de condições perigosas.",
+] as const;
 
 export const CONTRATO_PERICULOSIDADE_TITULO_LINHAS = [
   "CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS",
@@ -103,7 +108,7 @@ export function buildClausulasContratoPericulosidade(
       numero: "1",
       titulo: "DO OBJETO",
       paragrafos: [
-        `O presente contrato tem por objeto a prestação de serviços técnicos especializados para elaboração do Laudo Técnico de Periculosidade, com avaliação das atividades e condições de trabalho e verificação do enquadramento na NR-16, conforme escopo e condições estabelecidos na Proposta Comercial nº ${numero}, que passa a integrar este contrato para todos os fins.`,
+        `O presente contrato tem por objeto a prestação pontual de serviços técnicos para visita técnica, identificação e avaliação das condições de risco, análise das atividades e áreas de risco conforme a NR-16 e elaboração e entrega do Laudo Técnico de Periculosidade, com conclusão fundamentada sobre a caracterização ou não de condições perigosas, conforme a Proposta Comercial nº ${numero}, que passa a integrar este contrato para todos os fins.`,
         "O serviço será realizado considerando as atividades, instalações e condições de trabalho abrangidas pelo escopo contratado.",
       ],
     },
@@ -111,7 +116,7 @@ export function buildClausulasContratoPericulosidade(
       numero: "2",
       titulo: "DOS SERVIÇOS INCLUSOS",
       paragrafos: [],
-      itens: [...PERICULOSIDADE_INCLUSOS_ITENS],
+      itens: [...CONTRATO_PERICULOSIDADE_SERVICOS],
     },
     {
       numero: "3",
@@ -212,7 +217,8 @@ export function buildClausulasContratoPericulosidade(
       numero: "12",
       titulo: "DAS DISPOSIÇÕES GERAIS",
       paragrafos: [
-        "A elaboração e entrega do Laudo Técnico de Periculosidade não transfere à CONTRATADA a responsabilidade pela implementação das medidas corretivas, de prevenção ou de adequação eventualmente indicadas no documento.",
+        "A implementação das medidas corretivas indicadas é de responsabilidade da CONTRATANTE.",
+        "A elaboração e entrega do Laudo Técnico de Periculosidade não transfere à CONTRATADA a responsabilidade pela implementação dessas medidas.",
         "Serviços, avaliações ou atividades não expressamente previstos na proposta comercial não integram automaticamente o objeto deste contrato.",
         `A Proposta Comercial nº ${numero} integra o presente instrumento e deverá ser considerada em conjunto com estas cláusulas.`,
       ],

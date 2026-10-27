@@ -41,6 +41,7 @@ import {
 } from "../lib/riscos-psicossociais";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
+import { SERVICO_PERICULOSIDADE_NOME } from "../lib/servico-periculosidade";
 import { SERVICO_PARECER_TECNICO_NOME } from "../lib/servico-parecer-tecnico";
 import { classifyOrcamentoFluxoImplantacao } from "../lib/servico-treinamentos";
 import {
@@ -736,6 +737,118 @@ assert.equal(
 assert.equal(
   buildOrcamentoEtapas("ltcat").find((etapa) => etapa.id === "visita_aet")?.label,
   "Agendamento da visita"
+);
+
+const itemPericulosidade = {
+  servico_id: "peric-1",
+  servico_nome: SERVICO_PERICULOSIDADE_NOME,
+};
+const fluxoPericulosidade = classifyOrcamentoFluxoImplantacao([
+  itemPericulosidade,
+]);
+assert.equal(fluxoPericulosidade, "periculosidade");
+assert.notEqual(fluxoPericulosidade, "padrao");
+assert.equal(isFluxoLaudoPontual(fluxoPericulosidade), true);
+assert.deepEqual(
+  buildOrcamentoEtapas(fluxoPericulosidade).map((etapa) => etapa.id),
+  buildOrcamentoEtapas("insalubridade").map((etapa) => etapa.id)
+);
+assert.deepEqual(
+  buildOrcamentoEtapas(fluxoPericulosidade).map((etapa) => etapa.id),
+  buildOrcamentoEtapas("aet").map((etapa) => etapa.id)
+);
+for (const etapaGestao of [
+  "procuracao",
+  "funcionarios",
+  "logo",
+  "visita",
+  "agendamentos",
+  "treinamento",
+  "documentos",
+] as const) {
+  assert.equal(
+    buildOrcamentoEtapas(fluxoPericulosidade).some((etapa) => etapa.id === etapaGestao),
+    false,
+    etapaGestao
+  );
+  assert.equal(
+    isOrcamentoEtapaLiberada(etapaGestao, apInsal, true, {
+      fluxo: fluxoPericulosidade,
+    }),
+    false,
+    etapaGestao
+  );
+}
+
+const apPericulosidade = aprovacao(SERVICO_PERICULOSIDADE_NOME, {
+  contrato_assinado: true,
+  contrato_assinado_em: "2026-10-08T12:00:00.000Z",
+  contrato_salvo_em: "2026-10-08T12:00:00.000Z",
+  boleto_pago: true,
+  financeiro_salvo_em: "2026-10-09T12:00:00.000Z",
+  orcamento_aprovacao_itens: [
+    {
+      id: "ai-peric",
+      aprovacao_id: "ap1",
+      servico_id: "peric-1",
+      servico_nome: SERVICO_PERICULOSIDADE_NOME,
+      quantidade: 2,
+      valor_unitario: 4800,
+      valor_total: 4800,
+      ordem: 0,
+    },
+  ],
+});
+const visitaPericulosidade = aetRow({
+  visita_status: "realizada",
+  visita_data: "2026-10-20",
+  visita_horario: "14:00",
+  visita_responsavel: "Navarro",
+  visita_observacao: "GLP e maçarico nas injetoras",
+  visita_realizada_em: "2026-10-20T18:00:00Z",
+  elaboracao_status: "em_elaboracao",
+});
+const andamentoAntes = JSON.stringify({
+  aprovacao: apPericulosidade,
+  visita: visitaPericulosidade,
+});
+const pericDepois = buildImplantacaoProcesso({
+  orcamento: orcamento({
+    id: "orc-peric",
+    numero: "ORC-2026-0160",
+    cliente_nome: "INJETORA NORTE",
+  }),
+  aprovacao: { ...apPericulosidade, orcamento_id: "orc-peric" },
+  contrato: null,
+  fluxoImplantacao: fluxoPericulosidade,
+  aet: { ...visitaPericulosidade, orcamento_id: "orc-peric" },
+});
+assert.equal(
+  andamentoAntes,
+  JSON.stringify({
+    aprovacao: apPericulosidade,
+    visita: visitaPericulosidade,
+  })
+);
+assert.equal(pericDepois.etapaAtual, "concluido");
+assert.equal(pericDepois.aet?.visita_data, "2026-10-20");
+assert.equal(pericDepois.aet?.visita_observacao, "GLP e maçarico nas injetoras");
+assert.equal(pericDepois.aprovacao?.contrato_assinado, true);
+assert.equal(pericDepois.aprovacao?.boleto_pago, true);
+assert.equal(isProcessoElegivelLaudoPontualLaudosSst(pericDepois), true);
+assert.equal(isProcessoElegivelLaudosSst(pericDepois), false);
+assert.equal(isProcessoElegivelRiscosPsicossociais(pericDepois), false);
+const laudosPeric = buildLaudosSstProcesso(pericDepois, null);
+assert.equal(laudosPeric.laudoPontualKind, "periculosidade");
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosPeric).map((etapa) => etapa.id),
+  ["visita", "elaboracao", "envio"]
+);
+assert.equal(
+  etapasProgressoLaudosSst(laudosPeric).some((etapa) =>
+    /pgr|pcmso|epi/i.test(etapa.id)
+  ),
+  false
 );
 
 const apParecer = aprovacao(SERVICO_PARECER_TECNICO_NOME, {

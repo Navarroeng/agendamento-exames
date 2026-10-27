@@ -15,7 +15,9 @@ import {
 import {
   drawContratoPdfDocument,
   nomeArquivoContratoNavarro,
+  rotuloServicoContratoArquivo,
 } from "../lib/contrato-pdf";
+import { CONTRATO_PERICULOSIDADE_SERVICOS } from "../lib/contrato-periculosidade";
 import { contratoUsaCronogramaVencimentos } from "../lib/contrato-vencimentos";
 import {
   exibeColunaQuantidadeColaboradores,
@@ -23,7 +25,10 @@ import {
   validateOrcamentoItensValores,
 } from "../lib/orcamento-calculo";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
-import { isServicoOferecidoNoOrcamento } from "../lib/orcamento-modalidade";
+import {
+  isOrcamentoMensalidade,
+  isServicoOferecidoNoOrcamento,
+} from "../lib/orcamento-modalidade";
 import { buildOrcamentoEtapas } from "../lib/orcamento-etapas";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
 import { orcamentoPermitePagamentoAVista, resolveTipoDocumentoContrato } from "../lib/servico-aet";
@@ -196,6 +201,13 @@ const aprovacao: OrcamentoAprovacaoRecord = {
   ],
 };
 
+const tipoSelecionadoPeloBotao = resolveTipoDocumentoContrato({
+  itens: aprovacao.orcamento_aprovacao_itens,
+  isMensalidade: isOrcamentoMensalidade(orcamento.modalidade),
+});
+assert.equal(tipoSelecionadoPeloBotao, "periculosidade");
+assert.notEqual(tipoSelecionadoPeloBotao, "pontual_sst");
+assert.notEqual(tipoSelecionadoPeloBotao, "mensalidade");
 assert.equal(podeGerarContratoNavarro(orcamento, aprovacao), true);
 assert.equal(motivoBloqueioGeracaoContrato(orcamento, aprovacao), null);
 assert.equal(
@@ -209,7 +221,16 @@ const doc = buildContratoNavarroDocumento({
   dataContrato: "2026-10-05",
   vencimentosIso: ["2026-10-10", "2026-11-10"],
 });
-assert.equal(doc.tipoDocumento, "periculosidade");
+assert.equal(doc.tipoDocumento, tipoSelecionadoPeloBotao);
+assert.equal(
+  rotuloServicoContratoArquivo(doc.tipoDocumento),
+  "Laudo de Periculosidade (NR16)"
+);
+assert.notEqual(rotuloServicoContratoArquivo(doc.tipoDocumento), "Gestão SST");
+assert.equal(
+  nomeArquivoContratoNavarro(doc.contratante.razaoSocial, doc.tipoDocumento),
+  "Contrato - Laudo de Periculosidade (NR16) - INJETORA NORTE.pdf"
+);
 assert.equal(doc.colaboradores, 0);
 assert.equal(doc.valor, 4800);
 assert.equal(doc.parcelas[0]?.dataIso, "2026-10-10");
@@ -223,9 +244,13 @@ assert.match(doc.texto, /R\$ 4\.800,00/);
 assert.match(doc.texto, /2 \(duas\) parcelas/);
 assert.match(doc.texto, /10\/10\/2026/);
 assert.match(doc.texto, /10\/11\/2026/);
-for (const incluso of PERICULOSIDADE_INCLUSOS_ITENS) {
+for (const incluso of CONTRATO_PERICULOSIDADE_SERVICOS) {
   assert.ok(doc.texto.includes(incluso), incluso);
 }
+assert.match(
+  doc.texto,
+  /implementação das medidas corretivas indicadas é de responsabilidade da CONTRATANTE/
+);
 const proibidos = [
   "AET",
   "Análise Ergonômica",
@@ -236,8 +261,15 @@ const proibidos = [
   "PCMSO",
   "LTCAT",
   "eSocial",
+  "Gestão SST",
+  "Gestão Completa",
+  "mensalidade",
+  "renovação automática",
+  "exame ocupacional",
+  "exames ocupacionais",
   "quantidade de colaboradores",
   "à vista",
+  "DE SAÚDE E SEGURANÇA DO TRABALHO",
   SERVICO_INSALUBRIDADE_NOME,
 ];
 for (const termo of proibidos) {
@@ -260,11 +292,21 @@ assert.doesNotMatch(sql, /includes\(/);
 
 const pdf = new jsPDF({ unit: "mm", format: "a4" });
 drawContratoPdfDocument(pdf, doc, null);
-const pdfRaw = Buffer.from(pdf.output("arraybuffer")).toString("latin1");
-assert.match(pdfRaw, /Laudo T[eé]cnico de Periculosidade/);
-assert.match(pdfRaw, /NR-16/);
-assert.doesNotMatch(pdfRaw, /An[aá]lise Ergon[oô]mica/);
-assert.doesNotMatch(pdfRaw, /Laudo de Insalubridade/);
-assert.doesNotMatch(pdfRaw, /Servi[cç]o: Laudo AET/);
+const pdfTexto = Buffer.from(pdf.output("arraybuffer"))
+  .toString("latin1")
+  .replace(/\\([()\\])/g, "$1");
+assert.match(pdfTexto, /Laudo T[eé]cnico de Periculosidade/);
+assert.match(pdfTexto, /NR-16/);
+assert.match(pdfTexto, /Servi[cç]o: Periculosidade \(NR16\)/);
+assert.match(pdfTexto, /responsabilidade da CONTRATANTE/);
+assert.doesNotMatch(pdfTexto, /An[aá]lise Ergon[oô]mica/);
+assert.doesNotMatch(pdfTexto, /Laudo de Insalubridade/);
+assert.doesNotMatch(pdfTexto, /Servi[cç]o: Laudo AET/);
+assert.doesNotMatch(pdfTexto, /Modalidade: Pontual/);
+assert.doesNotMatch(pdfTexto, /Modalidade: Mensalidade/);
+assert.doesNotMatch(pdfTexto, /PCMSO/);
+assert.doesNotMatch(pdfTexto, /eSocial/);
+assert.doesNotMatch(pdfTexto, /Gest[aã]o SST/);
+assert.doesNotMatch(pdfTexto, /DE SA[UÚ]DE E SEGURAN[CÇ]A DO TRABALHO/);
 
 console.log("ok: servico-periculosidade");
