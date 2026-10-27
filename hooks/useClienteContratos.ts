@@ -9,6 +9,7 @@ import {
   podeEncerrarContrato as usuarioPodeEncerrarContrato,
 } from "@/lib/contrato-permissoes";
 import { useClienteContratoForm } from "@/hooks/useClienteContratoForm";
+import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
 import {
   getContratoAtual,
   getHistoricoContratos,
@@ -32,7 +33,7 @@ export function useClienteContratos(
   const auditContext = useAuditoriaUsuario();
   const { profile } = useAuth();
   const podeEncerrarContrato = usuarioPodeEncerrarContrato(profile?.perfil);
-  const [contratos, setContratos] = useState<ClienteContratoRecord[]>([]);
+  const [contratos, setContratos] = useState<ClienteContratoConsulta[]>([]);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

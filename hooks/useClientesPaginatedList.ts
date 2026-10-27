@@ -11,6 +11,7 @@ import {
   listarClientesPaginados,
   resolverPaginaClientePorNome,
 } from "@/services/cliente.service";
+import { mapearRenovacaoAtualDosClientes } from "@/services/cliente-contrato.service";
 
 const BUSCA_DEBOUNCE_MS = 300;
 
@@ -21,6 +22,9 @@ export function useClientesPaginatedList() {
   );
   const [debouncedBusca, setDebouncedBusca] = useState("");
   const [clientes, setClientes] = useState<ClienteRecord[]>([]);
+  const [renovacaoPorCliente, setRenovacaoPorCliente] = useState<
+    Record<string, boolean | null>
+  >({});
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -72,6 +76,15 @@ export function useClientesPaginatedList() {
         setClientes(result.records);
         setTotal(result.total);
         setTotalPages(result.totalPages);
+        try {
+          const renovacao = await mapearRenovacaoAtualDosClientes(
+            result.records.map((cliente) => cliente.id)
+          );
+          if (!cancelled) setRenovacaoPorCliente(renovacao);
+        } catch (renovacaoErr) {
+          console.error(renovacaoErr);
+          if (!cancelled) setRenovacaoPorCliente({});
+        }
 
         if (page > result.totalPages && result.totalPages > 0) {
           setPage(result.totalPages);
@@ -146,6 +159,7 @@ export function useClientesPaginatedList() {
 
   return {
     clientes,
+    renovacaoPorCliente,
     loading,
     error,
     page,

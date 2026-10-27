@@ -66,6 +66,7 @@ export function ClientesPage() {
 
   const {
     clientes,
+    renovacaoPorCliente,
     loading,
     error,
     page,
@@ -250,6 +251,7 @@ export function ClientesPage() {
               pageSize={pageSize}
               hasActiveSearch={hasActiveClientesListFilters(filters)}
               highlightClienteId={highlightClienteId}
+              renovacaoPorCliente={renovacaoPorCliente}
               onAbrir={(id) => abrirCliente(id)}
               onPageChange={setPage}
             />

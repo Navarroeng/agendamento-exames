@@ -7,10 +7,11 @@ import {
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
 import { formatDateBR } from "@/lib/format";
-import type { ClienteContratoRecord } from "@/lib/types";
+import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
+import { RenovacaoContratoBadge } from "./RenovacaoContratoBadge";
 
 interface ClienteContratosHistoricoTableProps {
-  contratos: ClienteContratoRecord[];
+  contratos: ClienteContratoConsulta[];
   contratoAtualId?: string | null;
   loading: boolean;
   podeEncerrarContrato?: boolean;
@@ -54,6 +55,7 @@ export function ClienteContratosHistoricoTable({
               "Valor",
               "Status",
               "Financeiro",
+              "Renovação",
               "Liberação na vigência",
               "Ações",
             ].map((h) => (
@@ -103,6 +105,11 @@ export function ClienteContratosHistoricoTable({
                       {situacao}
                     </div>
                   ) : null}
+                </td>
+                <td>
+                  <RenovacaoContratoBadge
+                    renovacaoAutomatica={contrato.renovacaoAutomatica}
+                  />
                 </td>
                 <td>
                   <span

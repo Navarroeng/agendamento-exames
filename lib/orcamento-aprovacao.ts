@@ -160,6 +160,11 @@ export interface OrcamentoAprovacaoRecord {
   mensalidade_exame_avulso_centavos?: number | null;
   /** Exame clínico avulso demissional acordado nesta contratação, em centavos. */
   mensalidade_exame_demissional_centavos?: number | null;
+  /**
+   * true = renovação automática; false = sem renovação automática.
+   * Null ou ausente não é evidência de renovação automática.
+   */
+  mensalidade_renovacao_automatica?: boolean | null;
   /** Versão das condições comerciais vigentes. Sobe só quando elas mudam. */
   condicoes_revisao?: number | null;
   created_at: string;

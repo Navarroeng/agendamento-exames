@@ -1,4 +1,7 @@
-import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
+import {
+  selecionarContratoAtual,
+  type ClienteContratoConsulta,
+} from "@/lib/cliente-contrato-atual";
 import { centavosSalvosParaReais } from "@/lib/contrato-navarro";
 import { createClient } from "@/lib/supabase/client";
 import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
@@ -63,16 +66,27 @@ export async function complementarContratosComCobranca(
   if (orcamentoIds.length === 0) return contratos;
 
   const supabase = createClient();
-  const [orcamentosRes, aprovacoesRes] = await Promise.all([
+  const selectAprovacaoBase =
+    "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
+  const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
     supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
     supabase
       .from("orcamento_aprovacoes")
-      .select(
-        "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos"
-      )
+      .select(`${selectAprovacaoBase}, mensalidade_renovacao_automatica`)
       .in("orcamento_id", orcamentoIds),
   ]);
   if (orcamentosRes.error) throw orcamentosRes.error;
+  const faltaColunaRenovacao =
+    Boolean(aprovacoesPrimeira.error) &&
+    /mensalidade_renovacao_automatica|schema cache/i.test(
+      aprovacoesPrimeira.error?.message ?? ""
+    );
+  const aprovacoesRes = faltaColunaRenovacao
+    ? await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectAprovacaoBase)
+        .in("orcamento_id", orcamentoIds)
+    : aprovacoesPrimeira;
   if (aprovacoesRes.error) throw aprovacoesRes.error;
 
   const modalidadePorOrcamento = new Map<string, string | null>();
@@ -91,6 +105,7 @@ export async function complementarContratosComCobranca(
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
     mensalidade_exame_avulso_centavos: number | null;
+    mensalidade_renovacao_automatica?: boolean | null;
   };
   const aprovacaoPorOrcamento = new Map<string, AprovacaoCobranca>();
   for (const row of (aprovacoesRes.data ?? []) as AprovacaoCobranca[]) {
@@ -145,6 +160,12 @@ export async function complementarContratosComCobranca(
       exameAdmissionalReais: centavosSalvosParaReais(
         aprovacao?.mensalidade_exame_avulso_centavos
       ),
+      renovacaoAutomatica:
+        aprovacao?.mensalidade_renovacao_automatica === true
+          ? true
+          : aprovacao?.mensalidade_renovacao_automatica === false
+            ? false
+            : null,
       parcelasMensalidade: aprovacao
         ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
         : [],
@@ -310,4 +331,43 @@ export async function buscarContratoPorOrcamentoId(
     .maybeSingle();
   if (error) throw error;
   return (data as ClienteContratoRecord | null) ?? null;
+}
+
+/** Renovação do contrato SST atual de cada cliente. Null quando não há evidência. */
+export async function mapearRenovacaoAtualDosClientes(
+  clienteIds: string[]
+): Promise<Record<string, boolean | null>> {
+  const ids = Array.from(
+    new Set(clienteIds.map((id) => id.trim()).filter(Boolean))
+  );
+  const mapa: Record<string, boolean | null> = {};
+  for (const id of ids) mapa[id] = null;
+  if (ids.length === 0) return mapa;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("cliente_contratos")
+    .select("*")
+    .in("cliente_id", ids);
+  if (error) throw error;
+
+  const contratos = await complementarContratosComCobranca(
+    (data ?? []) as ClienteContratoRecord[]
+  );
+  const porCliente = new Map<string, ClienteContratoConsulta[]>();
+  for (const contrato of contratos) {
+    const lista = porCliente.get(contrato.cliente_id) ?? [];
+    lista.push(contrato);
+    porCliente.set(contrato.cliente_id, lista);
+  }
+  for (const id of ids) {
+    const atual = selecionarContratoAtual(porCliente.get(id) ?? []);
+    mapa[id] =
+      atual?.renovacaoAutomatica === true
+        ? true
+        : atual?.renovacaoAutomatica === false
+          ? false
+          : null;
+  }
+  return mapa;
 }

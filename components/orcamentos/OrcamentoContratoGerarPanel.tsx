@@ -21,8 +21,12 @@ import {
 import {
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
   DIAS_VENCIMENTO_MENSALIDADE,
+  RENOVACAO_CONTRATO_OPCOES,
+  RENOVACAO_CONTRATO_PENDENTE_MSG,
   diaVencimentoMensalidadeValido,
+  renovacaoContratoSalva,
   type DiaVencimentoMensalidade,
+  type RenovacaoContratoGestao,
 } from "@/lib/contrato-navarro";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
 import {
@@ -59,6 +63,7 @@ import { salvarCondicaoContratoParecer } from "@/services/orcamento-aprovacao.se
 import {
   obterVigenciaContratualOrcamento,
   salvarParametrosContratoMensalidade,
+  salvarRenovacaoContratoMensalidade,
 } from "@/services/orcamento-aprovacao.service";
 import {
   listarContratoDocumentos,
@@ -108,9 +113,12 @@ export function OrcamentoContratoGerarPanel({
   const [diaVencimento, setDiaVencimento] = useState<DiaVencimentoMensalidade | null>(
     () => diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
   );
+  const [renovacaoLocal, setRenovacaoLocal] =
+    useState<RenovacaoContratoGestao | null>(null);
   const [parametrosLocais, setParametrosLocais] =
     useState<OrcamentoAprovacaoRecord | null>(null);
   const loadSeq = useRef(0);
+  const padraoRenovacaoRef = useRef<string | null>(null);
 
   const podeGerar = podeGerarContratoNavarro(orcamento, aprovacao);
   const motivoBloqueio = motivoBloqueioGeracaoContrato(orcamento, aprovacao);
@@ -196,6 +204,14 @@ export function OrcamentoContratoGerarPanel({
     diaVencimentoMensalidadeValido(aprovacaoContrato.mensalidade_dia_vencimento);
   const diaPendente =
     isMensalidadeDoc && !pagamentoAvistaPlano && diaEfetivo == null;
+  const renovacaoSalva = renovacaoContratoSalva(
+    aprovacaoContrato.mensalidade_renovacao_automatica
+  );
+  const renovacaoExibicao =
+    renovacaoLocal ??
+    renovacaoSalva ??
+    (contratoAssinado ? null : "automatica");
+  const renovacaoPendente = isMensalidadeDoc && renovacaoSalva == null;
   const parcelasValores = useMemo(
     () =>
       montarParcelasPontual({
@@ -304,7 +320,9 @@ export function OrcamentoContratoGerarPanel({
     setDiaVencimento(
       diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
     );
+    setRenovacaoLocal(null);
     setParametrosLocais(null);
+    padraoRenovacaoRef.current = null;
   }, [aprovacao.id]);
 
   useEffect(() => {
@@ -407,6 +425,10 @@ export function OrcamentoContratoGerarPanel({
       toast.error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
       return;
     }
+    if (renovacaoPendente) {
+      toast.error(RENOVACAO_CONTRATO_PENDENTE_MSG);
+      return;
+    }
     const erroDatas = erroVencimentos();
     if (erroDatas) {
       toast.error(erroDatas);
@@ -424,6 +446,10 @@ export function OrcamentoContratoGerarPanel({
     }
     if (diaPendente) {
       toast.error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
+      return;
+    }
+    if (renovacaoPendente) {
+      toast.error(RENOVACAO_CONTRATO_PENDENTE_MSG);
       return;
     }
     const erroDatas = erroVencimentos();
@@ -646,6 +672,56 @@ export function OrcamentoContratoGerarPanel({
     }
   }
 
+  async function handleEscolherRenovacao(escolha: RenovacaoContratoGestao) {
+    if (contratoAssinado || working) return;
+    if (escolha === renovacaoExibicao && renovacaoSalva === escolha) return;
+    const anterior = renovacaoLocal;
+    setRenovacaoLocal(escolha);
+    setWorking(true);
+    try {
+      const atualizada = await salvarRenovacaoContratoMensalidade({
+        aprovacaoId: aprovacao.id,
+        renovacaoAutomatica: escolha === "automatica",
+      });
+      setParametrosLocais(atualizada);
+      onAprovacaoAtualizada?.(atualizada);
+      const revisao = revisaoCondicoesAprovacao(atualizada);
+      if (revisao != null) setRevisaoVigente(revisao);
+    } catch (err) {
+      console.error(err);
+      setRenovacaoLocal(anterior);
+      const detalhe = mensagemErroContratoDocumento(
+        err,
+        "Não foi possível salvar a renovação do contrato."
+      );
+      const faltaColuna =
+        /mensalidade_renovacao_automatica|schema cache/i.test(detalhe);
+      toast.error(
+        faltaColuna
+          ? `${detalhe} Execute a migration 145_mensalidade_renovacao_automatica.sql.`
+          : detalhe
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isMensalidadeDoc || contratoAssinado) return;
+    if (aprovacao.mensalidade_renovacao_automatica === false) return;
+    if (renovacaoContratoSalva(aprovacao.mensalidade_renovacao_automatica)) {
+      return;
+    }
+    if (padraoRenovacaoRef.current === aprovacao.id) return;
+    padraoRenovacaoRef.current = aprovacao.id;
+    void handleEscolherRenovacao("automatica");
+  }, [
+    aprovacao.id,
+    aprovacao.mensalidade_renovacao_automatica,
+    contratoAssinado,
+    isMensalidadeDoc,
+  ]);
+
   async function handleEscolherDia(dia: DiaVencimentoMensalidade) {
     if (contratoAssinado || working || dia === diaEfetivo) return;
     const anterior = diaVencimento;
@@ -758,7 +834,8 @@ export function OrcamentoContratoGerarPanel({
                 !podeGerar ||
                 contratoAssinado ||
                 parecerAguardandoEscolha ||
-                diaPendente
+                diaPendente ||
+                renovacaoPendente
               }
               onClick={() => void handleAbrirConferencia()}
             >
@@ -790,7 +867,8 @@ export function OrcamentoContratoGerarPanel({
                   !podeGerar ||
                   contratoAssinado ||
                   parecerAguardandoEscolha ||
-                  diaPendente
+                  diaPendente ||
+                  renovacaoPendente
                 }
                 onClick={() => void handleAbrirConferencia()}
               >
@@ -802,6 +880,42 @@ export function OrcamentoContratoGerarPanel({
           )}
         </div>
       </div>
+
+      {isMensalidadeDoc ? (
+        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+            Renovação do contrato
+          </p>
+          <p className="mt-1 text-[11px] text-[#64748b]">
+            Automática é o padrão das novas contratações. Use a outra opção
+            quando a ausência de renovação automática tiver sido negociada.
+          </p>
+          {contratoAssinado ? (
+            <p className="mt-1 text-[12px] text-[#64748b]">
+              {CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG}
+            </p>
+          ) : null}
+          {renovacaoPendente && !contratoAssinado ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              {RENOVACAO_CONTRATO_PENDENTE_MSG}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-col gap-1.5 text-[12px] text-[#334155]">
+            {RENOVACAO_CONTRATO_OPCOES.map((opcao) => (
+              <label key={opcao.id} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`renovacao-contrato-${aprovacao.id}`}
+                  checked={renovacaoExibicao === opcao.id}
+                  disabled={busy || contratoAssinado}
+                  onChange={() => void handleEscolherRenovacao(opcao.id)}
+                />
+                <span>{opcao.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {isMensalidadeDoc && !pagamentoAvistaPlano ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">

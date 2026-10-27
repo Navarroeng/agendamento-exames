@@ -462,6 +462,10 @@ export function buildContratoNavarroDocumento(params: {
     diaVencimentoMensalidade: pagamentoAvista ? null : diaPlano,
     renovacaoBaseReais: renovacaoBase,
     renovacaoIncrementoReais: renovacaoIncremento,
+    renovacaoAutomatica:
+      mensalidade && aprovacao?.mensalidade_renovacao_automatica === false
+        ? false
+        : true,
   };
 
   const clausulas = buildClausulasContrato(ctx);

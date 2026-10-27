@@ -979,6 +979,136 @@ await run("PDF pontual e mensalidade", async () => {
     assert.ok(!rawOutro.includes("DADOS PARA PAGAMENTO"));
   });
 
+  await run("mensalidade sem renovação automática, mensal e à vista", () => {
+    const orcamento = makeOrcamento({
+      id: "o-ren",
+      numero: "ORC-2026-0300",
+      modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
+      valor_total: 350,
+      quantidade_parcelas: null,
+      forma_pagamento: null,
+      orcamento_itens: [
+        {
+          id: "i1",
+          orcamento_id: "o-ren",
+          servico_id: "s2",
+          servico_nome: GESTAO_SST_MENSAL_NOME,
+          quantidade: 23,
+          valor_unitario: 350,
+          valor_total: 350,
+          ordem: 0,
+        },
+      ],
+    });
+    const baseAprovacao = {
+      orcamento_id: "o-ren",
+      valor_final: 350,
+      quantidade_parcelas: null,
+      valor_parcela: null,
+      condicao_pagamento: "12 mensalidades",
+      mensalidade_renovacao_automatica: false as const,
+    };
+    const mensal = buildContratoNavarroDocumento({
+      orcamento,
+      aprovacao: makeAprovacao(baseAprovacao),
+      dataContrato: "2026-09-17",
+      diaVencimentoMensalidade: 10,
+    });
+    const texto = mensal.texto;
+    assert.match(texto, /A vigência deste contrato é de 12 meses/);
+    assert.match(texto, /será encerrado, sem renovação automática/);
+    assert.match(
+      texto,
+      /caberá à CONTRATANTE entrar em contato com a CONTRATADA/
+    );
+    assert.match(
+      texto,
+      /O encerramento da vigência não afasta o pagamento de valores/
+    );
+    assert.match(texto, /vencimentos ocorrerem após o término da vigência/);
+    assert.match(texto, /depende de novo acordo escrito/);
+    assert.match(texto, /Não há renovação automática nem cobrança automática/);
+    assert.match(texto, /R\$ 130,00/);
+    assert.match(texto, /R\$ 10,00 por colaborador/);
+    assert.match(texto, /dia 10 de cada mês/);
+    assert.match(texto, /desistência imotivada/);
+    assert.match(texto, /não gera multa adicional de cancelamento/);
+    assert.match(texto, /legislação aplicável/);
+    assert.match(texto, /descumprimento da CONTRATADA/);
+    assert.match(texto, /compromisso anual correspondente à vigência contratada/);
+    assert.doesNotMatch(texto, /automaticamente renovado/);
+    assert.doesNotMatch(texto, /30 \(trinta\) dias/);
+    assert.doesNotMatch(texto, /vigências renovadas/);
+    assert.doesNotMatch(texto, /preparação da renovação/);
+    assert.doesNotMatch(texto, /impedir a próxima renovação/);
+    const clausula7 = trechoClausula(texto, "7");
+    assert.match(clausula7, /sem renovação automática/);
+    assert.match(clausula7, /Se as partes ajustarem uma nova contratação por escrito/);
+    assert.doesNotMatch(clausula7, /30 \(trinta\) dias/);
+
+    const avista = buildContratoNavarroDocumento({
+      orcamento,
+      aprovacao: makeAprovacao({
+        ...baseAprovacao,
+        condicao_pagamento: "À vista",
+        valor_avista: 1400,
+        mensalidade_pagamento: "avista",
+        mensalidade_valor_mensal: 350,
+        mensalidade_meses: 12,
+        mensalidade_valor_bruto: 1560,
+        mensalidade_desconto_valor: 160,
+      }),
+      dataContrato: "2026-10-13",
+    });
+    assert.doesNotMatch(avista.texto, /dia 10 de cada mês|dia 20 de cada mês/);
+    assert.doesNotMatch(avista.texto, /preparação da renovação/);
+    assert.doesNotMatch(avista.texto, /automaticamente renovado/);
+    assert.doesNotMatch(avista.texto, /30 \(trinta\) dias/);
+    assert.match(avista.texto, /sem renovação automática/);
+    assert.match(avista.texto, /Não haverá mensalidades no período já pago antecipadamente/);
+    assert.match(avista.texto, /dependerá de novo acordo escrito/);
+    assert.match(avista.texto, /sem cobrança automática de novo período/);
+    assert.match(avista.texto, /desistência imotivada não gera devolução/);
+    assert.match(avista.texto, /quinto dia útil/);
+
+    const preservada = buildContratoNavarroDocumento({
+      orcamento,
+      aprovacao: makeAprovacao({
+        ...baseAprovacao,
+        mensalidade_renovacao_automatica: true,
+      }),
+      dataContrato: "2026-09-17",
+      diaVencimentoMensalidade: 20,
+    });
+    assert.match(preservada.texto, /automaticamente renovado/);
+    assert.match(preservada.texto, /30 \(trinta\) dias/);
+    assert.match(preservada.texto, /dia 20 de cada mês/);
+    assert.doesNotMatch(preservada.texto, /sem renovação automática/);
+
+    for (const [nome, documento] of [
+      ["mensal-sem", mensal],
+      ["avista-sem", avista],
+      ["mensal-com", preservada],
+    ] as const) {
+      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+      drawContratoPdfDocument(pdf, documento, null);
+      const paginas = pdf.getNumberOfPages();
+      assert.ok(paginas >= 2 && paginas <= 8, `${nome}: ${paginas} páginas`);
+      const raw = extractPdfLatin1(pdf.output("arraybuffer") as ArrayBuffer);
+      assert.ok(raw.includes("INSTRUMENTO PARTICULAR"), nome);
+      assert.ok(raw.includes("Página") || raw.includes("Pagina"), nome);
+      assert.ok(raw.includes("navarroeng.com.br"), nome);
+      assert.ok(!raw.includes("TODO"), nome);
+      assert.ok(!raw.includes("undefined"), nome);
+      assert.ok(!/NaN/.test(raw), nome);
+      const espacamento = /([0-9.]+) Tc/g;
+      let espaco: RegExpExecArray | null;
+      while ((espaco = espacamento.exec(raw))) {
+        assert.ok(Number(espaco[1]) <= 0.05, `${nome} espaçamento ${espaco[1]}`);
+      }
+    }
+  });
+
   await run("erro PostgREST plano não vira toast genérico", () => {
     const fallback = "Não foi possível gerar a prévia.";
     assert.equal(

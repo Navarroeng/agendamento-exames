@@ -50,6 +50,7 @@ import {
   ORCAMENTO_COM_CONTRATO_USE_ENCERRAR_MSG,
 } from "@/lib/contrato-permissoes";
 import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
+import { CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG } from "@/lib/contrato-vencimentos";
 import {
   mensagemErroMensalidadePagamento,
   resolverMesesVigenciaMensalidade,
@@ -162,6 +163,38 @@ export async function salvarParametrosContratoMensalidade(params: {
         exameAdmissional ?? CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos,
       mensalidade_exame_demissional_centavos:
         exameDemissional ?? CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.aprovacaoId)
+    .select(APROVACAO_SELECT)
+    .single();
+  if (error) throw error;
+  return sortAprovacao(data as OrcamentoAprovacaoRecord);
+}
+
+/** Grava a renovação da Gestão SST mensal. Contrato assinado não é alterado. */
+export async function salvarRenovacaoContratoMensalidade(params: {
+  aprovacaoId: string;
+  renovacaoAutomatica: boolean;
+}): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const { data: beforeRaw, error: beforeError } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(APROVACAO_SELECT)
+    .eq("id", params.aprovacaoId)
+    .single();
+  if (beforeError) throw beforeError;
+  const before = sortAprovacao(beforeRaw as OrcamentoAprovacaoRecord);
+  if (before.contrato_assinado) {
+    throw new Error(CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG);
+  }
+  if (before.mensalidade_renovacao_automatica === params.renovacaoAutomatica) {
+    return before;
+  }
+  const { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .update({
+      mensalidade_renovacao_automatica: params.renovacaoAutomatica,
       updated_at: new Date().toISOString(),
     })
     .eq("id", params.aprovacaoId)

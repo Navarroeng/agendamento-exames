@@ -58,6 +58,38 @@ export type DiaVencimentoMensalidade =
 export const DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG =
   "Selecione o dia de vencimento das mensalidades (10 ou 20) antes de gerar o contrato.";
 
+/** Escolha gravada na contratação. Null não é renovação automática. */
+export type RenovacaoContratoGestao = "automatica" | "nao_automatica";
+
+export const RENOVACAO_CONTRATO_OPCOES: readonly {
+  id: RenovacaoContratoGestao;
+  label: string;
+}[] = [
+  { id: "automatica", label: "Automática." },
+  { id: "nao_automatica", label: "Sem renovação automática." },
+] as const;
+
+export const RENOVACAO_CONTRATO_PENDENTE_MSG =
+  "Selecione a renovação do contrato antes de gerar o PDF.";
+
+export function renovacaoContratoSalva(
+  value: boolean | null | undefined
+): RenovacaoContratoGestao | null {
+  if (value === true) return "automatica";
+  if (value === false) return "nao_automatica";
+  return null;
+}
+
+/** Rótulo da listagem e do modal. Não infere pela modalidade nem pelo pagamento. */
+export function labelRenovacaoContratoListagem(
+  value: boolean | null | undefined
+): "Automática" | "Não automática" | "—" {
+  const modo = renovacaoContratoSalva(value);
+  if (modo === "automatica") return "Automática";
+  if (modo === "nao_automatica") return "Não automática";
+  return "—";
+}
+
 export function diaVencimentoMensalidadeValido(
   value: unknown
 ): DiaVencimentoMensalidade | null {
@@ -197,6 +229,11 @@ export type ContratoNavarroContexto = {
   /** Parâmetros da fórmula de renovação gravados nesta contratação. */
   renovacaoBaseReais?: number | null;
   renovacaoIncrementoReais?: number | null;
+  /**
+   * false quando a contratação gravou a ausência de renovação automática.
+   * Ausente ou true mantém o modelo de renovação automática.
+   */
+  renovacaoAutomatica?: boolean;
 };
 
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -362,7 +399,9 @@ function redigirExamesGestaoMensalidade(ctx: ContratoNavarroContexto): string[] 
     "O exame clínico demissional desses novos colaboradores também será cobrado separadamente durante a mesma vigência.",
     redigirValorExameClinicoAvulso(ctx),
     "Exames complementares são sempre cobrados à parte, inclusive quando o exame clínico estiver incluído no plano, conforme necessidade prevista no PCMSO e autorização da CONTRATANTE.",
-    "Nas renovações, a cobertura será aplicada aos colaboradores abrangidos pelo plano renovado.",
+    semRenovacaoAutomatica(ctx)
+      ? "Em uma nova contratação ajustada por escrito, a cobertura será aplicada aos colaboradores abrangidos pelo novo acordo. Não há renovação automática desta cobertura."
+      : "Nas renovações, a cobertura será aplicada aos colaboradores abrangidos pelo plano renovado.",
     "Essa regra comercial de cobertura não altera a indicação nem a periodicidade médica dos exames.",
   ];
 }
@@ -438,15 +477,27 @@ function parametrosRenovacao(ctx: ContratoNavarroContexto): {
   };
 }
 
+function semRenovacaoAutomatica(ctx: ContratoNavarroContexto): boolean {
+  return ctx.renovacaoAutomatica === false;
+}
+
 function redigirCalculoRenovacao(ctx: ContratoNavarroContexto): string[] {
   const params = parametrosRenovacao(ctx);
   const base = formatCurrency(params.baseReais);
   const incremento = formatCurrency(params.incrementoReais);
   const exemplo = (quantidade: number) =>
     formatCurrency(valorMensalidadeRenovacaoGestaoSst(quantidade, params));
+  const criterio = `Para zero ou um colaborador, a mensalidade será de ${base}. A partir do segundo, serão acrescentados ${incremento} por colaborador. Por exemplo: 2 colaboradores, ${exemplo(2)}; 10 colaboradores, ${exemplo(10)}; e 15 colaboradores, ${exemplo(15)} mensais.`;
+  if (semRenovacaoAutomatica(ctx)) {
+    return [
+      "A continuidade dos serviços após o término desta vigência depende de novo acordo escrito entre as partes. Não há renovação automática nem cobrança automática de novo período.",
+      `Se as partes ajustarem uma nova contratação por escrito, o valor mensal será calculado conforme a quantidade de colaboradores ativos no início do novo período, considerando as admissões e os desligamentos informados pela CONTRATANTE. ${criterio} Esse critério não altera as cobranças do período em andamento.`,
+      "O pagamento antecipado e o desconto são válidos somente para o período contratado. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de pagamento antecipado.",
+    ];
+  }
   return [
     "Na renovação, o valor mensal será calculado conforme a quantidade de colaboradores ativos no início do novo período, considerando as admissões e os desligamentos informados pela CONTRATANTE.",
-    `Para zero ou um colaborador, a mensalidade será de ${base}. A partir do segundo, serão acrescentados ${incremento} por colaborador. Por exemplo: 2 colaboradores, ${exemplo(2)}; 10 colaboradores, ${exemplo(10)}; e 15 colaboradores, ${exemplo(15)} mensais. O novo valor será aplicado somente na renovação, sem alterar as cobranças do período em andamento.`,
+    `${criterio} O novo valor será aplicado somente na renovação, sem alterar as cobranças do período em andamento.`,
     "O pagamento antecipado e o desconto são válidos somente para o período contratado. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito para pagamento antecipado.",
   ];
 }
@@ -458,7 +509,9 @@ function redigirRenovacaoSimplificada(
   const paragrafos: string[] = [];
   if (avista) {
     paragrafos.push(
-      "O dia de vencimento será definido na preparação da renovação. Não haverá mensalidades no período já pago antecipadamente. Quando houver cobrança mensal, serão 12 mensalidades por vigência, e a primeira vencerá no mês seguinte ao início da vigência renovada."
+      semRenovacaoAutomatica(ctx)
+        ? "Não haverá mensalidades no período já pago antecipadamente. A continuidade dos serviços, se houver, dependerá de novo acordo escrito, no qual será definido o dia de vencimento. Não há cobrança automática de novo período."
+        : "O dia de vencimento será definido na preparação da renovação. Não haverá mensalidades no período já pago antecipadamente. Quando houver cobrança mensal, serão 12 mensalidades por vigência, e a primeira vencerá no mês seguinte ao início da vigência renovada."
     );
   } else {
     const dia = diaVencimentoMensalidadeValido(ctx.diaVencimentoMensalidade);
@@ -558,19 +611,32 @@ function redigirVigencia(ctx: ContratoNavarroContexto): string[] {
         `A vigência inicial tem início em ${formatDateIsoToBR(vigencia.inicio)} e término em ${formatDateIsoToBR(vigencia.fim)}.`
       );
     }
-    paragrafos.push(
-      `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência para impedir a próxima renovação.`
-    );
+    if (semRenovacaoAutomatica(ctx)) {
+      paragrafos.push(
+        "A vigência deste contrato é de 12 meses. Ao término desse período, o contrato será encerrado, sem renovação automática. Caso tenha interesse na continuidade dos serviços, caberá à CONTRATANTE entrar em contato com a CONTRATADA para ajustar uma nova contratação, mediante acordo escrito entre as partes."
+      );
+      paragrafos.push(
+        "O encerramento da vigência não afasta o pagamento de valores relativos aos serviços prestados e às parcelas da contratação, inclusive quando seus vencimentos ocorrerem após o término da vigência."
+      );
+    } else {
+      paragrafos.push(
+        `Ao término da vigência, o contrato será automaticamente renovado por períodos sucessivos de ${formatNumeroComExtenso(meses)} meses, salvo comunicação escrita de qualquer das partes com antecedência mínima de ${formatNumeroComExtenso(CONTRATO_AVISO_PREVIO_DIAS)} dias do término da vigência para impedir a próxima renovação.`
+      );
+    }
     paragrafos.push(...redigirCalculoRenovacao(ctx));
     paragrafos.push(
-      "O pagamento mensal é a forma de pagamento de um compromisso anual, inclusive nas vigências renovadas."
+      semRenovacaoAutomatica(ctx)
+        ? "O pagamento mensal é a forma de pagamento de um compromisso anual correspondente à vigência contratada."
+        : "O pagamento mensal é a forma de pagamento de um compromisso anual, inclusive nas vigências renovadas."
     );
     paragrafos.push(
       "A desistência imotivada da CONTRATANTE durante uma vigência não afasta o compromisso financeiro até o término dessa vigência e não gera multa adicional de cancelamento."
     );
     if (ctx.pagamentoMensalidade?.forma === "avista") {
       paragrafos.push(
-        "No pagamento antecipado, a desistência imotivada não gera devolução do valor daquele período. A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. Nas renovações, a cobrança do plano segue a forma mensal prevista na cláusula de pagamento, salvo ajuste escrito em contrário antes do início do novo período."
+        semRenovacaoAutomatica(ctx)
+          ? "No pagamento antecipado, a desistência imotivada não gera devolução do valor daquele período. A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. A continuidade, se houver, dependerá de novo acordo escrito. Nesse acordo, a forma de cobrança será a ajustada por escrito, sem cobrança automática de novo período."
+          : "No pagamento antecipado, a desistência imotivada não gera devolução do valor daquele período. A ausência de vencimentos mensais do plano limita-se ao período efetivamente pago antecipadamente. Nas renovações, a cobrança do plano segue a forma mensal prevista na cláusula de pagamento, salvo ajuste escrito em contrário antes do início do novo período."
       );
     } else {
       paragrafos.push(

@@ -11,6 +11,7 @@ import {
 import type { ClienteRecord } from "@/lib/types";
 
 import { ClientesPagination } from "./ClientesPagination";
+import { RenovacaoContratoBadge } from "./RenovacaoContratoBadge";
 
 interface ClientesTableProps {
   clientes: ClienteRecord[];
@@ -22,6 +23,7 @@ interface ClientesTableProps {
   pageSize: number;
   hasActiveSearch: boolean;
   highlightClienteId?: string | null;
+  renovacaoPorCliente?: Record<string, boolean | null>;
   onAbrir: (id: string) => void;
   onPageChange: (page: number) => void;
 }
@@ -36,6 +38,7 @@ export function ClientesTable({
   pageSize,
   hasActiveSearch,
   highlightClienteId,
+  renovacaoPorCliente,
   onAbrir,
   onPageChange,
 }: ClientesTableProps) {
@@ -65,12 +68,14 @@ export function ClientesTable({
         )}
 
         {!loading && !error && clientes.length > 0 && (
-          <table className="table-premium w-full min-w-[520px]">
+          <table className="table-premium w-full min-w-[680px]">
             <thead>
               <tr>
-                {["Nome", "CNPJ", "Agendamento", "Ações"].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
+                {["Nome", "CNPJ", "Agendamento", "Renovação", "Ações"].map(
+                  (h) => (
+                    <th key={h}>{h}</th>
+                  )
+                )}
               </tr>
             </thead>
 
@@ -108,6 +113,14 @@ export function ClientesTable({
                         </span>
                       );
                     })()}
+                  </td>
+
+                  <td>
+                    <RenovacaoContratoBadge
+                      renovacaoAutomatica={
+                        renovacaoPorCliente?.[cliente.id] ?? null
+                      }
+                    />
                   </td>
 
                   <td>

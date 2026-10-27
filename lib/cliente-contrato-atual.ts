@@ -22,6 +22,11 @@ export type ContextoCobrancaContrato = {
    * Ausente em contratos antigos: a tela usa o catálogo da modalidade.
    */
   exameAdmissionalReais?: number | null;
+  /**
+   * Condição gravada na contratação deste contrato.
+   * Ausente ou null não autoriza exibir renovação automática.
+   */
+  renovacaoAutomatica?: boolean | null;
 };
 
 export type ClienteContratoConsulta = ClienteContratoRecord &
@@ -193,6 +198,20 @@ export function deduplicarContratos<T extends ClienteContratoConsulta>(
  * Não escolhe o registro mais recente nem um início futuro.
  * Sem vigente, mantém o expirado operacional para a tela não esconder o vínculo.
  */
+/**
+ * Condição gravada no contrato atual. Sem contrato ou sem o campo, null.
+ * Não usa modalidade, parcelas nem forma de pagamento.
+ */
+export function renovacaoSalvaDoContratoAtual(
+  contratos: ClienteContratoConsulta[],
+  hojeIso?: string
+): boolean | null {
+  const atual = selecionarContratoAtual(contratos, hojeIso);
+  if (atual?.renovacaoAutomatica === true) return true;
+  if (atual?.renovacaoAutomatica === false) return false;
+  return null;
+}
+
 export function selecionarContratoAtual<T extends ClienteContratoConsulta>(
   contratos: T[],
   hojeIso: string = todayIsoSaoPaulo()

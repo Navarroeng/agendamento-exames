@@ -13,10 +13,11 @@ import {
   type DisponibilidadeAgendamentoResult,
 } from "@/lib/cliente-disponibilidade-agendamento";
 import { formatDateBR } from "@/lib/format";
-import type { ClienteContratoRecord } from "@/lib/types";
+import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
+import { RenovacaoContratoBadge } from "./RenovacaoContratoBadge";
 
 interface ClienteContratoAtualCardProps {
-  contrato: ClienteContratoRecord | null;
+  contrato: ClienteContratoConsulta | null;
   /** Mesmo resultado da listagem e do campo do cliente. */
   disponibilidade?: Pick<DisponibilidadeAgendamentoResult, "label"> | null;
 }
@@ -146,6 +147,16 @@ export function ClienteContratoAtualCard({
           label="Reajuste"
           value={formatReajusteContrato(contrato.reajuste_percentual)}
         />
+        <div className="rounded-xl border border-[#e8edf5] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b95a8]">
+            Renovação
+          </p>
+          <div className="mt-1">
+            <RenovacaoContratoBadge
+              renovacaoAutomatica={contrato.renovacaoAutomatica}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
