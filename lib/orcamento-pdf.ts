@@ -70,6 +70,7 @@ import {
   parseQuantidadeParcelasInteira,
   PROPOSTA_DESCRICAO_PARAGRAFOS_PARECER_TECNICO,
 } from "@/lib/servico-parecer-tecnico";
+import { anexarUltimaPaginaOrcamento } from "@/lib/orcamento-pdf-institucional";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
 
@@ -2577,6 +2578,26 @@ export function drawOrcamentoPdfDocument(
   }
 }
 
+/** Anexa o flyer depois do rodapé, sem redesenhar nem numerar essa página. */
+export async function finalizarPdfOrcamento(doc: JsPDF): Promise<Uint8Array> {
+  const bruto = new Uint8Array(doc.output("arraybuffer") as ArrayBuffer);
+  return anexarUltimaPaginaOrcamento(bruto);
+}
+
+function baixarPdf(bytes: Uint8Array, filename: string): void {
+  const copia = new Uint8Array(bytes.byteLength);
+  copia.set(bytes);
+  const blob = new Blob([copia], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 async function carregarParametrosPropostaMensalidade(orcamentoId: string) {
   try {
     const { obterParametrosPropostaMensalidade } = await import(
@@ -2614,5 +2635,6 @@ export async function gerarPdfOrcamento(
     propostaMensalidade,
   });
 
-  doc.save(buildFilename(orcamento));
+  const bytes = await finalizarPdfOrcamento(doc);
+  baixarPdf(bytes, buildFilename(orcamento));
 }
