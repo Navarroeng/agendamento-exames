@@ -101,6 +101,12 @@ const painel = readFileSync(
 assert.match(painel, /Renovação do contrato/);
 assert.match(painel, /RENOVACAO_CONTRATO_OPCOES/);
 assert.match(painel, /salvarRenovacaoContratoMensalidade/);
+assert.match(painel, /RENOVACAO_CONTRATO_MIGRATION_MSG/);
+assert.match(painel, /RENOVACAO_CONTRATO_NOVA_VERSAO_MSG/);
+assert.ok(
+  painel.indexOf("Renovação do contrato") < painel.indexOf("Gerar contrato"),
+  "a renovação precisa aparecer antes dos botões de geração"
+);
 assert.match(
   readFileSync("lib/contrato-navarro.ts", "utf8"),
   /Sem renovação automática/

@@ -162,10 +162,12 @@ export async function listarFechamentosGestaoComercial(): Promise<
     .order("aprovado_em", { ascending: false });
 
   if (error && colunaReversaoAindaNaoExiste(error)) {
-    ({ data, error } = await supabase
+    const legado = await supabase
       .from("orcamento_aprovacoes")
       .select(selectFechamentosLegado)
-      .order("aprovado_em", { ascending: false }));
+      .order("aprovado_em", { ascending: false });
+    data = legado.data as typeof data;
+    error = legado.error;
   }
 
   if (error) throw error;
@@ -368,13 +370,15 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
       .order("id", { ascending: true })
       .range(from, from + SELECT_PAGE_SIZE - 1);
     if (error && colunaReversaoAindaNaoExiste(error)) {
-      ({ data, error } = await supabase
+      const legado = await supabase
         .from("orcamento_mensalidade_parcelas")
         .select(
           "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
         )
         .order("id", { ascending: true })
-        .range(from, from + SELECT_PAGE_SIZE - 1));
+        .range(from, from + SELECT_PAGE_SIZE - 1);
+      data = legado.data as typeof data;
+      error = legado.error;
     }
     if (error) {
       if (parcelasAusentes(error)) {

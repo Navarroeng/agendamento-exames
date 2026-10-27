@@ -65,12 +65,18 @@ export const RENOVACAO_CONTRATO_OPCOES: readonly {
   id: RenovacaoContratoGestao;
   label: string;
 }[] = [
-  { id: "automatica", label: "Automática." },
-  { id: "nao_automatica", label: "Sem renovação automática." },
+  { id: "automatica", label: "Automática" },
+  { id: "nao_automatica", label: "Sem renovação automática" },
 ] as const;
 
 export const RENOVACAO_CONTRATO_PENDENTE_MSG =
   "Selecione a renovação do contrato antes de gerar o PDF.";
+
+export const RENOVACAO_CONTRATO_MIGRATION_MSG =
+  "A coluna mensalidade_renovacao_automatica ainda não existe no banco. Execute a migration 145_mensalidade_renovacao_automatica.sql no Supabase. A opção permanece visível, mas ainda não pode ser gravada.";
+
+export const RENOVACAO_CONTRATO_NOVA_VERSAO_MSG =
+  "O PDF já gerado não muda sozinho. Depois de alterar a opção, gere uma nova versão para a cláusula 7 usar a escolha.";
 
 export function renovacaoContratoSalva(
   value: boolean | null | undefined

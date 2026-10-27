@@ -21,6 +21,8 @@ import {
 import {
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
   DIAS_VENCIMENTO_MENSALIDADE,
+  RENOVACAO_CONTRATO_MIGRATION_MSG,
+  RENOVACAO_CONTRATO_NOVA_VERSAO_MSG,
   RENOVACAO_CONTRATO_OPCOES,
   RENOVACAO_CONTRATO_PENDENTE_MSG,
   diaVencimentoMensalidadeValido,
@@ -115,6 +117,9 @@ export function OrcamentoContratoGerarPanel({
   );
   const [renovacaoLocal, setRenovacaoLocal] =
     useState<RenovacaoContratoGestao | null>(null);
+  const [avisoMigracaoRenovacao, setAvisoMigracaoRenovacao] = useState<
+    string | null
+  >(null);
   const [parametrosLocais, setParametrosLocais] =
     useState<OrcamentoAprovacaoRecord | null>(null);
   const loadSeq = useRef(0);
@@ -687,6 +692,7 @@ export function OrcamentoContratoGerarPanel({
       });
       setParametrosLocais(atualizada);
       onAprovacaoAtualizada?.(atualizada);
+      setAvisoMigracaoRenovacao(null);
       const revisao = revisaoCondicoesAprovacao(atualizada);
       if (revisao != null) setRevisaoVigente(revisao);
     } catch (err) {
@@ -697,12 +703,11 @@ export function OrcamentoContratoGerarPanel({
         "Não foi possível salvar a renovação do contrato."
       );
       const faltaColuna =
-        /mensalidade_renovacao_automatica|schema cache/i.test(detalhe);
-      toast.error(
-        faltaColuna
-          ? `${detalhe} Execute a migration 145_mensalidade_renovacao_automatica.sql.`
-          : detalhe
-      );
+        /mensalidade_renovacao_automatica|schema cache|42703/i.test(detalhe);
+      if (faltaColuna) {
+        setAvisoMigracaoRenovacao(RENOVACAO_CONTRATO_MIGRATION_MSG);
+      }
+      toast.error(faltaColuna ? RENOVACAO_CONTRATO_MIGRATION_MSG : detalhe);
     } finally {
       setWorking(false);
     }
@@ -789,8 +794,7 @@ export function OrcamentoContratoGerarPanel({
 
   return (
     <section className="rounded-xl border border-[#dbe4f0] bg-[#f8fbff] px-4 py-3.5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div>
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
             Contrato automático
           </p>
@@ -827,8 +831,55 @@ export function OrcamentoContratoGerarPanel({
               histórico.
             </p>
           ) : null}
+      </div>
+
+      {isMensalidadeDoc ? (
+        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
+            Renovação do contrato
+          </p>
+          <p className="mt-1 text-[11px] text-[#64748b]">
+            Automática é o padrão das novas contratações. Use a outra opção
+            quando a ausência de renovação automática tiver sido negociada.
+          </p>
+          {avisoMigracaoRenovacao ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              {avisoMigracaoRenovacao}
+            </p>
+          ) : null}
+          {contratoAssinado ? (
+            <p className="mt-1 text-[12px] text-[#64748b]">
+              Condição registrada apenas para consulta. A renovação não pode
+              ser alterada.
+            </p>
+          ) : atual ? (
+            <p className="mt-1 text-[12px] text-[#92400e]">
+              {RENOVACAO_CONTRATO_NOVA_VERSAO_MSG}
+            </p>
+          ) : null}
+          {renovacaoPendente && !contratoAssinado && !avisoMigracaoRenovacao ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
+              {RENOVACAO_CONTRATO_PENDENTE_MSG}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-col gap-1.5 text-[12px] text-[#334155]">
+            {RENOVACAO_CONTRATO_OPCOES.map((opcao) => (
+              <label key={opcao.id} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`renovacao-contrato-${aprovacao.id}`}
+                  checked={renovacaoExibicao === opcao.id}
+                  disabled={busy || contratoAssinado}
+                  onChange={() => void handleEscolherRenovacao(opcao.id)}
+                />
+                <span>{opcao.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
           {motivoBloqueio ? null : !atual ? (
             <button
               type="button"
@@ -882,44 +933,7 @@ export function OrcamentoContratoGerarPanel({
               </button>
             </>
           )}
-        </div>
       </div>
-
-      {isMensalidadeDoc ? (
-        <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
-            Renovação do contrato
-          </p>
-          <p className="mt-1 text-[11px] text-[#64748b]">
-            Automática é o padrão das novas contratações. Use a outra opção
-            quando a ausência de renovação automática tiver sido negociada.
-          </p>
-          {contratoAssinado ? (
-            <p className="mt-1 text-[12px] text-[#64748b]">
-              {CONTRATO_ASSINADO_BLOQUEIA_REGENERACAO_MSG}
-            </p>
-          ) : null}
-          {renovacaoPendente && !contratoAssinado ? (
-            <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
-              {RENOVACAO_CONTRATO_PENDENTE_MSG}
-            </p>
-          ) : null}
-          <div className="mt-2 flex flex-col gap-1.5 text-[12px] text-[#334155]">
-            {RENOVACAO_CONTRATO_OPCOES.map((opcao) => (
-              <label key={opcao.id} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name={`renovacao-contrato-${aprovacao.id}`}
-                  checked={renovacaoExibicao === opcao.id}
-                  disabled={busy || contratoAssinado}
-                  onChange={() => void handleEscolherRenovacao(opcao.id)}
-                />
-                <span>{opcao.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {isMensalidadeDoc && !pagamentoAvistaPlano ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
