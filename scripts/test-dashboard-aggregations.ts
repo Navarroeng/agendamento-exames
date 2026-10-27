@@ -2,7 +2,12 @@
 
 import assert from "node:assert/strict";
 import { agendamentoFiltersFromSearchParams } from "../lib/agendamento-filters";
-import { buildDashboardKpis } from "../lib/dashboard/aggregations";
+import {
+  buildDashboardKpiDetailRows,
+  buildDashboardKpiLists,
+  buildDashboardKpis,
+  filterDashboardKpiRowsBySearch,
+} from "../lib/dashboard/aggregations";
 import { buildDashboardCardHrefs } from "../lib/dashboard/links";
 import {
   getDashboardMonthBounds,
@@ -225,6 +230,139 @@ test("periódicos: 31/07 vencido; agosto no mês atual; 01/09 fora", () => {
   );
   assert.equal(kpis.periodicosVencidos, 1);
   assert.equal(kpis.periodicosVencendoMesAtual, 2);
+});
+
+test("listas do modal têm os mesmos registros da contagem dos cards", () => {
+  const agendamentos = [
+    agendamento({ id: "jul", data_agendamento: "2026-07-31", envio_esocial: false }),
+    agendamento({ id: "ago", data_agendamento: "2026-08-01", envio_esocial: false }),
+    agendamento({
+      id: "jul-enviado",
+      data_agendamento: "2026-07-31",
+      envio_esocial: true,
+      aso_assinado: true,
+      aso_enviado_cliente: true,
+    }),
+    agendamento({
+      id: "jul-cancelado",
+      data_agendamento: "2026-07-31",
+      status: "cancelado",
+    }),
+    agendamento({ id: "hoje", data_agendamento: "2026-08-15" }),
+  ];
+  const periodicos = [
+    periodico({ id: "jul", proxima_data: "2026-07-31" }),
+    periodico({ id: "ago", proxima_data: "2026-08-10" }),
+    periodico({
+      id: "jul-canc",
+      proxima_data: "2026-07-31",
+      status: "cancelado",
+      cancelado_em: "2026-07-20",
+      motivo_cancelamento: "Cancelado",
+    }),
+  ];
+  const kpis = buildDashboardKpis(agendamentos, periodicos, agoraAgosto);
+  const lists = buildDashboardKpiLists(agendamentos, periodicos, agoraAgosto);
+
+  assert.equal(lists.pendenciasEsocial.length, kpis.pendenciasEsocial);
+  assert.deepEqual(
+    lists.pendenciasEsocial.map((row) => row.id),
+    ["jul"]
+  );
+  assert.equal(lists.asosNaoRecebidosClinicas.length, kpis.asosNaoRecebidosClinicas);
+  assert.deepEqual(
+    lists.asosNaoRecebidosClinicas.map((row) => row.id),
+    ["jul"]
+  );
+  assert.equal(lists.asosNaoEnviadosClientes.length, kpis.asosNaoEnviadosClientes);
+  assert.deepEqual(
+    lists.asosNaoEnviadosClientes.map((row) => row.id),
+    ["jul"]
+  );
+  assert.equal(lists.periodicosVencidos.length, kpis.periodicosVencidos);
+  assert.deepEqual(
+    lists.periodicosVencidos.map((row) => row.id),
+    ["jul"]
+  );
+  assert.equal(
+    lists.periodicosVencendoMesAtual.length,
+    kpis.periodicosVencendoMesAtual
+  );
+  assert.deepEqual(
+    lists.periodicosVencendoMesAtual.map((row) => row.id),
+    ["ago"]
+  );
+  assert.equal(lists.agendamentosDoDia.length, kpis.agendamentosDoDia);
+  assert.deepEqual(
+    lists.agendamentosDoDia.map((row) => row.id),
+    ["hoje"]
+  );
+});
+
+test("detalhe e-Social usa status do módulo e não mistura competência atual", () => {
+  const rows = buildDashboardKpiDetailRows(
+    "pendenciasEsocial",
+    [
+      agendamento({
+        id: "jul",
+        data_agendamento: "2026-07-31",
+        colaborador: "ISABEL TELES",
+        cliente_nome: "PORTAL DO CRESCER",
+        envio_esocial: false,
+      }),
+      agendamento({
+        id: "ago",
+        data_agendamento: "2026-08-01",
+        colaborador: "OUTRO",
+        envio_esocial: false,
+      }),
+    ],
+    [],
+    agoraAgosto
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, "jul");
+  assert.equal(rows[0].colaborador, "ISABEL TELES");
+  assert.ok(["Pendente", "Enviar urgente"].includes(rows[0].status));
+});
+
+test("busca do modal filtra colaborador/empresa sem alterar a lista-fonte", () => {
+  const rows = buildDashboardKpiDetailRows(
+    "agendamentosDoDia",
+    [
+      agendamento({
+        id: "a",
+        data_agendamento: "2026-08-15",
+        colaborador: "ISABEL TELES",
+        cliente_nome: "PORTAL DO CRESCER",
+      }),
+      agendamento({
+        id: "b",
+        data_agendamento: "2026-08-15",
+        colaborador: "MARIA SILVA",
+        cliente_nome: "OUTRA EMPRESA",
+      }),
+    ],
+    [],
+    agoraAgosto
+  );
+  assert.equal(rows.length, 2);
+  const filtrados = filterDashboardKpiRowsBySearch(rows, "isabel");
+  assert.deepEqual(
+    filtrados.map((row) => row.id),
+    ["a"]
+  );
+  const empresa = filterDashboardKpiRowsBySearch(rows, "portal");
+  assert.deepEqual(
+    empresa.map((row) => row.id),
+    ["a"]
+  );
+  assert.equal(filterDashboardKpiRowsBySearch(rows, "inexistente").length, 0);
+});
+
+test("modal vazio quando o indicador é zero", () => {
+  const rows = buildDashboardKpiDetailRows("periodicosVencidos", [], [], agoraAgosto);
+  assert.equal(rows.length, 0);
 });
 
 test("agendamentos de hoje usa a data de referência, não o mês inteiro", () => {

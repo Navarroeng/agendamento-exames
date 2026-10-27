@@ -1,5 +1,13 @@
 export type DashboardAgendaFilter = "hoje" | "amanha" | "semana";
 
+export type DashboardKpiKey =
+  | "pendenciasEsocial"
+  | "asosNaoRecebidosClinicas"
+  | "asosNaoEnviadosClientes"
+  | "periodicosVencidos"
+  | "periodicosVencendoMesAtual"
+  | "agendamentosDoDia";
+
 export interface DashboardKpis {
   pendenciasEsocial: number;
   asosNaoRecebidosClinicas: number;
@@ -7,6 +15,42 @@ export interface DashboardKpis {
   periodicosVencidos: number;
   periodicosVencendoMesAtual: number;
   agendamentosDoDia: number;
+}
+
+export type DashboardKpiStatusTone =
+  | "active"
+  | "pending"
+  | "overdue"
+  | "draft"
+  | "cancelled";
+
+export type DashboardKpiColumnId =
+  | "horario"
+  | "colaborador"
+  | "empresa"
+  | "data"
+  | "clinica"
+  | "tipoAso"
+  | "exame"
+  | "status";
+
+export interface DashboardKpiColumn {
+  id: DashboardKpiColumnId;
+  label: string;
+}
+
+export interface DashboardKpiDetailRow {
+  id: string;
+  colaborador: string;
+  empresa: string;
+  dataIso: string;
+  dataLabel: string;
+  horario: string;
+  clinica: string;
+  tipoAso: string;
+  exame: string;
+  status: string;
+  statusTone: DashboardKpiStatusTone;
 }
 
 export interface DashboardAgendaRow {
@@ -17,7 +61,7 @@ export interface DashboardAgendaRow {
   horario: string;
   clinica: string;
   status: string;
-  statusTone: "active" | "pending" | "overdue" | "draft" | "cancelled";
+  statusTone: DashboardKpiStatusTone;
   dataIso: string;
 }
 

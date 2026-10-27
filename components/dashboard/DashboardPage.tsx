@@ -5,12 +5,26 @@ import { Panel } from "@/components/ui/Panel";
 import { IconCalendar, IconHome } from "@/components/ui/icons/OutlineIcons";
 import { useDashboardPage } from "@/hooks/useDashboardPage";
 import { DashboardAgenda } from "./DashboardAgenda";
+import { DashboardKpiDetailModal } from "./DashboardKpiDetailModal";
 import { DashboardQuickActions } from "./DashboardQuickActions";
-import { DashboardSummaryCards } from "./DashboardSummaryCards";
+import {
+  DASHBOARD_KPI_CARD_ICONS,
+  DashboardSummaryCards,
+} from "./DashboardSummaryCards";
 
 export function DashboardPage() {
-  const { loading, error, kpis, agenda, agendaFilter, setAgendaFilter } =
-    useDashboardPage();
+  const {
+    loading,
+    error,
+    kpis,
+    agenda,
+    agendaFilter,
+    setAgendaFilter,
+    selectedKpi,
+    selectedKpiRows,
+    openKpiDetail,
+    closeKpiDetail,
+  } = useDashboardPage();
 
   return (
     <AppShell
@@ -33,7 +47,7 @@ export function DashboardPage() {
 
         {!loading && !error && (
           <>
-            <DashboardSummaryCards kpis={kpis} />
+            <DashboardSummaryCards kpis={kpis} onCardClick={openKpiDetail} />
 
             <Panel
               title="Atividades do Dia"
@@ -49,6 +63,13 @@ export function DashboardPage() {
           </>
         )}
       </div>
+
+      <DashboardKpiDetailModal
+        kpiKey={selectedKpi}
+        rows={selectedKpiRows}
+        icon={selectedKpi ? DASHBOARD_KPI_CARD_ICONS[selectedKpi] : null}
+        onClose={closeKpiDetail}
+      />
     </AppShell>
   );
 }
