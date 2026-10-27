@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { RequiredMark } from "@/components/ui/Field";
@@ -95,6 +95,7 @@ import {
   type OrcamentoEtapaId,
   type OrcamentoEtapasContexto,
 } from "@/lib/orcamento-etapas";
+import { chaveSessaoModalOrcamento } from "@/lib/orcamento-modal-sessao";
 import { buildMensagemVisitaTecnica } from "@/lib/orcamento-visita-mensagem";
 import type { ContratoAgendamentoContagem } from "@/lib/contrato-agendamentos";
 import {
@@ -282,13 +283,24 @@ export function OrcamentoAprovarModal({
     useState<ContratoAgendamentoContagem | null>(null);
   const [treinoForm, setTreinoForm] =
     useState<OrcamentoAbaTreinamentoForm>(emptyTreinamentoForm);
+  const sessaoModalRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!open || !orcamento) return;
+    if (!open || !orcamento) {
+      sessaoModalRef.current = null;
+      return;
+    }
+    const sessao = chaveSessaoModalOrcamento({
+      orcamentoId: orcamento.id,
+      mode,
+      initialTab,
+    });
+    if (sessaoModalRef.current === sessao) return;
+    sessaoModalRef.current = sessao;
     const treinamentosId = resolveTreinamentosServicoId(servicos);
     const itens = resolveItensParaFluxoImplantacao({
       aprovacaoItens: aprovacao?.orcamento_aprovacao_itens,
