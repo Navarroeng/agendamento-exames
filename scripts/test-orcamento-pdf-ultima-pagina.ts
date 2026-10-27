@@ -103,14 +103,17 @@ function sha256(bytes: Uint8Array): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+function resolver(doc: PDFDocument, value: unknown): unknown {
+  return value instanceof PDFRef ? doc.context.lookup(value) : value;
+}
+
 function conteudoDaPagina(doc: PDFDocument, pageIndex: number): Buffer {
   const page = doc.getPage(pageIndex);
-  let contents = page.node.Contents();
-  if (contents instanceof PDFRef) contents = doc.context.lookup(contents);
+  const contents = resolver(doc, page.node.Contents());
   const partes = contents instanceof PDFArray ? contents.asArray() : [contents];
   const buffers: Buffer[] = [];
   for (const item of partes) {
-    const stream = item instanceof PDFRef ? doc.context.lookup(item) : item;
+    const stream = resolver(doc, item);
     if (stream instanceof PDFRawStream) {
       buffers.push(Buffer.from(decodePDFRawStream(stream).decode()));
     } else if (stream instanceof PDFStream) {
@@ -128,15 +131,13 @@ function imagensDaPagina(doc: PDFDocument, pageIndex: number): string[] {
 
   const visitar = (dict: PDFDict | undefined) => {
     if (!dict) return;
-    const resolvido = dict.lookup(PDFName.of("XObject"));
-    const xobjects =
-      resolvido instanceof PDFRef ? doc.context.lookup(resolvido) : resolvido;
+    const xobjects = resolver(doc, dict.lookup(PDFName.of("XObject")));
     if (!(xobjects instanceof PDFDict)) return;
     for (const [, ref] of xobjects.entries()) {
       const chave = ref instanceof PDFRef ? ref.toString() : "";
       if (chave && vistos.has(chave)) continue;
       if (chave) vistos.add(chave);
-      const stream = ref instanceof PDFRef ? doc.context.lookup(ref) : ref;
+      const stream = resolver(doc, ref);
       if (!(stream instanceof PDFRawStream) && !(stream instanceof PDFStream)) {
         continue;
       }
@@ -145,9 +146,7 @@ function imagensDaPagina(doc: PDFDocument, pageIndex: number): string[] {
         const data = stream.getContents();
         hashes.push(`${sha256(data)}:${data.length}`);
       } else if (subtype === PDFName.of("Form")) {
-        const aninhado = stream.dict.lookup(PDFName.of("Resources"));
-        const recursos =
-          aninhado instanceof PDFRef ? doc.context.lookup(aninhado) : aninhado;
+        const recursos = resolver(doc, stream.dict.lookup(PDFName.of("Resources")));
         if (recursos instanceof PDFDict) visitar(recursos);
       }
     }
