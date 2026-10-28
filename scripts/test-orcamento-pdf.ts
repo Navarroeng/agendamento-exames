@@ -65,6 +65,12 @@ import {
   SERVICO_LTCAT_NOME,
   SERVICO_LTCAT_NOME_EXIBICAO,
 } from "../lib/servico-ltcat";
+import {
+  PGR_INCLUSOS_ITENS,
+  PGR_INCLUSOS_OBSERVACOES,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_PGR,
+  SERVICO_PGR_NOME,
+} from "../lib/servico-pgr";
 
 const NAVY: [number, number, number] = [8, 43, 99];
 const GOLD: [number, number, number] = [201, 151, 43];
@@ -963,6 +969,47 @@ assert.doesNotMatch(mistoRaw, /16\.000|16000/);
 fs.writeFileSync(
   path.join(previewDir, "preview-ltcat.pdf"),
   Buffer.from(ltcatDoc.output("arraybuffer"))
+);
+
+const pgrOrc = buildOrcamento({
+  numero: "ORC-2026-0801",
+  modalidade: "pontual",
+  quantidade_parcelas: 2,
+  itens: [{ nome: SERVICO_PGR_NOME, quantidade: 4, valor: 3200 }],
+});
+const pgrDoc = renderPdf(pgrOrc);
+const pgrRaw = pdfVisibleText(pdfLatin1(pgrDoc));
+assert.match(pgrRaw, /PGR - Programa de Gerenciamento de Riscos/);
+assert.match(pgrRaw, /invent[aá]rio de riscos ocupacionais/);
+assert.match(pgrRaw, /plano de a[cç][aã]o/);
+assert.match(pgrRaw, /NR-01/);
+assert.match(pgrRaw, /O que est[áa] incluso/i);
+assert.match(pgrRaw, /Visita t[eé]cnica para reconhecimento/);
+assert.match(pgrRaw, /Entrega do documento final em formato digital/);
+assert.match(pgrRaw, /implementa[cç][aã]o das medidas indicadas no plano de a[cç][aã]o/);
+assert.match(pgrRaw, /(^|\n)Quantidade(\n|$)/);
+assert.match(pgrRaw, /(^|\n)4(\n|$)/);
+assert.doesNotMatch(pgrRaw, /Quantidade de Colaboradores/i);
+assert.doesNotMatch(pgrRaw, /N[uú]mero de Colaboradores/i);
+assert.match(pgrRaw, /3\.200,00/);
+assert.doesNotMatch(pgrRaw, /12\.800|12800/);
+assert.match(pgrRaw, /2x de R\$ 1\.600,00/);
+assert.match(pgrRaw, /[ÀA] vista \(5% de desconto\)/);
+assert.doesNotMatch(pgrRaw, /aposentadoria especial/);
+assert.doesNotMatch(pgrRaw, /enquadramento previdenci[aá]rio/);
+assert.doesNotMatch(pgrRaw, /eSocial/);
+assert.doesNotMatch(pgrRaw, /agentes nocivos/);
+assert.doesNotMatch(pgrRaw, /An[aá]lise Ergon[oô]mica/);
+assert.doesNotMatch(pgrRaw, /NR-15/);
+assert.doesNotMatch(pgrRaw, /NR-16/);
+assert.doesNotMatch(pgrRaw, /Laudo de Insalubridade/);
+assert.equal(PROPOSTA_DESCRICAO_PARAGRAFOS_PGR.length, 2);
+assert.equal(PGR_INCLUSOS_ITENS.length, 6);
+assert.equal(PGR_INCLUSOS_OBSERVACOES.length, 2);
+assert.equal(resolveItemValorServico(pgrOrc.orcamento_itens![0]), 3200);
+fs.writeFileSync(
+  path.join(previewDir, "preview-pgr.pdf"),
+  Buffer.from(pgrDoc.output("arraybuffer"))
 );
 
 const variasPaginas = renderPdf(

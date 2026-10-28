@@ -8,6 +8,7 @@ import {
   isServicoInsalubridadeNome,
 } from "@/lib/servico-insalubridade";
 import { isServicoLtcatNome, LTCAT_INCLUSOS_ITENS } from "@/lib/servico-ltcat";
+import { isServicoPgrNome, PGR_INCLUSOS_ITENS } from "@/lib/servico-pgr";
 import {
   isServicoParecerTecnicoNome,
   PARECER_TECNICO_INCLUSOS_ITENS,
@@ -120,6 +121,9 @@ export function resolveItensInclusosServico(
   }
   if (isServicoLtcatNome(nome)) {
     return [...LTCAT_INCLUSOS_ITENS];
+  }
+  if (isServicoPgrNome(nome)) {
+    return [...PGR_INCLUSOS_ITENS];
   }
   if (isServicoParecerTecnicoNome(nome)) {
     return [...PARECER_TECNICO_INCLUSOS_ITENS];

@@ -18,6 +18,7 @@ import {
   resolveValorTotalParecerTecnico,
 } from "@/lib/servico-parecer-tecnico";
 import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
+import { isServicoPgrNome, resolveValorTotalPgr } from "@/lib/servico-pgr";
 
 /** AET, Insalubridade, Parecer Técnico e LTCAT não pedem quantidade de colaboradores. */
 export function servicoOcultaQuantidadeColaboradores(
@@ -26,6 +27,7 @@ export function servicoOcultaQuantidadeColaboradores(
   return (
     isServicoLaudoPontualNome(nome) ||
     isServicoLtcatNome(nome) ||
+    isServicoPgrNome(nome) ||
     isServicoParecerTecnicoNome(nome)
   );
 }
@@ -255,7 +257,10 @@ export function validateOrcamentoItensValores(
   for (const item of itens) {
     if (!item.servico_nome.trim()) continue;
     const qtd = Math.round(Number(item.quantidade));
-    if (isServicoPericulosidadeNome(item.servico_nome)) {
+    if (
+      isServicoPericulosidadeNome(item.servico_nome) ||
+      isServicoPgrNome(item.servico_nome)
+    ) {
       if (!Number.isFinite(qtd) || qtd < 1) {
         return "Informe a quantidade do serviço (mínimo 1).";
       }
@@ -317,6 +322,9 @@ export function resolveItemValorServico(item: {
 }): number {
   if (isServicoLtcatNome(item.servico_nome)) {
     return resolveValorTotalLtcat(item);
+  }
+  if (isServicoPgrNome(item.servico_nome)) {
+    return resolveValorTotalPgr(item);
   }
   if (isServicoParecerTecnicoNome(item.servico_nome)) {
     return resolveValorTotalParecerTecnico(item);

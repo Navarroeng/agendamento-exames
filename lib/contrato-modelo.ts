@@ -54,6 +54,11 @@ import {
   CONTRATO_PERICULOSIDADE_TITULO_LINHAS,
   qualificacaoContratoPericulosidade,
 } from "@/lib/contrato-periculosidade";
+import {
+  buildClausulasContratoPgr,
+  CONTRATO_PGR_TITULO_LINHAS,
+  qualificacaoContratoPgr,
+} from "@/lib/contrato-pgr";
 import { SERVICO_LTCAT_CONTRATO_NAO_CONFIGURADO_MSG } from "@/lib/servico-ltcat";
 import {
   resolveTipoDocumentoContrato,
@@ -250,7 +255,8 @@ export function buildContratoNavarroDocumento(params: {
     tipoDocumento === "aet" ||
     tipoDocumento === "insalubridade" ||
     tipoDocumento === "parecer_tecnico" ||
-    tipoDocumento === "periculosidade"
+    tipoDocumento === "periculosidade" ||
+    tipoDocumento === "pgr"
       ? 0
       : resolveColaboradores(orcamento, aprovacao);
   const mesesMensalidade = resolverMesesVigenciaMensalidade({
@@ -414,6 +420,42 @@ export function buildContratoNavarroDocumento(params: {
     };
   }
 
+  if (tipoDocumento === "pgr") {
+    const quantidadeParcelas = Math.max(1, parcelas.length);
+    const clausulas = buildClausulasContratoPgr({
+      numeroOrcamento: orcamento.numero.trim(),
+      contratante,
+      valor,
+      quantidadeParcelas,
+      valorParcela: resolveValorParcela(aprovacao, parcelas, valor),
+      parcelas,
+    });
+    const qualificacao = qualificacaoContratoPgr(contratante);
+    const textoQualificacao = [
+      qualificacao.titulo,
+      ...qualificacao.paragrafos,
+    ].join("\n");
+    return {
+      modalidade,
+      tipoDocumento,
+      numeroOrcamento: orcamento.numero.trim(),
+      dataContrato,
+      contratante,
+      colaboradores: 0,
+      valor,
+      condicaoPagamento:
+        aprovacao?.condicao_pagamento?.trim() ||
+        orcamento.forma_pagamento?.trim() ||
+        null,
+      parcelas,
+      servicos: resolveServicos(orcamento, aprovacao),
+      clausulas,
+      texto: `${textoQualificacao}\n\n${textoPlanoContrato(clausulas, "aet")}`,
+      tituloLinhas: [...CONTRATO_PGR_TITULO_LINHAS],
+      qualificacao,
+    };
+  }
+
   if (tipoDocumento === "aet") {
     const quantidadeParcelas = Math.max(1, parcelas.length);
     const clausulas = buildClausulasContratoAet({
@@ -561,6 +603,8 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
           ? "Laudo de Parecer Técnico"
           : doc.tipoDocumento === "periculosidade"
             ? "Laudo de Periculosidade (NR16)"
+            : doc.tipoDocumento === "pgr"
+              ? "PGR - Programa de Gerenciamento de Riscos"
           : doc.modalidade === "mensalidade"
             ? "Mensalidade"
             : "Pontual",
@@ -568,6 +612,7 @@ export function resumoConferenciaContrato(doc: ContratoNavarroDocumento): {
       doc.tipoDocumento === "aet" ||
       doc.tipoDocumento === "parecer_tecnico" ||
       doc.tipoDocumento === "periculosidade" ||
+      doc.tipoDocumento === "pgr" ||
       doc.colaboradores < 1
         ? "—"
         : String(doc.colaboradores),

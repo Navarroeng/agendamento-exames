@@ -59,6 +59,10 @@ import {
 } from "@/lib/servico-laudo-pontual";
 import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
 import {
+  isServicoPgrNome,
+  SERVICO_PGR_QUANTIDADE_INICIAL,
+} from "@/lib/servico-pgr";
+import {
   bloqueioParecerTecnicoExclusivo,
   isServicoParecerTecnicoNome,
   mensagemExclusividadeParecerTecnico,
@@ -156,7 +160,11 @@ export function useOrcamentoForm() {
       setForm((prev) => {
         if (field === "quantidade") {
           const alvo = prev.itens.find((item) => item.id === id);
-          if (alvo && isServicoPericulosidadeNome(alvo.servico_nome)) {
+          if (
+            alvo &&
+            (isServicoPericulosidadeNome(alvo.servico_nome) ||
+              isServicoPgrNome(alvo.servico_nome))
+          ) {
             const quantidade = value.replace(/\D/g, "").slice(0, 6);
             return {
               ...prev,
@@ -210,8 +218,15 @@ export function useOrcamentoForm() {
           if (field === "servico_id" && servicoNome !== undefined) {
             next.servico_nome = servicoNome;
             next.valor_manual = false;
-            if (isServicoPericulosidadeNome(servicoNome)) {
-              next.quantidade = String(SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA);
+            if (
+              isServicoPericulosidadeNome(servicoNome) ||
+              isServicoPgrNome(servicoNome)
+            ) {
+              next.quantidade = String(
+                isServicoPgrNome(servicoNome)
+                  ? SERVICO_PGR_QUANTIDADE_INICIAL
+                  : SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA
+              );
               next.valor_unitario = "";
               next.valor_total = "";
               next.valor_manual = true;
@@ -459,7 +474,9 @@ export function useOrcamentoForm() {
     const itensRaw = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
-        const quantidade = isServicoPericulosidadeNome(item.servico_nome)
+        const quantidade =
+          isServicoPericulosidadeNome(item.servico_nome) ||
+          isServicoPgrNome(item.servico_nome)
           ? parseQuantidadeColaboradores(item.quantidade) || 1
           : isServicoLaudoPontualNome(item.servico_nome)
           ? SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA

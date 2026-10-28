@@ -3,6 +3,7 @@ import { isServicoAetNome } from "@/lib/servico-aet";
 import { isServicoInsalubridadeNome } from "@/lib/servico-insalubridade";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { isServicoLtcatNome } from "@/lib/servico-ltcat";
+import { isServicoPgrNome } from "@/lib/servico-pgr";
 import { isServicoParecerTecnicoNome } from "@/lib/servico-parecer-tecnico";
 import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
 import { normalizeServicoNome } from "@/lib/servico-treinamentos";
@@ -161,7 +162,8 @@ export function isServicoOferecidoNoOrcamento(
     isServicoInsalubridadeNome(nome) ||
     isServicoLtcatNome(nome) ||
     isServicoParecerTecnicoNome(nome) ||
-    isServicoPericulosidadeNome(nome)
+    isServicoPericulosidadeNome(nome) ||
+    isServicoPgrNome(nome)
   ) {
     return true;
   }
@@ -206,6 +208,7 @@ export function labelItensInclusosServico(
   if (
     isServicoLaudoPontualNome(nome) ||
     isServicoLtcatNome(nome) ||
+    isServicoPgrNome(nome) ||
     isServicoParecerTecnicoNome(nome)
   ) {
     return "O que está incluso?";

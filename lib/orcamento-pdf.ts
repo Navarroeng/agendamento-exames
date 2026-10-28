@@ -69,6 +69,13 @@ import {
   PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE,
 } from "@/lib/servico-periculosidade";
 import {
+  orcamentoEhExclusivoPgr,
+  orcamentoPossuiPgr,
+  PGR_INCLUSOS_ITENS,
+  PGR_INCLUSOS_OBSERVACOES,
+  PROPOSTA_DESCRICAO_PARAGRAFOS_PGR,
+} from "@/lib/servico-pgr";
+import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   PARECER_TECNICO_INCLUSOS_ITENS,
@@ -230,11 +237,15 @@ function resolveDescricaoPropostaParagrafos(
   if (kind === "periculosidade") {
     return PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE;
   }
-  const base = isOrcamentoMensalidade(orcamento.modalidade)
+  if (kind === "pgr") return PROPOSTA_DESCRICAO_PARAGRAFOS_PGR;
+  let base: readonly string[] = isOrcamentoMensalidade(orcamento.modalidade)
     ? paragrafosPropostaGestaoMensal(propostaMensalidade)
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
   if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {
-    return [...PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT, ...base];
+    base = [...PROPOSTA_DESCRICAO_PARAGRAFOS_LTCAT, ...base];
+  }
+  if (orcamentoPossuiPgr(orcamento.orcamento_itens)) {
+    base = [...PROPOSTA_DESCRICAO_PARAGRAFOS_PGR, ...base];
   }
   return base;
 }
@@ -2200,11 +2211,13 @@ function drawServicesTable(
   if (itens.length === 0) return y;
 
   const exclusivoPericulosidade = orcamentoEhExclusivoPericulosidade(itens);
+  const exclusivoPgr = orcamentoEhExclusivoPgr(itens);
+  const exibeQuantidadeServico = exclusivoPericulosidade || exclusivoPgr;
   const isLaudoPontual = !exibeColunaQuantidadeColaboradores(itens);
-  const semColunaQuantidade = isLaudoPontual && !exclusivoPericulosidade;
+  const semColunaQuantidade = isLaudoPontual && !exibeQuantidadeServico;
   const colWidths = semColunaQuantidade
     ? [138, 40]
-    : exclusivoPericulosidade
+    : exibeQuantidadeServico
       ? [118, 28, 40]
       : [98, 44, 40];
   const colStarts = semColunaQuantidade
@@ -2216,7 +2229,7 @@ function drawServicesTable(
       ];
   const headers = semColunaQuantidade
     ? ["Serviço", labelValorColunaOrcamento(orcamento.modalidade)]
-    : exclusivoPericulosidade
+    : exibeQuantidadeServico
       ? ["Serviço", "Quantidade", labelValorColunaOrcamento(orcamento.modalidade)]
     : [
         "Serviço",
@@ -2343,7 +2356,7 @@ function drawServicesTable(
     const valorColIndex = semColunaQuantidade ? 1 : 2;
     if (
       !semColunaQuantidade &&
-      (exclusivoPericulosidade ||
+      (exibeQuantidadeServico ||
         !servicoOcultaQuantidadeColaboradores(item.servico_nome))
     ) {
       doc.text(
@@ -2416,21 +2429,28 @@ function drawFinancialAndInclusosRow(
           ? [...PERICULOSIDADE_INCLUSOS_ITENS]
         : laudoKind === "ltcat"
           ? [...LTCAT_INCLUSOS_ITENS]
+          : laudoKind === "pgr"
+            ? [...PGR_INCLUSOS_ITENS]
           : !isMensalidade && usaCardInclusosEstruturado
             ? buildPacoteCompletoInclusosItens(orcamento)
             : [];
-  const inclusosCard =
-    laudoKind == null &&
-    !isMensalidade &&
-    orcamentoPossuiLtcat(orcamento.orcamento_itens)
-      ? [...pacoteInclusosItens, ...LTCAT_INCLUSOS_ITENS]
-      : pacoteInclusosItens;
+  let inclusosCard = pacoteInclusosItens;
+  if (laudoKind == null && !isMensalidade) {
+    if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {
+      inclusosCard = [...inclusosCard, ...LTCAT_INCLUSOS_ITENS];
+    }
+    if (orcamentoPossuiPgr(orcamento.orcamento_itens)) {
+      inclusosCard = [...inclusosCard, ...PGR_INCLUSOS_ITENS];
+    }
+  }
   const inclusosObservacoes = exclusivoParecer
     ? []
     : laudoKind === "insalubridade"
       ? INSALUBRIDADE_INCLUSOS_OBSERVACOES
       : laudoKind === "periculosidade"
         ? PERICULOSIDADE_INCLUSOS_OBSERVACOES
+        : laudoKind === "pgr"
+          ? PGR_INCLUSOS_OBSERVACOES
       : laudoKind === "aet" || laudoKind === "ltcat"
         ? []
         : PACOTE_COMPLETO_INCLUSOS_OBSERVACOES;

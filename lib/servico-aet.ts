@@ -8,6 +8,7 @@ import { orcamentoEhExclusivoInsalubridade } from "@/lib/servico-insalubridade";
 import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
 import { orcamentoEhExclusivoParecerTecnico } from "@/lib/servico-parecer-tecnico";
 import { orcamentoEhExclusivoPericulosidade } from "@/lib/servico-periculosidade";
+import { orcamentoEhExclusivoPgr } from "@/lib/servico-pgr";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const SERVICO_AET_NOME =
@@ -160,6 +161,7 @@ export type TipoDocumentoContrato =
   | "ltcat"
   | "parecer_tecnico"
   | "periculosidade"
+  | "pgr"
   | "mensalidade"
   | "pontual_sst";
 
@@ -184,6 +186,9 @@ export function resolveTipoDocumentoContrato(params: {
   }
   if (orcamentoEhExclusivoLtcat(params.itens, params.ltcatServicoId)) {
     return "ltcat";
+  }
+  if (orcamentoEhExclusivoPgr(params.itens)) {
+    return "pgr";
   }
   if (orcamentoEhExclusivoParecerTecnico(params.itens)) {
     return "parecer_tecnico";

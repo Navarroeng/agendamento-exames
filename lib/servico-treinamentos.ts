@@ -13,7 +13,8 @@ export type OrcamentoFluxoImplantacao =
   | "insalubridade"
   | "ltcat"
   | "parecer_tecnico"
-  | "periculosidade";
+  | "periculosidade"
+  | "pgr";
 
 export type ServicoItemRef = {
   servico_id?: string | null;
@@ -149,6 +150,20 @@ function isItemPericulosidadeFluxo(
   );
 }
 
+/** Igual a SERVICO_PGR_NOME. Match exato, sem includes. */
+const PGR_NOMES_NORMALIZADOS = new Set([
+  normalizeServicoNome("PGR - Programa de Gerenciamento de Riscos"),
+]);
+
+function isItemPgrFluxo(
+  item: ServicoItemRef,
+  pgrServicoId?: string | null
+): boolean {
+  const id = (item.servico_id ?? "").trim();
+  if (pgrServicoId && id) return id === pgrServicoId;
+  return PGR_NOMES_NORMALIZADOS.has(normalizeServicoNome(item.servico_nome));
+}
+
 function isItemParecerTecnicoFluxo(
   item: ServicoItemRef,
   parecerServicoId?: string | null
@@ -167,7 +182,8 @@ export function classifyOrcamentoFluxoImplantacao(
   insalubridadeServicoId?: string | null,
   ltcatServicoId?: string | null,
   parecerServicoId?: string | null,
-  periculosidadeServicoId?: string | null
+  periculosidadeServicoId?: string | null,
+  pgrServicoId?: string | null
 ): OrcamentoFluxoImplantacao {
   const relevant = itens.filter(
     (item) =>
@@ -190,6 +206,10 @@ export function classifyOrcamentoFluxoImplantacao(
 
   if (relevant.every((item) => isItemLtcatFluxo(item, ltcatServicoId))) {
     return "ltcat";
+  }
+
+  if (relevant.every((item) => isItemPgrFluxo(item, pgrServicoId))) {
+    return "pgr";
   }
 
   if (

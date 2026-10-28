@@ -36,6 +36,10 @@ import {
   orcamentoEhExclusivoPericulosidade,
 } from "@/lib/servico-periculosidade";
 import {
+  isServicoPgrNome,
+  orcamentoEhExclusivoPgr,
+} from "@/lib/servico-pgr";
+import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   parecerMostraAlternativaAvista,
@@ -108,7 +112,8 @@ export function OrcamentoViewBody({
   const validadeLabel = validadeIso ? formatDateIsoToBR(validadeIso) : null;
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
   const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(itens);
-  const exibeQuantidadeServico = orcamentoEhExclusivoPericulosidade(itens);
+  const exibeQuantidadeServico =
+    orcamentoEhExclusivoPericulosidade(itens) || orcamentoEhExclusivoPgr(itens);
   const ocultaColunaQuantidade =
     !exibeColunaQuantidadeColaboradores(itens) && !exibeQuantidadeServico;
   const labelQuantidade = exibeQuantidadeServico
@@ -223,7 +228,8 @@ export function OrcamentoViewBody({
                     {ocultaColunaQuantidade ? null : (
                     <td className="px-3 py-3.5 text-center align-top font-semibold text-[#334155]">
                       {servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
-                      !isServicoPericulosidadeNome(item.servico_nome)
+                      !isServicoPericulosidadeNome(item.servico_nome) &&
+                      !(exibeQuantidadeServico && isServicoPgrNome(item.servico_nome))
                         ? ""
                         : item.quantidade}
                     </td>

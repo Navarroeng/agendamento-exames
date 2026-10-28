@@ -138,6 +138,7 @@ export function OrcamentoContratoGerarPanel({
   const isAet = tipoDocumento === "aet";
   const isParecer = tipoDocumento === "parecer_tecnico";
   const isPericulosidade = tipoDocumento === "periculosidade";
+  const isPgr = tipoDocumento === "pgr";
   const isMensalidadeDoc = tipoDocumento === "mensalidade";
   const ofereceAvista =
     isParecer &&
@@ -806,6 +807,8 @@ export function OrcamentoContratoGerarPanel({
                 ? "Contrato específico do Laudo de Parecer Técnico. Gera o PDF da contratação. Não marca como enviado nem assinado e não altera o contrato SST."
                 : isPericulosidade
                   ? "Contrato específico do Laudo Técnico de Periculosidade (NR-16). Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
+                  : isPgr
+                    ? "Contrato específico do PGR – Programa de Gerenciamento de Riscos. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
                 : isAet
                   ? "Contrato específico do Laudo AET – Análise Ergonômica do Trabalho. Gera o PDF da contratação pontual. Não marca como enviado nem assinado e não altera o contrato SST."
                   : "Gera o PDF a partir do orçamento aprovado. Não marca como enviado nem assinado."}
@@ -1182,13 +1185,13 @@ export function OrcamentoContratoGerarPanel({
                       <Row label="Orçamento" value={resumo.orcamento} />
                       <Row
                         label={
-                          isAet || isParecer || isPericulosidade
+                          isAet || isParecer || isPericulosidade || isPgr
                             ? "Serviço"
                             : "Modalidade"
                         }
                         value={resumo.modalidade}
                       />
-                      {isAet || isParecer || isPericulosidade ? null : (
+                      {isAet || isParecer || isPericulosidade || isPgr ? null : (
                         <Row
                           label="Colaboradores"
                           value={resumo.colaboradores}

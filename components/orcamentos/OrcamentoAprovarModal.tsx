@@ -124,6 +124,7 @@ import {
 import { resolveInsalubridadeServicoId } from "@/lib/servico-insalubridade";
 import { resolveLtcatServicoId } from "@/lib/servico-ltcat";
 import { resolvePericulosidadeServicoId } from "@/lib/servico-periculosidade";
+import { resolvePgrServicoId } from "@/lib/servico-pgr";
 import {
   fluxoToLaudoPontualKind,
   isFluxoLaudoPontual,
@@ -315,7 +316,8 @@ export function OrcamentoAprovarModal({
       resolveInsalubridadeServicoId(servicos),
       resolveLtcatServicoId(servicos),
       resolveParecerTecnicoServicoId(servicos),
-      resolvePericulosidadeServicoId(servicos)
+      resolvePericulosidadeServicoId(servicos),
+      resolvePgrServicoId(servicos)
     );
     const orcamentoAprovadoInit = aprovacaoCicloVigente(
       aprovacao,
@@ -468,14 +470,17 @@ export function OrcamentoAprovarModal({
       resolveInsalubridadeServicoId(servicos),
       resolveLtcatServicoId(servicos),
       resolveParecerTecnicoServicoId(servicos),
-      resolvePericulosidadeServicoId(servicos)
+      resolvePericulosidadeServicoId(servicos),
+      resolvePgrServicoId(servicos)
     );
   }, [orcamento, aprovacao, servicos]);
   const ocultaColaboradoresComerciais =
     laudoPontualOcultaColaboradores(fluxoImplantacao) ||
     orcamentoEhExclusivoParecerTecnico(orcamento?.orcamento_itens);
   const ocultaCampoQuantidadeColaboradores =
-    ocultaColaboradoresComerciais || fluxoImplantacao === "ltcat";
+    ocultaColaboradoresComerciais ||
+    fluxoImplantacao === "ltcat" ||
+    fluxoImplantacao === "pgr";
   const aetEnabled = Boolean(
     open && orcamento && aprovacao && isFluxoLaudoPontual(fluxoImplantacao)
   );

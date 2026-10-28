@@ -24,6 +24,10 @@ import {
   isServicoPericulosidadeNome,
   orcamentoEhExclusivoPericulosidade,
 } from "@/lib/servico-periculosidade";
+import {
+  isServicoPgrNome,
+  orcamentoEhExclusivoPgr,
+} from "@/lib/servico-pgr";
 import { OrcamentoItemTableRow } from "./OrcamentoItemTableRow";
 
 interface OrcamentoItensSectionProps {
@@ -68,7 +72,8 @@ export function OrcamentoItensSection({
   const isLaudoPontual =
     laudoPontualOcultaColaboradores(resolveLaudoPontualKind(itens)) ||
     orcamentoPossuiParecerTecnico(itens);
-  const exibeQuantidadeServico = orcamentoEhExclusivoPericulosidade(itens);
+  const exibeQuantidadeServico =
+    orcamentoEhExclusivoPericulosidade(itens) || orcamentoEhExclusivoPgr(itens);
   const ocultaColunaQuantidade =
     !exibeColunaQuantidadeColaboradores(itens) && !exibeQuantidadeServico;
   const labelQuantidade = exibeQuantidadeServico
@@ -134,7 +139,8 @@ export function OrcamentoItensSection({
                 hideQuantidadeColaboradores={ocultaColunaQuantidade}
                 ocultarCampoQuantidade={
                   servicoOcultaQuantidadeColaboradores(item.servico_nome) &&
-                  !isServicoPericulosidadeNome(item.servico_nome)
+                  !isServicoPericulosidadeNome(item.servico_nome) &&
+                  !(exibeQuantidadeServico && isServicoPgrNome(item.servico_nome))
                 }
               />
             ))}

@@ -42,6 +42,7 @@ import {
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
 import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
 import { SERVICO_PERICULOSIDADE_NOME } from "../lib/servico-periculosidade";
+import { SERVICO_PGR_NOME } from "../lib/servico-pgr";
 import { SERVICO_PARECER_TECNICO_NOME } from "../lib/servico-parecer-tecnico";
 import { classifyOrcamentoFluxoImplantacao } from "../lib/servico-treinamentos";
 import {
@@ -1068,5 +1069,78 @@ const pgrModalSrc = readFileSync(
 assert.match(pgrModalSrc, /LAUDOS_SST_ETAPAS\.map/);
 assert.doesNotMatch(pgrModalSrc, /buildLaudosPontualEtapas/);
 assert.doesNotMatch(pgrModalSrc, /OrcamentoAbaAetElaboracao/);
+
+const fluxoPgr = classifyOrcamentoFluxoImplantacao([
+  { servico_id: "pgr-1", servico_nome: SERVICO_PGR_NOME },
+]);
+assert.equal(fluxoPgr, "pgr");
+assert.equal(
+  classifyOrcamentoFluxoImplantacao([
+    { servico_nome: SERVICO_PGR_NOME },
+    { servico_nome: "LTCAT" },
+  ]),
+  "padrao"
+);
+assert.equal(classifyOrcamentoFluxoImplantacao([{ servico_nome: "PGR" }]), "padrao");
+assert.deepEqual(
+  buildOrcamentoEtapas(fluxoPgr).map((etapa) => etapa.id),
+  buildOrcamentoEtapas("ltcat").map((etapa) => etapa.id)
+);
+assert.equal(sanitizeOrcamentoEtapaTab("elaboracao", "pgr"), "visita_aet");
+assert.equal(sanitizeOrcamentoEtapaTab("envio", "pgr"), "visita_aet");
+const apPgr = aprovacao(SERVICO_PGR_NOME, {
+  contrato_assinado: true,
+  contrato_assinado_em: "2026-10-08T12:00:00.000Z",
+  contrato_salvo_em: "2026-10-08T12:00:00.000Z",
+  boleto_pago: true,
+  financeiro_salvo_em: "2026-10-09T12:00:00.000Z",
+  quantidade_colaboradores: 4,
+  orcamento_aprovacao_itens: [
+    {
+      id: "ai-pgr",
+      aprovacao_id: "ap1",
+      servico_id: "pgr-1",
+      servico_nome: SERVICO_PGR_NOME,
+      quantidade: 4,
+      valor_unitario: 3200,
+      valor_total: 3200,
+      ordem: 0,
+    },
+  ],
+});
+const visitaPgr = aetRow({
+  visita_status: "realizada",
+  visita_data: "2026-10-21",
+  visita_observacao: "Inventário da produção e plano de ação",
+  visita_realizada_em: "2026-10-21T18:00:00Z",
+});
+const pgrProcesso = buildImplantacaoProcesso({
+  orcamento: orcamento({
+    id: "orc-pgr",
+    numero: "ORC-2026-0180",
+    cliente_nome: "METAL NORTE",
+  }),
+  aprovacao: { ...apPgr, orcamento_id: "orc-pgr" },
+  contrato: null,
+  fluxoImplantacao: fluxoPgr,
+  aet: { ...visitaPgr, orcamento_id: "orc-pgr" },
+});
+assert.equal(pgrProcesso.etapaAtual, "concluido");
+assert.equal(pgrProcesso.aet?.visita_observacao, "Inventário da produção e plano de ação");
+assert.equal(isProcessoElegivelLaudoPontualLaudosSst(pgrProcesso), true);
+assert.equal(isProcessoElegivelLaudosSst(pgrProcesso), false);
+assert.equal(isProcessoElegivelRiscosPsicossociais(pgrProcesso), false);
+const laudosPgr = buildLaudosSstProcesso(pgrProcesso, null);
+assert.equal(laudosPgr.laudoPontualKind, "pgr");
+assert.deepEqual(
+  etapasProgressoLaudosSst(laudosPgr).map((etapa) => etapa.id),
+  ["visita", "elaboracao", "envio"]
+);
+assert.equal(
+  etapasProgressoLaudosSst(laudosPgr).some((etapa) => etapa.id === "pgr_pcmso_ltcat"),
+  false
+);
+assert.equal(copyLaudoPontual("pgr").etapaElaboracao, "Elaboração do PGR");
+assert.match(copyLaudoPontual("pgr").textoElaboracao, /inventário de riscos ocupacionais/);
 
 console.log("ok: laudo-pontual-implantacao-fluxo");

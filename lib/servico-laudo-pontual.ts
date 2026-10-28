@@ -34,6 +34,11 @@ import {
   orcamentoPossuiParecerTecnico,
 } from "@/lib/servico-parecer-tecnico";
 import {
+  isServicoPgr,
+  orcamentoEhExclusivoPgr,
+  orcamentoPossuiPgr,
+} from "@/lib/servico-pgr";
+import {
   bloqueioPericulosidadeExclusivo,
   isServicoPericulosidade,
   isServicoPericulosidadeNome,
@@ -51,7 +56,8 @@ export type LaudoPontualKind =
   | "insalubridade"
   | "ltcat"
   | "parecer_tecnico"
-  | "periculosidade";
+  | "periculosidade"
+  | "pgr";
 
 export const SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA =
   SERVICO_AET_QUANTIDADE_INTERNA;
@@ -64,7 +70,8 @@ export function isFluxoLaudoPontual(
     fluxo === "insalubridade" ||
     fluxo === "ltcat" ||
     fluxo === "parecer_tecnico" ||
-    fluxo === "periculosidade"
+    fluxo === "periculosidade" ||
+    fluxo === "pgr"
   );
 }
 
@@ -90,7 +97,8 @@ export function fluxoToLaudoPontualKind(
     fluxo === "insalubridade" ||
     fluxo === "ltcat" ||
     fluxo === "parecer_tecnico" ||
-    fluxo === "periculosidade"
+    fluxo === "periculosidade" ||
+    fluxo === "pgr"
   ) {
     return fluxo;
   }
@@ -262,6 +270,46 @@ export function copyLaudoPontual(kind: LaudoPontualKind): {
       rotuloColunaVisita: "Visita",
     };
   }
+  if (kind === "pgr") {
+    return {
+      titulo: "PGR",
+      andamento: "Andamento do PGR",
+      abaElaboracao: "PGR em elaboração",
+      etapaVisita: "Visita técnica",
+      etapaElaboracao: "Elaboração do PGR",
+      etapaEnvio: "Envio ao cliente",
+      textoVisitaConsulta:
+        "Consulta da visita técnica registrada na Implantação de Clientes. Estas informações são somente leitura.",
+      textoVisitaEdicao:
+        "Agende e registre a visita técnica para reconhecimento das atividades e dos ambientes de trabalho.",
+      textoElaboracao:
+        "Acompanhe a elaboração do PGR após a visita. O documento deve conter o inventário de riscos ocupacionais e o plano de ação. Anexe o PDF final antes de concluir.",
+      upload: "PGR final (PDF)",
+      nomeCurto: "PGR",
+      anexeAntesDeConcluir: "Anexe o PGR final antes de concluir esta etapa.",
+      concluaAntesEnvio:
+        "Conclua a elaboração do PGR e anexe o PDF final antes de registrar o envio.",
+      textoEnvio:
+        "Registre o envio do PGR ao cliente. O envio automático por e-mail não faz parte desta etapa.",
+      toastCarregarErro: "Não foi possível carregar o acompanhamento do PGR.",
+      toastAnexado: "PGR anexado.",
+      auditVisitaRealizada: (usuario) =>
+        `${usuario} registrou a visita do PGR como realizada.`,
+      auditVisitaAgendada: (usuario) =>
+        `${usuario} atualizou o agendamento da visita do PGR.`,
+      auditLaudoAnexado: (usuario) => `${usuario} anexou o PGR final.`,
+      auditElaboracaoConcluida: (usuario) =>
+        `${usuario} concluiu a elaboração do PGR.`,
+      auditElaboracaoAtualizada: (usuario) =>
+        `${usuario} atualizou a elaboração do PGR.`,
+      auditEnvioConfirmado: (usuario) =>
+        `${usuario} confirmou o envio do PGR ao cliente.`,
+      rotuloStatus: "Status da visita",
+      rotuloData: "Data da visita",
+      bannerRealizada: "Visita realizada",
+      rotuloColunaVisita: "Visita",
+    };
+  }
   if (kind === "parecer_tecnico") {
     return {
       titulo: "Laudo de Parecer Técnico",
@@ -365,6 +413,7 @@ export function isServicoLaudoPontual(
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
     periculosidadeServicoId?: string | null;
+    pgrServicoId?: string | null;
   }
 ): boolean {
   return (
@@ -372,7 +421,8 @@ export function isServicoLaudoPontual(
     isServicoInsalubridade(item, ids?.insalubridadeServicoId) ||
     isServicoLtcat(item, ids?.ltcatServicoId) ||
     isServicoParecerTecnico(item, ids?.parecerServicoId) ||
-    isServicoPericulosidade(item, ids?.periculosidadeServicoId)
+    isServicoPericulosidade(item, ids?.periculosidadeServicoId) ||
+    isServicoPgr(item, ids?.pgrServicoId)
   );
 }
 
@@ -384,6 +434,7 @@ export function resolveLaudoPontualKind(
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
     periculosidadeServicoId?: string | null;
+    pgrServicoId?: string | null;
   }
 ): LaudoPontualKind | null {
   if (orcamentoEhExclusivoAet(itens, ids?.aetServicoId)) return "aet";
@@ -393,6 +444,7 @@ export function resolveLaudoPontualKind(
     return "insalubridade";
   }
   if (orcamentoEhExclusivoLtcat(itens, ids?.ltcatServicoId)) return "ltcat";
+  if (orcamentoEhExclusivoPgr(itens, ids?.pgrServicoId)) return "pgr";
   if (orcamentoEhExclusivoParecerTecnico(itens, ids?.parecerServicoId)) {
     return "parecer_tecnico";
   }
@@ -440,6 +492,7 @@ export function orcamentoPossuiLaudoPontual(
     ltcatServicoId?: string | null;
     parecerServicoId?: string | null;
     periculosidadeServicoId?: string | null;
+    pgrServicoId?: string | null;
   }
 ): boolean {
   return (
@@ -447,7 +500,8 @@ export function orcamentoPossuiLaudoPontual(
     orcamentoPossuiInsalubridade(itens, ids?.insalubridadeServicoId) ||
     orcamentoPossuiLtcat(itens, ids?.ltcatServicoId) ||
     orcamentoPossuiParecerTecnico(itens, ids?.parecerServicoId) ||
-    orcamentoPossuiPericulosidade(itens, ids?.periculosidadeServicoId)
+    orcamentoPossuiPericulosidade(itens, ids?.periculosidadeServicoId) ||
+    orcamentoPossuiPgr(itens, ids?.pgrServicoId)
   );
 }
 

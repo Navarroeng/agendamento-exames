@@ -62,6 +62,10 @@ function isContratoPericulosidade(documento: ContratoNavarroDocumento): boolean 
   return documento.tipoDocumento === "periculosidade";
 }
 
+function isContratoPgr(documento: ContratoNavarroDocumento): boolean {
+  return documento.tipoDocumento === "pgr";
+}
+
 function isContratoParecer(documento: ContratoNavarroDocumento): boolean {
   return documento.tipoDocumento === "parecer_tecnico";
 }
@@ -70,7 +74,8 @@ function isContratoEstiloPontual(documento: ContratoNavarroDocumento): boolean {
   return (
     isContratoAet(documento) ||
     isContratoParecer(documento) ||
-    isContratoPericulosidade(documento)
+    isContratoPericulosidade(documento) ||
+    isContratoPgr(documento)
   );
 }
 
@@ -100,6 +105,8 @@ export function rotuloServicoContratoArquivo(
       return "Laudo de Parecer Técnico";
     case "periculosidade":
       return "Laudo de Periculosidade (NR16)";
+    case "pgr":
+      return "PGR - Programa de Gerenciamento de Riscos";
     case "mensalidade":
     case "pontual_sst":
       return "Gestão SST";
@@ -251,6 +258,11 @@ function drawHeader(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("Laudo Técnico de Periculosidade – NR-16", textX, 16);
+  } else if (isContratoPgr(documento)) {
+    doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("PGR – Programa de Gerenciamento de Riscos", textX, 16);
   } else if (isContratoAet(documento)) {
     doc.text("CONTRATO DE PRESTAÇÃO DE SERVIÇOS TÉCNICOS", textX, 11);
     doc.setFont("helvetica", "normal");
@@ -276,6 +288,8 @@ function drawHeader(
       ? "Serviço: Parecer técnico"
       : isContratoPericulosidade(documento)
         ? "Serviço: Periculosidade (NR16)"
+        : isContratoPgr(documento)
+          ? "Serviço: PGR"
       : isContratoAet(documento)
         ? "Serviço: Laudo AET"
         : documento.modalidade === "mensalidade"

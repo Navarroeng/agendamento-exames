@@ -16,6 +16,7 @@ import {
 } from "@/lib/servico-sst-pacote";
 import { isServicoLaudoPontualNome } from "@/lib/servico-laudo-pontual";
 import { isServicoLtcatNome } from "@/lib/servico-ltcat";
+import { isServicoPgrNome } from "@/lib/servico-pgr";
 import { isServicoParecerTecnicoNome } from "@/lib/servico-parecer-tecnico";
 
 interface OrcamentoItemTableRowProps {
@@ -78,6 +79,7 @@ export function OrcamentoItemTableRow({
       isGestaoMensalSstNome(nome) ||
       isServicoLaudoPontualNome(nome) ||
       isServicoLtcatNome(nome) ||
+      isServicoPgrNome(nome) ||
       isServicoParecerTecnicoNome(nome)
     ) {
       onApplyValorSugerido(null);

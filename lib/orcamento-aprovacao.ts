@@ -30,6 +30,7 @@ import {
 import type { ServicoItemRef } from "@/lib/servico-treinamentos";
 import { orcamentoPermitePagamentoAVista } from "@/lib/servico-aet";
 import { orcamentoEhExclusivoLtcat } from "@/lib/servico-ltcat";
+import { orcamentoEhExclusivoPgr } from "@/lib/servico-pgr";
 import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
@@ -801,7 +802,8 @@ export function buildAprovacaoDiffs(
   const diffs: OrcamentoAprovacaoDiffItem[] = [];
   if (
     !ocultaQuantidadeColaboradores(orcamento.orcamento_itens) &&
-    !orcamentoEhExclusivoLtcat(orcamento.orcamento_itens)
+    !orcamentoEhExclusivoLtcat(orcamento.orcamento_itens) &&
+    !orcamentoEhExclusivoPgr(orcamento.orcamento_itens)
   ) {
     diffs.push({
       label: "Quantidade de colaboradores",

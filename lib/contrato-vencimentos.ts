@@ -23,7 +23,8 @@ export function contratoUsaCronogramaVencimentos(
   return (
     tipoDocumento === "aet" ||
     tipoDocumento === "parecer_tecnico" ||
-    tipoDocumento === "periculosidade"
+    tipoDocumento === "periculosidade" ||
+    tipoDocumento === "pgr"
   );
 }
 

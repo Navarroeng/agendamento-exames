@@ -328,6 +328,22 @@ async function main() {
   );
 
   await validar(
+    "pgr",
+    buildOrcamento({
+      numero: "ORC-2026-9018",
+      observacoes: "OBS-VALIDACAO-9018",
+      itens: [
+        {
+          nome: "PGR - Programa de Gerenciamento de Riscos",
+          quantidade: 4,
+          valor: 3200,
+        },
+      ],
+    }),
+    { minPaginas: 1 }
+  );
+
+  await validar(
     "varias-paginas",
     buildOrcamento({
       numero: "ORC-2026-9003",

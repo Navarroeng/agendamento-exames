@@ -1084,6 +1084,12 @@ export function useOrcamentosPage() {
               ? "Aprovação salva. Cliente vinculado e implantação do Laudo de Periculosidade iniciada."
               : "Aprovação salva. Implantação do Laudo de Periculosidade iniciada."
           );
+        } else if (laudoKind === "pgr") {
+          toast.success(
+            integracao.cliente_criado
+              ? "Aprovação salva. Cliente vinculado e implantação do PGR iniciada."
+              : "Aprovação salva. Implantação do PGR iniciada."
+          );
         } else if (laudoKind === "parecer_tecnico") {
           toast.success(
             integracao.cliente_criado
