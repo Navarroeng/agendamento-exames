@@ -79,10 +79,10 @@ import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   PARECER_TECNICO_INCLUSOS_ITENS,
-  parecerMostraAlternativaAvista,
   parseQuantidadeParcelasInteira,
   PROPOSTA_DESCRICAO_PARAGRAFOS_PARECER_TECNICO,
 } from "@/lib/servico-parecer-tecnico";
+import { resolverApresentacaoAvistaPdf } from "@/lib/orcamento-avista";
 import { anexarUltimaPaginaOrcamento } from "@/lib/orcamento-pdf-institucional";
 import { buscarClientePorId } from "@/services/cliente.service";
 import { listarServicosSst } from "@/services/servico-sst.service";
@@ -900,7 +900,7 @@ function condicaoPagamentoEmpilhada(
 function measureFinancialCardContentHeight(
   isMensalidade = false,
   isAet = false,
-  mostraAvista = false,
+  avistaLinhas = 0,
   extraCondicaoH = 0
 ): number {
   if (isMensalidade) {
@@ -921,9 +921,9 @@ function measureFinancialCardContentHeight(
     );
   }
   if (isAet) {
-    const avistaExtra = mostraAvista
-      ? FINANCIAL_DIVIDER_PAD + FINANCIAL_ROW_SPACING + 5.5
-      : 0;
+    const avistaExtra =
+      Math.max(0, avistaLinhas) *
+      (FINANCIAL_DIVIDER_PAD + FINANCIAL_ROW_SPACING + 5.5);
     return (
       FINANCIAL_CARD_BODY_PAD +
       5.5 +
@@ -944,9 +944,8 @@ function measureFinancialCardContentHeight(
     FINANCIAL_DIVIDER_PAD +
     FINANCIAL_ROW_SPACING +
     5.5 +
-    FINANCIAL_DIVIDER_PAD +
-    FINANCIAL_ROW_SPACING +
-    5 +
+    Math.max(0, avistaLinhas) *
+      (FINANCIAL_DIVIDER_PAD + FINANCIAL_ROW_SPACING + 5) +
     FINANCIAL_VALIDADE_GAP +
     1.2 +
     3.5 +
@@ -1247,10 +1246,20 @@ function drawChecklistItem(
   return y + lines.length * CHECKLIST_LINE_HEIGHT + CHECKLIST_ITEM_GAP;
 }
 
+function linhasApresentacaoAvista(
+  orcamento: OrcamentoComItens,
+  layoutLaudo: boolean
+): number {
+  const apresentacao = resolverApresentacaoAvistaPdf(orcamento, layoutLaudo);
+  if (apresentacao.modo === "oculto") return 0;
+  if (apresentacao.modo === "automatico") return 1;
+  return apresentacao.descontoTexto ? 2 : 1;
+}
+
 function measureResumoFinanceiroCardHeight(
   isMensalidade = false,
   isAet = false,
-  mostraAvista = false,
+  avistaLinhas = 0,
   extraCondicaoH = 0
 ): number {
   return (
@@ -1258,7 +1267,7 @@ function measureResumoFinanceiroCardHeight(
     measureFinancialCardContentHeight(
       isMensalidade,
       isAet,
-      mostraAvista,
+      avistaLinhas,
       extraCondicaoH
     )
   );
@@ -1319,7 +1328,40 @@ function drawResumoFinanceiroCard(
   const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(
     orcamento.orcamento_itens
   );
-  const mostraAvistaParecer = parecerMostraAlternativaAvista(orcamento);
+  const apresentacaoAvista = resolverApresentacaoAvistaPdf(
+    orcamento,
+    isLaudoPontual
+  );
+  const desenharAvistaManual = () => {
+    if (apresentacaoAvista.modo !== "manual") return;
+    drawRow(
+      "avista",
+      "Pagamento à vista",
+      formatCurrency(apresentacaoAvista.valorFinal),
+      {
+        labelFont: 7.5,
+        valueFont: 9.5,
+        valueColor: GOLD_STRONG,
+        iconColor: GOLD_STRONG,
+        rowHeight: 5.5,
+      },
+      apresentacaoAvista.descontoTexto != null
+    );
+    if (!apresentacaoAvista.descontoTexto) return;
+    drawRow(
+      "avista",
+      "Desconto",
+      apresentacaoAvista.descontoTexto,
+      {
+        labelFont: 7.5,
+        valueFont: 9.5,
+        valueColor: GOLD_STRONG,
+        iconColor: GOLD_STRONG,
+        rowHeight: 5.5,
+      },
+      false
+    );
+  };
 
   if (isLaudoPontual) {
     const textoCondicao = exclusivoParecer
@@ -1377,23 +1419,35 @@ function drawResumoFinanceiroCard(
         iconColor: GOLD,
         rowHeight: 6.5,
       },
-      mostraAvistaParecer
+      apresentacaoAvista.modo === "manual"
     );
-    if (mostraAvistaParecer) {
-      drawRow(
-        "avista",
-        "Pagamento à vista",
-        formatCurrency(Number(orcamento.valor_avista) || 0),
-        {
-          labelFont: 7.5,
-          valueFont: 9.5,
-          valueColor: GOLD_STRONG,
-          iconColor: GOLD_STRONG,
-          rowHeight: 5.5,
-        },
-        false
-      );
-    }
+    desenharAvistaManual();
+  } else if (apresentacaoAvista.modo !== "automatico") {
+  drawRow(
+    "total",
+    "Valor Total",
+    formatCurrency(valorTotal),
+    {
+      labelFont: 8.5,
+      valueFont: 12,
+      labelBold: true,
+      iconColor: GOLD,
+      rowHeight: 6.5,
+    },
+    true
+  );
+  drawRow(
+    "parcel",
+    "Pagamento parcelado",
+    pagamento.textoParcelado,
+    {
+      labelFont: 7.5,
+      valueFont: 9.5,
+      rowHeight: 5.5,
+    },
+    apresentacaoAvista.modo === "manual"
+  );
+  desenharAvistaManual();
   } else {
   drawRow(
     "total",
@@ -2032,7 +2086,7 @@ function measureDesiredCardsRowHeight(
   isMensalidade = false,
   inclusosObservacoes: readonly string[] = PACOTE_COMPLETO_INCLUSOS_OBSERVACOES,
   isAet = false,
-  mostraAvista = false,
+  avistaLinhas = 0,
   extraCondicaoH = 0
 ): { desiredH: number; contentMinH: number } {
   let inclusosH = 0;
@@ -2053,7 +2107,7 @@ function measureDesiredCardsRowHeight(
   const financeiroH = measureResumoFinanceiroCardHeight(
     isMensalidade,
     isAet,
-    mostraAvista,
+    avistaLinhas,
     extraCondicaoH
   );
   const hasInclusosCard = isMensalidade || hasPacote || inclusos.length > 0;
@@ -2476,7 +2530,7 @@ function drawFinancialAndInclusosRow(
     isMensalidade,
     inclusosObservacoes,
     ocultaColaboradores,
-    parecerMostraAlternativaAvista(orcamento),
+    linhasApresentacaoAvista(orcamento, ocultaColaboradores),
     extraCondicaoH
   );
   const { needsNewPage, cardH } = resolveCardsBlockPlacement(

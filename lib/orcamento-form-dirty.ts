@@ -19,6 +19,8 @@ export function serializeOrcamentoFormSnapshot(
     forma_pagamento: form.forma_pagamento,
     quantidade_parcelas: form.quantidade_parcelas,
     oferecer_desconto_avista: form.oferecer_desconto_avista,
+    desconto_avista_tipo: form.desconto_avista_tipo,
+    desconto_avista_informado: form.desconto_avista_informado,
     valor_avista: form.valor_avista,
     origem_cliente: form.origem_cliente,
     modalidade: form.modalidade,

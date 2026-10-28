@@ -31,8 +31,15 @@ import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
   parseQuantidadeParcelasInteira,
-  validarValorAvistaParecer,
 } from "@/lib/servico-parecer-tecnico";
+import {
+  calcValorFinalAvista,
+  maskPercentualInput,
+  OPCAO_AVISTA_PDF_LABEL,
+  orcamentoPermiteOpcaoAvistaManual,
+  parseDescontoInformado,
+  validarDescontoAvista,
+} from "@/lib/orcamento-avista";
 import { OrcamentoItensSection } from "./OrcamentoItensSection";
 
 interface OrcamentoFormProps {
@@ -82,18 +89,32 @@ export function OrcamentoForm({
 }: OrcamentoFormProps) {
   const isMensalidade = isOrcamentoMensalidade(form.modalidade);
   const isParecerTecnico = orcamentoEhExclusivoParecerTecnico(form.itens);
+  const usaAvistaManual = orcamentoPermiteOpcaoAvistaManual(form.itens);
   const parcelasParecer = parseQuantidadeParcelasInteira(form.quantidade_parcelas);
   const textoParcelasParecer =
     isParecerTecnico && parcelasParecer != null && valorTotal > 0
       ? formatCondicaoParcelasCentavos(valorTotal, parcelasParecer)
       : "";
-  const erroAvistaParecer = isParecerTecnico
-    ? validarValorAvistaParecer({
+  const erroAvista = usaAvistaManual
+    ? validarDescontoAvista({
         oferecer: form.oferecer_desconto_avista,
-        valorAvistaTexto: form.valor_avista,
+        tipo: form.desconto_avista_tipo,
+        descontoTexto: form.desconto_avista_informado,
         valorTotal,
       })
     : null;
+  const descontoInformado = parseDescontoInformado(
+    form.desconto_avista_tipo,
+    form.desconto_avista_informado
+  );
+  const valorFinalAvista =
+    form.oferecer_desconto_avista && erroAvista == null && descontoInformado != null
+      ? calcValorFinalAvista({
+          valorTotal,
+          tipo: form.desconto_avista_tipo,
+          desconto: descontoInformado,
+        })
+      : null;
   const servicosFiltrados = useMemo(
     () => filterServicosSelecaoOrcamento(servicos),
     [servicos]
@@ -377,42 +398,17 @@ export function OrcamentoForm({
                 </p>
               </div>
             </div>
-            <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-navy">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[#082b63]"
-                checked={form.oferecer_desconto_avista}
-                onChange={(e) =>
-                  onChange("oferecer_desconto_avista", e.target.checked ? "1" : "0")
-                }
-              />
-              Oferecer desconto à vista
-            </label>
-            {form.oferecer_desconto_avista ? (
-              <div className="mt-3 max-w-[240px]">
-                <label className="mb-1.5 block text-xs font-bold text-navy">
-                  Valor à vista com desconto
-                </label>
-                <input
-                  className="field-input"
-                  placeholder="R$ 0,00"
-                  value={form.valor_avista}
-                  onChange={(e) =>
-                    onChange("valor_avista", maskMoneyInput(e.target.value))
-                  }
-                />
-                {erroAvistaParecer && form.valor_avista.trim() !== "" ? (
-                  <p className="mt-1 text-[11px] text-brand-red">
-                    {erroAvistaParecer}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+            <OpcaoAvistaFields
+              form={form}
+              erro={erroAvista}
+              valorFinal={valorFinalAvista}
+              onChange={onChange}
+            />
           </div>
         ) : (
         <div
           className={
-            condicoesPagamento.permitePagamentoAVista
+            condicoesPagamento.permitePagamentoAVista && !usaAvistaManual
               ? "grid grid-cols-1 gap-3 md:grid-cols-2"
               : "grid grid-cols-1 gap-3"
           }
@@ -452,7 +448,15 @@ export function OrcamentoForm({
               para este valor.
             </p>
           </div>
-          {condicoesPagamento.permitePagamentoAVista ? (
+          {usaAvistaManual ? (
+            <OpcaoAvistaFields
+              form={form}
+              erro={erroAvista}
+              valorFinal={valorFinalAvista}
+              onChange={onChange}
+            />
+          ) : null}
+          {condicoesPagamento.permitePagamentoAVista && !usaAvistaManual ? (
           <div className="rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#b45309]">
               Valor à vista
@@ -470,5 +474,85 @@ export function OrcamentoForm({
         </Panel>
       </div>
     </>
+  );
+}
+
+function OpcaoAvistaFields({
+  form,
+  erro,
+  valorFinal,
+  onChange,
+}: {
+  form: OrcamentoFormValues;
+  erro: string | null;
+  valorFinal: number | null;
+  onChange: (field: OrcamentoFormField, value: string) => void;
+}) {
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-[#082b63]"
+          checked={form.oferecer_desconto_avista}
+          onChange={(e) =>
+            onChange("oferecer_desconto_avista", e.target.checked ? "1" : "0")
+          }
+        />
+        {OPCAO_AVISTA_PDF_LABEL}
+      </label>
+      {form.oferecer_desconto_avista ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Tipo de desconto
+            </label>
+            <select
+              className="field-input"
+              value={form.desconto_avista_tipo}
+              onChange={(e) => onChange("desconto_avista_tipo", e.target.value)}
+            >
+              <option value="valor">Valor (R$)</option>
+              <option value="percentual">Porcentagem (%)</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-navy">
+              Desconto
+            </label>
+            <input
+              className="field-input"
+              inputMode="decimal"
+              placeholder={form.desconto_avista_tipo === "valor" ? "R$ 0,00" : "0"}
+              value={form.desconto_avista_informado}
+              onChange={(e) =>
+                onChange(
+                  "desconto_avista_informado",
+                  form.desconto_avista_tipo === "valor"
+                    ? maskMoneyInput(e.target.value)
+                    : maskPercentualInput(e.target.value)
+                )
+              }
+            />
+            {erro ? (
+              <p className="mt-1 text-[11px] text-brand-red">{erro}</p>
+            ) : (
+              <p className="mt-1 text-[11px] text-[#64748b]">
+                Use 0 para exibir a opção sem desconto.
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-navy">Valor final à vista</p>
+            <p className="text-sm font-extrabold text-navy">
+              {valorFinal == null ? "—" : formatCurrency(valorFinal)}
+            </p>
+            <p className="mt-1 text-[11px] text-[#64748b]">
+              O total e as parcelas permanecem iguais.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

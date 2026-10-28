@@ -42,9 +42,14 @@ import {
 import {
   formatCondicaoParcelasCentavos,
   orcamentoEhExclusivoParecerTecnico,
-  parecerMostraAlternativaAvista,
   parseQuantidadeParcelasInteira,
 } from "@/lib/servico-parecer-tecnico";
+import {
+  formatDescontoAvistaInformado,
+  orcamentoMostraAlternativaAvista,
+  orcamentoPermiteOpcaoAvistaManual,
+  parseDescontoAvistaTipo,
+} from "@/lib/orcamento-avista";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCriadoPorOrcamento, formatResponsavelOrcamentoDisplay } from "@/lib/orcamento-responsavel";
 import {
@@ -126,7 +131,16 @@ export function OrcamentoViewBody({
         parseQuantidadeParcelasInteira(orcamento.quantidade_parcelas) ?? 1
       )
     : "";
-  const mostraAvistaParecer = parecerMostraAlternativaAvista(orcamento);
+  const mostraAvistaManual = orcamentoMostraAlternativaAvista(orcamento);
+  const usaAvistaManual = orcamentoPermiteOpcaoAvistaManual(itens);
+  const tipoAvista = parseDescontoAvistaTipo(orcamento.desconto_avista_tipo);
+  const textoDescontoAvista =
+    mostraAvistaManual && tipoAvista
+      ? formatDescontoAvistaInformado(
+          tipoAvista,
+          Number(orcamento.desconto_avista_valor) || 0
+        )
+      : null;
   const linhasMensalidade = isMensalidade
     ? buildResumoMensalidadeLinhas(valorServico)
     : [];
@@ -331,8 +345,7 @@ export function OrcamentoViewBody({
               </p>
             </div>
           </div>
-          {isParecerTecnico ? (
-            mostraAvistaParecer ? (
+          {mostraAvistaManual ? (
           <div className="flex items-start gap-3 py-4">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#c9972b]/15 text-[#a07820]">
               <IconTag size={16} />
@@ -344,10 +357,14 @@ export function OrcamentoViewBody({
               <p className="mt-0.5 text-xl font-extrabold tracking-[-0.3px] text-[#a07820]">
                 {formatCurrency(Number(orcamento.valor_avista))}
               </p>
+              {textoDescontoAvista ? (
+                <p className="mt-0.5 text-[12px] font-semibold text-[#a07820]">
+                  Desconto {textoDescontoAvista}
+                </p>
+              ) : null}
             </div>
           </div>
-            ) : null
-          ) : condicoesPagamento.permitePagamentoAVista ? (
+          ) : usaAvistaManual ? null : condicoesPagamento.permitePagamentoAVista ? (
           <div className="flex items-start gap-3 py-4">
             <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#c9972b]/15 text-[#a07820]">
               <IconTag size={16} />

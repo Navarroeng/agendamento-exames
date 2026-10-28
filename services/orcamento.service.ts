@@ -20,6 +20,12 @@ import {
   parseQuantidadeParcelasInteira,
 } from "@/lib/servico-parecer-tecnico";
 import { condicaoAprovadaParecer } from "@/lib/contrato-parecer-tecnico";
+import {
+  orcamentoPermiteOpcaoAvistaManual,
+  parseDescontoAvistaTipo,
+  resolverAvistaPersistido,
+  validarDescontoAvista,
+} from "@/lib/orcamento-avista";
 
 const ORCAMENTO_SELECT = `
   *,
@@ -47,20 +53,47 @@ function normalizeOrcamentoPayload(
   );
   const modalidade = resolveOrcamentoModalidade(payload.modalidade);
   const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(itens);
-  const valorAvistaInformado = Number(payload.valor_avista);
-  const oferecerAvista =
-    exclusivoParecer &&
+  const tipoAvista = parseDescontoAvistaTipo(payload.desconto_avista_tipo);
+  const usaAvista = orcamentoPermiteOpcaoAvistaManual(itens);
+  if (
+    usaAvista &&
     payload.oferecer_desconto_avista === true &&
-    Number.isFinite(valorAvistaInformado) &&
-    valorAvistaInformado > 0;
+    tipoAvista
+  ) {
+    if (payload.desconto_avista_valor == null) {
+      throw new Error(
+        "Informe o desconto à vista. Use 0 para exibir a opção sem desconto."
+      );
+    }
+    const erroAvista = validarDescontoAvista({
+      oferecer: true,
+      tipo: tipoAvista,
+      descontoTexto:
+        tipoAvista === "percentual"
+          ? String(payload.desconto_avista_valor ?? "").replace(".", ",")
+          : String(payload.desconto_avista_valor ?? 0).replace(".", ","),
+      valorTotal: subtotal,
+    });
+    if (erroAvista) throw new Error(erroAvista);
+  }
+  const avista = resolverAvistaPersistido({
+    itens,
+    oferecer: payload.oferecer_desconto_avista === true,
+    tipo: tipoAvista,
+    desconto: payload.desconto_avista_valor ?? null,
+    valorTotal: subtotal,
+    valorAvistaLegado: payload.valor_avista,
+  });
 
   return {
     ...payload,
     itens,
     modalidade,
     desconto_percentual: 0,
-    oferecer_desconto_avista: oferecerAvista,
-    valor_avista: oferecerAvista ? valorAvistaInformado : null,
+    oferecer_desconto_avista: avista.oferecer_desconto_avista,
+    desconto_avista_tipo: avista.desconto_avista_tipo,
+    desconto_avista_valor: avista.desconto_avista_valor,
+    valor_avista: avista.valor_avista,
     quantidade_parcelas: isOrcamentoMensalidade(modalidade)
       ? null
       : exclusivoParecer
@@ -170,6 +203,12 @@ export async function criarOrcamento(
       forma_pagamento: normalized.forma_pagamento,
       quantidade_parcelas: normalized.quantidade_parcelas,
       oferecer_desconto_avista: normalized.oferecer_desconto_avista === true,
+      desconto_avista_tipo: normalized.oferecer_desconto_avista
+        ? normalized.desconto_avista_tipo ?? null
+        : null,
+      desconto_avista_valor: normalized.oferecer_desconto_avista
+        ? normalized.desconto_avista_valor ?? null
+        : null,
       valor_avista: normalized.oferecer_desconto_avista
         ? normalized.valor_avista ?? null
         : null,
@@ -217,6 +256,12 @@ export async function atualizarOrcamento(
       forma_pagamento: normalized.forma_pagamento,
       quantidade_parcelas: normalized.quantidade_parcelas,
       oferecer_desconto_avista: normalized.oferecer_desconto_avista === true,
+      desconto_avista_tipo: normalized.oferecer_desconto_avista
+        ? normalized.desconto_avista_tipo ?? null
+        : null,
+      desconto_avista_valor: normalized.oferecer_desconto_avista
+        ? normalized.desconto_avista_valor ?? null
+        : null,
       valor_avista: normalized.oferecer_desconto_avista
         ? normalized.valor_avista ?? null
         : null,
@@ -299,6 +344,14 @@ export async function duplicarOrcamento(
     forma_pagamento: original.forma_pagamento,
     quantidade_parcelas: original.quantidade_parcelas ?? null,
     oferecer_desconto_avista: original.oferecer_desconto_avista === true,
+    desconto_avista_tipo:
+      original.oferecer_desconto_avista === true
+        ? original.desconto_avista_tipo ?? null
+        : null,
+    desconto_avista_valor:
+      original.oferecer_desconto_avista === true
+        ? original.desconto_avista_valor ?? null
+        : null,
     valor_avista:
       original.oferecer_desconto_avista === true
         ? original.valor_avista ?? null

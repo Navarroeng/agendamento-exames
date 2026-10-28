@@ -70,8 +70,14 @@ import {
   parseQuantidadeParcelasInteira,
   SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA,
   validarQuantidadeParcelasParecer,
-  validarValorAvistaParecer,
 } from "@/lib/servico-parecer-tecnico";
+import {
+  calcValorFinalAvista,
+  camposAvistaDoOrcamento,
+  orcamentoPermiteOpcaoAvistaManual,
+  parseDescontoInformado,
+  validarDescontoAvista,
+} from "@/lib/orcamento-avista";
 
 export type OrcamentoFormField = keyof Omit<OrcamentoFormValues, "itens">;
 
@@ -89,7 +95,18 @@ export function useOrcamentoForm() {
         return {
           ...prev,
           oferecer_desconto_avista: oferecer,
-          valor_avista: oferecer ? prev.valor_avista : "",
+          desconto_avista_tipo: oferecer ? prev.desconto_avista_tipo : "valor",
+          desconto_avista_informado: oferecer
+            ? prev.desconto_avista_informado
+            : "",
+          valor_avista: "",
+        };
+      }
+      if (field === "desconto_avista_tipo") {
+        return {
+          ...prev,
+          desconto_avista_tipo: value === "percentual" ? "percentual" : "valor",
+          desconto_avista_informado: "",
         };
       }
       if (field !== "modalidade") {
@@ -268,6 +285,8 @@ export function useOrcamentoForm() {
             modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
             quantidade_parcelas: "",
             oferecer_desconto_avista: false,
+            desconto_avista_tipo: "valor",
+            desconto_avista_informado: "",
             valor_avista: "",
             itens: [changed],
           };
@@ -285,6 +304,8 @@ export function useOrcamentoForm() {
             ...prev,
             modalidade: ORCAMENTO_MODALIDADE_PONTUAL,
             oferecer_desconto_avista: false,
+            desconto_avista_tipo: "valor",
+            desconto_avista_informado: "",
             valor_avista: "",
             itens,
           };
@@ -292,6 +313,8 @@ export function useOrcamentoForm() {
         return {
           ...prev,
           oferecer_desconto_avista: false,
+          desconto_avista_tipo: "valor",
+          desconto_avista_informado: "",
           valor_avista: "",
           itens,
         };
@@ -390,15 +413,15 @@ export function useOrcamentoForm() {
               )
             )
           : "",
-      oferecer_desconto_avista:
-        orcamentoEhExclusivoParecerTecnico(itensDb) &&
-        orcamento.oferecer_desconto_avista === true,
-      valor_avista:
-        orcamentoEhExclusivoParecerTecnico(itensDb) &&
-        orcamento.oferecer_desconto_avista === true &&
-        Number(orcamento.valor_avista) > 0
-          ? maskMoneyInput(String(Math.round(Number(orcamento.valor_avista) * 100)))
-          : "",
+      ...(() => {
+        const avista = camposAvistaDoOrcamento(orcamento);
+        return {
+          oferecer_desconto_avista: avista.oferecer,
+          desconto_avista_tipo: avista.tipo,
+          desconto_avista_informado: avista.informado,
+          valor_avista: "",
+        };
+      })(),
       itens:
         itensDb.length > 0
           ? itensDb.map((item) => {
@@ -503,7 +526,20 @@ export function useOrcamentoForm() {
     const validadeIso = resolveValidadePropostaIso(form.data_proposta);
     const modalidade = resolveOrcamentoModalidade(form.modalidade);
     const exclusivoParecer = orcamentoEhExclusivoParecerTecnico(itens);
-    const oferecerAvista = exclusivoParecer && form.oferecer_desconto_avista;
+    const usaAvistaManual = orcamentoPermiteOpcaoAvistaManual(itens);
+    const descontoInformado = parseDescontoInformado(
+      form.desconto_avista_tipo,
+      form.desconto_avista_informado
+    );
+    const oferecerAvista = usaAvistaManual && form.oferecer_desconto_avista;
+    const valorAvista =
+      oferecerAvista && descontoInformado != null
+        ? calcValorFinalAvista({
+            valorTotal: subtotal,
+            tipo: form.desconto_avista_tipo,
+            desconto: descontoInformado,
+          })
+        : null;
     const quantidadeParcelas = isOrcamentoMensalidade(modalidade)
       ? null
       : exclusivoParecer
@@ -540,7 +576,9 @@ export function useOrcamentoForm() {
       forma_pagamento: null,
       quantidade_parcelas: quantidadeParcelas,
       oferecer_desconto_avista: oferecerAvista,
-      valor_avista: oferecerAvista ? parseMoney(form.valor_avista) : null,
+      desconto_avista_tipo: oferecerAvista ? form.desconto_avista_tipo : null,
+      desconto_avista_valor: oferecerAvista ? descontoInformado : null,
+      valor_avista: valorAvista,
       validade_proposta: validadeIso,
       subtotal,
       valor_total: subtotal,
@@ -602,13 +640,19 @@ export function useOrcamentoForm() {
         form.quantidade_parcelas
       );
       if (parcelasErro) return parcelasErro;
+    }
+    if (
+      orcamentoPermiteOpcaoAvistaManual(itensValidos) &&
+      form.oferecer_desconto_avista
+    ) {
       const valorTotal = itensValidos.reduce(
         (sum, item) => sum + parseMoney(item.valor_unitario),
         0
       );
-      return validarValorAvistaParecer({
-        oferecer: form.oferecer_desconto_avista,
-        valorAvistaTexto: form.valor_avista,
+      return validarDescontoAvista({
+        oferecer: true,
+        tipo: form.desconto_avista_tipo,
+        descontoTexto: form.desconto_avista_informado,
         valorTotal,
       });
     }

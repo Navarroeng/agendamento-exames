@@ -112,10 +112,14 @@ export interface OrcamentoRecord {
   forma_pagamento: string | null;
   /** Parcelas escolhidas na proposta. Pacote SST: 1–10. Parecer técnico: inteiro >= 1. */
   quantidade_parcelas?: number | null;
-  /** Laudo de Parecer Técnico: oferece pagamento à vista com valor final informado. */
+  /** Exibe a alternativa à vista no PDF dos laudos e serviços pontuais. */
   oferecer_desconto_avista?: boolean | null;
-  /** Valor final à vista do Laudo de Parecer Técnico. Null quando a opção está desmarcada. */
+  /** Valor final da alternativa à vista. Null quando a opção está desmarcada. */
   valor_avista?: number | null;
+  /** valor = desconto em reais; percentual = desconto sobre o total. Null em registros antigos. */
+  desconto_avista_tipo?: "valor" | "percentual" | null;
+  /** Desconto digitado. Reais ou percentual, conforme o tipo. Não altera o total nem as parcelas. */
+  desconto_avista_valor?: number | null;
   /** Condição escolhida para o contrato do Parecer Técnico. Ignorada se a oferta à vista estiver desmarcada. */
   parecer_pagamento_escolhido?: "parcelado" | "avista" | null;
   validade_proposta: string | null;
@@ -176,9 +180,13 @@ export interface OrcamentoFormValues {
   forma_pagamento: string;
   /** Quantidade de parcelas escolhida (string do Select). Vazio = máximo permitido. */
   quantidade_parcelas: string;
-  /** Laudo de Parecer Técnico. Começa desmarcada. */
+  /** Laudos e serviços pontuais. Começa desmarcada. */
   oferecer_desconto_avista: boolean;
-  /** Valor final à vista digitado. Ignorado quando a caixa está desmarcada. */
+  /** Tipo do desconto manual da alternativa à vista. */
+  desconto_avista_tipo: "valor" | "percentual";
+  /** Desconto digitado, em reais ou percentual. */
+  desconto_avista_informado: string;
+  /** Campo legado do formulário. O valor final é calculado na gravação. */
   valor_avista: string;
   itens: OrcamentoItemFormItem[];
 }
@@ -215,6 +223,8 @@ export interface OrcamentoInsertPayload {
   quantidade_parcelas: number | null;
   oferecer_desconto_avista?: boolean;
   valor_avista?: number | null;
+  desconto_avista_tipo?: "valor" | "percentual" | null;
+  desconto_avista_valor?: number | null;
   validade_proposta: string | null;
   subtotal: number;
   valor_total: number;
