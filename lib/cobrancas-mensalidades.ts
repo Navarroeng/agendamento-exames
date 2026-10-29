@@ -92,6 +92,18 @@ export function rotuloParcelaCobranca(numero: number): string {
   return `${numero}/${MENSALIDADE_PARCELAS_QUANTIDADE}`;
 }
 
+export function referenciaFinanceiroDaCobranca(parcela: {
+  orcamentoId: string;
+  numeroOrcamento: string;
+  empresa: string;
+}): { orcamentoId: string; numeroOrcamento: string; empresa: string } {
+  return {
+    orcamentoId: parcela.orcamentoId,
+    numeroOrcamento: parcela.numeroOrcamento.trim(),
+    empresa: parcela.empresa,
+  };
+}
+
 export function rotuloContratoCobranca(
   numeroOrcamento: string,
   numeroContrato: string | null | undefined

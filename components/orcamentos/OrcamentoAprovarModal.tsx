@@ -143,6 +143,8 @@ interface OrcamentoAprovarModalProps {
   mode?: "consulta" | "aprovacao";
   /** Aba inicial ao abrir (ex.: etapa atual da Implantação). */
   initialTab?: OrcamentoEtapaId | null;
+  /** Depois de salvar, permanece nesta aba em vez de avançar o fluxo. */
+  ancorarAba?: OrcamentoEtapaId | null;
   orcamento: OrcamentoComItens | null;
   aprovacao: OrcamentoAprovacaoRecord | null;
   servicos: ServicoSstRecord[];
@@ -213,6 +215,7 @@ export function OrcamentoAprovarModal({
   open,
   mode = "aprovacao",
   initialTab = null,
+  ancorarAba = null,
   orcamento,
   aprovacao,
   servicos,
@@ -566,6 +569,10 @@ export function OrcamentoAprovarModal({
     [fluxoImplantacao]
   );
 
+  function irAposSalvar(destino: TabId) {
+    setTab(ancorarAba ?? destino);
+  }
+
   useEffect(() => {
     if (!open || tab !== "financeiro" || !controleMensalidades || !orcamento || !aprovacao) {
       return;
@@ -796,7 +803,7 @@ export function OrcamentoAprovarModal({
         : form
     );
     setShowDiffConfirm(false);
-    setTab("contrato");
+    irAposSalvar("contrato");
   }
 
   async function handleSalvarContratoClick() {
@@ -821,7 +828,7 @@ export function OrcamentoAprovarModal({
 
     await onSalvarContrato(aprovacao.id, payload);
     if (contratoAssinado) {
-      setTab("financeiro");
+      irAposSalvar("financeiro");
     }
   }
 
@@ -906,16 +913,13 @@ export function OrcamentoAprovarModal({
     await onSalvarFinanceiro(aprovacao.id, payload, comprovanteFile);
     setComprovanteFile(null);
     if (boletoPago) {
-      if (isFluxoLaudoPontual(fluxoImplantacao)) {
-        setTab("visita_aet");
-      } else if (
-        fluxoImplantacao === "somente_treinamentos" ||
-        fluxoImplantacao === "combinado"
-      ) {
-        setTab("treinamento");
-      } else {
-        setTab("procuracao");
-      }
+      const destino = isFluxoLaudoPontual(fluxoImplantacao)
+        ? "visita_aet"
+        : fluxoImplantacao === "somente_treinamentos" ||
+            fluxoImplantacao === "combinado"
+          ? "treinamento"
+          : "procuracao";
+      irAposSalvar(destino);
     }
   }
 
@@ -948,7 +952,7 @@ export function OrcamentoAprovarModal({
       observacao_procuracao: emptyToNull(observacaoProcuracao),
     });
     if (isProcuracaoStatusConcluida(procuracaoStatus)) {
-      setTab("funcionarios");
+      irAposSalvar("funcionarios");
     }
   }
 
@@ -964,7 +968,7 @@ export function OrcamentoAprovarModal({
     }
     await onSalvarLogo(aprovacao.id, logoFile, possuiLogo);
     setLogoFile(null);
-    setTab("visita");
+    irAposSalvar("visita");
   }
 
   async function handleSalvarVisitaClick() {
@@ -1000,7 +1004,7 @@ export function OrcamentoAprovarModal({
         ? emptyToNull(visitaObservacoes)
         : null,
     });
-    setTab("agendamentos");
+    irAposSalvar("agendamentos");
   }
 
   async function handleSalvarTreinamentoClick() {
@@ -2041,7 +2045,7 @@ export function OrcamentoAprovarModal({
               onFileChange={setFuncionariosFile}
               onEtapaSalva={(saved) => {
                 onAprovacaoAtualizada?.(saved);
-                setTab("logo");
+                irAposSalvar("logo");
               }}
               onSubstituir={async (file) => {
                 await onSubstituirFuncionarios(aprovacao.id, file);

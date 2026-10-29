@@ -17,7 +17,7 @@ import {
   anosDisponiveisCobrancas,
   centavosParaReais,
   consultarCobrancas,
-  rotuloContratoCobranca,
+  referenciaFinanceiroDaCobranca,
   rotuloParcelaCobranca,
   seloStatusCobranca,
   type CobrancaParcela,
@@ -34,9 +34,11 @@ import {
 } from "@/lib/mensalidade-parcelas";
 import { formatCurrency } from "@/lib/money";
 import { isPerfilStaffNavarro } from "@/lib/permissions";
+import { useOrcamentoProcessoModal } from "@/hooks/useOrcamentoProcessoModal";
 import { listarCobrancasMensalidades } from "@/services/cobrancas.service";
 import { registrarBaixaParcelaMensalidade } from "@/services/mensalidade-parcelas.service";
 import { obterUrlOrcamentoComprovante } from "@/services/orcamento-comprovante.service";
+import { OrcamentoAprovarModal } from "@/components/orcamentos/OrcamentoAprovarModal";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -68,8 +70,8 @@ export function CobrancasPage() {
   const [consulta, setConsulta] = useState<CobrancaParcela | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  const carregar = useCallback(async () => {
-    setLoading(true);
+  const carregar = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setErro(null);
     try {
       setParcelas(await listarCobrancasMensalidades());
@@ -79,9 +81,15 @@ export function CobrancasPage() {
         err instanceof Error ? err.message : "Não foi possível carregar as cobranças."
       );
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
+
+  const atualizarLista = useCallback(() => {
+    void carregar({ silent: true });
+  }, [carregar]);
+
+  const financeiro = useOrcamentoProcessoModal({ onChanged: atualizarLista });
 
   useEffect(() => {
     void carregar();
@@ -306,7 +314,7 @@ export function CobrancasPage() {
             <thead>
               <tr className="border-b border-[#e4ebf4] text-[10px] font-extrabold uppercase tracking-wide text-[#64748b]">
                 <th className="px-3 py-2 font-extrabold">Empresa</th>
-                <th className="px-3 py-2 font-extrabold">Orçamento/contrato</th>
+                <th className="px-3 py-2 font-extrabold">Orçamento</th>
                 <th className="px-3 py-2 font-extrabold">Parcela</th>
                 <th className="px-3 py-2 font-extrabold">Vencimento</th>
                 <th className="px-3 py-2 font-extrabold">Valor da parcela</th>
@@ -343,18 +351,26 @@ export function CobrancasPage() {
                   return (
                     <tr key={parcela.id} className="border-b border-[#f1f5f9]">
                       <td className="px-3 py-2">
-                        <p className="font-semibold text-navy">{parcela.empresa}</p>
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-navy hover:underline"
+                          aria-label={`Abrir financeiro de ${parcela.empresa}, orçamento ${parcela.numeroOrcamento}`}
+                          onClick={() => {
+                            const alvo = referenciaFinanceiroDaCobranca(parcela);
+                            void financeiro.openProcesso(
+                              alvo.orcamentoId,
+                              "financeiro"
+                            );
+                          }}
+                        >
+                          {parcela.empresa}
+                        </button>
                         <p className="text-[11px] text-[#64748b]">
                           {formatCNPJ(parcela.cnpj)}
                           {selo ? ` · ${selo}` : ""}
                         </p>
                       </td>
-                      <td className="px-3 py-2">
-                        {rotuloContratoCobranca(
-                          parcela.numeroOrcamento,
-                          parcela.numeroContrato
-                        )}
-                      </td>
+                      <td className="px-3 py-2">{parcela.numeroOrcamento}</td>
                       <td className="px-3 py-2">
                         {rotuloParcelaCobranca(parcela.numero)}
                       </td>
@@ -439,6 +455,46 @@ export function CobrancasPage() {
           void verComprovante(path);
         }}
       />
+      <OrcamentoAprovarModal
+        open={financeiro.modalOpen}
+        mode="consulta"
+        initialTab={financeiro.modalInitialTab}
+        ancorarAba="financeiro"
+        orcamento={financeiro.modalOrcamento}
+        aprovacao={financeiro.modalAprovacao}
+        servicos={financeiro.servicos}
+        saving={financeiro.modalSaving}
+        usuarioNome={financeiro.usuarioNome}
+        funcionariosPreviewUrl={financeiro.funcionariosPreviewUrl}
+        logoPreviewUrl={financeiro.logoPreviewUrl}
+        onClose={financeiro.closeModal}
+        onSalvarAprovacao={financeiro.handleSalvarAprovacao}
+        onAtualizarCondicoesAprovadas={financeiro.handleAtualizarCondicoesAprovadas}
+        onListarHistoricoCondicoes={financeiro.handleListarHistoricoCondicoes}
+        onSalvarContrato={financeiro.handleSalvarContrato}
+        onSalvarFinanceiro={financeiro.handleSalvarFinanceiro}
+        onSalvarProcuracao={financeiro.handleSalvarProcuracao}
+        onSalvarFuncionarios={financeiro.handleSalvarFuncionarios}
+        onSubstituirFuncionarios={financeiro.handleSubstituirFuncionarios}
+        onRemoverFuncionarios={financeiro.handleRemoverFuncionarios}
+        onAprovacaoAtualizada={financeiro.handleAprovacaoAtualizada}
+        onSalvarLogo={financeiro.handleSalvarLogo}
+        onSubstituirLogo={financeiro.handleSubstituirLogo}
+        onRemoverLogo={financeiro.handleRemoverLogo}
+        onSalvarVisita={financeiro.handleSalvarVisita}
+        treinamento={financeiro.modalTreinamento}
+        treinamentoEventos={financeiro.modalTreinamentoEventos}
+        onSalvarTreinamento={financeiro.handleSalvarTreinamento}
+        onVerComprovante={(path) => {
+          void financeiro.handleVerComprovante(path);
+        }}
+      />
+      {(financeiro.actionLoading || financeiro.modalSaving) && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/10 backdrop-blur-[1px]"
+          aria-hidden
+        />
+      )}
     </AppShell>
   );
 }

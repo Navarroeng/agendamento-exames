@@ -7,6 +7,7 @@ import {
   BAIXA_JA_PAGA_MSG,
   BAIXA_VALOR_DIVERGENTE_MSG,
   consultarCobrancas,
+  referenciaFinanceiroDaCobranca,
   parcelaEntraEmCobrancas,
   resumirCobrancas,
   validarBaixaParcela,
@@ -391,6 +392,41 @@ assert.doesNotMatch(pagina, /salvarControleMensalidades/);
 assert.doesNotMatch(pagina, /location\.reload/);
 assert.doesNotMatch(pagina, /boleto_pago/);
 assert.match(pagina, /registrarBaixaParcelaMensalidade/);
+assert.match(pagina, />Orçamento</);
+assert.doesNotMatch(pagina, /Orçamento\/contrato/i);
+assert.doesNotMatch(pagina, /rotuloContratoCobranca/);
+assert.match(pagina, /referenciaFinanceiroDaCobranca\(parcela\)/);
+assert.match(pagina, /openProcesso\(\s*alvo\.orcamentoId,\s*"financeiro"\s*\)/);
+assert.match(pagina, /ancorarAba="financeiro"/);
+assert.match(pagina, /carregar\(\{ silent: true \}\)/);
+
+const mesmoClienteA = parcela({
+  id: "a",
+  vencimentoIso: "2026-10-31",
+  empresa: "Alfa Ltda",
+  orcamentoId: "orc-a",
+  numeroOrcamento: "ORC-A",
+});
+const mesmoClienteB = parcela({
+  id: "b",
+  vencimentoIso: "2026-10-31",
+  empresa: "Alfa Ltda",
+  orcamentoId: "orc-b",
+  numeroOrcamento: "ORC-B",
+});
+assert.deepEqual(referenciaFinanceiroDaCobranca(mesmoClienteA), {
+  orcamentoId: "orc-a",
+  numeroOrcamento: "ORC-A",
+  empresa: "Alfa Ltda",
+});
+assert.notEqual(
+  referenciaFinanceiroDaCobranca(mesmoClienteA).orcamentoId,
+  referenciaFinanceiroDaCobranca(mesmoClienteB).orcamentoId
+);
+assert.equal(
+  referenciaFinanceiroDaCobranca(mesmoClienteB).numeroOrcamento,
+  "ORC-B"
+);
 
 const migration = readFileSync(
   join(root, "supabase/migrations/150_mensalidade_parcela_recebimento.sql"),
