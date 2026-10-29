@@ -24,6 +24,7 @@ export function OrcamentoAbaFinanceiroMensalidade({
   disabled,
   onChangePagoEm,
   onChangeObservacao,
+  onVerComprovante,
 }: {
   loading: boolean;
   pendencias: string[];
@@ -32,6 +33,7 @@ export function OrcamentoAbaFinanceiroMensalidade({
   disabled: boolean;
   onChangePagoEm: (numero: number, pagoEm: string) => void;
   onChangeObservacao: (value: string) => void;
+  onVerComprovante?: (path: string) => void;
 }) {
   const resumo = parcelas.reduce(
     (acc, parcela) => {
@@ -106,6 +108,25 @@ export function OrcamentoAbaFinanceiroMensalidade({
                           onChangePagoEm(parcela.numero, event.target.value)
                         }
                       />
+                      {parcela.pagoEmIso && parcela.valorRecebido != null ? (
+                        <p className="mt-1 text-[11px] text-[#047857]">
+                          Recebido {formatCurrency(parcela.valorRecebido)}
+                        </p>
+                      ) : null}
+                      {parcela.comprovantePath && onVerComprovante ? (
+                        <button
+                          type="button"
+                          className="mt-1 block text-[11px] font-semibold text-brand-blue hover:underline"
+                          onClick={() =>
+                            onVerComprovante(parcela.comprovantePath!)
+                          }
+                        >
+                          Ver comprovante
+                          {parcela.comprovanteNome
+                            ? ` (${parcela.comprovanteNome})`
+                            : ""}
+                        </button>
+                      ) : null}
                     </td>
                     <td
                       className={`py-1.5 font-semibold ${SITUACAO_COR[parcela.situacao]}`}

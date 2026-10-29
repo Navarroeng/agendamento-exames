@@ -31,6 +31,10 @@ export type ParcelaMensalidadeRegistrada = {
   vencimentoIso: string;
   valor: number;
   pagoEmIso: string | null;
+  /** Preenchido pela baixa de Cobranças. Null quando só a data foi informada no Financeiro. */
+  valorRecebido?: number | null;
+  comprovantePath?: string | null;
+  comprovanteNome?: string | null;
 };
 
 export type ParcelaMensalidadeGrade = {
@@ -40,6 +44,9 @@ export type ParcelaMensalidadeGrade = {
   pagoEmIso: string | null;
   registrada: boolean;
   situacao: SituacaoParcelaMensalidade;
+  valorRecebido: number | null;
+  comprovantePath: string | null;
+  comprovanteNome: string | null;
 };
 
 export type GradeMensalidades =
@@ -151,6 +158,9 @@ export function resolverGradeMensalidades(params: {
             pagoEmIso: salva ? pagoEmIso : null,
             hojeIso: hoje,
           }),
+          valorRecebido: salva?.valorRecebido ?? null,
+          comprovantePath: salva?.comprovantePath ?? null,
+          comprovanteNome: salva?.comprovanteNome ?? null,
         };
       }),
     };
@@ -184,6 +194,9 @@ export function resolverGradeMensalidades(params: {
         pagoEmIso: null,
         hojeIso: hoje,
       }),
+      valorRecebido: null,
+      comprovantePath: null,
+      comprovanteNome: null,
     })),
   };
 }
@@ -209,6 +222,33 @@ export function aplicarPagamentosEditados(
       }),
     };
   });
+}
+
+/**
+ * Atualização de pagamento de uma parcela já gravada.
+ * Ao apagar a data, zera valor recebido e a referência do comprovante desta baixa.
+ * Não apaga arquivo do bucket nem registro de auditoria.
+ * Ao informar uma data, altera só pago_em e mantém valor recebido e comprovante.
+ */
+export function payloadAtualizacaoPagoEm(pagoEmIso: string | null): {
+  pago_em: string | null;
+  valor_recebido?: null;
+  comprovante_path?: null;
+  comprovante_nome?: null;
+  comprovante_tipo?: null;
+  comprovante_tamanho?: null;
+} {
+  if (pagoEmIso) {
+    return { pago_em: pagoEmIso };
+  }
+  return {
+    pago_em: null,
+    valor_recebido: null,
+    comprovante_path: null,
+    comprovante_nome: null,
+    comprovante_tipo: null,
+    comprovante_tamanho: null,
+  };
 }
 
 export function planejarPersistenciaParcelas(params: {

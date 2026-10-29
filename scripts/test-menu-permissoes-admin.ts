@@ -41,6 +41,11 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
+  NAV_SECTIONS.find((s) => s.title === "Faturas")?.items.map((i) => i.label),
+  ["Faturas Clientes", "Cobranças", "Custos Clínicas"]
+);
+
+assert.deepEqual(
   NAV_SECTIONS.find((s) => s.title === "Gestão")?.items.map((i) => i.label),
   ["Gestão Comercial", "Relatórios"]
 );
@@ -79,6 +84,8 @@ assert.equal(canAccessPath("operacional", "/usuarios"), false);
 assert.equal(canAccessPath("operacional", "/auditoria"), false);
 assert.equal(canAccessPath("operacional", "/orcamentos"), true);
 assert.equal(canAccessPath("operacional", "/faturas-clientes"), true);
+assert.equal(canAccessPath("operacional", "/cobrancas"), true);
+assert.equal(canAccessPath("admin", "/cobrancas"), true);
 assert.equal(canAccessPath("operacional", "/dashboard"), true);
 assert.equal(canAccessPath("operacional", "/e-social"), true);
 assert.equal(canAccessPath("operacional", "/portal"), true);

@@ -2,6 +2,9 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
+import type { OrcamentoEtapaId } from "@/lib/orcamento-etapas";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { OrcamentoAprovarModal } from "./OrcamentoAprovarModal";
 import { OrcamentoAlterarResponsavelModal } from "./OrcamentoAlterarResponsavelModal";
 import { OrcamentoCancelarModal } from "./OrcamentoCancelarModal";
@@ -104,6 +107,23 @@ export function OrcamentosPage() {
     clearFilters,
     handleSelectCliente,
   } = useOrcamentosPage();
+  const searchParams = useSearchParams();
+  const abrirId = searchParams.get("abrir");
+  const aba = searchParams.get("aba");
+  const abertoRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!abrirId || abertoRef.current === abrirId) return;
+    abertoRef.current = abrirId;
+    void handleVisualizar(abrirId);
+  }, [abrirId, handleVisualizar]);
+
+  const abaInicial: OrcamentoEtapaId | null =
+    abrirId &&
+    aprovarOrcamento?.id === abrirId &&
+    aba === "financeiro"
+      ? "financeiro"
+      : null;
 
   return (
     <AppShell
@@ -217,6 +237,7 @@ export function OrcamentosPage() {
       <OrcamentoAprovarModal
         open={aprovarOpen}
         mode={aprovarMode}
+        initialTab={abaInicial}
         orcamento={aprovarOrcamento}
         aprovacao={aprovarAprovacao}
         servicos={servicos}

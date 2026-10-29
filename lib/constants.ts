@@ -99,6 +99,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         iconKey: "wallet",
+        label: "Cobranças",
+        href: "/cobrancas",
+      },
+      {
+        iconKey: "wallet",
         label: "Custos Clínicas",
         href: "/custos-clinicas",
       },

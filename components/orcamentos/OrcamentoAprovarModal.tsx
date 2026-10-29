@@ -1884,6 +1884,7 @@ export function OrcamentoAprovarModal({
                 }))
               }
               onChangeObservacao={setObservacaoPagamento}
+              onVerComprovante={onVerComprovante}
             />
           ) : null}
 
