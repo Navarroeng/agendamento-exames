@@ -44,6 +44,7 @@ export interface ImplantacaoAetRecord {
   visita_data: string | null;
   visita_horario: string | null;
   visita_responsavel: string | null;
+  visita_endereco: string | null;
   visita_observacao: string | null;
   visita_realizada_em: string | null;
   elaboracao_status: ImplantacaoAetElaboracaoStatus;
@@ -79,6 +80,7 @@ export type ImplantacaoAetVisitaPayload = {
   visita_data: string | null;
   visita_horario: string | null;
   visita_responsavel: string | null;
+  visita_endereco: string | null;
   visita_observacao: string | null;
 };
 

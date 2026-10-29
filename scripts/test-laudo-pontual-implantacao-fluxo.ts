@@ -76,6 +76,7 @@ function aetRow(
     visita_data: null,
     visita_horario: null,
     visita_responsavel: null,
+    visita_endereco: null,
     visita_observacao: null,
     visita_realizada_em: null,
     elaboracao_status: "aguardando",

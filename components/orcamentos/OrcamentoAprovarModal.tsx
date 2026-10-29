@@ -491,6 +491,7 @@ export function OrcamentoAprovarModal({
     aprovacaoId: aprovacao?.id ?? null,
     orcamentoNumero: orcamento?.numero ?? null,
     kind: laudoKind,
+    enderecoEmpresa: orcamento?.cliente_endereco,
     permitirElaboracaoEnvio: false,
   });
   const controleMensalidades = usaControleParcelasMensalidade(
@@ -2166,6 +2167,8 @@ export function OrcamentoAprovarModal({
               kind={laudoKind}
               aet={aetEtapas.aet}
               form={aetEtapas.visitaForm}
+              empresaNome={orcamento.cliente_nome}
+              orcamentoId={orcamento.id}
               saving={saving || aetEtapas.saving}
               onChange={(patch) =>
                 aetEtapas.setVisitaForm((prev) => ({ ...prev, ...patch }))

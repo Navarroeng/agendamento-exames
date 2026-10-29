@@ -226,8 +226,11 @@ function LaudosPontualModalBody({
                 visita_data: aet?.visita_data ?? "",
                 visita_horario: aet?.visita_horario ?? "",
                 visita_responsavel: aet?.visita_responsavel ?? "",
+                visita_endereco: aet?.visita_endereco ?? "",
                 visita_observacao: aet?.visita_observacao ?? "",
               }}
+              empresaNome={orcamento.cliente_nome}
+              orcamentoId={orcamento.id}
               saving={false}
               somenteLeitura
               onChange={() => {}}

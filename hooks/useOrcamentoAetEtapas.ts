@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { normalizeHorarioForCompare } from "@/lib/agendamento-datetime";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
   type ImplantacaoAetElaboracaoStatus,
@@ -29,6 +30,10 @@ import {
   uploadAetLaudoPdf,
 } from "@/services/orcamento-onboarding-storage.service";
 import {
+  dataVisitaIsoLocal,
+  enderecoVisitaInicial,
+} from "@/lib/orcamento-visita-confirmacao";
+import {
   copyLaudoPontual,
   LAUDO_PONTUAL_ELABORACAO_ENVIO_SOMENTE_LAUDOS_SST_MSG,
   type LaudoPontualKind,
@@ -40,6 +45,7 @@ export function emptyAetVisitaForm() {
     visita_data: "",
     visita_horario: "",
     visita_responsavel: "",
+    visita_endereco: "",
     visita_observacao: "",
   };
 }
@@ -59,14 +65,22 @@ export function emptyAetEnvioForm() {
   };
 }
 
-function formsFromAet(aet: ImplantacaoAetRecord | null) {
+function formsFromAet(
+  aet: ImplantacaoAetRecord | null,
+  enderecoEmpresa: string | null | undefined
+) {
   return {
     visita: aet
       ? {
           visita_status: aet.visita_status,
-          visita_data: aet.visita_data ?? "",
-          visita_horario: aet.visita_horario ?? "",
+          visita_data: dataVisitaIsoLocal(aet.visita_data),
+          visita_horario: normalizeHorarioForCompare(aet.visita_horario),
           visita_responsavel: aet.visita_responsavel ?? "",
+          visita_endereco: enderecoVisitaInicial({
+            enderecoSalvo: aet.visita_endereco,
+            enderecoEmpresa,
+            visitaStatus: aet.visita_status,
+          }),
           visita_observacao: aet.visita_observacao ?? "",
         }
       : emptyAetVisitaForm(),
@@ -92,6 +106,8 @@ export function useOrcamentoAetEtapas(params: {
   aprovacaoId: string | null;
   orcamentoNumero: string | null;
   kind?: LaudoPontualKind;
+  /** Endereço cadastrado da empresa deste orçamento. Não grava no cadastro. */
+  enderecoEmpresa?: string | null;
   /** Só Laudos SST edita elaboração/envio. Default: bloqueado. */
   permitirElaboracaoEnvio?: boolean;
 }) {
@@ -104,6 +120,7 @@ export function useOrcamentoAetEtapas(params: {
   const [elaboracaoForm, setElaboracaoForm] = useState(emptyAetElaboracaoForm);
   const [envioForm, setEnvioForm] = useState(emptyAetEnvioForm);
   const [saving, setSaving] = useState(false);
+  const pedidoVisitaRef = useRef(0);
 
   function garantirEdicaoLaudosSst() {
     if (!permitirElaboracaoEnvio) {
@@ -112,17 +129,20 @@ export function useOrcamentoAetEtapas(params: {
   }
 
   const reload = useCallback(async () => {
+    const pedido = ++pedidoVisitaRef.current;
     if (!params.enabled || !params.orcamentoId || !params.aprovacaoId) {
       setAet(null);
       return null;
     }
+    setAet(null);
     const row = await garantirImplantacaoAet({
       orcamentoId: params.orcamentoId,
       aprovacaoId: params.aprovacaoId,
       usuarioNome: auditContext.usuarioNome,
     });
+    if (pedido !== pedidoVisitaRef.current) return null;
     setAet(row);
-    const forms = formsFromAet(row);
+    const forms = formsFromAet(row, params.enderecoEmpresa);
     setVisitaForm(forms.visita);
     setElaboracaoForm(forms.elaboracao);
     setEnvioForm(forms.envio);
@@ -131,6 +151,7 @@ export function useOrcamentoAetEtapas(params: {
     auditContext.usuarioNome,
     params.aprovacaoId,
     params.enabled,
+    params.enderecoEmpresa,
     params.orcamentoId,
   ]);
 
@@ -188,6 +209,7 @@ export function useOrcamentoAetEtapas(params: {
           visita_data: visitaForm.visita_data || null,
           visita_horario: visitaForm.visita_horario.trim() || null,
           visita_responsavel: visitaForm.visita_responsavel.trim() || null,
+          visita_endereco: visitaForm.visita_endereco.trim() || null,
           visita_observacao: visitaForm.visita_observacao.trim() || null,
         },
         usuarioNome: auditContext.usuarioNome,

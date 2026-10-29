@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Copy } from "lucide-react";
+import { toast } from "sonner";
 import { RequiredMark } from "@/components/ui/Field";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatDateTimeBR } from "@/lib/format-datetime";
@@ -13,6 +17,15 @@ import {
   type ImplantacaoAetVisitaStatus,
 } from "@/lib/implantacao-aet";
 import { AET_LAUDO_PDF_FORMATO_HINT } from "@/lib/orcamento-onboarding-files";
+import {
+  copiarTextoAreaTransferencia,
+  MENSAGEM_CONFIRMACAO_VISITA_COPIADA,
+  MENSAGEM_CONFIRMACAO_VISITA_SALVAR_ANTES,
+  prepararCopiaConfirmacaoVisita,
+  visitaSalvaDoOrcamento,
+  visitaSalvaPermiteCopiarConfirmacao,
+  type VisitaConfirmacaoForm,
+} from "@/lib/orcamento-visita-confirmacao";
 import type { LaudoPontualKind } from "@/lib/servico-laudo-pontual";
 import { copyLaudoPontual } from "@/lib/servico-laudo-pontual";
 
@@ -28,18 +41,91 @@ const ELABORACAO_STATUS_OPTIONS: ImplantacaoAetElaboracaoStatus[] = [
   "concluido",
 ];
 
-type AetVisitaForm = {
-  visita_status: ImplantacaoAetVisitaStatus;
-  visita_data: string;
-  visita_horario: string;
-  visita_responsavel: string;
-  visita_observacao: string;
-};
+type AetVisitaForm = VisitaConfirmacaoForm;
+
+function JanelaCopiaManual({
+  mensagem,
+  onClose,
+}: {
+  mensagem: string;
+  onClose: () => void;
+}) {
+  const campoRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const campo = campoRef.current;
+    if (!campo) return;
+    campo.focus();
+    campo.select();
+  }, [mensagem]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex items-end justify-center p-3 sm:items-center sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/45"
+        aria-label="Fechar"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="copia-manual-titulo"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#e8edf5] bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
+      >
+        <div className="border-b border-[#e8edf5] px-4 py-4 sm:px-5">
+          <h3
+            id="copia-manual-titulo"
+            className="text-base font-extrabold text-navy"
+          >
+            Confirmação da visita
+          </h3>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Não foi possível copiar automaticamente. Selecione a mensagem e
+            copie manualmente.
+          </p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+          <textarea
+            ref={campoRef}
+            readOnly
+            value={mensagem}
+            aria-label="Mensagem de confirmação"
+            className="field-input h-auto min-h-[220px] w-full resize-y whitespace-pre-wrap py-3 leading-relaxed"
+          />
+        </div>
+        <div className="border-t border-[#e8edf5] px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            className="btn w-full justify-center sm:w-auto"
+            onClick={onClose}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 export function OrcamentoAbaAetVisita({
   kind = "aet",
   aet,
   form,
+  empresaNome,
+  orcamentoId,
   saving,
   somenteLeitura = false,
   onChange,
@@ -47,13 +133,9 @@ export function OrcamentoAbaAetVisita({
 }: {
   kind?: LaudoPontualKind;
   aet: ImplantacaoAetRecord | null;
-  form: {
-    visita_status: ImplantacaoAetVisitaStatus;
-    visita_data: string;
-    visita_horario: string;
-    visita_responsavel: string;
-    visita_observacao: string;
-  };
+  form: AetVisitaForm;
+  empresaNome: string;
+  orcamentoId: string;
   saving: boolean;
   somenteLeitura?: boolean;
   onChange: (patch: Partial<AetVisitaForm>) => void;
@@ -63,6 +145,33 @@ export function OrcamentoAbaAetVisita({
   const exigeData = form.visita_status !== "aguardando_agendamento";
   const exigeHorario = form.visita_status === "agendada";
   const locked = saving || somenteLeitura;
+  const visitaDesteOrcamento = visitaSalvaDoOrcamento(aet, orcamentoId);
+  const podeCopiar = visitaSalvaPermiteCopiarConfirmacao(visitaDesteOrcamento);
+  const [mensagemManual, setMensagemManual] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMensagemManual(null);
+  }, [orcamentoId]);
+
+  async function handleCopiarConfirmacao() {
+    const preparo = prepararCopiaConfirmacaoVisita({
+      form,
+      salvo: visitaDesteOrcamento,
+      empresa: empresaNome,
+    });
+    if (!preparo.ok) {
+      if (preparo.motivo === "alteracoes_nao_salvas") {
+        toast.error(MENSAGEM_CONFIRMACAO_VISITA_SALVAR_ANTES);
+      }
+      return;
+    }
+    const copiou = await copiarTextoAreaTransferencia(preparo.mensagem);
+    if (copiou) {
+      toast.success(MENSAGEM_CONFIRMACAO_VISITA_COPIADA);
+      return;
+    }
+    setMensagemManual(preparo.mensagem);
+  }
 
   return (
     <div className="space-y-4">
@@ -138,6 +247,18 @@ export function OrcamentoAbaAetVisita({
         </label>
         <label className="block md:col-span-2">
           <span className="mb-1.5 block text-xs font-bold text-navy">
+            Endereço da visita
+          </span>
+          <input
+            type="text"
+            className="field-input"
+            value={form.visita_endereco}
+            disabled={locked}
+            onChange={(e) => onChange({ visita_endereco: e.target.value })}
+          />
+        </label>
+        <label className="block md:col-span-2">
+          <span className="mb-1.5 block text-xs font-bold text-navy">
             Observação
           </span>
           <textarea
@@ -149,16 +270,37 @@ export function OrcamentoAbaAetVisita({
         </label>
       </div>
 
-      {somenteLeitura ? null : (
-        <button
-          type="button"
-          className="btn btn-primary justify-center sm:w-auto"
-          disabled={saving}
-          onClick={onSalvar}
-        >
-          {saving ? "Salvando..." : "Salvar visita"}
-        </button>
-      )}
+      {podeCopiar || !somenteLeitura ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          {podeCopiar ? (
+            <button
+              type="button"
+              className="btn w-full justify-center sm:w-auto"
+              disabled={saving}
+              onClick={() => void handleCopiarConfirmacao()}
+            >
+              <Copy className="h-4 w-4 shrink-0" aria-hidden />
+              Copiar confirmação
+            </button>
+          ) : null}
+          {somenteLeitura ? null : (
+            <button
+              type="button"
+              className="btn btn-primary w-full justify-center sm:w-auto"
+              disabled={saving}
+              onClick={onSalvar}
+            >
+              {saving ? "Salvando..." : "Salvar visita"}
+            </button>
+          )}
+        </div>
+      ) : null}
+      {mensagemManual ? (
+        <JanelaCopiaManual
+          mensagem={mensagemManual}
+          onClose={() => setMensagemManual(null)}
+        />
+      ) : null}
     </div>
   );
 }

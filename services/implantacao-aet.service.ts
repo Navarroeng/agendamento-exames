@@ -15,7 +15,10 @@ import {
 } from "@/lib/servico-laudo-pontual";
 
 function mapAet(row: ImplantacaoAetRecord): ImplantacaoAetRecord {
-  return row;
+  return {
+    ...row,
+    visita_endereco: row.visita_endereco ?? null,
+  };
 }
 
 export async function buscarAetPorAprovacaoId(
@@ -113,6 +116,7 @@ export async function salvarVisitaAet(params: {
     visita_data: params.payload.visita_data,
     visita_horario: params.payload.visita_horario,
     visita_responsavel: params.payload.visita_responsavel,
+    visita_endereco: params.payload.visita_endereco,
     visita_observacao: params.payload.visita_observacao,
     visita_realizada_em:
       params.payload.visita_status === "realizada" ? agora : null,
