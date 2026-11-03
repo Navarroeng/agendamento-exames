@@ -2,6 +2,10 @@ import {
   selecionarContratoAtual,
   type ClienteContratoConsulta,
 } from "@/lib/cliente-contrato-atual";
+import {
+  aplicarAssinaturaAbaContrato,
+  escolherAprovacaoVigente,
+} from "@/lib/cliente-contrato-inicio";
 import { centavosSalvosParaReais } from "@/lib/contrato-navarro";
 import { createClient } from "@/lib/supabase/client";
 import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
@@ -67,7 +71,7 @@ export async function complementarContratosComCobranca(
 
   const supabase = createClient();
   const selectAprovacaoBase =
-    "id, orcamento_id, contrato_assinado, contrato_assinado_em, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
+    "id, orcamento_id, contrato_assinado, contrato_assinado_em, revertida_em, created_at, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
   const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
     supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
     supabase
@@ -102,15 +106,24 @@ export async function complementarContratosComCobranca(
     orcamento_id: string;
     contrato_assinado: boolean | null;
     contrato_assinado_em: string | null;
+    revertida_em?: string | null;
+    created_at?: string | null;
     mensalidade_pagamento: string | null;
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
     mensalidade_exame_avulso_centavos: number | null;
     mensalidade_renovacao_automatica?: boolean | null;
   };
-  const aprovacaoPorOrcamento = new Map<string, AprovacaoCobranca>();
+  const aprovacoesPorOrcamento = new Map<string, AprovacaoCobranca[]>();
   for (const row of (aprovacoesRes.data ?? []) as AprovacaoCobranca[]) {
-    aprovacaoPorOrcamento.set(row.orcamento_id, row);
+    const lista = aprovacoesPorOrcamento.get(row.orcamento_id) ?? [];
+    lista.push(row);
+    aprovacoesPorOrcamento.set(row.orcamento_id, lista);
+  }
+  const aprovacaoPorOrcamento = new Map<string, AprovacaoCobranca>();
+  for (const [orcamentoId, rows] of Array.from(aprovacoesPorOrcamento.entries())) {
+    const vigente = escolherAprovacaoVigente(rows);
+    if (vigente) aprovacaoPorOrcamento.set(orcamentoId, vigente);
   }
 
   const aprovacaoIds = Array.from(aprovacaoPorOrcamento.values()).map(
@@ -171,11 +184,68 @@ export async function complementarContratosComCobranca(
         ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
         : [],
     };
-    if (!aprovacao) return consulta;
-    return {
-      ...consulta,
-      assinaturaAbaContratoEm: aprovacao.contrato_assinado_em ?? null,
-    };
+    return aplicarAssinaturaAbaContrato(consulta, {
+      consultaConcluida: true,
+      aprovacao: aprovacao
+        ? { contrato_assinado_em: aprovacao.contrato_assinado_em }
+        : null,
+    });
+  });
+}
+
+/**
+ * Lê só a data de assinatura da aba Contrato.
+ * Usada quando o complemento da cobrança falha, para não exibir a cópia do vínculo.
+ */
+export async function anexarAssinaturaAbaContrato(
+  contratos: ClienteContratoRecord[]
+): Promise<ClienteContratoConsulta[]> {
+  const orcamentoIds = Array.from(
+    new Set(
+      contratos
+        .map((contrato) => contrato.orcamento_id?.trim())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (orcamentoIds.length === 0) return contratos;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .select("orcamento_id, contrato_assinado_em, revertida_em, created_at")
+    .in("orcamento_id", orcamentoIds);
+  if (error) throw error;
+
+  const porOrcamento = new Map<
+    string,
+    Array<{
+      contrato_assinado_em: string | null;
+      revertida_em: string | null;
+      created_at: string | null;
+    }>
+  >();
+  for (const row of data ?? []) {
+    const orcamentoId = String(row.orcamento_id ?? "");
+    if (!orcamentoId) continue;
+    const lista = porOrcamento.get(orcamentoId) ?? [];
+    lista.push({
+      contrato_assinado_em:
+        row.contrato_assinado_em == null
+          ? null
+          : String(row.contrato_assinado_em),
+      revertida_em: row.revertida_em == null ? null : String(row.revertida_em),
+      created_at: row.created_at == null ? null : String(row.created_at),
+    });
+    porOrcamento.set(orcamentoId, lista);
+  }
+
+  return contratos.map((contrato) => {
+    const orcamentoId = contrato.orcamento_id?.trim();
+    if (!orcamentoId) return contrato;
+    return aplicarAssinaturaAbaContrato(contrato, {
+      consultaConcluida: true,
+      aprovacao: escolherAprovacaoVigente(porOrcamento.get(orcamentoId) ?? []),
+    });
   });
 }
 

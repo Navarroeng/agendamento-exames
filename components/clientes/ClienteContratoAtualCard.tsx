@@ -7,8 +7,8 @@ import {
   labelClienteContratoStatusExibicao,
   labelClienteContratoTipo,
   labelFinanceiroContrato,
-  labelInicioContratoSst,
 } from "@/lib/cliente-contrato-mappers";
+import { labelInicioContratoSst } from "@/lib/cliente-contrato-inicio";
 import {
   resolveDisponibilidadeAgendamentoCliente,
   type DisponibilidadeAgendamentoResult,

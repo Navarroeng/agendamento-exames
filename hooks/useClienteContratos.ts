@@ -14,8 +14,10 @@ import {
   getContratoAtual,
   getHistoricoContratos,
 } from "@/lib/cliente-contrato-mappers";
+import { aplicarAssinaturaAbaContrato } from "@/lib/cliente-contrato-inicio";
 import {
   atualizarContrato,
+  anexarAssinaturaAbaContrato,
   criarContrato,
   encerrarContrato,
   complementarContratosComCobranca,
@@ -65,7 +67,19 @@ export function useClienteContratos(
         setContratos(await complementarContratosComCobranca(data));
       } catch (contextoErr) {
         console.error(contextoErr);
-        setContratos(data);
+        try {
+          setContratos(await anexarAssinaturaAbaContrato(data));
+        } catch (assinaturaErr) {
+          console.error(assinaturaErr);
+          setContratos(
+            data.map((contrato) =>
+              aplicarAssinaturaAbaContrato(contrato, {
+                consultaConcluida: false,
+                aprovacao: null,
+              })
+            )
+          );
+        }
       }
     } catch (err) {
       console.error(err);

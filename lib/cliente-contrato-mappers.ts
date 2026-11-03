@@ -29,38 +29,6 @@ import type {
   ClienteContratoTipo,
 } from "@/lib/types";
 
-export const INICIO_CONTRATO_AGUARDANDO_ASSINATURA = "Aguardando assinatura";
-
-/**
- * Dia civil gravado, sem converter o instante para outro fuso.
- * `2026-10-28` e `2026-10-28T00:00:00.000Z` permanecem 28/10/2026.
- */
-function dataCivilRegistrada(value: string | null | undefined): string {
-  const texto = (value ?? "").trim();
-  const match = texto.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match?.[1] ?? "";
-}
-
-/**
- * Início exibido no contrato SST.
- * Usa somente a data gravada em "Data de assinatura" da aba Contrato.
- * Com a aprovação carregada, vale o valor atual dessa aba, inclusive vazio.
- */
-export function labelInicioContratoSst(
-  contrato: Pick<ClienteContratoRecord, "contrato_assinado_em"> &
-    Pick<ClienteContratoConsulta, "assinaturaAbaContratoEm">
-): string {
-  const dataAbaCarregada = Object.prototype.hasOwnProperty.call(
-    contrato,
-    "assinaturaAbaContratoEm"
-  );
-  const registrada = dataAbaCarregada
-    ? contrato.assinaturaAbaContratoEm
-    : contrato.contrato_assinado_em;
-  const iso = dataCivilRegistrada(registrada);
-  return iso ? formatDateBR(iso) : INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
-}
-
 export function labelClienteContratoStatus(status: ClienteContratoStatus): string {
   // Legado: "pago" era status misto financeiro/contratual — exibir como Ativo.
   if (status === "pago") return "Ativo";

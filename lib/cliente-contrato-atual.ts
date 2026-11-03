@@ -18,9 +18,16 @@ export type ContextoCobrancaContrato = {
   /** Flag gravada na aprovação. Não substitui a data quando ela existe. */
   contrato_assinado?: boolean | null;
   /**
-   * Data de assinatura da aba Contrato (`orcamento_aprovacoes.contrato_assinado_em`).
-   * Só vem preenchida na chave quando a aprovação foi carregada. Null = campo vazio.
+   * Leitura de `orcamento_aprovacoes.contrato_assinado_em` para o campo Início.
+   * nao_carregada: a consulta da aprovação não concluiu.
+   * vazia: a consulta concluiu e a data da aba está vazia.
+   * informada: a consulta concluiu e há data.
    * Não entra nas regras de vigência, financeiro ou liberação de agendamento.
+   */
+  assinaturaAbaContratoEstado?: "nao_carregada" | "vazia" | "informada";
+  /**
+   * Data da aba Contrato quando `assinaturaAbaContratoEstado` é `informada`.
+   * Permanece nula nos outros estados. Não copia `cliente_contratos.contrato_assinado_em`.
    */
   assinaturaAbaContratoEm?: string | null;
   /**
