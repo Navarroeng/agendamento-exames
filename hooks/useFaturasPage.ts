@@ -91,6 +91,7 @@ import type {
 import type { FaturaPagamentoModalMode } from "@/components/faturas/FaturaPagamentoModal";
 import type { FaturaEnvioEmailModalOrigem } from "@/components/faturas/FaturaEnvioEmailModal";
 import { obterEmailEnvioSugeridoCliente } from "@/lib/fatura-envio-sugestao";
+import { faturaPreviewPermiteEmitir } from "@/lib/fatura-preview-rodape";
 import { buscarUltimoEmailEnvioCliente } from "@/services/fatura-envio.service";
 
 const NO_RECORDS_TOAST = FATURA_SEM_ELEGIVEIS_MSG;
@@ -1081,14 +1082,19 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     }
   }, [persistPreview, syncClienteVencimentoNoPreview]);
 
-  const handleEmit = useCallback(async () => {
-    const current = previewRef.current;
-    if (!current || current.status === "cancelada") return;
+  const emitLockRef = useRef(false);
 
-    if (current.tipo === "cliente") {
-      if (!syncClienteVencimentoNoPreview()) return;
-      setSaving(true);
-      try {
+  const handleEmit = useCallback(async () => {
+    if (emitLockRef.current) return;
+    const current = previewRef.current;
+    if (!current || !faturaPreviewPermiteEmitir(current)) return;
+
+    if (current.tipo === "cliente" && !syncClienteVencimentoNoPreview()) return;
+
+    emitLockRef.current = true;
+    setSaving(true);
+    try {
+      if (current.tipo === "cliente") {
         const saved = await persistPreview("emitida");
         setPreviewOpen(false);
         previewRef.current = null;
@@ -1097,19 +1103,9 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           const faturasAtualizadas = await reloadHistorico();
           abrirEnvioEmailModalCliente(saved, "pos-emissao", faturasAtualizadas);
         }
-      } catch (err) {
-        console.error(err);
-        toast.error(
-          err instanceof Error ? err.message : "Erro ao emitir fatura."
-        );
-      } finally {
-        setSaving(false);
+        return;
       }
-      return;
-    }
 
-    setSaving(true);
-    try {
       const saved = await persistPreview("rascunho");
       setConferenciaFatura(saved);
       setConferenciaOpen(true);
@@ -1118,9 +1114,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Erro ao preparar conferência dos custos."
+          : current.tipo === "cliente"
+            ? "Erro ao emitir fatura."
+            : "Erro ao preparar conferência dos custos."
       );
     } finally {
+      emitLockRef.current = false;
       setSaving(false);
     }
   }, [

@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { FaturaPreviewContent } from "./FaturaPreviewContent";
 import { CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO } from "@/lib/custos-clinicas-conferencia";
+import { acoesRodapePreviewFatura } from "@/lib/fatura-preview-rodape";
 import type { FaturaPreviewState } from "@/lib/types";
 import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 
@@ -36,8 +37,8 @@ export function FaturaPreviewModal({
   if (!open || !preview) return null;
 
   const readonly = preview.readonly;
-  const cancelled = preview.status === "cancelada";
   const isClinica = preview.tipo === "clinica";
+  const acoes = acoesRodapePreviewFatura(preview);
   const emitLabel = isClinica
     ? CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO
     : "Emitir fatura";
@@ -47,71 +48,39 @@ export function FaturaPreviewModal({
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
       <button
         type="button"
-        className="btn btn-muted"
+        className="btn btn-muted w-full sm:w-auto"
         disabled={saving}
         onClick={onClose}
       >
-        {readonly ? "Fechar" : "Voltar / Editar filtros"}
+        {acoes.rotuloFechar}
       </button>
 
-      {!readonly && !cancelled && (
-        <>
-          <button
-            type="button"
-            className="btn"
-            disabled={saving}
-            onClick={() => void onSaveDraft()}
-          >
-            {saving ? "Salvando..." : "Salvar como rascunho"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={saving}
-            onClick={() => void onEmit()}
-          >
-            {saving ? emittingLabel : emitLabel}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={saving}
-            onClick={() => void onGeneratePdf()}
-          >
-            {saving ? "Gerando..." : "Gerar PDF"}
-          </button>
-        </>
-      )}
-
-      {readonly && preview.status === "rascunho" && (
-        <>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={saving}
-            onClick={() => void onEmit()}
-          >
-            {saving ? emittingLabel : emitLabel}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={saving}
-            onClick={() => void onGeneratePdf()}
-          >
-            {saving ? "Gerando..." : "Gerar PDF"}
-          </button>
-        </>
-      )}
-
-      {readonly &&
-        (preview.status === "emitida" ||
-          preview.status === "reemitida" ||
-          preview.status === "substituida" ||
-          preview.status === "necessita_reemissao") && (
+      {acoes.mostrarSalvarRascunho && (
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn w-full sm:w-auto"
+          disabled={saving}
+          onClick={() => void onSaveDraft()}
+        >
+          {saving ? "Salvando..." : "Salvar como rascunho"}
+        </button>
+      )}
+
+      {acoes.mostrarEmitir && (
+        <button
+          type="button"
+          className="btn btn-primary w-full sm:w-auto"
+          disabled={saving}
+          onClick={() => void onEmit()}
+        >
+          {saving ? emittingLabel : emitLabel}
+        </button>
+      )}
+
+      {acoes.mostrarGerarPdf && (
+        <button
+          type="button"
+          className="btn btn-primary w-full sm:w-auto"
           disabled={saving}
           onClick={() => void onGeneratePdf()}
         >
