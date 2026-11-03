@@ -67,7 +67,7 @@ export async function complementarContratosComCobranca(
 
   const supabase = createClient();
   const selectAprovacaoBase =
-    "id, orcamento_id, contrato_assinado, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
+    "id, orcamento_id, contrato_assinado, contrato_assinado_em, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
   const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
     supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
     supabase
@@ -101,6 +101,7 @@ export async function complementarContratosComCobranca(
     id: string;
     orcamento_id: string;
     contrato_assinado: boolean | null;
+    contrato_assinado_em: string | null;
     mensalidade_pagamento: string | null;
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
@@ -151,7 +152,7 @@ export async function complementarContratosComCobranca(
     const orcamentoId = contrato.orcamento_id?.trim();
     if (!orcamentoId) return contrato;
     const aprovacao = aprovacaoPorOrcamento.get(orcamentoId);
-    return {
+    const consulta: ClienteContratoConsulta = {
       ...contrato,
       modalidadeOrcamento: modalidadePorOrcamento.get(orcamentoId) ?? null,
       contrato_assinado: aprovacao?.contrato_assinado ?? null,
@@ -169,6 +170,11 @@ export async function complementarContratosComCobranca(
       parcelasMensalidade: aprovacao
         ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
         : [],
+    };
+    if (!aprovacao) return consulta;
+    return {
+      ...consulta,
+      assinaturaAbaContratoEm: aprovacao.contrato_assinado_em ?? null,
     };
   });
 }

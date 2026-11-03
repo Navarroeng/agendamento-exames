@@ -7,6 +7,7 @@ import {
   labelClienteContratoStatusExibicao,
   labelClienteContratoTipo,
   labelFinanceiroContrato,
+  labelInicioContratoSst,
 } from "@/lib/cliente-contrato-mappers";
 import {
   resolveDisponibilidadeAgendamentoCliente,
@@ -101,14 +102,7 @@ export function ClienteContratoAtualCard({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-4">
         <Metric label="Status" value={statusLabel} />
-        <Metric
-          label="Início"
-          value={
-            contrato.data_inicio?.trim()
-              ? formatDateBR(contrato.data_inicio)
-              : "—"
-          }
-        />
+        <Metric label="Início" value={labelInicioContratoSst(contrato)} />
         <Metric
           label="Fim previsto"
           value={

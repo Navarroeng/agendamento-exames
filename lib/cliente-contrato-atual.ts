@@ -18,6 +18,12 @@ export type ContextoCobrancaContrato = {
   /** Flag gravada na aprovação. Não substitui a data quando ela existe. */
   contrato_assinado?: boolean | null;
   /**
+   * Data de assinatura da aba Contrato (`orcamento_aprovacoes.contrato_assinado_em`).
+   * Só vem preenchida na chave quando a aprovação foi carregada. Null = campo vazio.
+   * Não entra nas regras de vigência, financeiro ou liberação de agendamento.
+   */
+  assinaturaAbaContratoEm?: string | null;
+  /**
    * Exame clínico admissional avulso acordado na contratação mensal, em reais.
    * Ausente em contratos antigos: a tela usa o catálogo da modalidade.
    */
