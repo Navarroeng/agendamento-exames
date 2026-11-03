@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/Modal";
 import { isEmailValido } from "@/lib/email-validacao";
 import { competenciaLabelBRUpperFromFatura } from "@/lib/fatura-reemissao";
 import { isFaturaEnvioExplicitamenteConfirmado } from "@/lib/fatura-envio";
+import { aplicarEmailSugeridoSemSobrescrever } from "@/lib/fatura-envio-sugestao";
 import { formatCurrency } from "@/lib/money";
 import type { FaturaRecord } from "@/lib/types";
 import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 import {
+  buscarUltimoEmailEnvioCliente,
   enviarFaturaClientePorEmail,
   prepararReenvioFaturaCliente,
   reenviarFaturaClientePorEmail,
@@ -40,22 +42,65 @@ export function FaturaEnvioEmailModal({
 }: FaturaEnvioEmailModalProps) {
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [historicoEncontrado, setHistoricoEncontrado] = useState(false);
+  const emailEditadoRef = useRef(false);
+  const emailSugeridoRef = useRef(emailSugerido);
+  emailSugeridoRef.current = emailSugerido;
 
   const envioConfirmado = fatura
     ? isFaturaEnvioExplicitamenteConfirmado(fatura)
     : false;
 
   const temHistorico =
-    Boolean(emailSugerido?.trim()) || envioConfirmado;
+    historicoEncontrado ||
+    Boolean(emailSugerido?.trim()) ||
+    envioConfirmado;
 
   useEffect(() => {
     if (!open || !fatura) return;
 
-    const prefill =
-      fatura.fatura_enviada_email?.trim() || emailSugerido?.trim() || "";
-    setEmail(prefill);
+    emailEditadoRef.current = false;
     setEnviando(false);
-  }, [open, fatura, emailSugerido]);
+
+    const proprio = fatura.fatura_enviada_email?.trim() || "";
+    const sugeridoInicial = emailSugeridoRef.current?.trim() || "";
+    const inicial = isEmailValido(proprio)
+      ? proprio
+      : isEmailValido(sugeridoInicial)
+        ? sugeridoInicial
+        : "";
+    setEmail(inicial);
+    setHistoricoEncontrado(
+      isEmailValido(sugeridoInicial) || isEmailValido(proprio)
+    );
+
+    const refId = fatura.referencia_id?.trim() || "";
+    if (!refId || isEmailValido(proprio)) return;
+
+    let ativo = true;
+    void buscarUltimoEmailEnvioCliente(refId, fatura.id)
+      .then((sugerido) => {
+        if (!ativo || !sugerido) return;
+        setHistoricoEncontrado(true);
+        setEmail((atual) =>
+          aplicarEmailSugeridoSemSobrescrever({
+            emailAtual: atual,
+            usuarioEditou: emailEditadoRef.current,
+            emailSugerido: sugerido,
+          })
+        );
+      })
+      .catch((err) => {
+        console.error("Erro ao recuperar e-mail de faturamento:", err);
+      });
+
+    return () => {
+      ativo = false;
+    };
+    // A sugestão que chega depois entra pelo fetch. Reexecutar ao mudar
+    // `emailSugerido` apagaria um endereço que a usuária já começou a digitar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, fatura]);
 
   const titulo = useMemo(() => {
     if (origem === "pos-emissao") return "Fatura emitida com sucesso";
@@ -166,7 +211,10 @@ export function FaturaEnvioEmailModal({
             type="email"
             className="field-input mt-1.5 h-11 w-full text-sm"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              emailEditadoRef.current = true;
+              setEmail(e.target.value);
+            }}
             placeholder="cliente@empresa.com.br"
             disabled={bloqueado}
             autoComplete="email"

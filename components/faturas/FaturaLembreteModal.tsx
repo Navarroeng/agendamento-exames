@@ -53,6 +53,9 @@ export function FaturaLembreteModal({
   const enviandoRef = useRef(false);
   const requestIdRef = useRef<string | null>(null);
   const payloadKeyRef = useRef("");
+  const emailEditadoRef = useRef(false);
+  const emailSugeridoRef = useRef(emailSugerido);
+  emailSugeridoRef.current = emailSugerido;
 
   const podeEnviar = fatura ? faturaPermiteLembrete(fatura) : false;
   const emailCadastrado = fatura
@@ -62,7 +65,8 @@ export function FaturaLembreteModal({
   useEffect(() => {
     if (!open || !fatura) return;
 
-    const prefill = emailOriginalLembrete(fatura, emailSugerido);
+    emailEditadoRef.current = false;
+    const prefill = emailOriginalLembrete(fatura, emailSugeridoRef.current);
     setEmail(prefill);
     try {
       const texto = buildLembreteFaturaTexto({
@@ -92,7 +96,17 @@ export function FaturaLembreteModal({
     payloadKeyRef.current = "";
     setHistoricoAberto(historicoInicial || !faturaPermiteLembrete(fatura));
     setHistorico([]);
-  }, [open, fatura, emailSugerido, historicoInicial]);
+    // `emailSugerido` chega em seguida, numa busca separada. Entrar de novo
+    // aqui apagaria assunto, mensagem e um e-mail que a usuária já digitou.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, fatura, historicoInicial]);
+
+  useEffect(() => {
+    if (!open || !fatura || emailEditadoRef.current) return;
+    const prefill = emailOriginalLembrete(fatura, emailSugerido);
+    if (!prefill) return;
+    setEmail((atual) => (emailEditadoRef.current ? atual : prefill));
+  }, [open, fatura, emailSugerido]);
 
   useEffect(() => {
     if (!open || !fatura || !historicoAberto) return;
@@ -254,7 +268,10 @@ export function FaturaLembreteModal({
                 type="email"
                 className="field-input mt-1.5 h-11 w-full text-sm"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  emailEditadoRef.current = true;
+                  setEmail(e.target.value);
+                }}
                 placeholder="cliente@empresa.com.br"
                 disabled={bloqueado}
                 autoComplete="email"

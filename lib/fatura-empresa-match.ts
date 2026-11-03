@@ -43,6 +43,34 @@ export function resolveClienteFromCatalog(
   );
 }
 
+/**
+ * Id do cliente para faturamento.
+ * Usa o identificador já gravado; só então o nome normalizado exato no cadastro.
+ * Nomes parecidos (filiais) não se misturam.
+ */
+export function resolverReferenciaIdCliente(
+  referenciaId: string | null | undefined,
+  referenciaNome: string | null | undefined,
+  catalog: ClienteCatalogItem[] | undefined
+): string | null {
+  const id = referenciaId?.trim();
+  if (id) return id;
+  return resolveClienteFromCatalog(catalog, referenciaNome)?.id ?? null;
+}
+
+/** Um único `cliente_id` entre os agendamentos. Vários ou nenhum → null. */
+export function referenciaIdUnicaDosAgendamentos(
+  agendamentos: { cliente_id?: string | null }[]
+): string | null {
+  const ids = new Set<string>();
+  for (const agendamento of agendamentos) {
+    const id = agendamento.cliente_id?.trim();
+    if (id) ids.add(id);
+  }
+  if (ids.size !== 1) return null;
+  return Array.from(ids)[0] ?? null;
+}
+
 function resolveAgendamentoIdentity(
   agendamento: AgendamentoEmpresaFields,
   catalog?: ClienteCatalogItem[]

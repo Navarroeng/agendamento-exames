@@ -5,6 +5,8 @@ import {
   isAgendamentoDaClinica,
   isAgendamentoDaEmpresa,
   normalizeNomeEmpresaFatura,
+  referenciaIdUnicaDosAgendamentos,
+  resolverReferenciaIdCliente,
 } from "../lib/fatura-empresa-match";
 import { filterAgendamentosDaReferenciaFatura } from "../lib/fatura-filters";
 import { buildResumoClientesMes } from "../lib/fatura-mes-resumo";
@@ -193,5 +195,32 @@ assert.equal(
 assert.equal(resumo.rows.length, 1);
 assert.equal(resumo.rows[0].referenciaNome, FSA);
 assert.equal(resumo.rows[0].valorTotal, 150);
+
+assert.equal(
+  resolverReferenciaIdCliente("c1", "FSA CAMPEÃO APOIO", catalog),
+  "c1"
+);
+assert.equal(
+  resolverReferenciaIdCliente(null, "FSA CAMPEÃO APOIO", catalog),
+  "c2"
+);
+assert.equal(
+  resolverReferenciaIdCliente(null, "CAMPEÃO", catalog),
+  null
+);
+assert.equal(
+  referenciaIdUnicaDosAgendamentos([
+    { cliente_id: "c2" },
+    { cliente_id: " c2 " },
+  ]),
+  "c2"
+);
+assert.equal(
+  referenciaIdUnicaDosAgendamentos([
+    { cliente_id: "c1" },
+    { cliente_id: "c2" },
+  ]),
+  null
+);
 
 console.log("ok: fatura-cliente-match-exato");

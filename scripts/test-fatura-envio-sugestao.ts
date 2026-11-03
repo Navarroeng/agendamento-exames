@@ -4,9 +4,12 @@
  */
 import assert from "node:assert/strict";
 import {
+  aplicarEmailSugeridoSemSobrescrever,
   clienteTemHistoricoEnvioFatura,
   obterEmailEnvioSugeridoCliente,
 } from "../lib/fatura-envio-sugestao";
+import { buscarUltimoEmailEnvioCliente } from "../services/fatura-envio.service";
+import type { FaturaEnvioEmailFonte } from "../lib/fatura-envio-sugestao";
 import type { FaturaRecord } from "../lib/types";
 
 function run(name: string, fn: () => void) {
@@ -275,4 +278,268 @@ run("extra — ignora registro sem fatura_enviada_em ou sem e-mail", () => {
   );
 });
 
-console.log("\nTodos os testes de sugestão de e-mail passaram.");
+run("8 — competência atual vazia, mês anterior no histórico → recupera pelo id", () => {
+  const competenciaAtual = [
+    faturaEnvio({
+      id: "fat-out-a",
+      referencia_id: CLI_A,
+      referencia_nome: "Alfa Engenharia",
+      mes_referencia: "2026-10",
+      fatura_enviada_em: null,
+      fatura_enviada_email: null,
+    }),
+  ];
+
+  assert.equal(
+    obterEmailEnvioSugeridoCliente(competenciaAtual, CLI_A, "fat-out-a"),
+    null
+  );
+
+  const historico = [
+    faturaEnvio({
+      id: "fat-set-a",
+      referencia_id: CLI_A,
+      referencia_nome: "Alfa Engenharia",
+      mes_referencia: "2026-09",
+      fatura_enviada_em: "2026-09-02T10:00:00.000Z",
+      fatura_enviada_email: "financeiro@alfa.com.br",
+    }),
+    faturaEnvio({
+      id: "fat-set-filial",
+      referencia_id: CLI_B,
+      referencia_nome: "Alfa Engenharia Filial",
+      mes_referencia: "2026-09",
+      fatura_enviada_em: "2026-09-03T10:00:00.000Z",
+      fatura_enviada_email: "filial@alfa.com.br",
+    }),
+    ...competenciaAtual,
+  ];
+
+  assert.equal(
+    obterEmailEnvioSugeridoCliente(historico, CLI_A, "fat-out-a"),
+    "financeiro@alfa.com.br"
+  );
+  assert.equal(
+    obterEmailEnvioSugeridoCliente(historico, CLI_B, "fat-out-b"),
+    "filial@alfa.com.br"
+  );
+});
+
+run("9 — e-mail inválido mais recente não substitui o último válido", () => {
+  const faturas = [
+    faturaEnvio({
+      id: "fat-valida",
+      referencia_id: CLI_A,
+      fatura_enviada_em: "2026-09-01T10:00:00.000Z",
+      fatura_enviada_email: "valido@cliente.com.br",
+    }),
+    faturaEnvio({
+      id: "fat-invalida",
+      referencia_id: CLI_A,
+      fatura_enviada_em: "2026-10-01T10:00:00.000Z",
+      fatura_enviada_email: "nao-e-email",
+    }),
+  ];
+
+  assert.equal(
+    obterEmailEnvioSugeridoCliente(faturas, CLI_A),
+    "valido@cliente.com.br"
+  );
+});
+
+run("10 — sugestão tardia não apaga o que a usuária digitou", () => {
+  assert.equal(
+    aplicarEmailSugeridoSemSobrescrever({
+      emailAtual: "",
+      usuarioEditou: false,
+      emailSugerido: "financeiro@alfa.com.br",
+    }),
+    "financeiro@alfa.com.br"
+  );
+
+  assert.equal(
+    aplicarEmailSugeridoSemSobrescrever({
+      emailAtual: "novo@",
+      usuarioEditou: true,
+      emailSugerido: "financeiro@alfa.com.br",
+    }),
+    "novo@"
+  );
+
+  assert.equal(
+    aplicarEmailSugeridoSemSobrescrever({
+      emailAtual: "",
+      usuarioEditou: true,
+      emailSugerido: "financeiro@alfa.com.br",
+    }),
+    ""
+  );
+
+  assert.equal(
+    aplicarEmailSugeridoSemSobrescrever({
+      emailAtual: "digitado@alfa.com.br",
+      usuarioEditou: false,
+      emailSugerido: "financeiro@alfa.com.br",
+      emailDestaFatura: "desta@alfa.com.br",
+    }),
+    "desta@alfa.com.br"
+  );
+});
+
+async function validarBuscaHistoricoSemEnvio() {
+  let enviouEmail = false;
+
+  await runAsync(
+    "11 — busca do mês anterior pelo id, sem enviar e-mail",
+    async () => {
+      const consultas: string[] = [];
+      const historico: FaturaEnvioEmailFonte[] = [
+        {
+          id: "fat-set-a",
+          tipo: "cliente",
+          referencia_id: CLI_A,
+          fatura_enviada_em: "2026-09-02T10:00:00.000Z",
+          fatura_enviada_email: "financeiro@alfa.com.br",
+        },
+        {
+          id: "fat-set-b",
+          tipo: "cliente",
+          referencia_id: CLI_B,
+          fatura_enviada_em: "2026-09-03T10:00:00.000Z",
+          fatura_enviada_email: "filial@alfa.com.br",
+        },
+        {
+          id: "fat-out-a",
+          tipo: "cliente",
+          referencia_id: CLI_A,
+          fatura_enviada_em: null,
+          fatura_enviada_email: null,
+        },
+      ];
+
+      const email = await buscarUltimoEmailEnvioCliente(
+        CLI_A,
+        "fat-out-a",
+        async (referenciaId) => {
+          consultas.push(referenciaId);
+          return historico;
+        }
+      );
+
+      assert.deepEqual(consultas, [CLI_A]);
+      assert.equal(email, "financeiro@alfa.com.br");
+      assert.equal(enviouEmail, false);
+    }
+  );
+
+  await runAsync(
+    "12 — alteração confirmada passa a valer na fatura seguinte",
+    async () => {
+      const depoisDoEnvio: FaturaEnvioEmailFonte[] = [
+        {
+          id: "fat-set-a",
+          tipo: "cliente",
+          referencia_id: CLI_A,
+          fatura_enviada_em: "2026-09-02T10:00:00.000Z",
+          fatura_enviada_email: "financeiro@alfa.com.br",
+        },
+        {
+          id: "fat-out-a",
+          tipo: "cliente",
+          referencia_id: CLI_A,
+          fatura_enviada_em: "2026-10-02T11:00:00.000Z",
+          fatura_enviada_email: "contasapagar@alfa.com.br",
+        },
+      ];
+
+      const email = await buscarUltimoEmailEnvioCliente(
+        CLI_A,
+        "fat-nov-a",
+        async () => depoisDoEnvio
+      );
+
+      assert.equal(email, "contasapagar@alfa.com.br");
+      assert.equal(enviouEmail, false);
+    }
+  );
+
+  await runAsync(
+    "13 — outro cliente, mesmo com nome parecido, permanece isolado",
+    async () => {
+      const email = await buscarUltimoEmailEnvioCliente(
+        CLI_B,
+        "fat-out-b",
+        async (referenciaId) => {
+          assert.equal(referenciaId, CLI_B);
+          return [
+            {
+              id: "fat-set-a",
+              tipo: "cliente",
+              referencia_id: CLI_A,
+              fatura_enviada_em: "2026-09-02T10:00:00.000Z",
+              fatura_enviada_email: "financeiro@alfa.com.br",
+            },
+            {
+              id: "fat-set-b",
+              tipo: "cliente",
+              referencia_id: CLI_B,
+              fatura_enviada_em: "2026-09-04T10:00:00.000Z",
+              fatura_enviada_email: "filial@alfa.com.br",
+            },
+          ];
+        }
+      );
+
+      assert.equal(email, "filial@alfa.com.br");
+      assert.equal(enviouEmail, false);
+    }
+  );
+
+  await runAsync("14 — sem histórico e sem id a busca não consulta nem envia", async () => {
+    let consultou = false;
+    const semHistorico = await buscarUltimoEmailEnvioCliente(
+      CLI_A,
+      "fat-out-a",
+      async () => {
+        consultou = true;
+        return [];
+      }
+    );
+    assert.equal(consultou, true);
+    assert.equal(semHistorico, null);
+
+    consultou = false;
+    const semId = await buscarUltimoEmailEnvioCliente(
+      "  ",
+      "fat-out-a",
+      async () => {
+        consultou = true;
+        return [];
+      }
+    );
+    assert.equal(consultou, false);
+    assert.equal(semId, null);
+    assert.equal(enviouEmail, false);
+  });
+}
+
+function runAsync(name: string, fn: () => Promise<void>) {
+  return (async () => {
+    try {
+      await fn();
+      console.log(`OK  ${name}`);
+    } catch (err) {
+      console.error(`FALHA  ${name}`);
+      throw err;
+    }
+  })();
+}
+
+validarBuscaHistoricoSemEnvio()
+  .then(() => {
+    console.log("\nTodos os testes de sugestão de e-mail passaram.");
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

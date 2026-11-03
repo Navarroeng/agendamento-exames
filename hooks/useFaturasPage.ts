@@ -20,7 +20,9 @@ import {
   type FaturaHistoricoFilters,
 } from "@/lib/fatura-filters";
 import {
+  referenciaIdUnicaDosAgendamentos,
   resolveClienteFromCatalog,
+  resolverReferenciaIdCliente,
   type ClienteCatalogItem,
 } from "@/lib/fatura-empresa-match";
 import {
@@ -89,6 +91,7 @@ import type {
 import type { FaturaPagamentoModalMode } from "@/components/faturas/FaturaPagamentoModal";
 import type { FaturaEnvioEmailModalOrigem } from "@/components/faturas/FaturaEnvioEmailModal";
 import { obterEmailEnvioSugeridoCliente } from "@/lib/fatura-envio-sugestao";
+import { buscarUltimoEmailEnvioCliente } from "@/services/fatura-envio.service";
 
 const NO_RECORDS_TOAST = FATURA_SEM_ELEGIVEIS_MSG;
 
@@ -160,6 +163,10 @@ function buildPreviewFromAgendamentos(
     faturaId: extras?.faturaId ?? null,
     status: extras?.status ?? null,
     readonly: extras?.readonly ?? false,
+    referencia_id:
+      tipo === "cliente"
+        ? referenciaIdUnicaDosAgendamentos(agendamentos)
+        : null,
   };
 }
 
@@ -178,6 +185,8 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       })),
     [clientes]
   );
+  const clientesCatalogRef = useRef(clientesCatalog);
+  clientesCatalogRef.current = clientesCatalog;
 
   const diaVencimentoPorClinica = useMemo(() => {
     const map = new Map<string, number | null>();
@@ -251,6 +260,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   >(null);
   const [lembreteHistoricoInicial, setLembreteHistoricoInicial] =
     useState(false);
+  const lembreteAlvoRef = useRef<string | null>(null);
 
   useEffect(() => {
     previewRef.current = preview;
@@ -822,8 +832,11 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         referencia_nome: current.referenciaNome,
         referencia_id:
           current.tipo === "cliente"
-            ? resolveClienteFromCatalog(clientesCatalog, current.referenciaNome)
-                ?.id ?? null
+            ? resolverReferenciaIdCliente(
+                current.referencia_id,
+                current.referenciaNome,
+                clientesCatalogRef.current
+              )
             : null,
         periodo_inicio: current.periodo_inicio,
         periodo_fim: current.periodo_fim,
@@ -851,13 +864,18 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       faturasFonte?: FaturaRecord[]
     ) => {
       const fonte = faturasFonte ?? faturas;
-      setEnvioEmailFatura(fatura);
+      const referenciaId = resolverReferenciaIdCliente(
+        fatura.referencia_id,
+        fatura.referencia_nome,
+        clientesCatalogRef.current
+      );
+      const faturaModal =
+        referenciaId && fatura.referencia_id !== referenciaId
+          ? { ...fatura, referencia_id: referenciaId }
+          : fatura;
+      setEnvioEmailFatura(faturaModal);
       setEnvioEmailSugerido(
-        obterEmailEnvioSugeridoCliente(
-          fonte,
-          fatura.referencia_id,
-          fatura.id
-        )
+        obterEmailEnvioSugeridoCliente(fonte, referenciaId, fatura.id)
       );
       setEnvioEmailModalOrigem(origem);
       setEnvioEmailModalOpen(true);
@@ -942,12 +960,33 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       faturasFonte?: FaturaRecord[]
     ) => {
       const fonte = faturasFonte ?? faturas;
-      setLembreteFatura(fatura);
+      const referenciaId = resolverReferenciaIdCliente(
+        fatura.referencia_id,
+        fatura.referencia_nome,
+        clientesCatalogRef.current
+      );
+      const faturaModal =
+        referenciaId && fatura.referencia_id !== referenciaId
+          ? { ...fatura, referencia_id: referenciaId }
+          : fatura;
+      lembreteAlvoRef.current = fatura.id;
+      setLembreteFatura(faturaModal);
       setLembreteEmailSugerido(
-        obterEmailEnvioSugeridoCliente(fonte, fatura.referencia_id, fatura.id)
+        obterEmailEnvioSugeridoCliente(fonte, referenciaId, fatura.id)
       );
       setLembreteHistoricoInicial(historicoInicial);
       setLembreteModalOpen(true);
+
+      if (!referenciaId) return;
+      const alvoId = fatura.id;
+      void buscarUltimoEmailEnvioCliente(referenciaId, fatura.id)
+        .then((email) => {
+          if (lembreteAlvoRef.current !== alvoId || !email) return;
+          setLembreteEmailSugerido(email);
+        })
+        .catch((err) => {
+          console.error("Erro ao recuperar e-mail de faturamento:", err);
+        });
     },
     [faturas]
   );
@@ -990,6 +1029,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
   );
 
   const handleCloseLembreteModal = useCallback(() => {
+    lembreteAlvoRef.current = null;
     setLembreteModalOpen(false);
     setLembreteFatura(null);
     setLembreteEmailSugerido(null);
@@ -1148,14 +1188,30 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         faturaSubstitutaNumero = substituta?.numero ?? null;
       }
 
-      const emailEnvioSugerido =
-        fatura.tipo === "cliente" && fatura.referencia_id
-          ? obterEmailEnvioSugeridoCliente(
-              faturas,
+      const referenciaId =
+        fatura.tipo === "cliente"
+          ? resolverReferenciaIdCliente(
               fatura.referencia_id,
-              fatura.id
+              fatura.referencia_nome,
+              clientesCatalogRef.current
             )
           : null;
+      let emailEnvioSugerido =
+        referenciaId
+          ? obterEmailEnvioSugeridoCliente(faturas, referenciaId, fatura.id)
+          : null;
+      if (referenciaId) {
+        try {
+          emailEnvioSugerido =
+            (await buscarUltimoEmailEnvioCliente(referenciaId, fatura.id)) ??
+            emailEnvioSugerido;
+        } catch (lookupErr) {
+          console.error(
+            "Erro ao recuperar e-mail de faturamento do cliente:",
+            lookupErr
+          );
+        }
+      }
 
       const nextPreview: FaturaPreviewState = {
         ...faturaComItensToPreview(fatura, true),
