@@ -87,7 +87,7 @@ export const RENOVACAO_CONTRATO_MIGRATION_MSG =
   "A coluna mensalidade_renovacao_automatica ainda não existe no banco. Execute a migration 145_mensalidade_renovacao_automatica.sql no Supabase. A opção permanece visível, mas ainda não pode ser gravada.";
 
 export const RENOVACAO_CONTRATO_NOVA_VERSAO_MSG =
-  "O PDF já gerado não muda sozinho. Depois de alterar a opção, gere o PDF novamente para a cláusula 7 usar a escolha. O modelo contratual permanece o mesmo.";
+  "O PDF já gerado não muda sozinho. Depois de alterar a opção, gere o PDF novamente para a cláusula 7 usar a escolha. O arquivo anterior permanece no histórico.";
 
 export function renovacaoContratoSalva(
   value: boolean | null | undefined

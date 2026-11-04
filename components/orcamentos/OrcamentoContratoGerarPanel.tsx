@@ -56,7 +56,9 @@ import {
 } from "@/lib/contrato-vencimentos";
 import { mensagemErroContratoDocumento } from "@/lib/contrato-documento-erro";
 import {
-  resolverModeloContratualGestaoSst,
+  modeloContratualDoPdfSalvo,
+  nomeArquivoComModeloContrato,
+  resolverModeloContratualParaGeracao,
   rotuloModeloContratualGestaoSst,
 } from "@/lib/contrato-modelo-rotulo";
 import {
@@ -217,12 +219,6 @@ export function OrcamentoContratoGerarPanel({
         : { ...aprovacaoBase, condicoes_revisao: revisaoVigente },
     [aprovacaoBase, revisaoVigente]
   );
-  const modeloContratual = isMensalidadeDoc
-    ? resolverModeloContratualGestaoSst({
-        propostaModeloVersao: orcamento.proposta_modelo_versao,
-        contratoModeloVersao: aprovacaoContrato.contrato_modelo_versao,
-      })
-    : null;
   const pagamentoAvistaPlano =
     isMensalidadeDoc && aprovacaoContrato.mensalidade_pagamento === "avista";
   const diaEfetivo = regraVencimento
@@ -261,6 +257,8 @@ export function OrcamentoContratoGerarPanel({
   const vigentes = documentos.filter((doc) => !doc.sem_validade_em);
   const semValidade = documentos.filter((doc) => Boolean(doc.sem_validade_em));
   const atual = vigentes[0] ?? null;
+  const modeloPdfAtual =
+    isMensalidadeDoc && atual ? modeloContratualDoPdfSalvo(atual) : null;
   const anteriores = vigentes.slice(1);
   const atualDesatualizado = atual
     ? pdfContratoEstaDesatualizado(atual, aprovacaoContrato)
@@ -581,7 +579,10 @@ export function OrcamentoContratoGerarPanel({
           cliente_id: orcamento.cliente_id,
           modalidade: previewDoc.modalidade,
           data_contrato: previewDoc.dataContrato,
-          arquivo_nome: pdf.filename,
+          arquivo_nome: nomeArquivoComModeloContrato(
+            pdf.filename,
+            resolverModeloContratualParaGeracao(previewDoc.modalidade)
+          ),
           arquivo_tipo: "application/pdf",
           arquivo_tamanho: file.size,
           gerado_por: auditContext.usuarioNome,
@@ -620,7 +621,7 @@ export function OrcamentoContratoGerarPanel({
 
       toast.success(
         regenerado
-          ? "Novo PDF do contrato gerado. O modelo contratual e o acompanhamento de envio/assinatura não foram alterados."
+          ? "Novo PDF do contrato gerado. O arquivo anterior permanece no histórico, e o acompanhamento de envio/assinatura não foi alterado."
           : "Contrato gerado. O acompanhamento de envio/assinatura não foi alterado."
       );
       fecharFluxo();
@@ -910,14 +911,20 @@ export function OrcamentoContratoGerarPanel({
           {atualDesatualizado ? (
             <p className="mt-1 text-[12px] font-semibold text-[#b45309]">
               Este PDF está desatualizado em relação às condições comerciais
-              vigentes. Gere o PDF novamente. O modelo contratual não muda, e
-              o arquivo anterior permanece no histórico.
+              vigentes. Gere o PDF novamente. O arquivo anterior permanece no
+              histórico.
             </p>
           ) : null}
-          {modeloContratual != null ? (
+          {modeloPdfAtual != null ? (
             <p className="mt-1 text-[12px] text-[#334155]">
-              Modelo contratual:{" "}
-              <strong>{rotuloModeloContratualGestaoSst(modeloContratual)}</strong>
+              Modelo deste PDF:{" "}
+              <strong>{rotuloModeloContratualGestaoSst(modeloPdfAtual)}</strong>
+            </p>
+          ) : null}
+          {modeloPdfAtual === 1 && !contratoAssinado ? (
+            <p className="mt-1 text-[12px] text-[#334155]">
+              Gerar novamente cria outro PDF, com as condições atualizadas da
+              Gestão SST e o Anexo I. Este arquivo permanece no histórico.
             </p>
           ) : null}
       </div>
@@ -1023,15 +1030,6 @@ export function OrcamentoContratoGerarPanel({
             </>
           )}
       </div>
-
-      {modeloContratual === 1 ? (
-        <p className="mt-3 rounded-lg border border-[#f3e3c5] bg-[#fff8ee] px-3 py-2 text-[12px] text-[#92400e]">
-          Esta proposta permanece nas condições anteriores. Gerar novamente não
-          muda o modelo contratual nem passa a usar a cobertura por tipo de
-          exame. Uma proposta nova de mensalidade, criada depois da mudança,
-          usa as novas condições da Gestão SST.
-        </p>
-      ) : null}
 
       {isMensalidadeDoc && !pagamentoAvistaPlano ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
@@ -1183,7 +1181,12 @@ export function OrcamentoContratoGerarPanel({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2 text-[12px] text-[#475569]"
               >
                 <span>
-                  PDF v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
+                  PDF v{doc.versao}
+                  {isMensalidadeDoc
+                    ? ` · ${rotuloModeloContratualGestaoSst(modeloContratualDoPdfSalvo(doc))}`
+                    : ""}
+                  {" · "}
+                  {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
                   {pdfContratoEstaDesatualizado(doc, aprovacaoContrato)
                     ? " · desatualizado"
@@ -1225,7 +1228,12 @@ export function OrcamentoContratoGerarPanel({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2 text-[12px] text-[#475569]"
               >
                 <span>
-                  PDF v{doc.versao} · {formatDateTimeBR(doc.gerado_em)}
+                  PDF v{doc.versao}
+                  {isMensalidadeDoc
+                    ? ` · ${rotuloModeloContratualGestaoSst(modeloContratualDoPdfSalvo(doc))}`
+                    : ""}
+                  {" · "}
+                  {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
                   {" · sem validade"}
                 </span>

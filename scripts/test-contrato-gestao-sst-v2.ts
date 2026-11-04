@@ -20,7 +20,10 @@ import {
 import { drawContratoPdfDocument } from "../lib/contrato-pdf";
 import { buildContratoNavarroDocumento } from "../lib/contrato-modelo";
 import {
-  resolverModeloContratualGestaoSst,
+  MARCADOR_PDF_MODELO_GESTAO_SST_2,
+  modeloContratualDoPdfSalvo,
+  nomeArquivoComModeloContrato,
+  resolverModeloContratualParaGeracao,
   rotuloModeloContratualGestaoSst,
 } from "../lib/contrato-modelo-rotulo";
 import { isExameFaturavel } from "../lib/fatura-elegibilidade";
@@ -396,47 +399,61 @@ const documentoAntigo = buildContratoNavarroDocumento({
 });
 assert.equal(documentoAntigo.parcelas[0]?.dataIso, "2026-12-10");
 const pdfAntigo = pdfDe(documentoAntigo);
-assert.match(pdfAntigo.bruto, /regras de atendimento vigentes/);
-assert.doesNotMatch(pdfAntigo.bruto, /ANEXO I/);
+assert.match(pdfAntigo.bruto, /ANEXO I/);
+assert.doesNotMatch(pdfAntigo.bruto, /regras de atendimento vigentes/);
 
-assert.equal(
-  resolverModeloContratualGestaoSst({
-    propostaModeloVersao: 1,
-    contratoModeloVersao: 2,
-  }),
-  1
-);
-assert.equal(
-  resolverModeloContratualGestaoSst({
-    propostaModeloVersao: 2,
-    contratoModeloVersao: 2,
-  }),
-  2
-);
-assert.equal(
-  resolverModeloContratualGestaoSst({
-    propostaModeloVersao: null,
-    contratoModeloVersao: null,
-  }),
-  1
-);
+assert.equal(resolverModeloContratualParaGeracao("mensalidade"), 2);
+assert.equal(resolverModeloContratualParaGeracao("pontual"), 1);
 assert.equal(rotuloModeloContratualGestaoSst(1), "Condições anteriores");
 assert.equal(
   rotuloModeloContratualGestaoSst(2),
   "Novas condições da Gestão SST"
 );
+assert.equal(
+  modeloContratualDoPdfSalvo({
+    versao: 2,
+    arquivo_nome: "Contrato - Gestao SST - ACERLOG.pdf",
+  } as { arquivo_nome: string }),
+  1
+);
+assert.equal(
+  modeloContratualDoPdfSalvo({
+    arquivo_nome: nomeArquivoComModeloContrato(
+      "Contrato - Gestao SST - ACERLOG.pdf",
+      2
+    ),
+  }),
+  2
+);
+assert.equal(modeloContratualDoPdfSalvo({ modelo_contratual: 1 }), 1);
+assert.ok(
+  nomeArquivoComModeloContrato("Contrato.pdf", 2).includes(
+    MARCADOR_PDF_MODELO_GESTAO_SST_2
+  )
+);
+assert.equal(nomeArquivoComModeloContrato("Contrato.pdf", 1), "Contrato.pdf");
 
 const regeneradoAntigo = buildContratoNavarroDocumento({
   orcamento: { ...orcamento(), numero: "ORC-2026-0072", proposta_modelo_versao: 1 },
-  aprovacao: aprovacao({ contrato_modelo_versao: 2 }),
+  aprovacao: aprovacao({
+    contrato_modelo_versao: 1,
+    mensalidade_dia_vencimento: 10,
+    mensalidade_vencimento_regra: null,
+  }),
   dataContrato: "2026-11-10",
   vigenciaInicio: "2026-11-10",
   vigenciaFim: "2027-11-10",
   diaVencimentoMensalidade: 10,
 });
 const pdfRegenerado = pdfDe(regeneradoAntigo);
-assert.doesNotMatch(pdfRegenerado.bruto, /ANEXO I/);
-assert.match(pdfRegenerado.bruto, /regras de atendimento vigentes/);
+assert.match(pdfRegenerado.bruto, /ANEXO I/);
+assert.match(regeneradoAntigo.texto, /em até 3 \(três\) dias úteis/);
+assert.match(regeneradoAntigo.texto, /valor bruto mensal/);
+assert.match(regeneradoAntigo.texto, /rescindir imediatamente/);
+assert.match(regeneradoAntigo.texto, /comunicação escrita/);
+assert.match(regeneradoAntigo.texto, /utilização de um tipo não consome/);
+assert.doesNotMatch(regeneradoAntigo.texto, /regras de atendimento vigentes/);
+assert.doesNotMatch(regeneradoAntigo.texto, /possibilidade de saneamento/);
 
 const avistaDoc = buildContratoNavarroDocumento({
   orcamento: orcamento(),
