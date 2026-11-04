@@ -22,6 +22,7 @@ import {
   normalizeNomeOcupante,
   validarDraftsListaVagas,
   vagaClassificacaoBloqueiaEdicaoOcupante,
+  vagaPermiteCorrigirNomeOcupante,
   vagaPermiteRemoverFuncionario,
   statusClassificacaoVaga,
   type ContextoClassificacaoDesligamentoVaga,
@@ -575,6 +576,8 @@ export function OrcamentoAbaFuncionarios({
                 const locked = vagaClassificacaoBloqueiaEdicaoOcupante(
                   statusPreview
                 );
+                const nomeBloqueado =
+                  !vagaPermiteCorrigirNomeOcupante(statusPreview);
                 const podeRemoverFuncionario = persistida
                   ? vagaPermiteRemoverFuncionario(persistida, desligamento)
                   : false;
@@ -591,10 +594,10 @@ export function OrcamentoAbaFuncionarios({
                         data-vaga-cell={`${rowIdx}-0`}
                         className="field-input h-8 px-2 text-xs"
                         value={formatUppercaseInput(row.colaborador)}
-                        disabled={busy || locked}
-                        placeholder={locked ? undefined : "Nome"}
+                        disabled={busy || nomeBloqueado}
+                        placeholder={nomeBloqueado ? undefined : "Nome"}
                         title={
-                          locked
+                          nomeBloqueado
                             ? statusPreview === "desligado_admin"
                               ? "Vaga consumida por desligamento administrativo. Não é possível atribuir outro funcionário."
                               : "Não é possível editar após o agendamento vinculado. Altere pelo agendamento, se necessário."

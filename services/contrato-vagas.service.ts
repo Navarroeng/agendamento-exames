@@ -12,7 +12,9 @@ import {
   isContratoVagaStatus,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
+  planoCorrecaoNomeVagaProgramada,
   resolveStatusVagaRascunho,
+  selecionarIdsCopiaNomeProgramacao,
   statusClassificacaoVaga,
   validarDraftsListaVagas,
   vagaClassificacaoBloqueiaEdicaoOcupante,
@@ -275,15 +277,31 @@ export async function salvarListaVagasContrato(params: {
       )
     : null;
   const byIndice = new Map(atuais.map((v) => [v.indice, v]));
+  let nomesCorrigidos = 0;
 
   for (const draft of drafts) {
     const atual = byIndice.get(draft.indice);
     if (!atual) continue;
-    if (
-      vagaClassificacaoBloqueiaEdicaoOcupante(
-        statusClassificacaoVaga(atual, ctx)
-      )
-    ) {
+    const classificacao = statusClassificacaoVaga(atual, ctx);
+    if (vagaClassificacaoBloqueiaEdicaoOcupante(classificacao)) {
+      const plano = planoCorrecaoNomeVagaProgramada({
+        vaga: atual,
+        classificacao,
+        nomeInformado: draft.colaborador,
+      });
+      if (plano) {
+        await sincronizarCopiaNomeProgramacao({
+          contratoId: atual.contrato_id,
+          periodicoFuturoId: plano.preservar.periodicoFuturoId,
+          cpf: plano.preservar.colaboradorCpf,
+          nomeAnterior: plano.nomeAnterior,
+          nomeNovo: plano.colaborador,
+        });
+        await atualizarVaga(plano.vagaId, {
+          colaborador: plano.colaborador,
+        });
+        nomesCorrigidos += 1;
+      }
       continue;
     }
 
@@ -365,12 +383,64 @@ export async function salvarListaVagasContrato(params: {
     acao: AUDITORIA_ACOES.contrato_vagas_salvas,
     registroId: params.contratoId,
     registroNome: params.numeroContrato ?? params.contratoId,
-    descricao: `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.numeroContrato ?? params.contratoId}.`,
+    descricao:
+      nomesCorrigidos > 0
+        ? `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.numeroContrato ?? params.contratoId}. Corrigiu o nome de ${nomesCorrigidos} funcionário(s) em vaga programada, preservando CPF, cargo, vínculos, programação e status.`
+        : `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.numeroContrato ?? params.contratoId}.`,
     usuarioNome: params.usuarioNome,
     usuarioEmail: "",
   });
 
   return atuais;
+}
+
+/**
+ * Atualiza só o nome nas programações já existentes do mesmo funcionário.
+ * Não insere periódico, não muda status e não regrava agendamento ou documento.
+ */
+async function sincronizarCopiaNomeProgramacao(params: {
+  contratoId: string;
+  periodicoFuturoId: string | null;
+  cpf: string | null;
+  nomeAnterior: string;
+  nomeNovo: string;
+}): Promise<void> {
+  const contratoId = params.contratoId.trim();
+  const nomeNovo = normalizeNomeOcupante(params.nomeNovo);
+  if (!contratoId || !nomeNovo || nomeNovo === normalizeNomeOcupante(params.nomeAnterior)) {
+    return;
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("periodicos_futuros")
+    .select("id, contrato_id, colaborador, colaborador_cpf, status")
+    .eq("contrato_id", contratoId)
+    .in("status", ["ativo", "reagendado"]);
+  if (error) throw error;
+
+  const ids = selecionarIdsCopiaNomeProgramacao({
+    contratoId,
+    periodicoFuturoId: params.periodicoFuturoId,
+    cpf: params.cpf,
+    nomeAnterior: params.nomeAnterior,
+    registros: (data ?? []).map((row) => ({
+      id: String(row.id),
+      contratoId: row.contrato_id ? String(row.contrato_id) : null,
+      colaborador: row.colaborador ? String(row.colaborador) : null,
+      colaboradorCpf: row.colaborador_cpf
+        ? String(row.colaborador_cpf)
+        : null,
+      status: row.status ? String(row.status) : null,
+    })),
+  });
+  if (ids.length === 0) return;
+
+  const { error: updErr } = await supabase
+    .from("periodicos_futuros")
+    .update({ colaborador: nomeNovo })
+    .in("id", ids);
+  if (updErr) throw updErr;
 }
 
 async function atualizarVaga(

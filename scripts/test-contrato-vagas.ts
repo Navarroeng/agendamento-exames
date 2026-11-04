@@ -22,7 +22,10 @@ import {
   resolverDadosExibicaoVagaContrato,
   resolveStatusVagaRascunho,
   statusClassificacaoVaga,
+  planoCorrecaoNomeVagaProgramada,
+  selecionarIdsCopiaNomeProgramacao,
   vagaClassificacaoBloqueiaEdicaoOcupante,
+  vagaPermiteCorrigirNomeOcupante,
   vagaPrecisaReconciliarAgendamento,
   validarDraftsListaVagas,
   vagaPermiteAcoesOperacionaisAgendamento,
@@ -35,6 +38,7 @@ import {
   buildContagemContratoComVagas,
   buildContratoAgendamentoContagem,
 } from "../lib/contrato-agendamentos";
+import { resolveStatusListaFuncionarioPreview } from "../lib/contrato-vagas-lista";
 import {
   aplicarImportacaoNasVagas,
   escolherAbaListaFuncionarios,
@@ -1150,5 +1154,195 @@ assert.match(
   /Desligado administrativamente/
 );
 assert.doesNotMatch(abaAgSrc, /from\("contrato_vagas"\)[\s\S]{0,80}\.update/);
+
+const NOME_VIRGINIA_COM_VIRGULA = "VIRGINIA AUDINO TOZATI,";
+const NOME_VIRGINIA = "VIRGINIA AUDINO TOZATI";
+const vagaVirginia = {
+  ...vagaCard("programada", {
+    id: "vaga-virginia",
+    indice: 4,
+    colaborador: NOME_VIRGINIA_COM_VIRGULA,
+    colaborador_cpf: CPF_JIVALDO,
+    periodico_futuro_id: "pf-virginia",
+    agendamento_id: null,
+    credito_aso_id: null,
+  }),
+  cargo_id: "cargo-eng",
+  cargo_nome: "ENGENHEIRA",
+};
+
+assert.equal(
+  resolveStatusListaFuncionarioPreview({
+    persistida: vagaVirginia,
+    draft: {
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: CPF_JIVALDO,
+      manterAsoAberto: false,
+    },
+  }),
+  "programada"
+);
+assert.equal(vagaClassificacaoBloqueiaEdicaoOcupante("programada"), true);
+assert.equal(vagaPermiteCorrigirNomeOcupante("programada"), true);
+assert.equal(vagaPermiteCorrigirNomeOcupante("agendada"), false);
+assert.equal(
+  vagaPermiteCorrigirNomeOcupante(CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN),
+  false
+);
+assert.equal(vagaPermiteCorrigirNomeOcupante("comprometida"), true);
+
+const planoVirginia = planoCorrecaoNomeVagaProgramada({
+  vaga: vagaVirginia,
+  classificacao: "programada",
+  nomeInformado: NOME_VIRGINIA,
+});
+assert.ok(planoVirginia);
+assert.equal(planoVirginia.vagaId, "vaga-virginia");
+assert.equal(planoVirginia.colaborador, NOME_VIRGINIA);
+assert.equal(planoVirginia.nomeAnterior, NOME_VIRGINIA_COM_VIRGULA);
+assert.equal(planoVirginia.preservar.status, "programada");
+assert.equal(planoVirginia.preservar.colaboradorCpf, CPF_JIVALDO);
+assert.equal(planoVirginia.preservar.cargoId, "cargo-eng");
+assert.equal(planoVirginia.preservar.cargoNome, "ENGENHEIRA");
+assert.equal(planoVirginia.preservar.agendamentoId, null);
+assert.equal(planoVirginia.preservar.periodicoFuturoId, "pf-virginia");
+assert.equal(planoVirginia.preservar.creditoAsoId, null);
+assert.equal(
+  planoCorrecaoNomeVagaProgramada({
+    vaga: vagaVirginia,
+    classificacao: "programada",
+    nomeInformado: NOME_VIRGINIA_COM_VIRGULA,
+  }),
+  null
+);
+assert.equal(
+  planoCorrecaoNomeVagaProgramada({
+    vaga: vagaCard("agendada", {
+      id: "vaga-agendada",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaborador_cpf: CPF_JIVALDO,
+      agendamento_id: "ag-1",
+    }),
+    classificacao: "agendada",
+    nomeInformado: NOME_VIRGINIA,
+  }),
+  null
+);
+assert.equal(
+  planoCorrecaoNomeVagaProgramada({
+    vaga: vagaVirginia,
+    classificacao: CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
+    nomeInformado: NOME_VIRGINIA,
+  }),
+  null
+);
+
+const idsProgramacao = selecionarIdsCopiaNomeProgramacao({
+  contratoId: "c1",
+  periodicoFuturoId: "pf-virginia",
+  cpf: CPF_JIVALDO,
+  nomeAnterior: NOME_VIRGINIA_COM_VIRGULA,
+  registros: [
+    {
+      id: "pf-virginia",
+      contratoId: "c1",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+    {
+      id: "pf-irmao",
+      contratoId: "c1",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: "529.982.247-25",
+      status: "reagendado",
+    },
+    {
+      id: "pf-outro-cpf",
+      contratoId: "c1",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: "11144477735",
+      status: "ativo",
+    },
+    {
+      id: "pf-cancelado",
+      contratoId: "c1",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: CPF_JIVALDO,
+      status: "cancelado",
+    },
+    {
+      id: "pf-outro-contrato",
+      contratoId: "c2",
+      colaborador: NOME_VIRGINIA_COM_VIRGULA,
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+    {
+      id: "pf-ja-corrigido",
+      contratoId: "c1",
+      colaborador: NOME_VIRGINIA,
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+  ],
+});
+assert.deepEqual(idsProgramacao, ["pf-virginia", "pf-irmao"]);
+
+const vagaReaberta = {
+  ...vagaVirginia,
+  colaborador: planoVirginia.colaborador,
+};
+const draftsReabertos = buildVagaDraftsIniciais(4, [vagaReaberta]);
+const draftVirginia = draftsReabertos.find((row) => row.indice === 4);
+assert.ok(draftVirginia);
+assert.equal(draftVirginia.colaborador, NOME_VIRGINIA);
+assert.equal(draftVirginia.id, "vaga-virginia");
+assert.equal(vagaReaberta.status, "programada");
+assert.equal(vagaReaberta.periodico_futuro_id, "pf-virginia");
+assert.equal(vagaReaberta.agendamento_id, null);
+assert.equal(vagaReaberta.colaborador_cpf, CPF_JIVALDO);
+assert.equal(vagaReaberta.cargo_nome, "ENGENHEIRA");
+assert.equal(
+  resolveStatusListaFuncionarioPreview({
+    persistida: vagaReaberta,
+    draft: draftVirginia,
+  }),
+  "programada"
+);
+
+const nomeInputSrc = abaFuncionariosSrc.slice(
+  abaFuncionariosSrc.indexOf("Nome do funcionário"),
+  abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-1`}")
+);
+assert.match(nomeInputSrc, /disabled=\{busy \|\| nomeBloqueado\}/);
+assert.match(nomeInputSrc, /vagaPermiteCorrigirNomeOcupante/);
+assert.doesNotMatch(nomeInputSrc, /disabled=\{busy \|\| locked\}/);
+assert.match(
+  abaFuncionariosSrc.slice(
+    abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-1`}"),
+    abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-2`}")
+  ),
+  /disabled=\{busy \|\| locked\}/
+);
+
+const vagasServiceSrc = readFileSync(
+  join(process.cwd(), "services/contrato-vagas.service.ts"),
+  "utf8"
+);
+const syncSrc = vagasServiceSrc.slice(
+  vagasServiceSrc.indexOf("async function sincronizarCopiaNomeProgramacao"),
+  vagasServiceSrc.indexOf("async function atualizarVaga")
+);
+assert.match(vagasServiceSrc, /planoCorrecaoNomeVagaProgramada/);
+assert.match(
+  vagasServiceSrc,
+  /atualizarVaga\(plano\.vagaId, \{\s*colaborador: plano\.colaborador,\s*\}\)/
+);
+assert.match(syncSrc, /\.update\(\{ colaborador: nomeNovo \}\)/);
+assert.match(syncSrc, /\.in\("id", ids\)/);
+assert.doesNotMatch(syncSrc, /\.insert\(/);
+assert.doesNotMatch(syncSrc, /from\("agendamentos"\)/);
+assert.doesNotMatch(syncSrc, /\.update\(\{[^}]*status/);
 
 console.log("test-contrato-vagas: OK");

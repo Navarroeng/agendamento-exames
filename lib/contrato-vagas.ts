@@ -141,6 +141,11 @@ export function vagaPermiteAcoesOperacionaisAgendamento(
   return status === "comprometida";
 }
 
+/**
+ * Bloqueia troca do ocupante (CPF, cargo, importação e regravação da vaga).
+ * A correção pontual do nome em vaga programada fica em
+ * `vagaPermiteCorrigirNomeOcupante`.
+ */
 export function vagaClassificacaoBloqueiaEdicaoOcupante(
   status: ContratoVagaStatusClassificacao
 ): boolean {
@@ -149,6 +154,127 @@ export function vagaClassificacaoBloqueiaEdicaoOcupante(
     status === "programada" ||
     status === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
   );
+}
+
+/**
+ * O nome pode ser corrigido na lista, inclusive com a vaga Programada.
+ * Agendada continua pelo agendamento. Desligado administrativo permanece bloqueado.
+ */
+export function vagaPermiteCorrigirNomeOcupante(
+  status: ContratoVagaStatusClassificacao
+): boolean {
+  return (
+    status !== "agendada" && status !== CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+  );
+}
+
+export type PlanoCorrecaoNomeVagaProgramada = {
+  vagaId: string;
+  colaborador: string;
+  nomeAnterior: string;
+  preservar: {
+    colaboradorCpf: string | null;
+    cargoId: string | null;
+    cargoNome: string | null;
+    status: "programada";
+    agendamentoId: string | null;
+    periodicoFuturoId: string | null;
+    creditoAsoId: string | null;
+  };
+};
+
+/**
+ * Correção de nome em vaga já programada: só o texto do nome, no mesmo id.
+ * Não altera status, CPF, cargo, agendamento nem o vínculo da programação.
+ */
+export function planoCorrecaoNomeVagaProgramada(params: {
+  vaga: Pick<
+    ContratoVagaRecord,
+    | "id"
+    | "status"
+    | "colaborador"
+    | "colaborador_cpf"
+    | "cargo_id"
+    | "cargo_nome"
+    | "agendamento_id"
+    | "periodico_futuro_id"
+    | "credito_aso_id"
+  >;
+  classificacao: ContratoVagaStatusClassificacao;
+  nomeInformado: string | null | undefined;
+}): PlanoCorrecaoNomeVagaProgramada | null {
+  if (params.vaga.status !== "programada") return null;
+  if (params.classificacao !== "programada") return null;
+  if (!vagaPermiteCorrigirNomeOcupante(params.classificacao)) return null;
+
+  const colaborador = normalizeNomeOcupante(params.nomeInformado);
+  const nomeAnterior = normalizeNomeOcupante(params.vaga.colaborador);
+  if (!isNomeFuncionarioReal(colaborador)) return null;
+  if (colaborador === nomeAnterior) return null;
+
+  return {
+    vagaId: params.vaga.id,
+    colaborador,
+    nomeAnterior,
+    preservar: {
+      colaboradorCpf: params.vaga.colaborador_cpf,
+      cargoId: params.vaga.cargo_id,
+      cargoNome: params.vaga.cargo_nome,
+      status: "programada",
+      agendamentoId: params.vaga.agendamento_id,
+      periodicoFuturoId: params.vaga.periodico_futuro_id,
+      creditoAsoId: params.vaga.credito_aso_id,
+    },
+  };
+}
+
+export type CopiaNomeProgramacao = {
+  id: string;
+  contratoId?: string | null;
+  colaborador?: string | null;
+  colaboradorCpf?: string | null;
+  status?: string | null;
+};
+
+/**
+ * Cópias do nome na programação existente (periódicos do contrato).
+ * Atualiza pelo id. Não inclui cancelados nem registros de outro CPF.
+ */
+export function selecionarIdsCopiaNomeProgramacao(params: {
+  contratoId: string;
+  periodicoFuturoId?: string | null;
+  cpf?: string | null;
+  nomeAnterior: string;
+  registros: CopiaNomeProgramacao[];
+}): string[] {
+  const contratoId = params.contratoId.trim();
+  const ligado = (params.periodicoFuturoId ?? "").trim();
+  const cpf = normalizeCpfDigits(params.cpf);
+  const nomeAnterior = normalizeNomeOcupante(params.nomeAnterior);
+  const ids: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of params.registros) {
+    const id = String(row.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    const status = String(row.status ?? "").trim().toLowerCase();
+    if (status !== "ativo" && status !== "reagendado") continue;
+    const rowContrato = String(row.contratoId ?? "").trim();
+    if (rowContrato && contratoId && rowContrato !== contratoId) continue;
+
+    const mesmoVinculo = Boolean(ligado) && id === ligado;
+    const mesmoCpf =
+      isValidCPF(cpf) && normalizeCpfDigits(row.colaboradorCpf) === cpf;
+    const mesmaCopia =
+      normalizeNomeOcupante(row.colaborador) === nomeAnterior;
+
+    if (mesmoVinculo || (mesmoCpf && mesmaCopia)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+
+  return ids;
 }
 
 export function normalizeNomeOcupante(
