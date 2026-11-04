@@ -37,6 +37,7 @@ import {
   type ContratoParcela,
 } from "@/lib/contrato-pagamento";
 import { reaisParaCentavos, resolverMesesVigenciaMensalidade } from "@/lib/orcamento-mensalidade-pagamento";
+import { resolverModeloContratualGestaoSst } from "@/lib/contrato-modelo-rotulo";
 import { resolveQuantidadeColaboradoresOrcamento } from "@/lib/orcamento-calculo";
 import { formatCondicaoParcelasCentavos } from "@/lib/servico-parecer-tecnico";
 import {
@@ -583,7 +584,10 @@ export function buildContratoNavarroDocumento(params: {
     diaVencimentoMensalidade: pagamentoAvista || quintoDiaUtil ? null : diaPlano,
     vencimentoRegraMensalidade:
       !pagamentoAvista && quintoDiaUtil ? "quinto_dia_util" : null,
-    modeloVersao: aprovacao?.contrato_modelo_versao === 2 ? 2 : 1,
+    modeloVersao: resolverModeloContratualGestaoSst({
+      propostaModeloVersao: orcamento.proposta_modelo_versao,
+      contratoModeloVersao: aprovacao?.contrato_modelo_versao,
+    }),
     renovacaoBaseReais: renovacaoBase,
     renovacaoIncrementoReais: renovacaoIncremento,
     renovacaoAutomatica:

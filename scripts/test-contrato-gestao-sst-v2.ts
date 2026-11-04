@@ -3,6 +3,7 @@
  * Rode: npx --yes tsx scripts/test-contrato-gestao-sst-v2.ts
  */
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { jsPDF } from "jspdf";
 import { addMonthsToIsoDate } from "../lib/cliente-contrato-dates";
 import { exameDemissionalDispensadoPelaNr7 } from "../lib/cobertura-exame-clinico";
@@ -18,6 +19,10 @@ import {
 } from "../lib/contrato-navarro";
 import { drawContratoPdfDocument } from "../lib/contrato-pdf";
 import { buildContratoNavarroDocumento } from "../lib/contrato-modelo";
+import {
+  resolverModeloContratualGestaoSst,
+  rotuloModeloContratualGestaoSst,
+} from "../lib/contrato-modelo-rotulo";
 import { isExameFaturavel } from "../lib/fatura-elegibilidade";
 import {
   isDiaUtilBancario,
@@ -394,6 +399,45 @@ const pdfAntigo = pdfDe(documentoAntigo);
 assert.match(pdfAntigo.bruto, /regras de atendimento vigentes/);
 assert.doesNotMatch(pdfAntigo.bruto, /ANEXO I/);
 
+assert.equal(
+  resolverModeloContratualGestaoSst({
+    propostaModeloVersao: 1,
+    contratoModeloVersao: 2,
+  }),
+  1
+);
+assert.equal(
+  resolverModeloContratualGestaoSst({
+    propostaModeloVersao: 2,
+    contratoModeloVersao: 2,
+  }),
+  2
+);
+assert.equal(
+  resolverModeloContratualGestaoSst({
+    propostaModeloVersao: null,
+    contratoModeloVersao: null,
+  }),
+  1
+);
+assert.equal(rotuloModeloContratualGestaoSst(1), "Condições anteriores");
+assert.equal(
+  rotuloModeloContratualGestaoSst(2),
+  "Novas condições da Gestão SST"
+);
+
+const regeneradoAntigo = buildContratoNavarroDocumento({
+  orcamento: { ...orcamento(), numero: "ORC-2026-0072", proposta_modelo_versao: 1 },
+  aprovacao: aprovacao({ contrato_modelo_versao: 2 }),
+  dataContrato: "2026-11-10",
+  vigenciaInicio: "2026-11-10",
+  vigenciaFim: "2027-11-10",
+  diaVencimentoMensalidade: 10,
+});
+const pdfRegenerado = pdfDe(regeneradoAntigo);
+assert.doesNotMatch(pdfRegenerado.bruto, /ANEXO I/);
+assert.match(pdfRegenerado.bruto, /regras de atendimento vigentes/);
+
 const avistaDoc = buildContratoNavarroDocumento({
   orcamento: orcamento(),
   aprovacao: aprovacao({
@@ -437,5 +481,25 @@ assert.equal(
   isExameFaturavel({ status: "cancelado", valor: 50 }),
   false
 );
+
+const sql152 = fs.readFileSync(
+  "supabase/migrations/152_contrato_modelo_gestao_sst.sql",
+  "utf8"
+);
+const sql153 = fs.readFileSync(
+  "supabase/migrations/153_cobertura_vigencia_proposta_versao.sql",
+  "utf8"
+);
+assert.match(sql152, /contrato_modelo_versao smallint not null default 1/);
+assert.match(sql153, /proposta_modelo_versao smallint not null default 1/);
+assert.match(sql153, /before insert on public\.orcamentos/);
+assert.match(sql153, /new\.proposta_modelo_versao := 2/);
+assert.match(
+  sql153,
+  /new\.contrato_modelo_versao := case when versao_proposta = 2 then 2 else 1 end/
+);
+assert.doesNotMatch(sql152, /update\s+public\.orcamento/i);
+assert.doesNotMatch(sql153, /update\s+public\.orcamento/i);
+assert.doesNotMatch(sql153, /contrato_cobertura_vigencia/);
 
 console.log("OK  contrato gestao sst v2");
