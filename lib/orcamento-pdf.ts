@@ -18,7 +18,10 @@ import {
   itensRegistroParaDescontoAvista,
 } from "@/lib/orcamento-pagamento";
 import { formatCurrency } from "@/lib/money";
-import { paragrafosPropostaGestaoMensal } from "@/lib/contrato-navarro";
+import {
+  paragrafosPropostaGestaoMensal,
+  propostaIncluiEscopoGestaoCompleta,
+} from "@/lib/contrato-navarro";
 import {
   MENSALIDADE_BENEFICIOS_ITENS,
   MENSALIDADE_BENEFICIOS_OBSERVACOES,
@@ -239,10 +242,17 @@ function resolveDescricaoPropostaParagrafos(
     return PROPOSTA_DESCRICAO_PARAGRAFOS_PERICULOSIDADE;
   }
   if (kind === "pgr") return PROPOSTA_DESCRICAO_PARAGRAFOS_PGR;
+  const textosEscopo = (orcamento.orcamento_itens ?? []).flatMap((item) => {
+    const nome = item.servico_nome ?? "";
+    return nome
+      ? [nome, ...resolveItensInclusosServico(undefined, nome)]
+      : [];
+  });
   let base: readonly string[] = isOrcamentoMensalidade(orcamento.modalidade)
     ? paragrafosPropostaGestaoMensal({
         ...propostaMensalidade,
         modeloVersao: orcamento.proposta_modelo_versao,
+        escopoCompleto: propostaIncluiEscopoGestaoCompleta(textosEscopo),
       })
     : PROPOSTA_DESCRICAO_PARAGRAFOS;
   if (orcamentoPossuiLtcat(orcamento.orcamento_itens)) {

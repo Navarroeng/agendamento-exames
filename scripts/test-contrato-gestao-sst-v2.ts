@@ -14,6 +14,7 @@ import {
 import {
   buildClausulasContrato,
   paragrafosPropostaGestaoMensal,
+  propostaIncluiEscopoGestaoCompleta,
   textoPlanoContrato,
   type ContratoNavarroContexto,
 } from "../lib/contrato-navarro";
@@ -34,8 +35,13 @@ import {
 } from "../lib/dia-util";
 import { resolverGradeMensalidades } from "../lib/mensalidade-parcelas";
 import {
+  GESTAO_COMPLETA_SST_ITENS,
   GESTAO_SST_MENSAL_NOME,
+  MENSALIDADE_BENEFICIOS_ITENS,
+  MENSALIDADE_BENEFICIOS_OBSERVACOES,
+  MENSALIDADE_BENEFICIOS_OBSERVACOES_V2,
   ORCAMENTO_MODALIDADE_MENSALIDADE,
+  observacoesCoberturaProposta,
 } from "../lib/orcamento-modalidade";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
@@ -482,10 +488,52 @@ const propostaNova = paragrafosPropostaGestaoMensal({
   exameAdmissional: 50,
   exameDemissional: 50,
   modeloVersao: 2,
+  escopoCompleto: true,
 }).join("\n");
-assert.match(propostaNova, /um exame clínico de cada tipo/i);
-assert.match(propostaNova, /admitidos durante a vigência/i);
+assert.match(propostaNova, /quando necessário, com emissão do ASO/);
+assert.match(
+  propostaNova,
+  /funcionários admitidos durante a vigência custam R\$ 50,00 cada/
+);
+assert.match(
+  propostaNova,
+  /A cada renovação, a mensalidade é recalculada conforme os colaboradores ativos/
+);
 assert.doesNotMatch(propostaNova, /ou demissional quando o desligamento/);
+assert.doesNotMatch(propostaNova, /A utilização de um tipo não consome/);
+
+const propostaNovaPreco = paragrafosPropostaGestaoMensal({
+  exameAdmissional: 80,
+  exameDemissional: 80,
+  modeloVersao: 2,
+  escopoCompleto: true,
+}).join("\n");
+assert.match(propostaNovaPreco, /custam R\$ 80,00 cada/);
+assert.doesNotMatch(propostaNovaPreco, /R\$ 50,00/);
+
+const propostaNovaIncompleta = paragrafosPropostaGestaoMensal({
+  exameAdmissional: 50,
+  exameDemissional: 50,
+  modeloVersao: 2,
+  escopoCompleto: false,
+}).join("\n");
+assert.match(propostaNovaIncompleta, /A utilização de um tipo não consome/);
+assert.doesNotMatch(
+  propostaNovaIncompleta,
+  /A cada renovação, a mensalidade é recalculada conforme os colaboradores ativos/
+);
+assert.equal(propostaIncluiEscopoGestaoCompleta(GESTAO_COMPLETA_SST_ITENS), true);
+assert.equal(propostaIncluiEscopoGestaoCompleta(["PGR - Programa"]), false);
+assert.equal(
+  observacoesCoberturaProposta(2)[0],
+  "Inclui um exame clínico de cada tipo por colaborador abrangido no início da vigência, quando necessário, com ASO. Repetições do mesmo tipo, exames de novos admitidos durante a vigência e exames complementares são cobrados à parte."
+);
+assert.equal(MENSALIDADE_BENEFICIOS_OBSERVACOES_V2.length, 1);
+assert.equal(MENSALIDADE_BENEFICIOS_ITENS.length, 6);
+assert.match(
+  MENSALIDADE_BENEFICIOS_OBSERVACOES[0],
+  /periódico ou demissional/
+);
 
 assert.equal(
   isExameFaturavel({

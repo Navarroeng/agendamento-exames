@@ -308,11 +308,31 @@ export function centavosSalvosParaReais(
  * O preço do exame avulso sai do parâmetro gravado na contratação, ou da
  * configuração da modalidade quando a contratação ainda não o registrou.
  */
+export function propostaIncluiEscopoGestaoCompleta(
+  textos: readonly string[]
+): boolean {
+  const blob = textos.join("\n");
+  return (
+    /\bpgr\b/i.test(blob) &&
+    /ltcat/i.test(blob) &&
+    /pcmso/i.test(blob) &&
+    /psicossocia/i.test(blob) &&
+    /s-2210/i.test(blob) &&
+    /s-2220/i.test(blob) &&
+    /s-2240/i.test(blob)
+  );
+}
+
 export function paragrafosPropostaGestaoMensal(params?: {
   exameAdmissional?: number | null;
   exameDemissional?: number | null;
   /** 2 = cobertura por tipo. Ausente ou outro valor preserva a proposta anterior. */
   modeloVersao?: number | null;
+  /**
+   * O texto que lista PGR, LTCAT, PCMSO, riscos psicossociais e eSocial
+   * só entra quando a proposta inclui todos esses serviços.
+   */
+  escopoCompleto?: boolean | null;
 }): readonly string[] {
   const catalogo = valorExameClinicoAvulsoMensalidade();
   const admissional =
@@ -333,9 +353,22 @@ export function paragrafosPropostaGestaoMensal(params?: {
           ? `O exame clínico avulso custa ${formatCurrency(admissional)} por exame, com ASO. O demissional avulso desta proposta permanece em ${formatCurrency(demissional)}. Exames complementares são cobrados à parte.`
           : `Exames clínicos avulsos admissionais custam ${formatCurrency(admissional)} cada e demissionais custam ${formatCurrency(demissional)} cada. Exames complementares são cobrados à parte.`
       : "O valor dos exames clínicos avulsos desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura. Exames complementares são cobrados à parte.";
-  if (params?.modeloVersao === 2) {
+  if (params?.modeloVersao === 2 && params.escopoCompleto === true) {
+    const precoCompleto =
+      admissional == null
+        ? "O valor dos exames clínicos avulsos desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura. Exames complementares são cobrados à parte."
+        : demissional != null && demissional !== admissional
+          ? `Repetições do mesmo tipo e exames clínicos de funcionários admitidos durante a vigência custam ${formatCurrency(admissional)} cada. O demissional avulso desta proposta permanece em ${formatCurrency(demissional)}. Exames complementares são cobrados à parte.`
+          : `Repetições do mesmo tipo e exames clínicos de funcionários admitidos durante a vigência custam ${formatCurrency(admissional)} cada. Exames complementares são cobrados à parte.`;
     return [
       "A proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho por 12 meses, incluindo PGR, LTCAT, PCMSO, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
+      "Para cada colaborador abrangido no início da vigência, o plano inclui um exame clínico de cada tipo, quando necessário, com emissão do ASO: admissional, periódico, demissional, retorno ao trabalho e mudança de risco ocupacional.",
+      precoCompleto,
+      "O compromisso é anual. A cada renovação, a mensalidade é recalculada conforme os colaboradores ativos, e a cobertura dos exames é renovada.",
+    ];
+  }
+  if (params?.modeloVersao === 2) {
+    return [
       "Cada colaborador abrangido no início da vigência tem um exame clínico de cada tipo, quando indicado: admissional, periódico, demissional, retorno ao trabalho e mudança de risco ocupacional, com ASO. A utilização de um tipo não consome outro.",
       "A repetição do mesmo tipo e os exames clínicos de colaboradores admitidos durante a vigência são avulsos. " +
         preco,

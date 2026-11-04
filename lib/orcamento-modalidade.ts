@@ -55,8 +55,7 @@ export const MENSALIDADE_BENEFICIOS_OBSERVACOES: readonly string[] = [
 
 /** Observações da proposta nova. Proposta antiga continua no texto anterior. */
 export const MENSALIDADE_BENEFICIOS_OBSERVACOES_V2: readonly string[] = [
-  "Um exame clínico de cada tipo por colaborador abrangido no início da vigência, quando indicado, com ASO.",
-  "Repetição do mesmo tipo, exames de admitidos durante a vigência e exames complementares são cobrados à parte.",
+  "Inclui um exame clínico de cada tipo por colaborador abrangido no início da vigência, quando necessário, com ASO. Repetições do mesmo tipo, exames de novos admitidos durante a vigência e exames complementares são cobrados à parte.",
 ] as const;
 
 export function observacoesCoberturaProposta(
