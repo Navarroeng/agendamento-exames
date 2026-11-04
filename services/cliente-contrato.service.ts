@@ -72,25 +72,39 @@ export async function complementarContratosComCobranca(
   const supabase = createClient();
   const selectAprovacaoBase =
     "id, orcamento_id, contrato_assinado, contrato_assinado_em, revertida_em, created_at, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
+  const selectComRenovacao = `${selectAprovacaoBase}, mensalidade_renovacao_automatica`;
+  const selectCompleto = `${selectComRenovacao}, mensalidade_vencimento_regra, contrato_modelo_versao, mensalidade_exame_demissional_centavos`;
   const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
     supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
     supabase
       .from("orcamento_aprovacoes")
-      .select(`${selectAprovacaoBase}, mensalidade_renovacao_automatica`)
+      .select(selectCompleto)
       .in("orcamento_id", orcamentoIds),
   ]);
   if (orcamentosRes.error) throw orcamentosRes.error;
-  const faltaColunaRenovacao =
+  const erroPrimeira = aprovacoesPrimeira.error?.message ?? "";
+  const faltaColunaNova =
     Boolean(aprovacoesPrimeira.error) &&
-    /mensalidade_renovacao_automatica|schema cache/i.test(
-      aprovacoesPrimeira.error?.message ?? ""
+    /mensalidade_vencimento_regra|contrato_modelo_versao|mensalidade_exame_demissional_centavos|schema cache|42703/i.test(
+      erroPrimeira
+    );
+  const aprovacoesRenovacao = faltaColunaNova
+    ? await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectComRenovacao)
+        .in("orcamento_id", orcamentoIds)
+    : aprovacoesPrimeira;
+  const faltaColunaRenovacao =
+    Boolean(aprovacoesRenovacao.error) &&
+    /mensalidade_renovacao_automatica|schema cache|42703/i.test(
+      aprovacoesRenovacao.error?.message ?? ""
     );
   const aprovacoesRes = faltaColunaRenovacao
     ? await supabase
         .from("orcamento_aprovacoes")
         .select(selectAprovacaoBase)
         .in("orcamento_id", orcamentoIds)
-    : aprovacoesPrimeira;
+    : aprovacoesRenovacao;
   if (aprovacoesRes.error) throw aprovacoesRes.error;
 
   const modalidadePorOrcamento = new Map<string, string | null>();
@@ -112,6 +126,9 @@ export async function complementarContratosComCobranca(
     mensalidade_dia_vencimento: number | null;
     mensalidade_valor_mensal: number | null;
     mensalidade_exame_avulso_centavos: number | null;
+    mensalidade_exame_demissional_centavos?: number | null;
+    mensalidade_vencimento_regra?: string | null;
+    contrato_modelo_versao?: number | null;
     mensalidade_renovacao_automatica?: boolean | null;
   };
   const aprovacoesPorOrcamento = new Map<string, AprovacaoCobranca[]>();
@@ -171,8 +188,15 @@ export async function complementarContratosComCobranca(
       contrato_assinado: aprovacao?.contrato_assinado ?? null,
       mensalidadePagamento: aprovacao?.mensalidade_pagamento ?? null,
       mensalidadeDiaVencimento: aprovacao?.mensalidade_dia_vencimento ?? null,
+      mensalidadeVencimentoRegra:
+        aprovacao?.mensalidade_vencimento_regra ?? null,
+      contratoModeloVersao:
+        aprovacao?.contrato_modelo_versao === 2 ? 2 : 1,
       exameAdmissionalReais: centavosSalvosParaReais(
         aprovacao?.mensalidade_exame_avulso_centavos
+      ),
+      exameDemissionalReais: centavosSalvosParaReais(
+        aprovacao?.mensalidade_exame_demissional_centavos
       ),
       renovacaoAutomatica:
         aprovacao?.mensalidade_renovacao_automatica === true

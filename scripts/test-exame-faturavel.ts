@@ -202,4 +202,40 @@ const itensMistos = buildFaturaItensFromAgendamentos([mistoExames], "cliente");
 assert.equal(itensMistos.length, 1);
 assert.equal(itensMistos[0].valor_unitario, 80);
 
+const definidoPelaEquipe = {
+  ...ag("equipe", "Valor da equipe", "2026-08-16", 0),
+  agendamento_exames: [
+    {
+      id: "eq-zero",
+      agendamento_id: "equipe",
+      tipo_exame: "Clínico",
+      valor_cliente: 0,
+      custo_clinica: 40,
+    },
+    {
+      id: "eq-valor",
+      agendamento_id: "equipe",
+      tipo_exame: "Audiometria",
+      valor_cliente: 35,
+      custo_clinica: 10,
+    },
+    {
+      id: "eq-credito",
+      agendamento_id: "equipe",
+      tipo_exame: "Clínico coberto pelo crédito",
+      valor_cliente: 50,
+      custo_clinica: 20,
+      incluso_credito_contrato: true,
+    },
+  ],
+} as AgendamentoWithExames;
+const itensEquipe = buildFaturaItensFromAgendamentos(
+  [definidoPelaEquipe],
+  "cliente"
+);
+assert.equal(itensEquipe.length, 1);
+assert.equal(itensEquipe[0].exame_nome, "Audiometria");
+assert.equal(itensEquipe[0].valor_unitario, 35);
+assert.equal(itensEquipe[0].valor_total, 35);
+
 console.log("test-exame-faturavel: ok");

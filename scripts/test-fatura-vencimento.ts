@@ -15,7 +15,7 @@ function iso(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// Jul/2026: 1 qua, 2 qui, 3 sex, 6 seg (4º), 7 ter (5º)
+// Jul/2026: 1º de julho é quarta. O 9 de julho não é feriado bancário nacional.
 assert.equal(iso(calcQuintoDiaUtilDoMes(2026, 7)), "2026-07-07");
 
 const venc = calcVencimentoFaturaCliente("06/2026");
@@ -23,9 +23,10 @@ assert.ok(venc);
 assert.equal(venc.iso, "2026-07-07");
 assert.equal(venc.label, "07/07/2026");
 
-// Dez/2026 -> Jan/2027
+// Dez/2026 -> Jan/2027. 01/01/2027 é sexta e feriado nacional: o 5º dia útil é 08/01.
 const vencJan = calcVencimentoFaturaCliente("12/2026");
 assert.ok(vencJan);
+assert.equal(vencJan.iso, "2027-01-08");
 assert.equal(vencJan.iso, iso(calcQuintoDiaUtilDoMes(2027, 1)));
 
 assert.equal(calcVencimentoFaturaCliente("13/2026"), null);

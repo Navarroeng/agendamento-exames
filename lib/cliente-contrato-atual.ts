@@ -14,6 +14,12 @@ export type ContextoCobrancaContrato = {
   modalidadeOrcamento?: string | null;
   mensalidadePagamento?: string | null;
   mensalidadeDiaVencimento?: number | null;
+  /** `quinto_dia_util` quando a mensalidade não usa dia 10 nem dia 20. */
+  mensalidadeVencimentoRegra?: string | null;
+  /** 2 = cobertura e texto novos. Ausente ou 1 preserva o contrato anterior. */
+  contratoModeloVersao?: number | null;
+  /** Demissional avulso quando o valor gravado difere do admissional. */
+  exameDemissionalReais?: number | null;
   parcelasMensalidade?: ParcelaMensalidadeRegistrada[];
   /** Flag gravada na aprovação. Não substitui a data quando ela existe. */
   contrato_assinado?: boolean | null;
@@ -408,6 +414,7 @@ export function labelFinanceiroMensalidade(
     | "data_fim"
     | "valor_contrato"
     | "mensalidadeDiaVencimento"
+    | "mensalidadeVencimentoRegra"
     | "parcelasMensalidade"
   >,
   hojeIso: string = todayIsoSaoPaulo()
@@ -416,6 +423,7 @@ export function labelFinanceiroMensalidade(
     vigenciaInicio: contrato.data_inicio,
     vigenciaFim: contrato.data_fim,
     dia: contrato.mensalidadeDiaVencimento,
+    vencimentoRegra: contrato.mensalidadeVencimentoRegra,
     valorMensal: contrato.valor_contrato,
     registradas: contrato.parcelasMensalidade,
     hojeIso,

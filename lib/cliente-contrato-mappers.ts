@@ -196,6 +196,7 @@ export function labelFinanceiroContrato(
         | "data_fim"
         | "valor_contrato"
         | "mensalidadeDiaVencimento"
+        | "mensalidadeVencimentoRegra"
         | "parcelasMensalidade"
       >
     >,
@@ -215,6 +216,7 @@ export function labelFinanceiroContrato(
         data_fim: contrato.data_fim ?? null,
         valor_contrato: contrato.valor_contrato ?? null,
         mensalidadeDiaVencimento: contrato.mensalidadeDiaVencimento,
+        mensalidadeVencimentoRegra: contrato.mensalidadeVencimentoRegra,
         parcelasMensalidade: contrato.parcelasMensalidade,
       },
       hojeIso

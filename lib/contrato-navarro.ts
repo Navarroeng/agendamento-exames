@@ -1,4 +1,6 @@
+import { DISPENSA_DEMISSIONAL_NR7 } from "@/lib/cobertura-exame-clinico";
 import { NAVARRO_DADOS_BANCARIOS } from "@/lib/navarro-pagamento";
+import { resolveItensInclusosServico } from "@/lib/servico-sst-pacote";
 import { formatCNPJ } from "@/lib/cnpj";
 import {
   formatMoedaComExtenso,
@@ -55,8 +57,17 @@ export const DIAS_VENCIMENTO_MENSALIDADE = [10, 20] as const;
 export type DiaVencimentoMensalidade =
   (typeof DIAS_VENCIMENTO_MENSALIDADE)[number];
 
+/** Identificador da mensalidade no 5º dia útil. Não é o dia 05. */
+export const MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL = "quinto_dia_util" as const;
+
 export const DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG =
-  "Selecione o dia de vencimento das mensalidades (10 ou 20) antes de gerar o contrato.";
+  "Selecione o vencimento das mensalidades (dia 10, dia 20 ou 5º dia útil) antes de gerar o contrato.";
+
+export function vencimentoMensalidadeQuintoDiaUtil(
+  value: unknown
+): boolean {
+  return value === MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL;
+}
 
 /** Escolha gravada na contratação. Null não é renovação automática. */
 export type RenovacaoContratoGestao = "automatica" | "nao_automatica";
@@ -153,6 +164,8 @@ export type ContratoClausula = {
   tabela?: ContratoClausulaTabela;
   blocoPagamento?: ContratoBlocoPagamento;
   paragrafosApos?: string[];
+  /** Quando preenchido, substitui o rótulo "CLÁUSULA n". Usado no Anexo I. */
+  rotulo?: string;
 };
 
 /** Campo pedido no contrato e ausente na fonte oficial de pagamento. */
@@ -195,6 +208,7 @@ export function rotuloClausulaContrato(
   clause: ContratoClausula,
   estilo: "sst" | "aet"
 ): string {
+  if (clause.rotulo?.trim()) return clause.rotulo.trim();
   if (estilo === "aet") {
     return `CLÁUSULA ${clause.numero}ª – ${clause.titulo}`;
   }
@@ -240,6 +254,12 @@ export type ContratoNavarroContexto = {
    * Ausente ou true mantém o modelo de renovação automática.
    */
   renovacaoAutomatica?: boolean;
+  /**
+   * 2 = condições novas da Gestão SST. Ausente ou outro valor preserva o texto anterior.
+   */
+  modeloVersao?: number | null;
+  /** `quinto_dia_util` quando a mensalidade vence no 5º dia útil. Não é o dia 05. */
+  vencimentoRegraMensalidade?: string | null;
 };
 
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -291,6 +311,8 @@ export function centavosSalvosParaReais(
 export function paragrafosPropostaGestaoMensal(params?: {
   exameAdmissional?: number | null;
   exameDemissional?: number | null;
+  /** 2 = cobertura por tipo. Ausente ou outro valor preserva a proposta anterior. */
+  modeloVersao?: number | null;
 }): readonly string[] {
   const catalogo = valorExameClinicoAvulsoMensalidade();
   const admissional =
@@ -304,9 +326,22 @@ export function paragrafosPropostaGestaoMensal(params?: {
   const preco =
     admissional != null && demissional != null
       ? admissional === demissional
-        ? `Exames clínicos avulsos admissionais e demissionais custam ${formatCurrency(admissional)} cada. Exames complementares são cobrados à parte.`
-        : `Exames clínicos avulsos admissionais custam ${formatCurrency(admissional)} cada e demissionais custam ${formatCurrency(demissional)} cada. Exames complementares são cobrados à parte.`
+        ? params?.modeloVersao === 2
+          ? `O exame clínico avulso custa ${formatCurrency(admissional)} por exame, com ASO, para todos os tipos clínicos. Exames complementares são cobrados à parte.`
+          : `Exames clínicos avulsos admissionais e demissionais custam ${formatCurrency(admissional)} cada. Exames complementares são cobrados à parte.`
+        : params?.modeloVersao === 2
+          ? `O exame clínico avulso custa ${formatCurrency(admissional)} por exame, com ASO. O demissional avulso desta proposta permanece em ${formatCurrency(demissional)}. Exames complementares são cobrados à parte.`
+          : `Exames clínicos avulsos admissionais custam ${formatCurrency(admissional)} cada e demissionais custam ${formatCurrency(demissional)} cada. Exames complementares são cobrados à parte.`
       : "O valor dos exames clínicos avulsos desta modalidade ainda não está configurado e deverá constar do contrato antes da assinatura. Exames complementares são cobrados à parte.";
+  if (params?.modeloVersao === 2) {
+    return [
+      "A proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho por 12 meses, incluindo PGR, LTCAT, PCMSO, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
+      "Cada colaborador abrangido no início da vigência tem um exame clínico de cada tipo, quando indicado: admissional, periódico, demissional, retorno ao trabalho e mudança de risco ocupacional, com ASO. A utilização de um tipo não consome outro.",
+      "A repetição do mesmo tipo e os exames clínicos de colaboradores admitidos durante a vigência são avulsos. " +
+        preco,
+      "A contratação tem compromisso anual. Na renovação automática, a mensalidade é recalculada e a cobertura recomeça para a nova lista de abrangidos.",
+    ];
+  }
   return [
     "A proposta contempla a Gestão Completa de Saúde e Segurança do Trabalho por 12 meses, incluindo PGR, LTCAT, PCMSO, Avaliação de Riscos Psicossociais e gestão dos eventos de SST no eSocial (S-2210, S-2220 e S-2240).",
     "Inclui um exame clínico periódico por colaborador abrangido pelo plano, com ASO, ou demissional quando o desligamento ocorrer antes da realização do periódico.",
@@ -689,7 +724,7 @@ export const CONTRATO_TEXTOS_PROIBIDOS = [
   "trilha de assinatura",
 ] as const;
 
-export function buildClausulasContrato(
+function montarClausulasContrato(
   ctx: ContratoNavarroContexto
 ): ContratoClausula[] {
   const pagamentoAvista =
@@ -786,6 +821,302 @@ export function buildClausulasContrato(
       ],
     },
   ];
+}
+
+function servicoContratado(
+  servicos: string[],
+  teste: RegExp
+): boolean {
+  return servicos.some((item) => teste.test(item));
+}
+
+export function servicosEfetivamenteContratados(nomes: string[]): string[] {
+  const saida: string[] = [];
+  const vistos = new Set<string>();
+  for (const nome of nomes) {
+    const texto = nome.trim();
+    if (!texto) continue;
+    const inclusos = resolveItensInclusosServico({ nome: texto });
+    const itens = inclusos.length > 0 ? inclusos : [texto];
+    for (const item of itens) {
+      const limpo = item.trim();
+      const chave = limpo.toLocaleLowerCase("pt-BR");
+      if (!chave || vistos.has(chave)) continue;
+      vistos.add(chave);
+      saida.push(limpo);
+    }
+  }
+  return saida;
+}
+
+function redigirValorExameClinicoAvulsoV2(ctx: ContratoNavarroContexto): string {
+  const admissional = ctx.valorExameClinicoAvulso;
+  const demissional = ctx.valorExameClinicoDemissional ?? admissional;
+  const admissionalOk =
+    admissional != null && Number.isFinite(admissional) && admissional > 0;
+  const demissionalOk =
+    demissional != null && Number.isFinite(demissional) && demissional > 0;
+  if (!admissionalOk || !demissionalOk) {
+    return "O valor do exame clínico avulso, com emissão do respectivo ASO, não está registrado nesta contratação e deverá ser ajustado por escrito antes da assinatura.";
+  }
+  const tipos =
+    "admissional, periódico, demissional, retorno ao trabalho e mudança de risco ocupacional";
+  if (admissional === demissional) {
+    return `Para esta contratação, o exame clínico avulso é de ${formatMoedaComExtenso(admissional)}, por exame, com emissão do ASO, para ${tipos}.`;
+  }
+  return `Para esta contratação, o exame clínico avulso é de ${formatMoedaComExtenso(admissional)}, por exame, com emissão do ASO. O exame clínico demissional avulso desta contratação permanece em ${formatMoedaComExtenso(demissional)}, com emissão do ASO.`;
+}
+
+function redigirExamesGestaoMensalidadeV2(ctx: ContratoNavarroContexto): string[] {
+  const quantitativo = fraseQuantitativoColaboradores(ctx.colaboradores);
+  return [
+    "Exames incluídos e avulsos.",
+    `Cada colaborador abrangido pelo plano no início da vigência, dentro do quantitativo de ${quantitativo}, tem direito a um exame clínico de cada tipo por vigência, quando indicado: admissional, periódico, demissional, retorno ao trabalho e mudança de risco ocupacional, com emissão do ASO.`,
+    "A utilização de um tipo não consome a cobertura de outro tipo.",
+    "A repetição do mesmo tipo na mesma vigência é avulsa e será cobrada pelo preço do exame clínico avulso previsto na cláusula de valores.",
+    "Exames complementares continuam cobrados separadamente, inclusive quando o exame clínico estiver incluído, conforme necessidade prevista no PCMSO e autorização da CONTRATANTE.",
+    "Essa cobertura comercial não altera a indicação nem a periodicidade médica dos exames.",
+    "O colaborador admitido durante a vigência passa a integrar a gestão de SST após a comunicação da admissão. Seus exames clínicos são avulsos durante essa vigência, pelo preço contratado para exame clínico avulso.",
+    semRenovacaoAutomatica(ctx)
+      ? "Em uma nova contratação ajustada por escrito, os colaboradores que permanecerem ativos e forem abrangidos pelo novo plano passam a ter a cobertura do novo ciclo. Não há renovação automática desta cobertura."
+      : "Na renovação, os colaboradores que permanecerem ativos e forem abrangidos pelo plano renovado passam a ter a cobertura do novo ciclo.",
+    `A dispensa do exame demissional, quando aplicável, segue a NR-7: menos de ${DISPENSA_DEMISSIONAL_NR7.graus1e2Dias} dias para os graus de risco 1 e 2 e menos de ${DISPENSA_DEMISSIONAL_NR7.graus3e4Dias} dias para os graus 3 e 4, contados do exame clínico ocupacional mais recente. A dispensa do exame não se confunde com a cobertura financeira nem a substitui.`,
+  ];
+}
+
+function redigirAtendimentoV2(ctx: ContratoNavarroContexto): string[] {
+  const servicos = servicosEfetivamenteContratados(ctx.servicos);
+  const paragrafos = [
+    "O atendimento objeto deste contrato compreende os serviços técnicos de SST discriminados no Anexo I, observados os itens abaixo somente quando integrarem esse anexo.",
+  ];
+  if (servicoContratado(servicos, /pcmso/i)) {
+    paragrafos.push(
+      "PCMSO. Elaboração e gestão do Programa de Controle Médico de Saúde Ocupacional, nos termos da NR-07, de acordo com as informações prestadas pela CONTRATANTE sobre suas atividades e seus colaboradores."
+    );
+  }
+  paragrafos.push(
+    "Rede credenciada. Os exames ocupacionais serão realizados na rede credenciada da CONTRATADA, conforme disponibilidade.",
+    "Exames clínicos. Os exames clínicos ocupacionais serão realizados em até 3 (três) dias úteis após o recebimento da solicitação por e-mail com os dados completos do colaborador. Esse prazo não abrange exames complementares."
+  );
+  if (servicoContratado(servicos, /\bpgr\b/i)) {
+    paragrafos.push(
+      "PGR. Elaboração e gerenciamento do Programa de Gerenciamento de Riscos (PGR), nos termos da NR-01, contemplando o inventário de riscos e o plano de ação do estabelecimento da CONTRATANTE, com atualizações quando houver alteração das informações necessárias à execução, devidamente comunicadas pela CONTRATANTE."
+    );
+  }
+  if (servicoContratado(servicos, /ltcat/i)) {
+    paragrafos.push(
+      "LTCAT. Elaboração do Laudo Técnico das Condições do Ambiente de Trabalho, nos termos da legislação previdenciária e de SST aplicável, com base nas informações e nas condições do estabelecimento informadas pela CONTRATANTE."
+    );
+  }
+  if (servicoContratado(servicos, /psicossocia/i)) {
+    paragrafos.push(
+      "Avaliação de riscos psicossociais. O escopo e a metodologia constam do Anexo I."
+    );
+  }
+  if (servicoContratado(servicos, /esocial/i)) {
+    paragrafos.push(
+      "eSocial. Gestão e envio dos eventos de Saúde e Segurança do Trabalho no eSocial (S-2210, S-2220 e S-2240), nos termos da legislação aplicável e do escopo do Anexo I."
+    );
+  }
+  paragrafos.push(...redigirExamesGestaoMensalidadeV2(ctx));
+  return paragrafos;
+}
+
+function redigirObjetoV2(numeroOrcamento: string): string {
+  return `Prestação de serviços técnicos de Saúde e Segurança do Trabalho (SST), compreendendo exclusivamente os serviços contratados e discriminados no Anexo I deste instrumento e na Proposta Comercial nº ${numeroOrcamento}, que passam a integrar o presente contrato para todos os fins.`;
+}
+
+function clausulaAnexoI(ctx: ContratoNavarroContexto): ContratoClausula {
+  const servicos = servicosEfetivamenteContratados(ctx.servicos);
+  const numero = ctx.numeroOrcamento.trim() || "não informada";
+  const paragrafos = [
+    `Este anexo descreve os serviços efetivamente contratados e integra a Proposta Comercial nº ${numero}.`,
+  ];
+  if (servicos.length === 0) {
+    paragrafos.push(
+      "Nenhum serviço específico foi identificado além da Proposta Comercial indicada. O escopo limita-se ao que constar dessa proposta."
+    );
+  } else {
+    paragrafos.push(
+      "Serviços contratados:",
+      ...servicos.map((servico, indice) => `${indice + 1}. ${servico}`)
+    );
+  }
+  if (servicoContratado(servicos, /psicossocia/i)) {
+    paragrafos.push(
+      "Avaliação de riscos psicossociais. Escopo: avaliação dos fatores de riscos psicossociais relacionados ao trabalho e elaboração de relatório com resultados e recomendações.",
+      "Metodologia: aplicação do questionário COPSOQ II, análise das respostas e apresentação consolidada dos resultados, preservando a confidencialidade dos participantes."
+    );
+  }
+  return {
+    numero: "I",
+    titulo: "DOS SERVIÇOS CONTRATADOS",
+    rotulo: "ANEXO I — DOS SERVIÇOS CONTRATADOS",
+    paragrafos,
+  };
+}
+
+function faturamentoExamesV2(omitirDistincaoDeDatas: boolean): string[] {
+  return FATURAMENTO_EXAMES_MENSALIDADE.filter(
+    (paragrafo) =>
+      !(
+        omitirDistincaoDeDatas &&
+        paragrafo.startsWith("Esse vencimento refere-se")
+      )
+  );
+}
+
+function redigirVencimentoMensalidadesV2(ctx: ContratoNavarroContexto): string[] {
+  if (vencimentoMensalidadeQuintoDiaUtil(ctx.vencimentoRegraMensalidade)) {
+    return [
+      "As mensalidades vencem no quinto dia útil do respectivo mês. A primeira vence no mês seguinte ao início da vigência, totalizando 12 mensalidades por vigência. Essa opção não corresponde ao dia 05 fixo.",
+    ];
+  }
+  const dia = diaVencimentoMensalidadeValido(ctx.diaVencimentoMensalidade);
+  if (!dia) return [];
+  return [
+    `As mensalidades vencerão no dia ${dia} de cada mês. A primeira vencerá no mês seguinte ao início do período cobrado mensalmente, totalizando 12 mensalidades por vigência.`,
+  ];
+}
+
+function redigirCompromissoERenovacaoPagamentoV2(
+  ctx: ContratoNavarroContexto
+): string[] {
+  const compromisso = semRenovacaoAutomatica(ctx)
+    ? "O pagamento mensal corresponde a um compromisso anual da vigência contratada. Não há cobrança única do saldo nem antecipação automática das mensalidades."
+    : "O pagamento mensal corresponde a um compromisso anual, inclusive nas renovações automáticas. Não há cobrança única do saldo nem antecipação automática das mensalidades.";
+  const renovacao = semRenovacaoAutomatica(ctx)
+    ? "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de antecipação."
+    : "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito de antecipação.";
+  return [compromisso, renovacao];
+}
+
+function redigirPagamentoMensalidadeV2(ctx: ContratoNavarroContexto): string[] {
+  const meses = mesesVigenciaContexto(ctx);
+  const quinto = vencimentoMensalidadeQuintoDiaUtil(
+    ctx.vencimentoRegraMensalidade
+  );
+  const multa = redigirInadimplencia(ctx.modalidade)[0];
+  return [
+    `A CONTRATANTE pagará à CONTRATADA o valor bruto mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
+    redigirValorExameClinicoAvulsoV2(ctx),
+    ...faturamentoExamesV2(quinto),
+    ...redigirVencimentoMensalidadesV2(ctx),
+    ...redigirCompromissoERenovacaoPagamentoV2(ctx),
+    multa,
+  ];
+}
+
+function aplicarModeloGestaoSstV2(
+  clausulas: ContratoClausula[],
+  ctx: ContratoNavarroContexto
+): ContratoClausula[] {
+  const avista = ctx.pagamentoMensalidade?.forma === "avista";
+  const quinto = vencimentoMensalidadeQuintoDiaUtil(
+    ctx.vencimentoRegraMensalidade
+  );
+  const ajustadas = clausulas.map((clause) => {
+    if (clause.numero === "2") {
+      return {
+        ...clause,
+        paragrafos: [redigirObjetoV2(ctx.numeroOrcamento)],
+      };
+    }
+    if (clause.numero === "3") {
+      return { ...clause, paragrafos: redigirAtendimentoV2(ctx) };
+    }
+    if (clause.numero === "4") {
+      if (avista) {
+        const multa = redigirInadimplencia(ctx.modalidade)[0];
+        return {
+          ...clause,
+          titulo: "DOS VALORES, PAGAMENTOS E VENCIMENTOS",
+          paragrafos: clause.paragrafos.map((paragrafo) =>
+            paragrafo.includes("O valor mensal de referência é de")
+              ? paragrafo.replace(
+                  "O valor mensal de referência é de",
+                  "O valor bruto mensal é de"
+                )
+              : paragrafo
+          ),
+          paragrafosApos: [
+            ...(clause.paragrafosApos ?? []).filter(
+              (paragrafo) =>
+                !(
+                  quinto && paragrafo.startsWith("Esse vencimento refere-se")
+                )
+            ),
+            redigirValorExameClinicoAvulsoV2(ctx),
+            ...redigirCompromissoERenovacaoPagamentoV2(ctx),
+            multa,
+          ],
+        };
+      }
+      return {
+        ...clause,
+        titulo: "DOS VALORES, PAGAMENTOS E VENCIMENTOS",
+        paragrafos: redigirPagamentoMensalidadeV2(ctx),
+      };
+    }
+    if (clause.numero === "5") {
+      return {
+        ...clause,
+        paragrafos: [
+          ...clause.paragrafos,
+          "Afastamentos programados serão comunicados pela CONTRATANTE assim que tiver conhecimento.",
+          "Afastamentos imprevistos serão comunicados pela CONTRATANTE até o próximo dia útil após tomar conhecimento.",
+          "A previsão de retorno será comunicada com antecedência, para que a CONTRATADA possa organizar eventual exame de retorno ao trabalho.",
+          "Cada parte informará a outra, tão logo tenha conhecimento, sobre incidente de segurança que possa afetar dados pessoais tratados no âmbito deste contrato.",
+        ],
+      };
+    }
+    if (clause.numero === "6") {
+      return {
+        ...clause,
+        paragrafos: clause.paragrafos.map((paragrafo) =>
+          paragrafo.startsWith("Cada parte informará a outra")
+            ? "A comunicação entre as partes sobre incidente de segurança que possa afetar dados pessoais tratados no âmbito deste contrato observa a obrigação prevista na cláusula das obrigações das partes."
+            : paragrafo
+        ),
+      };
+    }
+    if (clause.numero === "7") {
+      return {
+        ...clause,
+        paragrafos: clause.paragrafos
+          .filter(
+            (paragrafo) =>
+              !paragrafo.startsWith(
+                "O pagamento antecipado e o desconto são válidos somente"
+              ) &&
+              !paragrafo.startsWith(
+                "O pagamento mensal é a forma de pagamento de um compromisso anual"
+              ) &&
+              !paragrafo.startsWith("O atraso no pagamento sujeitará")
+          )
+          .map((paragrafo) =>
+            paragrafo.includes("possibilidade de saneamento")
+              ? "Qualquer das partes poderá rescindir imediatamente o presente instrumento em caso de descumprimento contratual da outra parte, mediante comunicação escrita."
+              : paragrafo
+          ),
+      };
+    }
+    return clause;
+  });
+  return [...ajustadas, clausulaAnexoI(ctx)];
+}
+
+export function buildClausulasContrato(
+  ctx: ContratoNavarroContexto
+): ContratoClausula[] {
+  const clausulas = montarClausulasContrato(ctx);
+  if (
+    ctx.modeloVersao === 2 &&
+    ctx.modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE
+  ) {
+    return aplicarModeloGestaoSstV2(clausulas, ctx);
+  }
+  return clausulas;
 }
 
 export function textoPlanoContrato(

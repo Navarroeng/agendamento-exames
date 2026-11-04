@@ -21,12 +21,14 @@ import {
 import {
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
   DIAS_VENCIMENTO_MENSALIDADE,
+  MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL,
   RENOVACAO_CONTRATO_MIGRATION_MSG,
   RENOVACAO_CONTRATO_NOVA_VERSAO_MSG,
   RENOVACAO_CONTRATO_OPCOES,
   RENOVACAO_CONTRATO_PENDENTE_MSG,
   diaVencimentoMensalidadeValido,
   renovacaoContratoSalva,
+  vencimentoMensalidadeQuintoDiaUtil,
   type DiaVencimentoMensalidade,
   type RenovacaoContratoGestao,
 } from "@/lib/contrato-navarro";
@@ -114,6 +116,13 @@ export function OrcamentoContratoGerarPanel({
   const [revisaoVigente, setRevisaoVigente] = useState<number | null>(null);
   const [diaVencimento, setDiaVencimento] = useState<DiaVencimentoMensalidade | null>(
     () => diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
+  );
+  const [regraVencimento, setRegraVencimento] = useState<
+    typeof MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL | null
+  >(() =>
+    vencimentoMensalidadeQuintoDiaUtil(aprovacao.mensalidade_vencimento_regra)
+      ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      : null
   );
   const [renovacaoLocal, setRenovacaoLocal] =
     useState<RenovacaoContratoGestao | null>(null);
@@ -206,11 +215,22 @@ export function OrcamentoContratoGerarPanel({
   );
   const pagamentoAvistaPlano =
     isMensalidadeDoc && aprovacaoContrato.mensalidade_pagamento === "avista";
-  const diaEfetivo =
-    diaVencimentoMensalidadeValido(diaVencimento) ??
-    diaVencimentoMensalidadeValido(aprovacaoContrato.mensalidade_dia_vencimento);
+  const diaEfetivo = regraVencimento
+    ? null
+    : diaVencimentoMensalidadeValido(diaVencimento) ??
+      diaVencimentoMensalidadeValido(aprovacaoContrato.mensalidade_dia_vencimento);
+  const regraEfetiva = regraVencimento
+    ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+    : vencimentoMensalidadeQuintoDiaUtil(
+          aprovacaoContrato.mensalidade_vencimento_regra
+        ) && diaEfetivo == null
+      ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      : null;
   const diaPendente =
-    isMensalidadeDoc && !pagamentoAvistaPlano && diaEfetivo == null;
+    isMensalidadeDoc &&
+    !pagamentoAvistaPlano &&
+    diaEfetivo == null &&
+    regraEfetiva == null;
   const renovacaoSalva = renovacaoContratoSalva(
     aprovacaoContrato.mensalidade_renovacao_automatica
   );
@@ -329,6 +349,11 @@ export function OrcamentoContratoGerarPanel({
     setDiaVencimento(
       diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
     );
+    setRegraVencimento(
+      vencimentoMensalidadeQuintoDiaUtil(aprovacao.mensalidade_vencimento_regra)
+        ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        : null
+    );
     setRenovacaoLocal(null);
     setParametrosLocais(null);
     padraoRenovacaoRef.current = null;
@@ -360,6 +385,7 @@ export function OrcamentoContratoGerarPanel({
           dataContrato,
           vencimentosIso: usaCronograma ? vencimentos : null,
           diaVencimentoMensalidade: pagamentoAvistaPlano ? null : diaEfetivo,
+          vencimentoRegraMensalidade: pagamentoAvistaPlano ? null : regraEfetiva,
         })
       );
     } catch {
@@ -369,6 +395,7 @@ export function OrcamentoContratoGerarPanel({
     aprovacaoContrato,
     dataContrato,
     diaEfetivo,
+    regraEfetiva,
     orcamentoContrato,
     pagamentoAvistaPlano,
     podeGerar,
@@ -487,6 +514,7 @@ export function OrcamentoContratoGerarPanel({
         vigenciaInicio: vigencia?.inicio,
         vigenciaFim: vigencia?.fim,
         diaVencimentoMensalidade: pagamentoAvistaPlano ? null : diaEfetivo,
+        vencimentoRegraMensalidade: pagamentoAvistaPlano ? null : regraEfetiva,
       });
       const pdf = await gerarPdfContratoNavarro(documento);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -732,14 +760,16 @@ export function OrcamentoContratoGerarPanel({
   ]);
 
   async function handleEscolherDia(dia: DiaVencimentoMensalidade) {
-    if (contratoAssinado || working || dia === diaEfetivo) return;
+    if (contratoAssinado || working || (dia === diaEfetivo && !regraEfetiva)) return;
     const anterior = diaVencimento;
+    const regraAnterior = regraVencimento;
     setDiaVencimento(dia);
+    setRegraVencimento(null);
     setWorking(true);
     try {
       const atualizada = await salvarParametrosContratoMensalidade({
         aprovacaoId: aprovacao.id,
-        diaVencimento: dia,
+        vencimento: { tipo: "dia_fixo", dia },
       });
       setParametrosLocais(atualizada);
       onAprovacaoAtualizada?.(atualizada);
@@ -748,6 +778,7 @@ export function OrcamentoContratoGerarPanel({
     } catch (err) {
       console.error(err);
       setDiaVencimento(anterior);
+      setRegraVencimento(regraAnterior);
       const detalhe = mensagemErroContratoDocumento(
         err,
         "Não foi possível salvar o dia de vencimento das mensalidades."
@@ -756,6 +787,42 @@ export function OrcamentoContratoGerarPanel({
       toast.error(
         faltaColuna
           ? `${detalhe} Execute a migration 141_mensalidade_dia_vencimento.sql.`
+          : detalhe
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function handleEscolherQuintoDiaUtil() {
+    if (contratoAssinado || working || regraEfetiva) return;
+    const anterior = diaVencimento;
+    const regraAnterior = regraVencimento;
+    setDiaVencimento(null);
+    setRegraVencimento(MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL);
+    setWorking(true);
+    try {
+      const atualizada = await salvarParametrosContratoMensalidade({
+        aprovacaoId: aprovacao.id,
+        vencimento: { tipo: "quinto_dia_util" },
+      });
+      setParametrosLocais(atualizada);
+      onAprovacaoAtualizada?.(atualizada);
+      const revisao = revisaoCondicoesAprovacao(atualizada);
+      if (revisao != null) setRevisaoVigente(revisao);
+    } catch (err) {
+      console.error(err);
+      setDiaVencimento(anterior);
+      setRegraVencimento(regraAnterior);
+      const detalhe = mensagemErroContratoDocumento(
+        err,
+        "Não foi possível salvar o 5º dia útil das mensalidades."
+      );
+      const faltaColuna =
+        /mensalidade_vencimento_regra|schema cache|42703/i.test(detalhe);
+      toast.error(
+        faltaColuna
+          ? `${detalhe} Execute a migration 152_contrato_modelo_gestao_sst.sql.`
           : detalhe
       );
     } finally {
@@ -941,15 +1008,24 @@ export function OrcamentoContratoGerarPanel({
           )}
       </div>
 
+      {isMensalidadeDoc && orcamento.proposta_modelo_versao === 1 ? (
+        <p className="mt-3 rounded-lg border border-[#f3e3c5] bg-[#fff8ee] px-3 py-2 text-[12px] text-[#92400e]">
+          Esta proposta foi emitida nas condições anteriores. O contrato segue
+          essa versão e não passa a usar a cobertura por tipo de exame. Uma
+          proposta nova, criada depois da mudança, é que usa as condições novas.
+        </p>
+      ) : null}
+
       {isMensalidadeDoc && !pagamentoAvistaPlano ? (
         <div className="mt-3 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2.5">
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
             Dia de vencimento das mensalidades
           </p>
           <p className="mt-1 text-[11px] text-[#64748b]">
-            Escolha 10 ou 20 antes de gerar o contrato. A primeira mensalidade
-            vence nesse dia, no mês seguinte ao início da vigência. Não é o
-            quinto dia útil das faturas de exames.
+            Escolha dia 10, dia 20 ou o 5º dia útil. A primeira mensalidade
+            vence no mês seguinte ao início da vigência. O 5º dia útil não é o
+            dia 05. As faturas de exames continuam vencendo no quinto dia útil
+            do mês seguinte aos atendimentos, em cobrança separada.
           </p>
           {contratoAssinado ? (
             <p className="mt-1 text-[12px] text-[#64748b]">
@@ -967,13 +1043,23 @@ export function OrcamentoContratoGerarPanel({
                 <input
                   type="radio"
                   name={`mensalidade-dia-vencimento-${aprovacao.id}`}
-                  checked={diaEfetivo === dia}
+                  checked={diaEfetivo === dia && !regraEfetiva}
                   disabled={busy || contratoAssinado}
                   onChange={() => void handleEscolherDia(dia)}
                 />
                 <span>Dia {dia}</span>
               </label>
             ))}
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`mensalidade-dia-vencimento-${aprovacao.id}`}
+                checked={regraEfetiva === MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL}
+                disabled={busy || contratoAssinado}
+                onChange={() => void handleEscolherQuintoDiaUtil()}
+              />
+              <span>5º dia útil</span>
+            </label>
           </div>
         </div>
       ) : null}

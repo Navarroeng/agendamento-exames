@@ -153,6 +153,16 @@ export interface OrcamentoAprovacaoRecord {
   mensalidade_vencimento?: string | null;
   /** Dia 10 ou 20 das mensalidades do plano. Não é o prazo do pagamento antecipado. */
   mensalidade_dia_vencimento?: number | null;
+  /**
+   * `quinto_dia_util` quando a mensalidade vence no 5º dia útil.
+   * Null com dia 10 ou 20 mantém o dia fixo. Não representa o dia 05.
+   */
+  mensalidade_vencimento_regra?: string | null;
+  /**
+   * 1 = texto e cobertura anteriores. 2 = condições novas da Gestão SST.
+   * Ausente equivale ao modelo anterior.
+   */
+  contrato_modelo_versao?: number | null;
   /** Base da fórmula de renovação gravada nesta contratação, em centavos. */
   mensalidade_renovacao_base_centavos?: number | null;
   /** Acréscimo por colaborador a partir do segundo, em centavos. */

@@ -279,6 +279,7 @@ type AprovacaoMensalidadeQueryRow = {
   mensalidade_pagamento: string | null;
   mensalidade_valor_mensal: number | string | null;
   mensalidade_dia_vencimento: number | null;
+  mensalidade_vencimento_regra?: string | null;
   valor_final: number | string | null;
   revertida_em?: string | null;
   orcamentos: {
@@ -320,6 +321,7 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
         mensalidade_pagamento,
         mensalidade_valor_mensal,
         mensalidade_dia_vencimento,
+        mensalidade_vencimento_regra,
         valor_final,
         revertida_em,
         orcamentos!inner (
@@ -346,8 +348,25 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
       .select(selectMensalidadesUsado)
       .order("id", { ascending: true })
       .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (
+      error &&
+      /mensalidade_vencimento_regra|schema cache|42703/i.test(error.message ?? "")
+    ) {
+      selectMensalidadesUsado = selectMensalidadesUsado.replace(
+        /\n\s*mensalidade_vencimento_regra,/,
+        ""
+      );
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectMensalidadesUsado)
+        .order("id", { ascending: true })
+        .range(from, from + SELECT_PAGE_SIZE - 1));
+    }
     if (error && colunaReversaoAindaNaoExiste(error)) {
-      selectMensalidadesUsado = selectMensalidadesLegado;
+      selectMensalidadesUsado = selectMensalidadesLegado.replace(
+        /\n\s*mensalidade_vencimento_regra,/,
+        ""
+      );
       ({ data, error } = await supabase
         .from("orcamento_aprovacoes")
         .select(selectMensalidadesUsado)
@@ -436,6 +455,7 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
       modalidade: orc.modalidade,
       mensalidadePagamento: raw.mensalidade_pagamento,
       diaVencimento: numeroOuNulo(raw.mensalidade_dia_vencimento),
+      vencimentoRegra: raw.mensalidade_vencimento_regra ?? null,
       valorMensal: numeroOuNulo(raw.mensalidade_valor_mensal),
       valorFinal: numeroOuNulo(raw.valor_final),
       vigencias,

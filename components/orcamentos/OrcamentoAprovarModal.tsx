@@ -506,6 +506,7 @@ export function OrcamentoAprovarModal({
       vigenciaInicio: vigenciaFinanceira?.inicio,
       vigenciaFim: vigenciaFinanceira?.fim,
       dia: aprovacao?.mensalidade_dia_vencimento,
+      vencimentoRegra: aprovacao?.mensalidade_vencimento_regra,
       valorMensal: valorMensalContratado({
         mensalidadeValorMensal: aprovacao?.mensalidade_valor_mensal,
         valorFinal: aprovacao?.valor_final,
@@ -524,6 +525,7 @@ export function OrcamentoAprovarModal({
     };
   }, [
     aprovacao?.mensalidade_dia_vencimento,
+    aprovacao?.mensalidade_vencimento_regra,
     aprovacao?.mensalidade_valor_mensal,
     aprovacao?.valor_final,
     pagamentosEditados,

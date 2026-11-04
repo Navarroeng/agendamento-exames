@@ -103,6 +103,11 @@ export interface OrcamentoRecord {
   origem_cliente: OrcamentoOrigemCliente | null;
   /** pontual (padrão legado) ou mensalidade. Ausente = pontual. */
   modalidade?: OrcamentoModalidade | null;
+  /**
+   * 1 = proposta nas condições anteriores. 2 = cobertura por tipo.
+   * Ausente equivale à proposta anterior.
+   */
+  proposta_modelo_versao?: number | null;
   observacoes: string | null;
   motivo_cancelamento: string | null;
   observacao_cancelamento: string | null;

@@ -37,6 +37,8 @@ export type FonteMensalidadePrevista = {
   modalidade?: string | null;
   mensalidadePagamento?: string | null;
   diaVencimento?: number | null;
+  /** `quinto_dia_util` calcula o vencimento. Não é o dia 05. */
+  vencimentoRegra?: string | null;
   /** Valor da mensalidade gravado. Não é o total da vigência. */
   valorMensal?: number | null;
   /**
@@ -208,6 +210,9 @@ function mesclarFontes(
     if (atual.diaVencimento == null && fonte.diaVencimento != null) {
       atual.diaVencimento = fonte.diaVencimento;
     }
+    if (!atual.vencimentoRegra && fonte.vencimentoRegra) {
+      atual.vencimentoRegra = fonte.vencimentoRegra;
+    }
     if (atual.valorMensal == null && fonte.valorMensal != null) {
       atual.valorMensal = fonte.valorMensal;
     }
@@ -373,6 +378,7 @@ export function montarMensalidadesPrevistas(
         vigenciaInicio: vigencia.inicio,
         vigenciaFim: vigencia.fim,
         dia: fonte.diaVencimento,
+        vencimentoRegra: fonte.vencimentoRegra,
         valorMensal,
         registradas,
         hojeIso: hoje,

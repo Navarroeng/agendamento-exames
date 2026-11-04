@@ -31,6 +31,7 @@ import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
+  MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL,
   GESTAO_SST_RENOVACAO_BASE_REAIS,
   GESTAO_SST_RENOVACAO_INCREMENTO_REAIS,
   centavosSalvosParaReais,
@@ -113,16 +114,25 @@ function centavosPositivos(value: number | null | undefined): number | null {
   return Math.round(numero);
 }
 
+export type EscolhaVencimentoMensalidade =
+  | { tipo: "dia_fixo"; dia: DiaVencimentoMensalidade }
+  | { tipo: "quinto_dia_util" };
+
 /**
- * Grava o dia 10 ou 20 e, na primeira vez, congela fórmula e preço de exame
- * desta contratação. Não altera parâmetros já gravados.
+ * Grava dia 10, dia 20 ou o 5º dia útil e, na primeira vez, congela fórmula
+ * e preço de exame desta contratação. Não altera preços já gravados.
+ * O 5º dia útil não é armazenado como dia 05.
  */
 export async function salvarParametrosContratoMensalidade(params: {
   aprovacaoId: string;
-  diaVencimento: DiaVencimentoMensalidade;
+  vencimento: EscolhaVencimentoMensalidade;
 }): Promise<OrcamentoAprovacaoRecord> {
-  const dia = diaVencimentoMensalidadeValido(params.diaVencimento);
-  if (!dia) throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
+  const quinto = params.vencimento.tipo === "quinto_dia_util";
+  const dia =
+    params.vencimento.tipo === "dia_fixo"
+      ? diaVencimentoMensalidadeValido(params.vencimento.dia)
+      : null;
+  if (!quinto && !dia) throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
 
   const supabase = createClient();
   const { data: beforeRaw, error: beforeError } = await supabase
@@ -145,9 +155,16 @@ export async function salvarParametrosContratoMensalidade(params: {
     before.mensalidade_exame_demissional_centavos
   );
   const diaSalvo = diaVencimentoMensalidadeValido(before.mensalidade_dia_vencimento);
+  const regraSalva =
+    before.mensalidade_vencimento_regra === MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      : null;
+  const mesmaEscolha = quinto
+    ? regraSalva === MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL && diaSalvo == null
+    : regraSalva == null && diaSalvo === dia;
 
   if (
-    diaSalvo === dia &&
+    mesmaEscolha &&
     baseSalva != null &&
     incrementoSalvo != null &&
     exameAdmissional != null &&
@@ -156,23 +173,44 @@ export async function salvarParametrosContratoMensalidade(params: {
     return before;
   }
 
-  const { data, error } = await supabase
+  const precos = {
+    mensalidade_renovacao_base_centavos:
+      baseSalva ?? Math.round(GESTAO_SST_RENOVACAO_BASE_REAIS * 100),
+    mensalidade_renovacao_incremento_centavos:
+      incrementoSalvo ?? Math.round(GESTAO_SST_RENOVACAO_INCREMENTO_REAIS * 100),
+    mensalidade_exame_avulso_centavos:
+      exameAdmissional ?? CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos,
+    mensalidade_exame_demissional_centavos:
+      exameDemissional ?? CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos,
+    updated_at: new Date().toISOString(),
+  };
+  const updateComRegra = {
+    ...precos,
+    mensalidade_dia_vencimento: dia,
+    mensalidade_vencimento_regra: quinto
+      ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      : null,
+  };
+  let { data, error } = await supabase
     .from("orcamento_aprovacoes")
-    .update({
-      mensalidade_dia_vencimento: dia,
-      mensalidade_renovacao_base_centavos:
-        baseSalva ?? Math.round(GESTAO_SST_RENOVACAO_BASE_REAIS * 100),
-      mensalidade_renovacao_incremento_centavos:
-        incrementoSalvo ?? Math.round(GESTAO_SST_RENOVACAO_INCREMENTO_REAIS * 100),
-      mensalidade_exame_avulso_centavos:
-        exameAdmissional ?? CONTRATO_ADICIONAL_MENSALIDADE.admissionalCentavos,
-      mensalidade_exame_demissional_centavos:
-        exameDemissional ?? CONTRATO_ADICIONAL_MENSALIDADE.demissionalCentavos,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateComRegra)
     .eq("id", params.aprovacaoId)
     .select(APROVACAO_SELECT)
     .single();
+  const faltaRegra =
+    Boolean(error) &&
+    /mensalidade_vencimento_regra|schema cache|42703/i.test(error?.message ?? "");
+  if (faltaRegra && !quinto) {
+    ({ data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .update({
+        ...precos,
+        mensalidade_dia_vencimento: dia,
+      })
+      .eq("id", params.aprovacaoId)
+      .select(APROVACAO_SELECT)
+      .single());
+  }
   if (error) throw error;
   return sortAprovacao(data as OrcamentoAprovacaoRecord);
 }

@@ -8,6 +8,7 @@ import {
   redigirContratante,
   textoPlanoContrato,
   valorExameClinicoAvulsoMensalidade,
+  vencimentoMensalidadeQuintoDiaUtil,
   vigenciaContratualConfiavel,
   type ContratoClausula,
   type ContratoNavarroContexto,
@@ -31,6 +32,7 @@ import {
 import {
   centsToReais,
   montarDatasMensalidadesPlano,
+  montarDatasMensalidadesQuintoDiaUtil,
   montarParcelasPontual,
   type ContratoParcela,
 } from "@/lib/contrato-pagamento";
@@ -234,6 +236,11 @@ export function buildContratoNavarroDocumento(params: {
   vigenciaInicio?: string | null;
   vigenciaFim?: string | null;
   diaVencimentoMensalidade?: number | null;
+  /**
+   * `quinto_dia_util` força o 5º dia útil.
+   * `null` escolhe dia fixo. Ausente lê a aprovação.
+   */
+  vencimentoRegraMensalidade?: "quinto_dia_util" | null;
 }): ContratoNavarroDocumento {
   const { orcamento, aprovacao, dataContrato } = params;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataContrato)) {
@@ -268,11 +275,24 @@ export function buildContratoNavarroDocumento(params: {
   const vigencia = mensalidade
     ? vigenciaContratualConfiavel(params.vigenciaInicio, params.vigenciaFim)
     : null;
-  const diaPlano = mensalidade
-    ? diaVencimentoMensalidadeValido(params.diaVencimentoMensalidade) ??
-      diaVencimentoMensalidadeValido(aprovacao?.mensalidade_dia_vencimento)
-    : null;
-  if (tipoDocumento === "mensalidade" && !pagamentoAvista && !diaPlano) {
+  const quintoDiaUtil =
+    mensalidade &&
+    (params.vencimentoRegraMensalidade === "quinto_dia_util" ||
+      (params.vencimentoRegraMensalidade === undefined &&
+        vencimentoMensalidadeQuintoDiaUtil(
+          aprovacao?.mensalidade_vencimento_regra
+        )));
+  const diaPlano =
+    mensalidade && !quintoDiaUtil
+      ? diaVencimentoMensalidadeValido(params.diaVencimentoMensalidade) ??
+        diaVencimentoMensalidadeValido(aprovacao?.mensalidade_dia_vencimento)
+      : null;
+  if (
+    tipoDocumento === "mensalidade" &&
+    !pagamentoAvista &&
+    !diaPlano &&
+    !quintoDiaUtil
+  ) {
     throw new Error(DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG);
   }
 
@@ -285,12 +305,18 @@ export function buildContratoNavarroDocumento(params: {
           valor: centsToReais(valorAvistaCentavos),
         },
       ]
-    : tipoDocumento === "mensalidade" && diaPlano && vigencia
-      ? montarDatasMensalidadesPlano({
-          inicioVigenciaIso: vigencia.inicio,
-          dia: diaPlano,
-          quantidade: mesesMensalidade,
-        }).map((dataIso, indice) => {
+    : tipoDocumento === "mensalidade" && vigencia && (quintoDiaUtil || diaPlano)
+      ? (quintoDiaUtil
+          ? montarDatasMensalidadesQuintoDiaUtil({
+              inicioVigenciaIso: vigencia.inicio,
+              quantidade: mesesMensalidade,
+            })
+          : montarDatasMensalidadesPlano({
+              inicioVigenciaIso: vigencia.inicio,
+              dia: diaPlano as 10 | 20,
+              quantidade: mesesMensalidade,
+            })
+        ).map((dataIso, indice) => {
           const valorCentavos = Math.round(valor * 100);
           return {
             indice: indice + 1,
@@ -554,7 +580,10 @@ export function buildContratoNavarroDocumento(params: {
         : null,
     vigenciaInicioIso: vigencia?.inicio ?? null,
     vigenciaFimIso: vigencia?.fim ?? null,
-    diaVencimentoMensalidade: pagamentoAvista ? null : diaPlano,
+    diaVencimentoMensalidade: pagamentoAvista || quintoDiaUtil ? null : diaPlano,
+    vencimentoRegraMensalidade:
+      !pagamentoAvista && quintoDiaUtil ? "quinto_dia_util" : null,
+    modeloVersao: aprovacao?.contrato_modelo_versao === 2 ? 2 : 1,
     renovacaoBaseReais: renovacaoBase,
     renovacaoIncrementoReais: renovacaoIncremento,
     renovacaoAutomatica:

@@ -53,6 +53,20 @@ export const MENSALIDADE_BENEFICIOS_OBSERVACOES: readonly string[] = [
   "Exames clínicos avulsos e complementares serão cobrados à parte.",
 ] as const;
 
+/** Observações da proposta nova. Proposta antiga continua no texto anterior. */
+export const MENSALIDADE_BENEFICIOS_OBSERVACOES_V2: readonly string[] = [
+  "Um exame clínico de cada tipo por colaborador abrangido no início da vigência, quando indicado, com ASO.",
+  "Repetição do mesmo tipo, exames de admitidos durante a vigência e exames complementares são cobrados à parte.",
+] as const;
+
+export function observacoesCoberturaProposta(
+  modeloVersao: number | null | undefined
+): readonly string[] {
+  return modeloVersao === 2
+    ? MENSALIDADE_BENEFICIOS_OBSERVACOES_V2
+    : MENSALIDADE_BENEFICIOS_OBSERVACOES;
+}
+
 export const ORCAMENTO_MENSALIDADE_MESES = 12;
 export const ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL = "12 meses";
 export const ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL =

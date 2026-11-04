@@ -1,4 +1,5 @@
 import { addMonthsToIsoDate } from "@/lib/cliente-contrato-dates";
+import { quintoDiaUtilIsoDoMes } from "@/lib/fatura-vencimento";
 import { formatCurrency } from "@/lib/money";
 
 /**
@@ -98,6 +99,42 @@ export function montarDatasMensalidadesPlano(params: {
   return Array.from({ length: n }, (_, i) =>
     i === 0 ? primeira : addCalendarMonths(primeira, i)
   );
+}
+
+/**
+ * Vencimentos no 5º dia útil de cada mês.
+ * A primeira mensalidade cai no mês seguinte ao início da vigência.
+ * Usa o mesmo cálculo das faturas de exames (`lib/dia-util`):
+ * calendário bancário da Resolução CMN nº 4.880/2020. Não é o dia 05 fixo.
+ */
+export function montarDatasMensalidadesQuintoDiaUtil(params: {
+  inicioVigenciaIso: string;
+  quantidade: number;
+}): string[] {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(params.inicioVigenciaIso.trim());
+  if (!match) {
+    throw new Error("Data de início da vigência inválida.");
+  }
+  const n = Math.floor(Number(params.quantidade));
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error("Quantidade de mensalidades inválida.");
+  }
+  let year = Number(match[1]);
+  let month = Number(match[2]) + 1;
+  if (month > 12) {
+    month = 1;
+    year += 1;
+  }
+  const datas: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    datas.push(quintoDiaUtilIsoDoMes(year, month));
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return datas;
 }
 
 export function montarMensalidades(params: {

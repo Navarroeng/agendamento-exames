@@ -1,6 +1,12 @@
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
-import { montarDatasMensalidadesPlano } from "@/lib/contrato-pagamento";
-import { diaVencimentoMensalidadeValido } from "@/lib/contrato-navarro";
+import {
+  montarDatasMensalidadesPlano,
+  montarDatasMensalidadesQuintoDiaUtil,
+} from "@/lib/contrato-pagamento";
+import {
+  diaVencimentoMensalidadeValido,
+  vencimentoMensalidadeQuintoDiaUtil,
+} from "@/lib/contrato-navarro";
 import { isOrcamentoMensalidade } from "@/lib/orcamento-modalidade";
 
 export const MENSALIDADE_PARCELAS_QUANTIDADE = 12;
@@ -103,10 +109,31 @@ function isoData(value: string | null | undefined): string | null {
  * Parcelas já gravadas dessa vigência são reexibidas como foram salvas.
  * Não usa a data do PDF, não aplica a fórmula de renovação e não copia boleto antigo.
  */
+function datasMensalidadesDaVigencia(params: {
+  inicio: string;
+  dia: 10 | 20 | null;
+  quintoDiaUtil: boolean;
+}): string[] | null {
+  if (params.quintoDiaUtil) {
+    return montarDatasMensalidadesQuintoDiaUtil({
+      inicioVigenciaIso: params.inicio,
+      quantidade: MENSALIDADE_PARCELAS_QUANTIDADE,
+    });
+  }
+  if (!params.dia) return null;
+  return montarDatasMensalidadesPlano({
+    inicioVigenciaIso: params.inicio,
+    dia: params.dia,
+    quantidade: MENSALIDADE_PARCELAS_QUANTIDADE,
+  });
+}
+
 export function resolverGradeMensalidades(params: {
   vigenciaInicio?: string | null;
   vigenciaFim?: string | null;
   dia?: number | null;
+  /** `quinto_dia_util` calcula o 5º dia útil. Não usa o dia 05. */
+  vencimentoRegra?: string | null;
   valorMensal?: number | null;
   registradas?: ParcelaMensalidadeRegistrada[];
   hojeIso?: string;
@@ -114,6 +141,7 @@ export function resolverGradeMensalidades(params: {
   const inicio = isoData(params.vigenciaInicio);
   const fim = isoData(params.vigenciaFim);
   const dia = diaVencimentoMensalidadeValido(params.dia);
+  const quintoDiaUtil = vencimentoMensalidadeQuintoDiaUtil(params.vencimentoRegra);
   const valor = Number(params.valorMensal);
   const valorOk = Number.isFinite(valor) && valor > 0;
   const hoje = isoData(params.hojeIso) ?? todayIsoSaoPaulo();
@@ -124,12 +152,8 @@ export function resolverGradeMensalidades(params: {
   if (daVigencia.length > 0 && inicio) {
     const porNumero = new Map(daVigencia.map((item) => [item.numero, item]));
     const datas =
-      dia && valorOk && porNumero.size < MENSALIDADE_PARCELAS_QUANTIDADE
-        ? montarDatasMensalidadesPlano({
-            inicioVigenciaIso: inicio,
-            dia,
-            quantidade: MENSALIDADE_PARCELAS_QUANTIDADE,
-          })
+      valorOk && porNumero.size < MENSALIDADE_PARCELAS_QUANTIDADE
+        ? datasMensalidadesDaVigencia({ inicio, dia, quintoDiaUtil })
         : null;
     const salvos: number[] = [];
     porNumero.forEach((_, numero) => salvos.push(numero));
@@ -168,17 +192,20 @@ export function resolverGradeMensalidades(params: {
 
   const pendencias: string[] = [];
   if (!inicio) pendencias.push("início da vigência");
-  if (!dia) pendencias.push("dia de vencimento 10 ou 20");
+  if (!quintoDiaUtil && !dia) pendencias.push("dia de vencimento 10 ou 20");
   if (!valorOk) pendencias.push("valor mensal contratado");
-  if (pendencias.length > 0 || !inicio || !dia || !valorOk) {
+  if (pendencias.length > 0 || !inicio || !valorOk || (!quintoDiaUtil && !dia)) {
     return { ok: false, pendencias };
   }
 
-  const datas = montarDatasMensalidadesPlano({
-    inicioVigenciaIso: inicio,
+  const datas = datasMensalidadesDaVigencia({
+    inicio,
     dia,
-    quantidade: MENSALIDADE_PARCELAS_QUANTIDADE,
+    quintoDiaUtil,
   });
+  if (!datas) {
+    return { ok: false, pendencias: ["dia de vencimento 10 ou 20"] };
+  }
   return {
     ok: true,
     vigenciaInicio: inicio,
