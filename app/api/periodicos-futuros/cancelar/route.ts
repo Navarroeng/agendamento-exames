@@ -61,7 +61,9 @@ export async function POST(request: Request) {
       ? 401
       : /somente administradores/i.test(message)
         ? 403
-        : /motivo|já está cancelado|não encontrado|nenhum periódico/i.test(message)
+        : /motivo|já está cancelado|não encontrado|nenhum periódico|não foi aplicada/i.test(
+            message
+          )
           ? 400
           : 500;
     return NextResponse.json({ error: message }, { status });

@@ -1,10 +1,14 @@
-import { lerPorIdentificadores } from "@/lib/consulta-lotes";
+import {
+  exigirGravacaoUnica,
+  lerPorIdentificadores,
+  lerTodosOsLotes,
+} from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   AUDITORIA_ACOES,
   AUDITORIA_MODULOS,
 } from "@/lib/auditoria";
-import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import { filtroOrCpfExato, isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { TIPO_DESLIGAMENTO_ADMIN, coletarCpfsDesligamentoAdminAtivo } from "@/lib/colaborador-movimentacoes";
 import {
   cpfVagaIguais,
@@ -27,6 +31,7 @@ import {
   type ContratoVagaStatus,
 } from "@/lib/contrato-vagas";
 import { registrarAuditoria } from "@/services/auditoria.service";
+import { buscarClientePorCnpjDigits } from "@/services/cliente.service";
 import {
   registrarCreditosAsoEmAberto,
   removerCreditoAsoEmAberto,
@@ -429,19 +434,24 @@ async function sincronizarCopiaNomeProgramacao(params: {
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select("id, contrato_id, colaborador, colaborador_cpf, status")
-    .eq("contrato_id", contratoId)
-    .in("status", ["ativo", "reagendado"]);
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("periodicos_futuros")
+      .select("id, contrato_id, colaborador, colaborador_cpf, status")
+      .eq("contrato_id", contratoId)
+      .in("status", ["ativo", "reagendado"])
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const ids = selecionarIdsCopiaNomeProgramacao({
     contratoId,
     periodicoFuturoId: params.periodicoFuturoId,
     cpf: params.cpf,
     nomeAnterior: params.nomeAnterior,
-    registros: (data ?? []).map((row) => ({
+    registros: data.map((row) => ({
       id: String(row.id),
       contratoId: row.contrato_id ? String(row.contrato_id) : null,
       colaborador: row.colaborador ? String(row.colaborador) : null,
@@ -451,12 +461,13 @@ async function sincronizarCopiaNomeProgramacao(params: {
       status: row.status ? String(row.status) : null,
     })),
   });
-  if (ids.length === 0) return;
+  const lista = exigirGravacaoUnica(ids);
+  if (lista.length === 0) return;
 
   const { error: updErr } = await supabase
     .from("periodicos_futuros")
     .update({ colaborador: nomeNovo })
-    .in("id", ids);
+    .in("id", lista);
   if (updErr) throw updErr;
 }
 
@@ -562,34 +573,48 @@ export async function buscarVagaComprometidaPorCpf(params: {
   if (!isValidCPF(cpf)) return null;
   if (!params.clienteId && !params.clienteCnpj) return null;
 
-  const supabase = createClient();
-  let contratosQuery = supabase
-    .from("cliente_contratos")
-    .select("id, numero, cliente_id, status")
-    .in("status", ["ativo", "em_renovacao"]);
-
-  if (params.clienteId) {
-    contratosQuery = contratosQuery.eq("cliente_id", params.clienteId);
+  let clienteId = (params.clienteId ?? "").trim();
+  if (!clienteId) {
+    const cliente = await buscarClientePorCnpjDigits(params.clienteCnpj ?? "");
+    clienteId = cliente?.id ?? "";
   }
+  if (!clienteId) return null;
 
-  const { data: contratos, error: cErr } = await contratosQuery;
-  if (cErr) throw cErr;
-  const ids = (contratos ?? []).map((c) => String(c.id));
+  const supabase = createClient();
+  const contratos = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("cliente_contratos")
+      .select("id, numero, cliente_id, status")
+      .eq("cliente_id", clienteId)
+      .in("status", ["ativo", "em_renovacao"])
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const ids = contratos.map((c) => String(c.id));
   if (ids.length === 0) return null;
 
-  const { data, error } = await supabase
-    .from("contrato_vagas")
-    .select(SELECT_VAGA)
-    .in("contrato_id", ids)
-    .eq("status", "comprometida")
-    .order("indice", { ascending: true });
-  if (error) throw error;
-  const matched = (data ?? [])
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("contrato_vagas")
+      .select(SELECT_VAGA)
+      .in("contrato_id", grupo)
+      .eq("status", "comprometida")
+      .or(filtroOrCpfExato("colaborador_cpf", cpf))
+      .order("indice", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const matched = data
     .map((row) => mapVaga(row as Record<string, unknown>))
-    .filter((vaga) => cpfVagaIguais(vaga.colaborador_cpf, cpf));
+    .filter((vaga) => cpfVagaIguais(vaga.colaborador_cpf, cpf))
+    .sort((a, b) => a.indice - b.indice || a.id.localeCompare(b.id));
   if (matched.length === 0) return null;
   const mapped = matched[0];
-  const ctr = (contratos ?? []).find((c) => String(c.id) === mapped.contrato_id);
+  const ctr = contratos.find((c) => String(c.id) === mapped.contrato_id);
   return {
     ...mapped,
     contrato_numero: ctr?.numero ? String(ctr.numero) : null,
@@ -779,15 +804,21 @@ export async function reconciliarVagasComprometidasDoContrato(params: {
 
   // Reconcilia vagas associadas a periódicos futuros deste contrato
   try {
-    const { data: periodicosContrato } = await supabase
-      .from("periodicos_futuros")
-      .select(
-        "id, status, agendamento_vinculado_id, agendamento_id, colaborador, colaborador_cpf, proxima_data"
-      )
-      .eq("contrato_id", contratoId)
-      .eq("consome_previsao_contrato", true);
+    const periodicosContrato = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error } = await supabase
+        .from("periodicos_futuros")
+        .select(
+          "id, status, agendamento_vinculado_id, agendamento_id, colaborador, colaborador_cpf, proxima_data"
+        )
+        .eq("contrato_id", contratoId)
+        .eq("consome_previsao_contrato", true)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    });
 
-    for (const periodico of periodicosContrato ?? []) {
+    for (const periodico of periodicosContrato) {
       const periodicoCancelado =
         String(periodico.status ?? "").trim().toLowerCase() === "cancelado";
 
@@ -1146,35 +1177,22 @@ export async function ocuparVagaComExameFuturo(params: {
 export async function reverterVagasProgramadasPorPeriodicosCancelados(params: {
   periodicoIds: string[];
 }): Promise<number> {
-  const ids = Array.from(
-    new Set(params.periodicoIds.map((id) => id.trim()).filter(Boolean))
-  );
+  const ids = exigirGravacaoUnica(params.periodicoIds);
   if (ids.length === 0) return 0;
 
   const supabase = createClient();
   const { data, error } = await supabase
     .from("contrato_vagas")
-    .select(SELECT_VAGA)
+    .update({
+      status: "comprometida",
+      periodico_futuro_id: null,
+      agendamento_id: null,
+    })
     .in("periodico_futuro_id", ids)
-    .eq("status", "programada");
+    .eq("status", "programada")
+    .select("id");
   if (error) throw error;
-
-  let atualizados = 0;
-  for (const row of data ?? []) {
-    const mapped = mapVaga(row as Record<string, unknown>);
-    const { error: updErr } = await supabase
-      .from("contrato_vagas")
-      .update({
-        status: "comprometida",
-        periodico_futuro_id: null,
-        agendamento_id: null,
-      })
-      .eq("id", mapped.id)
-      .eq("status", "programada");
-    if (updErr) throw updErr;
-    atualizados += 1;
-  }
-  return atualizados;
+  return (data ?? []).length;
 }
 
 export async function marcarVagaUtilizadaPorCredito(params: {

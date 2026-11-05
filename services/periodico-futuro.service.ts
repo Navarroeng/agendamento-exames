@@ -3,7 +3,11 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
-import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
+import {
+  exigirGravacaoUnica,
+  lerPorIdentificadores,
+  lerTodosOsLotes,
+} from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -32,7 +36,12 @@ import {
   validarCpfRegularizacaoPeriodico,
   type PeriodicoCpfConflito,
 } from "@/lib/periodico-cpf-regularizacao";
-import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  filtroOrCpfExato,
+  isValidCPF,
+  maskCPFInput,
+  normalizeCpfDigits,
+} from "@/lib/cpf";
 import { verificarContratoVigentePorNome } from "@/lib/cliente-contrato-vigencia";
 import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 import {
@@ -578,12 +587,17 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     origem: PeriodicoCpfConflito["origem"];
   }> = [];
 
-  const { data: periodicosCpf, error: perErr } = await supabase
-    .from("periodicos_futuros")
-    .select("id, colaborador, cliente_nome, colaborador_cpf")
-    .or(`colaborador_cpf.eq.${digits},colaborador_cpf.eq."${masked}"`);
-  if (perErr) throw perErr;
-  for (const row of periodicosCpf ?? []) {
+  const periodicosCpf = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error: perErr } = await supabase
+      .from("periodicos_futuros")
+      .select("id, colaborador, cliente_nome, colaborador_cpf")
+      .or(filtroOrCpfExato("colaborador_cpf", digits))
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (perErr) throw perErr;
+    return page ?? [];
+  });
+  for (const row of periodicosCpf) {
     if (normalizeCpfDigits(row.colaborador_cpf as string | null) !== digits) {
       continue;
     }
@@ -594,12 +608,17 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     });
   }
 
-  const { data: agsCpf, error: agErr } = await supabase
-    .from("agendamentos")
-    .select("id, colaborador, cliente_nome, colaborador_cpf")
-    .eq("colaborador_cpf_digits", digits);
-  if (agErr) throw agErr;
-  for (const row of agsCpf ?? []) {
+  const agsCpf = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error: agErr } = await supabase
+      .from("agendamentos")
+      .select("id, colaborador, cliente_nome, colaborador_cpf")
+      .eq("colaborador_cpf_digits", digits)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (agErr) throw agErr;
+    return page ?? [];
+  });
+  for (const row of agsCpf) {
     ocorrencias.push({
       colaborador: String(row.colaborador ?? ""),
       cliente_nome: String(row.cliente_nome ?? ""),
@@ -607,22 +626,26 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     });
   }
 
-  const { data: vagasCpf, error: vagasCpfErr } = await supabase
-    .from("contrato_vagas")
-    .select("colaborador, colaborador_cpf")
-    .or(`colaborador_cpf.eq.${digits},colaborador_cpf.eq."${masked}"`);
-  if (!vagasCpfErr) {
-    for (const row of vagasCpf ?? []) {
-      if (normalizeCpfDigits(row.colaborador_cpf as string | null) !== digits) {
-        continue;
-      }
-      if (!String(row.colaborador ?? "").trim()) continue;
-      ocorrencias.push({
-        colaborador: String(row.colaborador ?? ""),
-        cliente_nome: "Lista de funcionários do contrato",
-        origem: "vaga",
-      });
+  const vagasCpf = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error: vagasCpfErr } = await supabase
+      .from("contrato_vagas")
+      .select("colaborador, colaborador_cpf")
+      .or(filtroOrCpfExato("colaborador_cpf", digits))
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (vagasCpfErr) throw vagasCpfErr;
+    return page ?? [];
+  });
+  for (const row of vagasCpf) {
+    if (normalizeCpfDigits(row.colaborador_cpf as string | null) !== digits) {
+      continue;
     }
+    if (!String(row.colaborador ?? "").trim()) continue;
+    ocorrencias.push({
+      colaborador: String(row.colaborador ?? ""),
+      cliente_nome: "Lista de funcionários do contrato",
+      origem: "vaga",
+    });
   }
 
   const conflito = resolverConflitoCpfRegularizacao({
@@ -714,10 +737,11 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     if (row.contrato_id) contratoIds.add(row.contrato_id);
   }
 
+  const idsCpf = exigirGravacaoUnica(Array.from(idsParaAtualizar));
   const { error: updPerErr } = await supabase
     .from("periodicos_futuros")
     .update({ colaborador_cpf: digits })
-    .in("id", Array.from(idsParaAtualizar));
+    .in("id", idsCpf);
   if (updPerErr) throw updPerErr;
 
   if (agendamentoIds.size > 0) {
@@ -738,13 +762,13 @@ export async function regularizarCpfPeriodicosFuturos(params: {
       (row) => !isValidCPF(row.colaborador_cpf as string | null)
     );
     if (agsSemCpf.length > 0) {
+      const idsAgendamento = exigirGravacaoUnica(
+        agsSemCpf.map((row) => String(row.id))
+      );
       const { error: updAgErr } = await supabase
         .from("agendamentos")
         .update({ colaborador_cpf: masked })
-        .in(
-          "id",
-          agsSemCpf.map((row) => String(row.id))
-        );
+        .in("id", idsAgendamento);
       if (updAgErr) throw updAgErr;
     }
   }
@@ -753,11 +777,17 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     params.contratoId?.trim() ||
     (contratoIds.size === 1 ? Array.from(contratoIds)[0] : "");
   if (contratoAlvo) {
-    const { data: vagas, error: vagasErr } = await supabase
-      .from("contrato_vagas")
-      .select("id, colaborador, colaborador_cpf")
-      .eq("contrato_id", contratoAlvo);
-    if (!vagasErr) {
+    const vagas = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error: vagasErr } = await supabase
+        .from("contrato_vagas")
+        .select("id, colaborador, colaborador_cpf")
+        .eq("contrato_id", contratoAlvo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (vagasErr) throw vagasErr;
+      return page ?? [];
+    });
+    {
       const candidatas = (vagas ?? []).filter((vaga) => {
         if (isValidCPF(vaga.colaborador_cpf as string | null)) return false;
         return nomesColaboradorEquivalentes(
@@ -769,11 +799,12 @@ export async function regularizarCpfPeriodicosFuturos(params: {
         (vaga) => normalizeCpfDigits(vaga.colaborador_cpf as string | null) === digits
       );
       if (candidatas.length === 1 && !cpfJaNaLista) {
-        await supabase
+        const { error: vagaUpdErr } = await supabase
           .from("contrato_vagas")
           .update({ colaborador_cpf: digits })
           .eq("id", candidatas[0].id)
           .is("colaborador_cpf", null);
+        if (vagaUpdErr) throw vagaUpdErr;
       }
     }
   }

@@ -6,6 +6,13 @@ export function normalizeCpfDigits(value: string | null | undefined): string {
   return onlyDigits(value ?? "");
 }
 
+/** Filtro PostgREST para o CPF gravado só com dígitos ou na máscara da tela. */
+export function filtroOrCpfExato(coluna: string, digits: string): string {
+  const normalizado = normalizeCpfDigits(digits);
+  const mascarado = maskCPFInput(normalizado);
+  return `${coluna}.eq.${normalizado},${coluna}.eq."${mascarado}"`;
+}
+
 export function maskCPFInput(value: string): string {
   const digits = normalizeCpfDigits(value).slice(0, 11);
   if (digits.length <= 3) return digits;

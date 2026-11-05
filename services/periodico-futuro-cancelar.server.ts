@@ -3,6 +3,15 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import {
+  exigirGravacaoUnica,
+  GRAVACAO_NAO_APLICADA,
+  identificadoresCabemNaGravacao,
+  identificadoresUnicos,
+  lerPorIdentificadores,
+  lerTodosOsLotes,
+  LOTE_IDENTIFICADORES,
+} from "@/lib/consulta-lotes";
 import { chaveCicloPeriodico } from "@/lib/periodico-agrupamento";
 import {
   PERIODICO_CANCELAR_JA_CANCELADO_MSG,
@@ -24,6 +33,93 @@ export type CancelarPeriodicoFuturoResult = {
   canceladoPorId: string | null;
 };
 
+function funcaoDeGravacaoAusente(error: { message?: string; code?: string }): boolean {
+  const message = error.message ?? "";
+  return (
+    error.code === "PGRST202" ||
+    /schema cache/i.test(message) ||
+    /cancelar_periodicos_e_reverter_vagas|reverter_vagas_de_periodicos/i.test(message)
+  );
+}
+
+async function reverterVagasDosPeriodicos(ids: readonly string[]): Promise<void> {
+  const lista = identificadoresUnicos(ids);
+  if (lista.length === 0) return;
+  const admin = createAdminClient();
+  if (!identificadoresCabemNaGravacao(lista)) {
+    const { error } = await admin.rpc("reverter_vagas_de_periodicos", {
+      p_ids: lista,
+    });
+    if (error) {
+      if (funcaoDeGravacaoAusente(error)) throw new Error(GRAVACAO_NAO_APLICADA);
+      throw error;
+    }
+    return;
+  }
+  const { error } = await admin
+    .from("contrato_vagas")
+    .update({
+      status: "comprometida",
+      periodico_futuro_id: null,
+      agendamento_id: null,
+    })
+    .in("periodico_futuro_id", exigirGravacaoUnica(lista))
+    .eq("status", "programada");
+  if (error) throw error;
+}
+
+async function cancelarPeriodicosEReverterVagas(params: {
+  ids: string[];
+  motivo: string;
+  canceladoEm: string;
+  canceladoPor: string;
+  canceladoPorId: string | null;
+}): Promise<void> {
+  const lista = identificadoresUnicos(params.ids);
+  if (lista.length === 0) return;
+  const admin = createAdminClient();
+  if (!identificadoresCabemNaGravacao(lista)) {
+    const { error } = await admin.rpc("cancelar_periodicos_e_reverter_vagas", {
+      p_ids: lista,
+      p_motivo: params.motivo,
+      p_cancelado_em: params.canceladoEm,
+      p_cancelado_por: params.canceladoPor,
+      p_cancelado_por_id: params.canceladoPorId,
+    });
+    if (error) {
+      if (funcaoDeGravacaoAusente(error)) throw new Error(GRAVACAO_NAO_APLICADA);
+      if (error.code === "42703" || /motivo_cancelamento|cancelado_/i.test(error.message ?? "")) {
+        throw new Error(
+          "A estrutura de cancelamento do periódico ainda não está disponível. Aplique a migration 112."
+        );
+      }
+      throw error;
+    }
+    return;
+  }
+
+  const gravacao = exigirGravacaoUnica(lista);
+  const { error } = await admin
+    .from("periodicos_futuros")
+    .update({
+      status: "cancelado",
+      motivo_cancelamento: params.motivo,
+      cancelado_em: params.canceladoEm,
+      cancelado_por: params.canceladoPor,
+      cancelado_por_id: params.canceladoPorId,
+    })
+    .in("id", gravacao);
+  if (error) {
+    if (error.code === "42703" || /motivo_cancelamento|cancelado_/i.test(error.message ?? "")) {
+      throw new Error(
+        "A estrutura de cancelamento do periódico ainda não está disponível. Aplique a migration 112."
+      );
+    }
+    throw error;
+  }
+  await reverterVagasDosPeriodicos(gravacao);
+}
+
 function mapPeriodicoRow(row: Record<string, unknown>): PeriodicoFuturoRecord {
   return row as unknown as PeriodicoFuturoRecord;
 }
@@ -33,12 +129,17 @@ async function carregarPorIds(
 ): Promise<PeriodicoFuturoRecord[]> {
   if (ids.length === 0) return [];
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("periodicos_futuros")
-    .select("*")
-    .in("id", ids);
-  if (error) throw error;
-  return ((data ?? []) as Record<string, unknown>[]).map(mapPeriodicoRow);
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await admin
+      .from("periodicos_futuros")
+      .select("*")
+      .in("id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as Record<string, unknown>[];
+  });
+  return data.map(mapPeriodicoRow);
 }
 
 async function expandirCicloPeriodico(
@@ -54,16 +155,20 @@ async function expandirCicloPeriodico(
   );
 
   const admin = createAdminClient();
-  let query = admin.from("periodicos_futuros").select("*");
-  if (datas.length === 1) query = query.eq("proxima_data", datas[0]);
-  else if (datas.length > 1) query = query.in("proxima_data", datas);
-  if (clientes.length === 1) query = query.eq("cliente_nome", clientes[0]);
-  else if (clientes.length > 1) query = query.in("cliente_nome", clientes);
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = admin.from("periodicos_futuros").select("*");
+    if (datas.length === 1) query = query.eq("proxima_data", datas[0]);
+    else if (datas.length > 1) query = query.in("proxima_data", datas);
+    if (clientes.length === 1) query = query.eq("cliente_nome", clientes[0]);
+    else if (clientes.length > 1) query = query.in("cliente_nome", clientes);
+    const { data: page, error } = await query
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as Record<string, unknown>[];
+  });
 
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const encontrados = ((data ?? []) as Record<string, unknown>[]).map(mapPeriodicoRow);
+  const encontrados = data.map(mapPeriodicoRow);
   const doCiclo = encontrados.filter((row) => keys.has(chaveCicloPeriodico(row)));
   const byId = new Map(doCiclo.map((row) => [row.id, row]));
   for (const row of records) byId.set(row.id, row);
@@ -79,12 +184,18 @@ async function temAgendamentoAtivoVinculado(
   if (agendamentoIds.length === 0) return false;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("agendamentos")
-    .select("id, status")
-    .in("id", agendamentoIds);
-  if (error) throw error;
-  return (data ?? []).some((row) => String(row.status ?? "") !== "cancelado");
+  for (let indice = 0; indice < agendamentoIds.length; indice += LOTE_IDENTIFICADORES) {
+    const grupo = agendamentoIds.slice(indice, indice + LOTE_IDENTIFICADORES);
+    const { data, error } = await admin
+      .from("agendamentos")
+      .select("id")
+      .in("id", grupo)
+      .neq("status", "cancelado")
+      .limit(1);
+    if (error) throw error;
+    if ((data ?? []).length > 0) return true;
+  }
+  return false;
 }
 
 export async function cancelarPeriodicoFuturoNoServidor(params: {
@@ -109,53 +220,24 @@ export async function cancelarPeriodicoFuturoNoServidor(params: {
 
   const ciclo = await expandirCicloPeriodico(solicitados);
   const pendentes = ciclo.filter((row) => !isPeriodicoCanceladoManualmente(row));
+  const canceladoEm = new Date().toISOString();
+  const canceladoPor = params.auditContext.usuarioNome.trim() || "Administrador";
+  const canceladoPorId = params.auditContext.usuarioId ?? null;
+
   if (pendentes.length === 0) {
+    await reverterVagasDosPeriodicos(ciclo.map((row) => row.id));
     throw new Error(PERIODICO_CANCELAR_JA_CANCELADO_MSG);
   }
 
   const ids = pendentes.map((row) => row.id);
   const temAgendamentoAtivo = await temAgendamentoAtivoVinculado(ciclo);
-  const canceladoEm = new Date().toISOString();
-  const canceladoPor = params.auditContext.usuarioNome.trim() || "Administrador";
-  const canceladoPorId = params.auditContext.usuarioId ?? null;
-
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("periodicos_futuros")
-    .update({
-      status: "cancelado",
-      motivo_cancelamento: motivo,
-      cancelado_em: canceladoEm,
-      cancelado_por: canceladoPor,
-      cancelado_por_id: canceladoPorId,
-    })
-    .in("id", ids);
-
-  if (error) {
-    if (error.code === "42703" || /motivo_cancelamento|cancelado_/i.test(error.message ?? "")) {
-      throw new Error(
-        "A estrutura de cancelamento do periódico ainda não está disponível. Aplique a migration 112."
-      );
-    }
-    throw error;
-  }
-
-  // Programado p/ futuro → Comprometido (obrigação contratual sem definição).
-  const { error: vagaErr } = await admin
-    .from("contrato_vagas")
-    .update({
-      status: "comprometida",
-      periodico_futuro_id: null,
-      agendamento_id: null,
-    })
-    .in("periodico_futuro_id", ids)
-    .eq("status", "programada");
-  if (vagaErr) {
-    console.error(
-      "Erro ao reverter vagas programadas após cancelar periódico:",
-      vagaErr
-    );
-  }
+  await cancelarPeriodicosEReverterVagas({
+    ids,
+    motivo,
+    canceladoEm,
+    canceladoPor,
+    canceladoPorId,
+  });
 
   const representante = pendentes[0];
   await registrarAuditoriaServer({
