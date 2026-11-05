@@ -10,6 +10,7 @@ import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import {
   MENSALIDADE_PARCELAS_MIGRATION_MSG,
   payloadAtualizacaoPagoEm,
+  parcelasParaInserirDaGrade,
   planejarPersistenciaParcelas,
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
@@ -227,6 +228,55 @@ export async function salvarControleMensalidades(params: {
     aprovacaoId: params.aprovacaoId,
     observacao: params.observacao,
   });
+}
+
+/**
+ * Grava só as parcelas da grade que ainda não existem nesta vigência.
+ * Não altera vencimento, valor nem pagamento das que já foram salvas.
+ */
+export async function inserirParcelasMensalidadeAusentes(params: {
+  aprovacaoId: string;
+  vigenciaInicio: string;
+  vigenciaFim: string | null;
+  dia: number | null;
+  vencimentoRegra: string | null;
+  valorMensal: number | null;
+  valorFinal: number | null;
+}): Promise<number> {
+  const inicio = iso(params.vigenciaInicio);
+  const fim = iso(params.vigenciaFim);
+  if (!inicio) return 0;
+  const registradas = await listarParcelasMensalidade(params.aprovacaoId);
+  const inserir = parcelasParaInserirDaGrade({
+    vigenciaInicio: inicio,
+    vigenciaFim: fim,
+    dia: params.dia,
+    vencimentoRegra: params.vencimentoRegra,
+    valorMensal: params.valorMensal,
+    valorFinal: params.valorFinal,
+    registradas,
+  });
+  if (inserir.length === 0) return 0;
+
+  const supabase = createClient();
+  const agora = new Date().toISOString();
+  let gravadas = 0;
+  for (const item of inserir) {
+    const { error } = await supabase.from("orcamento_mensalidade_parcelas").insert({
+      aprovacao_id: params.aprovacaoId,
+      vigencia_inicio: inicio,
+      vigencia_fim: fim,
+      numero: item.numero,
+      vencimento: item.vencimentoIso,
+      valor: item.valor,
+      pago_em: null,
+      updated_at: agora,
+    });
+    if (error?.code === "23505") continue;
+    if (error) throw erroParcelas(error);
+    gravadas += 1;
+  }
+  return gravadas;
 }
 
 export async function salvarObservacaoMensalidades(params: {

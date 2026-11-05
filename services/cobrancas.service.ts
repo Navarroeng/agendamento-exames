@@ -1,9 +1,15 @@
 import {
   MENSALIDADE_BAIXA_COLUNAS_MSG,
+  completarCobrancasComGradeFinanceiro,
+  escolherVigenciaFinanceiro,
   parcelaEntraEmCobrancas,
   type CobrancaParcela,
+  type FonteGradeCobranca,
 } from "@/lib/cobrancas-mensalidades";
-import { MENSALIDADE_PARCELAS_MIGRATION_MSG } from "@/lib/mensalidade-parcelas";
+import {
+  MENSALIDADE_PARCELAS_MIGRATION_MSG,
+  type ParcelaMensalidadeRegistrada,
+} from "@/lib/mensalidade-parcelas";
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE = 1000;
@@ -14,6 +20,8 @@ const SELECT_CONTRATO = `
   numero,
   vencimento,
   valor,
+  vigencia_inicio,
+  vigencia_fim,
   pago_em,
   valor_recebido,
   comprovante_path,
@@ -53,6 +61,8 @@ type ParcelaListaRow = {
   numero: number | string;
   vencimento: string;
   valor: number | string;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
   pago_em: string | null;
   valor_recebido?: number | string | null;
   comprovante_path?: string | null;
@@ -146,7 +156,9 @@ function mapLista(row: ParcelaListaRow): CobrancaParcela | null {
 }
 
 /**
- * Lê as parcelas já gravadas. Não insere nem altera vencimento, valor ou pagamento.
+ * Lê as parcelas já gravadas e completa com a grade do Financeiro
+ * quando a parcela da vigência ainda não foi salva.
+ * Não insere nem altera vencimento, valor ou pagamento.
  */
 export async function listarCobrancasMensalidades(): Promise<CobrancaParcela[]> {
   const supabase = createClient();
@@ -176,6 +188,7 @@ export async function listarCobrancasMensalidades(): Promise<CobrancaParcela[]> 
   }
 
   const parcelas: CobrancaParcela[] = [];
+  const registradasPorAprovacao = new Map<string, ParcelaMensalidadeRegistrada[]>();
   for (let from = 0; ; from += PAGE) {
     let query = supabase
       .from("orcamento_mensalidade_parcelas")
@@ -189,9 +202,166 @@ export async function listarCobrancasMensalidades(): Promise<CobrancaParcela[]> 
     const batch = (data ?? []) as unknown as ParcelaListaRow[];
     for (const row of batch) {
       const parcela = mapLista(row);
-      if (parcela) parcelas.push(parcela);
+      if (!parcela) continue;
+      parcelas.push(parcela);
+      const lista = registradasPorAprovacao.get(row.aprovacao_id) ?? [];
+      lista.push({
+        vigenciaInicio: iso(row.vigencia_inicio) ?? "",
+        vigenciaFim: iso(row.vigencia_fim),
+        numero: parcela.numero,
+        vencimentoIso: parcela.vencimentoIso,
+        valor: parcela.valor,
+        pagoEmIso: parcela.pagoEmIso,
+        valorRecebido: parcela.valorRecebido,
+        comprovantePath: parcela.comprovantePath,
+        comprovanteNome: parcela.comprovanteNome,
+      });
+      registradasPorAprovacao.set(row.aprovacao_id, lista);
     }
     if (batch.length < PAGE) break;
   }
-  return parcelas;
+  const fontes = await listarFontesGradeCobranca(
+    supabase,
+    registradasPorAprovacao
+  );
+  return completarCobrancasComGradeFinanceiro(parcelas, fontes);
+}
+
+type ContratoGradeRow = {
+  numero?: string | null;
+  status?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  created_at?: string | null;
+};
+
+type OrcamentoGradeRow = {
+  id: string;
+  numero: string;
+  cliente_nome: string;
+  cliente_cnpj: string | null;
+  modalidade: string | null;
+  status: string;
+  cliente_contratos: ContratoGradeRow | ContratoGradeRow[] | null;
+};
+
+type AprovacaoGradeRow = {
+  id: string;
+  mensalidade_pagamento: string | null;
+  mensalidade_dia_vencimento: number | null;
+  mensalidade_vencimento_regra?: string | null;
+  mensalidade_valor_mensal: number | string | null;
+  valor_final: number | string | null;
+  revertida_em?: string | null;
+  orcamentos: OrcamentoGradeRow | OrcamentoGradeRow[] | null;
+};
+
+function numeroOuNulo(value: number | string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const numero = Number(value);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+/**
+ * Contratos mensais com vigência, no mesmo recorte da aba Financeiro.
+ * Só leitura: não grava parcela.
+ */
+async function listarFontesGradeCobranca(
+  supabase: ReturnType<typeof createClient>,
+  registradasPorAprovacao: Map<string, ParcelaMensalidadeRegistrada[]>
+): Promise<FonteGradeCobranca[]> {
+  const selectComRegra = `
+    id,
+    mensalidade_pagamento,
+    mensalidade_dia_vencimento,
+    mensalidade_vencimento_regra,
+    mensalidade_valor_mensal,
+    valor_final,
+    revertida_em,
+    orcamentos!inner (
+      id,
+      numero,
+      cliente_nome,
+      cliente_cnpj,
+      modalidade,
+      status,
+      cliente_contratos (
+        numero,
+        status,
+        data_inicio,
+        data_fim,
+        created_at
+      )
+    )
+  `;
+  const selectSemRegra = selectComRegra.replace(
+    /\n\s*mensalidade_vencimento_regra,/,
+    ""
+  );
+  let selectUsado = selectComRegra;
+  const rows: AprovacaoGradeRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let { data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(selectUsado)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (
+      error &&
+      /mensalidade_vencimento_regra|schema cache|42703/i.test(error.message ?? "")
+    ) {
+      selectUsado = selectSemRegra;
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectUsado)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1));
+    }
+    if (error && /revertida_em/i.test(error.message ?? "")) {
+      selectUsado = selectUsado.replace(/\n\s*revertida_em,/, "");
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectUsado)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1));
+    }
+    if (error) throw erroLista(error);
+    const batch = (data ?? []) as unknown as AprovacaoGradeRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+
+  const fontes: FonteGradeCobranca[] = [];
+  for (const row of rows) {
+    if (row.revertida_em) continue;
+    const orcamento = um(row.orcamentos);
+    if (!orcamento) continue;
+    const contratos =
+      orcamento.cliente_contratos == null
+        ? []
+        : Array.isArray(orcamento.cliente_contratos)
+          ? orcamento.cliente_contratos
+          : [orcamento.cliente_contratos];
+    const vigencia = escolherVigenciaFinanceiro(contratos);
+    if (!vigencia) continue;
+    fontes.push({
+      aprovacaoId: row.id,
+      orcamentoId: orcamento.id,
+      numeroOrcamento: orcamento.numero,
+      numeroContrato: vigencia.numero,
+      empresa: orcamento.cliente_nome,
+      cnpj: orcamento.cliente_cnpj,
+      statusOrcamento: orcamento.status,
+      modalidade: orcamento.modalidade,
+      mensalidadePagamento: row.mensalidade_pagamento,
+      vigenciaInicio: vigencia.inicio,
+      vigenciaFim: vigencia.fim,
+      dia: row.mensalidade_dia_vencimento,
+      vencimentoRegra: row.mensalidade_vencimento_regra ?? null,
+      valorMensal: numeroOuNulo(row.mensalidade_valor_mensal),
+      valorFinal: numeroOuNulo(row.valor_final),
+      registradas: registradasPorAprovacao.get(row.id) ?? [],
+    });
+  }
+  return fontes;
 }

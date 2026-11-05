@@ -1,8 +1,12 @@
 import { onlyDigits } from "@/lib/cnpj";
+import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
 import {
   MENSALIDADE_PARCELAS_QUANTIDADE,
+  resolverGradeMensalidades,
   situacaoParcelaMensalidade,
   usaControleParcelasMensalidade,
+  valorMensalContratado,
+  type ParcelaMensalidadeRegistrada,
   type SituacaoParcelaMensalidade,
 } from "@/lib/mensalidade-parcelas";
 import { mergeAnosComAtual, type YearMonth } from "@/lib/listagem-meses";
@@ -74,6 +78,152 @@ export type ConsultaCobrancas = {
   page: number;
   totalPages: number;
 };
+
+export type ContratoVigenciaCobranca = {
+  status?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  created_at?: string | null;
+  numero?: string | null;
+};
+
+/**
+ * Mesma escolha da aba Financeiro: o contrato não encerrado mais recente.
+ * Se a vigência dele não estiver completa, não usa outro contrato no lugar.
+ */
+export function escolherVigenciaFinanceiro(
+  contratos: ContratoVigenciaCobranca[]
+): { inicio: string; fim: string; numero: string | null } | null {
+  const ordenados = [...contratos]
+    .filter((contrato) => {
+      const status = String(contrato.status ?? "").trim().toLowerCase();
+      return status !== "encerrado" && status !== "cancelado";
+    })
+    .sort((a, b) =>
+      String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
+    );
+  const vigencia = vigenciaContratualConfiavel(
+    ordenados[0]?.data_inicio,
+    ordenados[0]?.data_fim
+  );
+  if (!vigencia) return null;
+  const numero = String(ordenados[0]?.numero ?? "").trim();
+  return { ...vigencia, numero: numero || null };
+}
+
+export type FonteGradeCobranca = {
+  aprovacaoId: string;
+  orcamentoId: string;
+  numeroOrcamento: string;
+  numeroContrato: string | null;
+  empresa: string;
+  cnpj: string | null;
+  statusOrcamento: string;
+  modalidade: string | null;
+  mensalidadePagamento: string | null;
+  vigenciaInicio: string | null;
+  vigenciaFim: string | null;
+  dia: number | null;
+  vencimentoRegra: string | null;
+  valorMensal: number | null;
+  valorFinal: number | null;
+  registradas: ParcelaMensalidadeRegistrada[];
+};
+
+export type ParcelaMensalidadeAusente = {
+  numeroOrcamento: string;
+  empresa: string;
+  aprovacaoId: string;
+  numeros: number[];
+};
+
+/**
+ * Completa a lista gravada com a grade que o Financeiro já mostra
+ * quando a parcela da vigência ainda não foi salva.
+ * Não altera vencimento, valor ou pagamento das parcelas gravadas.
+ */
+export function completarCobrancasComGradeFinanceiro(
+  persistidas: CobrancaParcela[],
+  fontes: FonteGradeCobranca[]
+): CobrancaParcela[] {
+  const existentes = new Set(
+    persistidas.map(
+      (parcela) =>
+        `${parcela.aprovacaoId}:${parcela.numero}:${parcela.vencimentoIso}`
+    )
+  );
+  const extras: CobrancaParcela[] = [];
+  for (const fonte of fontes) {
+    if (fonte.aprovacaoId.trim() === "") continue;
+    if (
+      !parcelaEntraEmCobrancas({
+        modalidade: fonte.modalidade,
+        mensalidadePagamento: fonte.mensalidadePagamento,
+        semVigencia: false,
+      })
+    ) {
+      continue;
+    }
+    const grade = resolverGradeMensalidades({
+      vigenciaInicio: fonte.vigenciaInicio,
+      vigenciaFim: fonte.vigenciaFim,
+      dia: fonte.dia,
+      vencimentoRegra: fonte.vencimentoRegra,
+      valorMensal: valorMensalContratado({
+        mensalidadeValorMensal: fonte.valorMensal,
+        valorFinal: fonte.valorFinal,
+      }),
+      registradas: fonte.registradas,
+    });
+    if (!grade.ok) continue;
+    for (const parcela of grade.parcelas) {
+      if (parcela.registrada) continue;
+      const chave = `${fonte.aprovacaoId}:${parcela.numero}:${parcela.vencimentoIso}`;
+      if (existentes.has(chave)) continue;
+      existentes.add(chave);
+      extras.push({
+        id: `grade:${fonte.aprovacaoId}:${grade.vigenciaInicio}:${parcela.numero}`,
+        aprovacaoId: fonte.aprovacaoId,
+        orcamentoId: fonte.orcamentoId,
+        numeroOrcamento: fonte.numeroOrcamento,
+        numeroContrato: fonte.numeroContrato,
+        empresa: fonte.empresa,
+        cnpj: fonte.cnpj,
+        numero: parcela.numero,
+        vencimentoIso: parcela.vencimentoIso,
+        valor: parcela.valor,
+        pagoEmIso: null,
+        valorRecebido: null,
+        comprovantePath: null,
+        comprovanteNome: null,
+        situacao: parcela.situacao,
+        statusOrcamento: fonte.statusOrcamento,
+      });
+    }
+  }
+  return [...persistidas, ...extras];
+}
+
+export function auditarParcelasMensalidadeAusentes(
+  fontes: FonteGradeCobranca[]
+): ParcelaMensalidadeAusente[] {
+  const completas = completarCobrancasComGradeFinanceiro([], fontes);
+  const porAprovacao = new Map<string, ParcelaMensalidadeAusente>();
+  for (const fonte of fontes) {
+    const numeros = completas
+      .filter((parcela) => parcela.aprovacaoId === fonte.aprovacaoId)
+      .map((parcela) => parcela.numero)
+      .sort((a, b) => a - b);
+    if (numeros.length === 0) continue;
+    porAprovacao.set(fonte.aprovacaoId, {
+      numeroOrcamento: fonte.numeroOrcamento,
+      empresa: fonte.empresa,
+      aprovacaoId: fonte.aprovacaoId,
+      numeros,
+    });
+  }
+  return Array.from(porAprovacao.values());
+}
 
 /** Gestão SST mensal. À vista, pontual e parcelas sem vigência ficam de fora. */
 export function parcelaEntraEmCobrancas(params: {

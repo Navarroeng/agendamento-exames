@@ -28,6 +28,7 @@ import {
   statusContratoAposSyncComAtivoExistente,
 } from "@/lib/cliente-contrato-orcamento-sync";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
+import { inserirParcelasMensalidadeAusentes } from "@/services/mensalidade-parcelas.service";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
@@ -108,6 +109,39 @@ export async function obterVigenciaContratualOrcamento(
   return vigenciaContratualConfiavel(row?.data_inicio, row?.data_fim);
 }
 
+/** Insere a grade do Financeiro que ainda não foi gravada. Não reescreve parcelas existentes. */
+async function garantirParcelasMensalidadeDaAprovacao(
+  aprovacao: OrcamentoAprovacaoRecord
+): Promise<void> {
+  if (aprovacao.revertida_em) return;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamentos")
+    .select("modalidade")
+    .eq("id", aprovacao.orcamento_id)
+    .maybeSingle();
+  if (error) throw error;
+  if (
+    !usaControleParcelasMensalidade(
+      data?.modalidade,
+      aprovacao.mensalidade_pagamento
+    )
+  ) {
+    return;
+  }
+  const vigencia = await obterVigenciaContratualOrcamento(aprovacao.orcamento_id);
+  if (!vigencia) return;
+  await inserirParcelasMensalidadeAusentes({
+    aprovacaoId: aprovacao.id,
+    vigenciaInicio: vigencia.inicio,
+    vigenciaFim: vigencia.fim,
+    dia: aprovacao.mensalidade_dia_vencimento ?? null,
+    vencimentoRegra: aprovacao.mensalidade_vencimento_regra ?? null,
+    valorMensal: aprovacao.mensalidade_valor_mensal ?? null,
+    valorFinal: aprovacao.valor_final ?? null,
+  });
+}
+
 function centavosPositivos(value: number | null | undefined): number | null {
   const numero = Number(value);
   if (!Number.isFinite(numero) || numero <= 0) return null;
@@ -170,6 +204,7 @@ export async function salvarParametrosContratoMensalidade(params: {
     exameAdmissional != null &&
     exameDemissional != null
   ) {
+    await garantirParcelasMensalidadeDaAprovacao(before);
     return before;
   }
 
@@ -212,7 +247,9 @@ export async function salvarParametrosContratoMensalidade(params: {
       .single());
   }
   if (error) throw error;
-  return sortAprovacao(data as OrcamentoAprovacaoRecord);
+  const salva = sortAprovacao(data as OrcamentoAprovacaoRecord);
+  await garantirParcelasMensalidadeDaAprovacao(salva);
+  return salva;
 }
 
 /** Grava a renovação da Gestão SST mensal. Contrato assinado não é alterado. */
@@ -506,6 +543,10 @@ async function syncClienteContratoFromAprovacao(
     throw new Error(
       `Falha ao recomputar disponibilidade de agendamento: ${recomputeError.message}`
     );
+  }
+
+  if (cobrancaMensal) {
+    await garantirParcelasMensalidadeDaAprovacao(aprovacao);
   }
 }
 

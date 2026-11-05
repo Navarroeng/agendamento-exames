@@ -6,15 +6,20 @@ import { join } from "node:path";
 import {
   BAIXA_JA_PAGA_MSG,
   BAIXA_VALOR_DIVERGENTE_MSG,
+  auditarParcelasMensalidadeAusentes,
+  completarCobrancasComGradeFinanceiro,
   consultarCobrancas,
+  escolherVigenciaFinanceiro,
   referenciaFinanceiroDaCobranca,
   parcelaEntraEmCobrancas,
   resumirCobrancas,
   validarBaixaParcela,
   valorRecebidoEfetivo,
   type CobrancaParcela,
+  type FonteGradeCobranca,
 } from "../lib/cobrancas-mensalidades";
 import {
+  parcelasParaInserirDaGrade,
   payloadAtualizacaoPagoEm,
   resolverGradeMensalidades,
 } from "../lib/mensalidade-parcelas";
@@ -435,5 +440,338 @@ const migration = readFileSync(
 assert.match(migration, /add column if not exists valor_recebido/);
 assert.doesNotMatch(migration, /\bupdate\b/i);
 assert.doesNotMatch(migration, /\binsert\b/i);
+
+function fonteGrade(
+  partial: Partial<FonteGradeCobranca> &
+    Pick<FonteGradeCobranca, "aprovacaoId" | "numeroOrcamento" | "empresa">
+): FonteGradeCobranca {
+  return {
+    orcamentoId: partial.aprovacaoId,
+    numeroContrato: "CT",
+    cnpj: null,
+    statusOrcamento: "aprovado",
+    modalidade: "mensalidade",
+    mensalidadePagamento: "mensal",
+    vigenciaInicio: "2026-10-15",
+    vigenciaFim: "2027-10-15",
+    dia: 10,
+    vencimentoRegra: null,
+    valorMensal: 130,
+    valorFinal: null,
+    registradas: [],
+    ...partial,
+  };
+}
+
+const jet = parcela({
+  id: "jet",
+  aprovacaoId: "ap-jet",
+  orcamentoId: "orc-jet",
+  numeroOrcamento: "ORC-2026-0075",
+  empresa: "JET SERVICE BOMBAS",
+  valor: 170,
+  vencimentoIso: "2026-11-10",
+  numero: 1,
+});
+const trackers = parcela({
+  id: "trackers",
+  aprovacaoId: "ap-trackers",
+  orcamentoId: "orc-trackers",
+  numeroOrcamento: "ORC-2026-0077",
+  empresa: "TRACKERS COMERCIO EXTERIOR LTDA",
+  valor: 150,
+  vencimentoIso: "2026-11-10",
+  numero: 1,
+});
+const fonteGo = fonteGrade({
+  aprovacaoId: "ap-0080",
+  orcamentoId: "orc-0080",
+  numeroOrcamento: "ORC-2026-0080",
+  empresa: "GO GLOBAL CHINA ASSESSORIA EMPRESARIAL & COMERCIO LTDA.",
+  valorMensal: 130,
+});
+const fonteOutra = fonteGrade({
+  aprovacaoId: "ap-outra",
+  orcamentoId: "orc-outra",
+  numeroOrcamento: "ORC-2026-0091",
+  empresa: "OFICINA LESTE LTDA",
+  vigenciaInicio: "2026-11-03",
+  vigenciaFim: "2027-11-03",
+  valorMensal: 80,
+});
+const fonteAvista = fonteGrade({
+  aprovacaoId: "ap-avista",
+  numeroOrcamento: "ORC-2026-0092",
+  empresa: "PAGAMENTO A VISTA LTDA",
+  mensalidadePagamento: "avista",
+  valorMensal: 999,
+});
+const fontePontual = fonteGrade({
+  aprovacaoId: "ap-pontual",
+  numeroOrcamento: "ORC-2026-0093",
+  empresa: "PONTUAL LTDA",
+  modalidade: "pontual",
+  valorMensal: 999,
+});
+
+const semGradeSalva = completarCobrancasComGradeFinanceiro(
+  [jet, trackers],
+  [fonteGo, fonteOutra, fonteAvista, fontePontual]
+);
+const consultaNovembro = {
+  parcelas: semGradeSalva,
+  hojeIso: "2026-11-05",
+  competencia: { year: 2026, month: 11 },
+  busca: "",
+  situacao: "todas" as const,
+  todosVencidos: false,
+  page: 1,
+};
+const novembro = consultarCobrancas(consultaNovembro);
+assert.equal(novembro.resumo.previstoCentavos, 45000);
+assert.equal(novembro.total, 3);
+assert.deepEqual(
+  novembro.linhas.map((linha) => linha.numeroOrcamento).sort(),
+  ["ORC-2026-0075", "ORC-2026-0077", "ORC-2026-0080"]
+);
+const parcelaGo = novembro.linhas.find(
+  (linha) => linha.numeroOrcamento === "ORC-2026-0080"
+);
+assert.equal(parcelaGo?.valor, 130);
+assert.equal(parcelaGo?.vencimentoIso, "2026-11-10");
+assert.equal(parcelaGo?.pagoEmIso, null);
+assert.equal(parcelaGo?.numero, 1);
+
+for (let indice = 0; indice < 12; indice += 1) {
+  const monthIndex = 10 + indice;
+  const year = 2026 + Math.floor(monthIndex / 12);
+  const month = (monthIndex % 12) + 1;
+  const consulta = consultarCobrancas({
+    ...consultaNovembro,
+    competencia: { year, month },
+  });
+  const daGo = consulta.linhas.filter(
+    (linha) => linha.numeroOrcamento === "ORC-2026-0080"
+  );
+  assert.equal(daGo.length, 1, `${year}-${month}`);
+  assert.equal(daGo[0]?.valor, 130);
+  assert.equal(daGo[0]?.pagoEmIso, null);
+  assert.equal(
+    consulta.linhas.some((linha) => linha.numeroOrcamento === "ORC-2026-0092"),
+    false
+  );
+  assert.equal(
+    consulta.linhas.some((linha) => linha.numeroOrcamento === "ORC-2026-0093"),
+    false
+  );
+}
+
+const dezembro = consultarCobrancas({
+  ...consultaNovembro,
+  competencia: { year: 2026, month: 12 },
+});
+assert.equal(
+  dezembro.linhas.some((linha) => linha.numeroOrcamento === "ORC-2026-0080"),
+  true
+);
+assert.equal(
+  dezembro.linhas.find((linha) => linha.numeroOrcamento === "ORC-2026-0091")
+    ?.valor,
+  80
+);
+assert.equal(
+  dezembro.linhas.find((linha) => linha.numeroOrcamento === "ORC-2026-0091")
+    ?.vencimentoIso,
+  "2026-12-10"
+);
+
+const salvaParcial = parcela({
+  id: "real-parcial",
+  aprovacaoId: "ap-parcial",
+  orcamentoId: "orc-parcial",
+  numeroOrcamento: "ORC-2026-0100",
+  empresa: "PARCIAL LTDA",
+  numero: 1,
+  valor: 99,
+  vencimentoIso: "2026-11-18",
+  pagoEmIso: "2026-11-02",
+  valorRecebido: 99,
+  situacao: "paga",
+});
+const comParcial = completarCobrancasComGradeFinanceiro(
+  [salvaParcial],
+  [
+    fonteGrade({
+      aprovacaoId: "ap-parcial",
+      orcamentoId: "orc-parcial",
+      numeroOrcamento: "ORC-2026-0100",
+      empresa: "PARCIAL LTDA",
+      vigenciaInicio: "2026-10-01",
+      vigenciaFim: "2027-10-01",
+      valorMensal: 210,
+      registradas: [
+        {
+          vigenciaInicio: "2026-10-01",
+          numero: 1,
+          vencimentoIso: "2026-11-18",
+          valor: 99,
+          pagoEmIso: "2026-11-02",
+          valorRecebido: 99,
+        },
+      ],
+    }),
+  ]
+);
+const novembroParcial = comParcial.filter(
+  (item) => item.aprovacaoId === "ap-parcial" && item.vencimentoIso.startsWith("2026-11")
+);
+assert.equal(novembroParcial.length, 1);
+assert.equal(novembroParcial[0]?.id, "real-parcial");
+assert.equal(novembroParcial[0]?.valor, 99);
+assert.equal(novembroParcial[0]?.vencimentoIso, "2026-11-18");
+assert.equal(novembroParcial[0]?.pagoEmIso, "2026-11-02");
+const segundaParcial = comParcial.find(
+  (item) => item.aprovacaoId === "ap-parcial" && item.numero === 2
+);
+assert.equal(segundaParcial?.vencimentoIso, "2026-12-10");
+assert.equal(segundaParcial?.valor, 210);
+assert.equal(segundaParcial?.pagoEmIso, null);
+
+const inserirParcial = parcelasParaInserirDaGrade({
+  vigenciaInicio: "2026-10-01",
+  vigenciaFim: "2027-10-01",
+  dia: 10,
+  valorMensal: 210,
+  registradas: [
+    {
+      vigenciaInicio: "2026-10-01",
+      numero: 1,
+      vencimentoIso: "2026-11-18",
+      valor: 99,
+      pagoEmIso: "2026-11-02",
+    },
+  ],
+});
+assert.equal(inserirParcial.some((item) => item.numero === 1), false);
+assert.equal(inserirParcial.length, 11);
+assert.ok(inserirParcial.every((item) => item.pagoEmIso == null));
+assert.equal(inserirParcial[0]?.vencimentoIso, "2026-12-10");
+assert.equal(inserirParcial[0]?.valor, 210);
+
+const ausentes = auditarParcelasMensalidadeAusentes([
+  fonteGo,
+  fonteOutra,
+  fonteAvista,
+  fontePontual,
+]);
+assert.deepEqual(
+  ausentes.map((item) => item.numeroOrcamento).sort(),
+  ["ORC-2026-0080", "ORC-2026-0091"]
+);
+assert.equal(ausentes.find((item) => item.numeroOrcamento === "ORC-2026-0080")?.numeros.length, 12);
+
+assert.equal(
+  escolherVigenciaFinanceiro([
+    {
+      status: "ativo",
+      data_inicio: "2026-10-01",
+      data_fim: "2027-10-01",
+      created_at: "2026-09-01T00:00:00Z",
+      numero: "CT-VELHO",
+    },
+    {
+      status: "encerrado",
+      data_inicio: "2026-01-01",
+      data_fim: "2026-12-01",
+      created_at: "2026-10-01T00:00:00Z",
+      numero: "CT-NOVO",
+    },
+  ])?.numero,
+  "CT-VELHO"
+);
+assert.equal(
+  escolherVigenciaFinanceiro([
+    {
+      status: "ativo",
+      data_inicio: "2026-10-01",
+      data_fim: "2026-10-01",
+      created_at: "2026-10-02T00:00:00Z",
+      numero: "CT-RUIM",
+    },
+    {
+      status: "ativo",
+      data_inicio: "2026-09-01",
+      data_fim: "2027-09-01",
+      created_at: "2026-09-01T00:00:00Z",
+      numero: "CT-BOM",
+    },
+  ]),
+  null
+);
+
+const gradePaginada = Array.from({ length: 24 }, (_, indice) =>
+  parcela({
+    id: `pg-${indice}`,
+    aprovacaoId: `ap-pg-${indice}`,
+    orcamentoId: `orc-pg-${indice}`,
+    numeroOrcamento: `ORC-PG-${indice}`,
+    empresa: `Empresa ${String(indice).padStart(2, "0")}`,
+    valor: 10,
+    vencimentoIso: "2026-11-10",
+    numero: 1,
+  })
+);
+const listaPaginada = completarCobrancasComGradeFinanceiro(gradePaginada, [
+  fonteGrade({
+    aprovacaoId: "ap-g1",
+    numeroOrcamento: "ORC-G1",
+    empresa: "Grade Um",
+    valorMensal: 11,
+  }),
+  fonteGrade({
+    aprovacaoId: "ap-g2",
+    numeroOrcamento: "ORC-G2",
+    empresa: "Grade Dois",
+    valorMensal: 12,
+  }),
+]);
+const gradePagina1 = consultarCobrancas({
+  parcelas: listaPaginada,
+  hojeIso: "2026-11-05",
+  competencia: { year: 2026, month: 11 },
+  busca: "",
+  situacao: "todas",
+  todosVencidos: false,
+  page: 1,
+  pageSize: 25,
+});
+const gradePagina2 = consultarCobrancas({
+  parcelas: listaPaginada,
+  hojeIso: "2026-11-05",
+  competencia: { year: 2026, month: 11 },
+  busca: "",
+  situacao: "todas",
+  todosVencidos: false,
+  page: 2,
+  pageSize: 25,
+});
+assert.equal(gradePagina1.total, 26);
+assert.equal(gradePagina1.linhas.length, 25);
+assert.equal(gradePagina1.totalPages, 2);
+assert.equal(gradePagina2.linhas.length, 1);
+assert.equal(gradePagina1.resumo.previstoCentavos, 24000 + 1100 + 1200);
+
+assert.match(lista, /completarCobrancasComGradeFinanceiro/);
+assert.doesNotMatch(pagina, /inserirParcelasMensalidadeAusentes/);
+const aprovacaoService = readFileSync(
+  join(root, "services/orcamento-aprovacao.service.ts"),
+  "utf8"
+);
+assert.match(aprovacaoService, /inserirParcelasMensalidadeAusentes/);
+const parcelasService = readFileSync(
+  join(root, "services/mensalidade-parcelas.service.ts"),
+  "utf8"
+);
+assert.match(parcelasService, /pago_em: null/);
 
 console.log("test-cobrancas-mensalidades: OK");

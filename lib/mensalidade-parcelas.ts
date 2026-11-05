@@ -320,3 +320,54 @@ export function planejarPersistenciaParcelas(params: {
   }
   return { inserir, atualizarPagoEm };
 }
+
+/**
+ * Parcelas da grade do Financeiro que ainda não estão gravadas.
+ * Não devolve atualização de pagamento, vencimento ou valor já registrados.
+ */
+export function parcelasParaInserirDaGrade(params: {
+  vigenciaInicio?: string | null;
+  vigenciaFim?: string | null;
+  dia?: number | null;
+  vencimentoRegra?: string | null;
+  valorMensal?: number | null;
+  valorFinal?: number | null;
+  registradas?: ParcelaMensalidadeRegistrada[];
+}): Array<{
+  numero: number;
+  vencimentoIso: string;
+  valor: number;
+  pagoEmIso: null;
+}> {
+  const grade = resolverGradeMensalidades({
+    vigenciaInicio: params.vigenciaInicio,
+    vigenciaFim: params.vigenciaFim,
+    dia: params.dia,
+    vencimentoRegra: params.vencimentoRegra,
+    valorMensal: valorMensalContratado({
+      mensalidadeValorMensal: params.valorMensal,
+      valorFinal: params.valorFinal,
+    }),
+    registradas: params.registradas,
+  });
+  if (!grade.ok) return [];
+  const plano = planejarPersistenciaParcelas({
+    existentes: (params.registradas ?? []).filter(
+      (item) => isoData(item.vigenciaInicio) === grade.vigenciaInicio
+    ),
+    desejadas: grade.parcelas
+      .filter((item) => !item.registrada)
+      .map((item) => ({
+        numero: item.numero,
+        vencimentoIso: item.vencimentoIso,
+        valor: item.valor,
+        pagoEmIso: null,
+      })),
+  });
+  return plano.inserir.map((item) => ({
+    numero: item.numero,
+    vencimentoIso: item.vencimentoIso,
+    valor: item.valor,
+    pagoEmIso: null,
+  }));
+}
