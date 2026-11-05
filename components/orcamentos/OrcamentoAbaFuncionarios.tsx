@@ -14,6 +14,7 @@ import {
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
+  CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
   CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
   buildVagaDraftsIniciais,
   draftAposRemoverFuncionario,
@@ -22,6 +23,7 @@ import {
   normalizeNomeOcupante,
   validarDraftsListaVagas,
   vagaClassificacaoBloqueiaEdicaoOcupante,
+  vagaPermiteCorrigirCargoOcupante,
   vagaPermiteCorrigirNomeOcupante,
   vagaPermiteRemoverFuncionario,
   statusClassificacaoVaga,
@@ -75,6 +77,20 @@ interface OrcamentoAbaFuncionariosProps {
   onEtapaSalva: (aprovacao: OrcamentoAprovacaoRecord) => void;
   onSubstituir: (file: File) => Promise<void>;
   onRemover: () => Promise<void>;
+}
+
+function mensagemFalhaLista(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    const message = (err as { message: string }).message.trim();
+    if (message) return message;
+  }
+  return "Erro ao salvar a lista.";
 }
 
 function StatusBadge({ status }: { status: ContratoVagaStatusClassificacao }) {
@@ -235,6 +251,7 @@ export function OrcamentoAbaFuncionarios({
       toast.error(erro);
       return;
     }
+    setError(null);
     setSavingLista(true);
     try {
       const saved = await salvarListaVagasContrato({
@@ -256,9 +273,9 @@ export function OrcamentoAbaFuncionarios({
       toast.success("Lista de funcionários salva. Logo da empresa liberada.");
     } catch (err) {
       console.error(err);
-      toast.error(
-        err instanceof Error ? err.message : "Erro ao salvar a lista."
-      );
+      const message = mensagemFalhaLista(err);
+      setError(message);
+      toast.error(message);
     } finally {
       setSavingLista(false);
     }
@@ -578,6 +595,8 @@ export function OrcamentoAbaFuncionarios({
                 );
                 const nomeBloqueado =
                   !vagaPermiteCorrigirNomeOcupante(statusPreview);
+                const cargoBloqueado =
+                  locked && !vagaPermiteCorrigirCargoOcupante(statusPreview);
                 const podeRemoverFuncionario = persistida
                   ? vagaPermiteRemoverFuncionario(persistida, desligamento)
                   : false;
@@ -655,8 +674,15 @@ export function OrcamentoAbaFuncionarios({
                         className="field-input h-8 px-2 text-xs"
                         list="contrato-vagas-cargos"
                         value={formatUppercaseInput(row.cargoNome)}
-                        disabled={busy || locked}
+                        disabled={busy || cargoBloqueado}
                         placeholder="Cargo"
+                        title={
+                          statusPreview === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+                            ? "Desligamento administrativo não permite alterar o cargo por aqui."
+                            : vagaPermiteCorrigirCargoOcupante(statusPreview)
+                              ? "Corrige só o cargo. CPF, ocupante, exames e status permanecem."
+                              : undefined
+                        }
                         onChange={(e) => {
                           const nome = formatUppercaseInput(e.target.value);
                           const found = cargos.find(
