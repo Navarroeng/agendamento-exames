@@ -83,6 +83,7 @@ function SimNaoBadge({ value }: { value: boolean }) {
 interface AgendamentosTableProps {
   rows: AgendamentoTableRow[];
   loading: boolean;
+  updating?: boolean;
   error: string | null;
   sort: AgendamentoTableSortState | null;
   onSortColumn: (column: AgendamentoTableSortColumn) => void;
@@ -98,6 +99,7 @@ interface AgendamentosTableProps {
 export function AgendamentosTable({
   rows,
   loading,
+  updating = false,
   error,
   sort,
   onSortColumn,
@@ -116,16 +118,31 @@ export function AgendamentosTable({
       iconTone="purple"
       clipContent={false}
       bodyClassName="overflow-visible"
+      action={
+        updating ? (
+          <span
+            role="status"
+            aria-live="polite"
+            className="text-[11px] font-semibold text-[#64748b]"
+          >
+            Atualizando...
+          </span>
+        ) : null
+      }
     >
-      <div className="w-full overflow-x-auto">
-        {loading && (
+      <div className="w-full overflow-x-auto" aria-busy={loading || updating}>
+        {loading && rows.length === 0 && (
           <p className="py-6 text-center text-sm text-app-muted">
             Carregando agendamentos...
           </p>
         )}
 
-        {!loading && error && (
+        {error && rows.length === 0 && (
           <p className="py-6 text-center text-sm text-brand-red">{error}</p>
+        )}
+
+        {error && rows.length > 0 && (
+          <p className="pb-3 text-center text-sm text-brand-red">{error}</p>
         )}
 
         {!loading && !error && rows.length === 0 && (
@@ -134,7 +151,7 @@ export function AgendamentosTable({
           </p>
         )}
 
-        {!loading && !error && rows.length > 0 && (
+        {rows.length > 0 && (
           <table className="w-full min-w-[1080px] border-collapse">
             <thead>
               <tr>

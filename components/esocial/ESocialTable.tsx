@@ -83,6 +83,7 @@ interface ESocialTableProps {
   agendamentos: AgendamentoWithExames[];
   totalFiltrados: number;
   loading: boolean;
+  updating?: boolean;
   error: string | null;
   saving: boolean;
   page: number;
@@ -101,6 +102,7 @@ export function ESocialTable({
   agendamentos,
   totalFiltrados,
   loading,
+  updating = false,
   error,
   saving,
   page,
@@ -123,26 +125,39 @@ export function ESocialTable({
           </PanelIcon>
           Controle de envio ao e-Social
         </div>
+        {updating ? (
+          <span
+            role="status"
+            aria-live="polite"
+            className="text-[11px] font-semibold text-[#64748b]"
+          >
+            Atualizando...
+          </span>
+        ) : null}
       </div>
 
-      <div className="p-5">
-        {loading && (
+      <div className="p-5" aria-busy={loading || updating}>
+        {loading && agendamentos.length === 0 && (
           <p className="py-6 text-center text-sm text-app-muted">
             Carregando agendamentos...
           </p>
         )}
 
-        {!loading && error && (
+        {error && agendamentos.length === 0 && (
           <p className="py-6 text-center text-sm text-brand-red">{error}</p>
         )}
 
-        {!loading && !error && totalFiltrados === 0 && (
+        {error && agendamentos.length > 0 && (
+          <p className="pb-3 text-center text-sm text-brand-red">{error}</p>
+        )}
+
+        {!loading && !error && totalFiltrados === 0 && agendamentos.length === 0 && (
           <p className="py-6 text-center text-sm text-app-muted">
             Nenhum registro encontrado para este período.
           </p>
         )}
 
-        {!loading && !error && agendamentos.length > 0 && (
+        {agendamentos.length > 0 && (
           <>
             <div className="w-full overflow-x-auto [overflow-y:visible]">
               <table className="w-full min-w-[860px] border-collapse">

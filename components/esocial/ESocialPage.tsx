@@ -15,6 +15,7 @@ import { ESocialVerCancelamentoModal } from "./ESocialVerCancelamentoModal";
 export function ESocialPage() {
   const {
     loading,
+    updating,
     error,
     saving,
     filters,
@@ -92,6 +93,7 @@ export function ESocialPage() {
           agendamentos={paginatedAgendamentos}
           totalFiltrados={totalFiltrados}
           loading={loading}
+          updating={updating}
           error={error}
           saving={saving}
           page={page}

@@ -63,6 +63,14 @@ import {
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { registrarHistorico } from "@/services/historico.service";
 import type { AgendamentoWithExames } from "@/lib/types";
+import { useFiltrosConsulta } from "@/hooks/useFiltrosConsulta";
+
+const CAMPOS_TEXTO_ESOCIAL = [
+  "cliente",
+  "colaborador",
+  "dataInicio",
+  "dataFim",
+] as const satisfies readonly (keyof ESocialFilters)[];
 
 export function useESocialPage() {
   const searchParams = useSearchParams();
@@ -80,9 +88,11 @@ export function useESocialPage() {
     percentualEnviado: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const consultaSeq = useRef(0);
+  const possuiResultado = useRef(false);
   const { clientes } = useClientesList();
 
   const refresh = useCallback(() => {
@@ -109,6 +119,11 @@ export function useESocialPage() {
     () => esocialFiltersFromSearchParams(searchParams).expanded
   );
   const [page, setPage] = useState(1);
+  const consultaFilters = useFiltrosConsulta(
+    filters,
+    setPage,
+    CAMPOS_TEXTO_ESOCIAL
+  );
   const [tableSort, setTableSort] = useState<ESocialTableSortState | null>(null);
   const [saving, setSaving] = useState(false);
   const [validatingRecibo, setValidatingRecibo] = useState(false);
@@ -172,15 +187,17 @@ export function useESocialPage() {
 
   useEffect(() => {
     const seq = ++consultaSeq.current;
-    setLoading(true);
+    const atualizacao = possuiResultado.current;
+    if (atualizacao) setUpdating(true);
+    else setLoading(true);
     setError(null);
     void Promise.all([
       listarAgendamentosEsocialPagina({
-        filters,
+        filters: consultaFilters,
         page,
         sort: tableSort,
       }),
-      contarResumoEsocial(filters),
+      contarResumoEsocial(consultaFilters),
     ])
       .then(([result, resumo]) => {
         if (seq !== consultaSeq.current) return;
@@ -188,6 +205,7 @@ export function useESocialPage() {
         setTotalFiltrados(result.total);
         setTotalPages(result.totalPages);
         setSummary(resumo);
+        possuiResultado.current = true;
         if (page > result.totalPages) setPage(result.totalPages);
       })
       .catch((err) => {
@@ -198,18 +216,18 @@ export function useESocialPage() {
             ? String((err as { message: unknown }).message)
             : "Erro ao carregar e-Social";
         setError(message);
-        setAgendamentos([]);
-        setTotalFiltrados(0);
-        setTotalPages(1);
+        if (!atualizacao) {
+          setAgendamentos([]);
+          setTotalFiltrados(0);
+          setTotalPages(1);
+        }
       })
       .finally(() => {
-        if (seq === consultaSeq.current) setLoading(false);
+        if (seq !== consultaSeq.current) return;
+        setLoading(false);
+        setUpdating(false);
       });
-  }, [filters, page, tableSort, refreshKey]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filters]);
+  }, [consultaFilters, page, tableSort, refreshKey]);
 
   const mesSelecionado = useMemo<YearMonth>(() => {
     return (
@@ -227,7 +245,6 @@ export function useESocialPage() {
 
   const handleClearFilters = useCallback(() => {
     setFilters(getDefaultESocialFilters());
-    setPage(1);
   }, []);
 
   const handleMesChange = useCallback((mes: YearMonth) => {
@@ -627,6 +644,7 @@ export function useESocialPage() {
 
   return {
     loading,
+    updating,
     error,
     saving,
     filters,
