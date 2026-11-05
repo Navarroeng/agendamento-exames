@@ -4,10 +4,12 @@
  */
 
 import {
+  TIPO_ADMISSAO,
   TIPO_DESLIGAMENTO_ADMIN,
   isUuid,
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
+  validarPayloadAdmissao,
   validarPayloadDesfazerDesligamento,
   validarPayloadDesligamentoAdmin,
 } from "@/lib/colaborador-movimentacoes";
@@ -178,6 +180,164 @@ export async function registrarDesligamentoAdmin(params: {
       colaborador_nome: linha.nome,
       data_evento: payload.dataEvento,
       motivo: payload.motivo,
+    },
+  });
+
+  return {
+    ok: true,
+    ...(await listarColaboradoresPortal(payload.clienteId)),
+  };
+}
+
+export async function salvarAdmissaoColaborador(params: {
+  clienteId: string;
+  cpf: string;
+  dataAdmissao: string;
+  movimentacaoId?: string | null;
+  actor: AuditoriaUsuarioContext;
+}): Promise<
+  | {
+      ok: true;
+      colaboradores: Awaited<
+        ReturnType<typeof listarColaboradoresPortal>
+      >["colaboradores"];
+      resumo: Awaited<ReturnType<typeof listarColaboradoresPortal>>["resumo"];
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const payload = validarPayloadAdmissao({
+    clienteId: params.clienteId,
+    cpf: params.cpf,
+    dataAdmissao: params.dataAdmissao,
+    movimentacaoId: params.movimentacaoId,
+  });
+  if (!payload.ok) return payload;
+
+  const cliente = await assertClienteExiste(payload.clienteId);
+  if (!cliente.ok) return cliente;
+
+  const { colaboradores } = await listarColaboradoresPortal(payload.clienteId);
+  const linha = colaboradores.find((item) => item.cpfDigits === payload.cpfDigits);
+  if (!linha) {
+    return {
+      ok: false,
+      error: "Colaborador não encontrado nesta empresa.",
+      status: 404,
+    };
+  }
+  if (
+    payload.movimentacaoId &&
+    linha.admissaoMovimentacaoId &&
+    payload.movimentacaoId !== linha.admissaoMovimentacaoId
+  ) {
+    return {
+      ok: false,
+      error: "A admissão informada não pertence a este vínculo.",
+      status: 409,
+    };
+  }
+
+  const admin = createAdminClient();
+  const idInformado = linha.admissaoMovimentacaoId ?? payload.movimentacaoId;
+  let registroId = idInformado;
+  const dataAnterior = linha.dataAdmissaoIso;
+
+  if (registroId) {
+    const atualizado = await admin
+      .from("colaborador_movimentacoes")
+      .update({ data_evento: payload.dataAdmissao })
+      .eq("id", registroId)
+      .eq("cliente_id", payload.clienteId)
+      .eq("cpf_digits", payload.cpfDigits)
+      .eq("tipo", TIPO_ADMISSAO)
+      .is("cancelado_em", null)
+      .select("id");
+    if (atualizado.error) throw atualizado.error;
+    if (!atualizado.data?.length) {
+      return {
+        ok: false,
+        error: "Não foi possível atualizar a admissão deste vínculo.",
+        status: 404,
+      };
+    }
+  } else {
+    const existente = await admin
+      .from("colaborador_movimentacoes")
+      .select("id")
+      .eq("cliente_id", payload.clienteId)
+      .eq("cpf_digits", payload.cpfDigits)
+      .eq("tipo", TIPO_ADMISSAO)
+      .is("cancelado_em", null)
+      .maybeSingle();
+    if (existente.error) throw existente.error;
+
+    if (existente.data?.id) {
+      registroId = String(existente.data.id);
+      const atualizado = await admin
+        .from("colaborador_movimentacoes")
+        .update({ data_evento: payload.dataAdmissao })
+        .eq("id", registroId)
+        .eq("cliente_id", payload.clienteId)
+        .eq("cpf_digits", payload.cpfDigits)
+        .eq("tipo", TIPO_ADMISSAO)
+        .is("cancelado_em", null)
+        .select("id");
+      if (atualizado.error) throw atualizado.error;
+      if (!atualizado.data?.length) {
+        return {
+          ok: false,
+          error: "Não foi possível atualizar a admissão deste vínculo.",
+          status: 404,
+        };
+      }
+    } else {
+      const criado = await admin
+        .from("colaborador_movimentacoes")
+        .insert({
+          cliente_id: payload.clienteId,
+          cpf_digits: payload.cpfDigits,
+          tipo: TIPO_ADMISSAO,
+          data_evento: payload.dataAdmissao,
+          colaborador_nome: linha.nome,
+          cargo_nome: linha.cargo === "—" ? null : linha.cargo,
+          criado_por: params.actor.usuarioId,
+          criado_por_nome: params.actor.usuarioNome,
+        })
+        .select("id")
+        .maybeSingle();
+      if (criado.error) {
+        if (criado.error.code === "23505") {
+          return {
+            ok: false,
+            error: "A admissão deste vínculo já está sendo salva. Tente novamente.",
+            status: 409,
+          };
+        }
+        throw criado.error;
+      }
+      registroId = criado.data?.id ? String(criado.data.id) : payload.clienteId;
+    }
+  }
+
+  await registrarAuditoria({
+    usuarioId: params.actor.usuarioId,
+    usuarioNome: params.actor.usuarioNome,
+    usuarioEmail: params.actor.usuarioEmail,
+    modulo: AUDITORIA_MODULOS.clientes,
+    acao: AUDITORIA_ACOES.colaborador_admissao_registrada,
+    registroId: registroId ?? payload.clienteId,
+    registroNome: linha.nome,
+    descricao: `${params.actor.usuarioNome} registrou a admissão de ${linha.nome} (CPF ${payload.cpfDigits}) em ${payload.dataAdmissao}.`,
+    dadosAntes: {
+      cliente_id: payload.clienteId,
+      cpf_digits: payload.cpfDigits,
+      data_admissao: dataAnterior,
+    },
+    dadosDepois: {
+      cliente_id: payload.clienteId,
+      cpf_digits: payload.cpfDigits,
+      data_admissao: payload.dataAdmissao,
+      movimentacao_id: registroId,
     },
   });
 

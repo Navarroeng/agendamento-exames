@@ -173,6 +173,7 @@ export const AUDITORIA_ACOES = {
   colaborador_desligamento_admin: "colaborador_desligamento_admin",
   colaborador_desligamento_admin_desfeito:
     "colaborador_desligamento_admin_desfeito",
+  colaborador_admissao_registrada: "colaborador_admissao_registrada",
 } as const;
 
 export type AuditoriaAcao =
@@ -357,6 +358,7 @@ export const AUDITORIA_ACAO_LABELS: Record<AuditoriaAcao, string> = {
     "Desligamento administrativo de colaborador",
   colaborador_desligamento_admin_desfeito:
     "Desligamento administrativo desfeito",
+  colaborador_admissao_registrada: "Data de admissão do colaborador registrada",
 };
 
 export interface AuditoriaUsuarioContext {
