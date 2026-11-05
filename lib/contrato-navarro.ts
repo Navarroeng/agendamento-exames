@@ -735,7 +735,7 @@ function redigirRescisao(_ctx: ContratoNavarroContexto): string[] {
 
 function redigirInadimplencia(modalidade: OrcamentoModalidade): string[] {
   const base = [
-    `O atraso no pagamento sujeitará a CONTRATANTE à multa de ${CONTRATO_INADIMPLENCIA.multaPercentual}% (dois por cento) sobre o valor em atraso, acrescida de juros de mora de ${CONTRATO_INADIMPLENCIA.jurosMesPercentual}% (um por cento) ao mês, sem prejuízo da correção aplicável.`,
+    `O atraso no pagamento sujeitará a CONTRATANTE à multa de ${CONTRATO_INADIMPLENCIA.multaPercentual}% (dois por cento) sobre o valor em atraso, acrescida de juros de mora de ${CONTRATO_INADIMPLENCIA.jurosMesPercentual}% (um por cento) ao mês, calculados proporcionalmente aos dias de atraso, sem prejuízo da correção aplicável.`,
   ];
   if (modalidade === ORCAMENTO_MODALIDADE_MENSALIDADE) {
     base.push(
@@ -989,6 +989,9 @@ function clausulaAnexoI(ctx: ContratoNavarroContexto): ContratoClausula {
   };
 }
 
+const COBRANCA_EXAMES_SEPARADA_MENSAL =
+  "As cobranças dos exames clínicos avulsos e complementares são separadas das mensalidades de gestão SST. Os exames clínicos incluídos na cobertura contratada não serão cobrados novamente.";
+
 function faturamentoExamesV2(omitirDistincaoDeDatas: boolean): string[] {
   return FATURAMENTO_EXAMES_MENSALIDADE.filter(
     (paragrafo) =>
@@ -996,6 +999,10 @@ function faturamentoExamesV2(omitirDistincaoDeDatas: boolean): string[] {
         omitirDistincaoDeDatas &&
         paragrafo.startsWith("Esse vencimento refere-se")
       )
+  ).map((paragrafo) =>
+    paragrafo.startsWith("Essas cobranças são independentes")
+      ? COBRANCA_EXAMES_SEPARADA_MENSAL
+      : paragrafo
   );
 }
 
@@ -1126,11 +1133,26 @@ function aplicarModeloGestaoSstV2(
               ) &&
               !paragrafo.startsWith("O atraso no pagamento sujeitará")
           )
-          .map((paragrafo) =>
-            paragrafo.includes("possibilidade de saneamento")
-              ? "Qualquer das partes poderá rescindir imediatamente o presente instrumento em caso de descumprimento contratual da outra parte, mediante comunicação escrita."
-              : paragrafo
-          ),
+          .map((paragrafo) => {
+            if (
+              paragrafo.startsWith(
+                "O presente instrumento é celebrado pelo prazo de"
+              )
+            ) {
+              return "O presente contrato terá vigência de 12 (doze) meses contados da data de sua assinatura.";
+            }
+            if (
+              paragrafo.startsWith("A vigência deste contrato é de 12 meses. ")
+            ) {
+              return paragrafo.slice(
+                "A vigência deste contrato é de 12 meses. ".length
+              );
+            }
+            if (paragrafo.includes("possibilidade de saneamento")) {
+              return "Qualquer das partes poderá rescindir imediatamente o presente instrumento em caso de descumprimento contratual da outra parte, mediante comunicação escrita.";
+            }
+            return paragrafo;
+          }),
       };
     }
     return clause;

@@ -362,6 +362,15 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.match(texto, /quinto dia útil/);
   assert.doesNotMatch(texto, /boleto bancário/);
   assert.doesNotMatch(texto, /válidos somente para a vigência paga/);
+  assert.match(
+    texto,
+    /As cobranças dos exames clínicos avulsos e complementares são separadas das mensalidades de gestão SST/
+  );
+  assert.match(texto, /calculados proporcionalmente aos dias de atraso/);
+  assert.match(
+    texto,
+    /O presente contrato terá vigência de 12 \(doze\) meses contados da data de sua assinatura/
+  );
   assert.match(texto, /R\$ 130,00/);
   assert.doesNotMatch(texto, /cento e trinta reais|dez reais/);
   assert.match(texto, /R\$ 10,00 por colaborador/);
@@ -1031,7 +1040,11 @@ await run("PDF pontual e mensalidade", async () => {
       diaVencimentoMensalidade: 10,
     });
     const texto = mensal.texto;
-    assert.match(texto, /A vigência deste contrato é de 12 meses/);
+    assert.match(
+      texto,
+      /O presente contrato terá vigência de 12 \(doze\) meses contados da data de sua assinatura/
+    );
+    assert.doesNotMatch(texto, /A vigência deste contrato é de 12 meses/);
     assert.match(texto, /será encerrado, sem renovação automática/);
     assert.match(
       texto,

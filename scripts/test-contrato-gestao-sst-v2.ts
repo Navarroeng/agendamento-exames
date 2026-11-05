@@ -207,8 +207,19 @@ assert.match(novo, /DOS VALORES, PAGAMENTOS E VENCIMENTOS/);
 assert.match(novo, /valor bruto mensal de R\$ 200,00/);
 assert.match(novo, /multa de 2%/);
 assert.match(novo, /juros de mora de 1%/);
+assert.match(novo, /calculados proporcionalmente aos dias de atraso/);
 assert.match(novo, /correção aplicável/);
+assert.match(
+  novo,
+  /As cobranças dos exames clínicos avulsos e complementares são separadas das mensalidades de gestão SST\. Os exames clínicos incluídos na cobertura contratada não serão cobrados novamente\./
+);
+assert.doesNotMatch(novo, /pago antecipadamente/);
 assert.doesNotMatch(novo, /válidos somente para a vigência paga/);
+assert.match(
+  novo,
+  /O presente contrato terá vigência de 12 \(doze\) meses contados da data de sua assinatura/
+);
+assert.doesNotMatch(novo, /O presente instrumento é celebrado pelo prazo de/);
 assert.doesNotMatch(novo, /salvo novo acordo escrito de antecipação/);
 assert.match(novo, /compromisso anual, inclusive nas renovações automáticas/);
 assert.match(novo, /durante uma vigência/);
@@ -245,6 +256,11 @@ assert.match(dia20, /Esse vencimento refere-se às faturas dos exames/);
 const semRenovacao = texto({ modeloVersao: 2, renovacaoAutomatica: false });
 assert.match(semRenovacao, /sem renovação automática/);
 assert.match(semRenovacao, /durante uma vigência/);
+assert.match(
+  semRenovacao,
+  /Ao término desse período, o contrato será encerrado, sem renovação automática/
+);
+assert.doesNotMatch(semRenovacao, /A vigência deste contrato é de 12 meses/);
 assert.doesNotMatch(semRenovacao, /24 meses/);
 
 const soPgr = texto({
@@ -279,6 +295,19 @@ assert.match(avista, /valor mensal de referência é de R\$ 200,00/);
 assert.match(avista, /Foi concedido desconto de/);
 assert.match(avista, /válidos somente para a vigência paga/);
 assert.match(avista, /pagamento antecipado/);
+assert.match(
+  avista,
+  /Essas cobranças são independentes da remuneração do plano de gestão SST e permanecem devidas mesmo quando o plano tiver sido pago antecipadamente/
+);
+assert.doesNotMatch(
+  avista,
+  /As cobranças dos exames clínicos avulsos e complementares são separadas das mensalidades/
+);
+assert.match(avista, /calculados proporcionalmente aos dias de atraso/);
+assert.match(
+  avista,
+  /O presente contrato terá vigência de 12 \(doze\) meses contados da data de sua assinatura/
+);
 assert.doesNotMatch(avista, /mediante 12 \(doze\) mensalidades/);
 assert.doesNotMatch(avista, /dia 05/);
 

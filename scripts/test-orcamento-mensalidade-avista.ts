@@ -271,7 +271,10 @@ assert.match(texto, /por Pix ou transferência bancária/i);
 assert.match(texto, /DADOS PARA PAGAMENTO/);
 assert.match(texto, /99729-6/);
 assert.match(texto, /8\.550,00/);
-assert.match(texto, /prazo de 12 \(doze\) meses/);
+assert.match(
+  texto,
+  /vigência de 12 \(doze\) meses contados da data de sua assinatura/
+);
 assert.match(texto, /Não haverá mensalidades no período já pago antecipadamente/);
 assert.match(texto, /preparação da renovação/);
 assert.doesNotMatch(texto, /dia 10 de cada mês|dia 20 de cada mês|\{dia escolhido\}/);
