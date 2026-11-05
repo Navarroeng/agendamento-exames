@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { compareByLabel, sortByNome } from "@/lib/sort-by-label";
 import { VALIDADE_PERIODICO_ALERTA } from "@/lib/cargo-periodico";
 import { createClient } from "@/lib/supabase/client";
@@ -10,28 +11,35 @@ import type {
   ExameRecord,
 } from "@/lib/types";
 
-export async function listarCargos(limit = 500): Promise<CargoRecord[]> {
+export async function listarCargos(): Promise<CargoRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("cargos")
-    .select("*")
-    .order("nome", { ascending: true })
-    .limit(limit);
-
-  if (error) throw error;
-  return sortByNome((data ?? []) as CargoRecord[]);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("cargos")
+      .select("*")
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as CargoRecord[];
+  });
+  return sortByNome(rows);
 }
 
 export async function listarCargosAtivos(): Promise<CargoRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("cargos")
-    .select("*")
-    .eq("ativo", true)
-    .order("nome", { ascending: true });
-
-  if (error) throw error;
-  return sortByNome((data ?? []) as CargoRecord[]);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("cargos")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as CargoRecord[];
+  });
+  return sortByNome(rows);
 }
 
 export async function buscarCargoPorId(

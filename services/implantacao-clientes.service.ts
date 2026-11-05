@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
@@ -55,29 +56,49 @@ export async function listarProcessosImplantacao(): Promise<
 > {
   const supabase = createClient();
 
-  const [aprovacoesRes, contratosRes, orcamentosAprovadosRes, servicosRes] =
+  const [aprovacoesRaw, contratosRaw, orcamentosAprovadosRaw, catalogoServicos] =
     await Promise.all([
-      supabase
-        .from("orcamento_aprovacoes")
-        .select("*, orcamento_aprovacao_itens (*)")
-        .order("aprovado_em", { ascending: true }),
-      supabase
-        .from("cliente_contratos")
-        .select("*")
-        .not("orcamento_id", "is", null),
-      supabase.from("orcamentos").select("*").eq("status", "aprovado"),
-      supabase.from("servicos_sst").select("id, nome"),
+      lerTodosOsLotes(async (from, to) => {
+        const { data, error } = await supabase
+          .from("orcamento_aprovacoes")
+          .select("*, orcamento_aprovacao_itens (*)")
+          .order("aprovado_em", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      }),
+      lerTodosOsLotes(async (from, to) => {
+        const { data, error } = await supabase
+          .from("cliente_contratos")
+          .select("*")
+          .not("orcamento_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      }),
+      lerTodosOsLotes(async (from, to) => {
+        const { data, error } = await supabase
+          .from("orcamentos")
+          .select("*")
+          .eq("status", "aprovado")
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      }),
+      lerTodosOsLotes(async (from, to) => {
+        const { data, error } = await supabase
+          .from("servicos_sst")
+          .select("id, nome")
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return (data ?? []) as Array<{ id: string; nome: string }>;
+      }),
     ]);
 
-  if (aprovacoesRes.error) throw aprovacoesRes.error;
-  if (contratosRes.error) throw contratosRes.error;
-  if (orcamentosAprovadosRes.error) throw orcamentosAprovadosRes.error;
-  if (servicosRes.error) throw servicosRes.error;
-
-  const catalogoServicos = (servicosRes.data ?? []) as Array<{
-    id: string;
-    nome: string;
-  }>;
   const treinamentosServicoId = resolveTreinamentosServicoId(catalogoServicos);
   const aetServicoId = resolveAetServicoId(catalogoServicos);
   const insalubridadeServicoId = resolveInsalubridadeServicoId(catalogoServicos);
@@ -92,14 +113,13 @@ export async function listarProcessosImplantacao(): Promise<
     .filter((servico) => isGestaoMensalSstNome(servico.nome))
     .map((servico) => servico.id);
 
-  const aprovacoes = (aprovacoesRes.data ?? [])
+  const aprovacoes = aprovacoesRaw
     .map((row) => sortAprovacao(row as OrcamentoAprovacaoRecord))
     .filter((row) => !row.revertida_em);
-  const contratos = ((contratosRes.data ?? []) as ClienteContratoRecord[]).filter(
+  const contratos = (contratosRaw as ClienteContratoRecord[]).filter(
     (row) => !row.aprovacao_revertida_em
   );
-  const orcamentosAprovados = (orcamentosAprovadosRes.data ??
-    []) as OrcamentoRecord[];
+  const orcamentosAprovados = orcamentosAprovadosRaw as OrcamentoRecord[];
 
   const orcamentoIds = new Set<string>();
   for (const a of aprovacoes) orcamentoIds.add(a.orcamento_id);

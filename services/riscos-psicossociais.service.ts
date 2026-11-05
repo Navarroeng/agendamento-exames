@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { buildLaudosSstProcesso } from "@/lib/laudos-sst";
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
@@ -119,30 +120,44 @@ async function listarStatusParticipantesPorCampanhas(
   if (ids.length === 0) return map;
 
   const supabase = createClient();
-  let { data, error } = await supabase
-    .from("riscos_campanha_participantes")
-    .select("campanha_id, status, removido_em")
-    .in("campanha_id", ids);
+  const ler = (select: string, ocultarRemovidos: boolean) =>
+    lerTodosOsLotes(async (from, to) => {
+      let query = supabase
+        .from("riscos_campanha_participantes")
+        .select(select)
+        .in("campanha_id", ids)
+        .order("id", { ascending: true });
+      if (ocultarRemovidos) query = query.neq("status", "removido");
+      const { data: page, error: pageError } = await query.range(from, to);
+      if (pageError) throw pageError;
+      return (page ?? []) as unknown as Array<Record<string, unknown>>;
+    });
 
-  if (error && /removido_em/i.test(error.message ?? "")) {
-    const fallback = await supabase
-      .from("riscos_campanha_participantes")
-      .select("campanha_id, status")
-      .in("campanha_id", ids)
-      .neq("status", "removido");
-    data = fallback.data as typeof data;
-    error = fallback.error;
-  }
-
-  if (error) {
-    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+  let data: Array<Record<string, unknown>>;
+  try {
+    data = await ler("campanha_id, status, removido_em", false);
+  } catch (error) {
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: string }).message ?? "")
+        : "";
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string }).code ?? "")
+        : "";
+    if (/removido_em/i.test(message)) {
+      try {
+        data = await ler("campanha_id, status", true);
+      } catch (fallback) {
+        console.warn("riscos participantes (progresso) indisponível:", fallback);
+        return map;
+      }
+    } else if (code === "42P01" || /does not exist/i.test(message)) {
+      return map;
+    } else {
+      console.warn("riscos participantes (progresso) indisponível:", error);
       return map;
     }
-    console.warn(
-      "riscos participantes (progresso) indisponível:",
-      error.message
-    );
-    return map;
   }
 
   for (const row of data ?? []) {

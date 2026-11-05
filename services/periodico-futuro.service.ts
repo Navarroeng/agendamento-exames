@@ -3,6 +3,7 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -17,7 +18,10 @@ import {
 } from "@/lib/cargo-periodico";
 import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
 import { efeitoCancelamentoAsoSobrePeriodico } from "@/lib/periodico-cancelamento";
-import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
+import {
+  canEditarProximaDataPeriodico,
+  listPeriodicoAnosDisponiveis,
+} from "@/lib/periodicos-futuro";
 import {
   nomesColaboradorEquivalentes,
   normalizeIdentidadeColaborador,
@@ -71,22 +75,53 @@ function stripCargoJoin(
   return rest;
 }
 
-export async function listarPeriodicosFuturos(
-  limit = 2000
-): Promise<PeriodicoFuturoRecord[]> {
+export async function listarAnosPeriodicos(): Promise<number[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select("*, cargos(validade_periodico_meses)")
-    .order("proxima_data", { ascending: true })
-    .limit(limit);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("periodicos_futuros")
+      .select("proxima_data, data_prevista_original, status")
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as Pick<
+      PeriodicoFuturoRecord,
+      "proxima_data" | "data_prevista_original" | "status"
+    >[];
+  });
+  return listPeriodicoAnosDisponiveis(rows);
+}
 
-  if (error) throw error;
+export async function listarPeriodicosFuturos(params?: {
+  /** Limite exclusivo de `proxima_data`. Usado pelo painel. */
+  proximaDataAntesDe?: string;
+  /** Ano civil da obrigação. A página não baixa os demais anos. */
+  ano?: number;
+}): Promise<PeriodicoFuturoRecord[]> {
+  const supabase = createClient();
+  const antesDe = params?.proximaDataAntesDe?.slice(0, 10) || null;
+  const ano = params?.ano;
+  const inicioAno = ano ? `${ano}-01-01` : null;
+  const fimAno = ano ? `${ano + 1}-01-01` : null;
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("periodicos_futuros")
+      .select("*, cargos(validade_periodico_meses)")
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true });
+    if (antesDe) query = query.lt("proxima_data", antesDe);
+    if (inicioAno && fimAno) {
+      query = query.or(
+        `and(proxima_data.gte.${inicioAno},proxima_data.lt.${fimAno}),and(status.eq.reagendado,data_prevista_original.gte.${inicioAno},data_prevista_original.lt.${fimAno})`
+      );
+    }
+    const { data, error } = await query.range(from, to);
+    if (error) throw error;
+    return (data ?? []) as PeriodicoFuturoWithCargo[];
+  });
 
   return anexarDatasAgendamentoVinculado(
-    ((data ?? []) as PeriodicoFuturoWithCargo[])
-      .filter(deveListarPeriodico)
-      .map(stripCargoJoin)
+    rows.filter(deveListarPeriodico).map(stripCargoJoin)
   );
 }
 
@@ -107,14 +142,28 @@ async function anexarDatasAgendamentoVinculado(
   if (ids.length === 0) return rows;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("id, data_agendamento, status")
-    .in("id", ids);
-  if (error) throw error;
+  const encontrados: Array<{
+    id: string;
+    data_agendamento: string | null;
+    status: string | null;
+  }> = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select("id, data_agendamento, status")
+      .in("id", ids.slice(i, i + 200));
+    if (error) throw error;
+    encontrados.push(
+      ...((data ?? []) as Array<{
+        id: string;
+        data_agendamento: string | null;
+        status: string | null;
+      }>)
+    );
+  }
 
   const porId = new Map(
-    (data ?? []).map((row) => [
+    encontrados.map((row) => [
       String(row.id),
       {
         data: String(row.data_agendamento ?? "").slice(0, 10),

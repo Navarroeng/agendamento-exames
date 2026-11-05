@@ -89,7 +89,6 @@ import {
 import { useAgendamentoForm } from "@/hooks/useAgendamentoForm";
 import { useContratoVigenciaCheck } from "@/hooks/useContratoVigenciaCheck";
 import { useMensalidadeAgendamentoBloqueio } from "@/hooks/useMensalidadeAgendamentoBloqueio";
-import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useExams, useExamesCatalogOptions } from "@/hooks/useExams";
 import { useClinicasList } from "@/hooks/useClinicasList";
 import { useClientesList } from "@/hooks/useClientesList";
@@ -157,6 +156,10 @@ import {
   cancelarAgendamento,
   salvarAgendamentoComExames,
 } from "@/services/agendamento.service";
+import {
+  listarAgendamentosPagina,
+  listarNomesClinicaAgendamentos,
+} from "@/services/agendamento-lista.service";
 import { invalidarContabilizacaoPorCancelamento } from "@/services/contrato-agendamentos.service";
 import {
   listarCreditosDisponiveisDoCliente,
@@ -234,12 +237,10 @@ import {
   getDefaultAgendamentoFilters,
   agendamentoFiltersFromSearchParams,
   extractFilterOptions,
-  filterAgendamentos,
   type AgendamentoFilters,
 } from "@/lib/agendamento-filters";
 import {
   cycleAgendamentoTableSort,
-  orderAgendamentosForTable,
   type AgendamentoTableSortState,
 } from "@/lib/agendamento-table-sort";
 import type {
@@ -747,8 +748,24 @@ export function useAgendamentosPage() {
     [appendExamesFromNomes, catalogExames, exams]
   );
 
-  const { agendamentos, loading, error, refresh, getById } =
-    useAgendamentosList();
+  const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>([]);
+  const [totalFiltrados, setTotalFiltrados] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const consultaSeq = useRef(0);
+  const [nomesClinicaHistorico, setNomesClinicaHistorico] = useState<string[]>(
+    []
+  );
+
+  const refresh = useCallback(() => {
+    setRefreshKey((key) => key + 1);
+  }, []);
+
+  const getById = useCallback(
+    (id: string) => agendamentos.find((item) => item.id === id) ?? null,
+    [agendamentos]
+  );
 
   const [filters, setFilters] = useState<AgendamentoFilters>(() =>
     agendamentoFiltersFromSearchParams(searchParams).filters
@@ -838,6 +855,57 @@ export function useAgendamentosPage() {
     [bloqueioPorAgendamento]
   );
 
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    const seq = ++consultaSeq.current;
+    setLoading(true);
+    setError(null);
+
+    void listarAgendamentosPagina({
+      filters,
+      page,
+      pageSize: AGENDAMENTOS_PAGE_SIZE,
+      sort: tableSort,
+    })
+      .then((result) => {
+        if (seq !== consultaSeq.current) return;
+        setAgendamentos(result.records);
+        setTotalFiltrados(result.total);
+        setTotalPages(result.totalPages);
+        if (page > result.totalPages) setPage(result.totalPages);
+      })
+      .catch((err) => {
+        if (seq !== consultaSeq.current) return;
+        console.error("Erro ao carregar agendamentos:", err);
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Erro ao carregar agendamentos";
+        setError(message);
+        setAgendamentos([]);
+        setTotalFiltrados(0);
+        setTotalPages(1);
+      })
+      .finally(() => {
+        if (seq === consultaSeq.current) setLoading(false);
+      });
+  }, [filters, page, tableSort, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listarNomesClinicaAgendamentos()
+      .then((nomes) => {
+        if (!cancelled) setNomesClinicaHistorico(nomes);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar nomes de clínica:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractFilterOptions(agendamentos);
     return {
@@ -846,39 +914,17 @@ export function useAgendamentosPage() {
         clientes,
         agendamentos.map((ag) => ag.cliente_nome)
       ),
-      clinicas: buildClinicaFilterOptionsHistorico(
-        clinicasList,
-        agendamentos.map((ag) => ag.clinica_nome)
-      ),
+      clinicas: buildClinicaFilterOptionsHistorico(clinicasList, [
+        ...nomesClinicaHistorico,
+        ...agendamentos.map((ag) => ag.clinica_nome),
+      ]),
     };
-  }, [agendamentos, clientes, clinicasList]);
+  }, [agendamentos, clientes, clinicasList, nomesClinicaHistorico]);
 
-  const filteredAgendamentos = useMemo(
-    () => filterAgendamentos(agendamentos, filters),
-    [agendamentos, filters]
-  );
-
-  const orderedAgendamentos = useMemo(
-    () => orderAgendamentosForTable(filteredAgendamentos, filters, tableSort),
-    [filteredAgendamentos, filters, tableSort]
-  );
-
-  const totalPages = useMemo(
-    () =>
-      Math.max(
-        1,
-        Math.ceil(orderedAgendamentos.length / AGENDAMENTOS_PAGE_SIZE)
-      ),
-    [orderedAgendamentos.length]
-  );
+  const filteredAgendamentos = agendamentos;
 
   const paginatedRows = useMemo(() => {
-    const start = (page - 1) * AGENDAMENTOS_PAGE_SIZE;
-    const slice = orderedAgendamentos.slice(
-      start,
-      start + AGENDAMENTOS_PAGE_SIZE
-    );
-    return mapAgendamentosToTableRows(slice).map((row) => {
+    return mapAgendamentosToTableRows(agendamentos).map((row) => {
       const bloqueio = bloqueioPorAgendamento.get(row.agendamentoId);
       return {
         ...row,
@@ -889,7 +935,7 @@ export function useAgendamentosPage() {
         faturaBloqueioStatus: bloqueio?.faturaStatusLabel ?? null,
       };
     });
-  }, [orderedAgendamentos, page, bloqueioPorAgendamento, isAdmin]);
+  }, [agendamentos, bloqueioPorAgendamento, isAdmin]);
 
   const viewFaturaBloqueio = useMemo(() => {
     if (!viewAgendamento) return null;
@@ -899,10 +945,6 @@ export function useAgendamentosPage() {
   useEffect(() => {
     setPage(1);
   }, [filters]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3615,6 +3657,7 @@ export function useAgendamentosPage() {
     filterOptions,
     filtersExpanded,
     filteredAgendamentos,
+    totalFiltrados,
     agendamentos,
     paginatedRows,
     page,

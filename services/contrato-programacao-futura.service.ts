@@ -27,6 +27,7 @@ import {
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -191,21 +192,20 @@ export async function listarSugestoesColaboradoresContrato(params: {
   if (!clienteId && nomes.length === 0) return [];
 
   const supabase = createClient();
-  let query = supabase
-    .from("agendamentos")
-    .select("colaborador, colaborador_cpf, cliente_nome, cliente_id")
-    .neq("status", "cancelado")
-    .order("colaborador", { ascending: true })
-    .limit(2000);
-
-  if (clienteId) {
-    query = query.eq("cliente_id", clienteId);
-  } else {
-    query = query.in("cliente_nome", nomes);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("agendamentos")
+      .select("colaborador, colaborador_cpf, cliente_nome, cliente_id")
+      .neq("status", "cancelado")
+      .order("colaborador", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (clienteId) query = query.eq("cliente_id", clienteId);
+    else query = query.in("cliente_nome", nomes);
+    const { data: page, error } = await query;
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const nomesNorm = new Set(
     nomes.map((n) => n.replace(/\s+/g, " ").toLocaleLowerCase("pt-BR"))
@@ -642,28 +642,32 @@ export async function listarPeriodicosPendentesColaborador(params: {
 
   if (!cliente || (!colaborador && !cpf)) return [];
 
-  let query = supabase
-    .from("periodicos_futuros")
-    .select("*")
-    .eq("status", "ativo")
-    .order("proxima_data", { ascending: true })
-    .limit(100);
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("periodicos_futuros")
+      .select("*")
+      .eq("status", "ativo")
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (cpf) {
-    const masked = maskCPFInput(cpf);
-    query = query.or(
-      `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
-    );
-  } else {
-    query = query
-      .ilike("cliente_nome", cliente)
-      .ilike("colaborador", colaborador);
-  }
+    if (cpf) {
+      const masked = maskCPFInput(cpf);
+      query = query.or(
+        `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
+      );
+    } else {
+      query = query
+        .ilike("cliente_nome", cliente)
+        .ilike("colaborador", colaborador);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
+    const { data: page, error } = await query;
+    if (error) throw error;
+    return (page ?? []) as PeriodicoFuturoRecord[];
+  });
 
-  let rows = (data ?? []) as PeriodicoFuturoRecord[];
+  let rows = data;
   if (rows.length === 0) return [];
 
   if (cpf) {

@@ -169,7 +169,7 @@ function formatDataCell(date: string): string {
 async function resolveClinicaInfo(nome: string): Promise<ClinicaInfo> {
   const fallback: ClinicaInfo = { nome, cnpj: "—" };
   try {
-    const clinicas = await listarClinicas(500);
+    const clinicas = await listarClinicas();
     const n = nome.trim().toLowerCase();
     const found = clinicas.find(
       (c) =>

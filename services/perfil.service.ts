@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PerfilUsuario } from "@/lib/types";
 
@@ -35,11 +36,15 @@ export async function buscarPerfilUsuarioLogado(): Promise<PerfilUsuario | null>
 export async function listarPerfisUsuarios(): Promise<PerfilUsuario[]> {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("perfis_usuarios")
-    .select("*")
-    .order("nome", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []) as PerfilUsuario[];
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("perfis_usuarios")
+      .select("*")
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  return data as PerfilUsuario[];
 }

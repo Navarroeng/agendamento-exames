@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
-import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
+import { isValidMonthYearBR, parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
 import { formatDateBR } from "@/lib/format";
 import {
   calcVencimentoFaturaCliente,
@@ -378,11 +378,27 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
               inicio: janela.inicio,
               fim: janela.fim,
             })
-          : await listarAgendamentosParaFatura();
+          : await listarAgendamentosParaFatura(
+              (() => {
+                const range = parseMonthYearBRToIsoRange(filters.mesReferencia);
+                return range
+                  ? { inicio: range.inicio, fim: range.fim }
+                  : undefined;
+              })()
+            );
         setAgendamentos(data);
         return;
       }
-      const data = await listarAgendamentosParaFatura();
+      const data = isValidMonthYearBR(filters.mesReferencia)
+        ? await listarAgendamentosParaFatura(
+            (() => {
+              const range = parseMonthYearBRToIsoRange(filters.mesReferencia);
+              return range
+                ? { inicio: range.inicio, fim: range.fim }
+                : undefined;
+            })()
+          )
+        : await listarAgendamentosParaFatura();
       setAgendamentos(data);
     } catch (err) {
       console.error("Erro ao carregar agendamentos para faturas:", err);

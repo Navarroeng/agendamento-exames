@@ -21,6 +21,7 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import { formatCurrency } from "@/lib/money";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
@@ -88,20 +89,19 @@ async function gerarNumeroFatura(tipo: FaturaTipo): Promise<string> {
   return `${prefix}-${year}-${seq}`;
 }
 
-/**
- * Histórico recente, com teto. A listagem por competência não usa esta função:
- * ver `listarFaturasDaCompetencia`.
- */
-export async function listarFaturas(limit = 100): Promise<FaturaRecord[]> {
+/** Histórico completo de faturas. A tela por competência usa `listarFaturasDaCompetencia`. */
+export async function listarFaturas(): Promise<FaturaRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("faturas")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as FaturaRecord[];
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("faturas")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as FaturaRecord[];
+  });
 }
 
 export async function buscarFaturaComItens(
@@ -234,12 +234,16 @@ async function validarItensFaturaElegiveis(
 
 async function listarClientesCatalogFatura(): Promise<ClienteCatalogItem[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("clientes")
-    .select("id, nome, cnpj")
-    .limit(5000);
-  if (error) throw error;
-  return (data ?? []) as ClienteCatalogItem[];
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("id, nome, cnpj")
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ClienteCatalogItem[];
+  });
 }
 
 /** Busca agendamentos atuais e reconstrói itens oficiais da fatura cliente. */

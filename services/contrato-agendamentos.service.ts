@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   agendamentoEVinculadoAoContrato,
@@ -189,26 +190,40 @@ export async function carregarAgendamentosVigenciaContrato(params: {
   const [byIdRes, legadoRes, clienteRes, catalogRes, porContratoRes, porVagaRes] =
     await Promise.all([
       podeBuscarVigencia
-        ? supabase
-            .from("agendamentos")
-            .select(AGENDAMENTO_SELECT)
-            .eq("cliente_id", clienteId)
-            .gte("data_agendamento", inicio)
-            .lte("data_agendamento", fim)
-            .order("data_agendamento", { ascending: true })
-            .order("horario", { ascending: true })
-            .limit(2000)
+        ? {
+            data: await lerTodosOsLotes(async (from, to) => {
+              const { data, error } = await supabase
+                .from("agendamentos")
+                .select(AGENDAMENTO_SELECT)
+                .eq("cliente_id", clienteId)
+                .gte("data_agendamento", inicio)
+                .lte("data_agendamento", fim)
+                .order("data_agendamento", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, to);
+              if (error) throw error;
+              return (data ?? []) as AgendamentoWithExames[];
+            }),
+            error: null,
+          }
         : Promise.resolve(emptyAg),
       podeBuscarVigencia
-        ? supabase
-            .from("agendamentos")
-            .select(AGENDAMENTO_SELECT)
-            .is("cliente_id", null)
-            .gte("data_agendamento", inicio)
-            .lte("data_agendamento", fim)
-            .order("data_agendamento", { ascending: true })
-            .order("horario", { ascending: true })
-            .limit(2000)
+        ? {
+            data: await lerTodosOsLotes(async (from, to) => {
+              const { data, error } = await supabase
+                .from("agendamentos")
+                .select(AGENDAMENTO_SELECT)
+                .is("cliente_id", null)
+                .gte("data_agendamento", inicio)
+                .lte("data_agendamento", fim)
+                .order("data_agendamento", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, to);
+              if (error) throw error;
+              return (data ?? []) as AgendamentoWithExames[];
+            }),
+            error: null,
+          }
         : Promise.resolve(emptyAg),
       clienteId
         ? supabase
@@ -217,18 +232,53 @@ export async function carregarAgendamentosVigenciaContrato(params: {
             .eq("id", clienteId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
-      supabase.from("clientes").select("id, nome"),
-      supabase
-        .from("agendamentos")
-        .select(AGENDAMENTO_SELECT)
-        .eq("contrato_id", contrato.id)
-        .limit(2000),
-      idsContratoParaBuscar.length > 0
-        ? supabase
+      {
+        data: await lerTodosOsLotes(async (from, to) => {
+          const { data, error } = await supabase
+            .from("clientes")
+            .select("id, nome")
+            .order("nome", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+          if (error) throw error;
+          return data ?? [];
+        }),
+        error: null,
+      },
+      {
+        data: await lerTodosOsLotes(async (from, to) => {
+          const { data, error } = await supabase
             .from("agendamentos")
             .select(AGENDAMENTO_SELECT)
-            .in("id", idsContratoParaBuscar)
-        : Promise.resolve(emptyAg),
+            .eq("contrato_id", contrato.id)
+            .order("id", { ascending: true })
+            .range(from, to);
+          if (error) throw error;
+          return (data ?? []) as AgendamentoWithExames[];
+        }),
+        error: null,
+      },
+      {
+        data: await (async () => {
+          const todos: AgendamentoWithExames[] = [];
+          for (let i = 0; i < idsContratoParaBuscar.length; i += 100) {
+            const ids = idsContratoParaBuscar.slice(i, i + 100);
+            const lote = await lerTodosOsLotes(async (from, to) => {
+              const { data, error } = await supabase
+                .from("agendamentos")
+                .select(AGENDAMENTO_SELECT)
+                .in("id", ids)
+                .order("id", { ascending: true })
+                .range(from, to);
+              if (error) throw error;
+              return (data ?? []) as AgendamentoWithExames[];
+            });
+            todos.push(...lote);
+          }
+          return todos;
+        })(),
+        error: null,
+      },
     ]);
 
   if (byIdRes.error) throw byIdRes.error;

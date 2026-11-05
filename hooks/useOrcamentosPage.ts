@@ -219,7 +219,9 @@ export function useOrcamentosPage() {
     ImplantacaoTreinamentoEventoRecord[]
   >([]);
 
-  const { orcamentos, loading, error, refresh } = useOrcamentosList();
+  const { orcamentos, loading, error, refresh } = useOrcamentosList(
+    mesSelecionado.year
+  );
   const { clientes, refresh: refreshClientes } = useClientesList();
   const { servicos, loading: servicosLoading, error: servicosError } =
     useServicosSstList();

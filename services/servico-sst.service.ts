@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { parseItensInclusos } from "@/lib/servico-sst-pacote";
 import type { ServicoSstRecord } from "@/lib/orcamento-types";
@@ -21,18 +22,16 @@ export async function listarServicosSst(
   apenasAtivos = true
 ): Promise<ServicoSstRecord[]> {
   const supabase = createClient();
-  let query = supabase
-    .from("servicos_sst")
-    .select("*")
-    .order("ordem", { ascending: true });
-
-  if (apenasAtivos) {
-    query = query.eq("ativo", true);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).map((row) =>
-    mapServicoSstRow(row as Record<string, unknown>)
-  );
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("servicos_sst")
+      .select("*")
+      .order("ordem", { ascending: true })
+      .order("id", { ascending: true });
+    if (apenasAtivos) query = query.eq("ativo", true);
+    const { data: page, error } = await query.range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  return data.map((row) => mapServicoSstRow(row as Record<string, unknown>));
 }

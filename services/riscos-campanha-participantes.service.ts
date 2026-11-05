@@ -9,6 +9,7 @@ import {
   type RiscosParticipanteOrigem,
   type RiscosParticipanteStatus,
 } from "@/lib/riscos-campanha-participantes";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { buscarCampanhaPorOrcamento } from "@/services/riscos-campanha.service";
 
@@ -59,35 +60,40 @@ export async function listarParticipantesCampanha(
   const selectSemRemovido =
     "id, campanha_id, orcamento_id, cliente_id, nome_completo, cpf, data_nascimento, cargo, setor, email, status, codigo_acesso, origem, criado_por, created_at, updated_at";
 
-  let { data, error } = await supabase
-    .from("riscos_campanha_participantes")
-    .select(selectComRemovido)
-    .eq("campanha_id", campanhaId)
-    .is("removido_em", null)
-    .order("created_at", { ascending: true });
+  const ler = (select: string, semRemovido: boolean) =>
+    lerTodosOsLotes(async (from, to) => {
+      let query = supabase
+        .from("riscos_campanha_participantes")
+        .select(select)
+        .eq("campanha_id", campanhaId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      query = semRemovido
+        ? query.is("removido_em", null)
+        : query.neq("status", "removido").neq("status", "invalidado");
+      const { data: page, error: pageError } = await query.range(from, to);
+      if (pageError) throw pageError;
+      return (page ?? []) as unknown as Array<Record<string, unknown>>;
+    });
 
-  if (error && /removido_em/i.test(error.message ?? "")) {
-    const fallback = await supabase
-      .from("riscos_campanha_participantes")
-      .select(selectSemRemovido)
-      .eq("campanha_id", campanhaId)
-      .neq("status", "removido")
-      .neq("status", "invalidado")
-      .order("created_at", { ascending: true });
-    data = fallback.data as typeof data;
-    error = fallback.error;
-  }
-
-  if (error) {
-    if (error.code === "42P01" || error.message?.includes("does not exist")) {
-      return [];
+  try {
+    const data = await ler(selectComRemovido, true);
+    return data.map((row) => mapParticipante(row));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(
+      (error as { message?: string } | null)?.message ?? error
+    );
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string }).code ?? "")
+        : "";
+    if (/removido_em/i.test(message)) {
+      const data = await ler(selectSemRemovido, false);
+      return data.map((row) => mapParticipante(row));
     }
+    if (code === "42P01" || /does not exist/i.test(message)) return [];
     throw error;
   }
-
-  return (data ?? []).map((row) =>
-    mapParticipante(row as Record<string, unknown>)
-  );
 }
 
 export async function criarParticipanteCampanha(

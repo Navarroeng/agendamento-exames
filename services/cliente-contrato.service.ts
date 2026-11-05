@@ -7,6 +7,7 @@ import {
   escolherAprovacaoVigente,
 } from "@/lib/cliente-contrato-inicio";
 import { centavosSalvosParaReais } from "@/lib/contrato-navarro";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
 import type {
@@ -16,19 +17,18 @@ import type {
 } from "@/lib/types";
 import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
 
-export async function listarTodosContratos(
-  limit = 1000
-): Promise<ClienteContratoRecord[]> {
+export async function listarTodosContratos(): Promise<ClienteContratoRecord[]> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("cliente_contratos")
-    .select("*")
-    .order("data_fim", { ascending: true, nullsFirst: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as ClienteContratoRecord[];
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("cliente_contratos")
+      .select("*")
+      .order("data_fim", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ClienteContratoRecord[];
+  });
 }
 
 export async function listarContratosPorCliente(

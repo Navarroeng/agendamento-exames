@@ -434,7 +434,8 @@ export async function listarClientesPaginados(
   const query = supabase
     .from("clientes")
     .select(CLIENTE_DB_COLUMNS, { count: "exact" })
-    .order("nome", { ascending: true });
+    .order("nome", { ascending: true })
+    .order("id", { ascending: true });
 
   const { data, error, count } = await query.range(from, to);
 
@@ -479,6 +480,7 @@ async function listarTodosClientesParaBusca(): Promise<ClienteRecord[]> {
       .from("clientes")
       .select(CLIENTE_LIST_COLUMNS)
       .order("nome", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + SELECT_BATCH_SIZE - 1);
 
     if (error) throw error;
@@ -522,6 +524,7 @@ export async function listarClientesParaSelect(): Promise<ClienteRecord[]> {
       .from("clientes")
       .select(CLIENTE_SELECT_COLUMNS)
       .order("nome", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + SELECT_BATCH_SIZE - 1);
 
     if (error) throw error;
@@ -537,21 +540,8 @@ export async function listarClientesParaSelect(): Promise<ClienteRecord[]> {
 }
 
 /** @deprecated Use listarClientesParaSelect ou listarClientesPaginados. */
-export async function listarClientes(limit = 100): Promise<ClienteRecord[]> {
-  if (limit >= SELECT_BATCH_SIZE) {
-    return listarClientesParaSelect();
-  }
-
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("clientes")
-    .select(CLIENTE_DB_COLUMNS)
-    .order("nome", { ascending: true })
-    .limit(limit);
-
-  if (error) throw error;
-
-  return sortByNome((data ?? []) as ClienteRecord[]);
+export async function listarClientes(): Promise<ClienteRecord[]> {
+  return listarClientesParaSelect();
 }
 
 export async function buscarClientePorId(
