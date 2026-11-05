@@ -9,6 +9,10 @@ import {
   type ImplantacaoProcesso,
 } from "@/lib/implantacao-clientes";
 import {
+  isGestaoMensalSstNome,
+  orcamentoPossuiGestaoSstMensal,
+} from "@/lib/orcamento-modalidade";
+import {
   orcamentoPossuiPacoteCompletoSst,
   resolvePacoteCompletoSstServicoId,
 } from "@/lib/servico-sst-pacote";
@@ -84,6 +88,9 @@ export async function listarProcessosImplantacao(): Promise<
   const pgrServicoId = resolvePgrServicoId(catalogoServicos);
   const pacoteCompletoServicoId =
     resolvePacoteCompletoSstServicoId(catalogoServicos);
+  const gestaoSstServicoIds = catalogoServicos
+    .filter((servico) => isGestaoMensalSstNome(servico.nome))
+    .map((servico) => servico.id);
 
   const aprovacoes = (aprovacoesRes.data ?? [])
     .map((row) => sortAprovacao(row as OrcamentoAprovacaoRecord))
@@ -285,6 +292,10 @@ export async function listarProcessosImplantacao(): Promise<
       itens,
       pacoteCompletoServicoId
     );
+    const possuiGestaoSstMensal = orcamentoPossuiGestaoSstMensal(
+      itens,
+      gestaoSstServicoIds
+    );
 
     processos.push(
       buildImplantacaoProcesso({
@@ -300,6 +311,7 @@ export async function listarProcessosImplantacao(): Promise<
         treinamento,
         aet,
         possuiPacoteCompletoSst,
+        possuiGestaoSstMensal,
       })
     );
   }

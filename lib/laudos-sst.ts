@@ -227,21 +227,91 @@ export function isVisitaTecnicaEfetivamenteConcluida(
 }
 
 /**
+ * Serviço acompanhado no fluxo PGR de Laudos SST.
+ * Pacote completo - SST ou Gestão SST mensal (inclui PGR, LTCAT e PCMSO).
+ * Mensalidade e renovação não entram sozinhas. Treinamento exclusivo,
+ * laudo pontual e a soma de laudos avulsos ficam de fora.
+ */
+export function processoContrataAcompanhamentoLaudosSst(
+  processo: ImplantacaoProcesso
+): boolean {
+  if (isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
+  if (processo.fluxoImplantacao === "somente_treinamentos") return false;
+  return Boolean(
+    processo.possuiPacoteCompletoSst || processo.possuiGestaoSstMensal
+  );
+}
+
+/**
  * Elegível ao encaminhamento automático para Laudos SST (fluxo PGR):
- * Pacote completo - SST e visita técnica salva (agendamentos podem seguir
- * pendentes). Implantação concluída ou treinamento agendado continua
- * elegível para preservar registros antigos. PGR/LTCAT/PCMSO avulsos não
- * bastam. Laudo pontual exclusivo não entra aqui.
+ * Pacote completo - SST ou Gestão SST mensal, com visita técnica salva
+ * (agendamentos podem seguir pendentes). Visita dispensada conta quando
+ * o salvamento gravou `visita_tecnica_necessaria` e `visita_tecnica_salva_em`,
+ * sem exigir data, horário ou endereço. Renovação que reaproveita a visita
+ * e não tem esse registro entra se a implantação já está pronta.
+ * Implantação concluída ou treinamento agendado continua elegível para
+ * preservar registros antigos. PGR/LTCAT/PCMSO avulsos não bastam.
+ * Laudo pontual exclusivo não entra aqui.
  * Não conclui a implantação nem marca laudos como elaborados ou enviados.
  */
 export function isProcessoElegivelLaudosSst(
   processo: ImplantacaoProcesso
 ): boolean {
-  if (isFluxoLaudoPontual(processo.fluxoImplantacao)) return false;
-  if (!processo.possuiPacoteCompletoSst) return false;
+  if (!processoContrataAcompanhamentoLaudosSst(processo)) return false;
   if (processoImpedidoEmLaudosSst(processo)) return false;
   if (isVisitaTecnicaEfetivamenteConcluida(processo)) return true;
   return isImplantacaoProntaParaEncaminhamento(processo);
+}
+
+/**
+ * Data histórica de entrada. Null quando não há visita, aprovação nem
+ * treinamento — nesse caso não se usa o relógio, para não mudar o mês
+ * a cada sincronização.
+ */
+export function entradaHistoricaLaudosSst(
+  processo: ImplantacaoProcesso
+): string | null {
+  const visita = processo.aprovacao?.visita_tecnica_salva_em?.trim();
+  if (visita) return visita;
+  const aprovacao = processo.dataAprovacao?.trim();
+  if (aprovacao) return aprovacao;
+  const treino =
+    processo.treinamento?.atualizado_em?.trim() ||
+    processo.treinamento?.criado_em?.trim() ||
+    "";
+  return treino || null;
+}
+
+/**
+ * Competência de entrada em Laudos SST.
+ * Visita salva (inclusive dispensada) prevalece. Sem esse registro, usa a
+ * aprovação — não a data de hoje nem `updated_at`, que mudaria o mês.
+ */
+export function resolverEntradaLaudosSst(
+  processo: ImplantacaoProcesso,
+  agoraIso: string = new Date().toISOString()
+): string {
+  return entradaHistoricaLaudosSst(processo) ?? agoraIso;
+}
+
+/** Linha nova do fluxo PGR. Não copia o processo anterior nem marca documentos. */
+export function payloadInicialLaudosSst(
+  processo: ImplantacaoProcesso,
+  agoraIso: string = new Date().toISOString()
+): {
+  orcamento_id: string;
+  etapa_atual: "epis";
+  etapas_concluidas: 0;
+  status: "em_andamento";
+  entrada_em: string;
+} {
+  return {
+    orcamento_id: processo.orcamento.id,
+    etapa_atual: "epis",
+    etapas_concluidas: 0,
+    status: "em_andamento",
+    entrada_em: resolverEntradaLaudosSst(processo, agoraIso),
+  };
 }
 
 /** Tracking com trabalho real (não só a linha inicial em EPIs). */
@@ -256,7 +326,24 @@ export function laudosTrackingTemTrabalhoReal(
   return workflowTemResposta(mapLaudosWorkflowFromRecord(tracking));
 }
 
-/** Lista: Pacote SST após visita salva (ou implantação já pronta), laudo pontual após visita, ou tracking antigo já trabalhado. */
+/**
+ * Corrige só a competência de uma linha ainda intocada (EPIs, sem respostas).
+ * Processo com progresso permanece na data já gravada.
+ */
+export function deveCorrigirEntradaInicialLaudosSst(
+  processo: ImplantacaoProcesso,
+  tracking: OrcamentoLaudosSstRecord | null | undefined
+): string | null {
+  if (!tracking || laudosTrackingTemTrabalhoReal(tracking)) return null;
+  const historica = entradaHistoricaLaudosSst(processo);
+  if (!historica) return null;
+  if ((tracking.entrada_em ?? "").slice(0, 10) === historica.slice(0, 10)) {
+    return null;
+  }
+  return historica;
+}
+
+/** Lista: Pacote SST ou Gestão SST mensal após visita salva (ou implantação já pronta), laudo pontual após visita, ou tracking antigo já trabalhado. */
 export function isProcessoVisivelLaudosSst(
   processo: ImplantacaoProcesso,
   tracking: OrcamentoLaudosSstRecord | null | undefined

@@ -2,10 +2,12 @@ import { createClient } from "@/lib/supabase/client";
 import {
   buildLaudosSstProcesso,
   isLaudosSstConcluido,
+  deveCorrigirEntradaInicialLaudosSst,
   isProcessoElegivelLaudosSst,
   isProcessoVisivelLaudosSst,
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
+  payloadInicialLaudosSst,
   sortLaudosSstProcessos,
   type LaudosSstEtapaId,
   type LaudosSstProcesso,
@@ -83,9 +85,12 @@ const LAUDOS_TRACKING_SELECT = [
 
 /**
  * Lista processos de Laudos SST.
- * Pacote completo - SST entra após a visita técnica salva (agendamentos
- * podem continuar pendentes) ou, no legado, com a implantação já pronta.
- * Cria tracking em andamento na etapa EPIs; não conclui a implantação
+ * Pacote completo - SST e Gestão SST mensal entram após a visita técnica
+ * salva (agendamentos podem continuar pendentes) ou, no legado e na
+ * renovação sem novo registro de visita, com a implantação já pronta.
+ * Cria um tracking por orçamento, em andamento na etapa EPIs. Reexecutar
+ * não duplica e não copia o processo do contrato anterior. Em linha ainda
+ * sem progresso, só corrige a data de entrada. Não conclui a implantação
  * nem marca laudos como elaborados ou enviados. Não apaga linhas antigas.
  * Laudo pontual exclusivo aparece após a visita realizada, reusando implantacao_aet.
  */
@@ -100,6 +105,7 @@ export async function listarProcessosLaudosSst(): Promise<LaudosSstProcesso[]> {
     elegiveis,
     trackingExistente
   );
+  await regularizarEntradaInicialLaudosSst(elegiveis, trackingMap);
   await sincronizarConclusaoLaudosSst(trackingMap);
 
   const visiveis = implantacao.filter((p) =>
@@ -149,9 +155,11 @@ export async function buscarTrackingLaudosSst(
 }
 
 /**
- * Cria tracking ao entrar em Laudos SST, só se for elegível pelo pacote.
- * Um registro por orçamento (`orcamento_id`). Não apaga nem reescreve
- * linhas existentes e não altera o status da implantação.
+ * Cria tracking ao entrar em Laudos SST, só se o serviço for acompanhado.
+ * Um registro por orçamento (`orcamento_id`), da vigência daquele contrato.
+ * Reexecutar ignora a linha já existente: não duplica, não sobrescreve
+ * progresso e não copia documentos do contrato anterior.
+ * Não altera o status da implantação.
  */
 async function garantirTrackingLaudosSst(
   elegiveis: ImplantacaoProcesso[],
@@ -168,57 +176,74 @@ async function garantirTrackingLaudosSst(
   if (faltantes.length === 0) return map;
 
   const supabase = createClient();
+  const agora = new Date().toISOString();
 
   for (const processo of faltantes) {
-    const orcamentoId = processo.orcamento.id;
-    const entradaEm =
-      processo.aprovacao?.visita_tecnica_salva_em ??
-      processo.treinamento?.atualizado_em ??
-      processo.treinamento?.criado_em ??
-      processo.aprovacao?.updated_at ??
-      new Date().toISOString();
-
-    const { data: inserted, error: insertError } = await supabase
+    const payload = payloadInicialLaudosSst(processo, agora);
+    const { error: insertError } = await supabase
       .from("orcamento_laudos_sst")
-      .upsert(
-        {
-          orcamento_id: orcamentoId,
-          etapa_atual: "epis",
-          etapas_concluidas: 0,
-          status: "em_andamento",
-          entrada_em: entradaEm,
-        },
-        { onConflict: "orcamento_id", ignoreDuplicates: true }
-      )
-      .select(LAUDOS_TRACKING_SELECT)
-      .maybeSingle();
+      .upsert(payload, { onConflict: "orcamento_id", ignoreDuplicates: true });
 
     if (insertError) {
       console.warn("falha ao criar tracking Laudos SST:", insertError.message);
-      map.set(orcamentoId, {
-        orcamento_id: orcamentoId,
-        etapa_atual: "epis",
-        etapas_concluidas: 0,
-        status: "em_andamento",
-        entrada_em: entradaEm,
-      });
+      map.set(processo.orcamento.id, payload);
+    }
+  }
+
+  const confirmados = await buscarTrackingLaudosSst(
+    faltantes.map((p) => p.orcamento.id)
+  );
+  for (const processo of faltantes) {
+    const id = processo.orcamento.id;
+    const row = confirmados.get(id);
+    if (row) {
+      map.set(id, row);
       continue;
     }
-
-    if (inserted) {
-      map.set(orcamentoId, inserted as unknown as OrcamentoLaudosSstRecord);
-    } else {
-      map.set(orcamentoId, {
-        orcamento_id: orcamentoId,
-        etapa_atual: "epis",
-        etapas_concluidas: 0,
-        status: "em_andamento",
-        entrada_em: entradaEm,
-      });
+    if (!map.has(id)) {
+      map.set(id, payloadInicialLaudosSst(processo, agora));
     }
   }
 
   return map;
+}
+
+/**
+ * Linha ainda em EPIs, sem trabalho, pode ter entrado com a data de hoje.
+ * Reexecutar só ajusta `entrada_em` para a visita ou a aprovação.
+ * Não altera etapa, documentos nem processo que já teve progresso.
+ */
+async function regularizarEntradaInicialLaudosSst(
+  elegiveis: ImplantacaoProcesso[],
+  trackingMap: Map<string, OrcamentoLaudosSstRecord>
+): Promise<void> {
+  const ajustes = elegiveis.flatMap((processo) => {
+    const row = trackingMap.get(processo.orcamento.id) ?? null;
+    const entrada = deveCorrigirEntradaInicialLaudosSst(processo, row);
+    if (!entrada || !row) return [];
+    return [{ id: processo.orcamento.id, entrada, row }];
+  });
+  if (ajustes.length === 0) return;
+
+  const supabase = createClient();
+  for (const ajuste of ajustes) {
+    const { error } = await supabase
+      .from("orcamento_laudos_sst")
+      .update({ entrada_em: ajuste.entrada })
+      .eq("orcamento_id", ajuste.id)
+      .eq("etapa_atual", "epis")
+      .eq("etapas_concluidas", 0);
+
+    if (error) {
+      console.warn(
+        "falha ao regularizar entrada Laudos SST:",
+        error.message
+      );
+      continue;
+    }
+
+    trackingMap.set(ajuste.id, { ...ajuste.row, entrada_em: ajuste.entrada });
+  }
 }
 
 /**

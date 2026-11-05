@@ -111,6 +111,47 @@ export function isGestaoMensalSstNome(
   return GESTAO_MENSAL_NOMES_NORMALIZADOS.has(normalizeServicoNome(nome));
 }
 
+export type ServicoItemGestaoRef = {
+  servico_id?: string | null;
+  servico_nome?: string | null;
+};
+
+function idsGestaoSstMensal(
+  gestaoServicoId?: readonly string[] | string | null
+): Set<string> {
+  const lista = Array.isArray(gestaoServicoId)
+    ? gestaoServicoId
+    : gestaoServicoId
+      ? [gestaoServicoId]
+      : [];
+  return new Set(lista.map((id) => (id ?? "").trim()).filter(Boolean));
+}
+
+/**
+ * Item é Gestão SST mensal (nome canônico ou legado).
+ * O id do catálogo confirma; o nome salvo também vale, para orçamento
+ * antigo cujo id não está mais no catálogo atual.
+ * Não trata mensalidade nem renovação como serviço.
+ */
+export function isItemGestaoSstMensal(
+  item: ServicoItemGestaoRef,
+  gestaoServicoId?: readonly string[] | string | null
+): boolean {
+  const itemId = (item.servico_id ?? "").trim();
+  if (itemId && idsGestaoSstMensal(gestaoServicoId).has(itemId)) return true;
+  return isGestaoMensalSstNome(item.servico_nome);
+}
+
+/** True se qualquer item aprovado for Gestão SST mensal. */
+export function orcamentoPossuiGestaoSstMensal(
+  itens: ServicoItemGestaoRef[] | null | undefined,
+  gestaoServicoId?: readonly string[] | string | null
+): boolean {
+  return (itens ?? []).some((item) =>
+    isItemGestaoSstMensal(item, gestaoServicoId)
+  );
+}
+
 /** @deprecated Prefer isGestaoMensalSstNome. Mantido para call sites existentes. */
 export function isGestaoCompletaSstNome(
   nome: string | null | undefined

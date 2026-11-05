@@ -384,10 +384,17 @@ export interface ImplantacaoProcesso {
   etapasOperacionais: Array<{ id: ImplantacaoEtapaOperacionalId; label: string }>;
   /**
    * Orçamento aprovado contém o serviço principal "Pacote completo - SST".
-   * Exigido no encaminhamento automático para Laudos SST e Riscos.
+   * Exigido no encaminhamento automático para Riscos.
+   * Laudos SST também aceita Gestão SST mensal (`possuiGestaoSstMensal`).
    * Laudos SST libera após a visita técnica salva; Riscos segue na implantação pronta.
    */
   possuiPacoteCompletoSst?: boolean;
+  /**
+   * Orçamento aprovado contém Gestão SST mensal (PGR, LTCAT e PCMSO).
+   * Entra em Laudos SST. Não encaminha Riscos por si só.
+   * Mensalidade ou renovação, sem este serviço nem o pacote, não bastam.
+   */
+  possuiGestaoSstMensal?: boolean;
   /**
    * Contrato assinado e boleto ainda não pago.
    * No AET coexiste com a etapa operacional atual.
@@ -652,6 +659,7 @@ export function buildImplantacaoProcesso(params: {
   treinamento?: ImplantacaoTreinamentoRecord | null;
   aet?: ImplantacaoAetRecord | null;
   possuiPacoteCompletoSst?: boolean;
+  possuiGestaoSstMensal?: boolean;
 }): ImplantacaoProcesso {
   const { orcamento, aprovacao, contrato } = params;
   const fluxo = params.fluxoImplantacao ?? "padrao";
@@ -773,6 +781,7 @@ export function buildImplantacaoProcesso(params: {
     aet,
     etapasOperacionais,
     possuiPacoteCompletoSst: Boolean(params.possuiPacoteCompletoSst),
+    possuiGestaoSstMensal: Boolean(params.possuiGestaoSstMensal),
     pagamentoPendente: contagemOpts.controleMensalidades
       ? false
       : isOrcamentoPagamentoPendente(aprovacao),

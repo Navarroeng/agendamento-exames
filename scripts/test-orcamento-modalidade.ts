@@ -21,7 +21,9 @@ import {
   opcoesServicoLinhaOrcamento,
   formatValorOrcamentoExibicao,
   isGestaoMensalSstNome,
+  isItemGestaoSstMensal,
   isOrcamentoMensalidade,
+  orcamentoPossuiGestaoSstMensal,
   labelItensInclusosServico,
   labelValorColunaOrcamento,
   resolveModalidadePorServicoNome,
@@ -471,6 +473,58 @@ assert.match(resumoPontual.textoParcelado, /4x de/);
 assert.equal(
   formatValorOrcamentoExibicao(orcamentoPontual),
   formatCurrency(2000)
+);
+
+assert.equal(
+  isItemGestaoSstMensal(
+    { servico_id: "gestao", servico_nome: "outro rotulo" },
+    ["gestao", "legado"]
+  ),
+  true
+);
+assert.equal(
+  isItemGestaoSstMensal(
+    { servico_id: "legado", servico_nome: "Gestão Completa SST" },
+    ["gestao", "legado"]
+  ),
+  true
+);
+assert.equal(
+  isItemGestaoSstMensal(
+    { servico_id: "id-antigo", servico_nome: "Gestão Completa SST" },
+    ["gestao"]
+  ),
+  true,
+  "nome legado continua Gestão SST mesmo com id fora do catálogo atual"
+);
+assert.equal(
+  isItemGestaoSstMensal({ servico_id: "pgr", servico_nome: "PGR" }, ["gestao"]),
+  false
+);
+assert.equal(
+  isItemGestaoSstMensal(
+    { servico_nome: "Pacote completo - SST" },
+    ["gestao"]
+  ),
+  false
+);
+assert.equal(
+  orcamentoPossuiGestaoSstMensal(
+    [
+      { servico_id: "pgr", servico_nome: "PGR" },
+      { servico_id: "ltcat", servico_nome: "LTCAT" },
+    ],
+    ["gestao"]
+  ),
+  false,
+  "laudos avulsos não viram Gestão SST mensal"
+);
+assert.equal(
+  orcamentoPossuiGestaoSstMensal(
+    [{ servico_nome: "Gestão SST - Mensal" }],
+    []
+  ),
+  true
 );
 
 console.log("test-orcamento-modalidade: OK");

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   buildLaudosSstProcesso,
   filterLaudosSstProcessos,
+  filterLaudosSstProcessosPorMes,
   grupoOrdenacaoLaudosSst,
   isProcessoElegivelLaudoPontualLaudosSst,
   isProcessoElegivelLaudosSst,
@@ -14,6 +15,9 @@ import {
   LAUDOS_SST_ETAPAS,
   LAUDOS_SST_TOTAL_ETAPAS,
   laudosSstEtapaAtualBadgeClass,
+  deveCorrigirEntradaInicialLaudosSst,
+  payloadInicialLaudosSst,
+  resolverEntradaLaudosSst,
   sortLaudosSstProcessos,
 } from "../lib/laudos-sst";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
@@ -316,13 +320,19 @@ const serviceSrc = readFileSync(
 );
 assert.match(serviceSrc, /onConflict:\s*"orcamento_id"/);
 assert.match(serviceSrc, /ignoreDuplicates:\s*true/);
-assert.match(serviceSrc, /etapa_atual:\s*"epis"/);
-assert.match(serviceSrc, /visita_tecnica_salva_em/);
+assert.match(serviceSrc, /payloadInicialLaudosSst/);
+assert.doesNotMatch(serviceSrc, /pgr_realizado:\s*true/);
+assert.doesNotMatch(serviceSrc, /enviado_cliente:\s*true/);
 assert.doesNotMatch(
   serviceSrc,
   /from\("orcamento_aprovacoes"\)/,
   "listar Laudos não regrava a visita nem a implantação"
 );
+const libLaudosSrc = readFileSync(
+  join(process.cwd(), "lib/laudos-sst.ts"),
+  "utf8"
+);
+assert.match(libLaudosSrc, /visita_tecnica_salva_em/);
 
 const built = buildLaudosSstProcesso(
   baseProcesso({ etapaAtual: "concluido" }),
@@ -549,5 +559,259 @@ assert.doesNotMatch(
   ].join(" "),
   /#F1EDFF|#6D4AFF/
 );
+
+function comOrigem(
+  etapaAtual: ImplantacaoProcesso["etapaAtual"],
+  patch: Partial<ImplantacaoProcesso["orcamento"]>
+): ImplantacaoProcesso["orcamento"] {
+  return {
+    ...baseProcesso({ etapaAtual }).orcamento,
+    ...patch,
+  };
+}
+
+const gestaoMensalVisitaSalva = baseProcesso({
+  etapaAtual: "aguardando_agendamentos",
+  possuiPacoteCompletoSst: false,
+  possuiGestaoSstMensal: true,
+  quantidadeContratada: 1,
+  agendamentosRealizados: 0,
+  dataAprovacao: "2026-10-15T12:00:00Z",
+  aprovacao: {
+    visita_tecnica_necessaria: true,
+    visita_tecnica_salva_em: "2026-10-20T14:00:00Z",
+    updated_at: "2026-11-05T12:00:00Z",
+  } as ImplantacaoProcesso["aprovacao"],
+  orcamento: comOrigem("aguardando_agendamentos", {
+    id: "orc-0080",
+    numero: "ORC-2026-0080",
+    modalidade: "mensalidade",
+    origem_cliente: "google",
+  }),
+});
+assert.equal(
+  isProcessoElegivelLaudosSst(gestaoMensalVisitaSalva),
+  true,
+  "Gestão SST mensal entra após a visita salva, com agendamentos pendentes"
+);
+assert.equal(
+  isProcessoElegivelRiscosPsicossociais(gestaoMensalVisitaSalva),
+  false,
+  "Gestão SST mensal não libera Riscos só pela visita"
+);
+assert.equal(
+  resolverEntradaLaudosSst(gestaoMensalVisitaSalva, "2026-11-05T12:00:00Z"),
+  "2026-10-20T14:00:00Z",
+  "competência segue a visita salva, não a data da sincronização"
+);
+
+const renovacaoVisitaDispensada = baseProcesso({
+  etapaAtual: "aguardando_agendamentos",
+  possuiPacoteCompletoSst: false,
+  possuiGestaoSstMensal: true,
+  quantidadeContratada: 8,
+  agendamentosRealizados: 0,
+  dataAprovacao: "2026-10-03T12:00:00Z",
+  aprovacao: {
+    visita_tecnica_necessaria: false,
+    visita_tecnica_salva_em: "2026-10-08T15:00:00Z",
+    visita_tecnica_data: null,
+    visita_tecnica_horario: null,
+    visita_tecnica_endereco: null,
+    updated_at: "2026-11-05T12:00:00Z",
+  } as ImplantacaoProcesso["aprovacao"],
+  orcamento: comOrigem("aguardando_agendamentos", {
+    id: "orc-0073",
+    numero: "ORC-2026-0073",
+    modalidade: "mensalidade",
+    origem_cliente: "renovacao",
+  }),
+});
+assert.equal(
+  isVisitaTecnicaEfetivamenteConcluida(renovacaoVisitaDispensada),
+  true,
+  "visita dispensada não exige data, horário ou endereço"
+);
+assert.equal(isProcessoElegivelLaudosSst(renovacaoVisitaDispensada), true);
+const payloadRenovacao = payloadInicialLaudosSst(
+  renovacaoVisitaDispensada,
+  "2026-11-05T12:00:00Z"
+);
+assert.equal(payloadRenovacao.orcamento_id, "orc-0073");
+assert.equal(payloadRenovacao.etapa_atual, "epis");
+assert.equal(payloadRenovacao.etapas_concluidas, 0);
+assert.equal(payloadRenovacao.status, "em_andamento");
+assert.equal(payloadRenovacao.entrada_em, "2026-10-08T15:00:00Z");
+assert.equal("pgr_realizado" in payloadRenovacao, false);
+assert.equal("enviado_cliente" in payloadRenovacao, false);
+assert.equal("pcmso_realizado" in payloadRenovacao, false);
+assert.equal("ltcat_realizado" in payloadRenovacao, false);
+
+const renovacaoVisitaReaproveitada = baseProcesso({
+  etapaAtual: "concluido",
+  possuiPacoteCompletoSst: false,
+  possuiGestaoSstMensal: true,
+  dataAprovacao: "2026-10-03T12:00:00Z",
+  aprovacao: {
+    visita_tecnica_necessaria: null,
+    visita_tecnica_salva_em: null,
+    updated_at: "2026-11-05T12:00:00Z",
+  } as ImplantacaoProcesso["aprovacao"],
+  orcamento: comOrigem("concluido", {
+    id: "orc-0075",
+    numero: "ORC-2026-0075",
+    modalidade: "mensalidade",
+    origem_cliente: "renovacao",
+  }),
+});
+assert.equal(
+  isVisitaTecnicaEfetivamenteConcluida(renovacaoVisitaReaproveitada),
+  false
+);
+assert.equal(
+  isProcessoElegivelLaudosSst(renovacaoVisitaReaproveitada),
+  true,
+  "renovação concluída sem novo registro de visita continua elegível"
+);
+assert.equal(
+  resolverEntradaLaudosSst(
+    renovacaoVisitaReaproveitada,
+    "2026-11-05T12:00:00Z"
+  ),
+  "2026-10-03T12:00:00Z"
+);
+
+const mensalSemServicoLaudos = baseProcesso({
+  etapaAtual: "concluido",
+  possuiPacoteCompletoSst: false,
+  possuiGestaoSstMensal: false,
+  orcamento: comOrigem("concluido", {
+    id: "orc-sem-laudo",
+    numero: "ORC-2026-0099",
+    modalidade: "mensalidade",
+    origem_cliente: "renovacao",
+  }),
+});
+assert.equal(isProcessoElegivelLaudosSst(mensalSemServicoLaudos), false);
+assert.equal(isProcessoVisivelLaudosSst(mensalSemServicoLaudos, null), false);
+
+const gestaoVisitaPendente = baseProcesso({
+  etapaAtual: "visita",
+  possuiPacoteCompletoSst: false,
+  possuiGestaoSstMensal: true,
+  aprovacao: {
+    visita_tecnica_necessaria: null,
+    visita_tecnica_salva_em: null,
+  } as ImplantacaoProcesso["aprovacao"],
+  orcamento: comOrigem("visita", {
+    modalidade: "mensalidade",
+    origem_cliente: "renovacao",
+  }),
+});
+assert.equal(isProcessoElegivelLaudosSst(gestaoVisitaPendente), false);
+
+const contratoAnterior = baseProcesso({
+  etapaAtual: "concluido",
+  possuiGestaoSstMensal: true,
+  dataAprovacao: "2025-10-01T12:00:00Z",
+  orcamento: comOrigem("concluido", {
+    id: "orc-anterior",
+    numero: "ORC-2025-0040",
+    modalidade: "mensalidade",
+  }),
+});
+const trackingAnterior = {
+  orcamento_id: "orc-anterior",
+  etapa_atual: "envio_cliente" as const,
+  etapas_concluidas: 6,
+  status: "concluido" as const,
+  entrada_em: "2025-10-01T12:00:00Z",
+  pgr_realizado: true,
+  enviado_cliente: true,
+};
+const laudosAnterior = buildLaudosSstProcesso(contratoAnterior, trackingAnterior);
+const laudosRenovacao = buildLaudosSstProcesso(renovacaoVisitaDispensada, null);
+assert.equal(trackingAnterior.status, "concluido");
+assert.equal(trackingAnterior.pgr_realizado, true);
+assert.equal(laudosAnterior.implantacao.orcamento.id, "orc-anterior");
+assert.equal(laudosAnterior.workflow.pgrRealizado, true);
+assert.equal(laudosRenovacao.etapaAtual, "epis");
+assert.equal(laudosRenovacao.etapasConcluidas, 0);
+assert.equal(laudosRenovacao.workflow.pgrRealizado, null);
+assert.equal(laudosRenovacao.workflow.enviadoCliente, null);
+assert.equal(laudosRenovacao.tracking, null);
+const payloadAnterior = payloadInicialLaudosSst(
+  contratoAnterior,
+  "2026-11-05T12:00:00Z"
+);
+assert.notEqual(payloadAnterior.orcamento_id, payloadRenovacao.orcamento_id);
+assert.equal("pgr_realizado" in payloadAnterior, false);
+assert.deepEqual(
+  payloadInicialLaudosSst(renovacaoVisitaDispensada, "2026-11-05T12:00:00Z"),
+  payloadRenovacao,
+  "sincronizar de novo gera o mesmo payload e não outra linha"
+);
+
+const trackingRenovacao = {
+  ...payloadRenovacao,
+  etapa_atual: "epis" as const,
+};
+const naCompetencia = buildLaudosSstProcesso(
+  renovacaoVisitaDispensada,
+  trackingRenovacao
+);
+const outubro = filterLaudosSstProcessosPorMes(
+  [naCompetencia],
+  { year: 2026, month: 10 }
+);
+const novembro = filterLaudosSstProcessosPorMes(
+  [naCompetencia],
+  { year: 2026, month: 11 }
+);
+assert.equal(outubro.length, 1);
+assert.equal(outubro[0].implantacao.orcamento.numero, "ORC-2026-0073");
+assert.equal(novembro.length, 0);
+const recarregado = buildLaudosSstProcesso(
+  renovacaoVisitaDispensada,
+  trackingRenovacao
+);
+assert.equal(recarregado.dataEntrada, naCompetencia.dataEntrada);
+assert.equal(
+  filterLaudosSstProcessosPorMes([recarregado], { year: 2026, month: 10 })
+    .length,
+  1
+);
+assert.equal(
+  deveCorrigirEntradaInicialLaudosSst(renovacaoVisitaDispensada, {
+    ...trackingRenovacao,
+    entrada_em: "2026-11-05T12:00:00Z",
+  }),
+  "2026-10-08T15:00:00Z",
+  "linha vazia no mês errado volta para a visita salva"
+);
+assert.equal(
+  deveCorrigirEntradaInicialLaudosSst(
+    renovacaoVisitaDispensada,
+    trackingRenovacao
+  ),
+  null,
+  "reexecutar com a competência certa não altera a linha"
+);
+assert.equal(
+  deveCorrigirEntradaInicialLaudosSst(contratoAnterior, trackingAnterior),
+  null,
+  "progresso do contrato anterior não é reescrito"
+);
+
+const gestaoCancelada = baseProcesso({
+  etapaAtual: "concluido",
+  possuiGestaoSstMensal: true,
+  orcamento: comOrigem("concluido", {
+    status: "cancelado",
+    modalidade: "mensalidade",
+    origem_cliente: "renovacao",
+  }),
+});
+assert.equal(isProcessoElegivelLaudosSst(gestaoCancelada), false);
 
 console.log("test-laudos-sst: OK");

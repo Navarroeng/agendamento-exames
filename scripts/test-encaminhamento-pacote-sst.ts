@@ -328,6 +328,29 @@ const visitaPendentePacote = processo({
 assert.equal(isProcessoElegivelLaudosSst(visitaPendentePacote), false);
 assert.equal(isProcessoElegivelRiscosPsicossociais(visitaPendentePacote), false);
 
+const gestaoMensalRenovacao = processo({
+  etapaAtual: "concluido",
+  possuiPacoteCompletoSst: false,
+  clienteNome: "JET SERVICE BOMBAS",
+});
+gestaoMensalRenovacao.possuiGestaoSstMensal = true;
+gestaoMensalRenovacao.orcamento = {
+  ...gestaoMensalRenovacao.orcamento,
+  numero: "ORC-2026-0075",
+  modalidade: "mensalidade",
+  origem_cliente: "renovacao",
+};
+assert.equal(
+  isProcessoElegivelLaudosSst(gestaoMensalRenovacao),
+  true,
+  "Gestão SST mensal renovada entra em Laudos"
+);
+assert.equal(
+  isProcessoElegivelRiscosPsicossociais(gestaoMensalRenovacao),
+  false,
+  "Gestão SST mensal não entra no encaminhamento automático de Riscos"
+);
+
 const riscosLib = readFileSync(
   join(process.cwd(), "lib/riscos-psicossociais.ts"),
   "utf8"
