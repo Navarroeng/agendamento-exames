@@ -17,8 +17,10 @@ import {
   isContratoVagaStatus,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
+  planoCorrecaoCargoVagaOcupada,
   planoCorrecaoNomeVagaProgramada,
   resolveStatusVagaRascunho,
+  selecionarIdsCopiaCargoOperacional,
   selecionarIdsCopiaNomeProgramacao,
   statusClassificacaoVaga,
   validarDraftsListaVagas,
@@ -300,6 +302,7 @@ export async function salvarListaVagasContrato(params: {
     : null;
   const byIndice = new Map(atuais.map((v) => [v.indice, v]));
   let nomesCorrigidos = 0;
+  let cargosCorrigidos = 0;
 
   for (const draft of drafts) {
     const atual = byIndice.get(draft.indice);
@@ -323,6 +326,28 @@ export async function salvarListaVagasContrato(params: {
           colaborador: plano.colaborador,
         });
         nomesCorrigidos += 1;
+      }
+      const planoCargo = planoCorrecaoCargoVagaOcupada({
+        vaga: atual,
+        classificacao,
+        cargoId: draft.cargoId,
+        cargoNome: draft.cargoNome,
+      });
+      if (planoCargo) {
+        await sincronizarCopiaCargoOperacional({
+          contratoId: atual.contrato_id,
+          clienteId: params.clienteId,
+          cpf: planoCargo.preservar.colaboradorCpf,
+          agendamentoId: planoCargo.preservar.agendamentoId,
+          periodicoFuturoId: planoCargo.preservar.periodicoFuturoId,
+          cargoId: planoCargo.cargoId,
+          cargoNome: planoCargo.cargoNome,
+        });
+        await atualizarVaga(planoCargo.vagaId, {
+          cargo_id: planoCargo.cargoId,
+          cargo_nome: planoCargo.cargoNome,
+        });
+        cargosCorrigidos += 1;
       }
       continue;
     }
@@ -405,10 +430,12 @@ export async function salvarListaVagasContrato(params: {
     acao: AUDITORIA_ACOES.contrato_vagas_salvas,
     registroId: params.contratoId,
     registroNome: params.numeroContrato ?? params.contratoId,
-    descricao:
-      nomesCorrigidos > 0
-        ? `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.numeroContrato ?? params.contratoId}. Corrigiu o nome de ${nomesCorrigidos} funcionário(s) em vaga programada, preservando CPF, cargo, vínculos, programação e status.`
-        : `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.numeroContrato ?? params.contratoId}.`,
+    descricao: descreverSalvarListaVagas({
+      usuarioNome: params.usuarioNome,
+      contrato: params.numeroContrato ?? params.contratoId,
+      nomesCorrigidos,
+      cargosCorrigidos,
+    }),
     usuarioNome: params.usuarioNome,
     usuarioEmail: "",
   });
@@ -485,6 +512,152 @@ async function atualizarVaga(
     }
     throw error;
   }
+}
+
+
+function descreverSalvarListaVagas(params: {
+  usuarioNome: string;
+  contrato: string;
+  nomesCorrigidos: number;
+  cargosCorrigidos: number;
+}): string {
+  const base = `${params.usuarioNome} salvou a lista de vagas/funcionários do contrato ${params.contrato}.`;
+  const partes: string[] = [];
+  if (params.nomesCorrigidos > 0) {
+    partes.push(
+      `Corrigiu o nome de ${params.nomesCorrigidos} funcionário(s) em vaga programada, preservando CPF, cargo, vínculos, programação e status.`
+    );
+  }
+  if (params.cargosCorrigidos > 0) {
+    partes.push(
+      `Corrigiu o cargo de ${params.cargosCorrigidos} funcionário(s) em vaga programada ou agendada, preservando CPF, ocupante, vínculos, datas, exames e status.`
+    );
+  }
+  return partes.length > 0 ? `${base} ${partes.join(" ")}` : base;
+}
+
+/**
+ * Atualiza só o cargo na programação e no agendamento já existentes.
+ * Não insere registro, não mexe em exame, valor, data, status nem em ASO emitido.
+ */
+async function sincronizarCopiaCargoOperacional(params: {
+  contratoId: string;
+  clienteId: string | null;
+  cpf: string | null;
+  agendamentoId: string | null;
+  periodicoFuturoId: string | null;
+  cargoId: string | null;
+  cargoNome: string | null;
+}): Promise<void> {
+  const contratoId = params.contratoId.trim();
+  if (!contratoId) return;
+  const supabase = createClient();
+  const patch = {
+    cargo_id: params.cargoId,
+    cargo_nome: params.cargoNome,
+  };
+
+  const periodicos = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("periodicos_futuros")
+      .select("id, contrato_id, colaborador_cpf, status")
+      .eq("contrato_id", contratoId)
+      .in("status", ["ativo", "reagendado"])
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const idsProgramacao = exigirGravacaoUnica(
+    selecionarIdsCopiaCargoOperacional({
+      contratoId,
+      clienteId: params.clienteId,
+      cpf: params.cpf,
+      vinculoId: params.periodicoFuturoId,
+      modo: "programacao",
+      registros: periodicos.map((row) => ({
+        id: String(row.id),
+        contratoId: row.contrato_id ? String(row.contrato_id) : null,
+        colaboradorCpf: row.colaborador_cpf ? String(row.colaborador_cpf) : null,
+        status: row.status ? String(row.status) : null,
+      })),
+    })
+  );
+
+  const agendamentos = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("agendamentos")
+      .select(
+        "id, contrato_id, cliente_id, colaborador_cpf, status, aso_assinado, aso_enviado_clinica, aso_enviado_cliente"
+      )
+      .eq("contrato_id", contratoId)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const registrosAgendamento = agendamentos.map((row) => ({
+    id: String(row.id),
+    contratoId: row.contrato_id ? String(row.contrato_id) : null,
+    clienteId: row.cliente_id ? String(row.cliente_id) : null,
+    colaboradorCpf: row.colaborador_cpf ? String(row.colaborador_cpf) : null,
+    status: row.status ? String(row.status) : null,
+    asoAssinado: row.aso_assinado === true,
+    asoEnviadoClinica: row.aso_enviado_clinica === true,
+    asoEnviadoCliente: row.aso_enviado_cliente === true,
+  }));
+
+  const vinculo = (params.agendamentoId ?? "").trim();
+  if (vinculo && !registrosAgendamento.some((row) => row.id === vinculo)) {
+    const { data: direto, error: diretoErr } = await supabase
+      .from("agendamentos")
+      .select(
+        "id, contrato_id, cliente_id, colaborador_cpf, status, aso_assinado, aso_enviado_clinica, aso_enviado_cliente"
+      )
+      .eq("id", vinculo)
+      .maybeSingle();
+    if (diretoErr) throw diretoErr;
+    if (direto) {
+      registrosAgendamento.push({
+        id: String(direto.id),
+        contratoId: direto.contrato_id ? String(direto.contrato_id) : null,
+        clienteId: direto.cliente_id ? String(direto.cliente_id) : null,
+        colaboradorCpf: direto.colaborador_cpf
+          ? String(direto.colaborador_cpf)
+          : null,
+        status: direto.status ? String(direto.status) : null,
+        asoAssinado: direto.aso_assinado === true,
+        asoEnviadoClinica: direto.aso_enviado_clinica === true,
+        asoEnviadoCliente: direto.aso_enviado_cliente === true,
+      });
+    }
+  }
+
+  const idsAgendamento = exigirGravacaoUnica(
+    selecionarIdsCopiaCargoOperacional({
+      contratoId,
+      clienteId: params.clienteId,
+      cpf: params.cpf,
+      vinculoId: params.agendamentoId,
+      modo: "agendamento",
+      registros: registrosAgendamento,
+    })
+  );
+
+  if (idsProgramacao.length > 0) {
+    const { error } = await supabase
+      .from("periodicos_futuros")
+      .update(patch)
+      .in("id", idsProgramacao);
+    if (error) throw error;
+  }
+  if (idsAgendamento.length === 0) return;
+
+  const { error } = await supabase
+    .from("agendamentos")
+    .update(patch)
+    .in("id", idsAgendamento);
+  if (error) throw error;
 }
 
 export async function liberarFuncionarioDaVagaComprometida(params: {

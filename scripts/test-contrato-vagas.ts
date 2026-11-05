@@ -22,9 +22,12 @@ import {
   resolverDadosExibicaoVagaContrato,
   resolveStatusVagaRascunho,
   statusClassificacaoVaga,
+  planoCorrecaoCargoVagaOcupada,
   planoCorrecaoNomeVagaProgramada,
+  selecionarIdsCopiaCargoOperacional,
   selecionarIdsCopiaNomeProgramacao,
   vagaClassificacaoBloqueiaEdicaoOcupante,
+  vagaPermiteCorrigirCargoOcupante,
   vagaPermiteCorrigirNomeOcupante,
   vagaPrecisaReconciliarAgendamento,
   validarDraftsListaVagas,
@@ -1350,6 +1353,272 @@ assert.match(
   /disabled=\{busy \|\| locked\}/
 );
 
+assert.equal(vagaPermiteCorrigirCargoOcupante("programada"), true);
+assert.equal(vagaPermiteCorrigirCargoOcupante("agendada"), true);
+assert.equal(vagaPermiteCorrigirCargoOcupante("comprometida"), false);
+assert.equal(
+  vagaPermiteCorrigirCargoOcupante(CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN),
+  false
+);
+
+const planoCargoProgramada = planoCorrecaoCargoVagaOcupada({
+  vaga: vagaVirginia,
+  classificacao: "programada",
+  cargoId: "cargo-tec",
+  cargoNome: "tecnica de enfermagem",
+});
+assert.ok(planoCargoProgramada);
+assert.equal(planoCargoProgramada.vagaId, "vaga-virginia");
+assert.equal(planoCargoProgramada.cargoId, "cargo-tec");
+assert.equal(planoCargoProgramada.cargoNome, "TECNICA DE ENFERMAGEM");
+assert.equal(planoCargoProgramada.cargoNomeAnterior, "ENGENHEIRA");
+assert.equal(planoCargoProgramada.preservar.colaborador, NOME_VIRGINIA_COM_VIRGULA);
+assert.equal(planoCargoProgramada.preservar.colaboradorCpf, CPF_JIVALDO);
+assert.equal(planoCargoProgramada.preservar.status, "programada");
+assert.equal(planoCargoProgramada.preservar.agendamentoId, null);
+assert.equal(planoCargoProgramada.preservar.periodicoFuturoId, "pf-virginia");
+assert.equal(planoCargoProgramada.preservar.creditoAsoId, null);
+
+const vagaAgendadaCargo = {
+  ...vagaCard("agendada", {
+    id: "vaga-coconut",
+    indice: 2,
+    colaborador: "MARIA COCONUT",
+    colaborador_cpf: CPF_JIVALDO,
+    agendamento_id: "ag-coconut",
+    periodico_futuro_id: "pf-coconut",
+    credito_aso_id: "cred-coconut",
+  }),
+  cargo_id: "cargo-aux",
+  cargo_nome: "AUXILIAR",
+};
+const planoCargoAgendada = planoCorrecaoCargoVagaOcupada({
+  vaga: vagaAgendadaCargo,
+  classificacao: "agendada",
+  cargoId: "cargo-tec",
+  cargoNome: "TECNICA DE ENFERMAGEM",
+});
+assert.ok(planoCargoAgendada);
+assert.equal(planoCargoAgendada.vagaId, "vaga-coconut");
+assert.equal(planoCargoAgendada.preservar.status, "agendada");
+assert.equal(planoCargoAgendada.preservar.colaboradorCpf, CPF_JIVALDO);
+assert.equal(planoCargoAgendada.preservar.agendamentoId, "ag-coconut");
+assert.equal(planoCargoAgendada.preservar.periodicoFuturoId, "pf-coconut");
+assert.equal(planoCargoAgendada.preservar.creditoAsoId, "cred-coconut");
+assert.equal(
+  planoCorrecaoNomeVagaProgramada({
+    vaga: vagaAgendadaCargo,
+    classificacao: "agendada",
+    nomeInformado: "OUTRO NOME",
+  }),
+  null
+);
+assert.equal(
+  planoCorrecaoCargoVagaOcupada({
+    vaga: vagaVirginia,
+    classificacao: "programada",
+    cargoId: "cargo-eng",
+    cargoNome: "ENGENHEIRA",
+  }),
+  null
+);
+assert.equal(
+  planoCorrecaoCargoVagaOcupada({
+    vaga: vagaVirginia,
+    classificacao: CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
+    cargoId: "cargo-tec",
+    cargoNome: "TECNICA DE ENFERMAGEM",
+  }),
+  null
+);
+assert.equal(
+  planoCorrecaoCargoVagaOcupada({
+    vaga: vagaCard("comprometida", {
+      id: "vaga-aberta-cargo",
+      colaborador: NOME_VIRGINIA,
+      colaborador_cpf: CPF_JIVALDO,
+    }),
+    classificacao: "comprometida",
+    cargoId: "cargo-tec",
+    cargoNome: "TECNICA",
+  }),
+  null
+);
+
+const CPF_OUTRA_PESSOA = "11144477735";
+const idsCargoProgramacao = selecionarIdsCopiaCargoOperacional({
+  contratoId: "c1",
+  clienteId: "cli-coconut",
+  cpf: CPF_JIVALDO,
+  vinculoId: "pf-virginia",
+  modo: "programacao",
+  registros: [
+    {
+      id: "pf-virginia",
+      contratoId: "c1",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+    {
+      id: "pf-mesmo-cpf-outro-nome",
+      contratoId: "c1",
+      colaboradorCpf: "529.982.247-25",
+      status: "reagendado",
+    },
+    {
+      id: "pf-mesmo-nome-outro-cpf",
+      contratoId: "c1",
+      colaboradorCpf: CPF_OUTRA_PESSOA,
+      status: "ativo",
+    },
+    {
+      id: "pf-cancelado",
+      contratoId: "c1",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "cancelado",
+    },
+    {
+      id: "pf-outro-contrato",
+      contratoId: "c2",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+    {
+      id: "pf-outro-cliente",
+      contratoId: "c1",
+      clienteId: "cli-outro",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "ativo",
+    },
+  ],
+});
+assert.deepEqual(idsCargoProgramacao, [
+  "pf-virginia",
+  "pf-mesmo-cpf-outro-nome",
+]);
+
+const depoisDoMil = Array.from({ length: 1000 }, (_, indice) => ({
+  id: `pf-lote-${indice}`,
+  contratoId: "c1",
+  colaboradorCpf: CPF_OUTRA_PESSOA,
+  status: "ativo",
+}));
+depoisDoMil.push({
+  id: "pf-depois-do-mil-cargo",
+  contratoId: "c1",
+  colaboradorCpf: CPF_JIVALDO,
+  status: "ativo",
+});
+assert.deepEqual(
+  selecionarIdsCopiaCargoOperacional({
+    contratoId: "c1",
+    cpf: CPF_JIVALDO,
+    modo: "programacao",
+    registros: depoisDoMil,
+  }),
+  ["pf-depois-do-mil-cargo"]
+);
+
+const idsCargoAgendamento = selecionarIdsCopiaCargoOperacional({
+  contratoId: "c1",
+  clienteId: "cli-coconut",
+  cpf: CPF_JIVALDO,
+  vinculoId: "ag-coconut",
+  modo: "agendamento",
+  registros: [
+    {
+      id: "ag-coconut",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "agendado",
+    },
+    {
+      id: "ag-mesmo-cpf",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "rascunho",
+    },
+    {
+      id: "ag-outro-cpf",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_OUTRA_PESSOA,
+      status: "agendado",
+    },
+    {
+      id: "ag-cancelado",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "cancelado",
+    },
+    {
+      id: "ag-aso-assinado",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "agendado",
+      asoAssinado: true,
+    },
+    {
+      id: "ag-aso-emitido",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "agendado",
+      asoEnviadoClinica: true,
+    },
+    {
+      id: "ag-aso-retido",
+      contratoId: "c1",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "aso_retido",
+    },
+    {
+      id: "ag-outro-contrato",
+      contratoId: "c2",
+      clienteId: "cli-coconut",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "agendado",
+    },
+    {
+      id: "ag-outro-cliente",
+      contratoId: "c1",
+      clienteId: "cli-outro",
+      colaboradorCpf: CPF_JIVALDO,
+      status: "agendado",
+    },
+  ],
+});
+assert.deepEqual(idsCargoAgendamento, ["ag-coconut", "ag-mesmo-cpf"]);
+
+const vagaCargoCorrigida = {
+  ...vagaAgendadaCargo,
+  cargo_id: planoCargoAgendada.cargoId,
+  cargo_nome: planoCargoAgendada.cargoNome,
+};
+const draftCargoReaberto = buildVagaDraftsIniciais(2, [vagaCargoCorrigida]).find(
+  (row) => row.id === "vaga-coconut"
+);
+assert.ok(draftCargoReaberto);
+assert.equal(draftCargoReaberto.cargoNome, "TECNICA DE ENFERMAGEM");
+assert.equal(draftCargoReaberto.cargoId, "cargo-tec");
+assert.equal(draftCargoReaberto.colaboradorCpf.replace(/\D/g, ""), CPF_JIVALDO);
+assert.equal(vagaCargoCorrigida.status, "agendada");
+assert.equal(vagaCargoCorrigida.agendamento_id, "ag-coconut");
+assert.equal(vagaCargoCorrigida.periodico_futuro_id, "pf-coconut");
+
+const cargoInputSrc = abaFuncionariosSrc.slice(
+  abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-2`}"),
+  abaFuncionariosSrc.indexOf("<StatusBadge")
+);
+assert.match(cargoInputSrc, /disabled=\{busy \|\| cargoBloqueado\}/);
+assert.match(cargoInputSrc, /vagaPermiteCorrigirCargoOcupante/);
+assert.doesNotMatch(cargoInputSrc, /disabled=\{busy \|\| locked\}/);
+
 const vagasServiceSrc = readFileSync(
   join(process.cwd(), "services/contrato-vagas.service.ts"),
   "utf8"
@@ -1359,9 +1628,14 @@ const syncSrc = vagasServiceSrc.slice(
   vagasServiceSrc.indexOf("async function atualizarVaga")
 );
 assert.match(vagasServiceSrc, /planoCorrecaoNomeVagaProgramada/);
+assert.match(vagasServiceSrc, /planoCorrecaoCargoVagaOcupada/);
 assert.match(
   vagasServiceSrc,
   /atualizarVaga\(plano\.vagaId, \{\s*colaborador: plano\.colaborador,\s*\}\)/
+);
+assert.match(
+  vagasServiceSrc,
+  /atualizarVaga\(planoCargo\.vagaId, \{\s*cargo_id: planoCargo\.cargoId,\s*cargo_nome: planoCargo\.cargoNome,\s*\}\)/
 );
 assert.match(syncSrc, /\.update\(\{ colaborador: nomeNovo \}\)/);
 assert.match(syncSrc, /exigirGravacaoUnica\(ids\)/);
@@ -1369,5 +1643,21 @@ assert.match(syncSrc, /\.in\("id", lista\)/);
 assert.doesNotMatch(syncSrc, /\.insert\(/);
 assert.doesNotMatch(syncSrc, /from\("agendamentos"\)/);
 assert.doesNotMatch(syncSrc, /\.update\(\{[^}]*status/);
+
+const cargoSyncSrc = vagasServiceSrc.slice(
+  vagasServiceSrc.indexOf("async function sincronizarCopiaCargoOperacional"),
+  vagasServiceSrc.indexOf("export async function liberarFuncionarioDaVagaComprometida")
+);
+assert.match(cargoSyncSrc, /lerTodosOsLotes/);
+assert.match(cargoSyncSrc, /exigirGravacaoUnica/);
+assert.match(cargoSyncSrc, /cargo_id: params\.cargoId/);
+assert.match(cargoSyncSrc, /cargo_nome: params\.cargoNome/);
+assert.match(cargoSyncSrc, /\.update\(patch\)/);
+assert.doesNotMatch(cargoSyncSrc, /\.insert\(/);
+assert.doesNotMatch(cargoSyncSrc, /\.delete\(/);
+assert.doesNotMatch(cargoSyncSrc, /listarExamesObrigatoriosPorCargo/);
+assert.doesNotMatch(cargoSyncSrc, /agendamento_exames/);
+assert.doesNotMatch(cargoSyncSrc, /\.update\(\{[^}]*status/);
+assert.doesNotMatch(cargoSyncSrc, /\.update\(\{[^}]*aso_/);
 
 console.log("test-contrato-vagas: OK");

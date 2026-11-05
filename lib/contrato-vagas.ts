@@ -168,6 +168,16 @@ export function vagaPermiteCorrigirNomeOcupante(
   );
 }
 
+/**
+ * O cargo pode ser corrigido na lista com a vaga Programada ou Agendada.
+ * Não libera troca de CPF nem de ocupante. Desligado administrativo permanece bloqueado.
+ */
+export function vagaPermiteCorrigirCargoOcupante(
+  status: ContratoVagaStatusClassificacao
+): boolean {
+  return status === "programada" || status === "agendada";
+}
+
 export type PlanoCorrecaoNomeVagaProgramada = {
   vagaId: string;
   colaborador: string;
@@ -272,6 +282,139 @@ export function selecionarIdsCopiaNomeProgramacao(params: {
       seen.add(id);
       ids.push(id);
     }
+  }
+
+  return ids;
+}
+
+export type PlanoCorrecaoCargoVagaOcupada = {
+  vagaId: string;
+  cargoId: string | null;
+  cargoNome: string | null;
+  cargoIdAnterior: string | null;
+  cargoNomeAnterior: string | null;
+  preservar: {
+    colaborador: string | null;
+    colaboradorCpf: string | null;
+    status: "programada" | "agendada";
+    agendamentoId: string | null;
+    periodicoFuturoId: string | null;
+    creditoAsoId: string | null;
+  };
+};
+
+/**
+ * Correção de cargo em vaga Programada ou Agendada: só cargo_id e cargo_nome, no mesmo id.
+ * Não altera ocupante, CPF, status, datas, exames nem vínculos.
+ */
+export function planoCorrecaoCargoVagaOcupada(params: {
+  vaga: Pick<
+    ContratoVagaRecord,
+    | "id"
+    | "status"
+    | "colaborador"
+    | "colaborador_cpf"
+    | "cargo_id"
+    | "cargo_nome"
+    | "agendamento_id"
+    | "periodico_futuro_id"
+    | "credito_aso_id"
+  >;
+  classificacao: ContratoVagaStatusClassificacao;
+  cargoId: string | null | undefined;
+  cargoNome: string | null | undefined;
+}): PlanoCorrecaoCargoVagaOcupada | null {
+  if (params.vaga.status !== "programada" && params.vaga.status !== "agendada") {
+    return null;
+  }
+  if (params.classificacao !== params.vaga.status) return null;
+  if (!vagaPermiteCorrigirCargoOcupante(params.classificacao)) return null;
+
+  const cargoNome = normalizeNomeOcupante(params.cargoNome) || null;
+  const cargoId = params.cargoId?.trim() || null;
+  const cargoNomeAnterior = normalizeNomeOcupante(params.vaga.cargo_nome) || null;
+  const cargoIdAnterior = params.vaga.cargo_id?.trim() || null;
+  if (cargoNome === cargoNomeAnterior && cargoId === cargoIdAnterior) return null;
+
+  return {
+    vagaId: params.vaga.id,
+    cargoId,
+    cargoNome,
+    cargoIdAnterior,
+    cargoNomeAnterior,
+    preservar: {
+      colaborador: params.vaga.colaborador,
+      colaboradorCpf: params.vaga.colaborador_cpf,
+      status: params.vaga.status,
+      agendamentoId: params.vaga.agendamento_id,
+      periodicoFuturoId: params.vaga.periodico_futuro_id,
+      creditoAsoId: params.vaga.credito_aso_id,
+    },
+  };
+}
+
+export type RegistroCargoOperacional = {
+  id: string;
+  contratoId?: string | null;
+  clienteId?: string | null;
+  colaboradorCpf?: string | null;
+  status?: string | null;
+  asoAssinado?: boolean | null;
+  asoEnviadoClinica?: boolean | null;
+  asoEnviadoCliente?: boolean | null;
+};
+
+/**
+ * Programações e agendamentos da mesma pessoa nesta contratação.
+ * Usa o vínculo já gravado ou o CPF. Não usa o nome e não atravessa outro contrato.
+ * Agendamento com ASO emitido ou assinado fica de fora.
+ */
+export function selecionarIdsCopiaCargoOperacional(params: {
+  contratoId: string;
+  clienteId?: string | null;
+  cpf?: string | null;
+  vinculoId?: string | null;
+  modo: "programacao" | "agendamento";
+  registros: RegistroCargoOperacional[];
+}): string[] {
+  const contratoId = params.contratoId.trim();
+  const clienteId = (params.clienteId ?? "").trim();
+  const vinculo = (params.vinculoId ?? "").trim();
+  const cpf = normalizeCpfDigits(params.cpf);
+  const ids: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of params.registros) {
+    const id = String(row.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    const rowContrato = String(row.contratoId ?? "").trim();
+    if (rowContrato && contratoId && rowContrato !== contratoId) continue;
+    const rowCliente = String(row.clienteId ?? "").trim();
+    if (clienteId && rowCliente && rowCliente !== clienteId) continue;
+
+    const status = String(row.status ?? "").trim().toLowerCase();
+    if (params.modo === "programacao") {
+      if (status !== "ativo" && status !== "reagendado") continue;
+    } else {
+      if (status === "cancelado" || status === "aso_retido") continue;
+      if (
+        row.asoAssinado === true ||
+        row.asoEnviadoClinica === true ||
+        row.asoEnviadoCliente === true
+      ) {
+        continue;
+      }
+    }
+
+    const mesmoVinculo = Boolean(vinculo) && id === vinculo;
+    const mesmoCpf =
+      isValidCPF(cpf) &&
+      Boolean(rowContrato) &&
+      rowContrato === contratoId &&
+      normalizeCpfDigits(row.colaboradorCpf) === cpf;
+    if (!mesmoVinculo && !mesmoCpf) continue;
+    seen.add(id);
+    ids.push(id);
   }
 
   return ids;
