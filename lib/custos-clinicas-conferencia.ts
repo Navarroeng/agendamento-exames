@@ -40,26 +40,44 @@ export const HISTORICO_STATUS_FILTER_LABELS_CLINICA: Record<
   paga: "Conferido",
 };
 
-/** Conferida ou vencida: o retrato gravado não segue preço nem configuração novos. */
+type FaturaCustosEstado = Pick<
+  FaturaRecord,
+  "status" | "pago" | "conferido_em"
+>;
+
+/**
+ * Vencida não é conferida. A data de vencimento, sozinha, não congela
+ * uma fatura ainda aberta. O retrato fica preservado depois da conferência
+ * ou quando já existe pagamento registrado.
+ */
 export function faturaCustosCongelada(
-  fatura: Pick<FaturaRecord, "status"> | null | undefined
+  fatura: FaturaCustosEstado | null | undefined
 ): boolean {
-  return fatura?.status === "emitida" || fatura?.status === "vencida";
+  if (!fatura || fatura.status === "cancelada") return false;
+  if (fatura.pago) return true;
+  return custosClinicaConferido(fatura);
 }
 
-/** Custos conferidos (emitida ou vencida) contam como pagos no resumo. */
+/** Conferência concluída. Status vencida só conta se a conferência já ocorreu. */
 export function custosClinicaConferido(
-  fatura: Pick<FaturaRecord, "status"> | null | undefined
+  fatura: FaturaCustosEstado | null | undefined
 ): boolean {
-  return fatura?.status === "emitida" || fatura?.status === "vencida";
+  if (!fatura || fatura.status === "cancelada" || fatura.status === "rascunho") {
+    return false;
+  }
+  if (fatura.status === "emitida") return true;
+  if (fatura.status === "vencida") return Boolean(fatura.conferido_em?.trim());
+  return false;
 }
 
-/** Aberta para conferência: sem fatura ou rascunho. */
+/** Aberta para conferência: sem fatura, rascunho ou vencida ainda não conferida nem paga. */
 export function custosClinicaEmAberto(
-  fatura: Pick<FaturaRecord, "status"> | null | undefined
+  fatura: FaturaCustosEstado | null | undefined
 ): boolean {
   if (!fatura) return true;
-  return fatura.status === "rascunho";
+  if (fatura.pago || custosClinicaConferido(fatura)) return false;
+  if (fatura.status === "cancelada") return false;
+  return true;
 }
 
 export function deriveFaturaMesStatusClinica(

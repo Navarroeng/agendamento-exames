@@ -11,6 +11,7 @@ import {
   FATURA_MES_STATUS_LABELS_CLINICA,
   custosClinicaConferido,
   custosClinicaEmAberto,
+  faturaCustosCongelada,
   deriveFaturaMesStatusClinica,
   formatAuditoriaMarcarConferido,
   formatAuditoriaReabrirConferencia,
@@ -80,11 +81,27 @@ assert.equal(deriveFaturaMesStatusClinica(fatura("emitida", true)), "emitida");
 assert.equal(custosClinicaConferido(fatura("emitida")), true);
 assert.equal(custosClinicaConferido(fatura("emitida", true)), true);
 assert.equal(custosClinicaConferido(fatura("rascunho")), false);
+assert.equal(custosClinicaConferido(fatura("vencida")), false);
+assert.equal(
+  custosClinicaConferido(fatura("vencida", false, { conferido_em: "2026-06-30" })),
+  true
+);
 assert.equal(custosClinicaConferido(null), false);
+
+assert.equal(faturaCustosCongelada(fatura("rascunho")), false);
+assert.equal(faturaCustosCongelada(fatura("vencida")), false);
+assert.equal(faturaCustosCongelada(fatura("emitida")), true);
+assert.equal(faturaCustosCongelada(fatura("rascunho", true)), true);
+assert.equal(
+  faturaCustosCongelada(fatura("vencida", false, { conferido_em: "2026-06-30" })),
+  true
+);
 
 assert.equal(custosClinicaEmAberto(null), true);
 assert.equal(custosClinicaEmAberto(fatura("rascunho")), true);
+assert.equal(custosClinicaEmAberto(fatura("vencida")), true);
 assert.equal(custosClinicaEmAberto(fatura("emitida")), false);
+assert.equal(custosClinicaEmAberto(fatura("rascunho", true)), false);
 
 assert.equal(CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO, "Marcar como conferido");
 assert.equal(CUSTOS_CLINICA_ACAO_REABRIR, "Reabrir conferência");
@@ -193,5 +210,35 @@ const resumoLegadoPago = buildResumoClinicasMes(
 assert.ok(resumoLegadoPago);
 assert.equal(resumoLegadoPago.resumo.valorPago, 500);
 assert.equal(resumoLegadoPago.resumo.valorEmAberto, 0);
+
+const resumoVencidaAberta = buildResumoClinicasMes(
+  [agClinica("ag3", "Clínica Gama", 300)],
+  [
+    {
+      ...fatura("vencida"),
+      referencia_nome: "Clínica Gama",
+      data_vencimento: "2026-05-10",
+    },
+  ],
+  "06/2026"
+);
+assert.ok(resumoVencidaAberta);
+assert.equal(resumoVencidaAberta.rows[0]?.valorTotal, 300);
+assert.equal(resumoVencidaAberta.resumo.valorEmAberto, 300);
+assert.equal(resumoVencidaAberta.resumo.valorPago, 0);
+
+const resumoVencidaConferida = buildResumoClinicasMes(
+  [agClinica("ag4", "Clínica Delta", 300)],
+  [
+    {
+      ...fatura("vencida", false, { conferido_em: "2026-06-30" }),
+      referencia_nome: "Clínica Delta",
+    },
+  ],
+  "06/2026"
+);
+assert.ok(resumoVencidaConferida);
+assert.equal(resumoVencidaConferida.rows[0]?.valorTotal, 500);
+assert.equal(resumoVencidaConferida.resumo.valorPago, 500);
 
 console.log("test-custos-clinicas-conferencia: ok");

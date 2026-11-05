@@ -410,7 +410,7 @@ function computeResumo(
     const valor = Number(row.valorTotal);
 
     if (tipo === "clinica") {
-      if (custosClinicaConferido(row.fatura)) {
+      if (row.fatura?.pago || custosClinicaConferido(row.fatura)) {
         valorPago += valor;
       } else if (custosClinicaEmAberto(row.fatura)) {
         valorEmAberto += valor;
