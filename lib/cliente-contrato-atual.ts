@@ -46,6 +46,12 @@ export type ContextoCobrancaContrato = {
    * Ausente ou null não autoriza exibir renovação automática.
    */
   renovacaoAutomatica?: boolean | null;
+  /**
+   * Quantidade gravada na aprovação do orçamento que originou o contrato.
+   * Só aparece no histórico quando o próprio contrato não tem quantidade.
+   * Não substitui `quantidade_colaboradores` e não é gravada de volta.
+   */
+  quantidadeColaboradoresOrcamento?: number | null;
 };
 
 export type ClienteContratoConsulta = ClienteContratoRecord &

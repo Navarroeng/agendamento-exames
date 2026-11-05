@@ -71,7 +71,7 @@ export async function complementarContratosComCobranca(
 
   const supabase = createClient();
   const selectAprovacaoBase =
-    "id, orcamento_id, contrato_assinado, contrato_assinado_em, revertida_em, created_at, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
+    "id, orcamento_id, quantidade_colaboradores, contrato_assinado, contrato_assinado_em, revertida_em, created_at, mensalidade_pagamento, mensalidade_dia_vencimento, mensalidade_valor_mensal, mensalidade_exame_avulso_centavos";
   const selectComRenovacao = `${selectAprovacaoBase}, mensalidade_renovacao_automatica`;
   const selectCompleto = `${selectComRenovacao}, mensalidade_vencimento_regra, contrato_modelo_versao, mensalidade_exame_demissional_centavos`;
   const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
@@ -130,6 +130,7 @@ export async function complementarContratosComCobranca(
     mensalidade_vencimento_regra?: string | null;
     contrato_modelo_versao?: number | null;
     mensalidade_renovacao_automatica?: boolean | null;
+    quantidade_colaboradores?: number | null;
   };
   const aprovacoesPorOrcamento = new Map<string, AprovacaoCobranca[]>();
   for (const row of (aprovacoesRes.data ?? []) as AprovacaoCobranca[]) {
@@ -204,6 +205,10 @@ export async function complementarContratosComCobranca(
           : aprovacao?.mensalidade_renovacao_automatica === false
             ? false
             : null,
+      quantidadeColaboradoresOrcamento:
+        aprovacao?.quantidade_colaboradores == null
+          ? null
+          : Number(aprovacao.quantidade_colaboradores),
       parcelasMensalidade: aprovacao
         ? (parcelasPorAprovacao.get(aprovacao.id) ?? [])
         : [],

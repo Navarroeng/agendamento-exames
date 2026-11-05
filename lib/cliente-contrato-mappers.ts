@@ -285,6 +285,38 @@ export function formatValorContrato(valor: number | null | undefined): string {
   return formatCurrencyBRL(Number(valor));
 }
 
+/**
+ * Quantidade da contratação daquela linha.
+ * O número gravado no contrato prevalece. Se estiver ausente, usa a
+ * quantidade da aprovação do orçamento que originou o contrato.
+ * Valor ausente não vira zero.
+ */
+export function labelQuantidadeColaboradoresContrato(
+  contrato: Pick<ClienteContratoRecord, "quantidade_colaboradores"> & {
+    quantidadeColaboradoresOrcamento?: number | null;
+  }
+): string {
+  const propria = quantidadeColaboradoresRegistrada(
+    contrato.quantidade_colaboradores
+  );
+  if (propria != null) return propria;
+  const origem = quantidadeColaboradoresRegistrada(
+    contrato.quantidadeColaboradoresOrcamento
+  );
+  if (origem != null) return origem;
+  return "—";
+}
+
+function quantidadeColaboradoresRegistrada(
+  value: number | string | null | undefined
+): string | null {
+  if (value == null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return String(Math.trunc(n));
+}
+
 export function formatValorContratoExibicao(
   contrato: Pick<
     ClienteContratoRecord,
