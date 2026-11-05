@@ -2,6 +2,7 @@ import {
   clienteContratoBadgeClassExibicao,
   condicaoPagamentoExibicao,
   formatValorContratoExibicao,
+  labelQuantidadeColaboradoresContrato,
   labelLiberacaoNaVigenciaContrato,
   labelClienteContratoStatusExibicao,
   labelFinanceiroContrato,
@@ -46,7 +47,7 @@ export function ClienteContratosHistoricoTable({
 
   return (
     <div className="table-wrap -mx-1 overflow-x-auto px-1">
-      <table className="table-premium w-full min-w-[1180px]">
+      <table className="table-premium w-full min-w-[1320px]">
         <thead>
           <tr>
             {[
@@ -54,6 +55,7 @@ export function ClienteContratosHistoricoTable({
               "Orçamento",
               "Aprovação",
               "Valor",
+              "Colaboradores",
               "Status",
               "Financeiro",
               "Renovação",
@@ -96,6 +98,9 @@ export function ClienteContratosHistoricoTable({
                 </td>
                 <td className="tabular-nums">
                   {formatValorContratoExibicao(contrato)}
+                </td>
+                <td className="tabular-nums">
+                  {labelQuantidadeColaboradoresContrato(contrato)}
                 </td>
                 <td>
                   <span
