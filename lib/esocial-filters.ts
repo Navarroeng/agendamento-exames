@@ -133,27 +133,29 @@ export function isEnvioEsocialConcluido(
   return Boolean(envio);
 }
 
-function daysSinceExam(isoDate: string): number {
+function daysSinceExam(isoDate: string, agora: Date = new Date()): number {
   const exam = new Date(`${isoDate.split("T")[0]}T12:00:00`);
-  const hoje = new Date(`${new Date().toISOString().split("T")[0]}T12:00:00`);
+  const hoje = new Date(`${agora.toISOString().split("T")[0]}T12:00:00`);
   return Math.floor((hoje.getTime() - exam.getTime()) / 86400000);
 }
 
 /** Status derivado sem considerar cancelamento (para gravar status anterior). */
 export function getESocialVisualStatusSemCancelamento(
-  agendamento: AgendamentoWithExames
+  agendamento: AgendamentoWithExames,
+  agora: Date = new Date()
 ): Exclude<ESocialVisualStatus, "cancelado"> {
   if (isEnvioEsocialConcluido(agendamento.envio_esocial)) return "enviado";
-  const dias = daysSinceExam(agendamento.data_agendamento);
+  const dias = daysSinceExam(agendamento.data_agendamento, agora);
   if (dias > URGENTE_DIAS) return "urgente";
   return "pendente";
 }
 
 export function getESocialVisualStatus(
-  agendamento: AgendamentoWithExames
+  agendamento: AgendamentoWithExames,
+  agora: Date = new Date()
 ): ESocialVisualStatus {
   if (isEsocialEnvioCancelado(agendamento)) return "cancelado";
-  return getESocialVisualStatusSemCancelamento(agendamento);
+  return getESocialVisualStatusSemCancelamento(agendamento, agora);
 }
 
 export const ESOCIAL_VISUAL_STATUS_LABELS: Record<ESocialVisualStatus, string> =
@@ -203,9 +205,10 @@ function matchesPeriodo(
 
 function matchesStatusFilter(
   agendamento: AgendamentoWithExames,
-  status: ESocialStatusFilter
+  status: ESocialStatusFilter,
+  agora: Date
 ): boolean {
-  const visual = getESocialVisualStatus(agendamento);
+  const visual = getESocialVisualStatus(agendamento, agora);
 
   switch (status) {
     case "acao":
@@ -227,13 +230,14 @@ function matchesStatusFilter(
 
 export function filterAgendamentosESocial(
   agendamentos: AgendamentoWithExames[],
-  filters: ESocialFilters
+  filters: ESocialFilters,
+  agora: Date = new Date()
 ): AgendamentoWithExames[] {
   return agendamentos.filter((item) => {
     if (item.status === "cancelado") return false;
     if (!matchesText(item.cliente_nome, filters.cliente)) return false;
     if (!matchesText(item.colaborador, filters.colaborador)) return false;
-    if (!matchesStatusFilter(item, filters.statusEsocial)) return false;
+    if (!matchesStatusFilter(item, filters.statusEsocial, agora)) return false;
     if (!matchesPeriodo(item, filters)) return false;
     return true;
   });
@@ -280,7 +284,8 @@ export interface ESocialSummaryStats {
 }
 
 export function computeESocialSummary(
-  agendamentos: AgendamentoWithExames[]
+  agendamentos: AgendamentoWithExames[],
+  agora: Date = new Date()
 ): ESocialSummaryStats {
   let pendentes = 0;
   let enviarUrgente = 0;
@@ -288,7 +293,7 @@ export function computeESocialSummary(
   let cancelados = 0;
 
   agendamentos.forEach((a) => {
-    const visual = getESocialVisualStatus(a);
+    const visual = getESocialVisualStatus(a, agora);
     if (visual === "enviado") enviados += 1;
     else if (visual === "urgente") enviarUrgente += 1;
     else if (visual === "pendente") pendentes += 1;

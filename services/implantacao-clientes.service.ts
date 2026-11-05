@@ -1,4 +1,4 @@
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
@@ -136,12 +136,19 @@ export async function listarProcessosImplantacao(): Promise<
 
   let orcamentosExtra: OrcamentoRecord[] = [];
   if (missingIds.length > 0) {
-    const { data, error } = await supabase
-      .from("orcamentos")
-      .select("*")
-      .in("id", missingIds);
-    if (error) throw error;
-    orcamentosExtra = (data ?? []) as OrcamentoRecord[];
+    orcamentosExtra = await lerPorIdentificadores(
+      missingIds,
+      async (grupo, from, to) => {
+        const { data, error } = await supabase
+          .from("orcamentos")
+          .select("*")
+          .in("id", grupo)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return (data ?? []) as OrcamentoRecord[];
+      }
+    );
   }
 
   const orcamentoById = new Map<string, OrcamentoRecord>();
@@ -187,12 +194,20 @@ export async function listarProcessosImplantacao(): Promise<
     );
   });
   if (needItens.length > 0) {
-    const { data: itensRows, error: itensErr } = await supabase
-      .from("orcamento_itens")
-      .select("orcamento_id, servico_id, servico_nome")
-      .in("orcamento_id", needItens);
-    if (itensErr) throw itensErr;
-    for (const row of itensRows ?? []) {
+    const itensRows = await lerPorIdentificadores(
+      needItens,
+      async (grupo, from, to) => {
+        const { data, error } = await supabase
+          .from("orcamento_itens")
+          .select("orcamento_id, servico_id, servico_nome")
+          .in("orcamento_id", grupo)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      }
+    );
+    for (const row of itensRows) {
       const list = itensByOrcamento.get(row.orcamento_id) ?? [];
       list.push({
         servico_id: row.servico_id,

@@ -6,7 +6,7 @@ import {
 } from "../lib/agendamento-filters";
 import { consultaEsocial, limiteUrgenciaEsocial } from "../lib/esocial-consulta";
 import { getDefaultESocialFilters } from "../lib/esocial-filters";
-import { diaSeguinteIso, termoIlike } from "../lib/consulta-lotes";
+import { diaSeguinteIso, termoBuscaRegex } from "../lib/consulta-lotes";
 
 function filtros(
   partial: Partial<AgendamentoFilters>
@@ -34,10 +34,12 @@ assert.equal(
   "status todos não restringe status"
 );
 const colaborador = erica.condicoes.find(
-  (item) => item.op === "ilike" && item.coluna === "colaborador"
+  (item) => item.op === "imatch" && item.coluna === "colaborador"
 );
-assert.ok(colaborador && colaborador.op === "ilike");
-assert.equal(colaborador.valor, "%ERICA DA SILVA COSTA%");
+assert.ok(colaborador && colaborador.op === "imatch");
+assert.match(String(colaborador.valor), /\[EÉÈÊËeéèêë\]/);
+assert.match(String(colaborador.valor), /\\s\+/);
+assert.equal(termoBuscaRegex("  érica   da silva costa "), termoBuscaRegex("ERICA DA SILVA COSTA"));
 assert.deepEqual(erica.ordem, [
   { coluna: "data_agendamento", ascending: true },
   { coluna: "horario", ascending: true },
@@ -70,7 +72,7 @@ assert.ok(
     (item) => item.op === "lt" && item.valor === "2026-09-01"
   )
 );
-assert.equal(termoIlike("Érica"), "ERICA");
+assert.equal(termoBuscaRegex("Érica"), termoBuscaRegex("erica"));
 assert.equal(diaSeguinteIso("2026-08-31"), "2026-09-01");
 
 const esocial = consultaEsocial(

@@ -1,4 +1,4 @@
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { compareByLabel, sortByNome } from "@/lib/sort-by-label";
 import { VALIDADE_PERIODICO_ALERTA } from "@/lib/cargo-periodico";
 import { createClient } from "@/lib/supabase/client";
@@ -201,16 +201,20 @@ export async function contarExamesPorCargo(
   if (cargoIds.length === 0) return {};
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("cargo_exames")
-    .select("cargo_id")
-    .in("cargo_id", cargoIds)
-    .eq("ativo", true);
-
-  if (error) throw error;
+  const data = await lerPorIdentificadores(cargoIds, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("cargo_exames")
+      .select("cargo_id")
+      .in("cargo_id", grupo)
+      .eq("ativo", true)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const counts: Record<string, number> = {};
-  (data ?? []).forEach((row) => {
+  data.forEach((row) => {
     const id = row.cargo_id as string;
     counts[id] = (counts[id] ?? 0) + 1;
   });

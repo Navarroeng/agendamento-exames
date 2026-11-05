@@ -3,6 +3,7 @@ import {
   obterEmailEnvioSugeridoCliente,
   type FaturaEnvioEmailFonte,
 } from "@/lib/fatura-envio-sugestao";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { FaturaComItens } from "@/lib/types";
 
@@ -20,17 +21,19 @@ export async function listarEnviosEmailCliente(
   if (!UUID_RE.test(refId)) return [];
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("faturas")
-    .select("id, tipo, referencia_id, fatura_enviada_email, fatura_enviada_em")
-    .eq("tipo", "cliente")
-    .eq("referencia_id", refId)
-    .not("fatura_enviada_em", "is", null)
-    .order("fatura_enviada_em", { ascending: false })
-    .limit(200);
-
-  if (error) throw error;
-  return (data ?? []) as FaturaEnvioEmailFonte[];
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("faturas")
+      .select("id, tipo, referencia_id, fatura_enviada_email, fatura_enviada_em")
+      .eq("tipo", "cliente")
+      .eq("referencia_id", refId)
+      .not("fatura_enviada_em", "is", null)
+      .order("fatura_enviada_em", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as FaturaEnvioEmailFonte[];
+  });
 }
 
 /**

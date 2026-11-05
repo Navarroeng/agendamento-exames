@@ -9,6 +9,7 @@ import {
   type RiscosCampanhaLogoOrigem,
 } from "@/lib/riscos-campanha-logo";
 import type { RiscosCampanhaRecord } from "@/lib/riscos-campanha";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import {
@@ -61,13 +62,23 @@ export async function buscarLogoEmpresaPorCliente(
   const id = clienteId.trim();
   if (!id) return null;
   const supabase = createClient();
-  const { data: orcs, error: orcErr } = await supabase
-    .from("orcamentos")
-    .select("id")
-    .eq("cliente_id", id)
-    .order("created_at", { ascending: false })
-    .limit(20);
-  if (orcErr || !orcs?.length) return null;
+  let orcs: Array<{ id?: string }>;
+  try {
+    orcs = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await supabase
+        .from("orcamentos")
+        .select("id")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id?: string }>;
+    });
+  } catch {
+    return null;
+  }
+  if (orcs.length === 0) return null;
 
   for (const row of orcs) {
     const oid = String((row as { id?: string }).id ?? "");

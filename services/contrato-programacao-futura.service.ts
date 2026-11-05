@@ -27,7 +27,7 @@ import {
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -71,16 +71,23 @@ export async function contarProgramacoesFuturasPorContratos(
   for (const id of contratoIds) map.set(id, 0);
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select("contrato_id")
-    .in("contrato_id", contratoIds)
-    .eq("consome_previsao_contrato", true)
-    .in("status", ["ativo", "reagendado"]);
+  const data = await lerPorIdentificadores(
+    contratoIds,
+    async (grupo, from, to) => {
+      const { data: page, error } = await supabase
+        .from("periodicos_futuros")
+        .select("contrato_id")
+        .in("contrato_id", grupo)
+        .eq("consome_previsao_contrato", true)
+        .in("status", ["ativo", "reagendado"])
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    }
+  );
 
-  if (error) throw error;
-
-  for (const row of data ?? []) {
+  for (const row of data) {
     const cid = String(row.contrato_id ?? "");
     if (!cid) continue;
     map.set(cid, (map.get(cid) ?? 0) + 1);
@@ -92,18 +99,22 @@ export async function listarProgramacoesFuturasDoContrato(
   contratoId: string
 ): Promise<PeriodicoProgramadoContrato[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select(
-      "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
-    )
-    .eq("contrato_id", contratoId)
-    .eq("consome_previsao_contrato", true)
-    .in("status", ["ativo", "reagendado"])
-    .order("proxima_data", { ascending: true });
-
-  if (error) throw error;
-  const rows = (data ?? []) as PeriodicoProgramadoContrato[];
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
+      )
+      .eq("contrato_id", contratoId)
+      .eq("consome_previsao_contrato", true)
+      .in("status", ["ativo", "reagendado"])
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const rows = data as PeriodicoProgramadoContrato[];
   if (rows.length === 0) return [];
 
   const agIds = Array.from(
@@ -128,12 +139,18 @@ export async function listarProgramacoesFuturasDoContrato(
   >();
 
   if (agIds.length > 0) {
-    const { data: agsData } = await supabase
-      .from("agendamentos")
-      .select("id, data_agendamento, status, aso_assinado, data_aso_assinado")
-      .in("id", agIds);
+    const agsData = await lerPorIdentificadores(agIds, async (grupo, from, to) => {
+      const { data: page, error } = await supabase
+        .from("agendamentos")
+        .select("id, data_agendamento, status, aso_assinado, data_aso_assinado")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    });
 
-    for (const ag of agsData ?? []) {
+    for (const ag of agsData) {
       const dataIso = String(ag.data_agendamento ?? "").slice(0, 10);
       const st = String(ag.status ?? "");
       const assinado =

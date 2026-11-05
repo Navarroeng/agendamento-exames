@@ -3,7 +3,7 @@
  * Isolamento por orcamentos.cliente_id + liberação envio_cliente.
  */
 
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   LAUDOS_SST_ANEXOS_BUCKET,
@@ -78,15 +78,19 @@ export async function listarLaudosSstPortal(clienteId: string): Promise<{
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("orcamento_laudos_sst")
-    .select(TRACKING_SELECT)
-    .in("orcamento_id", orcamentoIds);
-
-  if (error) throw error;
+  const rows = await lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+    const { data, error } = await admin
+      .from("orcamento_laudos_sst")
+      .select(TRACKING_SELECT)
+      .in("orcamento_id", grupo)
+      .order("orcamento_id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return data ?? [];
+  });
 
   const documentos: PortalLaudoDocumento[] = [];
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const tracking = row as unknown as OrcamentoLaudosSstRecord;
     documentos.push(...extrairDocumentosPortalLaudosSst(tracking));
   }

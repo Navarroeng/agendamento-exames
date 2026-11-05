@@ -93,8 +93,7 @@ export async function buscarCpfEmOutraCampanhaAtiva(input: {
     .eq("cpf", cpf)
     .in("riscos_campanhas.status", [...RISCOS_CAMPANHA_STATUS_ATIVOS])
     .is("removido_em", null)
-    .not("status", "in", '("removido","invalidado")')
-    .limit(5);
+    .not("status", "in", '("removido","invalidado")');
 
   if (input.excludeParticipanteId) {
     query = query.neq("id", input.excludeParticipanteId);

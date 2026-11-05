@@ -6,11 +6,11 @@ import {
 import { parseMonthYearBRToIsoRange } from "@/lib/agendamento-datetime";
 import type { AgendamentoTableSortState } from "@/lib/agendamento-table-sort";
 import { PENDENCIA_LABELS } from "@/lib/agendamentos-table";
-import { diaSeguinteIso, termoIlike } from "@/lib/consulta-lotes";
+import { diaSeguinteIso, termoBuscaRegex } from "@/lib/consulta-lotes";
 
 export type CondicaoConsulta =
   | {
-      op: "gte" | "lt" | "ilike" | "eq" | "neq";
+      op: "gte" | "lt" | "ilike" | "imatch" | "eq" | "neq";
       coluna: string;
       valor: string | boolean;
     }
@@ -122,23 +122,22 @@ function ordemDoUsuario(sort: AgendamentoTableSortState): OrdemConsulta[] {
       return [{ coluna: "envio_esocial", ascending }, id];
     case "exames":
     case "totalCliente":
-      return [
-        { coluna: "data_agendamento", ascending: true },
-        { coluna: "horario", ascending: true },
-        id,
-      ];
+      return [id];
     default:
       return [id];
   }
 }
 
-function texto(
-  coluna: string,
-  valor: string
-): CondicaoConsulta | null {
-  const termo = termoIlike(valor);
+function texto(coluna: string, valor: string): CondicaoConsulta | null {
+  const termo = termoBuscaRegex(valor);
   if (!termo) return null;
-  return { op: "ilike", coluna, valor: `%${termo}%` };
+  return { op: "imatch", coluna, valor: termo };
+}
+
+export function ordenacaoPorExamesOuTotal(
+  sort: AgendamentoTableSortState | null
+): boolean {
+  return sort?.column === "exames" || sort?.column === "totalCliente";
 }
 
 /**
@@ -180,6 +179,6 @@ export function consultaAgendamentos(
   return {
     condicoes,
     ordem: sort ? ordemDoUsuario(sort) : ordemPadrao(filters),
-    tipoExame: termoIlike(filters.tipoExame),
+    tipoExame: termoBuscaRegex(filters.tipoExame),
   };
 }

@@ -53,19 +53,26 @@ function mockAgendamento(
   };
 }
 
+/** Data em que 04/08/2026 ainda está dentro da janela de 30 dias (pendente, não urgente). */
+const REFERENCIA_PERIODO = new Date("2026-08-20T12:00:00Z");
+
 function filtrarMes(
   agendamentos: AgendamentoWithExames[],
   mesReferencia: string,
   statusEsocial: ESocialFilters["statusEsocial"] = "todos"
 ) {
-  return filterAgendamentosESocial(agendamentos, {
-    cliente: "",
-    colaborador: "",
-    statusEsocial,
-    mesReferencia,
-    dataInicio: "",
-    dataFim: "",
-  });
+  return filterAgendamentosESocial(
+    agendamentos,
+    {
+      cliente: "",
+      colaborador: "",
+      statusEsocial,
+      mesReferencia,
+      dataInicio: "",
+      dataFim: "",
+    },
+    REFERENCIA_PERIODO
+  );
 }
 
 run("criado 31/07, agendado 04/08 → aparece em Agosto", () => {
@@ -119,7 +126,7 @@ run("KPIs do mês usam a mesma regra da tabela", () => {
   });
 
   const lista = filtrarMes([julho, agosto], "08/2026");
-  const summary = computeESocialSummary(lista);
+  const summary = computeESocialSummary(lista, REFERENCIA_PERIODO);
 
   assert.equal(lista.length, 1);
   assert.equal(lista[0].id, "ago");

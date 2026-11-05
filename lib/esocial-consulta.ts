@@ -5,10 +5,7 @@ import {
 } from "@/lib/agendamento-datetime";
 import type { ESocialFilters, ESocialStatusFilter } from "@/lib/esocial-filters";
 import type { ESocialTableSortState } from "@/lib/esocial-table-sort";
-import {
-  diaSeguinteIso,
-  termoIlike,
-} from "@/lib/consulta-lotes";
+import { diaSeguinteIso, termoBuscaRegex } from "@/lib/consulta-lotes";
 import type {
   CondicaoConsulta,
   OrdemConsulta,
@@ -24,9 +21,9 @@ export function limiteUrgenciaEsocial(hojeIso = todayIsoSaoPaulo()): string {
 }
 
 function texto(coluna: string, valor: string): CondicaoConsulta | null {
-  const termo = termoIlike(valor);
+  const termo = termoBuscaRegex(valor);
   if (!termo) return null;
-  return { op: "ilike", coluna, valor: `%${termo}%` };
+  return { op: "imatch", coluna, valor: termo };
 }
 
 function periodo(filters: ESocialFilters): CondicaoConsulta[] {

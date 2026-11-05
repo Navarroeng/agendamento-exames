@@ -21,7 +21,7 @@ import {
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
 import { formatCurrency } from "@/lib/money";
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   FATURA_AGENDAMENTO_NAO_ELEGIVEL_MSG,
@@ -199,12 +199,16 @@ async function validarItensFaturaElegiveis(
   const ids = Array.from(new Set(itens.map((item) => item.agendamento_id!)));
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("id, status")
-    .in("id", ids);
-
-  if (error) throw error;
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .in("id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const statusById = new Map(
     (data ?? []).map((row) => [row.id as string, row.status as string])

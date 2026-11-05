@@ -1,4 +1,4 @@
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { buildLaudosSstProcesso } from "@/lib/laudos-sst";
 import type { ImplantacaoProcesso } from "@/lib/implantacao-clientes";
@@ -190,33 +190,43 @@ async function listarRelatoriosMetaPorCampanhas(
   if (ids.length === 0) return map;
 
   const supabase = createClient();
-  let { data, error } = await supabase
-    .from("riscos_relatorios")
-    .select("campanha_id, gerado_em, relatorio_enviado_em")
-    .in("campanha_id", ids);
+  const ler = (select: string) =>
+    lerPorIdentificadores(ids, async (grupo, from, to) => {
+      const { data, error } = await supabase
+        .from("riscos_relatorios")
+        .select(select)
+        .in("campanha_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    });
 
-  if (
-    error &&
-    (/relatorio_enviado_em/i.test(error.message ?? "") ||
-      error.code === "42703")
-  ) {
-    const fb = await supabase
-      .from("riscos_relatorios")
-      .select("campanha_id, gerado_em")
-      .in("campanha_id", ids);
-    data = fb.data as typeof data;
-    error = fb.error;
-  }
-
-  if (error) {
-    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+  let data: unknown[];
+  try {
+    data = await ler("campanha_id, gerado_em, relatorio_enviado_em");
+  } catch (error) {
+    const falha = error as { message?: string; code?: string };
+    if (falha.code === "42P01" || falha.message?.includes("does not exist")) {
       return map;
     }
-    console.warn("riscos_relatorios (listagem) indisponível:", error.message);
-    return map;
+    if (
+      /relatorio_enviado_em/i.test(falha.message ?? "") ||
+      falha.code === "42703"
+    ) {
+      try {
+        data = await ler("campanha_id, gerado_em");
+      } catch (fallback) {
+        console.warn("riscos_relatorios (listagem) indisponível:", fallback);
+        return map;
+      }
+    } else {
+      console.warn("riscos_relatorios (listagem) indisponível:", falha.message);
+      return map;
+    }
   }
 
-  for (const row of data ?? []) {
+  for (const row of data) {
     const cid = String((row as { campanha_id?: string }).campanha_id ?? "");
     if (!cid) continue;
     map.set(cid, {
@@ -240,39 +250,54 @@ async function garantirTrackingRiscosPsicossociais(
   if (ids.length === 0) return map;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orcamento_riscos_psicossociais")
-    .select(RISCOS_TRACKING_SELECT)
-    .in("orcamento_id", ids);
+  const ler = (select: string) =>
+    lerPorIdentificadores(ids, async (grupo, from, to) => {
+      const { data, error } = await supabase
+        .from("orcamento_riscos_psicossociais")
+        .select(select)
+        .in("orcamento_id", grupo)
+        .order("orcamento_id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    });
 
-  const trackingError =
-    error && /pausa_situacao|pausa_em|pausa_por|pausa_observacao/i.test(error.message ?? "")
-      ? (
-          await supabase
-            .from("orcamento_riscos_psicossociais")
-            .select(RISCOS_TRACKING_SELECT_SEM_PAUSA)
-            .in("orcamento_id", ids)
-        )
-      : error &&
-          /cancelado_em|cancelado_por|motivo_cancelamento/i.test(error.message ?? "")
-        ? (
-            await supabase
-              .from("orcamento_riscos_psicossociais")
-              .select(RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO)
-              .in("orcamento_id", ids)
-          )
-        : { data, error };
-
-  if (trackingError.error) {
-    console.warn(
-      "riscos-psicossociais tracking indisponível:",
-      trackingError.error.message
-    );
-    return map;
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = (await ler(RISCOS_TRACKING_SELECT)) as unknown as Array<
+      Record<string, unknown>
+    >;
+  } catch (error) {
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message?: string }).message ?? "")
+        : "";
+    try {
+      if (/pausa_situacao|pausa_em|pausa_por|pausa_observacao/i.test(message)) {
+        rows = (await ler(RISCOS_TRACKING_SELECT_SEM_PAUSA)) as unknown as Array<
+          Record<string, unknown>
+        >;
+      } else if (
+        /cancelado_em|cancelado_por|motivo_cancelamento/i.test(message)
+      ) {
+        rows = (await ler(
+          RISCOS_TRACKING_SELECT_SEM_CANCELAMENTO
+        )) as unknown as Array<Record<string, unknown>>;
+      } else {
+        console.warn("riscos-psicossociais tracking indisponível:", message);
+        return map;
+      }
+    } catch (fallback) {
+      console.warn("riscos-psicossociais tracking indisponível:", fallback);
+      return map;
+    }
   }
 
-  for (const row of trackingError.data ?? []) {
-    map.set(row.orcamento_id, row as OrcamentoRiscosPsicossociaisRecord);
+  for (const row of rows) {
+    map.set(
+      String(row.orcamento_id),
+      row as unknown as OrcamentoRiscosPsicossociaisRecord
+    );
   }
 
   const faltantes = implantacao.filter((p) =>

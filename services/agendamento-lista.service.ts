@@ -1,4 +1,7 @@
-import { consultaAgendamentos } from "@/lib/agendamento-consulta";
+import {
+  consultaAgendamentos,
+  ordenacaoPorExamesOuTotal,
+} from "@/lib/agendamento-consulta";
 import type {
   CondicaoConsulta,
   OrdemConsulta,
@@ -7,6 +10,7 @@ import type { AgendamentoFilters } from "@/lib/agendamento-filters";
 import { AGENDAMENTOS_PAGE_SIZE } from "@/lib/agendamento-filters";
 import type { AgendamentoTableSortState } from "@/lib/agendamento-table-sort";
 import {
+  lerPorIdentificadores,
   lerTodosOsLotes,
   montarPagina,
   type PaginaConsulta,
@@ -22,6 +26,7 @@ import {
   type ESocialSummaryStats,
 } from "@/lib/esocial-filters";
 import type { ESocialTableSortState } from "@/lib/esocial-table-sort";
+import { sortAgendamentosForTable } from "@/lib/agendamento-table-sort";
 import { createClient } from "@/lib/supabase/client";
 import type { AgendamentoExameRecord, AgendamentoWithExames } from "@/lib/types";
 
@@ -47,6 +52,7 @@ type Consulta = {
   gte: (coluna: string, valor: string) => Consulta;
   lt: (coluna: string, valor: string) => Consulta;
   ilike: (coluna: string, valor: string) => Consulta;
+  filter: (coluna: string, operador: string, valor: string) => Consulta;
   in: (coluna: string, valor: string[]) => Consulta;
   or: (filtros: string) => Consulta;
   not: (coluna: string, operador: string, valor: string | boolean) => Consulta;
@@ -66,6 +72,8 @@ function aplicarConsulta(
       atual = atual.in(condicao.coluna, condicao.valor);
     } else if (condicao.op === "notEq") {
       atual = atual.not(condicao.coluna, "eq", condicao.valor);
+    } else if (condicao.op === "imatch") {
+      atual = atual.filter(condicao.coluna, "imatch", String(condicao.valor));
     } else if (condicao.op === "ilike" || condicao.op === "gte" || condicao.op === "lt") {
       atual = atual[condicao.op](condicao.coluna, String(condicao.valor));
     } else {
@@ -106,6 +114,107 @@ async function anexarExamesCompletos(
   }));
 }
 
+function comExamesOrdenados(
+  records: AgendamentoWithExames[]
+): AgendamentoWithExames[] {
+  return records.map((row) => ({
+    ...row,
+    agendamento_exames: [...(row.agendamento_exames ?? [])].sort((a, b) =>
+      a.id.localeCompare(b.id)
+    ),
+  }));
+}
+
+async function listarPaginaPorExamesOuTotal(params: {
+  filters: AgendamentoFilters;
+  page: number;
+  pageSize: number;
+  sort: AgendamentoTableSortState;
+}): Promise<PaginaConsulta<AgendamentoWithExames>> {
+  const consulta = consultaAgendamentos(params.filters, null);
+  const supabase = createClient();
+  const pais = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("agendamentos")
+      .select(consulta.tipoExame ? "id, agendamento_exames!inner(id)" : "id") as any;
+    query = aplicarConsulta(query, consulta.condicoes, [
+      { coluna: "id", ascending: true },
+    ]);
+    if (consulta.tipoExame) {
+      query = query.filter(
+        "agendamento_exames.tipo_exame",
+        "imatch",
+        consulta.tipoExame
+      );
+    }
+    const { data, error } = await query.range(from, to);
+    if (error) throw error;
+    return (data ?? []) as Array<{ id: string }>;
+  });
+
+  const vistos = new Set<string>();
+  const ids = pais
+    .map((row) => row.id)
+    .filter((id) => {
+      if (vistos.has(id)) return false;
+      vistos.add(id);
+      return true;
+    });
+
+  const exames = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data, error } = await supabase
+      .from("agendamento_exames")
+      .select("id, agendamento_id, tipo_exame, valor_cliente")
+      .in("agendamento_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as AgendamentoExameRecord[];
+  });
+  const porAgendamento = new Map<string, AgendamentoExameRecord[]>();
+  for (const exame of exames) {
+    const lista = porAgendamento.get(exame.agendamento_id) ?? [];
+    lista.push(exame);
+    porAgendamento.set(exame.agendamento_id, lista);
+  }
+
+  const ordenados = sortAgendamentosForTable(
+    ids.map((id) => ({
+      id,
+      agendamento_exames: porAgendamento.get(id) ?? [],
+    })) as AgendamentoWithExames[],
+    params.sort
+  );
+  const inicio = (params.page - 1) * params.pageSize;
+  const paginaIds = ordenados
+    .slice(inicio, inicio + params.pageSize)
+    .map((row) => row.id);
+  if (paginaIds.length === 0) {
+    return montarPagina([], ordenados.length, params.page, params.pageSize);
+  }
+
+  const completos = await lerPorIdentificadores(
+    paginaIds,
+    async (grupo, from, to) => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select(SELECT_COM_EXAMES)
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as AgendamentoWithExames[];
+    }
+  );
+  const porId = new Map(completos.map((row) => [row.id, row]));
+  const records = comExamesOrdenados(
+    paginaIds
+      .map((id) => porId.get(id))
+      .filter((row): row is AgendamentoWithExames => Boolean(row))
+  );
+  return montarPagina(records, ordenados.length, params.page, params.pageSize);
+}
+
 export async function listarAgendamentosPagina(params: {
   filters: AgendamentoFilters;
   page?: number;
@@ -114,6 +223,14 @@ export async function listarAgendamentosPagina(params: {
 }): Promise<PaginaConsulta<AgendamentoWithExames>> {
   const pageSize = params.pageSize ?? AGENDAMENTOS_PAGE_SIZE;
   const page = Math.max(1, params.page ?? 1);
+  if (params.sort && ordenacaoPorExamesOuTotal(params.sort)) {
+    return listarPaginaPorExamesOuTotal({
+      filters: params.filters,
+      page,
+      pageSize,
+      sort: params.sort,
+    });
+  }
   const consulta = consultaAgendamentos(params.filters, params.sort ?? null);
   const supabase = createClient();
   const select = consulta.tipoExame
@@ -126,9 +243,10 @@ export async function listarAgendamentosPagina(params: {
     .select(select, { count: "exact" }) as any;
   query = aplicarConsulta(query, consulta.condicoes, consulta.ordem);
   if (consulta.tipoExame) {
-    query = query.ilike(
+    query = query.filter(
       "agendamento_exames.tipo_exame",
-      `%${consulta.tipoExame}%`
+      "imatch",
+      consulta.tipoExame
     );
   }
 
@@ -140,7 +258,7 @@ export async function listarAgendamentosPagina(params: {
   if (consulta.tipoExame) {
     records = await anexarExamesCompletos(records);
   }
-  return montarPagina(records, count ?? 0, page, pageSize);
+  return montarPagina(comExamesOrdenados(records), count ?? 0, page, pageSize);
 }
 
 export async function listarAgendamentosEsocialPagina(params: {

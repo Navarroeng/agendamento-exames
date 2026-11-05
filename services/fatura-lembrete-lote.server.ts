@@ -168,18 +168,24 @@ async function listarEnviosEmpresaAdmin(
 ): Promise<EnvioFaturamentoEmpresa[]> {
   if (referenciaIds.length === 0) return [];
   const admin = createAdminClient();
-  const rows = await listarPaginas(async (from, to) => {
-    const { data, error } = await admin
-      .from("faturas")
-      .select("id, referencia_id, fatura_enviada_email, fatura_enviada_em")
-      .eq("tipo", "cliente")
-      .in("referencia_id", referenciaIds)
-      .not("fatura_enviada_em", "is", null)
-      .order("fatura_enviada_em", { ascending: false })
-      .range(from, to);
-    if (error) throw error;
-    return (data ?? []) as EnvioFaturamentoEmpresa[];
-  });
+  const rows: EnvioFaturamentoEmpresa[] = [];
+  for (let indice = 0; indice < referenciaIds.length; indice += 100) {
+    const grupo = referenciaIds.slice(indice, indice + 100);
+    const pagina = await listarPaginas(async (from, to) => {
+      const { data, error } = await admin
+        .from("faturas")
+        .select("id, referencia_id, fatura_enviada_email, fatura_enviada_em")
+        .eq("tipo", "cliente")
+        .in("referencia_id", grupo)
+        .not("fatura_enviada_em", "is", null)
+        .order("fatura_enviada_em", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as EnvioFaturamentoEmpresa[];
+    });
+    rows.push(...pagina);
+  }
   return rows;
 }
 
@@ -188,16 +194,22 @@ async function listarLembretesAdmin(
 ): Promise<{ fatura_id: string; enviado_em: string }[]> {
   if (faturaIds.length === 0) return [];
   const admin = createAdminClient();
-  const rows = await listarPaginas(async (from, to) => {
-    const { data, error } = await admin
-      .from("fatura_lembretes")
-      .select("fatura_id, enviado_em")
-      .in("fatura_id", faturaIds)
-      .order("enviado_em", { ascending: false })
-      .range(from, to);
-    if (error) throw error;
-    return (data ?? []) as { fatura_id: string; enviado_em: string }[];
-  });
+  const rows: { fatura_id: string; enviado_em: string }[] = [];
+  for (let indice = 0; indice < faturaIds.length; indice += 100) {
+    const grupo = faturaIds.slice(indice, indice + 100);
+    const pagina = await listarPaginas(async (from, to) => {
+      const { data, error } = await admin
+        .from("fatura_lembretes")
+        .select("fatura_id, enviado_em")
+        .in("fatura_id", grupo)
+        .order("enviado_em", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as { fatura_id: string; enviado_em: string }[];
+    });
+    rows.push(...pagina);
+  }
   return rows;
 }
 

@@ -1,4 +1,4 @@
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   agendamentoEVinculadoAoContrato,
@@ -102,30 +102,39 @@ export async function contarColaboradoresPorContratos(
   for (const id of contratoIds) map.set(id, 0);
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("contrato_agendamentos")
-    .select("contrato_id, agendamento_id, contabiliza_previsao, removido_em")
-    .in("contrato_id", contratoIds)
-    .is("removido_em", null)
-    .eq("contabiliza_previsao", true);
-
-  if (error) throw error;
+  const data = await lerPorIdentificadores(contratoIds, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("contrato_agendamentos")
+      .select("contrato_id, agendamento_id, contabiliza_previsao, removido_em")
+      .in("contrato_id", grupo)
+      .is("removido_em", null)
+      .eq("contabiliza_previsao", true)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
   const agIds = Array.from(
-    new Set((data ?? []).map((r) => String(r.agendamento_id)))
+    new Set(data.map((r) => String(r.agendamento_id)))
   );
   if (agIds.length === 0) return map;
 
-  const { data: ags, error: agErr } = await supabase
-    .from("agendamentos")
-    .select("id, status")
-    .in("id", agIds);
-  if (agErr) throw agErr;
+  const ags = await lerPorIdentificadores(agIds, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .in("id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const statusById = new Map(
-    (ags ?? []).map((a) => [String(a.id), String(a.status)])
+    ags.map((a) => [String(a.id), String(a.status)])
   );
 
-  for (const row of data ?? []) {
+  for (const row of data) {
     const agId = String(row.agendamento_id);
     const status = statusById.get(agId);
     if (!status || status === "cancelado") continue;

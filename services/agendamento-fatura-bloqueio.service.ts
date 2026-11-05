@@ -10,6 +10,7 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateBR } from "@/lib/format";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -64,10 +65,11 @@ export async function listarBloqueioFaturaPorAgendamentos(
   if (ids.length === 0) return result;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("fatura_itens")
-    .select(
-      `
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("fatura_itens")
+      .select(
+        `
       agendamento_id,
       faturas (
         id,
@@ -78,10 +80,13 @@ export async function listarBloqueioFaturaPorAgendamentos(
         tipo
       )
     `
-    )
-    .in("agendamento_id", ids);
-
-  if (error) throw error;
+      )
+      .in("agendamento_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as FaturaItemVinculoRow[];
+  });
 
   const grouped = groupFaturasByAgendamento((data ?? []) as FaturaItemVinculoRow[]);
 
@@ -135,14 +140,18 @@ export async function listarFaturasClienteComAlteracaoPosEmissao(
   if (ids.length === 0) return result;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("fatura_itens")
-    .select("fatura_id, agendamentos ( status )")
-    .in("fatura_id", ids);
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("fatura_itens")
+      .select("fatura_id, agendamentos ( status )")
+      .in("fatura_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as FaturaItemAlteracaoRow[];
+  });
 
-  if (error) throw error;
-
-  for (const row of (data ?? []) as FaturaItemAlteracaoRow[]) {
+  for (const row of data) {
     const agendamentos = Array.isArray(row.agendamentos)
       ? row.agendamentos
       : row.agendamentos

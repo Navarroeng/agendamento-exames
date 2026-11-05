@@ -3,7 +3,7 @@
  * Não consulta sessões, vínculos nem respostas.
  */
 
-import { lerTodosOsLotes } from "@/lib/consulta-lotes";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   montarEmpresasPortalPreview,
@@ -282,20 +282,33 @@ async function complementarCobrancaPortal(
   );
   if (orcamentoIds.length === 0) return contratos;
 
-  const [orcamentosRes, aprovacoesRes] = await Promise.all([
-    admin.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
-    admin
-      .from("orcamento_aprovacoes")
-      .select(
-        "orcamento_id, contrato_assinado, mensalidade_pagamento, procuracao_status, revertida_em, created_at"
-      )
-      .in("orcamento_id", orcamentoIds),
+  const [orcamentos, aprovacoes] = await Promise.all([
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await admin
+        .from("orcamentos")
+        .select("id, modalidade")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }),
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await admin
+        .from("orcamento_aprovacoes")
+        .select(
+          "orcamento_id, contrato_assinado, mensalidade_pagamento, procuracao_status, revertida_em, created_at"
+        )
+        .in("orcamento_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }),
   ]);
-  if (orcamentosRes.error) throw orcamentosRes.error;
-  if (aprovacoesRes.error) throw aprovacoesRes.error;
 
   const modalidadePorOrcamento = new Map<string, string | null>();
-  for (const row of orcamentosRes.data ?? []) {
+  for (const row of orcamentos) {
     modalidadePorOrcamento.set(
       String(row.id),
       (row.modalidade as string | null) ?? null
@@ -311,7 +324,7 @@ async function complementarCobrancaPortal(
       created_at: string | null;
     }
   >();
-  for (const row of aprovacoesRes.data ?? []) {
+  for (const row of aprovacoes) {
     const atual = {
       contrato_assinado:
         typeof row.contrato_assinado === "boolean" ? row.contrato_assinado : null,

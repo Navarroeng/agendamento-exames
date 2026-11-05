@@ -44,10 +44,65 @@ export async function lerTodosOsLotes<T>(
   }
 }
 
-/** Termo de `ilike`: sem acento, sem curinga e com espaços colapsados. */
+/** Termo de busca: sem acento, sem curinga e com espaços colapsados. */
 export function termoIlike(valor: string | null | undefined): string | null {
   const normalizado = normalizeSearchText(valor).replace(/[%_\\]/g, "").trim();
   return normalizado || null;
+}
+
+const CLASSE_ACENTO: Record<string, string> = {
+  A: "AÁÀÂÃÄaáàâãä",
+  E: "EÉÈÊËeéèêë",
+  I: "IÍÌÎÏiíìîï",
+  O: "OÓÒÔÕÖoóòôõö",
+  U: "UÚÙÛÜuúùûü",
+  C: "CÇcç",
+  N: "NÑnñ",
+};
+
+/**
+ * Padrão `~*` em que cada letra casa com ou sem acento.
+ * O termo digitado e o texto gravado entram na mesma comparação.
+ */
+export function termoBuscaRegex(valor: string | null | undefined): string | null {
+  const termo = termoIlike(valor);
+  if (!termo) return null;
+  const tokens = termo
+    .split(" ")
+    .map((token) => {
+      let padrao = "";
+      for (const char of token) {
+        const classe = CLASSE_ACENTO[char];
+        if (classe) padrao += `[${classe}]`;
+        else padrao += char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+      return padrao;
+    })
+    .filter(Boolean);
+  return tokens.length > 0 ? tokens.join("\\s+") : null;
+}
+
+/** Quantos identificadores entram em cada `in`. A resposta de cada grupo ainda é paginada. */
+export const LOTE_IDENTIFICADORES = 100;
+
+/**
+ * Lê todas as linhas de uma lista de ids.
+ * Parte os ids para a URL não estourar e pagina cada parte até o lote voltar curto.
+ */
+export async function lerPorIdentificadores<T>(
+  ids: readonly string[],
+  buscar: (ids: string[], from: number, to: number) => Promise<T[]>
+): Promise<T[]> {
+  const unicos = Array.from(
+    new Set(ids.map((id) => String(id).trim()).filter(Boolean))
+  );
+  const todos: T[] = [];
+  for (let indice = 0; indice < unicos.length; indice += LOTE_IDENTIFICADORES) {
+    const grupo = unicos.slice(indice, indice + LOTE_IDENTIFICADORES);
+    const lote = await lerTodosOsLotes((from, to) => buscar(grupo, from, to));
+    todos.push(...lote);
+  }
+  return todos;
 }
 
 export function diaSeguinteIso(iso: string): string {
