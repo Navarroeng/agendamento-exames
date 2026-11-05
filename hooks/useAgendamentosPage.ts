@@ -106,6 +106,7 @@ import {
   filterClinicasParaNovoAgendamento,
 } from "@/lib/clinica-filters";
 import { clienteProcuracaoRequerAtencao } from "@/lib/cliente-procuracao";
+import { procuracaoEfetivaRequerAtencao } from "@/lib/cliente-procuracao-efetiva";
 import {
   CLIENTE_DISPONIVEL_AGENDAMENTO_MSG,
   filterClientesParaNovoAgendamento,
@@ -182,6 +183,7 @@ import {
   auditarClinicoZeroDemissionalSeNecessario,
 } from "@/services/agendamento-form-audit.service";
 import { registrarAgendamentoClienteSemProcuracao } from "@/services/cliente-procuracao-audit.service";
+import { obterProcuracaoEfetivaCliente } from "@/services/cliente-procuracao.service";
 import {
   cancelarPeriodicosPorAgendamento,
   criarPeriodicosDeAgendamento,
@@ -1107,7 +1109,16 @@ export function useAgendamentosPage() {
           return false;
         }
 
-        if (clienteProcuracaoRequerAtencao(cliente.procuracao)) {
+        const procuracaoEfetiva = await obterProcuracaoEfetivaCliente(
+          cliente.id,
+          cliente.procuracao
+        );
+        if (seq !== clienteValidacaoSeqRef.current) return false;
+        const procuracaoPedeAtencao =
+          procuracaoEfetiva == null
+            ? clienteProcuracaoRequerAtencao(cliente.procuracao)
+            : procuracaoEfetivaRequerAtencao(procuracaoEfetiva);
+        if (procuracaoPedeAtencao) {
           setPendingClienteId(nextClienteId);
           setClienteProcuracaoModalOpen(true);
           return false;
@@ -1897,11 +1908,38 @@ export function useAgendamentosPage() {
     replaceExamesFromCargo,
   ]);
 
-  const showClienteProcuracaoAlert = useMemo(() => {
-    if (!clienteId) return false;
-    const cliente = clientes.find((c) => c.id === clienteId);
-    return !!cliente && clienteProcuracaoRequerAtencao(cliente.procuracao);
+  const [procuracaoAlerta, setProcuracaoAlerta] = useState(false);
+  useEffect(() => {
+    const id = (clienteId ?? "").trim();
+    if (!id) {
+      setProcuracaoAlerta(false);
+      return;
+    }
+    const cliente = clientes.find((item) => item.id === id);
+    if (!cliente) {
+      setProcuracaoAlerta(false);
+      return;
+    }
+    let cancelado = false;
+    void obterProcuracaoEfetivaCliente(id, cliente.procuracao)
+      .then((status) => {
+        if (cancelado) return;
+        setProcuracaoAlerta(
+          status == null
+            ? clienteProcuracaoRequerAtencao(cliente.procuracao)
+            : procuracaoEfetivaRequerAtencao(status)
+        );
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setProcuracaoAlerta(clienteProcuracaoRequerAtencao(cliente.procuracao));
+      });
+    return () => {
+      cancelado = true;
+    };
   }, [clienteId, clientes]);
+
+  const showClienteProcuracaoAlert = procuracaoAlerta;
 
   const applyCargoChange = useCallback(
     async (nextCargoId: string) => {

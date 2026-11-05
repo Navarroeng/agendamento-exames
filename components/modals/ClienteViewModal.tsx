@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ClienteContratoAtualCard } from "@/components/clientes/ClienteContratoAtualCard";
@@ -19,11 +19,11 @@ import { useClienteServicosPontuais } from "@/hooks/useClienteServicosPontuais";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import { resolveClienteCnpjError } from "@/lib/cliente-cnpj";
 import { formatVigenciaContrato } from "@/lib/cliente-contrato-mappers";
+import { normalizeClienteProcuracao } from "@/lib/cliente-procuracao";
 import {
-  CLIENTE_PROCURACAO_OPTIONS,
-  formatClienteProcuracaoLabel,
-  normalizeClienteProcuracao,
-} from "@/lib/cliente-procuracao";
+  formatProcuracaoEfetivaLabel,
+  resolverProcuracaoEfetiva,
+} from "@/lib/cliente-procuracao-efetiva";
 import {
   boolToDisponivelAgendamentoForm,
   formatDisponibilidadeAgendamentoLabel,
@@ -121,6 +121,24 @@ export function ClienteViewModal({
 
   const { itens: servicosPontuais, loading: loadingPontuais } =
     useClienteServicosPontuais(cliente?.id ?? null);
+
+  const procuracaoEfetiva = useMemo(() => {
+    if (loading || !cliente) return null;
+    const preparados = contratos.map((contrato) =>
+      contrato.procuracaoStatus !== undefined
+        ? contrato
+        : { ...contrato, procuracaoStatus: cliente.procuracao }
+    );
+    const efetivo = resolverProcuracaoEfetiva(preparados);
+    if (efetivo) return efetivo;
+    if (contratos.length === 0) {
+      return normalizeClienteProcuracao(cliente.procuracao);
+    }
+    return efetivo;
+  }, [cliente, contratos, loading]);
+  const procuracaoLabel = loading
+    ? "…"
+    : formatProcuracaoEfetivaLabel(procuracaoEfetiva);
 
   const podeIncluirRiscos = clienteTemContratoVigente(contratos);
   const disponibilidadeAgendamento = resolveDisponibilidadeAgendamentoCliente({
@@ -332,21 +350,7 @@ export function ClienteViewModal({
                       }
                     />
                   </Field>
-                  <Field label="Procuração">
-                    <select
-                      className="field-input"
-                      value={clienteForm.procuracao}
-                      onChange={(e) =>
-                        setClienteField("procuracao", e.target.value)
-                      }
-                    >
-                      {CLIENTE_PROCURACAO_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <InfoItem label="Procuração" value={procuracaoLabel} />
                   <Field label="Disponível para agendamento">
                     <select
                       className="field-input"
@@ -370,10 +374,7 @@ export function ClienteViewModal({
                     value={formatClienteNomeDisplay(cliente.nome)}
                   />
                   <InfoItem label="CNPJ" value={formatCNPJ(cliente.cnpj)} />
-                  <InfoItem
-                    label="Procuração"
-                    value={formatClienteProcuracaoLabel(cliente.procuracao)}
-                  />
+                  <InfoItem label="Procuração" value={procuracaoLabel} />
                   <InfoItem
                     label="Disponível para agendamento"
                     value={formatDisponibilidadeAgendamentoLabel(

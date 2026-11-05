@@ -42,6 +42,9 @@ export async function salvarOrcamentoProcuracao(
   const status = payload.procuracao_status;
   const observacao = payload.observacao_procuracao?.trim() || null;
 
+  if (!aprovacaoId.trim() || !orcamentoId.trim()) {
+    throw new Error("Procuração sem contratação.");
+  }
   if (status === "nao_necessaria" && !observacao) {
     throw new Error(
       "Informe por que a procuração não será necessária para este cliente."
@@ -59,22 +62,9 @@ export async function salvarOrcamentoProcuracao(
       procuracao_atualizada_em: agora,
       procuracao_atualizada_por: payload.atualizadoPor.trim() || null,
     })
-    .eq("id", aprovacaoId);
+    .eq("id", aprovacaoId)
+    .eq("orcamento_id", orcamentoId);
   if (error) throw error;
-
-  // Espelha no cadastro do cliente vinculado ao orçamento
-  const { data: orc } = await supabase
-    .from("orcamentos")
-    .select("cliente_id")
-    .eq("id", orcamentoId)
-    .maybeSingle();
-
-  if (orc?.cliente_id) {
-    await supabase
-      .from("clientes")
-      .update({ procuracao: status })
-      .eq("id", orc.cliente_id);
-  }
 
   return fetchAprovacao(aprovacaoId);
 }

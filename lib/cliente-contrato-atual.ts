@@ -52,6 +52,12 @@ export type ContextoCobrancaContrato = {
    * Não substitui `quantidade_colaboradores` e não é gravada de volta.
    */
   quantidadeColaboradoresOrcamento?: number | null;
+  /**
+   * Status gravado na aba Procuração desta contratação.
+   * Ausente quando o contrato não veio de orçamento.
+   * Não herda a procuração de outro contrato do mesmo cliente.
+   */
+  procuracaoStatus?: string | null;
 };
 
 export type ClienteContratoConsulta = ClienteContratoRecord &

@@ -281,7 +281,9 @@ async function complementarCobrancaPortal(
     admin.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
     admin
       .from("orcamento_aprovacoes")
-      .select("orcamento_id, contrato_assinado, mensalidade_pagamento")
+      .select(
+        "orcamento_id, contrato_assinado, mensalidade_pagamento, procuracao_status, revertida_em, created_at"
+      )
       .in("orcamento_id", orcamentoIds),
   ]);
   if (orcamentosRes.error) throw orcamentosRes.error;
@@ -296,15 +298,37 @@ async function complementarCobrancaPortal(
   }
   const cobrancaPorOrcamento = new Map<
     string,
-    { contrato_assinado: boolean | null; mensalidade_pagamento: string | null }
+    {
+      contrato_assinado: boolean | null;
+      mensalidade_pagamento: string | null;
+      procuracao_status: string | null;
+      revertida_em: string | null;
+      created_at: string | null;
+    }
   >();
   for (const row of aprovacoesRes.data ?? []) {
-    cobrancaPorOrcamento.set(String(row.orcamento_id), {
+    const atual = {
       contrato_assinado:
         typeof row.contrato_assinado === "boolean" ? row.contrato_assinado : null,
       mensalidade_pagamento:
         (row.mensalidade_pagamento as string | null) ?? null,
-    });
+      procuracao_status: (row.procuracao_status as string | null) ?? null,
+      revertida_em: (row.revertida_em as string | null) ?? null,
+      created_at: (row.created_at as string | null) ?? null,
+    };
+    const anterior = cobrancaPorOrcamento.get(String(row.orcamento_id));
+    if (!anterior) {
+      cobrancaPorOrcamento.set(String(row.orcamento_id), atual);
+      continue;
+    }
+    if (anterior.revertida_em && !atual.revertida_em) {
+      cobrancaPorOrcamento.set(String(row.orcamento_id), atual);
+      continue;
+    }
+    if (!anterior.revertida_em && atual.revertida_em) continue;
+    if (String(atual.created_at ?? "") >= String(anterior.created_at ?? "")) {
+      cobrancaPorOrcamento.set(String(row.orcamento_id), atual);
+    }
   }
 
   return contratos.map((contrato) => {
@@ -312,9 +336,22 @@ async function complementarCobrancaPortal(
     const cobranca = cobrancaPorOrcamento.get(orcamentoId);
     return {
       ...contrato,
-      modalidadeOrcamento: modalidadePorOrcamento.get(orcamentoId) ?? null,
-      mensalidadePagamento: cobranca?.mensalidade_pagamento ?? null,
-      contrato_assinado: cobranca?.contrato_assinado ?? null,
+      modalidadeOrcamento: orcamentoId
+        ? (modalidadePorOrcamento.get(orcamentoId) ?? null)
+        : contrato.modalidadeOrcamento,
+      mensalidadePagamento: orcamentoId
+        ? (cobranca?.mensalidade_pagamento ?? null)
+        : contrato.mensalidadePagamento,
+      contrato_assinado: orcamentoId
+        ? (cobranca?.contrato_assinado ?? null)
+        : contrato.contrato_assinado,
+      ...(orcamentoId
+        ? {
+            procuracaoStatus: cobranca?.revertida_em
+              ? "pendente"
+              : (cobranca?.procuracao_status ?? "pendente"),
+          }
+        : {}),
     };
   });
 }

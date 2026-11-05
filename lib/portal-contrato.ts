@@ -10,10 +10,15 @@
 import { getContratoAtual } from "@/lib/cliente-contrato-mappers";
 import { resolveDisponibilidadeAgendamentoCliente } from "@/lib/cliente-disponibilidade-agendamento";
 import {
+  formatProcuracaoEfetivaLabel,
+  resolverProcuracaoEfetiva,
+  type ProcuracaoEfetiva,
+} from "@/lib/cliente-procuracao-efetiva";
+import {
   formatProcuracaoStatusLabel,
   normalizeProcuracaoStatus,
-  type ProcuracaoStatus,
 } from "@/lib/cliente-procuracao";
+import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoRecord, ClienteRecord } from "@/lib/types";
 
@@ -28,7 +33,7 @@ export type PortalContratoResumo = {
   vigenciaTitulo: string;
   /** Valor curto do resumo na Home (fim, indeterminado ou fallback). */
   vigenciaResumoLabel: string;
-  procuracaoStatus: ProcuracaoStatus;
+  procuracaoStatus: ProcuracaoEfetiva;
   procuracaoLabel: string;
   procuracaoTone: PortalContratoBadgeTone;
   /** Quantidade comercial do contrato atual (não roster ativo). */
@@ -88,6 +93,7 @@ export type PortalContratoFonte = Pick<
     modalidadeOrcamento?: string | null;
     mensalidadePagamento?: string | null;
     contrato_assinado?: boolean | null;
+    procuracaoStatus?: string | null;
   };
 
 export type PortalClienteContratoFonte = Pick<
@@ -188,9 +194,9 @@ export function formatVigenciaResumoPortal(
   return { titulo: "Contrato vigente até", valor: end };
 }
 
-function toneProcuracao(status: ProcuracaoStatus): PortalContratoBadgeTone {
+function toneProcuracao(status: ProcuracaoEfetiva): PortalContratoBadgeTone {
   if (status === "ativa") return "ok";
-  if (status === "pendente") return "pendente";
+  if (status === "pendente" || status === "expirada") return "pendente";
   return "neutro";
 }
 
@@ -230,9 +236,19 @@ export function montarPortalContratoResumo(input: {
     cliente != null &&
     cliente.procuracao != null &&
     String(cliente.procuracao).trim() !== "";
-  const procuracaoStatus = procuracaoInformada
-    ? normalizeProcuracaoStatus(cliente.procuracao)
-    : "pendente";
+  const procuracaoPorContrato = resolverProcuracaoEfetiva(
+    contratos as ClienteContratoConsulta[]
+  );
+  const procuracaoStatus: ProcuracaoEfetiva = procuracaoPorContrato
+    ? procuracaoPorContrato
+    : procuracaoInformada
+      ? normalizeProcuracaoStatus(cliente?.procuracao)
+      : "pendente";
+  const procuracaoLabel = procuracaoPorContrato
+    ? formatProcuracaoEfetivaLabel(procuracaoPorContrato)
+    : procuracaoInformada
+      ? formatProcuracaoStatusLabel(procuracaoStatus)
+      : PORTAL_CONTRATO_FALLBACK;
 
   const bloqueioManual = cliente?.agendamento_bloqueio_manual === true;
   const disponibilidade = resolveDisponibilidadeAgendamentoCliente({
@@ -273,12 +289,11 @@ export function montarPortalContratoResumo(input: {
     vigenciaTitulo: vigenciaResumo.titulo,
     vigenciaResumoLabel: vigenciaResumo.valor,
     procuracaoStatus,
-    procuracaoLabel: procuracaoInformada
-      ? formatProcuracaoStatusLabel(procuracaoStatus)
-      : PORTAL_CONTRATO_FALLBACK,
-    procuracaoTone: procuracaoInformada
-      ? toneProcuracao(procuracaoStatus)
-      : "neutro",
+    procuracaoLabel,
+    procuracaoTone:
+      procuracaoPorContrato || procuracaoInformada
+        ? toneProcuracao(procuracaoStatus)
+        : "neutro",
     colaboradoresContratados,
     colaboradoresContratadosLabel: formatColaboradoresContratadosLabel(
       colaboradoresContratados
