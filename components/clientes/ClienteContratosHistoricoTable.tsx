@@ -47,12 +47,11 @@ export function ClienteContratosHistoricoTable({
 
   return (
     <div className="table-wrap -mx-1 overflow-x-auto px-1">
-      <table className="table-premium w-full min-w-[1320px]">
+      <table className="table-premium w-full min-w-[1180px]">
         <thead>
           <tr>
             {[
               "Contrato",
-              "Orçamento",
               "Aprovação",
               "Valor",
               "Colaboradores",
@@ -87,9 +86,6 @@ export function ClienteContratosHistoricoTable({
                       </span>
                     ) : null}
                   </span>
-                </td>
-                <td className="font-semibold text-navy">
-                  {contrato.numero_orcamento?.trim() || "—"}
                 </td>
                 <td>
                   {contrato.aprovado_em
