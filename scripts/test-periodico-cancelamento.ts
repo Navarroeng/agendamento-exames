@@ -150,9 +150,11 @@ run("10. data/hora e responsável ficam no registro", () => {
   );
 });
 
+const REFERENCIA_EM_DIA = "2026-08-01";
+
 run("11. periódico cancelado sai dos KPIs ativos", () => {
   const ativos = agruparPeriodicosPorColaboradorCiclo(
-    cicloIsabel.map(toPeriodicoFuturoRow)
+    cicloIsabel.map((item) => toPeriodicoFuturoRow(item, REFERENCIA_EM_DIA))
   );
   const cancelados = agruparPeriodicosPorColaboradorCiclo(
     cicloIsabel.map((item) =>
@@ -299,12 +301,15 @@ run("18. histórico Cancelado herdado do ASO é recalculado pela data", () => {
 run("19. status do grupo legado volta a obrigação ativa", () => {
   const grupos = agruparPeriodicosPorColaboradorCiclo(
     cicloIsabel.map((item) =>
-      toPeriodicoFuturoRow({
-        ...item,
-        status: "cancelado",
-        cancelado_em: null,
-        motivo_cancelamento: null,
-      })
+      toPeriodicoFuturoRow(
+        {
+          ...item,
+          status: "cancelado",
+          cancelado_em: null,
+          motivo_cancelamento: null,
+        },
+        REFERENCIA_EM_DIA
+      )
     )
   );
   assert.equal(grupos[0].displayStatus, "em_dia");

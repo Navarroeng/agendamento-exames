@@ -1289,6 +1289,30 @@ const idsProgramacao = selecionarIdsCopiaNomeProgramacao({
 });
 assert.deepEqual(idsProgramacao, ["pf-virginia", "pf-irmao"]);
 
+const registrosAlémDoMil = Array.from({ length: 1000 }, (_, indice) => ({
+  id: `pf-outro-${indice}`,
+  contratoId: "c1",
+  colaborador: "OUTRA PESSOA",
+  colaboradorCpf: "11144477735",
+  status: "ativo",
+}));
+registrosAlémDoMil.push({
+  id: "pf-depois-do-mil",
+  contratoId: "c1",
+  colaborador: NOME_VIRGINIA_COM_VIRGULA,
+  colaboradorCpf: CPF_JIVALDO,
+  status: "ativo",
+});
+assert.deepEqual(
+  selecionarIdsCopiaNomeProgramacao({
+    contratoId: "c1",
+    cpf: CPF_JIVALDO,
+    nomeAnterior: NOME_VIRGINIA_COM_VIRGULA,
+    registros: registrosAlémDoMil,
+  }),
+  ["pf-depois-do-mil"]
+);
+
 const vagaReaberta = {
   ...vagaVirginia,
   colaborador: planoVirginia.colaborador,
@@ -1340,7 +1364,8 @@ assert.match(
   /atualizarVaga\(plano\.vagaId, \{\s*colaborador: plano\.colaborador,\s*\}\)/
 );
 assert.match(syncSrc, /\.update\(\{ colaborador: nomeNovo \}\)/);
-assert.match(syncSrc, /\.in\("id", ids\)/);
+assert.match(syncSrc, /exigirGravacaoUnica\(ids\)/);
+assert.match(syncSrc, /\.in\("id", lista\)/);
 assert.doesNotMatch(syncSrc, /\.insert\(/);
 assert.doesNotMatch(syncSrc, /from\("agendamentos"\)/);
 assert.doesNotMatch(syncSrc, /\.update\(\{[^}]*status/);

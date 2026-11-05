@@ -6,7 +6,8 @@ import {
 } from "../lib/agendamento-filters";
 import { consultaEsocial, limiteUrgenciaEsocial } from "../lib/esocial-consulta";
 import { getDefaultESocialFilters } from "../lib/esocial-filters";
-import { diaSeguinteIso, termoBuscaRegex } from "../lib/consulta-lotes";
+import { diaSeguinteIso, exigirGravacaoUnica, termoBuscaRegex } from "../lib/consulta-lotes";
+import { filtroOrCpfExato } from "../lib/cpf";
 
 function filtros(
   partial: Partial<AgendamentoFilters>
@@ -74,6 +75,15 @@ assert.ok(
 );
 assert.equal(termoBuscaRegex("Érica"), termoBuscaRegex("erica"));
 assert.equal(diaSeguinteIso("2026-08-31"), "2026-09-01");
+assert.deepEqual(exigirGravacaoUnica([" a ", "a", "b"]), ["a", "b"]);
+assert.throws(
+  () => exigirGravacaoUnica(Array.from({ length: 400 }, (_, i) => `id-${i}-${"x".repeat(40)}`)),
+  /não foi aplicada/
+);
+assert.equal(
+  filtroOrCpfExato("colaborador_cpf", "529.982.247-25"),
+  'colaborador_cpf.eq.52998224725,colaborador_cpf.eq."529.982.247-25"'
+);
 
 const esocial = consultaEsocial(
   {

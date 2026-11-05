@@ -15,7 +15,12 @@ import {
   type CriarExameFuturoInput,
   type StatusExameFuturoImplantacao,
 } from "@/lib/contrato-programacao-futura";
-import { isValidCPF, maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  filtroOrCpfExato,
+  isValidCPF,
+  maskCPFInput,
+  normalizeCpfDigits,
+} from "@/lib/cpf";
 import { isAsoDemissional } from "@/lib/periodico-geracao";
 import { isAsoPontual } from "@/lib/agendamento-aso-pontual";
 import { filtrarPeriodicosDoCliente } from "@/lib/agendamento-cliente-lookup";
@@ -27,7 +32,11 @@ import {
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
-import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
+import {
+  exigirGravacaoUnica,
+  lerPorIdentificadores,
+  lerTodosOsLotes,
+} from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -339,19 +348,23 @@ export async function criarExameFuturoImplantacao(
 
   // Evita duplicar periódico ativo do mesmo CPF + contrato (consome previsão).
   if (cpfDigits && isValidCPF(cpfDigits)) {
-    const masked = maskCPFInput(cpfDigits);
-    const { data: existentes, error: dupErr } = await supabase
+    const { data: existente, error: dupErr } = await supabase
       .from("periodicos_futuros")
       .select("*")
       .eq("contrato_id", input.contratoId)
       .eq("consome_previsao_contrato", true)
       .in("status", ["ativo", "reagendado"])
-      .or(`colaborador_cpf.eq.${cpfDigits},colaborador_cpf.eq."${masked}"`);
+      .or(filtroOrCpfExato("colaborador_cpf", cpfDigits))
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
     if (dupErr) throw dupErr;
 
-    const candidato = (existentes ?? []).find(
-      (r) => normalizeCpfDigits(r.colaborador_cpf) === cpfDigits
-    ) as PeriodicoFuturoRecord | undefined;
+    const candidato =
+      existente &&
+      normalizeCpfDigits(existente.colaborador_cpf) === cpfDigits
+        ? (existente as PeriodicoFuturoRecord)
+        : undefined;
 
     if (candidato) {
       const { data: vagaLigada } = await supabase
@@ -381,23 +394,33 @@ export async function criarExameFuturoImplantacao(
   }
 
   // Garante que ainda há vaga (agendamentos + programações).
-  const { data: agRows, error: agErr } = await supabase
-    .from("contrato_agendamentos")
-    .select("agendamento_id")
-    .eq("contrato_id", input.contratoId)
-    .eq("contabiliza_previsao", true)
-    .is("removido_em", null);
-  if (agErr) throw agErr;
+  const agRows = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error: agErr } = await supabase
+      .from("contrato_agendamentos")
+      .select("agendamento_id")
+      .eq("contrato_id", input.contratoId)
+      .eq("contabiliza_previsao", true)
+      .is("removido_em", null)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (agErr) throw agErr;
+    return page ?? [];
+  });
 
-  const agIds = (agRows ?? []).map((r) => String(r.agendamento_id));
+  const agIds = agRows.map((r) => String(r.agendamento_id));
   let utilizadosAg = 0;
   if (agIds.length > 0) {
-    const { data: ags, error: stErr } = await supabase
-      .from("agendamentos")
-      .select("id, status")
-      .in("id", agIds);
-    if (stErr) throw stErr;
-    utilizadosAg = (ags ?? []).filter((a) => a.status !== "cancelado").length;
+    const ags = await lerPorIdentificadores(agIds, async (grupo, from, to) => {
+      const { data: page, error: stErr } = await supabase
+        .from("agendamentos")
+        .select("id, status")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (stErr) throw stErr;
+      return page ?? [];
+    });
+    utilizadosAg = ags.filter((a) => a.status !== "cancelado").length;
   }
 
   const { count: progCount, error: progErr } = await supabase
@@ -788,13 +811,18 @@ export async function vincularPeriodicoAoAgendamento(params: {
   }
 
   const supabase = createClient();
-  const { data: encontrados, error: findErr } = await supabase
-    .from("periodicos_futuros")
-    .select("*")
-    .in("id", ids);
-  if (findErr) throw findErr;
+  const encontrados = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error: findErr } = await supabase
+      .from("periodicos_futuros")
+      .select("*")
+      .in("id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (findErr) throw findErr;
+    return page ?? [];
+  });
 
-  const records = ((encontrados ?? []) as PeriodicoFuturoRecord[]).filter(
+  const records = (encontrados as PeriodicoFuturoRecord[]).filter(
     (row) => row.status === "ativo" && !isPeriodicoCanceladoManualmente(row)
   );
   if (records.length === 0) {
@@ -810,16 +838,20 @@ export async function vincularPeriodicoAoAgendamento(params: {
   const cpf = normalizeCpfDigits(representante.colaborador_cpf);
   let doCiclo = [...records];
   if (isValidCPF(cpf)) {
-    const masked = maskCPFInput(cpf);
-    const { data: irmaos, error: irmaosErr } = await supabase
-      .from("periodicos_futuros")
-      .select("*")
-      .eq("status", "ativo")
-      .or(`colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`);
-    if (irmaosErr) throw irmaosErr;
+    const irmaos = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error: irmaosErr } = await supabase
+        .from("periodicos_futuros")
+        .select("*")
+        .eq("status", "ativo")
+        .or(filtroOrCpfExato("colaborador_cpf", cpf))
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (irmaosErr) throw irmaosErr;
+      return page ?? [];
+    });
     doCiclo = [
       ...doCiclo,
-      ...((irmaos ?? []) as PeriodicoFuturoRecord[]).filter(
+      ...(irmaos as PeriodicoFuturoRecord[]).filter(
         (row) =>
           !isPeriodicoCanceladoManualmente(row) &&
           chaveCicloPeriodico(row) === chaveCiclo
@@ -843,10 +875,11 @@ export async function vincularPeriodicoAoAgendamento(params: {
     dataPrevistaOriginal,
   });
 
+  const idsGravacao = exigirGravacaoUnica(idsDoCiclo);
   const { error } = await supabase
     .from("periodicos_futuros")
     .update(patch)
-    .in("id", idsDoCiclo)
+    .in("id", idsGravacao)
     .eq("status", "ativo");
   if (error) throw error;
 
@@ -854,52 +887,48 @@ export async function vincularPeriodicoAoAgendamento(params: {
     representante.contrato_id ||
     doCiclo.find((r) => r.contrato_id)?.contrato_id;
   if (contratoId) {
-    try {
-      const { data: vagasAfetadas } = await supabase
-        .from("contrato_vagas")
-        .select("id, status, periodico_futuro_id, colaborador_cpf")
-        .eq("contrato_id", contratoId)
-        .in("periodico_futuro_id", idsDoCiclo);
+    const { data: vagasAtualizadas, error: vagaErr } = await supabase
+      .from("contrato_vagas")
+      .update({
+        status: "agendada",
+        agendamento_id: params.agendamentoId,
+        colaborador: representante.colaborador,
+        colaborador_cpf: representante.colaborador_cpf || null,
+      })
+      .eq("contrato_id", contratoId)
+      .in("periodico_futuro_id", idsGravacao)
+      .select("id");
+    if (vagaErr) throw vagaErr;
 
-      if ((vagasAfetadas ?? []).length > 0) {
-        await supabase
+    if ((vagasAtualizadas ?? []).length === 0 && representante.colaborador_cpf) {
+      const normCpf = normalizeCpfDigits(representante.colaborador_cpf);
+      const { data: vagaMatch, error: vagaCpfErr } = await supabase
+        .from("contrato_vagas")
+        .select("id, colaborador_cpf")
+        .eq("contrato_id", contratoId)
+        .in("status", ["programada", "comprometida"])
+        .or(filtroOrCpfExato("colaborador_cpf", normCpf))
+        .order("indice", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (vagaCpfErr) throw vagaCpfErr;
+      if (
+        vagaMatch &&
+        normalizeCpfDigits(vagaMatch.colaborador_cpf) === normCpf
+      ) {
+        const { error: ocupaErr } = await supabase
           .from("contrato_vagas")
           .update({
             status: "agendada",
             agendamento_id: params.agendamentoId,
             colaborador: representante.colaborador,
             colaborador_cpf: representante.colaborador_cpf || null,
+            periodico_futuro_id: idsGravacao[0] ?? null,
           })
-          .in("id", (vagasAfetadas ?? []).map((v) => v.id));
-      } else if (representante.colaborador_cpf) {
-        const normCpf = normalizeCpfDigits(representante.colaborador_cpf);
-        const { data: vagasCpf } = await supabase
-          .from("contrato_vagas")
-          .select("id, status, periodico_futuro_id, colaborador_cpf")
-          .eq("contrato_id", contratoId)
-          .in("status", ["programada", "comprometida"]);
-
-        const vagaMatch = (vagasCpf ?? []).find(
-          (v) => normalizeCpfDigits(v.colaborador_cpf) === normCpf
-        );
-        if (vagaMatch) {
-          await supabase
-            .from("contrato_vagas")
-            .update({
-              status: "agendada",
-              agendamento_id: params.agendamentoId,
-              colaborador: representante.colaborador,
-              colaborador_cpf: representante.colaborador_cpf || null,
-              periodico_futuro_id: idsDoCiclo[0] ?? null,
-            })
-            .eq("id", vagaMatch.id);
-        }
+          .eq("id", vagaMatch.id);
+        if (ocupaErr) throw ocupaErr;
       }
-    } catch (vagaSyncErr) {
-      console.error(
-        "Erro ao sincronizar vaga com periódico vinculado:",
-        vagaSyncErr
-      );
     }
   }
 

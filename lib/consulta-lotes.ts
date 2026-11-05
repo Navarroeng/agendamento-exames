@@ -105,6 +105,36 @@ export async function lerPorIdentificadores<T>(
   return todos;
 }
 
+/**
+ * Orçamento da lista de ids numa gravação. O teto de linhas do PostgREST
+ * limita a resposta de uma leitura, não o UPDATE. O limite real da gravação
+ * é o tamanho da URL: acima dele a requisição não é enviada.
+ */
+export const ORCAMENTO_URL_GRAVACAO = 6000;
+
+export const GRAVACAO_NAO_APLICADA =
+  "A operação não foi aplicada: a quantidade de registros não cabe em uma única gravação.";
+
+export function identificadoresUnicos(ids: readonly string[]): string[] {
+  return Array.from(
+    new Set(ids.map((id) => String(id).trim()).filter(Boolean))
+  );
+}
+
+export function identificadoresCabemNaGravacao(ids: readonly string[]): boolean {
+  const tamanho = ids.reduce((soma, id) => soma + id.length + 1, 0);
+  return tamanho <= ORCAMENTO_URL_GRAVACAO;
+}
+
+/** Devolve a lista única ou interrompe antes de qualquer gravação. */
+export function exigirGravacaoUnica(ids: readonly string[]): string[] {
+  const lista = identificadoresUnicos(ids);
+  if (!identificadoresCabemNaGravacao(lista)) {
+    throw new Error(GRAVACAO_NAO_APLICADA);
+  }
+  return lista;
+}
+
 export function diaSeguinteIso(iso: string): string {
   const [year, month, day] = iso.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));

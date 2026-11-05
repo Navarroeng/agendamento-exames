@@ -185,9 +185,11 @@ export function periodicoDisplayStatusClass(
 }
 
 export function toPeriodicoFuturoRow(
-  record: PeriodicoFuturoRecord
+  record: PeriodicoFuturoRecord,
+  referenceDate?: string | number
 ): PeriodicoFuturoRow {
-  const displayStatus = computePeriodicoDisplayStatus(record);
+  const referencia = typeof referenceDate === "string" ? referenceDate : todayIso();
+  const displayStatus = computePeriodicoDisplayStatus(record, referencia);
   const ciclo = dataCicloPeriodico(record);
   const agendado = dataAgendadaPeriodico(record);
   return {
