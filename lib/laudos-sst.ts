@@ -479,14 +479,26 @@ export function etapasProgressoLaudosSst(
   return LAUDOS_SST_ETAPAS.map((e) => ({ id: e.id, label: e.label }));
 }
 
+function textoData(value: string | null | undefined): string | null {
+  const texto = value?.trim() ?? "";
+  return texto || null;
+}
+
+/**
+ * Competência do laudo pontual: a data da visita/perícia já salva
+ * quando ela está realizada. O relógio de `visita_realizada_em` só entra
+ * se essa data não existir. Não usa o dia da sincronização.
+ */
 function dataEntradaLaudoPontual(
   implantacao: ImplantacaoProcesso
 ): string | null {
   const aet = implantacao.aet ?? null;
+  const visitaData = textoData(aet?.visita_data);
+  if (aet?.visita_status === "realizada" && visitaData) return visitaData;
   return (
-    aet?.visita_realizada_em ??
-    aet?.visita_data ??
-    implantacao.dataAprovacao ??
+    textoData(aet?.visita_realizada_em) ??
+    visitaData ??
+    textoData(implantacao.dataAprovacao) ??
     null
   );
 }

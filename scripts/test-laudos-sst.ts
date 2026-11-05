@@ -20,8 +20,17 @@ import {
   resolverEntradaLaudosSst,
   sortLaudosSstProcessos,
 } from "../lib/laudos-sst";
+import type { ImplantacaoAetRecord } from "../lib/implantacao-aet";
 import type { ImplantacaoProcesso } from "../lib/implantacao-clientes";
 import { isProcessoElegivelRiscosPsicossociais } from "../lib/riscos-psicossociais";
+import { SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
+import type { LaudoPontualKind } from "../lib/servico-laudo-pontual";
+import { SERVICO_LTCAT_NOME } from "../lib/servico-ltcat";
+import { SERVICO_PARECER_TECNICO_NOME } from "../lib/servico-parecer-tecnico";
+import { SERVICO_PERICULOSIDADE_NOME } from "../lib/servico-periculosidade";
+import { SERVICO_PGR_NOME } from "../lib/servico-pgr";
+import { classifyOrcamentoFluxoImplantacao } from "../lib/servico-treinamentos";
 
 assert.equal(LAUDOS_SST_ETAPAS.length, 6);
 assert.equal(LAUDOS_SST_TOTAL_ETAPAS, 6);
@@ -813,5 +822,134 @@ const gestaoCancelada = baseProcesso({
   }),
 });
 assert.equal(isProcessoElegivelLaudosSst(gestaoCancelada), false);
+
+const laudosPontuais: Array<[LaudoPontualKind, string]> = [
+  ["aet", SERVICO_AET_NOME],
+  ["insalubridade", SERVICO_INSALUBRIDADE_NOME],
+  ["ltcat", SERVICO_LTCAT_NOME],
+  ["parecer_tecnico", SERVICO_PARECER_TECNICO_NOME],
+  ["periculosidade", SERVICO_PERICULOSIDADE_NOME],
+  ["pgr", SERVICO_PGR_NOME],
+];
+
+for (const [fluxo, nome] of laudosPontuais) {
+  const catalogoId = `catalogo-${fluxo}`;
+  assert.equal(
+    classifyOrcamentoFluxoImplantacao(
+      [{ servico_id: catalogoId, servico_nome: nome }],
+      "catalogo-treinamentos",
+      fluxo === "aet" ? catalogoId : "outro-aet",
+      fluxo === "insalubridade" ? catalogoId : "outro-insalubridade",
+      fluxo === "ltcat" ? catalogoId : "outro-ltcat",
+      fluxo === "parecer_tecnico" ? catalogoId : "outro-parecer",
+      fluxo === "periculosidade" ? catalogoId : "outro-periculosidade",
+      fluxo === "pgr" ? catalogoId : "outro-pgr"
+    ),
+    fluxo,
+    nome
+  );
+  assert.equal(
+    classifyOrcamentoFluxoImplantacao(
+      [{ servico_id: "id-de-outro-servico", servico_nome: nome }],
+      "catalogo-treinamentos",
+      fluxo === "aet" ? catalogoId : "outro-aet",
+      fluxo === "insalubridade" ? catalogoId : "outro-insalubridade",
+      fluxo === "ltcat" ? catalogoId : "outro-ltcat",
+      fluxo === "parecer_tecnico" ? catalogoId : "outro-parecer",
+      fluxo === "periculosidade" ? catalogoId : "outro-periculosidade",
+      fluxo === "pgr" ? catalogoId : "outro-pgr"
+    ),
+    "padrao",
+    `${nome} não muda de fluxo só pelo nome quando o id gravado é outro serviço`
+  );
+
+  const aet = {
+    visita_status: "realizada",
+    visita_data: "2026-10-29",
+    visita_realizada_em: "2026-11-05T13:09:00.000Z",
+    elaboracao_status: "aguardando",
+    laudo_path: null,
+    enviado_cliente: false,
+    enviado_em: null,
+  } as ImplantacaoAetRecord;
+  const pontual = baseProcesso({
+    etapaAtual: "concluido",
+    fluxoImplantacao: fluxo,
+    possuiPacoteCompletoSst: false,
+    possuiGestaoSstMensal: false,
+    totalEtapas: 5,
+    etapasConcluidas: 5,
+    progressoLabel: "5 de 5",
+    dataAprovacao: "2026-10-29T18:00:00.000Z",
+    aet,
+    orcamento: comOrigem("concluido", {
+      id: `orc-0084-${fluxo}`,
+      numero: "ORC-2026-0084",
+      cliente_nome: "DROGARIA NOVA GERACAO",
+      cliente_cnpj: "51.809.436/0001-67",
+      modalidade: "pontual",
+    }),
+    aprovacao: {
+      orcamento_aprovacao_itens: [
+        { servico_id: "id-gravado-antigo", servico_nome: nome },
+      ],
+    } as ImplantacaoProcesso["aprovacao"],
+  });
+  assert.equal(isProcessoElegivelLaudoPontualLaudosSst(pontual), true, nome);
+  assert.equal(isProcessoElegivelLaudosSst(pontual), false, nome);
+  assert.equal(isProcessoVisivelLaudosSst(pontual, null), true, nome);
+  const laudo = buildLaudosSstProcesso(pontual, null);
+  assert.equal(laudo.laudoPontualKind, fluxo, nome);
+  assert.equal(laudo.tracking, null, nome);
+  assert.equal(laudo.status, "em_andamento", nome);
+  assert.equal(laudo.etapasConcluidas, 1, nome);
+  assert.equal(laudo.dataEntrada, "2026-10-29", nome);
+  assert.equal(
+    filterLaudosSstProcessosPorMes([laudo], { year: 2026, month: 10 }).length,
+    1,
+    nome
+  );
+  assert.equal(
+    filterLaudosSstProcessosPorMes([laudo], { year: 2026, month: 11 }).length,
+    0,
+    nome
+  );
+  const recarregado = buildLaudosSstProcesso(pontual, null);
+  assert.equal(recarregado.dataEntrada, laudo.dataEntrada, nome);
+  assert.equal(recarregado.laudoPontualKind, fluxo, nome);
+}
+
+assert.equal(
+  classifyOrcamentoFluxoImplantacao(
+    [{ servico_id: "outro", servico_nome: "PGR" }],
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "catalogo-pgr-longo"
+  ),
+  "padrao",
+  "o nome curto PGR não vira laudo pontual"
+);
+
+const visitaSemRelogio = baseProcesso({
+  etapaAtual: "concluido",
+  fluxoImplantacao: "parecer_tecnico",
+  dataAprovacao: "2026-10-29T18:00:00.000Z",
+  aet: {
+    visita_status: "realizada",
+    visita_data: "2026-10-29",
+    visita_realizada_em: "",
+    elaboracao_status: "aguardando",
+    enviado_cliente: false,
+  } as ImplantacaoAetRecord,
+});
+assert.equal(
+  buildLaudosSstProcesso(visitaSemRelogio, null).dataEntrada,
+  "2026-10-29",
+  "relógio vazio não esconde o laudo nem o joga para o mês da correção"
+);
 
 console.log("test-laudos-sst: OK");
