@@ -4,6 +4,7 @@ import {
   IconBuilding,
   IconMapPin,
   IconPhone,
+  IconWallet,
 } from "@/components/ui/icons/OutlineIcons";
 import type { ClinicaFormField } from "@/hooks/useClinicaForm";
 import type { ClinicaFormValues } from "@/lib/types";
@@ -78,7 +79,45 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
                 <option value="Inativa">Inativa</option>
               </select>
             </Field>
-            <Field label="Dia do vencimento da fatura">
+          </div>
+        </ClinicaFormCard>
+
+        <ClinicaFormCard
+          title="Fechamento e pagamento"
+          icon={<IconWallet />}
+          iconTone="purple"
+        >
+          <div className={gridClass}>
+            <Field label="Período de apuração">
+              <select
+                className="field-input"
+                value={form.fechamento_apuracao}
+                onChange={(e) => onChange("fechamento_apuracao", e.target.value)}
+              >
+                <option value="mes_completo">Mês completo</option>
+                <option value="dia_especifico">Fechamento em dia específico</option>
+              </select>
+            </Field>
+            {form.fechamento_apuracao === "dia_especifico" ? (
+              <Field label={<>Dia do fechamento <RequiredMark /></>}>
+                <select
+                  className="field-input"
+                  value={form.dia_fechamento}
+                  onChange={(e) => onChange("dia_fechamento", e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {Array.from({ length: 31 }, (_, i) => {
+                    const dia = String(i + 1).padStart(2, "0");
+                    return (
+                      <option key={dia} value={dia}>
+                        {dia}
+                      </option>
+                    );
+                  })}
+                </select>
+              </Field>
+            ) : null}
+            <Field label="Dia do vencimento">
               <select
                 className="field-input"
                 value={form.dia_vencimento_fatura}
@@ -90,14 +129,30 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
                 {Array.from({ length: 31 }, (_, i) => {
                   const dia = String(i + 1).padStart(2, "0");
                   return (
-                    <option key={dia} value={dia}>
+                    <option key={`venc-${dia}`} value={dia}>
                       {dia}
                     </option>
                   );
                 })}
               </select>
             </Field>
+            <Field label="Mês do vencimento">
+              <select
+                className="field-input"
+                value={form.vencimento_mes}
+                onChange={(e) => onChange("vencimento_mes", e.target.value)}
+              >
+                <option value="mesmo_mes">Mesmo mês do fechamento</option>
+                <option value="mes_seguinte">Mês seguinte ao fechamento</option>
+              </select>
+            </Field>
           </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]">
+            O fechamento define quais exames entram em cada competência. O
+            vencimento é independente e só muda quando estes campos são
+            preenchidos. Clínica sem configuração continua no mês completo, com
+            o vencimento no próprio mês do fechamento.
+          </p>
         </ClinicaFormCard>
 
         <ClinicaFormCard

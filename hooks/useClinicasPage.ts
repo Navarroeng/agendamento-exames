@@ -8,6 +8,7 @@ import {
   filterClinicas,
   type ClinicasListFilters,
 } from "@/lib/clinica-filters";
+import { mensagemFechamentoCadastro } from "@/lib/clinica-fechamento";
 import {
   buildHistoricoAlteracoesClinica,
   buildHistoricoCriacaoClinica,
@@ -201,6 +202,14 @@ export function useClinicasPage() {
       toast.error(VALIDATION_MESSAGE);
       return;
     }
+    const erroFechamento = mensagemFechamentoCadastro({
+      fechamentoApuracao: form.fechamento_apuracao,
+      diaFechamento: form.dia_fechamento,
+    });
+    if (erroFechamento) {
+      toast.error(erroFechamento);
+      return;
+    }
 
     const payload = buildPayload();
     const usuario = payload.responsavel;
@@ -255,6 +264,8 @@ export function useClinicasPage() {
     }
   }, [
     validate,
+    form.fechamento_apuracao,
+    form.dia_fechamento,
     buildPayload,
     setSaving,
     editingId,

@@ -13,6 +13,7 @@ import { FaturaLembretesSecao } from "./FaturaLembretesSecao";
 import { FaturaLembretesVencidasBar } from "./FaturaLembretesVencidasBar";
 import { FaturaPreviewModal } from "./FaturaPreviewModal";
 import { FaturaPagamentoModal } from "./FaturaPagamentoModal";
+import { AjustarPeriodoCustosModal } from "./AjustarPeriodoCustosModal";
 import { FaturaConferenciaModal } from "./FaturaConferenciaModal";
 import { FaturasMesPanel } from "./FaturasMesPanel";
 import { useFaturasPage } from "@/hooks/useFaturasPage";
@@ -32,7 +33,7 @@ const PAGE_META: Record<
   clinica: {
     title: "Custos Clínicas",
     subtitle:
-      "Visualize os custos mensais por clínica, com valores em tempo real e status da conferência.",
+      "Visualize os custos de cada clínica no próprio período de fechamento, com conferência e vencimento.",
     icon: <IconWallet size={20} />,
   },
 };
@@ -49,7 +50,6 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     filterOptions,
     mesReferenciaValido,
     resumoMes,
-    diaVencimentoPorClinica,
     loading,
     saving,
     previewOpen,
@@ -102,6 +102,11 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleAbrirLembrete,
     handleCloseLembreteModal,
     handleLembreteEnviado,
+    ajusteRow,
+    ajusteErro,
+    handleAbrirAjustePeriodo,
+    handleFecharAjustePeriodo,
+    handleSalvarAjustePeriodo,
   } = useFaturasPage(tipo);
   const [lembreteTick, setLembreteTick] = useState(0);
   const [pagamentoTick, setPagamentoTick] = useState(0);
@@ -126,7 +131,6 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           mesValido={mesReferenciaValido}
           loading={loading}
           saving={saving}
-          diaVencimentoPorClinica={diaVencimentoPorClinica}
           onChange={handleFilterChange}
           onMesChange={handleMesChange}
           onYearChange={handleYearChange}
@@ -145,6 +149,9 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onReemitir={handleReemitirFatura}
           onReabrirConferencia={
             tipo === "clinica" ? handleReabrirConferencia : undefined
+          }
+          onAjustarPeriodo={
+            tipo === "clinica" ? handleAbrirAjustePeriodo : undefined
           }
           onEnviarEmail={
             tipo === "cliente" ? handleEnviarEmailMenu : undefined
@@ -222,6 +229,20 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
         }}
         onVerComprovante={handleVerComprovante}
       />
+
+      {tipo === "clinica" && ajusteRow ? (
+        <AjustarPeriodoCustosModal
+          open
+          clinicaNome={ajusteRow.referenciaNome}
+          mesFechamento={filters.mesReferencia}
+          inicioInicial={ajusteRow.periodoInicio ?? ""}
+          fimInicial={ajusteRow.periodoFim ?? ""}
+          saving={saving}
+          erro={ajusteErro}
+          onClose={handleFecharAjustePeriodo}
+          onSave={(params) => void handleSalvarAjustePeriodo(params)}
+        />
+      ) : null}
 
       {tipo === "clinica" && (
         <FaturaConferenciaModal

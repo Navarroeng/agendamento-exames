@@ -5,6 +5,11 @@ import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { ClinicaExamesTab } from "@/components/clinicas/ClinicaExamesTab";
 import { ClinicaRegrasAtendimentoViewSection } from "@/components/clinicas/ClinicaRegrasAtendimentoViewSection";
 import { IconBuilding } from "@/components/ui/icons/OutlineIcons";
+import {
+  rotuloApuracao,
+  rotuloVencimentoMes,
+} from "@/lib/clinica-fechamento";
+import { formatDiaVencimentoFatura } from "@/lib/fatura-vencimento";
 import { formatDateBR } from "@/lib/format";
 import { formatCreatedAtBR } from "@/lib/format-datetime";
 import type { ClinicaListItem } from "@/lib/types";
@@ -188,6 +193,29 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
 
             <SectionBlock title="Endereço">
               <InfoCard label="Endereço completo" value={endereco || "—"} />
+            </SectionBlock>
+
+            <SectionBlock title="Fechamento e pagamento">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <InfoCard
+                  label="Período de apuração"
+                  value={rotuloApuracao(clinica.fechamento_apuracao)}
+                />
+                {clinica.fechamento_apuracao === "dia_especifico" ? (
+                  <InfoCard
+                    label="Dia do fechamento"
+                    value={formatDiaVencimentoFatura(clinica.dia_fechamento)}
+                  />
+                ) : null}
+                <InfoCard
+                  label="Dia do vencimento"
+                  value={formatDiaVencimentoFatura(clinica.dia_vencimento_fatura)}
+                />
+                <InfoCard
+                  label="Mês do vencimento"
+                  value={rotuloVencimentoMes(clinica.vencimento_mes)}
+                />
+              </div>
             </SectionBlock>
 
             <ClinicaRegrasAtendimentoViewSection clinica={clinica} />

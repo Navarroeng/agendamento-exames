@@ -173,7 +173,11 @@ const resumoConferido = buildResumoClinicasMes(
   "06/2026"
 );
 assert.ok(resumoConferido);
-assert.equal(resumoConferido.resumo.valorPago, 300);
+assert.equal(
+  resumoConferido.resumo.valorPago,
+  500,
+  "conferido preserva o valor gravado, não o preço atual do agendamento"
+);
 assert.equal(resumoConferido.resumo.valorEmAberto, 0);
 
 const resumoLegadoPago = buildResumoClinicasMes(
@@ -187,7 +191,7 @@ const resumoLegadoPago = buildResumoClinicasMes(
   "06/2026"
 );
 assert.ok(resumoLegadoPago);
-assert.equal(resumoLegadoPago.resumo.valorPago, 300);
+assert.equal(resumoLegadoPago.resumo.valorPago, 500);
 assert.equal(resumoLegadoPago.resumo.valorEmAberto, 0);
 
 console.log("test-custos-clinicas-conferencia: ok");

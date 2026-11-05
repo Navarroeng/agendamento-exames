@@ -4,7 +4,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { isValidMonthYearBR } from "@/lib/agendamento-datetime";
-import { calcVencimentoFaturaCliente, calcDataVencimentoClinicaCompetencia } from "@/lib/fatura-vencimento";
+import { formatDateBR } from "@/lib/format";
+import {
+  calcVencimentoFaturaCliente,
+  calcDataVencimentoClinicaCompetencia,
+} from "@/lib/fatura-vencimento";
+import {
+  dataNoPeriodo,
+  dataOcupadaPorOutroFechamento,
+  dataVencimentoFechamento,
+  exameChave,
+  janelaBuscaFechamento,
+  parseMesReferenciaBR,
+  type ClinicaCicloConfig,
+  type ExameVinculoFatura,
+  type PeriodoRegistradoClinica,
+} from "@/lib/clinica-fechamento";
 import { useClinicasList } from "@/hooks/useClinicasList";
 import { canReemitirFaturaCliente, faturaStatusPermitePagamento, mesReferenciaBRFromFatura } from "@/lib/fatura-reemissao";
 import {
@@ -15,11 +30,13 @@ import {
   filterAgendamentosFatura,
   filterFaturasHistorico,
   formatPeriodoFatura,
+  mesReferenciaIsoFromBR,
   FATURA_HISTORICO_PAGE_SIZE,
   type FaturaFilters,
   type FaturaHistoricoFilters,
 } from "@/lib/fatura-filters";
 import {
+  isAgendamentoDaClinica,
   referenciaIdUnicaDosAgendamentos,
   resolveClienteFromCatalog,
   resolverReferenciaIdCliente,
@@ -28,6 +45,8 @@ import {
 import {
   buildResumoClientesMes,
   buildResumoClinicasMes,
+  type FaturaMesRow,
+  type ItemResumoCustoClinica,
   getCurrentMonthYearBR,
   computeFaturaMesResumo,
   filterFaturaMesRowsByStatus,
@@ -61,6 +80,9 @@ import {
 import {
   buscarFaturaComItens,
   cancelarFatura,
+  ajustarPeriodoCustosClinica,
+  listarItensCustosClinica,
+  listarPeriodosCustosClinicaAtivos,
   marcarConferenciaCustosClinica,
   marcarFaturaPendente,
   atualizarPagamentoFatura,
@@ -126,13 +148,38 @@ function buildPreviewFromAgendamentos(
     status?: FaturaStatus | null;
     readonly?: boolean;
     diaVencimentoClinica?: number | null;
+    vencimentoMes?: "mesmo_mes" | "mes_seguinte" | null;
+    periodoInicio?: string | null;
+    periodoFim?: string | null;
+    dataFechamento?: string | null;
+    dataVencimento?: string | null;
+    clinicaId?: string | null;
+    periodoAjustado?: boolean | null;
   }
 ): FaturaPreviewState {
   const itens = buildFaturaItensFromAgendamentos(agendamentos, tipo);
-  const { periodo_inicio, periodo_fim } = parsePeriodoIso(filters.mesReferencia);
+  const periodoPadrao = parsePeriodoIso(filters.mesReferencia);
+  const periodo_inicio = extras?.periodoInicio ?? periodoPadrao.periodo_inicio;
+  const periodo_fim = extras?.periodoFim ?? periodoPadrao.periodo_fim;
+  const mesFechamento = parseMesReferenciaBR(filters.mesReferencia);
   const vencimento =
     tipo === "clinica"
       ? (() => {
+          if (extras?.dataVencimento) {
+            const iso = extras.dataVencimento.split("T")[0];
+            return { iso, label: formatDateBR(iso) };
+          }
+          const porCiclo =
+            mesFechamento &&
+            dataVencimentoFechamento({
+              diaVencimento: extras?.diaVencimentoClinica,
+              anoFechamento: mesFechamento.ano,
+              mesFechamento: mesFechamento.mes,
+              vencimentoMes: extras?.vencimentoMes,
+            });
+          if (porCiclo) {
+            return { iso: porCiclo.iso, label: formatDateBR(porCiclo.iso) };
+          }
           const porDia = calcDataVencimentoClinicaCompetencia(
             extras?.diaVencimentoClinica,
             filters.mesReferencia
@@ -140,10 +187,8 @@ function buildPreviewFromAgendamentos(
           if (porDia) {
             return { iso: porDia.iso, label: porDia.label };
           }
-          return {
-            iso: periodo_fim ?? new Date().toISOString().split("T")[0],
-            label: "",
-          };
+          const iso = periodo_fim ?? new Date().toISOString().split("T")[0];
+          return { iso, label: formatDateBR(iso) };
         })()
       : (() => {
           const auto = calcVencimentoFaturaCliente(filters.mesReferencia);
@@ -154,9 +199,16 @@ function buildPreviewFromAgendamentos(
   return {
     tipo,
     referenciaNome,
-    periodoLabel: formatPeriodoFatura(filters.mesReferencia),
+    periodoLabel:
+      periodo_inicio && periodo_fim
+        ? `${formatDateBR(periodo_inicio)} a ${formatDateBR(periodo_fim)}`
+        : formatPeriodoFatura(filters.mesReferencia),
     periodo_inicio,
     periodo_fim,
+    data_fechamento: extras?.dataFechamento ?? periodo_fim,
+    periodo_ajustado: extras?.periodoAjustado ?? null,
+    mes_referencia:
+      tipo === "clinica" ? mesReferenciaIsoFromBR(filters.mesReferencia) : null,
     data_vencimento: vencimento.iso,
     data_vencimento_label: vencimento.label,
     itens,
@@ -167,7 +219,7 @@ function buildPreviewFromAgendamentos(
     referencia_id:
       tipo === "cliente"
         ? referenciaIdUnicaDosAgendamentos(agendamentos)
-        : null,
+        : extras?.clinicaId ?? null,
   };
 }
 
@@ -200,6 +252,44 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     }
     return map;
   }, [clinicas]);
+
+  const ciclosClinica = useMemo<ClinicaCicloConfig[]>(
+    () =>
+      clinicas.map((c) => ({
+        id: c.id,
+        nomes: [c.nome_fantasia, c.razao_social].filter(Boolean),
+        fechamentoApuracao: c.fechamento_apuracao ?? null,
+        diaFechamento: c.dia_fechamento ?? null,
+        diaVencimento: c.dia_vencimento_fatura ?? null,
+        vencimentoMes: c.vencimento_mes ?? null,
+      })),
+    [clinicas]
+  );
+
+  const [periodosRegistrados, setPeriodosRegistrados] = useState<
+    PeriodoRegistradoClinica[]
+  >([]);
+  const [itensCusto, setItensCusto] = useState<ExameVinculoFatura[]>([]);
+  const [ajusteRow, setAjusteRow] = useState<FaturaMesRow | null>(null);
+  const [ajusteErro, setAjusteErro] = useState<string | null>(null);
+  const periodosRef = useRef(periodosRegistrados);
+  periodosRef.current = periodosRegistrados;
+
+  const itensPorFatura = useMemo(() => {
+    const map = new Map<string, ItemResumoCustoClinica[]>();
+    for (const item of itensCusto) {
+      const lista = map.get(item.faturaId) ?? [];
+      lista.push({
+        faturaId: item.faturaId,
+        agendamentoId: item.agendamentoId,
+        exameNome: item.exameNome,
+        valorTotal: 0,
+        data: item.data,
+      });
+      map.set(item.faturaId, lista);
+    }
+    return map;
+  }, [itensCusto]);
 
   const resolveDiaVencimentoClinica = useCallback(
     (referenciaNome: string): number | null => {
@@ -267,9 +357,31 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     previewRef.current = preview;
   }, [preview]);
 
+  const faturasRef = useRef(faturas);
+  faturasRef.current = faturas;
+
   const reloadAgendamentos = useCallback(async () => {
     setLoading(true);
     try {
+      if (pageTipo === "clinica" && isValidMonthYearBR(filters.mesReferencia)) {
+        const janela = janelaBuscaFechamento(filters.mesReferencia, [
+          ...periodosRef.current,
+          ...faturasRef.current
+            .filter((fatura) => fatura.tipo === "clinica")
+            .map((fatura) => ({
+              inicio: fatura.periodo_inicio,
+              fim: fatura.periodo_fim,
+            })),
+        ]);
+        const data = janela
+          ? await listarAgendamentosParaFatura({
+              inicio: janela.inicio,
+              fim: janela.fim,
+            })
+          : await listarAgendamentosParaFatura();
+        setAgendamentos(data);
+        return;
+      }
       const data = await listarAgendamentosParaFatura();
       setAgendamentos(data);
     } catch (err) {
@@ -279,7 +391,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters.mesReferencia, pageTipo]);
 
   const historicoRequestRef = useRef(0);
 
@@ -412,6 +524,45 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [reloadAll]);
 
+  useEffect(() => {
+    if (pageTipo !== "clinica" || !isValidMonthYearBR(filters.mesReferencia)) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const periodos = await listarPeriodosCustosClinicaAtivos();
+        if (cancelled) return;
+        setPeriodosRegistrados(periodos);
+        const janela = janelaBuscaFechamento(filters.mesReferencia, periodos);
+        if (!janela) return;
+        const mesIso = parseMesReferenciaBR(filters.mesReferencia)?.iso;
+        const itens = await listarItensCustosClinica({
+          inicio: janela.inicio,
+          fim: janela.fim,
+          faturaIds: periodos
+            .filter((periodo) => periodo.mesReferencia === mesIso)
+            .map((periodo) => periodo.faturaId),
+        });
+        if (!cancelled) setItensCusto(itens);
+      } catch (err) {
+        console.error("Erro ao carregar períodos de fechamento:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.mesReferencia, pageTipo]);
+
+  const periodosKey = periodosRegistrados
+    .map((periodo) => `${periodo.faturaId}:${periodo.inicio}:${periodo.fim}`)
+    .join("|");
+
+  useEffect(() => {
+    if (pageTipo !== "clinica") return;
+    void reloadAgendamentos();
+  }, [pageTipo, periodosKey, reloadAgendamentos]);
+
   const filterOptions = useMemo(() => {
     const fromAgendamentos = extractFaturaFilterOptions(agendamentos);
     return {
@@ -449,17 +600,26 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           agendamentos,
           faturas,
           filters.mesReferencia,
-          filters.clinica
+          filters.clinica,
+          {
+            porFechamento: true,
+            clinicas: ciclosClinica,
+            periodosRegistrados,
+            itensPorFatura,
+          }
         );
   }, [
     agendamentos,
+    ciclosClinica,
     clientesCatalog,
     filters.cliente,
     filters.clinica,
     filters.mesReferencia,
     faturas,
+    itensPorFatura,
     mesReferenciaValido,
     pageTipo,
+    periodosRegistrados,
   ]);
 
   const resumoMes = useMemo(() => {
@@ -630,6 +790,68 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [filters.mesReferencia]
   );
 
+  const selecionarAgendamentosClinica = useCallback(
+    (referenciaNome: string) => {
+      const key = referenciaNome.trim().toLowerCase();
+      const row = resumoMesBase?.rows.find(
+        (item) => item.referenciaNome.trim().toLowerCase() === key
+      );
+      if (!row?.periodoInicio || !row.periodoFim) {
+        return filterAgendamentosDaReferenciaFatura(agendamentos, {
+          mesReferencia: filters.mesReferencia,
+          tipo: "clinica",
+          referenciaNome,
+        });
+      }
+      const bloqueados = new Set<string>();
+      for (const item of itensCusto) {
+        if (row.fatura?.id && item.faturaId === row.fatura.id) continue;
+        bloqueados.add(exameChave(item.agendamentoId, item.exameNome));
+      }
+      const config =
+        ciclosClinica.find((clinica) =>
+          clinica.nomes.some((nome) => nome.trim().toLowerCase() === key)
+        ) ?? null;
+      const mesIso = parseMesReferenciaBR(filters.mesReferencia)?.iso ?? "";
+      const salvo = Boolean(
+        row.fatura?.periodo_inicio && row.fatura.periodo_fim
+      );
+      return agendamentos.flatMap((ag) => {
+        if (!isAgendamentoDaClinica(ag.clinica_nome, referenciaNome)) return [];
+        if (!dataNoPeriodo(ag.data_agendamento, row.periodoInicio!, row.periodoFim!)) {
+          return [];
+        }
+        if (
+          dataOcupadaPorOutroFechamento({
+            dataIso: ag.data_agendamento,
+            nomeClinica: referenciaNome,
+            clinicaId: row.clinicaId,
+            mesFechamentoIso: mesIso,
+            faturaIdAtual: row.fatura?.id,
+            periodoSalvoNestaCompetencia: salvo,
+            periodos: periodosRegistrados,
+            config,
+          })
+        ) {
+          return [];
+        }
+        const exames = (ag.agendamento_exames ?? []).filter(
+          (exame) => !bloqueados.has(exameChave(ag.id, exame.tipo_exame))
+        );
+        if (exames.length === 0) return [];
+        return [{ ...ag, agendamento_exames: exames }];
+      });
+    },
+    [
+      agendamentos,
+      ciclosClinica,
+      filters.mesReferencia,
+      itensCusto,
+      periodosRegistrados,
+      resumoMesBase?.rows,
+    ]
+  );
+
   const openPreviewForReferencia = useCallback(
     async (
       tipo: FaturaTipo,
@@ -660,15 +882,22 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         ...filters,
         ...(isCliente ? { cliente: referencia } : { clinica: referencia }),
       };
-      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
-        mesReferencia: filters.mesReferencia,
-        tipo,
-        referenciaNome: referencia,
-        referenciaId: isCliente
-          ? resolveClienteFromCatalog(clientesCatalog, referencia)?.id
-          : null,
-        clientesCatalog,
-      });
+      const linhaClinica = isCliente
+        ? undefined
+        : resumoMesBase?.rows.find(
+            (item) =>
+              item.referenciaNome.trim().toLowerCase() ===
+              referencia.toLowerCase()
+          );
+      const agsReferencia = isCliente
+        ? filterAgendamentosDaReferenciaFatura(agendamentos, {
+            mesReferencia: filters.mesReferencia,
+            tipo,
+            referenciaNome: referencia,
+            referenciaId: resolveClienteFromCatalog(clientesCatalog, referencia)?.id,
+            clientesCatalog,
+          })
+        : selecionarAgendamentosClinica(referencia);
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
         resumoMesBase?.rows,
@@ -703,6 +932,18 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
             tipo === "clinica"
               ? resolveDiaVencimentoClinica(referencia)
               : null,
+          vencimentoMes:
+            ciclosClinica.find((clinica) =>
+              clinica.nomes.some(
+                (nome) => nome.trim().toLowerCase() === referencia.toLowerCase()
+              )
+            )?.vencimentoMes ?? null,
+          periodoInicio: linhaClinica?.periodoInicio,
+          periodoFim: linhaClinica?.periodoFim,
+          dataFechamento: linhaClinica?.dataFechamento,
+          dataVencimento: linhaClinica?.dataVencimento,
+          clinicaId: linhaClinica?.clinicaId,
+          periodoAjustado: linhaClinica?.fatura?.periodo_ajustado,
           ...(faturaExistente?.status === "rascunho"
             ? {
                 faturaId: faturaExistente.id,
@@ -719,10 +960,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [
       agendamentos,
       bloquearFaturaDuplicada,
+      ciclosClinica,
       clientesCatalog,
       filters,
       resolveDiaVencimentoClinica,
       resumoMesBase?.rows,
+      selecionarAgendamentosClinica,
     ]
   );
 
@@ -798,9 +1041,12 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const current = previewRef.current;
       if (!current) throw new Error("Pré-visualização indisponível.");
 
-      const mesReferencia = current.periodo_inicio
-        ? `${current.periodo_inicio.split("-")[1]}/${current.periodo_inicio.slice(0, 4)}`
-        : filters.mesReferencia;
+      const mesReferencia =
+        current.tipo === "clinica"
+          ? filters.mesReferencia
+          : current.periodo_inicio
+            ? `${current.periodo_inicio.split("-")[1]}/${current.periodo_inicio.slice(0, 4)}`
+            : filters.mesReferencia;
 
       if (mesReferencia.trim()) {
         const existente = await verificarFaturaExistenteMes({
@@ -838,9 +1084,15 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
                 current.referenciaNome,
                 clientesCatalogRef.current
               )
-            : null,
+            : current.referencia_id ?? null,
         periodo_inicio: current.periodo_inicio,
         periodo_fim: current.periodo_fim,
+        mes_referencia:
+          current.tipo === "clinica"
+            ? current.mes_referencia ?? mesReferenciaIsoFromBR(filters.mesReferencia)
+            : undefined,
+        data_fechamento: current.data_fechamento ?? current.periodo_fim,
+        periodo_ajustado: current.periodo_ajustado,
         data_vencimento: current.data_vencimento,
         valor_total: valorTotal,
         total_exames: current.itens.length,
@@ -1480,11 +1732,23 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
           {
             faturaId: conferenciaFatura.id,
             referencia_nome: conferenciaFatura.referencia_nome,
+            referencia_id:
+              previewCurrent?.referencia_id ?? conferenciaFatura.referencia_id,
             periodo_inicio:
               previewCurrent?.periodo_inicio ??
               conferenciaFatura.periodo_inicio,
             periodo_fim:
               previewCurrent?.periodo_fim ?? conferenciaFatura.periodo_fim,
+            mes_referencia:
+              previewCurrent?.mes_referencia ??
+              conferenciaFatura.mes_referencia,
+            data_fechamento:
+              previewCurrent?.data_fechamento ??
+              conferenciaFatura.data_fechamento ??
+              conferenciaFatura.periodo_fim,
+            periodo_ajustado:
+              previewCurrent?.periodo_ajustado ??
+              conferenciaFatura.periodo_ajustado,
             data_vencimento:
               previewCurrent?.data_vencimento ??
               conferenciaFatura.data_vencimento,
@@ -1589,15 +1853,22 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         ...filters,
         ...(isCliente ? { cliente: referencia } : { clinica: referencia }),
       };
-      const agsReferencia = filterAgendamentosDaReferenciaFatura(agendamentos, {
-        mesReferencia: filters.mesReferencia,
-        tipo: pageTipo,
-        referenciaNome: referencia,
-        referenciaId: isCliente
-          ? resolveClienteFromCatalog(clientesCatalog, referencia)?.id
-          : null,
-        clientesCatalog,
-      });
+      const linhaClinica = isCliente
+        ? undefined
+        : resumoMesBase?.rows.find(
+            (item) =>
+              item.referenciaNome.trim().toLowerCase() ===
+              referencia.toLowerCase()
+          );
+      const agsReferencia = isCliente
+        ? filterAgendamentosDaReferenciaFatura(agendamentos, {
+            mesReferencia: filters.mesReferencia,
+            tipo: pageTipo,
+            referenciaNome: referencia,
+            referenciaId: resolveClienteFromCatalog(clientesCatalog, referencia)?.id,
+            clientesCatalog,
+          })
+        : selecionarAgendamentosClinica(referencia);
 
       const faturaExistente = findFaturaRascunhoParaReferencia(
         resumoMesBase?.rows,
@@ -1634,6 +1905,18 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
             pageTipo === "clinica"
               ? resolveDiaVencimentoClinica(referencia)
               : null,
+          vencimentoMes:
+            ciclosClinica.find((clinica) =>
+              clinica.nomes.some(
+                (nome) => nome.trim().toLowerCase() === referencia.toLowerCase()
+              )
+            )?.vencimentoMes ?? null,
+          periodoInicio: linhaClinica?.periodoInicio,
+          periodoFim: linhaClinica?.periodoFim,
+          dataFechamento: linhaClinica?.dataFechamento,
+          dataVencimento: linhaClinica?.dataVencimento,
+          clinicaId: linhaClinica?.clinicaId,
+          periodoAjustado: linhaClinica?.fatura?.periodo_ajustado,
           ...(faturaExistente?.status === "rascunho"
             ? {
                 faturaId: faturaExistente.id,
@@ -1680,12 +1963,14 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     [
       agendamentos,
       bloquearFaturaDuplicada,
+      ciclosClinica,
       clientesCatalog,
       filters,
       pageTipo,
       persistPreview,
       resolveDiaVencimentoClinica,
       resumoMesBase?.rows,
+      selecionarAgendamentosClinica,
       syncClienteVencimentoNoPreview,
       abrirEnvioEmailModalCliente,
       reloadHistorico,
@@ -1859,6 +2144,93 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     ]
   );
 
+  const handleAbrirAjustePeriodo = useCallback((row: FaturaMesRow) => {
+    if (row.fatura && row.fatura.status !== "rascunho") {
+      toast.error(
+        "Somente um fechamento aberto para conferência pode ter o período ajustado."
+      );
+      return;
+    }
+    if (row.fatura?.pago) {
+      toast.error(
+        "Fechamento com pagamento registrado não pode ter o período alterado por este caminho."
+      );
+      return;
+    }
+    setAjusteErro(null);
+    setAjusteRow(row);
+  }, []);
+
+  const handleFecharAjustePeriodo = useCallback(() => {
+    if (saving) return;
+    setAjusteRow(null);
+    setAjusteErro(null);
+  }, [saving]);
+
+  const handleSalvarAjustePeriodo = useCallback(
+    async (params: { inicio: string; fim: string; motivo: string }) => {
+      if (!ajusteRow) return;
+      const config =
+        ciclosClinica.find((clinica) =>
+          clinica.nomes.some(
+            (nome) =>
+              nome.trim().toLowerCase() ===
+              ajusteRow.referenciaNome.trim().toLowerCase()
+          )
+        ) ?? null;
+      setSaving(true);
+      setAjusteErro(null);
+      try {
+        await ajustarPeriodoCustosClinica(
+          {
+            faturaId: ajusteRow.fatura?.id,
+            clinicaId: ajusteRow.clinicaId ?? config?.id ?? null,
+            referenciaNome: ajusteRow.referenciaNome,
+            mesFechamento: filters.mesReferencia,
+            periodoInicio: params.inicio,
+            periodoFim: params.fim,
+            dataFechamento:
+              ajusteRow.dataFechamento ??
+              ajusteRow.periodoFim ??
+              params.fim,
+            dataVencimento:
+              ajusteRow.dataVencimento ??
+              ajusteRow.fatura?.data_vencimento ??
+              params.fim,
+            motivo: params.motivo,
+            geradoPor,
+            config: config
+              ? {
+                  fechamentoApuracao: config.fechamentoApuracao,
+                  diaFechamento: config.diaFechamento,
+                }
+              : null,
+          },
+          auditOptions
+        );
+        toast.success("Período do fechamento ajustado.");
+        setAjusteRow(null);
+        await reloadAll();
+      } catch (err) {
+        console.error(err);
+        const mensagem =
+          err instanceof Error ? err.message : "Erro ao ajustar o período.";
+        setAjusteErro(mensagem);
+        toast.error(mensagem);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      ajusteRow,
+      auditOptions,
+      ciclosClinica,
+      filters.mesReferencia,
+      geradoPor,
+      reloadAll,
+    ]
+  );
+
   return {
     pageTipo,
     filters,
@@ -1918,6 +2290,11 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
     handleEmitirReferencia,
     handleReabrirConferencia,
     handleReemitirFatura,
+    ajusteRow,
+    ajusteErro,
+    handleAbrirAjustePeriodo,
+    handleFecharAjustePeriodo,
+    handleSalvarAjustePeriodo,
     envioEmailModalOpen,
     envioEmailFatura,
     envioEmailSugerido,

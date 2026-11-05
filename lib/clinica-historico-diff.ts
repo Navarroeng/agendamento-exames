@@ -1,3 +1,7 @@
+import {
+  rotuloApuracao,
+  rotuloVencimentoMes,
+} from "@/lib/clinica-fechamento";
 import type { ClinicaInsert, ClinicaRecord } from "@/lib/types";
 import {
   formatDiasAtendimentoLabel,
@@ -241,6 +245,30 @@ export function buildHistoricoAlteracoesClinica(
     "observação operacional",
     anterior.observacao_operacional,
     novo.observacao_operacional
+  );
+
+  compareField(
+    changes,
+    usuario,
+    "período de apuração",
+    rotuloApuracao(anterior.fechamento_apuracao),
+    rotuloApuracao(novo.fechamento_apuracao)
+  );
+  const diaAnterior =
+    anterior.fechamento_apuracao === "dia_especifico" && anterior.dia_fechamento
+      ? String(anterior.dia_fechamento).padStart(2, "0")
+      : null;
+  const diaNovo =
+    novo.fechamento_apuracao === "dia_especifico" && novo.dia_fechamento
+      ? String(novo.dia_fechamento).padStart(2, "0")
+      : null;
+  compareField(changes, usuario, "dia do fechamento", diaAnterior, diaNovo);
+  compareField(
+    changes,
+    usuario,
+    "mês do vencimento",
+    rotuloVencimentoMes(anterior.vencimento_mes),
+    rotuloVencimentoMes(novo.vencimento_mes)
   );
 
   return changes;

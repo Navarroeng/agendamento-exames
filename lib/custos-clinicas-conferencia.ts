@@ -40,11 +40,18 @@ export const HISTORICO_STATUS_FILTER_LABELS_CLINICA: Record<
   paga: "Conferido",
 };
 
-/** Custos conferidos (status emitida) contam como pagos no resumo. */
+/** Conferida ou vencida: o retrato gravado não segue preço nem configuração novos. */
+export function faturaCustosCongelada(
+  fatura: Pick<FaturaRecord, "status"> | null | undefined
+): boolean {
+  return fatura?.status === "emitida" || fatura?.status === "vencida";
+}
+
+/** Custos conferidos (emitida ou vencida) contam como pagos no resumo. */
 export function custosClinicaConferido(
   fatura: Pick<FaturaRecord, "status"> | null | undefined
 ): boolean {
-  return fatura?.status === "emitida";
+  return fatura?.status === "emitida" || fatura?.status === "vencida";
 }
 
 /** Aberta para conferência: sem fatura ou rascunho. */
@@ -62,6 +69,7 @@ export function deriveFaturaMesStatusClinica(
   if (fatura.status === "cancelada") return "cancelada";
   if (fatura.status === "rascunho") return "rascunho";
   if (fatura.status === "emitida") return "emitida";
+  if (fatura.status === "vencida") return "vencida";
   return "aberta_emissao";
 }
 

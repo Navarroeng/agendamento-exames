@@ -483,6 +483,9 @@ export interface ClinicaFormValues {
   observacoes: string;
   status: string;
   dia_vencimento_fatura: string;
+  fechamento_apuracao: string;
+  dia_fechamento: string;
+  vencimento_mes: string;
   tipo_atendimento: string;
   dias_atendimento: string;
   horario_padrao_inicio: string;
@@ -521,6 +524,11 @@ export interface ClinicaInsert {
   observacoes: string | null;
   status: ClinicaStatus;
   dia_vencimento_fatura: number | null;
+  /** Null = mês completo. Não gravar regra nova só por ausência. */
+  fechamento_apuracao: "mes_completo" | "dia_especifico" | null;
+  dia_fechamento: number | null;
+  /** Null = vencimento no mês do fechamento (comportamento anterior). */
+  vencimento_mes: "mesmo_mes" | "mes_seguinte" | null;
   tipo_atendimento: ClinicaTipoAtendimento;
   dias_atendimento: number[] | null;
   horario_padrao_inicio: string | null;
@@ -626,6 +634,9 @@ export interface FaturaRecord {
   periodo_inicio: string | null;
   periodo_fim: string | null;
   mes_referencia: string | null;
+  data_fechamento?: string | null;
+  total_agendamentos?: number | null;
+  periodo_ajustado?: boolean | null;
   data_emissao: string | null;
   data_vencimento: string;
   valor_total: number;
@@ -698,6 +709,9 @@ export interface FaturaPreviewState {
   periodo_inicio: string | null;
   periodo_fim: string | null;
   data_vencimento: string;
+  data_fechamento?: string | null;
+  periodo_ajustado?: boolean | null;
+  mes_referencia?: string | null;
   data_vencimento_label: string;
   itens: FaturaItemInsert[];
   numero: string | null;

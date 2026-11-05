@@ -29,6 +29,7 @@ interface FaturasMesRowActionsProps {
   onReabrirConferencia?: (id: string) => void;
   onEnviarEmail?: (id: string) => void;
   onEnviarLembrete?: (id: string) => void;
+  onAjustarPeriodo?: (row: FaturaMesRow) => void;
 }
 
 const EMIT_LABEL: Record<FaturaTipo, string> = {
@@ -61,8 +62,23 @@ export function FaturasMesRowActions({
   onVerFaturaClinica,
   onEnviarEmail,
   onEnviarLembrete,
+  onAjustarPeriodo,
 }: FaturasMesRowActionsProps) {
   const fatura = row.fatura;
+  const podeAjustarPeriodo =
+    variant === "clinica" &&
+    Boolean(onAjustarPeriodo) &&
+    (!fatura || (fatura.status === "rascunho" && !fatura.pago));
+  const itensAjuste =
+    podeAjustarPeriodo && onAjustarPeriodo
+      ? [
+          {
+            key: "ajustar-periodo",
+            label: "Ajustar período",
+            onClick: () => onAjustarPeriodo(row),
+          },
+        ]
+      : [];
 
   if (
     variant === "clinica" &&
@@ -93,6 +109,7 @@ export function FaturasMesRowActions({
         saving={saving}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
         onEmitir={() => onEmitir(row.referenciaNome)}
+        extraItems={itensAjuste}
       />
     );
   }
@@ -156,6 +173,7 @@ export function FaturasMesRowActions({
       saving={saving}
       onVisualizar={() => onVisualizarAgendamentos(row.referenciaNome)}
       onEmitir={() => onEmitir(row.referenciaNome)}
+      extraItems={itensAjuste}
     />
   );
 }
@@ -337,12 +355,14 @@ function AbertaEmissaoActionsMenu({
   saving,
   onVisualizar,
   onEmitir,
+  extraItems = [],
 }: {
   referenciaNome: string;
   emitLabel: string;
   saving: boolean;
   onVisualizar: () => void;
   onEmitir: () => void;
+  extraItems?: MenuItem[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -362,6 +382,7 @@ function AbertaEmissaoActionsMenu({
 
   const items: MenuItem[] = [
     { key: "visualizar", label: "Visualizar", onClick: onVisualizar },
+    ...extraItems,
     { key: "emitir", label: emitLabel, onClick: onEmitir },
   ];
 

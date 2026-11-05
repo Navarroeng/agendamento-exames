@@ -9,6 +9,10 @@ import {
   tipoAtendimentoToForm,
 } from "@/lib/clinica-regras-atendimento";
 import { formatDiaVencimentoFatura, parseDiaVencimentoFatura } from "@/lib/fatura-vencimento";
+import {
+  apuracaoEfetiva,
+  vencimentoMesEfetivo,
+} from "@/lib/clinica-fechamento";
 import type { ClinicaFormValues, ClinicaRecord } from "@/lib/types";
 
 function boolToSimNao(value: boolean): string {
@@ -56,6 +60,12 @@ export function clinicaToFormValues(clinica: ClinicaRecord): ClinicaFormValues {
       clinica.dia_vencimento_fatura != null
         ? formatDiaVencimentoFatura(clinica.dia_vencimento_fatura)
         : "",
+    fechamento_apuracao: apuracaoEfetiva(clinica.fechamento_apuracao),
+    dia_fechamento:
+      clinica.dia_fechamento != null
+        ? formatDiaVencimentoFatura(clinica.dia_fechamento)
+        : "",
+    vencimento_mes: vencimentoMesEfetivo(clinica.vencimento_mes),
     tipo_atendimento: tipoAtendimentoToForm(clinica.tipo_atendimento),
     dias_atendimento: formatDiasAtendimentoForm(clinica.dias_atendimento),
     horario_padrao_inicio: normalizeHorario(clinica.horario_padrao_inicio),
@@ -98,6 +108,14 @@ export function formValuesToClinicaInsert(
     observacoes: form.observacoes.trim() || null,
     status: statusFromForm(form.status),
     dia_vencimento_fatura: parseDiaVencimentoFatura(form.dia_vencimento_fatura),
+    fechamento_apuracao:
+      form.fechamento_apuracao === "dia_especifico" ? "dia_especifico" : null,
+    dia_fechamento:
+      form.fechamento_apuracao === "dia_especifico"
+        ? parseDiaVencimentoFatura(form.dia_fechamento)
+        : null,
+    vencimento_mes:
+      form.vencimento_mes === "mes_seguinte" ? "mes_seguinte" : null,
     tipo_atendimento: tipoAtendimentoFromForm(form.tipo_atendimento),
     dias_atendimento: (() => {
       const dias = parseDiasAtendimentoForm(form.dias_atendimento);

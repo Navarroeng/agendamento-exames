@@ -95,6 +95,83 @@ export type CustosClinicaVencimentoView = {
   tone: "muted" | "danger" | "warning" | "neutral" | "ok";
 };
 
+/**
+ * Vencimento já calculado (data completa). Alertas só com a fatura em aberto.
+ */
+export function buildCustosClinicaVencimentoPorData(params: {
+  dataIso: string | null | undefined;
+  emAberto: boolean;
+  hojeIso: string;
+}): CustosClinicaVencimentoView {
+  const iso = params.dataIso?.split("T")[0] ?? "";
+  if (!iso) {
+    return {
+      situacao: "sem_config",
+      diaLabel: "—",
+      dataIso: null,
+      dataLabel: null,
+      titulo: "—",
+      detalhe: null,
+      tone: "muted",
+    };
+  }
+  const label = formatDateIsoToBR(iso);
+  if (!params.emAberto) {
+    return {
+      situacao: "pago",
+      diaLabel: label,
+      dataIso: iso,
+      dataLabel: label,
+      titulo: label,
+      detalhe: null,
+      tone: "ok",
+    };
+  }
+  const diff = diasEntreIso(params.hojeIso, iso);
+  if (diff < 0) {
+    return {
+      situacao: "vencido",
+      diaLabel: label,
+      dataIso: iso,
+      dataLabel: label,
+      titulo: label,
+      detalhe: `Vencido · ${label}`,
+      tone: "danger",
+    };
+  }
+  if (diff === 0) {
+    return {
+      situacao: "vence_hoje",
+      diaLabel: label,
+      dataIso: iso,
+      dataLabel: label,
+      titulo: label,
+      detalhe: `Vence hoje · ${label}`,
+      tone: "warning",
+    };
+  }
+  if (diff >= 1 && diff <= 5) {
+    return {
+      situacao: "proximo",
+      diaLabel: label,
+      dataIso: iso,
+      dataLabel: label,
+      titulo: label,
+      detalhe: `Vence em ${diff} dia${diff === 1 ? "" : "s"} · ${label}`,
+      tone: "warning",
+    };
+  }
+  return {
+    situacao: "em_dia",
+    diaLabel: label,
+    dataIso: iso,
+    dataLabel: label,
+    titulo: label,
+    detalhe: null,
+    tone: "neutral",
+  };
+}
+
 function diasEntreIso(a: string, b: string): number {
   const da = new Date(`${a}T12:00:00`);
   const db = new Date(`${b}T12:00:00`);

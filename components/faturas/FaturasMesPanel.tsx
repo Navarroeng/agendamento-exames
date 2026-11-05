@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/icons/OutlineIcons";
 import type { ClienteFilterOption } from "@/lib/cliente-display";
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import { rotuloMesFechamento } from "@/lib/clinica-fechamento";
 import { custosClinicaEmAberto } from "@/lib/custos-clinicas-conferencia";
+import { formatDateBR } from "@/lib/format";
 import type { FaturaFilters } from "@/lib/fatura-filters";
 import {
   FATURA_MES_STATUS_LABELS,
@@ -22,7 +24,7 @@ import {
 import { FATURA_ALTERACAO_POS_EMISSAO_MSG } from "@/lib/fatura-alteracao-pos-emissao";
 import { textoUltimoLembrete } from "@/lib/fatura-lembrete";
 import {
-  buildCustosClinicaVencimentoView,
+  buildCustosClinicaVencimentoPorData,
   type CustosClinicaVencimentoView,
 } from "@/lib/fatura-vencimento";
 import type { YearMonth } from "@/lib/listagem-meses";
@@ -92,17 +94,15 @@ const PANEL_CONFIG: Record<
     emptyNone: "Nenhum registro encontrado para este período.",
     emptyFiltered: " para o filtro informado",
     invalidMonth:
-      "Informe um mês de referência válido para listar as clínicas com custos.",
+      "Informe um mês de fechamento válido para listar as clínicas com custos.",
     helpText: (
       <>
-        Apenas agendamentos com status{" "}
+        Cada clínica segue o próprio período de fechamento. O mês selecionado é o
+        mês em que esse período fecha. Apenas agendamentos com status{" "}
         <strong className="font-semibold text-navy">agendado</strong> entram no
-        cálculo de custos. Os valores são calculados em tempo real a partir dos
-        agendamentos do mês selecionado. O vencimento exibido usa o{" "}
-        <strong className="font-semibold text-navy">
-          dia cadastrado na clínica
-        </strong>{" "}
-        aplicado à competência do mês.
+        cálculo. Clínicas sem configuração continuam no mês completo. Enquanto
+        o fechamento está aberto, os valores acompanham os agendamentos; depois
+        da conferência, ficam os dados conferidos.
       </>
     ),
     resumoEntidadeLabel: "Clínicas com custo",
@@ -148,8 +148,6 @@ interface FaturasMesPanelProps {
   mesValido: boolean;
   loading: boolean;
   saving: boolean;
-  /** Nome (lower) → dia 1–31; só usado em variant=clinica. */
-  diaVencimentoPorClinica?: Map<string, number | null>;
   hojeIso?: string;
   onChange: (field: keyof FaturaFilters, value: string) => void;
   onMesChange: (mes: YearMonth) => void;
@@ -169,6 +167,7 @@ interface FaturasMesPanelProps {
   onEnviarEmail?: (id: string) => void;
   onEnviarLembrete?: (id: string) => void;
   onConsultarLembrete?: (id: string) => void;
+  onAjustarPeriodo?: (row: FaturaMesRow) => void;
   lembretes?: ReactNode;
 }
 
@@ -182,7 +181,6 @@ export function FaturasMesPanel({
   mesValido,
   loading,
   saving,
-  diaVencimentoPorClinica,
   hojeIso,
   onChange,
   onMesChange,
@@ -202,6 +200,7 @@ export function FaturasMesPanel({
   onEnviarEmail,
   onEnviarLembrete,
   onConsultarLembrete,
+  onAjustarPeriodo,
   lembretes,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
@@ -213,13 +212,10 @@ export function FaturasMesPanel({
   const hoje = hojeIso ?? todayIsoSaoPaulo();
 
   function vencimentoDaLinha(row: FaturaMesRow): CustosClinicaVencimentoView {
-    const key = row.referenciaNome.trim().toLowerCase();
-    const dia = diaVencimentoPorClinica?.get(key) ?? null;
     const emAberto =
       row.status !== "cancelada" && custosClinicaEmAberto(row.fatura);
-    return buildCustosClinicaVencimentoView({
-      diaVencimento: dia,
-      mesReferencia: filters.mesReferencia,
+    return buildCustosClinicaVencimentoPorData({
+      dataIso: row.dataVencimento,
       emAberto,
       hojeIso: hoje,
     });
@@ -286,7 +282,10 @@ export function FaturasMesPanel({
 
   return (
     <div className="space-y-5">
-      <Panel title="Mês de referência" icon={<IconSearch />}>
+      <Panel
+        title={variant === "clinica" ? "Mês de fechamento" : "Mês de referência"}
+        icon={<IconSearch />}
+      >
         <ListagemMesAnoTabs
           selected={mesSelecionado}
           onSelect={onMesChange}
@@ -294,12 +293,12 @@ export function FaturasMesPanel({
           ariaLabel={
             variant === "cliente"
               ? "Filtrar faturas pelo mês de referência"
-              : "Filtrar custos pelo mês de referência"
+              : "Filtrar custos pelo mês de fechamento"
           }
           monthTitlePrefix={
             variant === "cliente"
               ? "Faturas de"
-              : "Custos de"
+              : "Fechamentos de"
           }
         />
 
@@ -373,7 +372,15 @@ export function FaturasMesPanel({
       {lembretes}
 
       {mesValido && resumo && (
-        <Panel title="Resumo do mês" icon={<IconReceipt />} iconTone="green">
+        <Panel
+          title={
+            variant === "clinica"
+              ? `Resumo dos fechamentos · ${rotuloMesFechamento(filters.mesReferencia)}`
+              : "Resumo do mês"
+          }
+          icon={<IconReceipt />}
+          iconTone="green"
+        >
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
             {resumoCards.map((card) => {
               const value = resumo[card.key];
@@ -425,19 +432,35 @@ export function FaturasMesPanel({
 
         {!loading && mesValido && rows.length > 0 && (
           <div className="-mx-5 overflow-x-auto px-5">
-            <table className="w-full min-w-[920px] border-collapse">
+            <table
+              className={`w-full border-collapse ${
+                variant === "clinica" ? "min-w-[1080px]" : "min-w-[920px]"
+              }`}
+            >
               <thead>
                 <tr className="border-b border-[#e2e8f0] bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9]">
-                  {[
-                    config.entityColumn,
-                    ...(showVencimento ? ["Vencimento"] : []),
-                    "Período",
-                    "Agendamentos",
-                    "Exames",
-                    "Valor total",
-                    "Status",
-                    "Ações",
-                  ].map((h) => (
+                  {(variant === "clinica"
+                    ? [
+                        "Clínica",
+                        "Período dos exames",
+                        "Fechamento",
+                        "Vencimento",
+                        "Agendamentos",
+                        "Exames",
+                        "Valor total",
+                        "Status",
+                        "Ações",
+                      ]
+                    : [
+                        config.entityColumn,
+                        "Período",
+                        "Agendamentos",
+                        "Exames",
+                        "Valor total",
+                        "Status",
+                        "Ações",
+                      ]
+                  ).map((h) => (
                     <th
                       key={h}
                       className="px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b]"
@@ -464,21 +487,26 @@ export function FaturasMesPanel({
                     >
                       {row.referenciaNome}
                     </td>
-                    {venc ? (
-                      <td className="whitespace-nowrap px-2.5 py-2 text-xs">
-                        <p className="font-semibold text-navy">{venc.titulo}</p>
-                        {venc.detalhe ? (
-                          <p
-                            className={`mt-0.5 text-[11px] font-medium ${vencimentoToneClass(venc.tone)}`}
-                          >
-                            {venc.detalhe}
-                          </p>
-                        ) : null}
+                    <td className="whitespace-nowrap px-2.5 py-2 text-xs text-[#64748b]">
+                      {variant === "clinica" && row.periodoInicio && row.periodoFim
+                        ? `${formatDateBR(row.periodoInicio)} a ${formatDateBR(row.periodoFim)}`
+                        : row.periodoLabel}
+                    </td>
+                    {variant === "clinica" ? (
+                      <td className="whitespace-nowrap px-2.5 py-2 text-xs text-[#64748b]">
+                        {formatDateBR(row.dataFechamento)}
                       </td>
                     ) : null}
-                    <td className="px-2.5 py-2 text-xs text-[#64748b]">
-                      {row.periodoLabel}
-                    </td>
+                    {venc ? (
+                      <td className="whitespace-nowrap px-2.5 py-2 text-xs">
+                        <span
+                          className={`font-semibold ${vencimentoToneClass(venc.tone)}`}
+                          title={venc.detalhe ?? undefined}
+                        >
+                          {venc.titulo}
+                        </span>
+                      </td>
+                    ) : null}
                     <td className="px-2.5 py-2 text-xs tabular-nums text-[#64748b]">
                       {row.qtdAgendamentos}
                     </td>
@@ -536,6 +564,7 @@ export function FaturasMesPanel({
                         onReabrirConferencia={onReabrirConferencia}
                         onEnviarEmail={onEnviarEmail}
                         onEnviarLembrete={onEnviarLembrete}
+                        onAjustarPeriodo={onAjustarPeriodo}
                       />
                     </td>
                   </tr>

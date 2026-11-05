@@ -1,4 +1,14 @@
+import {
+  dataAgendamentoIso,
+  janelaBuscaFechamento,
+  normalizarNomeClinica,
+  parseMesReferenciaBR,
+  validarAjustePeriodo,
+  type ExameVinculoFatura,
+  type PeriodoRegistradoClinica,
+} from "@/lib/clinica-fechamento";
 import { mesReferenciaIsoFromPeriodoInicio } from "@/lib/duplicidade-validations";
+import { competenciaIsoFromTexto } from "@/lib/fatura-competencia";
 import {
   formatAuditoriaMarcarConferido,
   formatAuditoriaReabrirConferencia,
@@ -21,6 +31,7 @@ import {
   isValorTotalFaturavel,
 } from "@/lib/fatura-elegibilidade";
 import {
+  isAgendamentoDaClinica,
   resolveClienteFromCatalog,
   type ClienteCatalogItem,
 } from "@/lib/fatura-empresa-match";
@@ -30,6 +41,7 @@ import {
   isComprovantePagamentoDbError,
 } from "@/lib/fatura-comprovante";
 import {
+  buildFaturaItensFromAgendamentos,
   calcTotalFaturaItens,
 } from "@/lib/fatura-mappers";
 import {
@@ -125,6 +137,9 @@ interface SalvarFaturaInput {
   periodo_fim: string | null;
   mes_referencia?: string | null;
   mes_referencia_label?: string | null;
+  data_fechamento?: string | null;
+  total_agendamentos?: number | null;
+  periodo_ajustado?: boolean | null;
   data_vencimento: string;
   valor_total: number;
   total_exames: number;
@@ -347,6 +362,16 @@ export async function salvarFatura(
       status: input.status,
       gerado_por: input.gerado_por,
     };
+    if (input.tipo === "clinica") {
+      payload.data_fechamento =
+        input.data_fechamento ?? input.periodo_fim ?? null;
+      payload.total_agendamentos =
+        input.total_agendamentos ??
+        new Set(itens.map((item) => item.agendamento_id).filter(Boolean)).size;
+      if (input.periodo_ajustado != null) {
+        payload.periodo_ajustado = input.periodo_ajustado;
+      }
+    }
 
     if (input.status === "emitida" && !existing.data_emissao) {
       payload.data_emissao = new Date().toISOString();
@@ -409,24 +434,36 @@ export async function salvarFatura(
 
   const numero = await gerarNumeroFatura(input.tipo);
 
+  const insertPayload: Record<string, unknown> = {
+    numero,
+    tipo: input.tipo,
+    referencia_nome: input.referencia_nome,
+    referencia_id: input.referencia_id ?? null,
+    periodo_inicio: input.periodo_inicio,
+    periodo_fim: input.periodo_fim,
+    mes_referencia: mesReferencia,
+    data_vencimento: input.data_vencimento,
+    valor_total: valorTotal,
+    total_exames: totalExames,
+    status: input.status,
+    gerado_por: input.gerado_por,
+    data_emissao: input.status === "emitida" ? new Date().toISOString() : null,
+    fatura_origem_id: input.fatura_origem_id ?? null,
+  };
+  if (input.tipo === "clinica") {
+    insertPayload.data_fechamento =
+      input.data_fechamento ?? input.periodo_fim ?? null;
+    insertPayload.total_agendamentos =
+      input.total_agendamentos ??
+      new Set(itens.map((item) => item.agendamento_id).filter(Boolean)).size;
+    if (input.periodo_ajustado != null) {
+      insertPayload.periodo_ajustado = input.periodo_ajustado;
+    }
+  }
+
   const { data: fatura, error: faturaError } = await supabase
     .from("faturas")
-    .insert({
-      numero,
-      tipo: input.tipo,
-      referencia_nome: input.referencia_nome,
-      referencia_id: input.referencia_id ?? null,
-      periodo_inicio: input.periodo_inicio,
-      periodo_fim: input.periodo_fim,
-      mes_referencia: mesReferencia,
-      data_vencimento: input.data_vencimento,
-      valor_total: valorTotal,
-      total_exames: totalExames,
-      status: input.status,
-      gerado_por: input.gerado_por,
-      data_emissao: input.status === "emitida" ? new Date().toISOString() : null,
-      fatura_origem_id: input.fatura_origem_id ?? null,
-    })
+    .insert(insertPayload)
     .select("*")
     .single();
 
@@ -688,8 +725,12 @@ export async function reemitirFaturaCliente(
 export interface MarcarConferenciaCustosClinicaInput {
   faturaId?: string | null;
   referencia_nome: string;
+  referencia_id?: string | null;
   periodo_inicio: string | null;
   periodo_fim: string | null;
+  mes_referencia?: string | null;
+  data_fechamento?: string | null;
+  periodo_ajustado?: boolean | null;
   data_vencimento: string;
   gerado_por: string;
   itens: FaturaItemInsert[];
@@ -727,8 +768,16 @@ export async function marcarConferenciaCustosClinica(
       faturaId: input.faturaId,
       tipo: "clinica",
       referencia_nome: input.referencia_nome,
+      referencia_id: input.referencia_id ?? existing?.referencia_id ?? null,
       periodo_inicio: input.periodo_inicio,
       periodo_fim: input.periodo_fim,
+      mes_referencia:
+        input.mes_referencia ?? existing?.mes_referencia ?? undefined,
+      data_fechamento:
+        input.data_fechamento ??
+        existing?.data_fechamento ??
+        input.periodo_fim,
+      periodo_ajustado: input.periodo_ajustado ?? existing?.periodo_ajustado,
       data_vencimento: input.data_vencimento,
       valor_total: valorTotal,
       total_exames: input.itens.length,
@@ -765,6 +814,9 @@ export async function marcarConferenciaCustosClinica(
   const agora = new Date().toISOString();
 
   const supabase = createClient();
+  const agendamentosConferidos = new Set(
+    input.itens.map((item) => item.agendamento_id).filter(Boolean)
+  );
   const { error } = await supabase
     .from("faturas")
     .update({
@@ -772,6 +824,11 @@ export async function marcarConferenciaCustosClinica(
       data_emissao: existing?.data_emissao ?? agora,
       valor_total: valorTotal,
       total_exames: input.itens.length,
+      total_agendamentos: agendamentosConferidos.size,
+      data_fechamento:
+        rascunho.data_fechamento ??
+        existing?.data_fechamento ??
+        input.periodo_fim,
       conferido_em: input.conferido_em,
       conferido_por: usuario,
       fatura_clinica_path: faturaPath,
@@ -852,6 +909,267 @@ export async function reabrirConferenciaCustosClinica(
       existing.referencia_nome
     ),
   });
+}
+
+const STATUS_PERIODO_ATIVO = ["rascunho", "emitida", "vencida"] as const;
+
+function erroUnicoFechamento(error: { code?: string; message?: string }): boolean {
+  return error.code === "23505" || error.code === "23P01";
+}
+
+export async function listarPeriodosCustosClinicaAtivos(): Promise<
+  PeriodoRegistradoClinica[]
+> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("faturas")
+    .select(
+      "id, numero, referencia_id, referencia_nome, mes_referencia, periodo_inicio, periodo_fim, status"
+    )
+    .eq("tipo", "clinica")
+    .in("status", [...STATUS_PERIODO_ATIVO])
+    .not("periodo_inicio", "is", null)
+    .not("periodo_fim", "is", null);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    faturaId: row.id as string,
+    numero: (row.numero as string | null) ?? null,
+    referenciaId: (row.referencia_id as string | null) ?? null,
+    referenciaNome: String(row.referencia_nome ?? ""),
+    mesReferencia: competenciaIsoFromTexto(row.mes_referencia as string | null),
+    inicio: String(row.periodo_inicio).split("T")[0],
+    fim: String(row.periodo_fim).split("T")[0],
+    status: String(row.status),
+  }));
+}
+
+export async function listarItensCustosClinica(params: {
+  inicio: string;
+  fim: string;
+  faturaIds?: string[];
+}): Promise<ExameVinculoFatura[]> {
+  const supabase = createClient();
+  const pageSize = 1000;
+  const vistos = new Set<string>();
+  const itens: ExameVinculoFatura[] = [];
+
+  function guardar(pagina: Record<string, unknown>[]) {
+    for (const row of pagina) {
+      const id = String(row.id);
+      if (vistos.has(id)) continue;
+      vistos.add(id);
+      const fatura = row.faturas as
+        | { numero?: string | null }
+        | { numero?: string | null }[]
+        | null;
+      const numero = Array.isArray(fatura) ? fatura[0]?.numero : fatura?.numero;
+      itens.push({
+        faturaId: String(row.fatura_id),
+        agendamentoId: (row.agendamento_id as string | null) ?? null,
+        exameNome: String(row.exame_nome ?? ""),
+        data: String(row.data_agendamento ?? "").split("T")[0],
+        numero: numero ?? null,
+      });
+    }
+  }
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("fatura_itens")
+      .select(
+        "id, fatura_id, agendamento_id, exame_nome, data_agendamento, faturas!inner(numero, tipo, status)"
+      )
+      .eq("faturas.tipo", "clinica")
+      .in("faturas.status", [...STATUS_PERIODO_ATIVO])
+      .gte("data_agendamento", params.inicio)
+      .lte("data_agendamento", params.fim)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const pagina = (data ?? []) as Record<string, unknown>[];
+    guardar(pagina);
+    if (pagina.length < pageSize) break;
+  }
+
+  const ids = (params.faturaIds ?? []).filter(Boolean);
+  if (ids.length > 0) {
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("fatura_itens")
+        .select(
+          "id, fatura_id, agendamento_id, exame_nome, data_agendamento, faturas!inner(numero, tipo, status)"
+        )
+        .eq("faturas.tipo", "clinica")
+        .in("faturas.status", [...STATUS_PERIODO_ATIVO])
+        .in("fatura_id", ids)
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const pagina = (data ?? []) as Record<string, unknown>[];
+      guardar(pagina);
+      if (pagina.length < pageSize) break;
+    }
+  }
+  return itens;
+}
+
+export interface AjustarPeriodoCustosInput {
+  faturaId?: string | null;
+  clinicaId?: string | null;
+  referenciaNome: string;
+  mesFechamento: string;
+  periodoInicio: string;
+  periodoFim: string;
+  dataFechamento: string;
+  dataVencimento: string;
+  motivo: string;
+  geradoPor: string;
+  config: {
+    fechamentoApuracao: "mes_completo" | "dia_especifico" | null;
+    diaFechamento: number | null;
+  } | null;
+}
+
+export async function ajustarPeriodoCustosClinica(
+  input: AjustarPeriodoCustosInput,
+  auditOptions?: FaturaAuditOptions
+): Promise<FaturaComItens> {
+  const mes = parseMesReferenciaBR(input.mesFechamento);
+  if (!mes) throw new Error("Mês de fechamento inválido.");
+
+  const existente = input.faturaId
+    ? await buscarFaturaComItens(input.faturaId)
+    : null;
+  if (input.faturaId && !existente) {
+    throw new Error("Registro de custos não encontrado.");
+  }
+  if (existente && existente.tipo !== "clinica") {
+    throw new Error("Ajuste de período disponível apenas para custos de clínicas.");
+  }
+  if (existente && existente.status !== "rascunho") {
+    throw new Error(
+      "Somente um fechamento aberto para conferência pode ter o período ajustado."
+    );
+  }
+  if (existente?.pago) {
+    throw new Error(
+      "Fechamento com pagamento registrado não pode ter o período alterado por este caminho."
+    );
+  }
+
+  const periodos = await listarPeriodosCustosClinicaAtivos();
+  const janela = janelaBuscaFechamento(input.mesFechamento, [
+    { inicio: input.periodoInicio, fim: input.periodoFim },
+    ...periodos,
+  ]);
+  const agendamentos = janela
+    ? await listarAgendamentosParaFatura({ inicio: janela.inicio, fim: janela.fim })
+    : [];
+  const daClinica = agendamentos.filter((ag) =>
+    isAgendamentoDaClinica(ag.clinica_nome, input.referenciaNome)
+  );
+  const noPeriodo = daClinica.filter((ag) => {
+    const data = dataAgendamentoIso(ag.data_agendamento);
+    return data >= input.periodoInicio && data <= input.periodoFim;
+  });
+  const itens = buildFaturaItensFromAgendamentos(noPeriodo, "clinica");
+  const examesNovos: ExameVinculoFatura[] = itens.map((item) => ({
+    faturaId: existente?.id ?? "",
+    agendamentoId: item.agendamento_id,
+    exameNome: item.exame_nome,
+    data: item.data_agendamento,
+    numero: existente?.numero ?? null,
+  }));
+  const idsOutros = periodos
+    .filter((periodo) => periodo.faturaId !== existente?.id)
+    .map((periodo) => periodo.faturaId);
+  const vinculados = await listarItensCustosClinica({
+    inicio: input.periodoInicio,
+    fim: input.periodoFim,
+    faturaIds: idsOutros,
+  });
+  const conflito = validarAjustePeriodo({
+    inicio: input.periodoInicio,
+    fim: input.periodoFim,
+    motivo: input.motivo,
+    mesFechamento: input.mesFechamento,
+    faturaIdAtual: existente?.id,
+    clinicaId: input.clinicaId ?? existente?.referencia_id,
+    referenciaNome: input.referenciaNome,
+    config: input.config,
+    periodos,
+    examesNovos,
+    examesVinculados: vinculados,
+  });
+  if (conflito) throw new Error(conflito);
+  if (itens.length === 0) {
+    throw new Error("Não há exames elegíveis no período informado.");
+  }
+
+  const anteriorInicio = existente?.periodo_inicio;
+  const anteriorFim = existente?.periodo_fim;
+  let salva: FaturaComItens;
+  try {
+    salva = await salvarFatura(
+      {
+        faturaId: existente?.id,
+        tipo: "clinica",
+        referencia_nome: input.referenciaNome,
+        referencia_id: input.clinicaId ?? existente?.referencia_id ?? null,
+        periodo_inicio: input.periodoInicio,
+        periodo_fim: input.periodoFim,
+        mes_referencia: mes.iso,
+        data_fechamento: input.dataFechamento,
+        data_vencimento: input.dataVencimento,
+        periodo_ajustado: true,
+        valor_total: 0,
+        total_exames: itens.length,
+        status: "rascunho",
+        gerado_por: input.geradoPor,
+        itens,
+      },
+      auditOptions
+    );
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code)
+        : "";
+    if (erroUnicoFechamento({ code })) {
+      throw new Error(
+        "Já existe um fechamento desta clínica nesta competência."
+      );
+    }
+    throw err;
+  }
+
+  const usuario =
+    auditOptions?.auditContext?.usuarioNome?.trim() || input.geradoPor;
+  const nomeKey = normalizarNomeClinica(input.referenciaNome);
+  await auditarFatura(auditOptions, {
+    tipo: "clinica",
+    acao: AUDITORIA_ACOES.custo_clinica_periodo_ajustado,
+    registroId: salva.id,
+    registroNome: salva.numero,
+    descricao:
+      `${usuario} ajustou o período dos custos da clínica ${input.referenciaNome.trim()} ` +
+      `no fechamento ${input.mesFechamento}. ` +
+      `Período anterior: ${anteriorInicio ? dataAgendamentoIso(anteriorInicio) : "não registrado"} a ${anteriorFim ? dataAgendamentoIso(anteriorFim) : "não registrado"}. ` +
+      `Novo período: ${input.periodoInicio} a ${input.periodoFim}. Motivo: ${input.motivo.trim()}.`,
+    dadosAntes: {
+      periodo_inicio: anteriorInicio ?? null,
+      periodo_fim: anteriorFim ?? null,
+      clinica: nomeKey,
+    },
+    dadosDepois: {
+      periodo_inicio: input.periodoInicio,
+      periodo_fim: input.periodoFim,
+      motivo: input.motivo.trim(),
+    },
+  });
+
+  return salva;
 }
 
 /**
