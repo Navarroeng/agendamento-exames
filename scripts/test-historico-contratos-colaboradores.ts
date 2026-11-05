@@ -139,11 +139,13 @@ const cabecalhos = tabela.slice(
 );
 assert.match(
   cabecalhos,
-  /"Contrato"[\s\S]*"Orçamento"[\s\S]*"Aprovação"[\s\S]*"Valor"[\s\S]*"Colaboradores"/
+  /"Contrato"[\s\S]*"Aprovação"[\s\S]*"Valor"[\s\S]*"Colaboradores"[\s\S]*"Status"[\s\S]*"Financeiro"/
 );
+assert.doesNotMatch(cabecalhos, /"Orçamento"/);
+assert.doesNotMatch(tabela, /numero_orcamento/);
 assert.match(tabela, /labelQuantidadeColaboradoresContrato\(contrato\)/);
 assert.match(tabela, /overflow-x-auto/);
-assert.match(tabela, /min-w-\[1320px\]/);
+assert.match(tabela, /min-w-\[1180px\]/);
 assert.match(tabela, /tabular-nums/);
 assert.doesNotMatch(tabela, /contrato_vagas|funcionarios/);
 
