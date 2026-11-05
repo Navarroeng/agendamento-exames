@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
 import {
+  isDataCalendarioIso,
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
 } from "@/lib/colaborador-movimentacoes";
@@ -235,20 +236,20 @@ export function ClienteColaboradoresSection({
                       <colgroup>
                         {exibirDesligamento ? (
                           <>
-                            <col className="w-[26%]" />
-                            <col className="w-[14%]" />
-                            <col className="w-[20%]" />
+                            <col className="w-[24%]" />
+                            <col className="w-[13%]" />
+                            <col className="w-[18%]" />
+                            <col className="w-[18%]" />
                             <col className="w-[12%]" />
-                            <col className="w-[12%]" />
-                            <col className="w-[16%]" />
+                            <col className="w-[15%]" />
                           </>
                         ) : (
                           <>
-                            <col className="w-[32%]" />
-                            <col className="w-[16%]" />
-                            <col className="w-[24%]" />
-                            <col className="w-[12%]" />
-                            <col className="w-[16%]" />
+                            <col className="w-[28%]" />
+                            <col className="w-[15%]" />
+                            <col className="w-[22%]" />
+                            <col className="w-[20%]" />
+                            <col className="w-[15%]" />
                           </>
                         )}
                       </colgroup>
@@ -283,8 +284,12 @@ export function ClienteColaboradoresSection({
                                 {apresentarCargoColaboradorPortal(row.cargo)}
                               </span>
                             </td>
-                            <td className="whitespace-nowrap px-3 py-3 text-[#64748b]">
-                              {row.dataAdmissaoLabel ?? "—"}
+                            <td className="px-3 py-3 text-[#64748b]">
+                              <AdmissaoCelula
+                                clienteId={clienteId}
+                                row={row}
+                                onAtualizado={aplicarLista}
+                              />
                             </td>
                             {exibirDesligamento ? (
                               <td className="whitespace-nowrap px-3 py-3 text-[#64748b]">
@@ -323,14 +328,16 @@ export function ClienteColaboradoresSection({
                               {apresentarCargoColaboradorPortal(row.cargo)}
                             </dd>
                           </div>
-                          {row.dataAdmissaoLabel ? (
-                            <div className="flex justify-between gap-2">
-                              <dt className="text-[#94a3b8]">Admissão</dt>
-                              <dd className="text-right text-[#475569]">
-                                {row.dataAdmissaoLabel}
-                              </dd>
-                            </div>
-                          ) : null}
+                          <div className="flex items-start justify-between gap-2">
+                            <dt className="pt-1 text-[#94a3b8]">Admissão</dt>
+                            <dd className="text-right text-[#475569]">
+                              <AdmissaoCelula
+                                clienteId={clienteId}
+                                row={row}
+                                onAtualizado={aplicarLista}
+                              />
+                            </dd>
+                          </div>
                           {exibirDesligamento && row.dataDesligamentoLabel ? (
                             <div className="flex justify-between gap-2">
                               <dt className="text-[#94a3b8]">Desligamento</dt>
@@ -381,6 +388,161 @@ export function ClienteColaboradoresSection({
         />
       ) : null}
     </div>
+  );
+}
+
+function IconeLapis() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+function AdmissaoCelula({
+  clienteId,
+  row,
+  onAtualizado,
+}: {
+  clienteId: string;
+  row: ClienteColaboradorLinha;
+  onAtualizado: (json: ListResponse) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [valor, setValor] = useState(row.dataAdmissaoIso ?? "");
+  const [erro, setErro] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const abrir = () => {
+    if (saving) return;
+    setValor(row.dataAdmissaoIso ?? "");
+    setErro("");
+    setAberto(true);
+  };
+
+  const cancelar = () => {
+    if (saving) return;
+    setAberto(false);
+    setErro("");
+    setValor(row.dataAdmissaoIso ?? "");
+  };
+
+  const salvar = async () => {
+    if (saving) return;
+    if (!isDataCalendarioIso(valor)) {
+      setErro("Informe uma data de admissão válida.");
+      return;
+    }
+    setSaving(true);
+    setErro("");
+    try {
+      const res = await fetch(
+        `/api/clientes/${encodeURIComponent(clienteId)}/colaboradores/admissao`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cpf: row.cpfDigits,
+            data_admissao: valor,
+            movimentacao_id: row.admissaoMovimentacaoId,
+          }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as ListResponse;
+      if (!res.ok) {
+        const mensagem = json.error ?? "Não foi possível salvar a data de admissão.";
+        setErro(mensagem);
+        toast.error(mensagem);
+        return;
+      }
+      onAtualizado(json);
+      setAberto(false);
+      toast.success("Data de admissão salva.");
+    } catch {
+      const mensagem = "Não foi possível salvar a data de admissão.";
+      setErro(mensagem);
+      toast.error(mensagem);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!aberto) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {row.dataAdmissaoLabel ? (
+          <>
+            <span className="whitespace-nowrap">{row.dataAdmissaoLabel}</span>
+            <button
+              type="button"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#52617a] hover:bg-[#f4f6fb] hover:text-brand-blue"
+              aria-label={`Editar data de admissão de ${apresentarNomeColaboradorPortal(row.nome)}`}
+              onClick={abrir}
+            >
+              <IconeLapis />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline"
+            onClick={abrir}
+          >
+            Incluir data
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex min-w-[9.5rem] flex-col gap-1.5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void salvar();
+      }}
+    >
+      <label className="text-[10px] font-bold uppercase tracking-wide text-[#8b95a8]">
+        Data de admissão
+      </label>
+      <input
+        type="date"
+        className="h-9 rounded-lg border border-[#e2e8f0] bg-white px-2 text-xs text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+        value={valor}
+        onChange={(event) => setValor(event.target.value)}
+        disabled={saving}
+        required
+      />
+      {erro ? <p className="text-[10px] font-semibold text-[#dc2626]">{erro}</p> : null}
+      <div className="flex gap-1">
+        <button
+          type="submit"
+          className="btn btn-primary !px-2 !py-1 text-[10px]"
+          disabled={saving}
+        >
+          {saving ? "Salvando..." : "Salvar"}
+        </button>
+        <button
+          type="button"
+          className="btn !px-2 !py-1 text-[10px]"
+          onClick={cancelar}
+          disabled={saving}
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
   );
 }
 

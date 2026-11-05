@@ -7,8 +7,11 @@ import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
 
 export const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin" as const;
+export const TIPO_ADMISSAO = "admissao" as const;
 
-export type ColaboradorMovimentacaoTipo = typeof TIPO_DESLIGAMENTO_ADMIN;
+export type ColaboradorMovimentacaoTipo =
+  | typeof TIPO_DESLIGAMENTO_ADMIN
+  | typeof TIPO_ADMISSAO;
 
 export type ColaboradorDesligamentoOrigem = "demissional" | "admin";
 
@@ -47,8 +50,28 @@ export function isUuid(value: string | null | undefined): boolean {
 export function toDataEventoIso(value: string | null | undefined): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
-  const iso = raw.slice(0, 10);
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const iso = br ? `${br[3]}-${br[2]}-${br[1]}` : raw.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
+/** Data de calendário, sem interpretar o texto como instante UTC. */
+export function isDataCalendarioIso(value: string | null | undefined): boolean {
+  const iso = toDataEventoIso(value);
+  if (!iso) return false;
+  const [yearStr, monthStr, dayStr] = iso.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1) {
+    return false;
+  }
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
 }
 
 export function isMovimentacaoCancelada(
@@ -116,6 +139,53 @@ export function validarPayloadDesligamentoAdmin(
   const motivo = motivoRaw ? motivoRaw.slice(0, 500) : null;
 
   return { ok: true, clienteId, cpfDigits, dataEvento, motivo };
+}
+
+export type ValidarAdmissaoInput = {
+  clienteId: string;
+  cpf: string;
+  dataAdmissao: string;
+  movimentacaoId?: string | null;
+};
+
+export type ValidarAdmissaoOk = {
+  ok: true;
+  clienteId: string;
+  cpfDigits: string;
+  dataAdmissao: string;
+  movimentacaoId: string | null;
+};
+
+export function validarPayloadAdmissao(
+  input: ValidarAdmissaoInput
+): ValidarAdmissaoOk | ValidarDesligamentoErro {
+  const clienteId = String(input.clienteId ?? "").trim();
+  if (!isUuid(clienteId)) {
+    return { ok: false, error: "Cliente inválido.", status: 400 };
+  }
+
+  const cpfDigits = normalizeCpfDigits(input.cpf);
+  if (!isValidCPF(cpfDigits)) {
+    return { ok: false, error: "CPF inválido.", status: 400 };
+  }
+
+  const dataAdmissao = toDataEventoIso(input.dataAdmissao);
+  if (!dataAdmissao || !isDataCalendarioIso(dataAdmissao)) {
+    return { ok: false, error: "Data de admissão inválida.", status: 400 };
+  }
+
+  const movimentacaoInformada = String(input.movimentacaoId ?? "").trim();
+  if (movimentacaoInformada && !isUuid(movimentacaoInformada)) {
+    return { ok: false, error: "Registro de admissão inválido.", status: 400 };
+  }
+
+  return {
+    ok: true,
+    clienteId,
+    cpfDigits,
+    dataAdmissao,
+    movimentacaoId: movimentacaoInformada || null,
+  };
 }
 
 export type ValidarDesfazerInput = {

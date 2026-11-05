@@ -80,6 +80,7 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     dataDesligamentoLabel: null,
     desligamentoOrigem: null,
     desligamentoMovimentacaoId: null,
+    admissaoMovimentacaoId: null,
   };
   assert.equal(podeDemitirColaborador(ativo), true);
   assert.equal(podeDesfazerDesligamentoAdmin(ativo), false);
@@ -92,6 +93,7 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     dataDesligamentoLabel: "15/09/2026",
     desligamentoOrigem: "admin",
     desligamentoMovimentacaoId: "mov-1",
+    admissaoMovimentacaoId: null,
   };
   assert.equal(podeDemitirColaborador(demitidoAdmin), false);
   assert.equal(podeDesfazerDesligamentoAdmin(demitidoAdmin), true);
@@ -100,6 +102,7 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     ...demitidoAdmin,
     desligamentoOrigem: "demissional",
     desligamentoMovimentacaoId: null,
+    admissaoMovimentacaoId: null,
   };
   assert.equal(podeDesfazerDesligamentoAdmin(demitidoAso), false);
 }

@@ -41,11 +41,17 @@ export type PortalColaboradorLinha = {
 export type ClienteColaboradorLinha = PortalColaboradorLinha & {
   desligamentoOrigem: PortalColaboradorDesligamentoOrigem | null;
   desligamentoMovimentacaoId: string | null;
+  /**
+   * Registro vigente de admissão deste vínculo (empresa + CPF).
+   * Nulo quando a data exibida ainda é só a do exame admissional.
+   */
+  admissaoMovimentacaoId: string | null;
 };
 
 export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
   "desligamentoOrigem",
   "desligamentoMovimentacaoId",
+  "admissaoMovimentacaoId",
 ] as const;
 
 /** Remove metadados administrativos. Não altera a regra consolidada. */
@@ -111,6 +117,7 @@ export type PortalColaboradorMovimentacaoFonte = {
 };
 
 const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin";
+const TIPO_ADMISSAO = "admissao";
 
 type Interno = {
   cpfDigits: string;
@@ -123,6 +130,10 @@ type Interno = {
   ultimoSaidaOrigem: PortalColaboradorDesligamentoOrigem | null;
   ultimoSaidaMovimentacaoId: string | null;
   ultimoEventoSortKey: string;
+  /** Data gravada no evento de admissão. Não entra na situação. */
+  admissaoOficialSortKey: string;
+  admissaoOficialIso: string | null;
+  admissaoMovimentacaoId: string | null;
 };
 
 const SITUACAO_LABEL: Record<PortalColaboradorSituacao, string> = {
@@ -233,6 +244,9 @@ function ensureBucket(map: Map<string, Interno>, cpfDigits: string): Interno {
       ultimoSaidaOrigem: null,
       ultimoSaidaMovimentacaoId: null,
       ultimoEventoSortKey: "",
+      admissaoOficialSortKey: "",
+      admissaoOficialIso: null,
+      admissaoMovimentacaoId: null,
     };
     map.set(cpfDigits, row);
   }
@@ -287,6 +301,13 @@ function isDesligamentoAdminValido(
   mov: PortalColaboradorMovimentacaoFonte
 ): boolean {
   if (String(mov.tipo ?? "").trim() !== TIPO_DESLIGAMENTO_ADMIN) return false;
+  return !String(mov.cancelado_em ?? "").trim();
+}
+
+function isAdmissaoOficialValida(
+  mov: PortalColaboradorMovimentacaoFonte
+): boolean {
+  if (String(mov.tipo ?? "").trim() !== TIPO_ADMISSAO) return false;
   return !String(mov.cancelado_em ?? "").trim();
 }
 
@@ -387,6 +408,29 @@ export function consolidarPortalColaboradores(input: {
     );
   }
 
+  const admissoes = (input.movimentacoes ?? [])
+    .filter(isAdmissaoOficialValida)
+    .slice()
+    .sort((a, b) =>
+      eventSortKey(a.data_evento, a.criado_em).localeCompare(
+        eventSortKey(b.data_evento, b.criado_em)
+      )
+    );
+
+  for (const mov of admissoes) {
+    const cpf = normalizeCpfDigits(mov.cpf_digits);
+    if (!isValidCPF(cpf)) continue;
+    const existing = map.get(cpf);
+    if (!existing) continue;
+    const dataIso = toDataIso(mov.data_evento);
+    if (!dataIso) continue;
+    const sortKey = eventSortKey(mov.data_evento, mov.criado_em);
+    if (sortKey < existing.admissaoOficialSortKey) continue;
+    existing.admissaoOficialSortKey = sortKey;
+    existing.admissaoOficialIso = dataIso;
+    existing.admissaoMovimentacaoId = String(mov.id ?? "").trim() || null;
+  }
+
   const linhas: ClienteColaboradorLinha[] = [];
   for (const row of Array.from(map.values())) {
     if (!row.nome) continue;
@@ -394,6 +438,7 @@ export function consolidarPortalColaboradores(input: {
     const situacao = resolverSituacao(row);
     const demitido = situacao === "demitido";
     const desligamentoIso = demitido ? row.ultimoSaidaIso : null;
+    const dataAdmissaoIso = row.admissaoOficialIso ?? row.ultimoAdmissionalIso;
 
     linhas.push({
       id: row.cpfDigits,
@@ -403,9 +448,9 @@ export function consolidarPortalColaboradores(input: {
       cargo: row.cargo || "—",
       situacao,
       situacaoLabel: SITUACAO_LABEL[situacao],
-      dataAdmissaoIso: row.ultimoAdmissionalIso,
-      dataAdmissaoLabel: row.ultimoAdmissionalIso
-        ? formatDateIsoToBR(row.ultimoAdmissionalIso)
+      dataAdmissaoIso,
+      dataAdmissaoLabel: dataAdmissaoIso
+        ? formatDateIsoToBR(dataAdmissaoIso)
         : null,
       dataDesligamentoIso: desligamentoIso,
       dataDesligamentoLabel: desligamentoIso
@@ -414,6 +459,9 @@ export function consolidarPortalColaboradores(input: {
       desligamentoOrigem: demitido ? row.ultimoSaidaOrigem : null,
       desligamentoMovimentacaoId: demitido
         ? row.ultimoSaidaMovimentacaoId
+        : null,
+      admissaoMovimentacaoId: row.admissaoOficialIso
+        ? row.admissaoMovimentacaoId
         : null,
     });
   }

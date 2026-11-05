@@ -85,7 +85,7 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
       "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em"
     )
     .eq("cliente_id", id)
-    .eq("tipo", "desligamento_admin")
+    .in("tipo", ["desligamento_admin", "admissao"])
     .is("cancelado_em", null);
 
   if (errMov) throw errMov;
