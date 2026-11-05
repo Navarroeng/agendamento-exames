@@ -58,6 +58,8 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
     handleFilterChange,
     handleMesChange,
     handleYearChange,
+    abaSemVencimento,
+    handleSemVencimento,
     handleClosePreview,
     handleSaveDraft,
     handleEmit,
@@ -134,6 +136,10 @@ export function FaturasPage({ tipo }: FaturasPageProps) {
           onChange={handleFilterChange}
           onMesChange={handleMesChange}
           onYearChange={handleYearChange}
+          semVencimento={tipo === "clinica" && abaSemVencimento}
+          onSemVencimento={
+            tipo === "clinica" ? handleSemVencimento : undefined
+          }
           onVisualizarAgendamentos={handleVisualizarAgendamentos}
           onEmitir={handleEmitirReferencia}
           onVisualizarFatura={handleVisualizar}

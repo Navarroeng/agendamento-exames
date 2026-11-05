@@ -94,15 +94,16 @@ const PANEL_CONFIG: Record<
     emptyNone: "Nenhum registro encontrado para este período.",
     emptyFiltered: " para o filtro informado",
     invalidMonth:
-      "Informe um mês de fechamento válido para listar as clínicas com custos.",
+      "Informe um mês de vencimento válido para listar as clínicas com custos.",
     helpText: (
       <>
-        Cada clínica segue o próprio período de fechamento. O mês selecionado é o
-        mês em que esse período fecha. Apenas agendamentos com status{" "}
+        As faturas são agrupadas pelo mês de vencimento. O período dos exames e
+        o fechamento seguem a configuração de cada clínica. Apenas agendamentos
+        com status{" "}
         <strong className="font-semibold text-navy">agendado</strong> entram no
-        cálculo. Clínicas sem configuração continuam no mês completo. Enquanto
-        o fechamento está aberto, os valores acompanham os agendamentos; depois
-        da conferência, ficam os dados conferidos.
+        cálculo. Enquanto o fechamento está aberto, os valores acompanham os
+        agendamentos; depois da conferência ou do pagamento, ficam os dados
+        salvos.
       </>
     ),
     resumoEntidadeLabel: "Clínicas com custo",
@@ -152,8 +153,8 @@ interface FaturasMesPanelProps {
   onChange: (field: keyof FaturaFilters, value: string) => void;
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
-  onVisualizarAgendamentos: (referenciaNome: string) => void;
-  onEmitir: (referenciaNome: string) => void;
+  onVisualizarAgendamentos: (row: FaturaMesRow) => void;
+  onEmitir: (row: FaturaMesRow) => void;
   onVisualizarFatura: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -168,6 +169,8 @@ interface FaturasMesPanelProps {
   onEnviarLembrete?: (id: string) => void;
   onConsultarLembrete?: (id: string) => void;
   onAjustarPeriodo?: (row: FaturaMesRow) => void;
+  semVencimento?: boolean;
+  onSemVencimento?: () => void;
   lembretes?: ReactNode;
 }
 
@@ -201,6 +204,8 @@ export function FaturasMesPanel({
   onEnviarLembrete,
   onConsultarLembrete,
   onAjustarPeriodo,
+  semVencimento = false,
+  onSemVencimento,
   lembretes,
 }: FaturasMesPanelProps) {
   const config = PANEL_CONFIG[variant];
@@ -283,7 +288,7 @@ export function FaturasMesPanel({
   return (
     <div className="space-y-5">
       <Panel
-        title={variant === "clinica" ? "Mês de fechamento" : "Mês de referência"}
+        title={variant === "clinica" ? "Mês de vencimento" : "Mês de referência"}
         icon={<IconSearch />}
       >
         <ListagemMesAnoTabs
@@ -293,13 +298,16 @@ export function FaturasMesPanel({
           ariaLabel={
             variant === "cliente"
               ? "Filtrar faturas pelo mês de referência"
-              : "Filtrar custos pelo mês de fechamento"
+              : "Filtrar custos pelo mês de vencimento"
           }
           monthTitlePrefix={
             variant === "cliente"
               ? "Faturas de"
-              : "Fechamentos de"
+              : "Vencimentos de"
           }
+          showSemVencimentoTab={variant === "clinica"}
+          semVencimentoAtivo={semVencimento}
+          onSelectSemVencimento={onSemVencimento}
         />
 
         <div
@@ -367,6 +375,12 @@ export function FaturasMesPanel({
         <p className="mt-3 text-[11px] leading-relaxed text-[#64748b]">
           {config.helpText}
         </p>
+        {variant === "clinica" && semVencimento ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-[#64748b]">
+            O ano selecionado é o ano do fechamento. O vencimento precisa ser
+            configurado na clínica. Estes valores não entram nas abas mensais.
+          </p>
+        ) : null}
       </Panel>
 
       {lembretes}
@@ -375,7 +389,9 @@ export function FaturasMesPanel({
         <Panel
           title={
             variant === "clinica"
-              ? `Resumo dos fechamentos · ${rotuloMesFechamento(filters.mesReferencia)}`
+              ? semVencimento
+                ? `Resumo dos vencimentos · Sem vencimento · ${mesSelecionado.year}`
+                : `Resumo dos vencimentos · ${rotuloMesFechamento(filters.mesReferencia)}`
               : "Resumo do mês"
           }
           icon={<IconReceipt />}

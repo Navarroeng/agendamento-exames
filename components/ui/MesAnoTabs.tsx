@@ -37,6 +37,9 @@ interface MesAnoTabsProps {
   showAllMonthsTab?: boolean;
   onSelectTodos?: () => void;
   todosTitle?: string;
+  showSemVencimentoTab?: boolean;
+  semVencimentoAtivo?: boolean;
+  onSelectSemVencimento?: () => void;
 }
 
 export function MesAnoTabs({
@@ -54,6 +57,9 @@ export function MesAnoTabs({
   showAllMonthsTab = false,
   onSelectTodos,
   todosTitle,
+  showSemVencimentoTab = false,
+  semVencimentoAtivo = false,
+  onSelectSemVencimento,
 }: MesAnoTabsProps) {
   const showYear = Boolean(years && onYearChange && year != null);
   const todosAtivo = showAllMonthsTab && isPeriodoTodosMeses(selected);
@@ -117,6 +123,7 @@ export function MesAnoTabs({
               : true;
             const ativo =
               !todosAtivo &&
+              !semVencimentoAtivo &&
               selected.month != null &&
               isSameYearMonth(mes, {
                 year: selected.year,
@@ -156,6 +163,23 @@ export function MesAnoTabs({
               </button>
             );
           })}
+          {showSemVencimentoTab ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={semVencimentoAtivo}
+              title="Fechamentos do ano sem dia de vencimento configurado"
+              onClick={() => onSelectSemVencimento?.()}
+              className={[
+                "shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[11px] font-bold tracking-wide transition",
+                semVencimentoAtivo
+                  ? "border-brand-blue bg-brand-blue text-white shadow-[0_6px_14px_rgba(79,99,255,0.22)]"
+                  : "border-brand-blue/20 bg-brand-blue-soft text-brand-blue hover:border-brand-blue/40 hover:bg-[#e4e9ff]",
+              ].join(" ")}
+            >
+              Sem vencimento
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

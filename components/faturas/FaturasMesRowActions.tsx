@@ -15,8 +15,8 @@ interface FaturasMesRowActionsProps {
   variant: FaturaTipo;
   row: FaturaMesRow;
   saving: boolean;
-  onVisualizarAgendamentos: (referenciaNome: string) => void;
-  onEmitir: (referenciaNome: string) => void;
+  onVisualizarAgendamentos: (row: FaturaMesRow) => void;
+  onEmitir: (row: FaturaMesRow) => void;
   onVisualizarFatura: (id: string) => void;
   onGerarPdf: (id: string) => void;
   onCancelar: (id: string) => void;
@@ -108,7 +108,7 @@ export function FaturasMesRowActions({
         emitLabel={CUSTOS_CLINICA_ACAO_MARCAR_CONFERIDO}
         saving={saving}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
-        onEmitir={() => onEmitir(row.referenciaNome)}
+        onEmitir={() => onEmitir(row)}
         extraItems={itensAjuste}
       />
     );
@@ -137,7 +137,7 @@ export function FaturasMesRowActions({
         emitLabel={EMIT_LABEL.cliente}
         saving={saving}
         onVisualizar={() => onVisualizarFatura(fatura.id)}
-        onEmitir={() => onEmitir(row.referenciaNome)}
+        onEmitir={() => onEmitir(row)}
       />
     );
   }
@@ -171,8 +171,8 @@ export function FaturasMesRowActions({
       referenciaNome={row.referenciaNome}
       emitLabel={EMIT_LABEL[variant]}
       saving={saving}
-      onVisualizar={() => onVisualizarAgendamentos(row.referenciaNome)}
-      onEmitir={() => onEmitir(row.referenciaNome)}
+      onVisualizar={() => onVisualizarAgendamentos(row)}
+      onEmitir={() => onEmitir(row)}
       extraItems={itensAjuste}
     />
   );

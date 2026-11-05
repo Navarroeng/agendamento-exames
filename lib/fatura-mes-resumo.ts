@@ -26,9 +26,12 @@ import {
 } from "@/lib/fatura-reemissao";
 import type { AgendamentoWithExames, FaturaRecord, FaturaTipo } from "@/lib/types";
 import {
+  dataIsoNoMes,
   dataOcupadaPorOutroFechamento,
   dataVencimentoFechamento,
   exameChave,
+  fechamentoDoVencimento,
+  mesFechamentoDaFatura,
   indexClinicasCiclo,
   normalizarNomeClinica,
   parseMesReferenciaBR,
@@ -67,6 +70,8 @@ export interface FaturaMesRow {
   dataFechamento?: string | null;
   dataVencimento?: string | null;
   clinicaId?: string | null;
+  /** Competência de fechamento (MM/AAAA). Independente da aba de vencimento. */
+  mesFechamento?: string | null;
   qtdAgendamentos: number;
   qtdExames: number;
   valorTotal: number;
@@ -86,6 +91,14 @@ export type ItemResumoCustoClinica = {
 export type OpcoesResumoClinicas = {
   /** Usa o ciclo de cada clínica. Sem a opção, o mês civil permanece. */
   porFechamento?: boolean;
+  /**
+   * A aba é o mês de vencimento. O período e o fechamento continuam os do ciclo.
+   * Não grava essa posição de volta na competência da fatura.
+   */
+  porVencimento?: boolean;
+  /** Clínicas sem dia de vencimento, no ano de fechamento informado. */
+  semVencimento?: boolean;
+  anoFechamento?: number;
   clinicas?: ClinicaCicloConfig[];
   periodosRegistrados?: PeriodoRegistradoClinica[];
   itensPorFatura?: ReadonlyMap<string, ItemResumoCustoClinica[]>;
@@ -815,6 +828,269 @@ function buildResumoPorFechamento(
   return { rows: rowsFaturaveis, resumo: computeResumo(rowsFaturaveis, "clinica") };
 }
 
+function periodoSalvoDaFatura(fatura: FaturaRecord | null): {
+  inicio: string;
+  fim: string;
+  dataFechamento: string;
+} | null {
+  if (!fatura?.periodo_inicio || !fatura.periodo_fim) return null;
+  return {
+    inicio: fatura.periodo_inicio.split("T")[0],
+    fim: fatura.periodo_fim.split("T")[0],
+    dataFechamento: (fatura.data_fechamento ?? fatura.periodo_fim).split("T")[0],
+  };
+}
+
+function periodoRegistradoNoFechamento(
+  periodos: PeriodoRegistradoClinica[],
+  nome: string,
+  clinicaId: string | null | undefined,
+  mesFechamentoIso: string
+): boolean {
+  const nomeKey = normalizarNomeClinica(nome);
+  return periodos.some((periodo) => {
+    if (periodo.mesReferencia !== mesFechamentoIso) return false;
+    if (clinicaId && periodo.referenciaId && periodo.referenciaId === clinicaId) {
+      return true;
+    }
+    return normalizarNomeClinica(periodo.referenciaNome) === nomeKey;
+  });
+}
+
+function buildResumoPorVencimento(
+  agendamentos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  mesReferencia: string,
+  clinicaFilter: string,
+  opcoes: OpcoesResumoClinicas
+): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  const alvo = opcoes.semVencimento ? null : parseMesReferenciaBR(mesReferencia);
+  if (!opcoes.semVencimento && !alvo) return null;
+  const anoSem = opcoes.anoFechamento;
+  if (opcoes.semVencimento && (!anoSem || anoSem < 2000)) return null;
+
+  const configs = indexClinicasCiclo(opcoes.clinicas ?? []);
+  const periodos = opcoes.periodosRegistrados ?? [];
+  const itensPorFatura = opcoes.itensPorFatura;
+  const elegiveis = filterAgendamentosElegiveisFatura(agendamentos);
+  const vistosConfig = new Set<string>();
+  const configsUnicas: ClinicaCicloConfig[] = [];
+  for (const config of Array.from(configs.values())) {
+    if (vistosConfig.has(config.id)) continue;
+    vistosConfig.add(config.id);
+    configsUnicas.push(config);
+  }
+
+  type CicloLista = {
+    nome: string;
+    config: ClinicaCicloConfig | null;
+    fatura: FaturaRecord | null;
+    periodo: { inicio: string; fim: string; dataFechamento: string };
+    dataVencimento: string | null;
+    mesFechamentoIso: string;
+    mesFechamentoBR: string;
+    clinicaId: string | null;
+  };
+  const ciclos: CicloLista[] = [];
+  const ocupados = new Set<string>();
+
+  function ocupar(nome: string, iso: string) {
+    ocupados.add(`${normalizarNomeClinica(nome)}|${iso}`);
+  }
+  function ocupado(nome: string, iso: string) {
+    return ocupados.has(`${normalizarNomeClinica(nome)}|${iso}`);
+  }
+
+  if (alvo) {
+    for (const fatura of faturas) {
+      if (fatura.tipo !== "clinica") continue;
+      if (!matchesReferenciaFilter(fatura.referencia_nome, clinicaFilter)) continue;
+      if (!dataIsoNoMes(fatura.data_vencimento, alvo.ano, alvo.mes)) continue;
+      const fechamento = mesFechamentoDaFatura(fatura);
+      if (!fechamento) continue;
+      const nome = fatura.referencia_nome.trim();
+      if (!nome || ocupado(nome, fechamento.iso)) continue;
+      const config = configs.get(normalizarNomeClinica(nome)) ?? null;
+      const salvo = periodoSalvoDaFatura(fatura);
+      const canonico = periodoFechamentoClinica({
+        ano: fechamento.ano,
+        mes: fechamento.mes,
+        fechamentoApuracao: config?.fechamentoApuracao,
+        diaFechamento: config?.diaFechamento,
+      });
+      ocupar(nome, fechamento.iso);
+      ciclos.push({
+        nome,
+        config,
+        fatura,
+        periodo: salvo ?? canonico,
+        dataVencimento: fatura.data_vencimento.split("T")[0],
+        mesFechamentoIso: fechamento.iso,
+        mesFechamentoBR: fechamento.mesBR,
+        clinicaId: fatura.referencia_id ?? config?.id ?? null,
+      });
+    }
+
+    for (const config of configsUnicas) {
+      const nome = config.nomes.find((item) => item.trim())?.trim() ?? "";
+      if (!nome || !matchesReferenciaFilter(nome, clinicaFilter)) continue;
+      const fecha = fechamentoDoVencimento({
+        anoVencimento: alvo.ano,
+        mesVencimento: alvo.mes,
+        diaVencimento: config.diaVencimento,
+        vencimentoMes: config.vencimentoMes,
+        fechamentoApuracao: config.fechamentoApuracao,
+        diaFechamento: config.diaFechamento,
+      });
+      if (!fecha || ocupado(nome, fecha.iso)) continue;
+      if (periodoRegistradoNoFechamento(periodos, nome, config.id, fecha.iso)) {
+        continue;
+      }
+      ocupar(nome, fecha.iso);
+      ciclos.push({
+        nome,
+        config,
+        fatura: null,
+        periodo: fecha.periodo,
+        dataVencimento: fecha.vencimento,
+        mesFechamentoIso: fecha.iso,
+        mesFechamentoBR: fecha.mesBR,
+        clinicaId: config.id,
+      });
+    }
+  } else if (anoSem) {
+    for (const fatura of faturas) {
+      if (fatura.tipo !== "clinica") continue;
+      if ((fatura.data_vencimento ?? "").trim()) continue;
+      if (!matchesReferenciaFilter(fatura.referencia_nome, clinicaFilter)) continue;
+      const fechamento = mesFechamentoDaFatura(fatura);
+      if (!fechamento || fechamento.ano !== anoSem) continue;
+      const nome = fatura.referencia_nome.trim();
+      if (!nome || ocupado(nome, fechamento.iso)) continue;
+      const config = configs.get(normalizarNomeClinica(nome)) ?? null;
+      const salvo = periodoSalvoDaFatura(fatura);
+      const canonico = periodoFechamentoClinica({
+        ano: fechamento.ano,
+        mes: fechamento.mes,
+        fechamentoApuracao: config?.fechamentoApuracao,
+        diaFechamento: config?.diaFechamento,
+      });
+      ocupar(nome, fechamento.iso);
+      ciclos.push({
+        nome,
+        config,
+        fatura,
+        periodo: salvo ?? canonico,
+        dataVencimento: null,
+        mesFechamentoIso: fechamento.iso,
+        mesFechamentoBR: fechamento.mesBR,
+        clinicaId: fatura.referencia_id ?? config?.id ?? null,
+      });
+    }
+
+    for (const config of configsUnicas) {
+      if (config.diaVencimento != null) continue;
+      const nome = config.nomes.find((item) => item.trim())?.trim() ?? "";
+      if (!nome || !matchesReferenciaFilter(nome, clinicaFilter)) continue;
+      for (let mes = 1; mes <= 12; mes += 1) {
+        const iso = `${anoSem}-${String(mes).padStart(2, "0")}`;
+        if (ocupado(nome, iso)) continue;
+        if (periodoRegistradoNoFechamento(periodos, nome, config.id, iso)) continue;
+        ocupar(nome, iso);
+        const periodo = periodoFechamentoClinica({
+          ano: anoSem,
+          mes,
+          fechamentoApuracao: config.fechamentoApuracao,
+          diaFechamento: config.diaFechamento,
+        });
+        ciclos.push({
+          nome,
+          config,
+          fatura: null,
+          periodo,
+          dataVencimento: null,
+          mesFechamentoIso: iso,
+          mesFechamentoBR: `${String(mes).padStart(2, "0")}/${anoSem}`,
+          clinicaId: config.id,
+        });
+      }
+    }
+  }
+
+  const rows: FaturaMesRow[] = [];
+  for (const ciclo of ciclos) {
+    const { fatura, periodo } = ciclo;
+    if (fatura && faturaCustosCongelada(fatura)) {
+      rows.push({
+        referenciaNome: fatura.referencia_nome.trim() || ciclo.nome,
+        periodoLabel: rotuloPeriodoIso(periodo.inicio, periodo.fim),
+        periodoInicio: periodo.inicio,
+        periodoFim: periodo.fim,
+        dataFechamento: periodo.dataFechamento,
+        dataVencimento: ciclo.dataVencimento,
+        clinicaId: ciclo.clinicaId,
+        mesFechamento: ciclo.mesFechamentoBR,
+        ...metricasCustoCongelado(fatura, itensPorFatura?.get(fatura.id)),
+        fatura,
+        status: deriveFaturaMesStatusClinica(fatura),
+      });
+      continue;
+    }
+
+    const bloqueados = new Set<string>();
+    if (itensPorFatura) {
+      for (const [faturaId, itens] of Array.from(itensPorFatura.entries())) {
+        if (fatura && faturaId === fatura.id) continue;
+        for (const item of itens) {
+          bloqueados.add(exameChave(item.agendamentoId, item.exameNome));
+        }
+      }
+    }
+    const ags: AgendamentoWithExames[] = [];
+    for (const ag of elegiveis) {
+      if (normalizarNomeClinica(ag.clinica_nome) !== normalizarNomeClinica(ciclo.nome)) {
+        continue;
+      }
+      const data = dataAgendamentoIso(ag.data_agendamento);
+      if (!dataNoPeriodo(data, periodo.inicio, periodo.fim)) continue;
+      if (
+        dataOcupadaPorOutroFechamento({
+          dataIso: data,
+          nomeClinica: ciclo.nome,
+          clinicaId: ciclo.clinicaId,
+          mesFechamentoIso: ciclo.mesFechamentoIso,
+          faturaIdAtual: fatura?.id,
+          periodoSalvoNestaCompetencia: Boolean(fatura?.periodo_inicio && fatura.periodo_fim),
+          periodos,
+          config: ciclo.config,
+        })
+      ) {
+        continue;
+      }
+      const livre = semExamesJaVinculados(ag, bloqueados);
+      if (livre) ags.push(livre);
+    }
+    const metrics = buildMetricsFromAgendamentos(ags, "clinica");
+    rows.push({
+      referenciaNome: ciclo.nome,
+      periodoLabel: rotuloPeriodoIso(periodo.inicio, periodo.fim),
+      periodoInicio: periodo.inicio,
+      periodoFim: periodo.fim,
+      dataFechamento: periodo.dataFechamento,
+      dataVencimento: ciclo.dataVencimento,
+      clinicaId: ciclo.clinicaId,
+      mesFechamento: ciclo.mesFechamentoBR,
+      ...metrics,
+      fatura,
+      status: deriveFaturaMesStatusClinica(fatura),
+    });
+  }
+
+  const rowsFaturaveis = filterRowsFaturaveis(rows);
+  rowsFaturaveis.sort(compareFaturaMesRows);
+  return { rows: rowsFaturaveis, resumo: computeResumo(rowsFaturaveis, "clinica") };
+}
+
 export function buildResumoClinicasMes(
   agendamentos: AgendamentoWithExames[],
   faturas: FaturaRecord[],
@@ -829,6 +1105,16 @@ export function buildResumoClinicasMes(
       "clinica",
       clinicaFilter,
       "clinica"
+    );
+  }
+
+  if (opcoes?.porVencimento) {
+    return buildResumoPorVencimento(
+      agendamentos,
+      faturas,
+      mesReferencia,
+      clinicaFilter,
+      opcoes
     );
   }
 

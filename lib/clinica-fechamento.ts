@@ -288,6 +288,127 @@ export function dataVencimentoFechamento(params: {
   };
 }
 
+export function mesReferenciaBR(ano: number, mes: number): string {
+  return `${pad2(mes)}/${ano}`;
+}
+
+export function dataIsoNoMes(
+  dataIso: string | null | undefined,
+  ano: number,
+  mes: number
+): boolean {
+  const data = dataAgendamentoIso(dataIso);
+  return data.startsWith(`${ano}-${pad2(mes)}`);
+}
+
+/**
+ * Fechamento cujo vencimento cai no mês informado.
+ * Mesmo mês: o fechamento é o próprio mês. Mês seguinte: o fechamento é o anterior.
+ * Sem dia de vencimento não há aba mensal — não usa a data de fechamento no lugar.
+ */
+export function fechamentoDoVencimento(params: {
+  anoVencimento: number;
+  mesVencimento: number;
+  diaVencimento: number | null | undefined;
+  vencimentoMes: ClinicaVencimentoMes | null | undefined;
+  fechamentoApuracao: ClinicaFechamentoApuracao | null | undefined;
+  diaFechamento: number | null | undefined;
+}): {
+  ano: number;
+  mes: number;
+  iso: string;
+  mesBR: string;
+  periodo: PeriodoFechamento;
+  vencimento: string;
+} | null {
+  const vencimento = dataVencimentoFechamento({
+    diaVencimento: params.diaVencimento,
+    anoFechamento:
+      params.vencimentoMes === "mes_seguinte"
+        ? mesAnterior(params.anoVencimento, params.mesVencimento).ano
+        : params.anoVencimento,
+    mesFechamento:
+      params.vencimentoMes === "mes_seguinte"
+        ? mesAnterior(params.anoVencimento, params.mesVencimento).mes
+        : params.mesVencimento,
+    vencimentoMes: params.vencimentoMes,
+  });
+  if (!vencimento || !dataIsoNoMes(vencimento.iso, params.anoVencimento, params.mesVencimento)) {
+    return null;
+  }
+  const fechamento =
+    params.vencimentoMes === "mes_seguinte"
+      ? mesAnterior(params.anoVencimento, params.mesVencimento)
+      : { ano: params.anoVencimento, mes: params.mesVencimento };
+  return {
+    ano: fechamento.ano,
+    mes: fechamento.mes,
+    iso: `${fechamento.ano}-${pad2(fechamento.mes)}`,
+    mesBR: mesReferenciaBR(fechamento.ano, fechamento.mes),
+    periodo: periodoFechamentoClinica({
+      ano: fechamento.ano,
+      mes: fechamento.mes,
+      fechamentoApuracao: params.fechamentoApuracao,
+      diaFechamento: params.diaFechamento,
+    }),
+    vencimento: vencimento.iso,
+  };
+}
+
+/** Mês de fechamento gravado na fatura, sem trocar pela data de vencimento. */
+export function mesFechamentoDaFatura(fatura: {
+  mes_referencia?: string | null;
+  data_fechamento?: string | null;
+  periodo_fim?: string | null;
+}): { ano: number; mes: number; iso: string; mesBR: string } | null {
+  const pelaCompetencia = parseMesReferenciaBR(fatura.mes_referencia ?? "");
+  const pelaData = parseIsoCivil(fatura.data_fechamento ?? fatura.periodo_fim);
+  const base = pelaCompetencia ?? (pelaData
+    ? { ano: pelaData.ano, mes: pelaData.mes, iso: `${pelaData.ano}-${pad2(pelaData.mes)}` }
+    : null);
+  if (!base) return null;
+  return { ...base, mesBR: mesReferenciaBR(base.ano, base.mes) };
+}
+
+/**
+ * Consulta dos exames que podem vencer no mês: fecha no mês ou no anterior,
+ * e o ciclo do dia 20 ainda alcança o mês anterior a esse fechamento.
+ */
+export function janelaBuscaVencimento(
+  mesVencimento: string,
+  periodos: { inicio: string | null | undefined; fim: string | null | undefined }[]
+): { inicio: string; fim: string } | null {
+  const parsed = parseMesReferenciaBR(mesVencimento);
+  if (!parsed) return null;
+  const anterior = mesAnterior(parsed.ano, parsed.mes);
+  const doisAntes = mesAnterior(anterior.ano, anterior.mes);
+  let inicio = isoDataCivil(doisAntes.ano, doisAntes.mes, 1);
+  let fim = isoDataCivil(parsed.ano, parsed.mes, diasNoMes(parsed.ano, parsed.mes));
+  for (const periodo of periodos) {
+    const ini = periodo.inicio?.split("T")[0];
+    const end = periodo.fim?.split("T")[0];
+    if (ini && ini < inicio) inicio = ini;
+    if (end && end > fim) fim = end;
+  }
+  return { inicio, fim };
+}
+
+/** Ano do fechamento, do dezembro anterior até dezembro, para clínicas sem vencimento. */
+export function janelaBuscaSemVencimento(
+  ano: number,
+  periodos: { inicio: string | null | undefined; fim: string | null | undefined }[]
+): { inicio: string; fim: string } {
+  let inicio = isoDataCivil(ano - 1, 12, 1);
+  let fim = isoDataCivil(ano, 12, 31);
+  for (const periodo of periodos) {
+    const ini = periodo.inicio?.split("T")[0];
+    const end = periodo.fim?.split("T")[0];
+    if (ini && ini < inicio) inicio = ini;
+    if (end && end > fim) fim = end;
+  }
+  return { inicio, fim };
+}
+
 export function periodosSobrepoem(
   aInicio: string,
   aFim: string,

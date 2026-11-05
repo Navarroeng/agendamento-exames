@@ -353,4 +353,317 @@ assert.equal(
 );
 assert.equal(dois.resumo.valorPrevisto, somaLinhas);
 
+function porVencimento(
+  agendamentos: AgendamentoWithExames[],
+  faturas: FaturaRecord[],
+  mes: string,
+  clinicas: ReturnType<typeof config>[],
+  extra: {
+    semVencimento?: boolean;
+    anoFechamento?: number;
+    periodosRegistrados?: PeriodoRegistradoClinica[];
+  } = {}
+) {
+  return buildResumoClinicasMes(agendamentos, faturas, mes, "", {
+    porVencimento: true,
+    clinicas,
+    ...extra,
+  });
+}
+
+const bc = config("BC WORK", null, null, "mes_seguinte", 30);
+const exameBc = [ag("bc1", "BC WORK", "2026-10-15", 80)];
+const outubroBc = porVencimento(exameBc, [], "10/2026", [bc]);
+const novembroBc = porVencimento(exameBc, [], "11/2026", [bc]);
+assert.ok(outubroBc && novembroBc);
+assert.equal(outubroBc.rows.length, 0);
+assert.equal(novembroBc.rows.length, 1);
+assert.equal(novembroBc.rows[0]?.periodoInicio, "2026-10-01");
+assert.equal(novembroBc.rows[0]?.periodoFim, "2026-10-31");
+assert.equal(novembroBc.rows[0]?.dataFechamento, "2026-10-31");
+assert.equal(novembroBc.rows[0]?.dataVencimento, "2026-11-30");
+assert.equal(novembroBc.rows[0]?.mesFechamento, "10/2026");
+assert.equal(novembroBc.rows[0]?.valorTotal, 80);
+
+const mesmoMes = config("Alpha", null, null, "mesmo_mes", 10);
+const novembroMesmo = porVencimento(
+  [ag("m1", "Alpha", "2026-11-05", 50)],
+  [],
+  "11/2026",
+  [mesmoMes]
+);
+const outubroMesmo = porVencimento(
+  [ag("m1", "Alpha", "2026-11-05", 50)],
+  [],
+  "10/2026",
+  [mesmoMes]
+);
+assert.ok(novembroMesmo && outubroMesmo);
+assert.equal(outubroMesmo.rows.length, 0);
+assert.equal(novembroMesmo.rows[0]?.periodoInicio, "2026-11-01");
+assert.equal(novembroMesmo.rows[0]?.dataFechamento, "2026-11-30");
+assert.equal(novembroMesmo.rows[0]?.dataVencimento, "2026-11-10");
+assert.equal(novembroMesmo.rows[0]?.mesFechamento, "11/2026");
+
+const virada = config("Delta", null, null, "mes_seguinte", 15);
+const janeiroVenc = porVencimento(
+  [ag("d1", "Delta", "2026-12-10", 60)],
+  [],
+  "01/2027",
+  [virada]
+);
+const dezembroVenc = porVencimento(
+  [ag("d1", "Delta", "2026-12-10", 60)],
+  [],
+  "12/2026",
+  [virada]
+);
+assert.ok(janeiroVenc && dezembroVenc);
+assert.equal(dezembroVenc.rows.length, 0);
+assert.equal(janeiroVenc.rows[0]?.periodoInicio, "2026-12-01");
+assert.equal(janeiroVenc.rows[0]?.periodoFim, "2026-12-31");
+assert.equal(janeiroVenc.rows[0]?.dataVencimento, "2027-01-15");
+assert.equal(janeiroVenc.rows[0]?.mesFechamento, "12/2026");
+
+const ciclo20 = config("Gama", "dia_especifico", 20, "mesmo_mes", 10);
+const nov20 = porVencimento(
+  [ag("g1", "Gama", "2026-11-20", 30), ag("g2", "Gama", "2026-11-21", 90)],
+  [],
+  "11/2026",
+  [ciclo20]
+);
+const dez20 = porVencimento(
+  [ag("g1", "Gama", "2026-11-20", 30), ag("g2", "Gama", "2026-11-21", 90)],
+  [],
+  "12/2026",
+  [ciclo20]
+);
+assert.ok(nov20 && dez20);
+assert.equal(nov20.rows[0]?.periodoInicio, "2026-10-21");
+assert.equal(nov20.rows[0]?.periodoFim, "2026-11-20");
+assert.equal(nov20.rows[0]?.valorTotal, 30);
+assert.equal(nov20.rows[0]?.dataVencimento, "2026-11-10");
+assert.equal(dez20.rows[0]?.periodoInicio, "2026-11-21");
+assert.equal(dez20.rows[0]?.valorTotal, 90);
+
+const ciclo20Seguinte = config("Gama", "dia_especifico", 20, "mes_seguinte", 25);
+const novSeguinte = porVencimento(
+  [ag("g3", "Gama", "2026-10-20", 45)],
+  [],
+  "11/2026",
+  [ciclo20Seguinte]
+);
+assert.ok(novSeguinte);
+assert.equal(novSeguinte.rows[0]?.periodoInicio, "2026-09-21");
+assert.equal(novSeguinte.rows[0]?.periodoFim, "2026-10-20");
+assert.equal(novSeguinte.rows[0]?.dataVencimento, "2026-11-25");
+assert.equal(novSeguinte.rows[0]?.mesFechamento, "10/2026");
+
+const paga = fatura({
+  id: "fat-paga",
+  referencia_nome: "BC WORK",
+  referencia_id: "id-BC WORK",
+  mes_referencia: "2026-10",
+  periodo_inicio: "2026-10-01",
+  periodo_fim: "2026-10-31",
+  data_fechamento: "2026-10-31",
+  data_vencimento: "2026-11-30",
+  data_pagamento: "2026-12-02",
+  valor_total: 80,
+  status: "emitida",
+  pago: true,
+});
+const novembroPaga = porVencimento(
+  [ag("bc1", "BC WORK", "2026-10-15", 200)],
+  [paga],
+  "11/2026",
+  [bc]
+);
+const outubroPaga = porVencimento(
+  [ag("bc1", "BC WORK", "2026-10-15", 200)],
+  [paga],
+  "10/2026",
+  [bc]
+);
+assert.ok(novembroPaga && outubroPaga);
+assert.equal(novembroPaga.rows.length, 1);
+assert.equal(novembroPaga.rows[0]?.valorTotal, 80);
+assert.equal(novembroPaga.rows[0]?.fatura?.id, "fat-paga");
+assert.equal(novembroPaga.rows[0]?.mesFechamento, "10/2026");
+assert.equal(outubroPaga.rows.length, 0);
+
+const atrasada = fatura({
+  id: "fat-atraso",
+  referencia_nome: "BC WORK",
+  referencia_id: "id-BC WORK",
+  mes_referencia: "2026-10",
+  periodo_inicio: "2026-10-01",
+  periodo_fim: "2026-10-31",
+  data_fechamento: "2026-10-31",
+  data_vencimento: "2026-11-30",
+  status: "vencida",
+  pago: false,
+  conferido_em: "2026-11-01",
+  valor_total: 80,
+});
+const novembroAtraso = porVencimento([ag("bc1", "BC WORK", "2026-10-15", 200)], [atrasada], "11/2026", [bc]);
+const dezembroAtraso = porVencimento([ag("bc1", "BC WORK", "2026-10-15", 200)], [atrasada], "12/2026", [bc]);
+assert.ok(novembroAtraso && dezembroAtraso);
+assert.equal(novembroAtraso.rows[0]?.fatura?.id, "fat-atraso");
+assert.equal(novembroAtraso.rows[0]?.valorTotal, 80);
+assert.equal(dezembroAtraso.rows.length, 0);
+
+const semDia = config("Sem Dia", "dia_especifico", 20, null, null);
+const semAba = porVencimento(
+  [ag("s1", "Sem Dia", "2026-03-10", 12), ag("s2", "Sem Dia", "2026-10-05", 18)],
+  [],
+  "11/2026",
+  [semDia],
+  { semVencimento: true, anoFechamento: 2026 }
+);
+const semNoMes = porVencimento(
+  [ag("s1", "Sem Dia", "2026-03-10", 12)],
+  [],
+  "03/2026",
+  [semDia]
+);
+assert.ok(semAba && semNoMes);
+assert.equal(semNoMes.rows.length, 0);
+assert.equal(semAba.rows.length, 2);
+assert.ok(semAba.rows.every((row) => row.dataVencimento == null));
+const somaSem = semAba.rows.reduce((total, row) => total + row.valorTotal, 0);
+assert.equal(somaSem, semAba.resumo.valorEmAberto);
+assert.equal(somaSem, 30);
+assert.equal(semNoMes.resumo.valorPrevisto, 0);
+
+function assertCardsIguaisTabela(
+  resultado: NonNullable<ReturnType<typeof porVencimento>>
+) {
+  const soma = resultado.rows.reduce((total, row) => total + row.valorTotal, 0);
+  assert.equal(soma, resultado.resumo.valorPrevisto);
+  assert.equal(soma, resultado.resumo.valorPago + resultado.resumo.valorEmAberto);
+}
+
+assertCardsIguaisTabela(novembroBc);
+assertCardsIguaisTabela(novembroPaga);
+assertCardsIguaisTabela(novembroAtraso);
+assertCardsIguaisTabela(semAba);
+
+const semData = fatura({
+  id: "fat-sem",
+  referencia_nome: "Sem Dia",
+  referencia_id: "id-Sem Dia",
+  mes_referencia: "2026-03",
+  periodo_inicio: "2026-02-21",
+  periodo_fim: "2026-03-20",
+  data_fechamento: "2026-03-20",
+  data_vencimento: "",
+  status: "emitida",
+  pago: false,
+  valor_total: 12,
+  conferido_em: "2026-03-21",
+});
+const semDataAba = porVencimento(
+  [ag("s1", "Sem Dia", "2026-03-10", 99), ag("s2", "Sem Dia", "2026-10-05", 18)],
+  [semData],
+  "11/2026",
+  [semDia],
+  { semVencimento: true, anoFechamento: 2026 }
+);
+const semDataNoMes = porVencimento(
+  [ag("s1", "Sem Dia", "2026-03-10", 99)],
+  [semData],
+  "03/2026",
+  [semDia],
+  {
+    periodosRegistrados: [
+      {
+        faturaId: "fat-sem",
+        numero: "CC-1",
+        referenciaId: "id-Sem Dia",
+        referenciaNome: "Sem Dia",
+        mesReferencia: "2026-03",
+        inicio: "2026-02-21",
+        fim: "2026-03-20",
+        status: "emitida",
+      },
+    ],
+  }
+);
+assert.ok(semDataAba && semDataNoMes);
+assert.equal(semDataNoMes.rows.length, 0);
+const marçoSalvo = semDataAba.rows.find((row) => row.fatura?.id === "fat-sem");
+assert.equal(marçoSalvo?.valorTotal, 12);
+assert.equal(marçoSalvo?.dataVencimento, null);
+assert.equal(marçoSalvo?.mesFechamento, "03/2026");
+assert.equal(
+  semDataAba.rows.filter((row) => row.mesFechamento === "03/2026").length,
+  1
+);
+
+const salvaFora = fatura({
+  id: "fat-fora",
+  referencia_nome: "Alpha",
+  referencia_id: "id-Alpha",
+  mes_referencia: "2026-11",
+  periodo_inicio: "2026-11-01",
+  periodo_fim: "2026-11-30",
+  data_fechamento: "2026-11-30",
+  data_vencimento: "2026-12-10",
+  valor_total: 50,
+  pago: true,
+  status: "emitida",
+  data_pagamento: "2026-12-20",
+});
+const periodoFora = {
+  faturaId: "fat-fora",
+  numero: "CC-1",
+  referenciaId: "id-Alpha",
+  referenciaNome: "Alpha",
+  mesReferencia: "2026-11",
+  inicio: "2026-11-01",
+  fim: "2026-11-30",
+  status: "emitida",
+};
+const novembroFora = buildResumoClinicasMes(
+  [ag("m1", "Alpha", "2026-11-05", 50)],
+  [],
+  "11/2026",
+  "",
+  {
+    porVencimento: true,
+    clinicas: [mesmoMes],
+    periodosRegistrados: [periodoFora],
+  }
+);
+const dezembroFora = buildResumoClinicasMes(
+  [ag("m1", "Alpha", "2026-11-05", 50), ag("m2", "Alpha", "2026-12-05", 20)],
+  [salvaFora],
+  "12/2026",
+  "",
+  {
+    porVencimento: true,
+    clinicas: [mesmoMes],
+    periodosRegistrados: [periodoFora],
+  }
+);
+assert.ok(novembroFora && dezembroFora);
+assert.equal(novembroFora.rows.length, 0);
+assert.equal(
+  dezembroFora.rows.filter((row) => row.fatura?.id === "fat-fora").length,
+  1
+);
+assert.equal(
+  dezembroFora.rows.find((row) => row.fatura?.id === "fat-fora")?.mesFechamento,
+  "11/2026"
+);
+assert.equal(
+  dezembroFora.rows.find((row) => row.fatura?.id === "fat-fora")?.valorTotal,
+  50
+);
+assert.ok(
+  dezembroFora.rows.some((row) => row.mesFechamento === "12/2026" && !row.fatura)
+);
+assertCardsIguaisTabela(dezembroFora);
+
 console.log("test-clinica-fechamento: ok");

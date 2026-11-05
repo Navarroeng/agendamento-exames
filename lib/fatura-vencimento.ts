@@ -111,7 +111,7 @@ export function buildCustosClinicaVencimentoPorData(params: {
       dataIso: null,
       dataLabel: null,
       titulo: "—",
-      detalhe: null,
+      detalhe: "O vencimento precisa ser configurado na clínica.",
       tone: "muted",
     };
   }

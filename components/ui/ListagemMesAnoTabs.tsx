@@ -46,6 +46,10 @@ export interface ListagemMesAnoTabsProps {
   showAllMonthsTab?: boolean;
   onSelectTodos?: () => void;
   todosTitle?: string;
+  /** Aba extra de Custos Clínicas. Não altera as outras listagens. */
+  showSemVencimentoTab?: boolean;
+  semVencimentoAtivo?: boolean;
+  onSelectSemVencimento?: () => void;
 }
 
 /**
@@ -68,6 +72,9 @@ export function ListagemMesAnoTabs({
   showAllMonthsTab = false,
   onSelectTodos,
   todosTitle,
+  showSemVencimentoTab = false,
+  semVencimentoAtivo = false,
+  onSelectSemVencimento,
 }: ListagemMesAnoTabsProps) {
   const years = yearsProp ?? listAnosDisponiveis(startYear, now);
   const months = listMesAbasListagem(selected.year, {
@@ -89,6 +96,9 @@ export function ListagemMesAnoTabs({
       showAllMonthsTab={showAllMonthsTab}
       onSelectTodos={onSelectTodos}
       todosTitle={todosTitle}
+      showSemVencimentoTab={showSemVencimentoTab}
+      semVencimentoAtivo={semVencimentoAtivo}
+      onSelectSemVencimento={onSelectSemVencimento}
       ariaLabel={ariaLabel}
       monthTitle={
         monthTitle ??
