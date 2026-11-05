@@ -81,6 +81,7 @@ export function AgendamentoPage() {
     removeExam,
     updateExam,
     loading,
+    updating,
     error,
     filters,
     filterOptions,
@@ -246,26 +247,25 @@ export function AgendamentoPage() {
         </>
       )}
 
-      {!loading && !error && (
-        <AgendamentosFilters
-          filters={filters}
-          options={filterOptions}
-          totalFiltrados={totalFiltrados}
-          expanded={filtersExpanded}
-          onToggle={toggleFilters}
-          onChange={handleFilterChange}
-          onClear={handleClearFilters}
-        />
-      )}
+      <AgendamentosFilters
+        filters={filters}
+        options={filterOptions}
+        totalFiltrados={totalFiltrados}
+        expanded={filtersExpanded}
+        onToggle={toggleFilters}
+        onChange={handleFilterChange}
+        onClear={handleClearFilters}
+      />
 
       <AgendamentosTable
         rows={paginatedRows}
         loading={loading}
+        updating={updating}
         error={error}
         sort={tableSort}
         onSortColumn={handleSortColumn}
         paginationSlot={
-          !loading && !error && totalFiltrados > 0 ? (
+          !loading && totalFiltrados > 0 ? (
             <AgendamentosPagination
               page={page}
               totalPages={totalPages}

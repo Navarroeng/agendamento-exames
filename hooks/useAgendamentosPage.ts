@@ -239,6 +239,7 @@ import {
   extractFilterOptions,
   type AgendamentoFilters,
 } from "@/lib/agendamento-filters";
+import { useFiltrosConsulta } from "@/hooks/useFiltrosConsulta";
 import {
   cycleAgendamentoTableSort,
   type AgendamentoTableSortState,
@@ -249,6 +250,14 @@ import type {
   CargoRecord,
   ExameFormItem,
 } from "@/lib/types";
+
+const CAMPOS_TEXTO_AGENDAMENTO = [
+  "cliente",
+  "colaborador",
+  "tipoExame",
+  "aso",
+  "responsavel",
+] as const satisfies readonly (keyof AgendamentoFilters)[];
 
 export function useAgendamentosPage() {
   const searchParams = useSearchParams();
@@ -751,9 +760,11 @@ export function useAgendamentosPage() {
   const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>([]);
   const [totalFiltrados, setTotalFiltrados] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const consultaSeq = useRef(0);
+  const possuiResultado = useRef(false);
   const [nomesClinicaHistorico, setNomesClinicaHistorico] = useState<string[]>(
     []
   );
@@ -776,6 +787,11 @@ export function useAgendamentosPage() {
   const [page, setPage] = useState(1);
   const [tableSort, setTableSort] = useState<AgendamentoTableSortState | null>(
     null
+  );
+  const consultaFilters = useFiltrosConsulta(
+    filters,
+    setPage,
+    CAMPOS_TEXTO_AGENDAMENTO
   );
   const [bloqueioPorAgendamento, setBloqueioPorAgendamento] = useState<
     Map<string, AgendamentoFaturaBloqueio>
@@ -859,11 +875,13 @@ export function useAgendamentosPage() {
 
   useEffect(() => {
     const seq = ++consultaSeq.current;
-    setLoading(true);
+    const atualizacao = possuiResultado.current;
+    if (atualizacao) setUpdating(true);
+    else setLoading(true);
     setError(null);
 
     void listarAgendamentosPagina({
-      filters,
+      filters: consultaFilters,
       page,
       pageSize: AGENDAMENTOS_PAGE_SIZE,
       sort: tableSort,
@@ -873,6 +891,7 @@ export function useAgendamentosPage() {
         setAgendamentos(result.records);
         setTotalFiltrados(result.total);
         setTotalPages(result.totalPages);
+        possuiResultado.current = true;
         if (page > result.totalPages) setPage(result.totalPages);
       })
       .catch((err) => {
@@ -883,14 +902,18 @@ export function useAgendamentosPage() {
             ? String((err as { message: unknown }).message)
             : "Erro ao carregar agendamentos";
         setError(message);
-        setAgendamentos([]);
-        setTotalFiltrados(0);
-        setTotalPages(1);
+        if (!atualizacao) {
+          setAgendamentos([]);
+          setTotalFiltrados(0);
+          setTotalPages(1);
+        }
       })
       .finally(() => {
-        if (seq === consultaSeq.current) setLoading(false);
+        if (seq !== consultaSeq.current) return;
+        setLoading(false);
+        setUpdating(false);
       });
-  }, [filters, page, tableSort, refreshKey]);
+  }, [consultaFilters, page, tableSort, refreshKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -941,10 +964,6 @@ export function useAgendamentosPage() {
     if (!viewAgendamento) return null;
     return bloqueioPorAgendamento.get(viewAgendamento.id) ?? null;
   }, [viewAgendamento, bloqueioPorAgendamento]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3652,6 +3671,7 @@ export function useAgendamentosPage() {
     removeExam: handleRemoveExam,
     updateExam: handleUpdateExam,
     loading,
+    updating,
     error,
     filters,
     filterOptions,
