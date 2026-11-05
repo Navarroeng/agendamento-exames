@@ -365,3 +365,17 @@ async function listarFontesGradeCobranca(
   }
   return fontes;
 }
+
+/**
+ * Parcelas da Cobranças de um orçamento, de todos os meses.
+ * Usa a mesma leitura da página: parcelas gravadas e as ainda só calculadas.
+ * À vista, pontual e sem vigência continuam de fora. Não grava nada.
+ */
+export async function listarCobrancasMensalidadesDoOrcamento(
+  orcamentoId: string
+): Promise<CobrancaParcela[]> {
+  const id = orcamentoId.trim();
+  if (!id) return [];
+  const parcelas = await listarCobrancasMensalidades();
+  return parcelas.filter((parcela) => parcela.orcamentoId === id);
+}

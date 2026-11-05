@@ -20,6 +20,7 @@ import {
   isClienteInadimplenteError,
   isClienteInadimplenciaValidationError,
 } from "@/services/fatura-inadimplencia.service";
+import { assertMensalidadePermiteNovoAgendamento } from "@/services/agendamento-mensalidade-bloqueio.service";
 import { CLIENTE_INADIMPLENCIA_VALIDATION_MSG } from "@/lib/fatura-inadimplencia";
 import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
 import { createClient } from "@/lib/supabase/client";
@@ -96,7 +97,13 @@ async function inserirExamesAgendamento(
 export async function salvarAgendamentoComExames(
   agendamento: AgendamentoInsert,
   exames: ExamePayload[],
-  options?: { contratoIdPreferido?: string | null }
+  options?: {
+    contratoIdPreferido?: string | null;
+    /** Identifica a mensalidade do contrato atendido. Não altera preço de exame. */
+    vagaContratoId?: string | null;
+    periodicoContratoId?: string | null;
+    creditoContratoId?: string | null;
+  }
 ): Promise<string> {
   let examesParaSalvar = exames;
   if ((agendamento.aso ?? "").trim() === "Admissional") {
@@ -133,6 +140,15 @@ export async function salvarAgendamentoComExames(
   });
   await assertClienteSemInadimplencia(agendamento.cliente_nome, {
     clienteId: agendamento.cliente_id,
+  });
+  await assertMensalidadePermiteNovoAgendamento({
+    clienteId: agendamento.cliente_id,
+    clienteNome: agendamento.cliente_nome,
+    dataAgendamento: agendamento.data_agendamento,
+    vagaContratoId: options?.vagaContratoId ?? options?.contratoIdPreferido,
+    periodicoContratoId: options?.periodicoContratoId,
+    creditoContratoId: options?.creditoContratoId,
+    contratoVigenteId: agendamento.contrato_id,
   });
   await assertNumeroReciboDisponivel(agendamento.esocial_recibo);
   const supabase = createClient();

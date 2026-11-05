@@ -40,6 +40,7 @@ import { registrarBaixaParcelaMensalidade } from "@/services/mensalidade-parcela
 import { obterUrlOrcamentoComprovante } from "@/services/orcamento-comprovante.service";
 import { OrcamentoAprovarModal } from "@/components/orcamentos/OrcamentoAprovarModal";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -57,6 +58,7 @@ function competenciaHoje(): YearMonth {
 
 export function CobrancasPage() {
   const { profile } = useAuth();
+  const searchParams = useSearchParams();
   const podeBaixar = isPerfilStaffNavarro(profile?.perfil);
   const [parcelas, setParcelas] = useState<CobrancaParcela[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,16 @@ export function CobrancasPage() {
   const [baixa, setBaixa] = useState<CobrancaParcela | null>(null);
   const [consulta, setConsulta] = useState<CobrancaParcela | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const empresa = searchParams.get("empresa")?.trim() ?? "";
+    if (empresa) setBusca(empresa);
+    if (searchParams.get("vencidas") === "1") {
+      setTodosVencidos(true);
+      setSituacao("todas");
+      setPage(1);
+    }
+  }, [searchParams]);
 
   const carregar = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);

@@ -6,6 +6,7 @@ import { AgendamentoAsoRetidoModal } from "@/components/modals/AgendamentoAsoRet
 import { AgendamentoLiberarAsoRetidoModal } from "@/components/modals/AgendamentoLiberarAsoRetidoModal";
 import { AgendamentoCancelarModal } from "@/components/modals/AgendamentoCancelarModal";
 import { AgendamentoCargoChangeModal } from "@/components/modals/AgendamentoCargoChangeModal";
+import { AgendamentoMensalidadeBloqueioModal } from "@/components/agendamentos/AgendamentoMensalidadeBloqueioModal";
 import { AgendamentoClienteInadimplenciaModal } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
 import { AgendamentoClienteProcuracaoModal } from "@/components/modals/AgendamentoClienteProcuracaoModal";
 import { AgendamentoDuplicidade90DiasModal } from "@/components/modals/AgendamentoDuplicidade90DiasModal";
@@ -24,12 +25,16 @@ import { ExamSection } from "./ExamSection";
 import { FormActions } from "./FormActions";
 import { StatusDocumentacao } from "./StatusDocumentacao";
 import { TopActions } from "./TopActions";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAgendamentosPage } from "@/hooks/useAgendamentosPage";
+import { canAccessPath } from "@/lib/permissions";
 import { AGENDAMENTOS_PAGE_SIZE } from "@/lib/agendamento-filters";
 import { AGENDAMENTO_FATURA_SOMENTE_DOCUMENTACAO_MSG } from "@/lib/agendamento-documentacao";
 import { parseDateBRToIso } from "@/lib/agendamento-datetime";
 
 export function AgendamentoPage() {
+  const { profile } = useAuth();
+  const podeAbrirCobrancas = canAccessPath(profile?.perfil, "/cobrancas");
   const {
     showForm,
     editingId,
@@ -133,6 +138,12 @@ export function AgendamentoPage() {
     handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
+    mensalidadeAgendamento,
+    tentarNovamenteMensalidade,
+    abrirModalMensalidade,
+    fecharModalMensalidade,
+    mensalidadeModalAberto,
+    mensalidadeModalParcelas,
     showClienteProcuracaoAlert,
     clienteProcuracaoModalOpen,
     clienteProcuracaoConfirmLoading,
@@ -183,6 +194,9 @@ export function AgendamentoPage() {
             isEditing={!!editingId}
             readOnly={editingSomenteDocumentacao}
             contratoVigencia={contratoVigencia}
+            mensalidadeAgendamento={mensalidadeAgendamento}
+            onTentarNovamenteMensalidade={tentarNovamenteMensalidade}
+            onVerPendenciasMensalidade={abrirModalMensalidade}
             showClienteProcuracaoAlert={
               showClienteProcuracaoAlert && !editingSomenteDocumentacao
             }
@@ -342,6 +356,13 @@ export function AgendamentoPage() {
         loading={clienteProcuracaoConfirmLoading}
         onClose={closeClienteProcuracaoModal}
         onConfirm={handleConfirmClienteProcuracao}
+      />
+      <AgendamentoMensalidadeBloqueioModal
+        open={mensalidadeModalAberto}
+        empresa={form.cliente_nome}
+        parcelas={mensalidadeModalParcelas}
+        podeAbrirCobrancas={podeAbrirCobrancas}
+        onClose={fecharModalMensalidade}
       />
       <AgendamentoClienteInadimplenciaModal
         open={inadimplenciaModalOpen}

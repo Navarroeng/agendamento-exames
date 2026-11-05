@@ -65,6 +65,7 @@ import {
   isValidDateBR,
   isValidHorario24,
   parseDateBRToIso,
+  todayIsoSaoPaulo,
 } from "@/lib/agendamento-datetime";
 import {
   EXAME_DUPLICADO_TOAST,
@@ -87,6 +88,7 @@ import {
 } from "@/services/duplicidade.service";
 import { useAgendamentoForm } from "@/hooks/useAgendamentoForm";
 import { useContratoVigenciaCheck } from "@/hooks/useContratoVigenciaCheck";
+import { useMensalidadeAgendamentoBloqueio } from "@/hooks/useMensalidadeAgendamentoBloqueio";
 import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useExams, useExamesCatalogOptions } from "@/hooks/useExams";
 import { useClinicasList } from "@/hooks/useClinicasList";
@@ -213,6 +215,12 @@ import {
   isClienteInadimplenteError,
   validarClienteParaNovoAgendamento,
 } from "@/services/fatura-inadimplencia.service";
+import {
+  assertMensalidadePermiteNovoAgendamento,
+  isMensalidadeAgendamentoBloqueioError,
+  isMensalidadeAgendamentoConsultaError,
+} from "@/services/agendamento-mensalidade-bloqueio.service";
+import type { ParcelaMensalidadeBloqueante } from "@/lib/agendamento-mensalidade-bloqueio";
 import type { InadimplenciaClienteInfo } from "@/components/modals/AgendamentoClienteInadimplenciaModal";
 import {
   CLIENTE_INADIMPLENCIA_VALIDATION_MSG,
@@ -347,6 +355,11 @@ export function useAgendamentosPage() {
   const vagaDecisionRef = useRef<"none" | "skip" | "link">("none");
   const vagaEmUsoIdRef = useRef<string | null>(null);
   const vagaContratoIdRef = useRef<string | null>(null);
+  const periodicoContratoIdRef = useRef<string | null>(null);
+  const creditoContratoIdRef = useRef<string | null>(null);
+  const [periodicoContratoId, setPeriodicoContratoId] = useState<string | null>(
+    null
+  );
   const [contratoPreferidoId, setContratoPreferidoId] = useState<string | null>(
     null
   );
@@ -426,6 +439,29 @@ export function useAgendamentosPage() {
     clienteId
   );
   const contratoInvalido = contratoVigencia.status === "invalid";
+  const creditoContratoId = useMemo(() => {
+    const id = (creditoAsoEmUsoId ?? "").trim();
+    if (!id) return null;
+    return (
+      creditosAsoDisponiveis.find((item) => item.id === id)?.contrato_id ??
+      null
+    );
+  }, [creditoAsoEmUsoId, creditosAsoDisponiveis]);
+  const mensalidadeAgendamento = useMensalidadeAgendamentoBloqueio({
+    ativo: !editingId && !editingSomenteDocumentacao,
+    clienteId,
+    clienteNome: form.cliente_nome,
+    dataAgendamento: form.data_agendamento,
+    vagaContratoId: contratoPreferidoId,
+    periodicoContratoId,
+    creditoContratoId,
+  });
+  const mensalidadeBloqueada =
+    mensalidadeAgendamento.state.status === "bloqueado";
+  const [mensalidadeModalAberto, setMensalidadeModalAberto] = useState(false);
+  const [mensalidadeModalParcelas, setMensalidadeModalParcelas] = useState<
+    ParcelaMensalidadeBloqueante[]
+  >([]);
   const clinicasAtivas = useMemo(
     () => filterClinicasParaNovoAgendamento(clinicasList),
     [clinicasList]
@@ -945,6 +981,7 @@ export function useAgendamentosPage() {
     setCreditoAsoSelectedId(null);
     setCreditoAsoEmUsoId(null);
     creditoAsoEmUsoIdRef.current = null;
+    creditoContratoIdRef.current = null;
     setCreditoAsoNumeroContrato(null);
     creditoDecisionRef.current = "none";
     creditoAlertKeyRef.current = null;
@@ -962,6 +999,8 @@ export function useAgendamentosPage() {
     periodicoDecisionRef.current = "none";
     periodicoLinkIdsRef.current = [];
     periodicoAlertKeyRef.current = null;
+    periodicoContratoIdRef.current = null;
+    setPeriodicoContratoId(null);
     setPeriodicoVinculoOpen(false);
     setPeriodicoVinculoList([]);
     setInadimplenciaModalOpen(false);
@@ -1087,6 +1126,8 @@ export function useAgendamentosPage() {
           periodicoDecisionRef.current = "none";
           periodicoLinkIdsRef.current = [];
           periodicoAlertKeyRef.current = null;
+          periodicoContratoIdRef.current = null;
+          setPeriodicoContratoId(null);
           setPeriodicoVinculoOpen(false);
           setPeriodicoVinculoList([]);
           creditoDecisionRef.current = "none";
@@ -1095,6 +1136,7 @@ export function useAgendamentosPage() {
           setCreditoAsoModalVariant("padrao");
           setCreditoAsoEmUsoId(null);
           creditoAsoEmUsoIdRef.current = null;
+          creditoContratoIdRef.current = null;
           setCreditoAsoNumeroContrato(null);
           setCreditoAsoSelectedId(null);
         }
@@ -1604,6 +1646,8 @@ export function useAgendamentosPage() {
         periodicoDecisionRef.current = "none";
         periodicoLinkIdsRef.current = [];
         periodicoAlertKeyRef.current = null;
+        periodicoContratoIdRef.current = null;
+        setPeriodicoContratoId(null);
         setPeriodicoVinculoOpen(false);
         setPeriodicoVinculoList([]);
         creditoDecisionRef.current = "none";
@@ -1613,6 +1657,7 @@ export function useAgendamentosPage() {
         setCreditoAsoSelectedId(null);
         setCreditoAsoEmUsoId(null);
         creditoAsoEmUsoIdRef.current = null;
+        creditoContratoIdRef.current = null;
         setCreditoAsoNumeroContrato(null);
         vagaDecisionRef.current = "none";
         vagaEmUsoIdRef.current = null;
@@ -1744,6 +1789,7 @@ export function useAgendamentosPage() {
     const credito = creditosAsoDisponiveis.find((c) => c.id === id);
     creditoDecisionRef.current = "use";
     creditoAsoEmUsoIdRef.current = id;
+    creditoContratoIdRef.current = credito?.contrato_id ?? null;
     setCreditoAsoEmUsoId(id);
     setCreditoAsoNumeroContrato(credito?.contrato_numero ?? null);
     setCreditoAsoModalOpen(false);
@@ -2440,6 +2486,44 @@ export function useAgendamentosPage() {
       try {
       const bloquearCamposAso = isAgendamentoAsoRetido(editingStatus);
 
+      if (!editingId && !editingSomenteDocumentacao) {
+        const dataInformada = isValidDateBR(form.data_agendamento)
+          ? parseDateBRToIso(form.data_agendamento)
+          : null;
+        try {
+          await assertMensalidadePermiteNovoAgendamento({
+            clienteId: clienteId || null,
+            clienteNome: form.cliente_nome,
+            clienteCnpj:
+              clientes.find((item) => item.id === clienteId)?.cnpj ?? null,
+            dataAgendamento: dataInformada || todayIsoSaoPaulo(),
+            vagaContratoId: vagaContratoIdRef.current,
+            periodicoContratoId:
+              periodicoDecisionRef.current === "link"
+                ? periodicoContratoIdRef.current
+                : null,
+            creditoContratoId: creditoAsoEmUsoIdRef.current
+              ? creditoContratoIdRef.current
+              : null,
+            contratoVigenteId:
+              vagaContratoIdRef.current ||
+              periodicoContratoIdRef.current ||
+              creditoContratoIdRef.current,
+          });
+        } catch (err) {
+          if (isMensalidadeAgendamentoBloqueioError(err)) {
+            setMensalidadeModalParcelas(err.parcelas);
+            setMensalidadeModalAberto(true);
+            return;
+          }
+          if (isMensalidadeAgendamentoConsultaError(err)) {
+            toast.error(err.message);
+            return;
+          }
+          throw err;
+        }
+      }
+
       if (editingId && editingSomenteDocumentacao) {
         if (!isDocumentacaoCompleta(form, { bloquearCamposAso })) {
           toast.error(
@@ -2776,6 +2860,8 @@ export function useAgendamentosPage() {
             );
             periodicoDecisionRef.current = "none";
             periodicoLinkIdsRef.current = [];
+            periodicoContratoIdRef.current = null;
+            setPeriodicoContratoId(null);
             return;
           }
           periodicoIdsParaVincular = grupo.ids;
@@ -2941,7 +3027,17 @@ export function useAgendamentosPage() {
           const novoId = await salvarAgendamentoComExames(
             payload,
             examesPayload,
-            { contratoIdPreferido: vagaContratoIdRef.current }
+            {
+              contratoIdPreferido: vagaContratoIdRef.current,
+              vagaContratoId: vagaContratoIdRef.current,
+              periodicoContratoId:
+                periodicoDecisionRef.current === "link"
+                  ? periodicoContratoIdRef.current
+                  : null,
+              creditoContratoId: creditoAsoEmUsoIdRef.current
+                ? creditoContratoIdRef.current
+                : null,
+            }
           );
           await auditarClinicoZeroDemissionalSeNecessario(auditContext, {
             aso: payload.aso,
@@ -3099,6 +3195,15 @@ export function useAgendamentosPage() {
             err.pendencias,
             resolverInfoClienteInadimplencia(form.cliente_nome)
           );
+          return;
+        }
+        if (isMensalidadeAgendamentoBloqueioError(err)) {
+          setMensalidadeModalParcelas(err.parcelas);
+          setMensalidadeModalAberto(true);
+          return;
+        }
+        if (isMensalidadeAgendamentoConsultaError(err)) {
+          toast.error(err.message);
           return;
         }
         if (isAgendamentoDuplicidade90DiasError(err) && dataIso) {
@@ -3267,6 +3372,8 @@ export function useAgendamentosPage() {
     setPeriodicoVinculoList([]);
     periodicoDecisionRef.current = resultado.periodicoDecision;
     periodicoLinkIdsRef.current = [];
+    periodicoContratoIdRef.current = null;
+    setPeriodicoContratoId(null);
     pendingSaveStatusRef.current = null;
     periodicoAlertKeyRef.current = null;
     if (!fromSave) {
@@ -3318,10 +3425,13 @@ export function useAgendamentosPage() {
       );
       periodicoDecisionRef.current = resultado.periodicoDecision;
       periodicoLinkIdsRef.current = grupo.ids;
+      periodicoContratoIdRef.current = grupo.contrato_id ?? null;
+      setPeriodicoContratoId(grupo.contrato_id ?? null);
       // Não consumir ASO genérico junto com o vínculo específico.
       creditoDecisionRef.current = "skip";
       setCreditoAsoEmUsoId(null);
       creditoAsoEmUsoIdRef.current = null;
+      creditoContratoIdRef.current = null;
       setCreditoAsoNumeroContrato(null);
       setCreditoAsoModalOpen(false);
       setPeriodicoVinculoOpen(false);
@@ -3519,6 +3629,18 @@ export function useAgendamentosPage() {
     handleConfirmCargoChange,
     contratoVigencia,
     contratoInvalido,
+    mensalidadeAgendamento: mensalidadeAgendamento.state,
+    tentarNovamenteMensalidade: mensalidadeAgendamento.tentarNovamente,
+    mensalidadeBloqueada,
+    mensalidadeModalAberto,
+    mensalidadeModalParcelas,
+    abrirModalMensalidade: () => {
+      if (mensalidadeAgendamento.state.status === "bloqueado") {
+        setMensalidadeModalParcelas(mensalidadeAgendamento.state.parcelas);
+      }
+      setMensalidadeModalAberto(true);
+    },
+    fecharModalMensalidade: () => setMensalidadeModalAberto(false),
     showClienteProcuracaoAlert,
     clienteProcuracaoModalOpen,
     clienteProcuracaoConfirmLoading,

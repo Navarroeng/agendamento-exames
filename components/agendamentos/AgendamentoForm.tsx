@@ -1,4 +1,5 @@
 import { ContratoVigenciaAlert } from "@/components/agendamentos/ContratoVigenciaAlert";
+import { MensalidadeAtrasoAlert } from "@/components/agendamentos/MensalidadeAtrasoAlert";
 import { ClienteProcuracaoAlert } from "@/components/agendamentos/ClienteProcuracaoAlert";
 import {
   ClinicaRegrasAlert,
@@ -9,6 +10,7 @@ import { Panel } from "@/components/ui/Panel";
 import { IconFileText } from "@/components/ui/icons/OutlineIcons";
 import { RESPONSAVEIS, TIPOS_ASO } from "@/lib/constants";
 import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaCheck";
+import type { MensalidadeAgendamentoUiState } from "@/hooks/useMensalidadeAgendamentoBloqueio";
 import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
 import type { FormField } from "@/hooks/useAgendamentoForm";
@@ -31,6 +33,9 @@ interface AgendamentoFormProps {
   isEditing?: boolean;
   readOnly?: boolean;
   contratoVigencia: ContratoVigenciaCheckState;
+  mensalidadeAgendamento?: MensalidadeAgendamentoUiState;
+  onTentarNovamenteMensalidade?: () => void;
+  onVerPendenciasMensalidade?: () => void;
   showClienteProcuracaoAlert?: boolean;
   exams: ExameFormItem[];
   clienteValidacaoLoading?: boolean;
@@ -59,6 +64,9 @@ export function AgendamentoForm({
   isEditing = false,
   readOnly = false,
   contratoVigencia,
+  mensalidadeAgendamento = { status: "idle" },
+  onTentarNovamenteMensalidade,
+  onVerPendenciasMensalidade,
   showClienteProcuracaoAlert = false,
   exams,
   clienteValidacaoLoading = false,
@@ -261,6 +269,11 @@ export function AgendamentoForm({
           <ClinicaRegrasAlert clinica={selectedClinica} exams={exams} />
           <ClienteProcuracaoAlert visible={showClienteProcuracaoAlert} />
           <ContratoVigenciaAlert state={contratoVigencia} />
+          <MensalidadeAtrasoAlert
+            state={mensalidadeAgendamento}
+            onTentarNovamente={onTentarNovamenteMensalidade}
+            onVerPendencias={onVerPendenciasMensalidade}
+          />
         </>
       ) : null}
     </Panel>
