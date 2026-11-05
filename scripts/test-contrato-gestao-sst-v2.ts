@@ -208,7 +208,8 @@ assert.match(novo, /valor bruto mensal de R\$ 200,00/);
 assert.match(novo, /multa de 2%/);
 assert.match(novo, /juros de mora de 1%/);
 assert.match(novo, /correção aplicável/);
-assert.match(novo, /válidos somente para a vigência paga/);
+assert.doesNotMatch(novo, /válidos somente para a vigência paga/);
+assert.doesNotMatch(novo, /salvo novo acordo escrito de antecipação/);
 assert.match(novo, /compromisso anual, inclusive nas renovações automáticas/);
 assert.match(novo, /durante uma vigência/);
 assert.match(novo, /até o fim da vigência/);
@@ -274,8 +275,11 @@ const avista = texto({
   },
   diaVencimentoMensalidade: null,
 });
-assert.match(avista, /valor bruto mensal é de R\$ 200,00/);
+assert.match(avista, /valor mensal de referência é de R\$ 200,00/);
+assert.match(avista, /Foi concedido desconto de/);
+assert.match(avista, /válidos somente para a vigência paga/);
 assert.match(avista, /pagamento antecipado/);
+assert.doesNotMatch(avista, /mediante 12 \(doze\) mensalidades/);
 assert.doesNotMatch(avista, /dia 05/);
 
 assert.equal(addMonthsToIsoDate("2026-11-10", 12), "2027-11-10");

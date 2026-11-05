@@ -1013,15 +1013,21 @@ function redigirVencimentoMensalidadesV2(ctx: ContratoNavarroContexto): string[]
 }
 
 function redigirCompromissoERenovacaoPagamentoV2(
-  ctx: ContratoNavarroContexto
+  ctx: ContratoNavarroContexto,
+  avista: boolean
 ): string[] {
-  const compromisso = semRenovacaoAutomatica(ctx)
-    ? "O pagamento mensal corresponde a um compromisso anual da vigência contratada. Não há cobrança única do saldo nem antecipação automática das mensalidades."
-    : "O pagamento mensal corresponde a um compromisso anual, inclusive nas renovações automáticas. Não há cobrança única do saldo nem antecipação automática das mensalidades.";
-  const renovacao = semRenovacaoAutomatica(ctx)
-    ? "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de antecipação."
-    : "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito de antecipação.";
-  return [compromisso, renovacao];
+  if (!avista) {
+    return [
+      semRenovacaoAutomatica(ctx)
+        ? "O pagamento mensal corresponde a um compromisso anual da vigência contratada. Não há cobrança única do saldo nem antecipação automática das mensalidades."
+        : "O pagamento mensal corresponde a um compromisso anual, inclusive nas renovações automáticas. Não há cobrança única do saldo nem antecipação automática das mensalidades.",
+    ];
+  }
+  return [
+    semRenovacaoAutomatica(ctx)
+      ? "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de antecipação."
+      : "O pagamento antecipado e o desconto, quando houver, são válidos somente para a vigência paga. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito de antecipação.",
+  ];
 }
 
 function redigirPagamentoMensalidadeV2(ctx: ContratoNavarroContexto): string[] {
@@ -1035,7 +1041,7 @@ function redigirPagamentoMensalidadeV2(ctx: ContratoNavarroContexto): string[] {
     redigirValorExameClinicoAvulsoV2(ctx),
     ...faturamentoExamesV2(quinto),
     ...redigirVencimentoMensalidadesV2(ctx),
-    ...redigirCompromissoERenovacaoPagamentoV2(ctx),
+    ...redigirCompromissoERenovacaoPagamentoV2(ctx, false),
     multa,
   ];
 }
@@ -1064,14 +1070,7 @@ function aplicarModeloGestaoSstV2(
         return {
           ...clause,
           titulo: "DOS VALORES, PAGAMENTOS E VENCIMENTOS",
-          paragrafos: clause.paragrafos.map((paragrafo) =>
-            paragrafo.includes("O valor mensal de referência é de")
-              ? paragrafo.replace(
-                  "O valor mensal de referência é de",
-                  "O valor bruto mensal é de"
-                )
-              : paragrafo
-          ),
+          paragrafos: clause.paragrafos,
           paragrafosApos: [
             ...(clause.paragrafosApos ?? []).filter(
               (paragrafo) =>
@@ -1080,7 +1079,7 @@ function aplicarModeloGestaoSstV2(
                 )
             ),
             redigirValorExameClinicoAvulsoV2(ctx),
-            ...redigirCompromissoERenovacaoPagamentoV2(ctx),
+            ...redigirCompromissoERenovacaoPagamentoV2(ctx, true),
             multa,
           ],
         };

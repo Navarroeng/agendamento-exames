@@ -28,10 +28,14 @@ import {
   resolveOrcamentoModalidade,
 } from "../lib/orcamento-modalidade";
 import {
+  buildAprovacaoFormFromRecord,
   buildAprovacaoInsertPayload,
   buildResumoComercialOrcamento,
   formatCondicaoAprovada,
+  resolverFormaMensalidadeAprovada,
+  validarCondicoesMensalidadeForm,
 } from "../lib/orcamento-aprovacao";
+import { MENSALIDADE_PERCENTUAL_ACIMA_100_MSG } from "../lib/orcamento-mensalidade-pagamento";
 import {
   PACOTE_COMPLETO_SST_ITENS,
   resolveItensInclusosServico,
@@ -289,6 +293,8 @@ const camposMensalidade = {
   mensalidade_vencimento: "",
   mensalidade_fonte: "desconto" as const,
   mensalidade_meses: "12",
+  mensalidade_dia_vencimento: "10",
+  mensalidade_vencimento_regra: "",
 };
 
 const payloadIguais = buildAprovacaoInsertPayload(
@@ -337,6 +343,79 @@ assert.equal(
   ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO
 );
 assertNaoVazaTotalAnual(JSON.stringify(payloadEditado), "aprovação editada");
+assert.equal(payloadEditado.mensalidade_pagamento, "mensal");
+assert.equal(payloadEditado.mensalidade_dia_vencimento, 10);
+
+const payloadAvista = buildAprovacaoInsertPayload(
+  orcamentoMensalidade,
+  {
+    condicoes_iguais: false,
+    forma_pagamento: "parcelado",
+    quantidade_colaboradores: "10",
+    valor_final: "200,00",
+    quantidade_parcelas: "12",
+    observacoes: "negociado à vista",
+    ...camposMensalidade,
+    mensalidade_pagamento: "avista",
+    mensalidade_desconto_tipo: "percentual",
+    mensalidade_desconto: "10,00",
+    mensalidade_valor_avista: "",
+    mensalidade_vencimento: "2026-12-10",
+    mensalidade_fonte: "desconto",
+  },
+  "Ágatha",
+  parseMoney
+);
+assert.equal(payloadAvista.mensalidade_pagamento, "avista");
+assert.equal(payloadAvista.valor_final, 200);
+assert.equal(payloadAvista.valor_avista, 2160);
+assert.equal(payloadAvista.mensalidade_valor_mensal, 200);
+assert.notEqual(payloadAvista.valor_avista, payloadAvista.valor_final);
+
+const formReaberto = buildAprovacaoFormFromRecord(orcamentoMensalidade, {
+  quantidade_colaboradores: 10,
+  valor_final: 200,
+  condicao_pagamento: "À vista",
+  quantidade_parcelas: 1,
+  valor_parcela: 2160,
+  desconto_percentual: 10,
+  valor_avista: 2160,
+  observacoes: "negociado à vista",
+  mensalidade_pagamento: null,
+  mensalidade_valor_mensal: 200,
+  mensalidade_meses: 12,
+  mensalidade_valor_bruto: 2400,
+  mensalidade_desconto_valor: 240,
+  mensalidade_desconto_tipo: "percentual",
+  mensalidade_vencimento: "2026-12-10",
+  mensalidade_dia_vencimento: 20,
+  mensalidade_vencimento_regra: null,
+} as never);
+assert.equal(formReaberto.condicoes_iguais, false);
+assert.equal(formReaberto.mensalidade_pagamento, "avista");
+assert.equal(formReaberto.mensalidade_dia_vencimento, "20");
+assert.equal(formReaberto.mensalidade_vencimento, "2026-12-10");
+assert.equal(
+  resolverFormaMensalidadeAprovada({
+    mensalidade_pagamento: null,
+    condicao_pagamento: "12 mensalidades",
+  }),
+  "mensal"
+);
+assert.equal(
+  validarCondicoesMensalidadeForm(
+    {
+      ...formReaberto,
+      mensalidade_pagamento: "avista",
+      mensalidade_desconto_tipo: "percentual",
+      mensalidade_desconto: "150,00",
+      mensalidade_fonte: "desconto",
+    },
+    orcamentoMensalidade.orcamento_itens,
+    parseMoney
+  ),
+  MENSALIDADE_PERCENTUAL_ACIMA_100_MSG
+);
 
 assert.equal(
   formatCondicaoAprovada({

@@ -632,9 +632,20 @@ export async function salvarAprovacaoOrcamento(
   }
 
   const integracao = data as OrcamentoAprovacaoIntegracaoResult;
-  const aprovacao = await buscarAprovacaoPorOrcamentoId(orcamentoId);
+  let aprovacao = await buscarAprovacaoPorOrcamentoId(orcamentoId);
   if (!aprovacao) {
     throw new Error("Aprovação não encontrada após salvar.");
+  }
+  if (
+    payload.mensalidade_pagamento === "mensal" ||
+    payload.mensalidade_pagamento === "avista"
+  ) {
+    const ajustada = await atualizarCondicoesAprovadas(
+      aprovacao.id,
+      payload,
+      payload.aprovado_por
+    );
+    aprovacao = ajustada.aprovacao;
   }
 
   const { data: statusDepois, error: statusDepoisError } = await supabase
@@ -723,7 +734,13 @@ export async function atualizarCondicoesAprovadas(
         p_fonte: payload.mensalidade_fonte || "desconto",
       }
     );
-    if (rpcError) {
+    const semMudancaComercial = Boolean(
+      rpcError &&
+        /Nenhuma alteração nas condições aprovadas/i.test(
+          mensagemErroMensalidadePagamento(rpcError)
+        )
+    );
+    if (rpcError && !semMudancaComercial) {
       throw new Error(mensagemErroMensalidadePagamento(rpcError));
     }
 
@@ -733,6 +750,43 @@ export async function atualizarCondicoesAprovadas(
       .eq("id", aprovacaoId)
       .single();
     if (reloadError) throw reloadError;
+    let aprovacaoAtual = sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord);
+    const diaAntes = diaVencimentoMensalidadeValido(
+      aprovacaoAtual.mensalidade_dia_vencimento
+    );
+    const regraAntes =
+      aprovacaoAtual.mensalidade_vencimento_regra ===
+      MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        : null;
+
+    if (payload.mensalidade_pagamento === "mensal") {
+      const dia = diaVencimentoMensalidadeValido(payload.mensalidade_dia_vencimento);
+      const quinto =
+        payload.mensalidade_vencimento_regra ===
+        MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL;
+      if (dia || quinto) {
+        aprovacaoAtual = await salvarParametrosContratoMensalidade({
+          aprovacaoId,
+          vencimento: quinto
+            ? { tipo: "quinto_dia_util" }
+            : { tipo: "dia_fixo", dia: dia as DiaVencimentoMensalidade },
+        });
+      }
+    }
+
+    const diaDepois = diaVencimentoMensalidadeValido(
+      aprovacaoAtual.mensalidade_dia_vencimento
+    );
+    const regraDepois =
+      aprovacaoAtual.mensalidade_vencimento_regra ===
+      MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        : null;
+    const vencimentoMudou = diaAntes !== diaDepois || regraAntes !== regraDepois;
+    if (semMudancaComercial && !vencimentoMudou) {
+      throw new Error("Nenhuma alteração nas condições aprovadas.");
+    }
 
     const { data: historicoRaw, error: historicoError } = await supabase
       .from("orcamento_aprovacao_condicoes_historico")
@@ -740,11 +794,34 @@ export async function atualizarCondicoesAprovadas(
       .eq("aprovacao_id", aprovacaoId)
       .order("alterado_em", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
     if (historicoError) throw historicoError;
+    if (!historicoRaw) {
+      if (!vencimentoMudou) {
+        throw new Error("Nenhuma alteração nas condições aprovadas.");
+      }
+      return {
+        aprovacao: aprovacaoAtual,
+        historico: {
+          id: aprovacaoId,
+          aprovacao_id: aprovacaoId,
+          orcamento_id: aprovacaoAtual.orcamento_id,
+          alterado_em: new Date().toISOString(),
+          alterado_por: usuario,
+          quantidade_anterior: aprovacaoAtual.quantidade_colaboradores,
+          quantidade_nova: payload.quantidade_colaboradores,
+          valor_anterior: Number(aprovacaoAtual.valor_final) || 0,
+          valor_novo: payload.valor_final,
+          pagamento_anterior: formatCondicaoAprovada(aprovacaoAtual),
+          pagamento_novo: formatPagamentoFromCondicoes(payload),
+          observacoes_anteriores: aprovacaoAtual.observacoes ?? null,
+          observacoes_novas: payload.observacoes ?? null,
+        },
+      };
+    }
 
     return {
-      aprovacao: sortAprovacao(updatedRaw as OrcamentoAprovacaoRecord),
+      aprovacao: aprovacaoAtual,
       historico: historicoRaw as OrcamentoAprovacaoCondicoesHistoricoRecord,
     };
   }

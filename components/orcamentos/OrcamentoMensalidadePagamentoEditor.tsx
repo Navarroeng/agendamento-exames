@@ -2,8 +2,11 @@
 
 import { Field, RequiredMark } from "@/components/ui/Field";
 import type { OrcamentoAprovacaoFormValues } from "@/lib/orcamento-aprovacao";
+import {
+  DIAS_VENCIMENTO_MENSALIDADE,
+  MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL,
+} from "@/lib/contrato-navarro";
 import { formatCurrency, maskMoneyInput, parseMoney } from "@/lib/money";
-import { formatValorMensalidade } from "@/lib/orcamento-modalidade";
 import {
   calcularAvistaPorDesconto,
   calcularAvistaPorValorFinal,
@@ -26,6 +29,8 @@ export type MensalidadePagamentoEditorValue = {
   mensalidade_vencimento: string;
   mensalidade_fonte: MensalidadeFonteCalculo;
   mensalidade_meses: string;
+  mensalidade_dia_vencimento: string;
+  mensalidade_vencimento_regra: string;
 };
 
 export function OrcamentoMensalidadePagamentoEditor({
@@ -48,18 +53,40 @@ export function OrcamentoMensalidadePagamentoEditor({
 
   function selecionarForma(forma: MensalidadeFormaPagamento) {
     if (forma === value.mensalidade_pagamento) return;
-    if (forma === "mensal" || !base) {
-      onChange({ ...value, mensalidade_pagamento: "mensal" });
+    if (forma === "mensal" || !base || value.mensalidade_valor_avista.trim()) {
+      onChange({ ...value, mensalidade_pagamento: forma });
       return;
     }
-    const calculo = calcularAvistaPorDesconto(base, "valor", 0);
+    const informado =
+      value.mensalidade_desconto_tipo === "percentual"
+        ? parseDecimalBr(value.mensalidade_desconto)
+        : parseMoney(value.mensalidade_desconto);
+    const calculo = calcularAvistaPorDesconto(
+      base,
+      value.mensalidade_desconto_tipo,
+      Number.isFinite(informado) ? informado : 0
+    );
     onChange({
       ...value,
       mensalidade_pagamento: "avista",
-      mensalidade_desconto_tipo: "valor",
-      mensalidade_desconto: "",
       mensalidade_valor_avista: textoMoedaCentavos(calculo.valorFinalCentavos),
       mensalidade_fonte: "desconto",
+    });
+  }
+
+  function escolherDia(dia: 10 | 20) {
+    onChange({
+      ...value,
+      mensalidade_dia_vencimento: String(dia),
+      mensalidade_vencimento_regra: "",
+    });
+  }
+
+  function escolherQuintoDiaUtil() {
+    onChange({
+      ...value,
+      mensalidade_dia_vencimento: "",
+      mensalidade_vencimento_regra: MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL,
     });
   }
 
@@ -202,25 +229,76 @@ export function OrcamentoMensalidadePagamentoEditor({
               disabled={disabled}
               onChange={() => selecionarForma("avista")}
             />
-            À vista — pagamento único de toda a vigência
+            À vista
           </label>
         </div>
       </div>
 
       {value.mensalidade_pagamento === "mensal" ? (
-        <div className="rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-            Condição de pagamento
-          </p>
-          <p className="mt-1 text-sm font-extrabold text-navy">
-            {meses} mensalidades
-          </p>
-          <p className="mt-1 text-sm font-bold text-navy">
-            {valorMensal > 0 ? formatValorMensalidade(valorMensal) : "—"}
-          </p>
-          <p className="mt-2 text-[12px] text-[#475569]">
-            Vigência contratual: {meses} {meses === 1 ? "mês" : "meses"}
-          </p>
+        <div className="space-y-3 rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
+          <Field label={<>Valor da mensalidade <RequiredMark /></>}>
+            <input
+              className="field-input"
+              value={value.valor_final}
+              disabled={disabled}
+              onChange={(e) => alterarValorMensal(e.target.value)}
+            />
+          </Field>
+          <div>
+            <p className="mb-2 text-xs font-bold text-navy">
+              Vencimento <RequiredMark />
+            </p>
+            <div className="flex flex-col gap-1.5 text-sm font-semibold text-[#334155]">
+              {DIAS_VENCIMENTO_MENSALIDADE.map((dia) => (
+                <label key={dia} className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="mensalidade-vencimento-plano"
+                    className="h-4 w-4 accent-brand-blue"
+                    checked={
+                      value.mensalidade_dia_vencimento === String(dia) &&
+                      value.mensalidade_vencimento_regra !==
+                        MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+                    }
+                    disabled={disabled}
+                    onChange={() => escolherDia(dia)}
+                  />
+                  Dia {dia}
+                </label>
+              ))}
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="mensalidade-vencimento-plano"
+                  className="h-4 w-4 accent-brand-blue"
+                  checked={
+                    value.mensalidade_vencimento_regra ===
+                    MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+                  }
+                  disabled={disabled}
+                  onChange={escolherQuintoDiaUtil}
+                />
+                5º dia útil
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-[#64748b]">
+              A primeira mensalidade vence no mês seguinte ao início da vigência.
+              O 5º dia útil segue o calendário bancário e não é o dia 05.
+            </p>
+          </div>
+          <div className="rounded-lg border border-[#e8eef6] bg-[#f8fbff] px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
+              Resumo
+            </p>
+            <p className="mt-1 text-sm font-extrabold text-navy">
+              {valorMensal > 0
+                ? `${meses} mensalidades de ${formatCurrency(valorMensal)} — Total anual: ${formatCurrency(valorMensal * meses)}`
+                : "—"}
+            </p>
+            <p className="mt-1 text-[12px] text-[#475569]">
+              Vigência de {meses} meses.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-3 rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
@@ -232,14 +310,18 @@ export function OrcamentoMensalidadePagamentoEditor({
               onChange={(e) => alterarValorMensal(e.target.value)}
             />
           </Field>
+          <p className="text-[11px] text-[#64748b]">
+            Referência da mensalidade negociada. Não é o valor à vista.
+          </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Linha label="Vigência" value={`${meses} meses`} />
             <Linha
-              label="Meses contratados"
-              value={String(meses)}
-            />
-            <Linha
-              label="Total bruto do período"
-              value={base ? formatCurrency(base.valorBrutoCentavos / 100) : "—"}
+              label={`Total dos ${meses} meses`}
+              value={
+                base
+                  ? formatCurrency(base.baseGestaoCentavos / 100)
+                  : "—"
+              }
             />
             <Linha
               label="Serviços pontuais"
@@ -251,8 +333,11 @@ export function OrcamentoMensalidadePagamentoEditor({
             />
           </div>
           <p className="text-[11px] text-[#64748b]">
-            O desconto incide só sobre a gestão do período. Serviços pontuais
-            entram uma vez e não recebem desconto automático.
+            Base do desconto: a gestão do período
+            {base ? ` (${formatCurrency(base.baseGestaoCentavos / 100)})` : ""},
+            calculada pela mensalidade de referência × {meses}. O desconto
+            incide uma única vez sobre essa base. Serviços pontuais entram uma
+            vez no total e não recebem desconto automático.
           </p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field label="Desconto">
@@ -277,7 +362,7 @@ export function OrcamentoMensalidadePagamentoEditor({
                 />
               </div>
             </Field>
-            <Field label={<>Valor final à vista <RequiredMark /></>}>
+            <Field label={<>Valor final a pagar <RequiredMark /></>}>
               <input
                 className="field-input"
                 value={value.mensalidade_valor_avista}
@@ -298,7 +383,8 @@ export function OrcamentoMensalidadePagamentoEditor({
             />
           </Field>
           <p className="text-[11px] text-[#64748b]">
-            À vista não marca o pagamento como quitado.
+            O valor final é o total da vigência, não uma mensalidade. Selecionar
+            à vista não registra o pagamento como recebido.
           </p>
         </div>
       )}

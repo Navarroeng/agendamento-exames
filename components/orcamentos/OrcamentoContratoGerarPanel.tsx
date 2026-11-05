@@ -354,6 +354,12 @@ export function OrcamentoContratoGerarPanel({
   }, [orcamento.id, orcamento.parecer_pagamento_escolhido]);
 
   useEffect(() => {
+    setRenovacaoLocal(null);
+    setParametrosLocais(null);
+    padraoRenovacaoRef.current = null;
+  }, [aprovacao.id]);
+
+  useEffect(() => {
     setDiaVencimento(
       diaVencimentoMensalidadeValido(aprovacao.mensalidade_dia_vencimento)
     );
@@ -362,10 +368,11 @@ export function OrcamentoContratoGerarPanel({
         ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
         : null
     );
-    setRenovacaoLocal(null);
-    setParametrosLocais(null);
-    padraoRenovacaoRef.current = null;
-  }, [aprovacao.id]);
+  }, [
+    aprovacao.id,
+    aprovacao.mensalidade_dia_vencimento,
+    aprovacao.mensalidade_vencimento_regra,
+  ]);
 
   useEffect(() => {
     setRevisaoVigente(null);

@@ -360,7 +360,8 @@ await run("contrato mensalidade nunca mostra anual", () => {
   assert.match(texto, /compromisso anual/);
   assert.match(texto, /um exame clínico de cada tipo/);
   assert.match(texto, /quinto dia útil/);
-  assert.match(texto, /boleto bancário/);
+  assert.doesNotMatch(texto, /boleto bancário/);
+  assert.doesNotMatch(texto, /válidos somente para a vigência paga/);
   assert.match(texto, /R\$ 130,00/);
   assert.doesNotMatch(texto, /cento e trinta reais|dez reais/);
   assert.match(texto, /R\$ 10,00 por colaborador/);
@@ -388,7 +389,7 @@ await run("contrato mensalidade nunca mostra anual", () => {
   );
   assert.doesNotMatch(clausula4, /Esse desconto refere-se apenas/);
   assert.match(clausula4, /valor bruto mensal de R\$ 350,00/);
-  assert.match(clausula4, /válidos somente para a vigência paga/);
+  assert.doesNotMatch(clausula4, /válidos somente para a vigência paga/);
   assert.match(clausula4, /quinto dia útil/);
   assert.match(clausula4, /dia 10 de cada mês/);
   const ordemRenovacao = [
@@ -859,7 +860,8 @@ await run("PDF pontual e mensalidade", async () => {
     assert.match(cinco.texto, /5 \(cinco\) colaboradores/);
     assert.match(cinco.texto, /valor bruto mensal de R\$ 180,00/);
     assert.doesNotMatch(cinco.texto, /pagamento antecipado aplica-se|em pagamento antecipado/i);
-    assert.match(cinco.texto, /boleto bancário/);
+    assert.doesNotMatch(cinco.texto, /boleto bancário/);
+    assert.doesNotMatch(cinco.texto, /válidos somente para a vigência paga/);
     assert.doesNotMatch(cinco.texto, /1\.560,00|1\.400,00/);
 
     const oitenta = textoPlanoContrato(

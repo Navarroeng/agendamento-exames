@@ -13,6 +13,7 @@ import {
   calcularAvistaPorDesconto,
   calcularAvistaPorValorFinal,
   montarBaseMensalidadeAvista,
+  MENSALIDADE_PERCENTUAL_ACIMA_100_MSG,
   resolverMesesVigenciaMensalidade,
   textoCondicoesMensalidadeAvista,
   parseDecimalBr,
@@ -23,6 +24,11 @@ import {
   type MensalidadeFonteCalculo,
   type MensalidadeFormaPagamento,
 } from "@/lib/orcamento-mensalidade-pagamento";
+import {
+  DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
+  MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL,
+  diaVencimentoMensalidadeValido,
+} from "@/lib/contrato-navarro";
 import {
   laudoPontualOcultaColaboradores,
   resolveLaudoPontualKind,
@@ -224,6 +230,10 @@ export interface OrcamentoAprovacaoFormValues {
   mensalidade_vencimento: string;
   mensalidade_fonte: MensalidadeFonteCalculo;
   mensalidade_meses: string;
+  /** "10", "20" ou vazio. Não é apagado ao alternar para à vista. */
+  mensalidade_dia_vencimento: string;
+  /** "quinto_dia_util" ou vazio. */
+  mensalidade_vencimento_regra: string;
 }
 
 function camposMensalidadeForm(
@@ -236,6 +246,10 @@ function camposMensalidadeForm(
     | "desconto_percentual"
     | "mensalidade_vencimento"
     | "valor_avista"
+    | "mensalidade_dia_vencimento"
+    | "mensalidade_vencimento_regra"
+    | "condicao_pagamento"
+    | "mensalidade_valor_bruto"
   > | null
 ): Pick<
   OrcamentoAprovacaoFormValues,
@@ -246,8 +260,10 @@ function camposMensalidadeForm(
   | "mensalidade_vencimento"
   | "mensalidade_fonte"
   | "mensalidade_meses"
+  | "mensalidade_dia_vencimento"
+  | "mensalidade_vencimento_regra"
 > {
-  const forma = aprovacao?.mensalidade_pagamento === "avista" ? "avista" : "mensal";
+  const forma = resolverFormaMensalidadeAprovada(aprovacao);
   const tipo =
     aprovacao?.mensalidade_desconto_tipo === "percentual" ? "percentual" : "valor";
   const meses = resolverMesesVigenciaMensalidade({
@@ -277,7 +293,45 @@ function camposMensalidadeForm(
       forma === "avista" ? (aprovacao?.mensalidade_vencimento ?? "").slice(0, 10) : "",
     mensalidade_fonte: "desconto",
     mensalidade_meses: String(meses),
+    mensalidade_dia_vencimento:
+      diaVencimentoMensalidadeValido(
+        aprovacao?.mensalidade_dia_vencimento
+      )?.toString() ?? "",
+    mensalidade_vencimento_regra:
+      aprovacao?.mensalidade_vencimento_regra ===
+      MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+        : "",
   };
+}
+
+/**
+ * Recupera Mensal ou À vista pelos campos da aprovação.
+ * Não lê o texto das observações. Ausência dos campos novos não transforma
+ * todo histórico em mensal: total bruto e valor à vista já gravados prevalecem.
+ */
+export function resolverFormaMensalidadeAprovada(
+  aprovacao?: {
+    mensalidade_pagamento?: string | null;
+    condicao_pagamento?: string | null;
+    valor_avista?: number | null;
+    mensalidade_valor_bruto?: number | null;
+    mensalidade_meses?: number | null;
+  } | null
+): MensalidadeFormaPagamento {
+  if (aprovacao?.mensalidade_pagamento === "avista") return "avista";
+  if (aprovacao?.mensalidade_pagamento === "mensal") return "mensal";
+  const bruto = Number(aprovacao?.mensalidade_valor_bruto) || 0;
+  const avista = Number(aprovacao?.valor_avista) || 0;
+  const condicao = (aprovacao?.condicao_pagamento ?? "").trim();
+  if (bruto > 0 && avista > 0) return "avista";
+  if (
+    /^à\s*vista$/i.test(condicao) &&
+    (bruto > 0 || Number(aprovacao?.mensalidade_meses) > 0)
+  ) {
+    return "avista";
+  }
+  return "mensal";
 }
 
 export interface OrcamentoAprovacaoInsertPayload {
@@ -298,6 +352,18 @@ export interface OrcamentoAprovacaoInsertPayload {
     valor_total: number;
     ordem: number;
   }>;
+  mensalidade_pagamento?: MensalidadeFormaPagamento | null;
+  mensalidade_valor_mensal?: number | null;
+  mensalidade_meses?: number | null;
+  mensalidade_valor_bruto?: number | null;
+  mensalidade_valor_pontual?: number | null;
+  mensalidade_desconto_valor?: number | null;
+  mensalidade_desconto_tipo?: MensalidadeDescontoTipo | null;
+  mensalidade_vencimento?: string | null;
+  mensalidade_fonte?: MensalidadeFonteCalculo | null;
+  mensalidade_desconto_informado?: number | null;
+  mensalidade_dia_vencimento?: number | null;
+  mensalidade_vencimento_regra?: typeof MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL | null;
 }
 
 /** Campos comerciais das condições finais (sem itens / aprovado_por). */
@@ -323,6 +389,8 @@ export type OrcamentoCondicoesComerciaisPayload = Pick<
   mensalidade_fonte?: MensalidadeFonteCalculo | null;
   /** Valor digitado no desconto (reais ou %), antes de derivar o outro campo. */
   mensalidade_desconto_informado?: number | null;
+  mensalidade_dia_vencimento?: number | null;
+  mensalidade_vencimento_regra?: typeof MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL | null;
 };
 
 export interface OrcamentoAprovacaoCondicoesHistoricoRecord {
@@ -593,7 +661,7 @@ function pagamentoOuDescontoDivergeDoOriginal(
   resumo: OrcamentoResumoComercial
 ): boolean {
   if (isOrcamentoMensalidade(orcamento.modalidade)) {
-    if (aprovacao.mensalidade_pagamento === "avista") return true;
+    if (resolverFormaMensalidadeAprovada(aprovacao) === "avista") return true;
     if (/à\s*vista|\bavista\b/i.test(aprovacao.condicao_pagamento ?? "")) {
       return true;
     }
@@ -739,15 +807,15 @@ export function buildAprovacaoInsertPayload(
   const valorFinal = parseMoneyFn(form.valor_final);
 
   if (isOrcamentoMensalidade(orcamento.modalidade)) {
+    const comercial = montarCondicoesMensalidade(
+      form,
+      valorFinal,
+      quantidade,
+      orcamento.orcamento_itens,
+      parseMoneyFn
+    );
     return {
-      quantidade_colaboradores: quantidade,
-      valor_final: valorFinal,
-      condicao_pagamento: ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO,
-      quantidade_parcelas: null,
-      valor_parcela: null,
-      desconto_percentual: 0,
-      valor_avista: null,
-      observacoes: form.observacoes.trim() || null,
+      ...comercial,
       aprovado_por: aprovadoPor.trim(),
       itens,
     };
@@ -850,7 +918,7 @@ export function buildAprovacaoDiffs(
 export function formatCondicaoAprovada(
   aprovacao: OrcamentoAprovacaoRecord
 ): string {
-  if (aprovacao.mensalidade_pagamento === "avista") {
+  if (resolverFormaMensalidadeAprovada(aprovacao) === "avista") {
     return textoCondicoesMensalidadeAvista({
       meses: resolverMesesVigenciaMensalidade({
         mesesSalvos: aprovacao.mensalidade_meses,
@@ -890,6 +958,64 @@ export function formatCondicaoAprovada(
   return aprovacao.condicao_pagamento?.trim() || "—";
 }
 
+function vencimentoMensalDoForm(form: OrcamentoAprovacaoFormValues): {
+  mensalidade_dia_vencimento: number | null;
+  mensalidade_vencimento_regra: typeof MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL | null;
+} {
+  const quinto =
+    form.mensalidade_vencimento_regra === MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL;
+  return {
+    mensalidade_dia_vencimento: quinto
+      ? null
+      : diaVencimentoMensalidadeValido(Number(form.mensalidade_dia_vencimento)),
+    mensalidade_vencimento_regra: quinto
+      ? MENSALIDADE_VENCIMENTO_QUINTO_DIA_UTIL
+      : null,
+  };
+}
+
+export function validarCondicoesMensalidadeForm(
+  form: OrcamentoAprovacaoFormValues,
+  itens: ItemValorMensalidade[] | null | undefined,
+  parseMoneyFn: (value: string) => number
+): string | null {
+  const valorMensal = parseMoneyFn(form.valor_final);
+  if (valorMensal <= 0) return "Informe o valor da mensalidade.";
+  if (form.mensalidade_pagamento !== "avista") {
+    const vencimento = vencimentoMensalDoForm(form);
+    if (!vencimento.mensalidade_dia_vencimento && !vencimento.mensalidade_vencimento_regra) {
+      return DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG;
+    }
+    return null;
+  }
+  const meses = resolverMesesVigenciaMensalidade({
+    mesesSalvos: Number(form.mensalidade_meses) || null,
+  });
+  const tipoDesconto =
+    form.mensalidade_desconto_tipo === "percentual" ? "percentual" : "valor";
+  const descontoInformado =
+    tipoDesconto === "percentual"
+      ? parseDecimalBr(form.mensalidade_desconto ?? "")
+      : parseMoneyFn(form.mensalidade_desconto ?? "");
+  if (tipoDesconto === "percentual" && descontoInformado > 100) {
+    return MENSALIDADE_PERCENTUAL_ACIMA_100_MSG;
+  }
+  const base = montarBaseMensalidadeAvista({ valorMensal, meses, itens });
+  const calculo =
+    form.mensalidade_fonte === "final"
+      ? calcularAvistaPorValorFinal(
+          base,
+          parseMoneyFn(form.mensalidade_valor_avista ?? "")
+        )
+      : calcularAvistaPorDesconto(base, tipoDesconto, descontoInformado);
+  return (
+    validarCalculoMensalidadeAvista(
+      calculo,
+      form.mensalidade_fonte === "final" ? "final" : "desconto"
+    ) ?? validarVencimentoAvista(form.mensalidade_vencimento)
+  );
+}
+
 function montarCondicoesMensalidade(
   form: OrcamentoAprovacaoFormValues,
   valorMensal: number,
@@ -920,6 +1046,7 @@ function montarCondicoesMensalidade(
       mensalidade_desconto_tipo: null,
       mensalidade_vencimento: null,
       mensalidade_fonte: null,
+      ...vencimentoMensalDoForm(form),
     };
   }
 

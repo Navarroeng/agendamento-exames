@@ -7,6 +7,8 @@ export const MENSALIDADE_DESCONTO_NEGATIVO_MSG =
   "O desconto não pode ser negativo.";
 export const MENSALIDADE_DESCONTO_ACIMA_BASE_MSG =
   "O desconto não pode ser maior que a base da gestão no período.";
+export const MENSALIDADE_PERCENTUAL_ACIMA_100_MSG =
+  "O percentual de desconto não pode ser superior a 100%.";
 export const MENSALIDADE_FINAL_INVALIDO_MSG =
   "O valor final à vista deve ser maior que zero.";
 export const MENSALIDADE_FINAL_ACIMA_BRUTO_MSG =
@@ -280,7 +282,15 @@ export type ResumoMensalidadeAvistaSalva = {
 export function camposResumoMensalidadeAvista(
   salva: ResumoMensalidadeAvistaSalva
 ): CampoResumoMensalidadeAvista[] | null {
-  if (salva.mensalidade_pagamento !== "avista") return null;
+  if (salva.mensalidade_pagamento === "mensal") return null;
+  const brutoInformado = Number(salva.mensalidade_valor_bruto) || 0;
+  const avistaInformado = Number(salva.valor_avista) || 0;
+  if (
+    salva.mensalidade_pagamento !== "avista" &&
+    !(brutoInformado > 0 && avistaInformado > 0)
+  ) {
+    return null;
+  }
   const meses = resolverMesesVigenciaMensalidade({
     mesesSalvos: salva.mensalidade_meses,
   });

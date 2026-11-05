@@ -17,6 +17,7 @@ import {
   aprovacaoSegueOrcamentoOriginal,
   buildAprovacaoDiffs,
   buildAprovacaoFormFromOrcamento,
+  validarCondicoesMensalidadeForm,
   aprovacaoCicloVigente,
   buildAprovacaoFormFromRecord,
   buildResumoComercialOrcamento,
@@ -66,15 +67,7 @@ import {
   valorMensalContratado,
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
-import {
-  calcularAvistaPorDesconto,
-  calcularAvistaPorValorFinal,
-  camposResumoMensalidadeAvista,
-  montarBaseMensalidadeAvista,
-  parseDecimalBr,
-  validarCalculoMensalidadeAvista,
-  validarVencimentoAvista,
-} from "@/lib/orcamento-mensalidade-pagamento";
+import { camposResumoMensalidadeAvista } from "@/lib/orcamento-mensalidade-pagamento";
 import {
   OrcamentoAbaLogo,
   OrcamentoAbaProcuracao,
@@ -691,47 +684,21 @@ export function OrcamentoAprovarModal({
       toast.error("Informe a quantidade de colaboradores.");
       return;
     }
-    if (parseMoney(form.valor_final) <= 0) {
-      toast.error(
-        isOrcamentoMensalidade(orcamento?.modalidade)
-          ? "Informe o valor da mensalidade."
-          : "Informe o valor total fechado."
-      );
-      return;
-    }
     if (
-      isOrcamentoMensalidade(orcamento?.modalidade) &&
-      form.mensalidade_pagamento === "avista"
+      isOrcamentoMensalidade(orcamento?.modalidade)
     ) {
-      const meses = Math.max(1, Math.floor(Number(form.mensalidade_meses)) || 1);
-      const base = montarBaseMensalidadeAvista({
-        valorMensal: parseMoney(form.valor_final),
-        meses,
-        itens:
-          aprovacao.orcamento_aprovacao_itens ??
-          orcamento?.orcamento_itens ??
-          [],
-      });
-      const calculo =
-        form.mensalidade_fonte === "final"
-          ? calcularAvistaPorValorFinal(
-              base,
-              parseMoney(form.mensalidade_valor_avista)
-            )
-          : calcularAvistaPorDesconto(
-              base,
-              form.mensalidade_desconto_tipo,
-              form.mensalidade_desconto_tipo === "percentual"
-                ? parseDecimalBr(form.mensalidade_desconto)
-                : parseMoney(form.mensalidade_desconto)
-            );
-      const erro =
-        validarCalculoMensalidadeAvista(calculo, form.mensalidade_fonte) ??
-        validarVencimentoAvista(form.mensalidade_vencimento);
+      const erro = validarCondicoesMensalidadeForm(
+        form,
+        aprovacao.orcamento_aprovacao_itens ?? orcamento?.orcamento_itens ?? [],
+        parseMoney
+      );
       if (erro) {
         toast.error(erro);
         return;
       }
+    } else if (parseMoney(form.valor_final) <= 0) {
+      toast.error("Informe o valor total fechado.");
+      return;
     }
     if (
       !isOrcamentoMensalidade(orcamento?.modalidade) &&
@@ -776,12 +743,18 @@ export function OrcamentoAprovarModal({
         toast.error("Informe a quantidade de colaboradores.");
         return;
       }
-      if (parseMoney(form.valor_final) <= 0) {
-        toast.error(
-          isOrcamentoMensalidade(orcamento.modalidade)
-            ? "Informe o valor da mensalidade."
-            : "Informe o valor total fechado."
+      if (isOrcamentoMensalidade(orcamento.modalidade)) {
+        const erro = validarCondicoesMensalidadeForm(
+          form,
+          orcamento.orcamento_itens ?? [],
+          parseMoney
         );
+        if (erro) {
+          toast.error(erro);
+          return;
+        }
+      } else if (parseMoney(form.valor_final) <= 0) {
+        toast.error("Informe o valor total fechado.");
         return;
       }
       if (
@@ -1275,14 +1248,9 @@ export function OrcamentoAprovarModal({
                           />
                         </Field>
                         )}
-                        {isMensalidade &&
-                        form.mensalidade_pagamento === "avista" ? null : (
+                        {isMensalidade ? null : (
                         <Field
-                          label={
-                            isMensalidade
-                              ? "Valor da mensalidade"
-                              : "Valor total fechado"
-                          }
+                          label="Valor total fechado"
                           required
                         >
                           <input
@@ -1556,14 +1524,8 @@ export function OrcamentoAprovarModal({
                             />
                           </Field>
                           )}
-                          <Field
-                            label={
-                              isMensalidade
-                                ? "Valor da mensalidade"
-                                : "Valor total fechado"
-                            }
-                            required
-                          >
+                          {isMensalidade ? null : (
+                          <Field label="Valor total fechado" required>
                             <input
                               className="field-input"
                               value={form.valor_final}
@@ -1576,29 +1538,18 @@ export function OrcamentoAprovarModal({
                               }
                             />
                           </Field>
+                          )}
                         </div>
 
                         {isMensalidade ? (
-                          <div className="rounded-[10px] border border-[#eef2f7] bg-white px-4 py-3">
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
-                              Condição de pagamento
-                            </p>
-                            <p className="mt-1 text-sm font-extrabold text-navy">
-                              {ORCAMENTO_MENSALIDADE_CONDICAO_PAGAMENTO}
-                            </p>
-                            <p className="mt-1 text-sm font-bold text-navy">
-                              {valorFinalEditado > 0
-                                ? formatValorMensalidade(valorFinalEditado)
-                                : "—"}
-                            </p>
-                            <p className="mt-2 text-[12px] text-[#475569]">
-                              Vigência contratual:{" "}
-                              {ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL}
-                            </p>
-                            <p className="text-[12px] text-[#475569]">
-                              Renovação: {ORCAMENTO_MENSALIDADE_RENOVACAO_LABEL}
-                            </p>
-                          </div>
+                          <OrcamentoMensalidadePagamentoEditor
+                            value={form}
+                            itens={orcamento?.orcamento_itens ?? []}
+                            disabled={aprovadoLocked || saving}
+                            onChange={(next) =>
+                              setForm((prev) => (prev ? { ...prev, ...next } : prev))
+                            }
+                          />
                         ) : (
                         <>
                         {ocultaColaboradoresComerciais ? null : (
