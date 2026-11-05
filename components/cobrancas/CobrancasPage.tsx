@@ -128,20 +128,22 @@ export function CobrancasPage() {
       toast.error("Você não possui permissão para registrar esta baixa.");
       return;
     }
-    setSavingId(baixa.id);
+    const parcelaOrigemId = baixa.id;
+    setSavingId(parcelaOrigemId);
     let encerraSaving = true;
     try {
       const salva = await registrarBaixaParcelaMensalidade({
-        parcelaId: baixa.id,
+        parcelaId: parcelaOrigemId,
         pagoEmIso: params.pagoEmIso,
         valorRecebido: params.valorRecebido,
         comprovante: params.comprovante,
       });
       setParcelas((atual) =>
         atual.map((item) =>
-          item.id === salva.id
+          item.id === parcelaOrigemId || item.id === salva.id
             ? {
                 ...item,
+                id: salva.id,
                 pagoEmIso: salva.pagoEmIso,
                 valorRecebido: salva.valorRecebido,
                 comprovantePath: salva.comprovantePath,

@@ -225,6 +225,97 @@ export function auditarParcelasMensalidadeAusentes(
   return Array.from(porAprovacao.values());
 }
 
+export function lerIdParcelaGradeCobranca(id: string): {
+  aprovacaoId: string;
+  vigenciaInicio: string;
+  numero: number;
+} | null {
+  const match = /^grade:([^:]+):(\d{4}-\d{2}-\d{2}):([1-9]|1[0-2])$/.exec(id);
+  if (!match) return null;
+  return {
+    aprovacaoId: match[1],
+    vigenciaInicio: match[2],
+    numero: Number(match[3]),
+  };
+}
+
+export type PersistenciaParcelaCalculada =
+  | { acao: "recusar" }
+  | {
+      acao: "ja_gravada";
+      aprovacaoId: string;
+      vigenciaInicio: string;
+      numero: number;
+    }
+  | {
+      acao: "inserir";
+      aprovacaoId: string;
+      vigenciaInicio: string;
+      vigenciaFim: string | null;
+      numero: number;
+      vencimentoIso: string;
+      valor: number;
+    };
+
+/**
+ * Decide o que gravar ao dar baixa numa parcela que a tela só calculou.
+ * Parcela já salva não tem vencimento nem valor reescritos.
+ * Fora da grade vigente, à vista e pontual não criam linha.
+ */
+export function decidirPersistenciaParcelaCalculada(params: {
+  id: string;
+  fonte: FonteGradeCobranca;
+}): PersistenciaParcelaCalculada {
+  const lido = lerIdParcelaGradeCobranca(params.id);
+  const vigenciaInicio = (params.fonte.vigenciaInicio ?? "").slice(0, 10);
+  if (
+    !lido ||
+    lido.aprovacaoId !== params.fonte.aprovacaoId ||
+    vigenciaInicio !== lido.vigenciaInicio ||
+    !parcelaEntraEmCobrancas({
+      modalidade: params.fonte.modalidade,
+      mensalidadePagamento: params.fonte.mensalidadePagamento,
+      semVigencia: false,
+    })
+  ) {
+    return { acao: "recusar" };
+  }
+  const grade = resolverGradeMensalidades({
+    vigenciaInicio: params.fonte.vigenciaInicio,
+    vigenciaFim: params.fonte.vigenciaFim,
+    dia: params.fonte.dia,
+    vencimentoRegra: params.fonte.vencimentoRegra,
+    valorMensal: valorMensalContratado({
+      mensalidadeValorMensal: params.fonte.valorMensal,
+      valorFinal: params.fonte.valorFinal,
+    }),
+    registradas: params.fonte.registradas,
+  });
+  const parcela = grade.ok
+    ? grade.parcelas.find((item) => item.numero === lido.numero)
+    : undefined;
+  if (!parcela || parcela.vencimentoIso.trim() === "" || parcela.valor <= 0) {
+    return { acao: "recusar" };
+  }
+  if (parcela.registrada) {
+    return {
+      acao: "ja_gravada",
+      aprovacaoId: params.fonte.aprovacaoId,
+      vigenciaInicio,
+      numero: lido.numero,
+    };
+  }
+  return {
+    acao: "inserir",
+    aprovacaoId: params.fonte.aprovacaoId,
+    vigenciaInicio,
+    vigenciaFim: params.fonte.vigenciaFim,
+    numero: parcela.numero,
+    vencimentoIso: parcela.vencimentoIso,
+    valor: parcela.valor,
+  };
+}
+
 /** Gestão SST mensal. À vista, pontual e parcelas sem vigência ficam de fora. */
 export function parcelaEntraEmCobrancas(params: {
   modalidade: string | null | undefined;

@@ -9,6 +9,7 @@ import {
   auditarParcelasMensalidadeAusentes,
   completarCobrancasComGradeFinanceiro,
   consultarCobrancas,
+  decidirPersistenciaParcelaCalculada,
   escolherVigenciaFinanceiro,
   referenciaFinanceiroDaCobranca,
   parcelaEntraEmCobrancas,
@@ -763,6 +764,75 @@ assert.equal(gradePagina1.resumo.previstoCentavos, 24000 + 1100 + 1200);
 
 assert.match(lista, /completarCobrancasComGradeFinanceiro/);
 assert.doesNotMatch(pagina, /inserirParcelasMensalidadeAusentes/);
+assert.match(pagina, /parcelaOrigemId/);
+assert.match(pagina, /id: salva\.id/);
+assert.match(
+  service.slice(0, service.indexOf("export async function registrarBaixaParcelaMensalidade")),
+  /vencimento: decisao\.vencimentoIso/
+);
+assert.match(baixa, /idPersistidoParaBaixa\(params\.parcelaId\)/);
+assert.match(baixa, /\.eq\("id", parcelaId\)/);
+
+const idGo = "grade:ap-0080:2026-10-15:1";
+const inserirGo = decidirPersistenciaParcelaCalculada({ id: idGo, fonte: fonteGo });
+assert.equal(inserirGo.acao, "inserir");
+if (inserirGo.acao === "inserir") {
+  assert.equal(inserirGo.vencimentoIso, "2026-11-10");
+  assert.equal(inserirGo.valor, 130);
+  assert.equal(inserirGo.numero, 1);
+}
+const inserirSegunda = decidirPersistenciaParcelaCalculada({
+  id: "grade:ap-0080:2026-10-15:2",
+  fonte: fonteGo,
+});
+assert.equal(inserirSegunda.acao, "inserir");
+if (inserirSegunda.acao === "inserir") {
+  assert.equal(inserirSegunda.vencimentoIso, "2026-12-10");
+  assert.equal(inserirSegunda.valor, 130);
+}
+const jaGravada = decidirPersistenciaParcelaCalculada({
+  id: "grade:ap-parcial:2026-10-01:1",
+  fonte: fonteGrade({
+    aprovacaoId: "ap-parcial",
+    numeroOrcamento: "ORC-2026-0100",
+    empresa: "PARCIAL LTDA",
+    vigenciaInicio: "2026-10-01",
+    vigenciaFim: "2027-10-01",
+    valorMensal: 210,
+    registradas: [
+      {
+        vigenciaInicio: "2026-10-01",
+        numero: 1,
+        vencimentoIso: "2026-11-18",
+        valor: 99,
+        pagoEmIso: "2026-11-02",
+        valorRecebido: 99,
+      },
+    ],
+  }),
+});
+assert.equal(jaGravada.acao, "ja_gravada");
+assert.equal(
+  decidirPersistenciaParcelaCalculada({
+    id: "grade:ap-avista:2026-10-15:1",
+    fonte: fonteAvista,
+  }).acao,
+  "recusar"
+);
+assert.equal(
+  decidirPersistenciaParcelaCalculada({
+    id: "grade:ap-0080:2026-09-01:1",
+    fonte: fonteGo,
+  }).acao,
+  "recusar"
+);
+assert.equal(
+  decidirPersistenciaParcelaCalculada({
+    id: "uuid-real",
+    fonte: fonteGo,
+  }).acao,
+  "recusar"
+);
 const aprovacaoService = readFileSync(
   join(root, "services/orcamento-aprovacao.service.ts"),
   "utf8"

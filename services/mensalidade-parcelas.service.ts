@@ -3,8 +3,12 @@ import {
   BAIXA_EM_ANDAMENTO_MSG,
   BAIXA_JA_PAGA_MSG,
   MENSALIDADE_BAIXA_COLUNAS_MSG,
+  decidirPersistenciaParcelaCalculada,
+  escolherVigenciaFinanceiro,
+  lerIdParcelaGradeCobranca,
   parcelaEntraEmCobrancas,
   validarBaixaParcela,
+  type FonteGradeCobranca,
 } from "@/lib/cobrancas-mensalidades";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import {
@@ -360,11 +364,206 @@ async function lerParcelaParaBaixa(
   return data as unknown as ParcelaBaixaRow;
 }
 
+function numeroOuNulo(value: number | string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const numero = Number(value);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+async function buscarIdParcelaVigente(params: {
+  aprovacaoId: string;
+  vigenciaInicio: string;
+  numero: number;
+}): Promise<string | null> {
+  const supabase = createClient();
+  let { data, error } = await supabase
+    .from("orcamento_mensalidade_parcelas")
+    .select("id")
+    .eq("aprovacao_id", params.aprovacaoId)
+    .eq("vigencia_inicio", params.vigenciaInicio)
+    .eq("numero", params.numero)
+    .is("sem_vigencia_em", null)
+    .maybeSingle();
+  if (error && /sem_vigencia_em/i.test(error.message ?? "")) {
+    ({ data, error } = await supabase
+      .from("orcamento_mensalidade_parcelas")
+      .select("id")
+      .eq("aprovacao_id", params.aprovacaoId)
+      .eq("vigencia_inicio", params.vigenciaInicio)
+      .eq("numero", params.numero)
+      .maybeSingle());
+  }
+  if (error) throw erroParcelas(error);
+  const id = String(data?.id ?? "").trim();
+  return id || null;
+}
+
+async function fonteGradeDaAprovacao(
+  aprovacaoId: string
+): Promise<FonteGradeCobranca | null> {
+  const supabase = createClient();
+  const selectComRegra = `
+    id,
+    mensalidade_pagamento,
+    mensalidade_dia_vencimento,
+    mensalidade_vencimento_regra,
+    mensalidade_valor_mensal,
+    valor_final,
+    revertida_em,
+    orcamentos!inner (
+      id,
+      numero,
+      cliente_nome,
+      cliente_cnpj,
+      modalidade,
+      status,
+      cliente_contratos (
+        numero,
+        status,
+        data_inicio,
+        data_fim,
+        created_at
+      )
+    )
+  `;
+  let selectUsado = selectComRegra;
+  let { data, error } = await supabase
+    .from("orcamento_aprovacoes")
+    .select(selectUsado)
+    .eq("id", aprovacaoId)
+    .maybeSingle();
+  if (
+    error &&
+    /mensalidade_vencimento_regra|schema cache|42703/i.test(error.message ?? "")
+  ) {
+    selectUsado = selectUsado.replace(/\n\s*mensalidade_vencimento_regra,/, "");
+    ({ data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(selectUsado)
+      .eq("id", aprovacaoId)
+      .maybeSingle());
+  }
+  if (error && /revertida_em/i.test(error.message ?? "")) {
+    selectUsado = selectUsado.replace(/\n\s*revertida_em,/, "");
+    ({ data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select(selectUsado)
+      .eq("id", aprovacaoId)
+      .maybeSingle());
+  }
+  if (error) throw erroParcelas(error);
+  const row = data as {
+    id: string;
+    mensalidade_pagamento: string | null;
+    mensalidade_dia_vencimento: number | null;
+    mensalidade_vencimento_regra?: string | null;
+    mensalidade_valor_mensal: number | string | null;
+    valor_final: number | string | null;
+    revertida_em?: string | null;
+    orcamentos: {
+      id: string;
+      numero: string;
+      cliente_nome: string;
+      cliente_cnpj: string | null;
+      modalidade: string | null;
+      status: string;
+      cliente_contratos:
+        | {
+            numero?: string | null;
+            status?: string | null;
+            data_inicio?: string | null;
+            data_fim?: string | null;
+            created_at?: string | null;
+          }
+        | Array<{
+            numero?: string | null;
+            status?: string | null;
+            data_inicio?: string | null;
+            data_fim?: string | null;
+            created_at?: string | null;
+          }>
+        | null;
+    } | null;
+  } | null;
+  if (!row || row.revertida_em) return null;
+  const orcamento = um(row.orcamentos);
+  if (!orcamento) return null;
+  const contratos =
+    orcamento.cliente_contratos == null
+      ? []
+      : Array.isArray(orcamento.cliente_contratos)
+        ? orcamento.cliente_contratos
+        : [orcamento.cliente_contratos];
+  const vigencia = escolherVigenciaFinanceiro(contratos);
+  if (!vigencia) return null;
+  return {
+    aprovacaoId: row.id,
+    orcamentoId: orcamento.id,
+    numeroOrcamento: orcamento.numero,
+    numeroContrato: vigencia.numero,
+    empresa: orcamento.cliente_nome,
+    cnpj: orcamento.cliente_cnpj,
+    statusOrcamento: orcamento.status,
+    modalidade: orcamento.modalidade,
+    mensalidadePagamento: row.mensalidade_pagamento,
+    vigenciaInicio: vigencia.inicio,
+    vigenciaFim: vigencia.fim,
+    dia: row.mensalidade_dia_vencimento,
+    vencimentoRegra: row.mensalidade_vencimento_regra ?? null,
+    valorMensal: numeroOuNulo(row.mensalidade_valor_mensal),
+    valorFinal: numeroOuNulo(row.valor_final),
+    registradas: await listarParcelasMensalidade(row.id),
+  };
+}
+
 /**
- * Quita uma parcela já existente.
- * Grava pago_em, valor recebido e comprovante na mesma linha do Financeiro.
+ * Parcela calculada ainda não está na tabela.
+ * Grava só essa linha, sem pagamento. Se outra baixa já a criou, reutiliza o id.
+ */
+async function idPersistidoParaBaixa(parcelaId: string): Promise<string> {
+  if (!lerIdParcelaGradeCobranca(parcelaId)) return parcelaId;
+  const fonte = await fonteGradeDaAprovacao(
+    lerIdParcelaGradeCobranca(parcelaId)?.aprovacaoId ?? ""
+  );
+  if (!fonte) throw new Error("Parcela não encontrada.");
+  const decisao = decidirPersistenciaParcelaCalculada({ id: parcelaId, fonte });
+  if (decisao.acao === "recusar") throw new Error("Parcela não encontrada.");
+  if (decisao.acao === "ja_gravada") {
+    const existente = await buscarIdParcelaVigente(decisao);
+    if (!existente) throw new Error("Parcela não encontrada.");
+    return existente;
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_mensalidade_parcelas")
+    .insert({
+      aprovacao_id: decisao.aprovacaoId,
+      vigencia_inicio: decisao.vigenciaInicio,
+      vigencia_fim: iso(decisao.vigenciaFim),
+      numero: decisao.numero,
+      vencimento: decisao.vencimentoIso,
+      valor: decisao.valor,
+      pago_em: null,
+      updated_at: new Date().toISOString(),
+    })
+    .select("id")
+    .maybeSingle();
+  if (error?.code === "23505") {
+    const existente = await buscarIdParcelaVigente(decisao);
+    if (!existente) throw new Error("Parcela não encontrada.");
+    return existente;
+  }
+  if (error) throw erroParcelas(error);
+  const id = String(data?.id ?? "").trim();
+  if (!id) throw new Error("Parcela não encontrada.");
+  return id;
+}
+
+/**
+ * Quita a parcela na mesma linha do Financeiro.
+ * Se ela ainda era só calculada, grava essa linha e em seguida o pagamento.
+ * Não altera vencimento nem valor já registrados e não quita de novo.
  * Se as colunas da baixa não existirem, não grava pagamento algum.
- * Não cria parcela, não mexe em vencimento, valor, boleto, auditoria nem etapa.
  */
 export async function registrarBaixaParcelaMensalidade(params: {
   parcelaId: string;
@@ -384,7 +583,8 @@ export async function registrarBaixaParcelaMensalidade(params: {
   } | null = null;
   let confirmada = false;
   try {
-    const row = await lerParcelaParaBaixa(params.parcelaId);
+    const parcelaId = await idPersistidoParaBaixa(params.parcelaId);
+    const row = await lerParcelaParaBaixa(parcelaId);
     const aprovacao = um(row.orcamento_aprovacoes);
     const orcamento = um(aprovacao?.orcamentos);
     if (
@@ -428,7 +628,7 @@ export async function registrarBaixaParcelaMensalidade(params: {
       let query = supabase
         .from("orcamento_mensalidade_parcelas")
         .update(payload)
-        .eq("id", params.parcelaId)
+        .eq("id", parcelaId)
         .is("pago_em", null);
       if (filtrarVigencia) query = query.is("sem_vigencia_em", null);
       return query.select("id, pago_em, valor_recebido, comprovante_path");
@@ -452,7 +652,7 @@ export async function registrarBaixaParcelaMensalidade(params: {
 
     confirmada = true;
     return {
-      id: params.parcelaId,
+      id: parcelaId,
       pagoEmIso: params.pagoEmIso,
       valorRecebido: params.valorRecebido,
       comprovantePath: uploaded?.path ?? null,
