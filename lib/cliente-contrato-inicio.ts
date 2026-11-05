@@ -2,6 +2,7 @@ import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
 import { formatDateBR } from "@/lib/format";
 
 export const INICIO_CONTRATO_AGUARDANDO_ASSINATURA = "Aguardando assinatura";
+export const INICIO_CONTRATO_NAO_INFORMADO = "Não informado";
 
 export type AssinaturaAbaContratoEstado =
   | "nao_carregada"
@@ -89,24 +90,27 @@ export function classificarAssinaturaAba(
 
 /**
  * Início do contrato SST no modal do cliente.
- * Com orçamento, só a data da aba Contrato. Vazio e consulta pendente não usam a cópia.
+ * Manual, sem orçamento: a data de início cadastrada. Ausência de assinatura
+ * digital não significa pendência.
+ * Com orçamento: só a data da aba Contrato. "Aguardando assinatura" apenas
+ * quando a consulta concluiu e essa data está vazia. Consulta que não
+ * concluiu não vira contrato manual nem pendência de assinatura.
  */
 export function labelInicioContratoSst(
   contrato: Pick<
     ClienteContratoConsulta,
-    | "orcamento_id"
-    | "contrato_assinado_em"
-    | "assinaturaAbaContratoEstado"
-    | "assinaturaAbaContratoEm"
-  >
+    "orcamento_id" | "assinaturaAbaContratoEstado" | "assinaturaAbaContratoEm"
+  > & { data_inicio?: string | null }
 ): string {
-  if (contrato.orcamento_id?.trim()) {
-    if (contrato.assinaturaAbaContratoEstado === "informada") {
-      const iso = dataCivilRegistrada(contrato.assinaturaAbaContratoEm);
-      return iso ? formatDateBR(iso) : INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
-    }
-    return INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
+  const origem = classificarAssinaturaAba(contrato);
+  if (origem === "sem_orcamento") {
+    const iso = dataCivilRegistrada(contrato.data_inicio);
+    return iso ? formatDateBR(iso) : INICIO_CONTRATO_NAO_INFORMADO;
   }
-  const iso = dataCivilRegistrada(contrato.contrato_assinado_em);
-  return iso ? formatDateBR(iso) : INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
+  if (origem === "informada") {
+    const iso = dataCivilRegistrada(contrato.assinaturaAbaContratoEm);
+    return iso ? formatDateBR(iso) : INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
+  }
+  if (origem === "vazia") return INICIO_CONTRATO_AGUARDANDO_ASSINATURA;
+  return INICIO_CONTRATO_NAO_INFORMADO;
 }
