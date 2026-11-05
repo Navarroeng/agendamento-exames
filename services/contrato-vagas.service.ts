@@ -1,3 +1,4 @@
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   AUDITORIA_ACOES,
@@ -128,14 +129,20 @@ export async function listarVagasPorContratos(
   if (ids.length === 0) return map;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("contrato_vagas")
-    .select(SELECT_VAGA)
-    .in("contrato_id", ids)
-    .order("indice", { ascending: true });
-  if (error) throw error;
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("contrato_vagas")
+      .select(SELECT_VAGA)
+      .in("contrato_id", grupo)
+      .order("contrato_id", { ascending: true })
+      .order("indice", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
-  for (const row of data ?? []) {
+  for (const row of data) {
     const vaga = mapVaga(row as Record<string, unknown>);
     const list = map.get(vaga.contrato_id) ?? [];
     list.push(vaga);
@@ -154,14 +161,19 @@ export async function listarCpfsDesligamentoAdminAtivoPorClientes(
   for (const id of ids) map.set(id, new Set());
   if (ids.length === 0) return map;
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("colaborador_movimentacoes")
-    .select("cliente_id, cpf_digits, tipo, cancelado_em")
-    .in("cliente_id", ids)
-    .eq("tipo", TIPO_DESLIGAMENTO_ADMIN)
-    .is("cancelado_em", null);
-  if (error) throw error;
-  for (const row of data ?? []) {
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("colaborador_movimentacoes")
+      .select("cliente_id, cpf_digits, tipo, cancelado_em")
+      .in("cliente_id", grupo)
+      .eq("tipo", TIPO_DESLIGAMENTO_ADMIN)
+      .is("cancelado_em", null)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  for (const row of data) {
     const clienteId = String(
       (row as { cliente_id?: string }).cliente_id ?? ""
     ).trim();
@@ -185,12 +197,17 @@ export async function listarCpfsDemissionalAtivoPorClientes(
   for (const id of ids) map.set(id, new Set());
   if (ids.length === 0) return map;
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("cliente_id, colaborador_cpf, aso, status")
-    .in("cliente_id", ids)
-    .in("status", ["agendado", "aso_retido"]);
-  if (error) throw error;
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("agendamentos")
+      .select("cliente_id, colaborador_cpf, aso, status")
+      .in("cliente_id", grupo)
+      .in("status", ["agendado", "aso_retido"])
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
   const porCliente = new Map<
     string,
     Array<{

@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   montarFechamentoGestaoComercial,
@@ -156,21 +157,25 @@ export async function listarFechamentosGestaoComercial(): Promise<
     .replace(/\n\s*revertida_em,/, "")
     .replace(/\n\s*aprovacao_revertida_em/, "");
 
-  let { data, error } = await supabase
-    .from("orcamento_aprovacoes")
-    .select(selectFechamentos)
-    .order("aprovado_em", { ascending: false });
+  const lerFechamentos = (select: string) =>
+    lerTodosOsLotes(async (from, to) => {
+      const { data: page, error: pageError } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(select)
+        .order("aprovado_em", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (pageError) throw pageError;
+      return page ?? [];
+    });
 
-  if (error && colunaReversaoAindaNaoExiste(error)) {
-    const legado = await supabase
-      .from("orcamento_aprovacoes")
-      .select(selectFechamentosLegado)
-      .order("aprovado_em", { ascending: false });
-    data = legado.data as typeof data;
-    error = legado.error;
+  let data: unknown[];
+  try {
+    data = await lerFechamentos(selectFechamentos);
+  } catch (error) {
+    if (!colunaReversaoAindaNaoExiste(error as { message?: string })) throw error;
+    data = await lerFechamentos(selectFechamentosLegado);
   }
-
-  if (error) throw error;
 
   const rows: GestaoComercialFechamentoRow[] = [];
   for (const raw of (data ?? []) as unknown as AprovacaoQueryRow[]) {

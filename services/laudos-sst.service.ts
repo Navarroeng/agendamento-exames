@@ -1,3 +1,4 @@
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   buildLaudosSstProcesso,
@@ -126,31 +127,37 @@ export async function buscarTrackingLaudosSst(
   if (orcamentoIds.length === 0) return map;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orcamento_laudos_sst")
-    .select(LAUDOS_TRACKING_SELECT)
-    .in("orcamento_id", orcamentoIds);
+  const ler = (select: string) =>
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await supabase
+        .from("orcamento_laudos_sst")
+        .select(select)
+        .in("orcamento_id", grupo)
+        .order("orcamento_id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as unknown as OrcamentoLaudosSstRecord[];
+    });
 
-  if (error) {
-    const { data: fallback, error: fallbackError } = await supabase
-      .from("orcamento_laudos_sst")
-      .select(
+  let rows: OrcamentoLaudosSstRecord[];
+  try {
+    rows = await ler(LAUDOS_TRACKING_SELECT);
+  } catch (error) {
+    try {
+      rows = await ler(
         "orcamento_id, etapa_atual, etapas_concluidas, status, entrada_em, concluido_em, created_at, updated_at"
-      )
-      .in("orcamento_id", orcamentoIds);
-    if (fallbackError) {
-      console.warn("laudos-sst tracking indisponível:", error.message);
+      );
+    } catch {
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message?: string }).message ?? "")
+          : "";
+      console.warn("laudos-sst tracking indisponível:", message);
       return map;
     }
-    for (const row of (fallback ?? []) as unknown as OrcamentoLaudosSstRecord[]) {
-      map.set(row.orcamento_id, row);
-    }
-    return map;
   }
 
-  for (const row of (data ?? []) as unknown as OrcamentoLaudosSstRecord[]) {
-    map.set(row.orcamento_id, row);
-  }
+  for (const row of rows) map.set(row.orcamento_id, row);
   return map;
 }
 

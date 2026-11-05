@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AUDITORIA_ACAO_LABELS,
   AUDITORIA_MODULO_LABELS,
@@ -48,7 +48,10 @@ export function useAuditoriaPage() {
     []
   );
 
+  const consultaSeq = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++consultaSeq.current;
     setLoading(true);
     setError(null);
 
@@ -57,17 +60,20 @@ export function useAuditoriaPage() {
         page,
         filters,
       });
+      if (seq !== consultaSeq.current) return;
       setRecords(result.records.map(toAuditoriaRow));
       setTotal(result.total);
       setTotalPages(result.totalPages);
+      if (page > result.totalPages) setPage(result.totalPages);
     } catch (err) {
+      if (seq !== consultaSeq.current) return;
       console.error(err);
       setError("Erro ao carregar auditoria.");
       setRecords([]);
       setTotal(0);
       setTotalPages(1);
     } finally {
-      setLoading(false);
+      if (seq === consultaSeq.current) setLoading(false);
     }
   }, [page, filters]);
 

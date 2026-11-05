@@ -1,3 +1,4 @@
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import {
@@ -29,12 +30,17 @@ export async function listarServicosPontuaisPorCliente(
   if (!id) return [];
 
   const supabase = createClient();
-  const { data: orcamentos, error } = await supabase
-    .from("orcamentos")
-    .select("id, numero, status, cliente_id")
-    .eq("cliente_id", id)
-    .eq("status", "aprovado");
-  if (error) throw error;
+  const orcamentos = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("orcamentos")
+      .select("id, numero, status, cliente_id")
+      .eq("cliente_id", id)
+      .eq("status", "aprovado")
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return data ?? [];
+  });
 
   const rows = (orcamentos ?? []) as Array<{
     id: string;
@@ -43,11 +49,16 @@ export async function listarServicosPontuaisPorCliente(
   if (rows.length === 0) return [];
 
   const ids = rows.map((row) => row.id);
-  const { data: aprovacoesRaw, error: aprovacoesError } = await supabase
-    .from("orcamento_aprovacoes")
-    .select("*, orcamento_aprovacao_itens (*)")
-    .in("orcamento_id", ids);
-  if (aprovacoesError) throw aprovacoesError;
+  const aprovacoesRaw = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data, error } = await supabase
+      .from("orcamento_aprovacoes")
+      .select("*, orcamento_aprovacao_itens (*)")
+      .in("orcamento_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return data ?? [];
+  });
 
   const aprovacoesByOrcamentoId = new Map<string, OrcamentoAprovacaoRecord>();
   for (const row of (aprovacoesRaw ?? []) as OrcamentoAprovacaoRecord[]) {

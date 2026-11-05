@@ -1,3 +1,4 @@
+import { intervaloAnoIso, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   normalizeOrcamentoItensParaPersistencia,
@@ -121,17 +122,22 @@ export async function gerarNumeroOrcamento(): Promise<string> {
   return String(data);
 }
 
-export async function listarOrcamentos(limit = 500): Promise<OrcamentoRecord[]> {
+/** Orçamentos do ano civil, sem teto. A aba de mês filtra este conjunto. */
+export async function listarOrcamentos(ano: number): Promise<OrcamentoRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orcamentos")
-    .select("*")
-    .order("data_proposta", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as OrcamentoRecord[];
+  const { inicio, fimExclusivo } = intervaloAnoIso(ano);
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("orcamentos")
+      .select("*")
+      .gte("data_proposta", inicio)
+      .lt("data_proposta", fimExclusivo)
+      .order("data_proposta", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as OrcamentoRecord[];
+  });
 }
 
 export async function buscarOrcamentoComItens(

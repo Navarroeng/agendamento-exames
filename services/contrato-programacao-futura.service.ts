@@ -27,6 +27,7 @@ import {
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -70,16 +71,23 @@ export async function contarProgramacoesFuturasPorContratos(
   for (const id of contratoIds) map.set(id, 0);
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select("contrato_id")
-    .in("contrato_id", contratoIds)
-    .eq("consome_previsao_contrato", true)
-    .in("status", ["ativo", "reagendado"]);
+  const data = await lerPorIdentificadores(
+    contratoIds,
+    async (grupo, from, to) => {
+      const { data: page, error } = await supabase
+        .from("periodicos_futuros")
+        .select("contrato_id")
+        .in("contrato_id", grupo)
+        .eq("consome_previsao_contrato", true)
+        .in("status", ["ativo", "reagendado"])
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    }
+  );
 
-  if (error) throw error;
-
-  for (const row of data ?? []) {
+  for (const row of data) {
     const cid = String(row.contrato_id ?? "");
     if (!cid) continue;
     map.set(cid, (map.get(cid) ?? 0) + 1);
@@ -91,18 +99,22 @@ export async function listarProgramacoesFuturasDoContrato(
   contratoId: string
 ): Promise<PeriodicoProgramadoContrato[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select(
-      "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
-    )
-    .eq("contrato_id", contratoId)
-    .eq("consome_previsao_contrato", true)
-    .in("status", ["ativo", "reagendado"])
-    .order("proxima_data", { ascending: true });
-
-  if (error) throw error;
-  const rows = (data ?? []) as PeriodicoProgramadoContrato[];
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
+      )
+      .eq("contrato_id", contratoId)
+      .eq("consome_previsao_contrato", true)
+      .in("status", ["ativo", "reagendado"])
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  const rows = data as PeriodicoProgramadoContrato[];
   if (rows.length === 0) return [];
 
   const agIds = Array.from(
@@ -127,12 +139,18 @@ export async function listarProgramacoesFuturasDoContrato(
   >();
 
   if (agIds.length > 0) {
-    const { data: agsData } = await supabase
-      .from("agendamentos")
-      .select("id, data_agendamento, status, aso_assinado, data_aso_assinado")
-      .in("id", agIds);
+    const agsData = await lerPorIdentificadores(agIds, async (grupo, from, to) => {
+      const { data: page, error } = await supabase
+        .from("agendamentos")
+        .select("id, data_agendamento, status, aso_assinado, data_aso_assinado")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    });
 
-    for (const ag of agsData ?? []) {
+    for (const ag of agsData) {
       const dataIso = String(ag.data_agendamento ?? "").slice(0, 10);
       const st = String(ag.status ?? "");
       const assinado =
@@ -191,21 +209,20 @@ export async function listarSugestoesColaboradoresContrato(params: {
   if (!clienteId && nomes.length === 0) return [];
 
   const supabase = createClient();
-  let query = supabase
-    .from("agendamentos")
-    .select("colaborador, colaborador_cpf, cliente_nome, cliente_id")
-    .neq("status", "cancelado")
-    .order("colaborador", { ascending: true })
-    .limit(2000);
-
-  if (clienteId) {
-    query = query.eq("cliente_id", clienteId);
-  } else {
-    query = query.in("cliente_nome", nomes);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("agendamentos")
+      .select("colaborador, colaborador_cpf, cliente_nome, cliente_id")
+      .neq("status", "cancelado")
+      .order("colaborador", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (clienteId) query = query.eq("cliente_id", clienteId);
+    else query = query.in("cliente_nome", nomes);
+    const { data: page, error } = await query;
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const nomesNorm = new Set(
     nomes.map((n) => n.replace(/\s+/g, " ").toLocaleLowerCase("pt-BR"))
@@ -642,28 +659,32 @@ export async function listarPeriodicosPendentesColaborador(params: {
 
   if (!cliente || (!colaborador && !cpf)) return [];
 
-  let query = supabase
-    .from("periodicos_futuros")
-    .select("*")
-    .eq("status", "ativo")
-    .order("proxima_data", { ascending: true })
-    .limit(100);
+  const data = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("periodicos_futuros")
+      .select("*")
+      .eq("status", "ativo")
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (cpf) {
-    const masked = maskCPFInput(cpf);
-    query = query.or(
-      `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
-    );
-  } else {
-    query = query
-      .ilike("cliente_nome", cliente)
-      .ilike("colaborador", colaborador);
-  }
+    if (cpf) {
+      const masked = maskCPFInput(cpf);
+      query = query.or(
+        `colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`
+      );
+    } else {
+      query = query
+        .ilike("cliente_nome", cliente)
+        .ilike("colaborador", colaborador);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
+    const { data: page, error } = await query;
+    if (error) throw error;
+    return (page ?? []) as PeriodicoFuturoRecord[];
+  });
 
-  let rows = (data ?? []) as PeriodicoFuturoRecord[];
+  let rows = data;
   if (rows.length === 0) return [];
 
   if (cpf) {

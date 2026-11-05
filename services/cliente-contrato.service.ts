@@ -7,6 +7,7 @@ import {
   escolherAprovacaoVigente,
 } from "@/lib/cliente-contrato-inicio";
 import { centavosSalvosParaReais } from "@/lib/contrato-navarro";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { ParcelaMensalidadeRegistrada } from "@/lib/mensalidade-parcelas";
 import type {
@@ -16,19 +17,41 @@ import type {
 } from "@/lib/types";
 import { assertPodeEncerrarContrato } from "@/services/contrato-permissoes.service";
 
-export async function listarTodosContratos(
-  limit = 1000
-): Promise<ClienteContratoRecord[]> {
+async function lerPorColuna<T>(
+  ids: string[],
+  buscar: (
+    grupo: string[],
+    from: number,
+    to: number
+  ) => PromiseLike<{
+    data: T[] | null;
+    error: { message?: string; code?: string } | null;
+  }>
+): Promise<{ data: T[]; error: { message?: string; code?: string } | null }> {
+  try {
+    const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+      const resposta = await buscar(grupo, from, to);
+      if (resposta.error) throw resposta.error;
+      return resposta.data ?? [];
+    });
+    return { data, error: null };
+  } catch (error) {
+    return { data: [], error: error as { message?: string; code?: string } };
+  }
+}
+
+export async function listarTodosContratos(): Promise<ClienteContratoRecord[]> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("cliente_contratos")
-    .select("*")
-    .order("data_fim", { ascending: true, nullsFirst: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data ?? []) as ClienteContratoRecord[];
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("cliente_contratos")
+      .select("*")
+      .order("data_fim", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ClienteContratoRecord[];
+  });
 }
 
 export async function listarContratosPorCliente(
@@ -75,11 +98,22 @@ export async function complementarContratosComCobranca(
   const selectComRenovacao = `${selectAprovacaoBase}, mensalidade_renovacao_automatica`;
   const selectCompleto = `${selectComRenovacao}, mensalidade_vencimento_regra, contrato_modelo_versao, mensalidade_exame_demissional_centavos`;
   const [orcamentosRes, aprovacoesPrimeira] = await Promise.all([
-    supabase.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
-    supabase
-      .from("orcamento_aprovacoes")
-      .select(selectCompleto)
-      .in("orcamento_id", orcamentoIds),
+    lerPorColuna(orcamentoIds, (grupo, from, to) =>
+      supabase
+        .from("orcamentos")
+        .select("id, modalidade")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
+    lerPorColuna(orcamentoIds, (grupo, from, to) =>
+      supabase
+        .from("orcamento_aprovacoes")
+        .select(selectCompleto)
+        .in("orcamento_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ),
   ]);
   if (orcamentosRes.error) throw orcamentosRes.error;
   const erroPrimeira = aprovacoesPrimeira.error?.message ?? "";
@@ -89,10 +123,14 @@ export async function complementarContratosComCobranca(
       erroPrimeira
     );
   const aprovacoesRenovacao = faltaColunaNova
-    ? await supabase
-        .from("orcamento_aprovacoes")
-        .select(selectComRenovacao)
-        .in("orcamento_id", orcamentoIds)
+    ? await lerPorColuna(orcamentoIds, (grupo, from, to) =>
+        supabase
+          .from("orcamento_aprovacoes")
+          .select(selectComRenovacao)
+          .in("orcamento_id", grupo)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
     : aprovacoesPrimeira;
   const faltaColunaRenovacao =
     Boolean(aprovacoesRenovacao.error) &&
@@ -100,10 +138,14 @@ export async function complementarContratosComCobranca(
       aprovacoesRenovacao.error?.message ?? ""
     );
   const aprovacoesRes = faltaColunaRenovacao
-    ? await supabase
-        .from("orcamento_aprovacoes")
-        .select(selectAprovacaoBase)
-        .in("orcamento_id", orcamentoIds)
+    ? await lerPorColuna(orcamentoIds, (grupo, from, to) =>
+        supabase
+          .from("orcamento_aprovacoes")
+          .select(selectAprovacaoBase)
+          .in("orcamento_id", grupo)
+          .order("id", { ascending: true })
+          .range(from, to)
+      )
     : aprovacoesRenovacao;
   if (aprovacoesRes.error) throw aprovacoesRes.error;
 
@@ -150,12 +192,16 @@ export async function complementarContratosComCobranca(
   );
   const parcelasPorAprovacao = new Map<string, ParcelaMensalidadeRegistrada[]>();
   if (aprovacaoIds.length > 0) {
-    const parcelasRes = await supabase
-      .from("orcamento_mensalidade_parcelas")
-      .select(
-        "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
-      )
-      .in("aprovacao_id", aprovacaoIds);
+    const parcelasRes = await lerPorColuna(aprovacaoIds, (grupo, from, to) =>
+      supabase
+        .from("orcamento_mensalidade_parcelas")
+        .select(
+          "aprovacao_id, vigencia_inicio, vigencia_fim, numero, vencimento, valor, pago_em"
+        )
+        .in("aprovacao_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
     if (
       parcelasRes.error &&
       parcelasRes.error.code !== "42P01" &&
@@ -241,10 +287,14 @@ export async function anexarAssinaturaAbaContrato(
   if (orcamentoIds.length === 0) return contratos;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orcamento_aprovacoes")
-    .select("orcamento_id, contrato_assinado_em, revertida_em, created_at")
-    .in("orcamento_id", orcamentoIds);
+  const { data, error } = await lerPorColuna(orcamentoIds, (grupo, from, to) =>
+    supabase
+      .from("orcamento_aprovacoes")
+      .select("orcamento_id, contrato_assinado_em, revertida_em, created_at")
+      .in("orcamento_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
   if (error) throw error;
 
   const porOrcamento = new Map<
@@ -452,10 +502,14 @@ export async function mapearRenovacaoAtualDosClientes(
   if (ids.length === 0) return mapa;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("cliente_contratos")
-    .select("*")
-    .in("cliente_id", ids);
+  const { data, error } = await lerPorColuna(ids, (grupo, from, to) =>
+    supabase
+      .from("cliente_contratos")
+      .select("*")
+      .in("cliente_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
   if (error) throw error;
 
   const contratos = await complementarContratosComCobranca(

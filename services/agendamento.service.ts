@@ -23,6 +23,7 @@ import {
 import { assertMensalidadePermiteNovoAgendamento } from "@/services/agendamento-mensalidade-bloqueio.service";
 import { CLIENTE_INADIMPLENCIA_VALIDATION_MSG } from "@/lib/fatura-inadimplencia";
 import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
 import {
@@ -189,32 +190,38 @@ export async function salvarAgendamentoComExames(
   return data.id;
 }
 
-export async function listarAgendamentosComExames(
-  limit = 500
-): Promise<AgendamentoWithExames[]> {
+/**
+ * Lê todos os agendamentos autorizados, em lotes.
+ * Listagens pesquisáveis usam `listarAgendamentosPagina`.
+ */
+export async function listarAgendamentosComExames(): Promise<
+  AgendamentoWithExames[]
+> {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select(
+  return lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select(
+        `
+        *,
+        agendamento_exames (
+          id,
+          agendamento_id,
+          tipo_exame,
+          valor_cliente,
+          custo_clinica,
+          motivo_valor_zero
+        )
       `
-      *,
-      agendamento_exames (
-        id,
-        agendamento_id,
-        tipo_exame,
-        valor_cliente,
-        custo_clinica,
-        motivo_valor_zero
       )
-    `
-    )
-    .order("created_at", { ascending: false })
-    .limit(limit);
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
 
-  if (error) throw error;
-
-  return (data ?? []) as AgendamentoWithExames[];
+    if (error) throw error;
+    return (data ?? []) as AgendamentoWithExames[];
+  });
 }
 
 export async function buscarAgendamentoComExamesPorId(

@@ -4,6 +4,7 @@
  * agendamentos + colaborador_movimentacoes.
  */
 
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getContratoAtual } from "@/lib/cliente-contrato-mappers";
 import {
@@ -43,54 +44,65 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
 
   const admin = createAdminClient();
 
-  const { data: contratosRaw, error: errContratos } = await admin
-    .from("cliente_contratos")
-    .select(PORTAL_CONTRATO_SELECT)
-    .eq("cliente_id", id)
-    .order("aprovado_em", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .order("data_inicio", { ascending: false });
+  const contratosRaw = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await admin
+      .from("cliente_contratos")
+      .select(PORTAL_CONTRATO_SELECT)
+      .eq("cliente_id", id)
+      .order("aprovado_em", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return data ?? [];
+  });
 
-  if (errContratos) throw errContratos;
-
-  const contratos = (contratosRaw ?? []) as unknown as PortalContratoFonte[];
+  const contratos = contratosRaw as unknown as PortalContratoFonte[];
   const contratoAtual = getContratoAtual(
     contratos as ClienteContratoRecord[]
   );
 
   let vagas: PortalColaboradorVagaFonte[] = [];
   if (contratoAtual?.id) {
-    const { data: vagasRaw, error: errVagas } = await admin
-      .from("contrato_vagas")
-      .select(VAGA_SELECT)
-      .eq("contrato_id", contratoAtual.id);
-
-    if (errVagas) throw errVagas;
-    vagas = (vagasRaw ?? []) as PortalColaboradorVagaFonte[];
+    vagas = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await admin
+        .from("contrato_vagas")
+        .select(VAGA_SELECT)
+        .eq("contrato_id", contratoAtual.id)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as PortalColaboradorVagaFonte[];
+    });
   }
 
-  const { data: agsRaw, error: errAgs } = await admin
-    .from("agendamentos")
-    .select(AGENDAMENTO_SELECT)
-    .eq("cliente_id", id)
-    .in("status", ["agendado", "aso_retido"]);
+  const agendamentos = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await admin
+      .from("agendamentos")
+      .select(AGENDAMENTO_SELECT)
+      .eq("cliente_id", id)
+      .in("status", ["agendado", "aso_retido"])
+      .order("data_agendamento", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as PortalColaboradorAgendamentoFonte[];
+  });
 
-  if (errAgs) throw errAgs;
-
-  const agendamentos = (agsRaw ?? []) as PortalColaboradorAgendamentoFonte[];
-
-  const { data: movRaw, error: errMov } = await admin
-    .from("colaborador_movimentacoes")
-    .select(
-      "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em"
-    )
-    .eq("cliente_id", id)
-    .in("tipo", ["desligamento_admin", "admissao"])
-    .is("cancelado_em", null);
-
-  if (errMov) throw errMov;
-
-  const movimentacoes = (movRaw ?? []) as PortalColaboradorMovimentacaoFonte[];
+  const movimentacoes = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await admin
+      .from("colaborador_movimentacoes")
+      .select(
+        "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em"
+      )
+      .eq("cliente_id", id)
+      .in("tipo", ["desligamento_admin", "admissao"])
+      .is("cancelado_em", null)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as PortalColaboradorMovimentacaoFonte[];
+  });
 
   const colaboradores = consolidarPortalColaboradores({
     vagas,

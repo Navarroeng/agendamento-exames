@@ -1,3 +1,4 @@
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import {
   AUDITORIA_ACOES,
   AUDITORIA_MODULOS,
@@ -200,38 +201,35 @@ export async function listarCampanhasPorOrcamentos(
   if (orcamentoIds.length === 0) return map;
 
   const supabase = createClient();
-  let data: Array<Record<string, unknown>> | null = null;
-  let error: { message?: string; code?: string } | null = null;
-
-  const primary = await supabase
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .in("orcamento_id", orcamentoIds);
-  data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
-  error = primary.error;
-
-  if (isRiscosCampanhaSelectSchemaError(error)) {
-    const fb = await supabase
-      .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_SEM_LOGO)
-      .in("orcamento_id", orcamentoIds);
-    data = (fb.data as Array<Record<string, unknown>> | null) ?? null;
-    error = fb.error;
-    if (isRiscosCampanhaSelectSchemaError(error)) {
-      const fbLegacy = await supabase
+  const ler = (select: string) =>
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await supabase
         .from("riscos_campanhas")
-        .select(CAMPANHA_SELECT_LEGACY)
-        .in("orcamento_id", orcamentoIds);
-      data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
-      error = fbLegacy.error;
-    }
-  }
+        .select(select)
+        .in("orcamento_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
+    });
 
-  if (error) {
-    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+  let data: Array<Record<string, unknown>>;
+  try {
+    data = await ler(CAMPANHA_SELECT);
+  } catch (error) {
+    const falha = error as { message?: string; code?: string };
+    if (falha.code === "42P01" || falha.message?.includes("does not exist")) {
       return map;
     }
-    throw error;
+    if (!isRiscosCampanhaSelectSchemaError(falha)) throw error;
+    try {
+      data = await ler(CAMPANHA_SELECT_SEM_LOGO);
+    } catch (semLogo) {
+      if (!isRiscosCampanhaSelectSchemaError(semLogo as { message?: string })) {
+        throw semLogo;
+      }
+      data = await ler(CAMPANHA_SELECT_LEGACY);
+    }
   }
 
   const porOrcamento = new Map<string, RiscosCampanhaRecord[]>();
@@ -263,60 +261,48 @@ export async function listarCampanhasManuaisAtivas(): Promise<
   RiscosCampanhaRecord[]
 > {
   const supabase = createClient();
-  let data: Array<Record<string, unknown>> | null = null;
-  let error: { message?: string; code?: string } | null = null;
-
-  const primary = await supabase
-    .from("riscos_campanhas")
-    .select(CAMPANHA_SELECT)
-    .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
-    .is("orcamento_id", null)
-    .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
-    .order("created_at", { ascending: false });
-  data = (primary.data as Array<Record<string, unknown>> | null) ?? null;
-  error = primary.error;
-
-  // Migration 107 (logo_*) pode ainda não estar aplicada: nunca engolir a listagem.
-  if (isRiscosCampanhaSelectSchemaError(error)) {
-    const fbLogo = await supabase
-      .from("riscos_campanhas")
-      .select(CAMPANHA_SELECT_SEM_LOGO)
-      .eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente)
-      .is("orcamento_id", null)
-      .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
-      .order("created_at", { ascending: false });
-    data = (fbLogo.data as Array<Record<string, unknown>> | null) ?? null;
-    error = fbLogo.error;
-
-    if (isRiscosCampanhaSelectSchemaError(error)) {
-      const fbLegacy = await supabase
+  const ler = (select: string, comOrigem: boolean) =>
+    lerTodosOsLotes(async (from, to) => {
+      let query = supabase
         .from("riscos_campanhas")
-        .select(CAMPANHA_SELECT_LEGACY)
+        .select(select)
         .is("orcamento_id", null)
         .in("status", [...RISCOS_CAMPANHA_STATUS_LISTAGEM])
-        .order("created_at", { ascending: false });
-      data = (fbLegacy.data as Array<Record<string, unknown>> | null) ?? null;
-      error = fbLegacy.error;
-      if (!error && data) {
-        // LEGACY sem coluna origem: filtra no cliente quando possível.
-        data = data.filter((row) => {
-          const origem = row.origem;
-          return (
-            origem == null || origem === RISCOS_CAMPANHA_ORIGEM.manual_cliente
-          );
-        });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
+      if (comOrigem) {
+        query = query.eq("origem", RISCOS_CAMPANHA_ORIGEM.manual_cliente);
       }
-    }
-  }
+      const { data, error } = await query.range(from, to);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
+    });
 
-  if (error) {
-    if (error.code === "42P01" || error.message?.includes("does not exist")) {
+  let data: Array<Record<string, unknown>>;
+  try {
+    data = await ler(CAMPANHA_SELECT, true);
+  } catch (error) {
+    const falha = error as { message?: string; code?: string };
+    if (falha.code === "42P01" || falha.message?.includes("does not exist")) {
       return [];
     }
-    throw error;
+    if (!isRiscosCampanhaSelectSchemaError(falha)) throw error;
+    try {
+      data = await ler(CAMPANHA_SELECT_SEM_LOGO, true);
+    } catch (semLogo) {
+      const falhaLogo = semLogo as { message?: string; code?: string };
+      if (falhaLogo.code === "42P01" || falhaLogo.message?.includes("does not exist")) {
+        return [];
+      }
+      if (!isRiscosCampanhaSelectSchemaError(falhaLogo)) throw semLogo;
+      data = (await ler(CAMPANHA_SELECT_LEGACY, false)).filter((row) => {
+        const origem = row.origem;
+        return origem == null || origem === RISCOS_CAMPANHA_ORIGEM.manual_cliente;
+      });
+    }
   }
 
-  return (data ?? []).map((row) => mapCampanhaRow(row));
+  return data.map((row) => mapCampanhaRow(row));
 }
 
 export async function buscarCampanhaAtivaPorCliente(

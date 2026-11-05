@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { sortByLabel } from "@/lib/sort-by-label";
 import { contarExamesPorClinica } from "@/services/clinica-exame.service";
 import { createClient } from "@/lib/supabase/client";
@@ -24,14 +25,21 @@ async function fetchUltimoAgendamentoPorClinica(): Promise<
   const supabase = createClient();
   const map = new Map<string, string>();
 
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("clinica_nome, created_at")
-    .order("created_at", { ascending: false });
+  const linhas = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select("clinica_nome, created_at")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as Array<{
+      clinica_nome: string | null;
+      created_at: string | null;
+    }>;
+  });
 
-  if (error || !data) return map;
-
-  for (const row of data) {
+  for (const row of linhas) {
     const nome = row.clinica_nome?.trim();
     if (!nome || map.has(nome)) continue;
     if (row.created_at) map.set(nome, row.created_at);
@@ -50,16 +58,18 @@ function resolveUltimoAgendamento(
   return null;
 }
 
-export async function listarClinicas(limit = 500): Promise<ClinicaListItem[]> {
+export async function listarClinicas(): Promise<ClinicaListItem[]> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("clinicas")
-    .select("*")
-    .order("nome_fantasia", { ascending: true })
-    .limit(limit);
-
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("clinicas")
+      .select("*")
+      .order("nome_fantasia", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as ClinicaRecord[];
+  });
 
   const clinicas = sortByLabel(
     (data ?? []) as ClinicaRecord[],

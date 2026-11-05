@@ -1,3 +1,4 @@
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   validateTreinamentoPayload,
@@ -83,12 +84,17 @@ export async function buscarTreinamentosPorOrcamentoIds(
   const map = new Map<string, ImplantacaoTreinamentoRecord>();
   if (orcamentoIds.length === 0) return map;
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("implantacao_treinamentos")
-    .select("*")
-    .in("orcamento_id", orcamentoIds);
-  if (error) throw error;
-  for (const row of (data ?? []) as ImplantacaoTreinamentoRecord[]) {
+  const data = await lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("implantacao_treinamentos")
+      .select("*")
+      .in("orcamento_id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (page ?? []) as ImplantacaoTreinamentoRecord[];
+  });
+  for (const row of data) {
     map.set(row.orcamento_id, mapTreinamento(row));
   }
   return map;

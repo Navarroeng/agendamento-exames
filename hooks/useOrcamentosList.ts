@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { OrcamentoRecord } from "@/lib/orcamento-types";
 import { listarOrcamentos } from "@/services/orcamento.service";
 
-export function useOrcamentosList() {
+export function useOrcamentosList(ano: number) {
   const [orcamentos, setOrcamentos] = useState<OrcamentoRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function useOrcamentosList() {
       setLoading(true);
       setError(null);
       try {
-        const data = await listarOrcamentos();
+        const data = await listarOrcamentos(ano);
         if (!cancelled) setOrcamentos(data);
       } catch (err) {
         console.error("Erro ao carregar orçamentos:", err);
@@ -42,7 +42,7 @@ export function useOrcamentosList() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [ano, refreshKey]);
 
   return { orcamentos, loading, error, refresh };
 }

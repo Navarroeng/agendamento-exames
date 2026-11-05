@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
@@ -9,7 +9,6 @@ import {
   EMPTY_PERIODICO_FUTURO_FILTERS,
   extractPeriodicoFilterOptions,
   filterPeriodicosFuturosPorMes,
-  listPeriodicoAnosDisponiveis,
   periodicoViewFromSearchParams,
   resolveInitialMesPeriodicos,
   toPeriodicoFuturoRow,
@@ -43,6 +42,7 @@ import type {
 import {
   atualizarProximaDataPeriodico,
   cancelarPeriodicoFuturoManual,
+  listarAnosPeriodicos,
   listarPeriodicosFuturos,
   marcarPeriodicoReagendado,
   periodicoTemAgendamentoAtivoVinculado,
@@ -61,6 +61,7 @@ export function usePeriodicosFuturosPage() {
   const auditContext = useAuditoriaUsuario();
   const auditOptions = useMemo(() => ({ auditContext }), [auditContext]);
   const [records, setRecords] = useState<PeriodicoFuturoRow[]>([]);
+  const [anosDisponiveis, setAnosDisponiveis] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,31 +91,34 @@ export function usePeriodicosFuturosPage() {
   const [cancelarTemAgendamentoAtivo, setCancelarTemAgendamentoAtivo] =
     useState(false);
 
+  const consultaSeq = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++consultaSeq.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await listarPeriodicosFuturos();
+      const [anos, data] = await Promise.all([
+        listarAnosPeriodicos(),
+        listarPeriodicosFuturos({ ano: mesSelecionado.year }),
+      ]);
+      if (seq !== consultaSeq.current) return;
+      setAnosDisponiveis(anos);
       setRecords(data.map(toPeriodicoFuturoRow));
     } catch (err) {
+      if (seq !== consultaSeq.current) return;
       console.error(err);
       setError("Não foi possível carregar os periódicos futuros.");
       setRecords([]);
     } finally {
-      setLoading(false);
+      if (seq === consultaSeq.current) setLoading(false);
     }
-  }, []);
+  }, [mesSelecionado.year]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const anosDisponiveis = useMemo(
-    () => listPeriodicoAnosDisponiveis(records),
-    [records]
-  );
-
-  // Garante que o ano selecionado exista no seletor após o carregamento.
   useEffect(() => {
     if (anosDisponiveis.length === 0) return;
     if (!anosDisponiveis.includes(mesSelecionado.year)) {

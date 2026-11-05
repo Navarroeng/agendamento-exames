@@ -1,3 +1,4 @@
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   consolidarResultadosCampanha,
@@ -122,13 +123,21 @@ export async function obterResultadosCampanhaRiscos(
 
   let respostas: RespostaAvaliacaoConsolidacao[] = [];
   if (sessaoIds.length > 0) {
-    const { data: respostasRaw, error: errRespostas } = await supabase
-      .from("riscos_avaliacao_respostas")
-      .select("sessao_id, campanha_id, pergunta_id, alternativa_id")
-      .eq("campanha_id", id)
-      .in("sessao_id", sessaoIds);
+    const respostasRaw = await lerPorIdentificadores(
+      sessaoIds,
+      async (grupo, from, to) => {
+        const { data, error } = await supabase
+          .from("riscos_avaliacao_respostas")
+          .select("sessao_id, campanha_id, pergunta_id, alternativa_id")
+          .eq("campanha_id", id)
+          .in("sessao_id", grupo)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      }
+    );
 
-    if (errRespostas) throw errRespostas;
     respostas = (respostasRaw ?? []) as RespostaAvaliacaoConsolidacao[];
   }
 

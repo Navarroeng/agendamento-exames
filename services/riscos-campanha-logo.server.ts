@@ -4,6 +4,7 @@
  * storage da campanha → logo do onboarding da empresa → null.
  */
 
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ORCAMENTO_ONBOARDING_BUCKET } from "@/lib/orcamento-onboarding-files";
 import { RISCOS_LISTA_PRESENCA_BUCKET } from "@/lib/riscos-lista-presenca";
@@ -54,13 +55,23 @@ async function logoOnboardingPorCliente(
   const id = clienteId.trim();
   if (!id) return null;
   const admin = createAdminClient();
-  const { data: orcs, error } = await admin
-    .from("orcamentos")
-    .select("id")
-    .eq("cliente_id", id)
-    .order("created_at", { ascending: false })
-    .limit(20);
-  if (error || !orcs?.length) return null;
+  let orcs: Array<{ id?: string }>;
+  try {
+    orcs = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await admin
+        .from("orcamentos")
+        .select("id")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id?: string }>;
+    });
+  } catch {
+    return null;
+  }
+  if (orcs.length === 0) return null;
   for (const row of orcs) {
     const oid = String((row as { id?: string }).id ?? "");
     const url = await logoOnboardingPorOrcamento(oid);

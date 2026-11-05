@@ -4,6 +4,7 @@
  * NUNCA retorna faturas de outro cliente.
  */
 
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   faturaComItensToPortalDetalhe,
@@ -56,32 +57,31 @@ export async function listarFaturasPortal(
 }> {
   const admin = createAdminClient();
 
+  const lerFaturas = async (
+    restringir: (query: any) => any
+  ): Promise<FaturaRecord[]> =>
+    lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await restringir(
+        admin
+          .from("faturas")
+          .select(FATURA_SELECT_LISTAGEM)
+          .eq("tipo", "cliente")
+          .in("status", PORTAL_FATURA_STATUS_INCLUIDOS)
+          .order("data_vencimento", { ascending: false })
+          .order("id", { ascending: false })
+      ).range(from, to);
+      if (error) throw error;
+      return (data ?? []) as FaturaRecord[];
+    });
+
   // Consulta por referencia_id (campo UUID — mais seguro)
-  const { data: porId, error: errId } = await admin
-    .from("faturas")
-    .select(FATURA_SELECT_LISTAGEM)
-    .eq("tipo", "cliente")
-    .eq("referencia_id", clienteId)
-    .in("status", PORTAL_FATURA_STATUS_INCLUIDOS)
-    .order("data_vencimento", { ascending: false });
-
-  if (errId) throw errId;
-
-  let rows = (porId ?? []) as FaturaRecord[];
+  let rows = await lerFaturas((query) => query.eq("referencia_id", clienteId));
 
   // Se não encontrou por ID, tenta por nome (clientes sem referencia_id ainda)
   if (rows.length === 0) {
-    const { data: porNome, error: errNome } = await admin
-      .from("faturas")
-      .select(FATURA_SELECT_LISTAGEM)
-      .eq("tipo", "cliente")
-      .eq("referencia_nome", clienteNome)
-      .is("referencia_id", null)
-      .in("status", PORTAL_FATURA_STATUS_INCLUIDOS)
-      .order("data_vencimento", { ascending: false });
-
-    if (errNome) throw errNome;
-    rows = (porNome ?? []) as FaturaRecord[];
+    rows = await lerFaturas((query) =>
+      query.eq("referencia_nome", clienteNome).is("referencia_id", null)
+    );
   }
 
   // Segunda validação de isolamento (defesa em profundidade)

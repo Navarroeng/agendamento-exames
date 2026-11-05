@@ -1,31 +1,37 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { sortByNome } from "@/lib/sort-by-label";
 import { createClient } from "@/lib/supabase/client";
 import type { ExameCatalogInsert, ExameRecord } from "@/lib/types";
 
 export async function listarExamesAtivos(): Promise<ExameRecord[]> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("exames")
-    .select("*")
-    .eq("ativo", true)
-    .order("nome", { ascending: true });
-
-  if (error) throw error;
-  return sortByNome((data ?? []) as ExameRecord[]);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("exames")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ExameRecord[];
+  });
+  return sortByNome(rows);
 }
 
-export async function listarExamesCatalogo(limit = 500): Promise<ExameRecord[]> {
+export async function listarExamesCatalogo(): Promise<ExameRecord[]> {
   const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("exames")
-    .select("*")
-    .order("nome", { ascending: true })
-    .limit(limit);
-
-  if (error) throw error;
-  return sortByNome((data ?? []) as ExameRecord[]);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("exames")
+      .select("*")
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ExameRecord[];
+  });
+  return sortByNome(rows);
 }
 
 export async function buscarExamePorId(id: string): Promise<ExameRecord | null> {

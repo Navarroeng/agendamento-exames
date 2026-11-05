@@ -394,9 +394,13 @@ test("UI do histórico usa combobox controlado, sem datalist nativo", () => {
     "formulário não passou a incluir inativas"
   );
   assert(
-    /listarAgendamentosComExames\s*=\s*500|limit\s*=\s*500/.test(agendamentoService) ||
-      agendamentoService.includes("listarAgendamentosComExames(limit = 500)"),
-    "limit 500 do histórico permanece"
+    agendamentoService.includes("listarAgendamentosPagina") ||
+      agendamentoService.includes("lerTodosOsLotes"),
+    "histórico de agendamentos não usa mais o teto fixo de 500"
+  );
+  assert(
+    !/listarAgendamentosComExames\(\s*limit\s*=\s*500/.test(agendamentoService),
+    "listarAgendamentosComExames não corta em 500"
   );
 });
 

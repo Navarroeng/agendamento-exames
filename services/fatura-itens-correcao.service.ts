@@ -1,3 +1,4 @@
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import {
   isAgendamentoDaEmpresa,
@@ -17,23 +18,26 @@ export type CorrecaoFaturaItensResultado = {
 export async function corrigirItensFaturaClienteInconsistentes(): Promise<CorrecaoFaturaItensResultado> {
   const supabase = createClient();
 
-  const [
-    { data: clientesRows, error: cErr },
-    { data: faturasCliente, error: fErr },
-  ] = await Promise.all([
-    supabase.from("clientes").select("id, nome, cnpj").limit(5000),
-    supabase
+  const catalog = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("id, nome, cnpj")
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as ClienteCatalogItem[];
+  });
+
+  const faturas = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
       .from("faturas")
       .select("id, referencia_nome, referencia_id, status")
       .eq("tipo", "cliente")
-      .limit(5000),
-  ]);
-
-  if (cErr) throw cErr;
-  if (fErr) throw fErr;
-
-  const catalog = (clientesRows ?? []) as ClienteCatalogItem[];
-  const faturas = faturasCliente ?? [];
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return data ?? [];
+  });
   if (faturas.length === 0) {
     return { faturasAfetadas: 0, itensRemovidos: 0 };
   }
@@ -50,15 +54,26 @@ export async function corrigirItensFaturaClienteInconsistentes(): Promise<Correc
   );
 
   const faturaIds = Array.from(faturaById.keys());
-  const { data: itens, error: iErr } = await supabase
-    .from("fatura_itens")
-    .select("id, fatura_id, agendamento_id")
-    .in("fatura_id", faturaIds)
-    .not("agendamento_id", "is", null)
-    .limit(20000);
-  if (iErr) throw iErr;
-
-  const rows = itens ?? [];
+  const rows: Array<{
+    id: string;
+    fatura_id: string;
+    agendamento_id: string | null;
+  }> = [];
+  for (let i = 0; i < faturaIds.length; i += 100) {
+    const ids = faturaIds.slice(i, i + 100);
+    const lote = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await supabase
+        .from("fatura_itens")
+        .select("id, fatura_id, agendamento_id")
+        .in("fatura_id", ids)
+        .not("agendamento_id", "is", null)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as typeof rows;
+    });
+    rows.push(...lote);
+  }
   if (rows.length === 0) {
     return { faturasAfetadas: 0, itensRemovidos: 0 };
   }
@@ -66,21 +81,29 @@ export async function corrigirItensFaturaClienteInconsistentes(): Promise<Correc
   const agIds = Array.from(
     new Set(rows.map((r) => String(r.agendamento_id)).filter(Boolean))
   );
-  const { data: ags, error: aErr } = await supabase
-    .from("agendamentos")
-    .select("id, cliente_nome, cliente_id")
-    .in("id", agIds);
-  if (aErr) throw aErr;
-
-  const agById = new Map(
-    (ags ?? []).map((a) => [
-      String(a.id),
-      {
+  const agById = new Map<
+    string,
+    { cliente_id: string | null; cliente_nome: string }
+  >();
+  for (let i = 0; i < agIds.length; i += 100) {
+    const ids = agIds.slice(i, i + 100);
+    const lote = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("id, cliente_nome, cliente_id")
+        .in("id", ids)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    });
+    for (const a of lote) {
+      agById.set(String(a.id), {
         cliente_id: (a.cliente_id as string | null) ?? null,
         cliente_nome: String(a.cliente_nome ?? ""),
-      },
-    ])
-  );
+      });
+    }
+  }
 
   const toDelete: string[] = [];
   const affectedFaturas = new Set<string>();
@@ -115,11 +138,16 @@ export async function corrigirItensFaturaClienteInconsistentes(): Promise<Correc
   }
 
   for (const faturaId of Array.from(affectedFaturas)) {
-    const { data: remaining, error: rErr } = await supabase
-      .from("fatura_itens")
-      .select("valor_total")
-      .eq("fatura_id", faturaId);
-    if (rErr) throw rErr;
+    const remaining = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await supabase
+        .from("fatura_itens")
+        .select("valor_total")
+        .eq("fatura_id", faturaId)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    });
     const valorTotal = (remaining ?? []).reduce(
       (sum, item) => sum + Number(item.valor_total),
       0

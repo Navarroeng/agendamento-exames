@@ -85,7 +85,7 @@ export function AgendamentoPage() {
     filters,
     filterOptions,
     filtersExpanded,
-    filteredAgendamentos,
+    totalFiltrados,
     paginatedRows,
     page,
     totalPages,
@@ -250,7 +250,7 @@ export function AgendamentoPage() {
         <AgendamentosFilters
           filters={filters}
           options={filterOptions}
-          totalFiltrados={filteredAgendamentos.length}
+          totalFiltrados={totalFiltrados}
           expanded={filtersExpanded}
           onToggle={toggleFilters}
           onChange={handleFilterChange}
@@ -265,11 +265,11 @@ export function AgendamentoPage() {
         sort={tableSort}
         onSortColumn={handleSortColumn}
         paginationSlot={
-          !loading && !error && filteredAgendamentos.length > 0 ? (
+          !loading && !error && totalFiltrados > 0 ? (
             <AgendamentosPagination
               page={page}
               totalPages={totalPages}
-              totalItems={filteredAgendamentos.length}
+              totalItems={totalFiltrados}
               pageSize={AGENDAMENTOS_PAGE_SIZE}
               onPageChange={setPage}
             />

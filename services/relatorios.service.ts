@@ -22,10 +22,10 @@ export interface RelatoriosData {
 export async function carregarDadosRelatorios(): Promise<RelatoriosData> {
   const [agendamentos, agendamentosCustosClinicas, faturas, contratos, clientes] =
     await Promise.all([
-      listarAgendamentosComExames(1000),
+      listarAgendamentosComExames(),
       listarAgendamentosParaFatura(),
-      listarFaturas(500),
-      listarTodosContratos(1000),
+      listarFaturas(),
+      listarTodosContratos(),
       listarClientesParaSelect(),
     ]);
 

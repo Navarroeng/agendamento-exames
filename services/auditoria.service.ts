@@ -8,6 +8,7 @@ import {
   mapHistoricoAcaoToAuditoria,
   type RegistrarAuditoriaInput,
 } from "@/lib/auditoria";
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { AuditoriaRecord } from "@/lib/types";
 
@@ -120,6 +121,7 @@ export async function listarAuditoriaPaginada(
     .from("auditoria_sistema")
     .select(LIST_COLUMNS, { count: "exact" })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(from, to);
 
   if (filters.dataInicio) {
@@ -159,20 +161,26 @@ export async function listarAuditoriaPaginada(
   };
 }
 
-export async function listarAuditoriaUsuariosFiltro(
-  limit = 100
-): Promise<Array<{ email: string; nome: string }>> {
+export async function listarAuditoriaUsuariosFiltro(): Promise<
+  Array<{ email: string; nome: string }>
+> {
   const supabase = createClient();
 
   try {
-    const { data: perfis, error: perfilErr } = await supabase
-      .from("perfis_usuarios")
-      .select("email, nome")
-      .eq("ativo", true)
-      .in("perfil", ["admin", "operacional"])
-      .order("nome", { ascending: true });
+    const perfis = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await supabase
+        .from("perfis_usuarios")
+        .select("email, nome")
+        .eq("ativo", true)
+        .in("perfil", ["admin", "operacional"])
+        .order("nome", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    });
 
-    if (!perfilErr && Array.isArray(perfis) && perfis.length > 0) {
+    if (perfis.length > 0) {
       const map = new Map<string, string>();
       for (const p of perfis) {
         const email = String(p.email ?? "").trim();
@@ -184,23 +192,29 @@ export async function listarAuditoriaUsuariosFiltro(
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
     }
   } catch (err) {
-    console.warn("[auditoria] Falha ao listar de perfis_usuarios, tentando auditoria_sistema:", err);
+    console.warn(
+      "[auditoria] Falha ao listar de perfis_usuarios, tentando auditoria_sistema:",
+      err
+    );
   }
 
-  const { data, error } = await supabase
-    .from("auditoria_sistema")
-    .select("usuario_email, usuario_nome")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await supabase
+      .from("auditoria_sistema")
+      .select("usuario_email, usuario_nome")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   const map = new Map<string, string>();
-  (data ?? []).forEach((row) => {
+  for (const row of data) {
     const email = String(row.usuario_email ?? "").trim();
     const nome = String(row.usuario_nome ?? "").trim();
     if (email && !map.has(email)) map.set(email, nome || email);
-  });
+  }
 
   return Array.from(map.entries())
     .map(([email, nome]) => ({ email, nome }))

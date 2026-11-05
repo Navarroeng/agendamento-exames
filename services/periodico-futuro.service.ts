@@ -3,6 +3,7 @@ import {
   AUDITORIA_MODULOS,
   type AuditoriaUsuarioContext,
 } from "@/lib/auditoria";
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodicoFuturoRecord } from "@/lib/types";
 import { registrarAuditoria } from "@/services/auditoria.service";
@@ -17,7 +18,10 @@ import {
 } from "@/lib/cargo-periodico";
 import { ORIGEM_PERIODICO_IMPLANTACAO } from "@/lib/contrato-programacao-futura";
 import { efeitoCancelamentoAsoSobrePeriodico } from "@/lib/periodico-cancelamento";
-import { canEditarProximaDataPeriodico } from "@/lib/periodicos-futuro";
+import {
+  canEditarProximaDataPeriodico,
+  listPeriodicoAnosDisponiveis,
+} from "@/lib/periodicos-futuro";
 import {
   nomesColaboradorEquivalentes,
   normalizeIdentidadeColaborador,
@@ -71,22 +75,53 @@ function stripCargoJoin(
   return rest;
 }
 
-export async function listarPeriodicosFuturos(
-  limit = 2000
-): Promise<PeriodicoFuturoRecord[]> {
+export async function listarAnosPeriodicos(): Promise<number[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("periodicos_futuros")
-    .select("*, cargos(validade_periodico_meses)")
-    .order("proxima_data", { ascending: true })
-    .limit(limit);
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await supabase
+      .from("periodicos_futuros")
+      .select("proxima_data, data_prevista_original, status")
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as Pick<
+      PeriodicoFuturoRecord,
+      "proxima_data" | "data_prevista_original" | "status"
+    >[];
+  });
+  return listPeriodicoAnosDisponiveis(rows);
+}
 
-  if (error) throw error;
+export async function listarPeriodicosFuturos(params?: {
+  /** Limite exclusivo de `proxima_data`. Usado pelo painel. */
+  proximaDataAntesDe?: string;
+  /** Ano civil da obrigação. A página não baixa os demais anos. */
+  ano?: number;
+}): Promise<PeriodicoFuturoRecord[]> {
+  const supabase = createClient();
+  const antesDe = params?.proximaDataAntesDe?.slice(0, 10) || null;
+  const ano = params?.ano;
+  const inicioAno = ano ? `${ano}-01-01` : null;
+  const fimAno = ano ? `${ano + 1}-01-01` : null;
+  const rows = await lerTodosOsLotes(async (from, to) => {
+    let query = supabase
+      .from("periodicos_futuros")
+      .select("*, cargos(validade_periodico_meses)")
+      .order("proxima_data", { ascending: true })
+      .order("id", { ascending: true });
+    if (antesDe) query = query.lt("proxima_data", antesDe);
+    if (inicioAno && fimAno) {
+      query = query.or(
+        `and(proxima_data.gte.${inicioAno},proxima_data.lt.${fimAno}),and(status.eq.reagendado,data_prevista_original.gte.${inicioAno},data_prevista_original.lt.${fimAno})`
+      );
+    }
+    const { data, error } = await query.range(from, to);
+    if (error) throw error;
+    return (data ?? []) as PeriodicoFuturoWithCargo[];
+  });
 
   return anexarDatasAgendamentoVinculado(
-    ((data ?? []) as PeriodicoFuturoWithCargo[])
-      .filter(deveListarPeriodico)
-      .map(stripCargoJoin)
+    rows.filter(deveListarPeriodico).map(stripCargoJoin)
   );
 }
 
@@ -107,14 +142,28 @@ async function anexarDatasAgendamentoVinculado(
   if (ids.length === 0) return rows;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("id, data_agendamento, status")
-    .in("id", ids);
-  if (error) throw error;
+  const encontrados: Array<{
+    id: string;
+    data_agendamento: string | null;
+    status: string | null;
+  }> = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("agendamentos")
+      .select("id, data_agendamento, status")
+      .in("id", ids.slice(i, i + 200));
+    if (error) throw error;
+    encontrados.push(
+      ...((data ?? []) as Array<{
+        id: string;
+        data_agendamento: string | null;
+        status: string | null;
+      }>)
+    );
+  }
 
   const porId = new Map(
-    (data ?? []).map((row) => [
+    encontrados.map((row) => [
       String(row.id),
       {
         data: String(row.data_agendamento ?? "").slice(0, 10),
@@ -178,15 +227,20 @@ export async function criarPeriodicosDeAgendamento(
   let jaExisteObrigacaoEquivalente = false;
   if (cpf) {
     const masked = maskCPFInput(cpf);
-    const { data: existentes, error: eqErr } = await supabase
-      .from("periodicos_futuros")
-      .select(
-        "id, agendamento_id, proxima_data, data_prevista_original, status, colaborador_cpf"
-      )
-      .in("status", ["ativo", "reagendado"])
-      .or(`colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`);
-    if (eqErr) throw eqErr;
-    jaExisteObrigacaoEquivalente = ((existentes ?? []) as Array<{
+    const existentes = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error: eqErr } = await supabase
+        .from("periodicos_futuros")
+        .select(
+          "id, agendamento_id, proxima_data, data_prevista_original, status, colaborador_cpf"
+        )
+        .in("status", ["ativo", "reagendado"])
+        .or(`colaborador_cpf.eq.${cpf},colaborador_cpf.eq."${masked}"`)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (eqErr) throw eqErr;
+      return page ?? [];
+    });
+    jaExisteObrigacaoEquivalente = (existentes as Array<{
       agendamento_id?: string | null;
       proxima_data: string;
       data_prevista_original?: string | null;
@@ -423,12 +477,17 @@ export async function periodicoTemAgendamentoAtivoVinculado(
   const ids = Array.from(new Set(agendamentoIds.map((id) => id.trim()).filter(Boolean)));
   if (ids.length === 0) return false;
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("id, status")
-    .in("id", ids);
-  if (error) throw error;
-  return (data ?? []).some((row) => String(row.status ?? "") !== "cancelado");
+  const data = await lerPorIdentificadores(ids, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("agendamentos")
+      .select("id, status")
+      .in("id", grupo)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
+  return data.some((row) => String(row.status ?? "") !== "cancelado");
 }
 
 export async function atualizarProximaDataPeriodico(
@@ -574,13 +633,18 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     throw new PeriodicoCpfConflitoError(conflito);
   }
 
-  const { data: grupoRows, error: grupoErr } = await supabase
-    .from("periodicos_futuros")
-    .select(
-      "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
-    )
-    .in("id", ids);
-  if (grupoErr) throw grupoErr;
+  const grupoRows = await lerPorIdentificadores(ids, async (grupoIds, from, to) => {
+    const { data: page, error: grupoErr } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
+      )
+      .in("id", grupoIds)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (grupoErr) throw grupoErr;
+    return page ?? [];
+  });
   const grupo = (grupoRows ?? []) as Array<{
     id: string;
     agendamento_id: string | null;
@@ -605,13 +669,18 @@ export async function regularizarCpfPeriodicosFuturos(params: {
     params.cargoNome ?? grupo[0].cargo_nome
   );
 
-  const { data: irmaos, error: irmaosErr } = await supabase
-    .from("periodicos_futuros")
-    .select(
-      "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
-    )
-    .eq("cliente_nome", grupo[0].cliente_nome);
-  if (irmaosErr) throw irmaosErr;
+  const irmaos = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error: irmaosErr } = await supabase
+      .from("periodicos_futuros")
+      .select(
+        "id, agendamento_id, contrato_id, cliente_nome, colaborador, cargo_id, cargo_nome, colaborador_cpf"
+      )
+      .eq("cliente_nome", grupo[0].cliente_nome)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (irmaosErr) throw irmaosErr;
+    return page ?? [];
+  });
 
   const idsParaAtualizar = new Set(ids);
   const agendamentoIds = new Set<string>();
@@ -652,11 +721,19 @@ export async function regularizarCpfPeriodicosFuturos(params: {
   if (updPerErr) throw updPerErr;
 
   if (agendamentoIds.size > 0) {
-    const { data: ags, error: agLoadErr } = await supabase
-      .from("agendamentos")
-      .select("id, colaborador_cpf")
-      .in("id", Array.from(agendamentoIds));
-    if (agLoadErr) throw agLoadErr;
+    const ags = await lerPorIdentificadores(
+      Array.from(agendamentoIds),
+      async (grupoIds, from, to) => {
+        const { data: page, error: agLoadErr } = await supabase
+          .from("agendamentos")
+          .select("id, colaborador_cpf")
+          .in("id", grupoIds)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (agLoadErr) throw agLoadErr;
+        return page ?? [];
+      }
+    );
     const agsSemCpf = (ags ?? []).filter(
       (row) => !isValidCPF(row.colaborador_cpf as string | null)
     );

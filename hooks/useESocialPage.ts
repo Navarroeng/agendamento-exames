@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useHistoricoUsuario, useAuditoriaUsuario } from "@/contexts/AuthContext";
@@ -12,12 +12,9 @@ import {
 } from "@/lib/agendamento-datetime";
 import type { AgendamentoFaturaBloqueio } from "@/lib/agendamento-fatura-bloqueio";
 import {
-  ESOCIAL_PAGE_SIZE,
   ESOCIAL_VISUAL_STATUS_LABELS,
-  computeESocialSummary,
   esocialFiltersFromSearchParams,
   extractESocialFilterOptions,
-  filterAgendamentosESocial,
   getDefaultESocialFilters,
   getESocialVisualStatusSemCancelamento,
   isEsocialEnvioCancelado,
@@ -32,7 +29,6 @@ import {
 } from "@/lib/listagem-meses";
 import {
   cycleESocialTableSort,
-  orderESocialForTable,
   type ESocialTableSortColumn,
   type ESocialTableSortState,
 } from "@/lib/esocial-table-sort";
@@ -47,13 +43,16 @@ import {
   isEsocialReciboDuplicadoError,
   type EsocialReciboDuplicadoInfo,
 } from "@/lib/esocial-recibo-duplicidade";
-import { useAgendamentosList } from "@/hooks/useAgendamentosList";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
 import {
   atualizarEnvioEsocial,
   cancelarEnvioEsocial,
 } from "@/services/agendamento.service";
+import {
+  contarResumoEsocial,
+  listarAgendamentosEsocialPagina,
+} from "@/services/agendamento-lista.service";
 import {
   registrarTentativaReciboEsocialDuplicado,
   verificarReciboEsocialDuplicado,
@@ -69,16 +68,39 @@ export function useESocialPage() {
   const searchParams = useSearchParams();
   const usuario = useHistoricoUsuario();
   const auditContext = useAuditoriaUsuario();
-  const {
-    agendamentos,
-    loading,
-    error,
-    refresh,
-    reloadAgendamentos,
-    updateAgendamentoInList,
-    getById,
-  } = useAgendamentosList();
+  const [agendamentos, setAgendamentos] = useState<AgendamentoWithExames[]>([]);
+  const [totalFiltrados, setTotalFiltrados] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({
+    totalElegivel: 0,
+    pendentes: 0,
+    enviarUrgente: 0,
+    enviados: 0,
+    cancelados: 0,
+    percentualEnviado: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const consultaSeq = useRef(0);
   const { clientes } = useClientesList();
+
+  const refresh = useCallback(() => {
+    setRefreshKey((key) => key + 1);
+  }, []);
+  const reloadAgendamentos = refresh;
+  const updateAgendamentoInList = useCallback(
+    (id: string, partial: Partial<AgendamentoWithExames>) => {
+      setAgendamentos((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...partial } : item))
+      );
+    },
+    []
+  );
+  const getById = useCallback(
+    (id: string) => agendamentos.find((item) => item.id === id) ?? null,
+    [agendamentos]
+  );
 
   const [filters, setFilters] = useState<ESocialFilters>(
     () => esocialFiltersFromSearchParams(searchParams).filters
@@ -144,54 +166,50 @@ export function useESocialPage() {
     };
   }, [agendamentos, clientes]);
 
-  const filteredAgendamentos = useMemo(
-    () => filterAgendamentosESocial(agendamentos, filters),
-    [agendamentos, filters]
-  );
+  const filteredAgendamentos = agendamentos;
+  const orderedAgendamentos = agendamentos;
+  const paginatedAgendamentos = agendamentos;
 
-  const orderedAgendamentos = useMemo(
-    () => orderESocialForTable(filteredAgendamentos, tableSort),
-    [filteredAgendamentos, tableSort]
-  );
-
-  const periodAgendamentos = useMemo(
-    () =>
-      filterAgendamentosESocial(agendamentos, {
-        ...filters,
-        statusEsocial: "todos",
+  useEffect(() => {
+    const seq = ++consultaSeq.current;
+    setLoading(true);
+    setError(null);
+    void Promise.all([
+      listarAgendamentosEsocialPagina({
+        filters,
+        page,
+        sort: tableSort,
       }),
-    [
-      agendamentos,
-      filters.cliente,
-      filters.colaborador,
-      filters.mesReferencia,
-      filters.dataInicio,
-      filters.dataFim,
-    ]
-  );
-
-  const summary = useMemo(
-    () => computeESocialSummary(periodAgendamentos),
-    [periodAgendamentos]
-  );
-
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(orderedAgendamentos.length / ESOCIAL_PAGE_SIZE)),
-    [orderedAgendamentos.length]
-  );
-
-  const paginatedAgendamentos = useMemo(() => {
-    const start = (page - 1) * ESOCIAL_PAGE_SIZE;
-    return orderedAgendamentos.slice(start, start + ESOCIAL_PAGE_SIZE);
-  }, [orderedAgendamentos, page]);
+      contarResumoEsocial(filters),
+    ])
+      .then(([result, resumo]) => {
+        if (seq !== consultaSeq.current) return;
+        setAgendamentos(result.records);
+        setTotalFiltrados(result.total);
+        setTotalPages(result.totalPages);
+        setSummary(resumo);
+        if (page > result.totalPages) setPage(result.totalPages);
+      })
+      .catch((err) => {
+        if (seq !== consultaSeq.current) return;
+        console.error("Erro ao carregar e-Social:", err);
+        const message =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Erro ao carregar e-Social";
+        setError(message);
+        setAgendamentos([]);
+        setTotalFiltrados(0);
+        setTotalPages(1);
+      })
+      .finally(() => {
+        if (seq === consultaSeq.current) setLoading(false);
+      });
+  }, [filters, page, tableSort, refreshKey]);
 
   useEffect(() => {
     setPage(1);
   }, [filters]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const mesSelecionado = useMemo<YearMonth>(() => {
     return (
@@ -616,6 +634,7 @@ export function useESocialPage() {
     filtersExpanded,
     filterOptions,
     filteredAgendamentos,
+    totalFiltrados,
     orderedAgendamentos,
     paginatedAgendamentos,
     summary,

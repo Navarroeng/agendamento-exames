@@ -3,6 +3,7 @@
  * Não consulta sessões, vínculos nem respostas.
  */
 
+import { lerPorIdentificadores, lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   montarEmpresasPortalPreview,
@@ -202,12 +203,16 @@ async function carregarParticipantesPortal(
   const porCampanha = new Map<string, PortalParticipanteFonte[]>();
   if (campanhaIds.length === 0) return porCampanha;
 
-  const { data, error } = await admin
-    .from("riscos_campanha_participantes")
-    .select(PARTICIPANTE_SELECT)
-    .in("campanha_id", campanhaIds);
-
-  if (error) throw error;
+  const data = await lerTodosOsLotes(async (from, to) => {
+    const { data: page, error } = await admin
+      .from("riscos_campanha_participantes")
+      .select(PARTICIPANTE_SELECT)
+      .in("campanha_id", campanhaIds)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
   for (const row of data ?? []) {
     const campanhaId = String(
@@ -277,20 +282,33 @@ async function complementarCobrancaPortal(
   );
   if (orcamentoIds.length === 0) return contratos;
 
-  const [orcamentosRes, aprovacoesRes] = await Promise.all([
-    admin.from("orcamentos").select("id, modalidade").in("id", orcamentoIds),
-    admin
-      .from("orcamento_aprovacoes")
-      .select(
-        "orcamento_id, contrato_assinado, mensalidade_pagamento, procuracao_status, revertida_em, created_at"
-      )
-      .in("orcamento_id", orcamentoIds),
+  const [orcamentos, aprovacoes] = await Promise.all([
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await admin
+        .from("orcamentos")
+        .select("id, modalidade")
+        .in("id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }),
+    lerPorIdentificadores(orcamentoIds, async (grupo, from, to) => {
+      const { data, error } = await admin
+        .from("orcamento_aprovacoes")
+        .select(
+          "orcamento_id, contrato_assinado, mensalidade_pagamento, procuracao_status, revertida_em, created_at"
+        )
+        .in("orcamento_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return data ?? [];
+    }),
   ]);
-  if (orcamentosRes.error) throw orcamentosRes.error;
-  if (aprovacoesRes.error) throw aprovacoesRes.error;
 
   const modalidadePorOrcamento = new Map<string, string | null>();
-  for (const row of orcamentosRes.data ?? []) {
+  for (const row of orcamentos) {
     modalidadePorOrcamento.set(
       String(row.id),
       (row.modalidade as string | null) ?? null
@@ -306,7 +324,7 @@ async function complementarCobrancaPortal(
       created_at: string | null;
     }
   >();
-  for (const row of aprovacoesRes.data ?? []) {
+  for (const row of aprovacoes) {
     const atual = {
       contrato_assinado:
         typeof row.contrato_assinado === "boolean" ? row.contrato_assinado : null,
@@ -361,19 +379,29 @@ async function carregarSnapshotsPortal(
   campanhaIds: string[]
 ): Promise<PortalHistoricoSnapshotFonte[]> {
   if (campanhaIds.length === 0) return [];
-  const { data, error } = await admin
-    .from("riscos_relatorios")
-    .select(RELATORIO_SELECT)
-    .in("campanha_id", campanhaIds);
-
-  if (error) {
-    if (error.code === "42P01" || /does not exist/i.test(error.message ?? "")) {
-      return [];
-    }
+  let data: unknown[] = [];
+  try {
+    data = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error } = await admin
+        .from("riscos_relatorios")
+        .select(RELATORIO_SELECT)
+        .in("campanha_id", campanhaIds)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return page ?? [];
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string }).code ?? "")
+        : "";
+    if (code === "42P01" || /does not exist/i.test(message)) return [];
     throw error;
   }
 
-  return (data ?? []).map((row) => ({
+  return data.map((row) => ({
     campanha_id: String((row as { campanha_id?: string }).campanha_id ?? ""),
     cliente_id: (row as { cliente_id?: string | null }).cliente_id ?? null,
     gerado_em: (row as { gerado_em?: string | null }).gerado_em

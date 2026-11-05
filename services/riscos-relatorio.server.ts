@@ -13,6 +13,7 @@ import {
 } from "@/lib/riscos-relatorio";
 import { isEmailValido } from "@/lib/email-validacao";
 import { isRelatorioEnvioExplicitamenteConfirmado } from "@/lib/riscos-relatorio-envio";
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registrarAuditoriaServer } from "@/services/auditoria.server";
 import { assertProcessoRiscosNaoCanceladoNoServidor } from "@/services/riscos-campanha-cancelar.server";
@@ -142,22 +143,38 @@ export async function mapearRelatoriosMetaPorCampanhas(
   if (ids.length === 0) return map;
 
   const admin = createAdminClient();
-  let { data, error } = await admin
-    .from("riscos_relatorios")
-    .select("campanha_id, gerado_em, relatorio_enviado_em")
-    .in("campanha_id", ids);
+  const ler = (select: string) =>
+    lerPorIdentificadores(ids, async (grupo, from, to) => {
+      const { data: page, error: pageError } = await admin
+        .from("riscos_relatorios")
+        .select(select)
+        .in("campanha_id", grupo)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (pageError) throw pageError;
+      return page ?? [];
+    });
+
+  let data: unknown[];
+  let error: { message?: string; code?: string } | null = null;
+  try {
+    data = await ler("campanha_id, gerado_em, relatorio_enviado_em");
+  } catch (falha) {
+    data = [];
+    error = falha as { message?: string; code?: string };
+  }
 
   if (
     error &&
     (/relatorio_enviado_em/i.test(error.message ?? "") ||
       error.code === "42703")
   ) {
-    const fb = await admin
-      .from("riscos_relatorios")
-      .select("campanha_id, gerado_em")
-      .in("campanha_id", ids);
-    data = fb.data as typeof data;
-    error = fb.error;
+    try {
+      data = await ler("campanha_id, gerado_em");
+      error = null;
+    } catch (falha) {
+      error = falha as { message?: string; code?: string };
+    }
   }
 
   if (error) {

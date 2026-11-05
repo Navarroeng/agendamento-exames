@@ -21,7 +21,7 @@ export function ESocialPage() {
     mesSelecionado,
     filtersExpanded,
     filterOptions,
-    filteredAgendamentos,
+    totalFiltrados,
     paginatedAgendamentos,
     summary,
     page,
@@ -81,7 +81,7 @@ export function ESocialPage() {
         <ESocialFiltersPanel
           filters={filters}
           options={filterOptions}
-          totalFiltrados={filteredAgendamentos.length}
+          totalFiltrados={totalFiltrados}
           expanded={filtersExpanded}
           onToggle={toggleFilters}
           onChange={handleFilterChange}
@@ -90,7 +90,7 @@ export function ESocialPage() {
 
         <ESocialTable
           agendamentos={paginatedAgendamentos}
-          totalFiltrados={filteredAgendamentos.length}
+          totalFiltrados={totalFiltrados}
           loading={loading}
           error={error}
           saving={saving}

@@ -4,6 +4,7 @@
  * Cancelados e rascunhos nunca entram na consulta.
  */
 
+import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatEnderecoClinica } from "@/lib/agendamento-mensagem-clinica";
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
@@ -37,28 +38,35 @@ async function carregarAgendamentosVisiveisDoCliente(
   clienteNome: string
 ): Promise<AgendamentoWithExames[]> {
   const admin = createAdminClient();
-
-  const { data: porId, error: errId } = await admin
-    .from("agendamentos")
-    .select(AGENDAMENTO_SELECT_LISTAGEM)
-    .eq("cliente_id", clienteId)
-    .in("status", PORTAL_AGENDAMENTO_STATUS_INCLUIDOS)
-    .order("data_agendamento", { ascending: true });
-
-  if (errId) throw errId;
-
-  let rows = (porId ?? []) as AgendamentoWithExames[];
-
-  if (rows.length === 0 && clienteNome.trim()) {
-    const { data: porNome, error: errNome } = await admin
+  const rowsPorId = await lerTodosOsLotes(async (from, to) => {
+    const { data, error } = await admin
       .from("agendamentos")
       .select(AGENDAMENTO_SELECT_LISTAGEM)
-      .eq("cliente_nome", clienteNome.trim())
-      .is("cliente_id", null)
+      .eq("cliente_id", clienteId)
       .in("status", PORTAL_AGENDAMENTO_STATUS_INCLUIDOS)
-      .order("data_agendamento", { ascending: true });
-    if (errNome) throw errNome;
-    rows = (porNome ?? []) as AgendamentoWithExames[];
+      .order("data_agendamento", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return (data ?? []) as AgendamentoWithExames[];
+  });
+
+  let rows = rowsPorId;
+
+  if (rows.length === 0 && clienteNome.trim()) {
+    rows = await lerTodosOsLotes(async (from, to) => {
+      const { data, error } = await admin
+        .from("agendamentos")
+        .select(AGENDAMENTO_SELECT_LISTAGEM)
+        .eq("cliente_nome", clienteNome.trim())
+        .is("cliente_id", null)
+        .in("status", PORTAL_AGENDAMENTO_STATUS_INCLUIDOS)
+        .order("data_agendamento", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return (data ?? []) as AgendamentoWithExames[];
+    });
   }
 
   return rows.filter((ag) =>

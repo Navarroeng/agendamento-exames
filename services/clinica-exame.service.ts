@@ -1,3 +1,4 @@
+import { lerPorIdentificadores } from "@/lib/consulta-lotes";
 import { sortByLabel } from "@/lib/sort-by-label";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -48,15 +49,19 @@ export async function contarExamesPorClinica(
 
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("clinica_exames")
-    .select("clinica_id")
-    .in("clinica_id", clinicaIds)
-    .eq("ativo", true);
+  const data = await lerPorIdentificadores(clinicaIds, async (grupo, from, to) => {
+    const { data: page, error } = await supabase
+      .from("clinica_exames")
+      .select("clinica_id")
+      .in("clinica_id", grupo)
+      .eq("ativo", true)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    return page ?? [];
+  });
 
-  if (error) throw error;
-
-  (data ?? []).forEach((row) => {
+  data.forEach((row) => {
     const id = row.clinica_id as string;
     map.set(id, (map.get(id) ?? 0) + 1);
   });
