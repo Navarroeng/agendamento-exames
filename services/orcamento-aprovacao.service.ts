@@ -14,6 +14,7 @@ import {
   condicoesComerciaisMudaram,
   formatCondicaoAprovada,
   formatPagamentoFromCondicoes,
+  revisaoDocumentalSemAssinaturaAtual,
 } from "@/lib/orcamento-aprovacao";
 import { ORCAMENTO_JA_APROVADO_MSG } from "@/lib/orcamento-acoes";
 import {
@@ -453,6 +454,7 @@ async function syncClienteContratoFromAprovacao(
     );
   }
 
+  const preservarDocumental = revisaoDocumentalSemAssinaturaAtual(aprovacao);
   const outroAtivoPorContrato = new Map<string, boolean>();
   for (const row of targets) {
     const encerrarOutro = deveEncerrarAtivoAnteriorNaSincronizacao({
@@ -497,16 +499,24 @@ async function syncClienteContratoFromAprovacao(
       outroAtivoExiste: Boolean(outroAtivoPorContrato.get(row.id as string)),
       encerrarOutroAtivo: encerrarOutro,
     });
-    const update: Record<string, unknown> = {
-      status: statusFinal,
-      contrato_enviado_em: syncPayload.contrato_enviado_em,
-      contrato_assinado_em: syncPayload.contrato_assinado_em,
-      boleto_vencimento: syncPayload.boleto_vencimento,
-      boleto_pago: syncPayload.boleto_pago,
-      boleto_pago_em: syncPayload.boleto_pago_em,
-      liberado_para_agendamento: syncPayload.liberado_para_agendamento,
-      updated_at: new Date().toISOString(),
-    };
+    // A versão nova sem assinatura não rebaixa status, vigência nem agendamento.
+    const update: Record<string, unknown> = preservarDocumental
+      ? {
+          boleto_vencimento: syncPayload.boleto_vencimento,
+          boleto_pago: syncPayload.boleto_pago,
+          boleto_pago_em: syncPayload.boleto_pago_em,
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          status: statusFinal,
+          contrato_enviado_em: syncPayload.contrato_enviado_em,
+          contrato_assinado_em: syncPayload.contrato_assinado_em,
+          boleto_vencimento: syncPayload.boleto_vencimento,
+          boleto_pago: syncPayload.boleto_pago,
+          boleto_pago_em: syncPayload.boleto_pago_em,
+          liberado_para_agendamento: syncPayload.liberado_para_agendamento,
+          updated_at: new Date().toISOString(),
+        };
 
     if (syncPayload.tipo_contrato === "mensal") {
       update.tipo_contrato = "mensal";
@@ -516,7 +526,7 @@ async function syncClienteContratoFromAprovacao(
     const temVigencia =
       Boolean(String(row.data_inicio ?? "").trim()) &&
       Boolean(String(row.data_fim ?? "").trim());
-    if (!temVigencia) {
+    if (!preservarDocumental && !temVigencia) {
       if (syncPayload.data_inicio) update.data_inicio = syncPayload.data_inicio;
       if (syncPayload.data_fim) update.data_fim = syncPayload.data_fim;
       if (syncPayload.tipo_contrato && update.tipo_contrato == null) {
@@ -536,15 +546,17 @@ async function syncClienteContratoFromAprovacao(
     }
   }
 
-  const clienteId = targets[0].cliente_id as string;
-  const { error: recomputeError } = await supabase.rpc(
-    "recompute_cliente_disponivel_agendamento",
-    { p_cliente_id: clienteId }
-  );
-  if (recomputeError) {
-    throw new Error(
-      `Falha ao recomputar disponibilidade de agendamento: ${recomputeError.message}`
+  if (!preservarDocumental) {
+    const clienteId = targets[0].cliente_id as string;
+    const { error: recomputeError } = await supabase.rpc(
+      "recompute_cliente_disponivel_agendamento",
+      { p_cliente_id: clienteId }
     );
+    if (recomputeError) {
+      throw new Error(
+        `Falha ao recomputar disponibilidade de agendamento: ${recomputeError.message}`
+      );
+    }
   }
 
   if (cobrancaMensal) {
@@ -951,16 +963,21 @@ export async function atualizarAcompanhamentoDocumentalContrato(
   payload: OrcamentoContratoDocumentalUpdatePayload
 ): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
+  const updateRow: Record<string, unknown> = {
+    contrato_enviado: payload.contrato_enviado,
+    contrato_enviado_em: payload.contrato_enviado_em,
+    contrato_assinado: payload.contrato_assinado,
+    contrato_assinado_em: payload.contrato_assinado_em,
+    observacao_contrato: payload.observacao_contrato,
+    contrato_salvo_em: new Date().toISOString(),
+  };
+  if (payload.contrato_assinado) {
+    updateRow.contrato_versao_situacao = null;
+  }
+
   const { data, error } = await supabase
     .from("orcamento_aprovacoes")
-    .update({
-      contrato_enviado: payload.contrato_enviado,
-      contrato_enviado_em: payload.contrato_enviado_em,
-      contrato_assinado: payload.contrato_assinado,
-      contrato_assinado_em: payload.contrato_assinado_em,
-      observacao_contrato: payload.observacao_contrato,
-      contrato_salvo_em: new Date().toISOString(),
-    })
+    .update(updateRow)
     .eq("id", aprovacaoId)
     .select(APROVACAO_SELECT)
     .single();

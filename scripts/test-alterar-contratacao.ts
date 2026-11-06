@@ -18,6 +18,13 @@ import {
   planejarPersistenciaParcelas,
   resolverGradeMensalidades,
 } from "../lib/mensalidade-parcelas";
+import {
+  ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS,
+  revisaoDocumentalSemAssinaturaAtual,
+  resolveContratoDocumentalAndamento,
+  rotuloBotaoGerarContrato,
+} from "../lib/orcamento-aprovacao";
+import { textoAcompanhamentoVersaoAnterior } from "../lib/orcamento-contrato-documento";
 import { ORCAMENTO_MODALIDADE_MENSALIDADE } from "../lib/orcamento-modalidade";
 
 const VIGENCIA = "2026-10-14";
@@ -299,6 +306,111 @@ assert.match(sql, /new\.valor is distinct from old\.valor/);
 assert.doesNotMatch(sql, /update public\.agendamentos/i);
 assert.doesNotMatch(sql, /update public\.periodicos/i);
 assert.doesNotMatch(sql, /insert into public\.funcionarios/i);
+
+assert.equal(
+  resolveContratoDocumentalAndamento({
+    contrato_enviado: true,
+    contrato_assinado: true,
+    contrato_versao_situacao: null,
+  }),
+  "assinado"
+);
+assert.equal(
+  ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS.pendente_geracao,
+  "Pendente de geração"
+);
+assert.equal(ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS.gerado, "Gerado");
+assert.equal(
+  rotuloBotaoGerarContrato({
+    temPdfAtual: false,
+    desatualizado: false,
+    situacao: "pendente_geracao",
+  }),
+  "Gerar novo contrato"
+);
+assert.equal(
+  revisaoDocumentalSemAssinaturaAtual({
+    contrato_assinado: false,
+    contrato_versao_situacao: "pendente_geracao",
+  }),
+  true
+);
+assert.equal(
+  revisaoDocumentalSemAssinaturaAtual({
+    contrato_assinado: true,
+    contrato_versao_situacao: "gerado",
+  }),
+  false
+);
+assert.equal(
+  textoAcompanhamentoVersaoAnterior(
+    {
+      versao_enviado: true,
+      versao_enviado_em: "2026-10-20",
+      versao_assinado: true,
+      versao_assinado_em: "2026-10-21",
+    },
+    (iso) => iso.split("-").reverse().join("/")
+  ),
+  "Enviado em 20/10/2026 · Assinado em 21/10/2026"
+);
+
+const sql158 = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase/migrations/158_nova_versao_contrato_alteracao.sql"
+  ),
+  "utf8"
+);
+const abrir = sql158.slice(
+  sql158.indexOf("function public.abrir_revisao_contratual_apos_alteracao"),
+  sql158.indexOf("function public.preparar_nova_versao_contrato_contratacao")
+);
+assert.match(abrir, /versao_assinado = coalesce\(v_aprov\.contrato_assinado, false\)/);
+assert.match(abrir, /contrato_assinado = false/);
+assert.match(abrir, /contrato_enviado = false/);
+assert.match(abrir, /'pendente_geracao'/);
+assert.match(abrir, /repetida', true/);
+assert.doesNotMatch(abrir, /orcamento_mensalidade_parcelas/i);
+assert.doesNotMatch(abrir, /data_inicio/i);
+assert.doesNotMatch(abrir, /liberado_para_agendamento/i);
+assert.doesNotMatch(abrir, /recompute_cliente_disponivel_agendamento/i);
+assert.doesNotMatch(abrir, /mensalidade_renovacao_automatica/i);
+assert.doesNotMatch(abrir, /update public\.agendamentos/i);
+assert.doesNotMatch(abrir, /insert into public\.funcionarios/i);
+const aplicar158 = sql158.slice(
+  sql158.indexOf("function public.aplicar_alteracao_contratacao_mensalidade"),
+  sql158.indexOf("function public.registrar_contrato_documento_gerado")
+);
+assert.match(aplicar158, /abrir_revisao_contratual_apos_alteracao/);
+assert.doesNotMatch(aplicar158, /insert into public\.orcamento_contratacao_aditivos/i);
+assert.doesNotMatch(aplicar158, /data_inicio/i);
+assert.doesNotMatch(aplicar158, /liberado_para_agendamento/i);
+const registrar158 = sql158.slice(
+  sql158.indexOf("function public.registrar_contrato_documento_gerado")
+);
+assert.match(registrar158, /contrato_versao_situacao = 'gerado'/);
+assert.match(registrar158, /coalesce\(contrato_assinado, false\) = false/);
+assert.doesNotMatch(registrar158, /contrato_enviado = true/);
+assert.doesNotMatch(registrar158, /contrato_assinado = true/);
+
+const syncService = fs.readFileSync(
+  path.join(process.cwd(), "services/orcamento-aprovacao.service.ts"),
+  "utf8"
+);
+const syncFn = syncService.slice(
+  syncService.indexOf("async function syncClienteContratoFromAprovacao"),
+  syncService.indexOf("export async function buscarAprovacaoPorOrcamentoId")
+);
+assert.match(syncFn, /revisaoDocumentalSemAssinaturaAtual/);
+assert.match(syncFn, /if \(!preservarDocumental && !temVigencia\)/);
+assert.match(syncFn, /if \(!preservarDocumental\)/);
+assert.match(
+  syncService.slice(
+    syncService.indexOf("export async function atualizarAcompanhamentoDocumentalContrato")
+  ),
+  /contrato_versao_situacao = null/
+);
 
 const persistencia = planejarPersistenciaParcelas({
   existentes: [

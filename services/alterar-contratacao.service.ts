@@ -124,6 +124,11 @@ function mapPrevia(raw: Record<string, unknown>): PreviaAlteracaoContratacao {
 
 function erroRpc(error: { message?: string } | null, fallback: string): Error {
   const message = error?.message ?? "";
+  if (/preparar_nova_versao_contrato_contratacao/i.test(message)) {
+    return new Error(
+      "A nova versão do contrato ainda não está disponível no banco. Execute a migration 158_nova_versao_contrato_alteracao.sql."
+    );
+  }
   if (/prever_alteracao_contratacao_mensalidade|aplicar_alteracao_contratacao_mensalidade|schema cache|PGRST202/i.test(message)) {
     return new Error(
       "A alteração de contratação ainda não está disponível no banco. Execute a migration 157_alterar_contratacao_mensalidade.sql."
@@ -189,6 +194,43 @@ export async function aplicarAlteracaoContratacao(params: {
     previa: mapPrevia((data ?? {}) as Record<string, unknown>),
     aprovacao,
   };
+}
+
+export async function existeAlteracaoContratacao(
+  aprovacaoId: string
+): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("orcamento_contratacao_alteracoes")
+    .select("id")
+    .eq("aprovacao_id", aprovacaoId)
+    .limit(1);
+  if (error) {
+    if (/orcamento_contratacao_alteracoes|schema cache|PGRST205|42P01/i.test(error.message ?? "")) {
+      return false;
+    }
+    throw error;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+export async function prepararNovaVersaoContrato(params: {
+  aprovacaoId: string;
+  orcamentoId: string;
+}): Promise<OrcamentoAprovacaoRecord> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc(
+    "preparar_nova_versao_contrato_contratacao",
+    { p_aprovacao_id: params.aprovacaoId }
+  );
+  if (error) throw erroRpc(error, "Não foi possível preparar a nova versão do contrato.");
+  const aprovacao = await buscarAprovacaoPorOrcamentoId(params.orcamentoId);
+  if (!aprovacao) {
+    throw new Error(
+      "A nova versão foi preparada, mas a aprovação não pôde ser recarregada."
+    );
+  }
+  return aprovacao;
 }
 
 export async function listarAditivosContratacaoPendentes(

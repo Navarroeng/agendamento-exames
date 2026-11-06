@@ -396,6 +396,10 @@ export function OrcamentoAprovarModal({
     aprovacaoSyncRef.current = aprovacao.updated_at;
     if (primeiraLeitura) return;
     setForm(buildAprovacaoFormFromRecord(orcamento, aprovacao));
+    setContratoEnviado(Boolean(aprovacao.contrato_enviado));
+    setContratoEnviadoEm(aprovacao.contrato_enviado_em ?? "");
+    setContratoAssinado(Boolean(aprovacao.contrato_assinado));
+    setContratoAssinadoEm(aprovacao.contrato_assinado_em ?? "");
   }, [open, orcamento, aprovacao]);
 
   useEffect(() => {
