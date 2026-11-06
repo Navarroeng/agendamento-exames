@@ -211,6 +211,7 @@ async function inserirItens(
     quantidade: item.quantidade,
     valor_unitario: item.valor_unitario,
     valor_total: item.valor_total,
+    valor_automatico: item.valor_automatico ?? null,
     ordem: item.ordem ?? index,
   }));
 

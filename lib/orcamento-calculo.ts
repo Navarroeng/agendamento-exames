@@ -19,6 +19,7 @@ import {
 } from "@/lib/servico-parecer-tecnico";
 import { isServicoPericulosidadeNome } from "@/lib/servico-periculosidade";
 import { isServicoPgrNome, resolveValorTotalPgr } from "@/lib/servico-pgr";
+import { isGestaoMensalSstNome } from "@/lib/orcamento-modalidade";
 
 /** AET, Insalubridade, Parecer Técnico e LTCAT não pedem quantidade de colaboradores. */
 export function servicoOcultaQuantidadeColaboradores(
@@ -54,7 +55,12 @@ const LEGACY_VALOR_TOLERANCE = 0.01;
 export const PACOTE_COMPLETO_SST_PRECO_BASE = 1300;
 /** Cada colaborador adicional: + R$ 100,00 */
 export const PACOTE_COMPLETO_SST_PRECO_INCREMENTO = 100;
-/** Automático somente até este limite (inclusive). */
+
+/** Gestão SST mensal: 1 colaborador. */
+export const GESTAO_SST_MENSAL_PRECO_BASE = 130;
+/** Cada colaborador adicional da Gestão SST mensal: + R$ 10,00. Sem teto. */
+export const GESTAO_SST_MENSAL_PRECO_INCREMENTO = 10;
+/** Pacote completo - SST: automático somente até este limite (inclusive). */
 export const PACOTE_COMPLETO_SST_QTD_AUTO_MAX = 20;
 
 export function formatQuantidadeColaboradoresInput(value: string): string {
@@ -74,7 +80,7 @@ export function quantidadeColaboradoresItemParaFormulario(
   return Number.isFinite(n) && n >= 1 ? String(n) : "1";
 }
 
-/** Altera a quantidade só do item indicado; recálculo automático do Pacote SST permanece local. */
+/** Altera a quantidade só do item indicado. Recalcula Pacote SST e Gestão SST mensal só no modo automático. */
 export function applyQuantidadeColaboradoresSomenteNoItem(
   itens: OrcamentoItemFormItem[],
   itemId: string,
@@ -85,7 +91,11 @@ export function applyQuantidadeColaboradoresSomenteNoItem(
     if (item.id !== itemId) return item;
     const next = { ...item, quantidade };
     if (next.valor_manual) return next;
-    return { ...next, ...applyValorAutomaticoPacoteCompletoSstItem(next) };
+    const comPacote = {
+      ...next,
+      ...applyValorAutomaticoPacoteCompletoSstItem(next),
+    };
+    return { ...comPacote, ...applyValorMensalGestaoSstItem(comPacote) };
   });
 }
 
@@ -113,6 +123,77 @@ export function calcValorPacoteCompletoSst(
     PACOTE_COMPLETO_SST_PRECO_BASE +
     (qtd - 1) * PACOTE_COMPLETO_SST_PRECO_INCREMENTO
   );
+}
+
+/**
+ * Mensalidade da Gestão SST: 130 + 10 × max(quantidade − 1, 0).
+ * Quantidade vazia ou inválida não vira 1. Não lê o cadastro de funcionários.
+ */
+export function calcValorMensalGestaoSst(quantidade: number): number | null {
+  const qtd = Math.round(Number(quantidade));
+  if (!Number.isFinite(qtd) || qtd < 1) return null;
+  return (
+    GESTAO_SST_MENSAL_PRECO_BASE +
+    GESTAO_SST_MENSAL_PRECO_INCREMENTO * Math.max(qtd - 1, 0)
+  );
+}
+
+/** Preenche o valor mensal só no modo automático e com quantidade válida. */
+export function applyValorMensalGestaoSstItem(
+  item: Pick<
+    OrcamentoItemFormItem,
+    "servico_nome" | "quantidade" | "valor_unitario" | "valor_total"
+  > & { valor_manual?: boolean }
+): Pick<OrcamentoItemFormItem, "valor_unitario" | "valor_total"> {
+  if (item.valor_manual || !isGestaoMensalSstNome(item.servico_nome)) {
+    return {
+      valor_unitario: item.valor_unitario,
+      valor_total: item.valor_total,
+    };
+  }
+  const auto = calcValorMensalGestaoSst(
+    parseQuantidadeColaboradores(item.quantidade)
+  );
+  if (auto == null) {
+    return {
+      valor_unitario: item.valor_unitario,
+      valor_total: item.valor_total,
+    };
+  }
+  return {
+    valor_unitario: formatValorOrcamentoInput(auto),
+    valor_total: String(auto),
+  };
+}
+
+/**
+ * Grava o valor escolhido. O flag só é true quando o modo automático
+ * calculou nesta gravação. Registro antigo sem flag não é promovido.
+ */
+export function resolverPersistenciaValorMensalGestaoSst(item: {
+  servico_nome: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_manual: boolean;
+}): { valor: number; valor_automatico: boolean | null } {
+  if (!isGestaoMensalSstNome(item.servico_nome)) {
+    return { valor: item.valor_unitario, valor_automatico: null };
+  }
+  if (item.valor_manual) {
+    return { valor: item.valor_unitario, valor_automatico: false };
+  }
+  const auto = calcValorMensalGestaoSst(item.quantidade);
+  if (auto == null) {
+    return { valor: item.valor_unitario, valor_automatico: false };
+  }
+  return { valor: auto, valor_automatico: true };
+}
+
+/** Null ou ausente permanece manual. Só true reabre no modo automático. */
+export function gestaoSstReabreComoManual(
+  valorAutomatico: boolean | null | undefined
+): boolean {
+  return valorAutomatico !== true;
 }
 
 export function isPacoteCompletoSstValorAutomatico(

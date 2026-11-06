@@ -150,6 +150,11 @@ export interface OrcamentoItemRecord {
   valor_unitario: number;
   valor_total: number;
   ordem: number;
+  /**
+   * Gestão SST mensal. true = segue a tabela ao mudar a quantidade.
+   * false = negociado. null/ausente = orçamento anterior, não vira automático.
+   */
+  valor_automatico?: boolean | null;
   created_at?: string;
 }
 
@@ -214,6 +219,8 @@ export interface OrcamentoItemInsert {
   valor_unitario: number;
   valor_total: number;
   ordem: number;
+  /** Gestão SST mensal. Null nos demais serviços e nos registros antigos. */
+  valor_automatico?: boolean | null;
 }
 
 export interface OrcamentoInsertPayload {
