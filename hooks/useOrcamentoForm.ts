@@ -10,11 +10,14 @@ import {
   applyPacoteCompletoSstPrecoItensPayload,
   applyQuantidadeColaboradoresSomenteNoItem,
   applyValorAutomaticoPacoteCompletoSstItem,
+  applyValorMensalGestaoSstItem,
   calcSubtotalItens,
   formatValorOrcamentoInput,
+  gestaoSstReabreComoManual,
   inferValorManualOrcamentoItem,
   isPacoteCompletoSstValorAutomatico,
   parseQuantidadeColaboradores,
+  resolverPersistenciaValorMensalGestaoSst,
   quantidadeColaboradoresItemParaFormulario,
   resolveItemValorParaFormulario,
   validateOrcamentoItensValores,
@@ -256,8 +259,10 @@ export function useOrcamentoForm() {
               next.valor_total = "";
               next.valor_manual = true;
             } else if (isGestaoMensalSstNome(servicoNome)) {
-              next.valor_unitario = "";
-              next.valor_total = "";
+              next.valor_manual = false;
+              const mensal = applyValorMensalGestaoSstItem(next);
+              next.valor_unitario = mensal.valor_unitario;
+              next.valor_total = mensal.valor_total;
             } else {
               const auto = applyValorAutomaticoPacoteCompletoSstItem(next);
               next.valor_unitario = auto.valor_unitario;
@@ -340,7 +345,11 @@ export function useOrcamentoForm() {
           }
 
           if (isGestaoMensalSstNome(item.servico_nome)) {
-            return item;
+            const mensal = applyValorMensalGestaoSstItem({
+              ...item,
+              valor_manual: false,
+            });
+            return { ...item, ...mensal, valor_manual: false };
           }
 
           if (valorSugerido == null || valorSugerido <= 0) return item;
@@ -443,11 +452,13 @@ export function useOrcamentoForm() {
                 valor_total: valor > 0 ? String(valor) : "",
                 valor_manual: isServicoParecerTecnicoNome(item.servico_nome)
                   ? true
-                  : inferValorManualOrcamentoItem(
-                      item.servico_nome,
-                      qtd,
-                      valor
-                    ),
+                  : isGestaoMensalSstNome(item.servico_nome)
+                    ? gestaoSstReabreComoManual(item.valor_automatico)
+                    : inferValorManualOrcamentoItem(
+                        item.servico_nome,
+                        qtd,
+                        valor
+                      ),
               };
             })
           : [createEmptyOrcamentoItem()],
@@ -497,25 +508,35 @@ export function useOrcamentoForm() {
     const itensRaw = form.itens
       .filter((item) => item.servico_nome.trim() !== "")
       .map((item, index) => {
+        const quantidadeInformada = parseQuantidadeColaboradores(
+          item.quantidade
+        );
         const quantidade =
           isServicoPericulosidadeNome(item.servico_nome) ||
           isServicoPgrNome(item.servico_nome)
-          ? parseQuantidadeColaboradores(item.quantidade) || 1
+          ? quantidadeInformada || 1
           : isServicoLaudoPontualNome(item.servico_nome)
           ? SERVICO_LAUDO_PONTUAL_QUANTIDADE_INTERNA
           : isServicoParecerTecnicoNome(item.servico_nome)
             ? SERVICO_PARECER_TECNICO_QUANTIDADE_INTERNA
-            : parseQuantidadeColaboradores(item.quantidade) || 1;
-        const valor = parseMoney(item.valor_unitario);
+            : quantidadeInformada || 1;
+        const valorDigitado = parseMoney(item.valor_unitario);
+        const persistido = resolverPersistenciaValorMensalGestaoSst({
+          servico_nome: item.servico_nome,
+          quantidade: quantidadeInformada,
+          valor_unitario: valorDigitado,
+          valor_manual: item.valor_manual,
+        });
 
         return {
           servico_id: item.servico_id.trim() || null,
           servico_nome: item.servico_nome.trim(),
           quantidade,
-          valor_unitario: valor,
-          valor_total: valor,
+          valor_unitario: persistido.valor,
+          valor_total: persistido.valor,
           ordem: index,
           valor_manual: item.valor_manual,
+          valor_automatico: persistido.valor_automatico,
         };
       });
 

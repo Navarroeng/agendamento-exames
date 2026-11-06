@@ -1,4 +1,5 @@
 import {
+  calcValorMensalGestaoSst,
   calcValorPacoteCompletoSst,
   isPacoteCompletoSstValorAutomatico,
   parseQuantidadeColaboradores,
@@ -67,6 +68,10 @@ export function OrcamentoItemTableRow({
   )
     ? calcValorPacoteCompletoSst(qtd)
     : null;
+  const valorSugeridoGestao =
+    isMensalidade && isGestaoMensalSstNome(item.servico_nome)
+      ? calcValorMensalGestaoSst(qtd)
+      : null;
   const showSugestaoAutomatica =
     valorAutomatico != null && !item.valor_manual;
 
@@ -147,6 +152,21 @@ export function OrcamentoItemTableRow({
           <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#64748b]">
             / mês
           </p>
+        ) : null}
+        {valorSugeridoGestao != null ? (
+          <div className="mt-1 max-w-[180px] text-[10px] leading-snug text-app-muted">
+            <p>
+              {item.valor_manual ? "Ajustado manualmente" : "Valor automático"}
+            </p>
+            <p>Sugerido: {formatCurrency(valorSugeridoGestao)}</p>
+            <button
+              type="button"
+              className="mt-0.5 font-semibold text-brand-blue hover:underline"
+              onClick={() => onApplyValorSugerido(valorSugeridoGestao)}
+            >
+              Usar valor sugerido
+            </button>
+          </div>
         ) : null}
         {showSugestaoAutomatica ? (
           <p className="mt-1 max-w-[160px] text-[10px] leading-snug text-app-muted">
