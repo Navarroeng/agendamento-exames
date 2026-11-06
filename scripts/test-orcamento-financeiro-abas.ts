@@ -25,6 +25,30 @@ assert.equal(
   }),
   "assinado"
 );
+assert.equal(
+  resolveContratoDocumentalAndamento({
+    contrato_enviado: false,
+    contrato_assinado: false,
+    contrato_versao_situacao: "pendente_geracao",
+  }),
+  "pendente_geracao"
+);
+assert.equal(
+  resolveContratoDocumentalAndamento({
+    contrato_enviado: false,
+    contrato_assinado: false,
+    contrato_versao_situacao: "gerado",
+  }),
+  "gerado"
+);
+assert.equal(
+  resolveContratoDocumentalAndamento({
+    contrato_enviado: false,
+    contrato_assinado: true,
+    contrato_versao_situacao: "gerado",
+  }),
+  "assinado"
+);
 
 assert.equal(
   resolveFinanceiroAndamento({

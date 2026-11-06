@@ -164,10 +164,7 @@ function AlterarContratacaoDialog({
 
   const resumoContrato = useMemo(() => {
     if (!previa) return null;
-    if (previa.contratoAssinado) {
-      return "O contrato assinado permanece como está. A alteração fica pendente de aditivo e não marca esse aditivo como gerado ou assinado.";
-    }
-    return "O contrato ainda não está assinado. A versão anterior do PDF fica substituída. A nova versão é gerada depois, nesta tela, e não é enviada ao cliente.";
+    return "A alteração abre uma nova versão completa do contrato na aba Contrato. O PDF anterior permanece no histórico, com o envio e a assinatura daquela versão. A nova versão começa sem envio e sem assinatura, e só é gerada depois, nesta tela.";
   }, [previa]);
 
   async function verPrevia() {

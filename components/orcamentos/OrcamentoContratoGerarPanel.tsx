@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { useAuditoriaUsuario, useAuth } from "@/contexts/AuthContext";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatDateTimeBR } from "@/lib/format-datetime";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
@@ -66,16 +66,24 @@ import {
   pdfContratoEstaDesatualizado,
   revisaoCondicoesAprovacao,
 } from "@/lib/contrato-documento-revisao";
-import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
-import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
+import {
+  rotuloBotaoGerarContrato,
+  type OrcamentoAprovacaoRecord,
+} from "@/lib/orcamento-aprovacao";
+import { isPerfilAdmin } from "@/lib/permissions";
+import {
+  textoAcompanhamentoVersaoAnterior,
+  type OrcamentoContratoDocumentoRecord,
+} from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
 import {
-  listarAditivosContratacaoPendentes,
-  type AditivoContratacaoPendente,
+  existeAlteracaoContratacao,
+  prepararNovaVersaoContrato,
 } from "@/services/alterar-contratacao.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { salvarCondicaoContratoParecer } from "@/services/orcamento-aprovacao.service";
 import {
+  buscarAprovacaoPorOrcamentoId,
   obterVigenciaContratualOrcamento,
   salvarParametrosContratoMensalidade,
   salvarRenovacaoContratoMensalidade,
@@ -104,12 +112,12 @@ export function OrcamentoContratoGerarPanel({
   onAprovacaoAtualizada?: (aprovacao: OrcamentoAprovacaoRecord) => void;
 }) {
   const auditContext = useAuditoriaUsuario();
+  const { profile } = useAuth();
   const [documentos, setDocumentos] = useState<
     OrcamentoContratoDocumentoRecord[]
   >([]);
-  const [aditivosPendentes, setAditivosPendentes] = useState<
-    AditivoContratacaoPendente[]
-  >([]);
+  const [temAlteracao, setTemAlteracao] = useState(false);
+  const preparandoRef = useRef(false);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [etapa, setEtapa] = useState<EtapaFluxo>("idle");
   const [dataContrato, setDataContrato] = useState(hojeIsoLocal());
@@ -282,17 +290,15 @@ export function OrcamentoContratoGerarPanel({
     setLoadingDocs(true);
     try {
       const rows = await listarContratoDocumentos(aprovacao.id);
-      let pendentes: AditivoContratacaoPendente[] = [];
+      let alteracao = false;
       try {
-        pendentes = (
-          await listarAditivosContratacaoPendentes(aprovacao.id)
-        ).filter((item) => item.status === "pendente");
-      } catch (aditivoErr) {
-        console.error(aditivoErr);
+        alteracao = await existeAlteracaoContratacao(aprovacao.id);
+      } catch (alteracaoErr) {
+        console.error(alteracaoErr);
       }
       if (seq !== loadSeq.current) return;
       setDocumentos(rows);
-      setAditivosPendentes(pendentes);
+      setTemAlteracao(alteracao);
     } catch (err) {
       if (seq !== loadSeq.current) return;
       console.error(err);
@@ -620,7 +626,13 @@ export function OrcamentoContratoGerarPanel({
       });
 
       aplicarDocumentoSalvo(saved);
+      if (aprovacao.contrato_versao_situacao === "pendente_geracao") {
+        const atualizada = await buscarAprovacaoPorOrcamentoId(orcamento.id);
+        if (atualizada) onAprovacaoAtualizada?.(atualizada);
+      }
       const regenerado = saved.versao > 1;
+      const novaVersao =
+        aprovacao.contrato_versao_situacao === "pendente_geracao";
       try {
         await registrarAuditoria({
           ...auditContext,
@@ -649,9 +661,11 @@ export function OrcamentoContratoGerarPanel({
       }
 
       toast.success(
-        regenerado
-          ? "Novo PDF do contrato gerado. O arquivo anterior permanece no histórico, e o acompanhamento de envio/assinatura não foi alterado."
-          : "Contrato gerado. O acompanhamento de envio/assinatura não foi alterado."
+        novaVersao
+          ? "Nova versão do contrato gerada. Envio e assinatura continuam como não."
+          : regenerado
+            ? "Novo PDF do contrato gerado. O arquivo anterior permanece no histórico, e o acompanhamento de envio/assinatura não foi alterado."
+            : "Contrato gerado. O acompanhamento de envio/assinatura não foi alterado."
       );
       fecharFluxo();
       await carregar();
@@ -899,6 +913,48 @@ export function OrcamentoContratoGerarPanel({
     }
   }
 
+  const situacaoVersao = aprovacao.contrato_versao_situacao ?? null;
+  const revisaoAberta =
+    !contratoAssinado &&
+    (situacaoVersao === "pendente_geracao" || situacaoVersao === "gerado");
+  const podePrepararNovaVersao =
+    isPerfilAdmin(profile?.perfil) &&
+    temAlteracao &&
+    !revisaoAberta &&
+    (contratoAssinado || (substituidos.length > 0 && !atual));
+  const rotuloGerar = rotuloBotaoGerarContrato({
+    temPdfAtual: Boolean(atual),
+    desatualizado: atualDesatualizado,
+    situacao: situacaoVersao,
+  });
+
+  async function handlePrepararNovaVersao() {
+    if (preparandoRef.current) return;
+    preparandoRef.current = true;
+    setWorking(true);
+    try {
+      const atualizada = await prepararNovaVersaoContrato({
+        aprovacaoId: aprovacao.id,
+        orcamentoId: orcamento.id,
+      });
+      onAprovacaoAtualizada?.(atualizada);
+      toast.success(
+        "Nova versão preparada. O PDF anterior permanece no histórico. Gere o contrato nesta aba."
+      );
+      await carregar();
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível preparar a nova versão do contrato."
+      );
+    } finally {
+      preparandoRef.current = false;
+      setWorking(false);
+    }
+  }
+
   const busy = disabled || working;
 
   return (
@@ -1021,7 +1077,7 @@ export function OrcamentoContratoGerarPanel({
               }
               onClick={() => void handleAbrirConferencia()}
             >
-              Gerar contrato
+              {rotuloGerar}
             </button>
           ) : (
             <>
@@ -1054,9 +1110,7 @@ export function OrcamentoContratoGerarPanel({
                 }
                 onClick={() => void handleAbrirConferencia()}
               >
-                {atualDesatualizado
-                  ? "Gerar contrato atualizado"
-                  : "Gerar novamente"}
+                {rotuloGerar}
               </button>
             </>
           )}
@@ -1200,22 +1254,38 @@ export function OrcamentoContratoGerarPanel({
         </div>
       ) : null}
 
-      {aditivosPendentes.length > 0 ? (
-        <div className="mt-3 space-y-1 rounded-lg border border-[#f3d19c] bg-[#fff8eb] px-3 py-2 text-[12px] text-[#7c4a03]">
+      {situacaoVersao === "pendente_geracao" && !contratoAssinado ? (
+        <div className="mt-3 rounded-lg border border-[#f3d19c] bg-[#fff8eb] px-3 py-2 text-[12px] text-[#7c4a03]">
           <p className="font-semibold">
-            O contrato assinado foi preservado. A alteração exige aditivo e
-            continua pendente de formalização. Nenhum aditivo foi gerado nem
-            assinado.
+            A alteração da contratação abriu uma nova versão do contrato. Ela
+            ainda não foi gerada nem assinada. O documento anterior permanece
+            no histórico, com o envio e a assinatura daquela versão.
           </p>
-          {aditivosPendentes.map((aditivo) => (
-            <p key={aditivo.id}>
-              {aditivo.quantidade_anterior} → {aditivo.quantidade_nova}{" "}
-              colaboradores · {formatCurrency(aditivo.valor_anterior)} →{" "}
-              {formatCurrency(aditivo.valor_novo)} · a partir de{" "}
-              {formatDateIsoToBR(aditivo.efeito_vencimento)} (mensalidade{" "}
-              {aditivo.efeito_numero})
-            </p>
-          ))}
+        </div>
+      ) : situacaoVersao === "gerado" && !contratoAssinado && !aprovacao.contrato_enviado ? (
+        <div className="mt-3 rounded-lg border border-[#dbeafe] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#1e3a8a]">
+          <p className="font-semibold">
+            A nova versão do contrato foi gerada e ainda não foi enviada nem
+            assinada. A formalização só se conclui quando esta versão for
+            assinada.
+          </p>
+        </div>
+      ) : podePrepararNovaVersao ? (
+        <div className="mt-3 rounded-lg border border-[#f3d19c] bg-[#fff8eb] px-3 py-2 text-[12px] text-[#7c4a03]">
+          <p className="font-semibold">
+            A alteração da contratação já está registrada. Prepare a nova
+            versão para gerar o contrato atualizado, sem repetir a mudança de
+            quantidade, mensalidade ou parcelas. O PDF anterior permanece no
+            histórico.
+          </p>
+          <button
+            type="button"
+            className="btn mt-2 justify-center text-[12px]"
+            disabled={busy}
+            onClick={() => void handlePrepararNovaVersao()}
+          >
+            Preparar nova versão
+          </button>
         </div>
       ) : null}
 
@@ -1239,6 +1309,9 @@ export function OrcamentoContratoGerarPanel({
                   {formatDateTimeBR(doc.gerado_em)}
                   {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
                   {" · Substituída"}
+                  {textoAcompanhamentoVersaoAnterior(doc, formatDateIsoToBR)
+                    ? ` · ${textoAcompanhamentoVersaoAnterior(doc, formatDateIsoToBR)}`
+                    : ""}
                 </span>
                 <span className="flex gap-2">
                   <button

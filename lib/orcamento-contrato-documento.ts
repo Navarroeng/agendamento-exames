@@ -31,6 +31,32 @@ export interface OrcamentoContratoDocumentoRecord {
   /** PDF anterior à alteração de contratação. Não é a versão atual. */
   substituido_em?: string | null;
   substituido_motivo?: string | null;
+  /** Envio da aprovação no momento em que este PDF deixou de ser a versão atual. */
+  versao_enviado?: boolean | null;
+  versao_enviado_em?: string | null;
+  /** Assinatura da aprovação no momento em que este PDF deixou de ser a versão atual. */
+  versao_assinado?: boolean | null;
+  versao_assinado_em?: string | null;
+}
+
+export function textoAcompanhamentoVersaoAnterior(
+  doc: Pick<
+    OrcamentoContratoDocumentoRecord,
+    | "versao_enviado"
+    | "versao_enviado_em"
+    | "versao_assinado"
+    | "versao_assinado_em"
+  >,
+  formatarData: (iso: string) => string
+): string | null {
+  if (doc.versao_enviado == null && doc.versao_assinado == null) return null;
+  const envio = doc.versao_enviado
+    ? `Enviado${doc.versao_enviado_em ? ` em ${formatarData(doc.versao_enviado_em)}` : ""}`
+    : "Não enviado";
+  const assinatura = doc.versao_assinado
+    ? `Assinado${doc.versao_assinado_em ? ` em ${formatarData(doc.versao_assinado_em)}` : ""}`
+    : "Não assinado";
+  return `${envio} · ${assinatura}`;
 }
 
 export interface OrcamentoContratoDocumentoInsert {

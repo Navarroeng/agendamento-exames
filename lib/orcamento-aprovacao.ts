@@ -198,6 +198,11 @@ export interface OrcamentoAprovacaoRecord {
   contratacao_valor_anterior?: number | null;
   /** Quantidade que permanece nas parcelas anteriores a essa alteração. */
   contratacao_quantidade_anterior?: number | null;
+  /**
+   * Versão documental aberta pela alteração de contratação.
+   * pendente_geracao ou gerado. Nula quando não há versão nova em aberto.
+   */
+  contrato_versao_situacao?: "pendente_geracao" | "gerado" | null;
   created_at: string;
   updated_at: string;
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
@@ -495,27 +500,66 @@ export function resolveContratoAndamento(
   return "nao_enviado";
 }
 
-/** Andamento apenas documental (aba Contrato). */
+export type OrcamentoContratoDocumentalAndamento =
+  | "nao_enviado"
+  | "enviado"
+  | "assinado"
+  | "pendente_geracao"
+  | "gerado";
+
+/** Andamento apenas documental (aba Contrato), sempre da versão atual. */
 export function resolveContratoDocumentalAndamento(
-  aprovacao: Pick<
+  aprovacao: (Pick<
     OrcamentoAprovacaoRecord,
     "contrato_enviado" | "contrato_assinado"
-  > | null
-): "nao_enviado" | "enviado" | "assinado" {
+  > & {
+    contrato_versao_situacao?: OrcamentoAprovacaoRecord["contrato_versao_situacao"];
+  }) | null
+): OrcamentoContratoDocumentalAndamento {
   if (!aprovacao) return "nao_enviado";
   if (aprovacao.contrato_assinado) return "assinado";
   if (aprovacao.contrato_enviado) return "enviado";
+  if (aprovacao.contrato_versao_situacao === "pendente_geracao") {
+    return "pendente_geracao";
+  }
+  if (aprovacao.contrato_versao_situacao === "gerado") return "gerado";
   return "nao_enviado";
 }
 
 export const ORCAMENTO_CONTRATO_DOCUMENTAL_LABELS: Record<
-  "nao_enviado" | "enviado" | "assinado",
+  OrcamentoContratoDocumentalAndamento,
   string
 > = {
   nao_enviado: "Aguardando envio",
   enviado: "Enviado",
   assinado: "Assinado",
+  pendente_geracao: "Pendente de geração",
+  gerado: "Gerado",
 };
+
+/** A versão nova ainda não foi assinada. A liberação operacional não segue esse estado. */
+export function revisaoDocumentalSemAssinaturaAtual(
+  aprovacao: (Pick<OrcamentoAprovacaoRecord, "contrato_assinado"> & {
+    contrato_versao_situacao?: OrcamentoAprovacaoRecord["contrato_versao_situacao"];
+  }) | null
+): boolean {
+  if (!aprovacao || aprovacao.contrato_assinado) return false;
+  return (
+    aprovacao.contrato_versao_situacao === "pendente_geracao" ||
+    aprovacao.contrato_versao_situacao === "gerado"
+  );
+}
+
+export function rotuloBotaoGerarContrato(params: {
+  temPdfAtual: boolean;
+  desatualizado: boolean;
+  situacao?: string | null;
+}): string {
+  if (params.situacao === "pendente_geracao") return "Gerar novo contrato";
+  if (!params.temPdfAtual) return "Gerar contrato";
+  if (params.desatualizado) return "Gerar contrato atualizado";
+  return "Gerar novamente";
+}
 
 export function resolveFinanceiroAndamento(
   aprovacao: Pick<
