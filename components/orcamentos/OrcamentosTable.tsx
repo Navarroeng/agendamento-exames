@@ -89,13 +89,13 @@ export function OrcamentosTable({
                 <th>Cliente</th>
                 <th>Origem</th>
                 <th>Responsável</th>
-                <th>Valor</th>
                 <th
                   className="w-[4.75rem] !text-center"
                   title="Quantidade de colaboradores"
                 >
                   Qtde. Colab.
                 </th>
+                <th>Valor</th>
                 <th>Status</th>
                 <th className="w-[88px] text-center">Visualizar</th>
                 <th className="w-[72px] text-center">Ações</th>
@@ -117,11 +117,11 @@ export function OrcamentosTable({
                     <td>
                       {formatResponsavelOrcamentoDisplay(orcamento.responsavel)}
                     </td>
-                    <td className="font-semibold text-navy">
-                      {formatValorOrcamentoExibicao(orcamento)}
-                    </td>
                     <td className="text-center tabular-nums">
                       {formatQuantidadeColaboradoresHistorico(orcamento)}
+                    </td>
+                    <td className="font-semibold text-navy">
+                      {formatValorOrcamentoExibicao(orcamento)}
                     </td>
                     <td>
                       <span

@@ -611,10 +611,21 @@ const tableSrc = readFileSync(
   join(root, "components/orcamentos/OrcamentosTable.tsx"),
   "utf8"
 );
-const valorHeader = tableSrc.indexOf("<th>Valor</th>");
+const responsavelHeader = tableSrc.indexOf("<th>Responsável</th>");
 const qtdeHeader = tableSrc.indexOf("Qtde. Colab.");
+const valorHeader = tableSrc.indexOf("<th>Valor</th>");
 const statusHeader = tableSrc.indexOf("<th>Status</th>");
-assert.ok(valorHeader >= 0 && qtdeHeader > valorHeader && statusHeader > qtdeHeader);
+assert.ok(
+  responsavelHeader >= 0 &&
+    qtdeHeader > responsavelHeader &&
+    valorHeader > qtdeHeader &&
+    statusHeader > valorHeader
+);
+const qtdeCell = tableSrc.indexOf(
+  "{formatQuantidadeColaboradoresHistorico(orcamento)}"
+);
+const valorCell = tableSrc.indexOf("{formatValorOrcamentoExibicao(orcamento)}");
+assert.ok(qtdeCell > qtdeHeader && valorCell > qtdeCell);
 assert.match(tableSrc, /title="Quantidade de colaboradores"/);
 assert.match(tableSrc, /formatQuantidadeColaboradoresHistorico/);
 assert.doesNotMatch(tableSrc, /colSpan/);
