@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { OrcamentoRecord } from "@/lib/orcamento-types";
+import type { OrcamentoHistoricoRecord } from "@/lib/orcamento-types";
 import { listarOrcamentos } from "@/services/orcamento.service";
 
 export function useOrcamentosList(ano: number) {
-  const [orcamentos, setOrcamentos] = useState<OrcamentoRecord[]>([]);
+  const [orcamentos, setOrcamentos] = useState<OrcamentoHistoricoRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);

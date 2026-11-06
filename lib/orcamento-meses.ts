@@ -73,10 +73,9 @@ export function orcamentoBelongsToMes(
 }
 
 /** Filtra pela data oficial do orçamento (`data_proposta` / coluna “Data”). */
-export function filterOrcamentosPorMes(
-  orcamentos: OrcamentoRecord[],
-  mes: OrcamentoYearMonth
-): OrcamentoRecord[] {
+export function filterOrcamentosPorMes<
+  T extends Pick<OrcamentoRecord, "data_proposta">,
+>(orcamentos: T[], mes: OrcamentoYearMonth): T[] {
   return orcamentos.filter((o) => orcamentoBelongsToMes(o, mes));
 }
 

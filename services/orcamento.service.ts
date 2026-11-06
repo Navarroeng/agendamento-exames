@@ -11,6 +11,7 @@ import {
 import { calcValidadePropostaIso } from "@/lib/orcamento-validade";
 import type {
   OrcamentoComItens,
+  OrcamentoHistoricoRecord,
   OrcamentoInsertPayload,
   OrcamentoRecord,
 } from "@/lib/orcamento-types";
@@ -32,6 +33,35 @@ const ORCAMENTO_SELECT = `
   *,
   orcamento_itens (*)
 `;
+
+/** Listagem: o mesmo embed dos itens, só com os campos da quantidade. */
+const ORCAMENTO_HISTORICO_SELECT = `
+  *,
+  orcamento_itens (
+    servico_nome,
+    quantidade,
+    ordem
+  )
+`;
+
+function mapOrcamentoHistorico(
+  row: OrcamentoRecord & {
+    orcamento_itens?: Array<{
+      servico_nome?: string | null;
+      quantidade?: number | string | null;
+      ordem?: number | string | null;
+    }> | null;
+  }
+): OrcamentoHistoricoRecord {
+  const orcamento_itens = [...(row.orcamento_itens ?? [])]
+    .map((item) => ({
+      servico_nome: item.servico_nome ?? "",
+      quantidade: Number(item.quantidade),
+      ordem: Number(item.ordem) || 0,
+    }))
+    .sort((a, b) => a.ordem - b.ordem);
+  return { ...row, orcamento_itens };
+}
 
 function normalizeOrcamentoPayload(
   payload: OrcamentoInsertPayload
@@ -123,20 +153,32 @@ export async function gerarNumeroOrcamento(): Promise<string> {
 }
 
 /** Orçamentos do ano civil, sem teto. A aba de mês filtra este conjunto. */
-export async function listarOrcamentos(ano: number): Promise<OrcamentoRecord[]> {
+export async function listarOrcamentos(
+  ano: number
+): Promise<OrcamentoHistoricoRecord[]> {
   const supabase = createClient();
   const { inicio, fimExclusivo } = intervaloAnoIso(ano);
   return lerTodosOsLotes(async (from, to) => {
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("*")
+      .select(ORCAMENTO_HISTORICO_SELECT)
       .gte("data_proposta", inicio)
       .lt("data_proposta", fimExclusivo)
       .order("data_proposta", { ascending: false })
       .order("id", { ascending: false })
       .range(from, to);
     if (error) throw error;
-    return (data ?? []) as OrcamentoRecord[];
+    return (data ?? []).map((row) =>
+      mapOrcamentoHistorico(
+        row as OrcamentoRecord & {
+          orcamento_itens?: Array<{
+            servico_nome?: string | null;
+            quantidade?: number | string | null;
+            ordem?: number | string | null;
+          }> | null;
+        }
+      )
+    );
   });
 }
 

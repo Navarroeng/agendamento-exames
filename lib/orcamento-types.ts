@@ -157,6 +157,17 @@ export interface OrcamentoComItens extends OrcamentoRecord {
   orcamento_itens: OrcamentoItemRecord[];
 }
 
+/** Item reduzido da listagem: só o necessário para a quantidade de colaboradores. */
+export interface OrcamentoHistoricoItem {
+  servico_nome: string;
+  quantidade: number;
+  ordem: number;
+}
+
+export interface OrcamentoHistoricoRecord extends OrcamentoRecord {
+  orcamento_itens: OrcamentoHistoricoItem[];
+}
+
 export interface OrcamentoItemFormItem {
   id: string;
   servico_id: string;

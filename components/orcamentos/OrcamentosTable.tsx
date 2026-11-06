@@ -1,11 +1,13 @@
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { Panel } from "@/components/ui/Panel";
 import { IconEye, IconFileText } from "@/components/ui/icons/OutlineIcons";
+import { formatQuantidadeColaboradoresHistorico } from "@/lib/orcamento-calculo";
 import { formatValorOrcamentoExibicao } from "@/lib/orcamento-modalidade";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
   formatOrcamentoOrigemCliente,
+  type OrcamentoHistoricoRecord,
   type OrcamentoRecord,
 } from "@/lib/orcamento-types";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
@@ -18,7 +20,7 @@ import { OrcamentoMesTabs } from "./OrcamentoMesTabs";
 import { OrcamentoRowActionsMenu } from "./OrcamentoRowActionsMenu";
 
 interface OrcamentosTableProps {
-  orcamentos: OrcamentoRecord[];
+  orcamentos: OrcamentoHistoricoRecord[];
   loading: boolean;
   error: string | null;
   mesSelecionado: OrcamentoYearMonth;
@@ -79,7 +81,7 @@ export function OrcamentosTable({
           </p>
         )}
         {!loading && !error && orcamentos.length > 0 && (
-          <table className="table-premium w-full min-w-[1020px]">
+          <table className="table-premium w-full min-w-[1100px]">
             <thead>
               <tr>
                 <th>Número</th>
@@ -88,6 +90,12 @@ export function OrcamentosTable({
                 <th>Origem</th>
                 <th>Responsável</th>
                 <th>Valor</th>
+                <th
+                  className="w-[4.75rem] !text-center"
+                  title="Quantidade de colaboradores"
+                >
+                  Qtde. Colab.
+                </th>
                 <th>Status</th>
                 <th className="w-[88px] text-center">Visualizar</th>
                 <th className="w-[72px] text-center">Ações</th>
@@ -111,6 +119,9 @@ export function OrcamentosTable({
                     </td>
                     <td className="font-semibold text-navy">
                       {formatValorOrcamentoExibicao(orcamento)}
+                    </td>
+                    <td className="text-center tabular-nums">
+                      {formatQuantidadeColaboradoresHistorico(orcamento)}
                     </td>
                     <td>
                       <span
