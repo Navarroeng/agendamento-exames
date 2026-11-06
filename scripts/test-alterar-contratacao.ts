@@ -14,7 +14,10 @@ import {
   textoPlanoContrato,
   type ContratoNavarroContexto,
 } from "../lib/contrato-navarro";
-import { resolverGradeMensalidades } from "../lib/mensalidade-parcelas";
+import {
+  planejarPersistenciaParcelas,
+  resolverGradeMensalidades,
+} from "../lib/mensalidade-parcelas";
 import { ORCAMENTO_MODALIDADE_MENSALIDADE } from "../lib/orcamento-modalidade";
 
 const VIGENCIA = "2026-10-14";
@@ -290,8 +293,75 @@ assert.match(sql, /check \(status = 'pendente'\)/);
 assert.match(sql, /idempotencia uuid not null unique/);
 assert.match(sql, /Os dados mudaram depois da prévia/);
 assert.doesNotMatch(sql, /insert into public\.orcamento_mensalidade_parcelas/i);
+assert.match(sql, /before update on public\.orcamento_mensalidade_parcelas/);
+assert.doesNotMatch(sql, /before insert on public\.orcamento_mensalidade_parcelas/i);
+assert.match(sql, /new\.valor is distinct from old\.valor/);
 assert.doesNotMatch(sql, /update public\.agendamentos/i);
 assert.doesNotMatch(sql, /update public\.periodicos/i);
 assert.doesNotMatch(sql, /insert into public\.funcionarios/i);
+
+const persistencia = planejarPersistenciaParcelas({
+  existentes: [
+    {
+      vigenciaInicio: VIGENCIA,
+      numero: 1,
+      vencimentoIso: "2026-11-10",
+      valor: 270,
+      pagoEmIso: null,
+    },
+  ],
+  desejadas: [
+    {
+      numero: 1,
+      vencimentoIso: "2026-11-10",
+      valor: 340,
+      pagoEmIso: "2026-11-10",
+    },
+    {
+      numero: 2,
+      vencimentoIso: "2026-12-10",
+      valor: 340,
+      pagoEmIso: null,
+    },
+  ],
+});
+assert.deepEqual(persistencia.atualizarPagoEm, [
+  { numero: 1, pagoEmIso: "2026-11-10" },
+]);
+assert.equal(persistencia.inserir.length, 1);
+assert.equal(persistencia.inserir[0]?.numero, 2);
+assert.equal(persistencia.inserir[0]?.valor, 340);
+
+const parcelasService = fs.readFileSync(
+  path.join(process.cwd(), "services/mensalidade-parcelas.service.ts"),
+  "utf8"
+);
+const baixa = parcelasService.slice(
+  parcelasService.indexOf("export async function registrarBaixaParcelaMensalidade")
+);
+assert.match(baixa, /pago_em: params\.pagoEmIso/);
+assert.match(baixa, /valor_recebido: params\.valorRecebido/);
+assert.doesNotMatch(baixa.slice(0, baixa.indexOf(".update(payload)")), /\n\s*valor:/);
+assert.match(
+  parcelasService.slice(
+    parcelasService.indexOf("export async function inserirParcelasMensalidadeAusentes"),
+    parcelasService.indexOf("export async function salvarObservacaoMensalidades")
+  ),
+  /\.insert\(/
+);
+
+const reversao = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    "supabase/migrations/146_reverter_aprovacao_contrato_nao_assinado.sql"
+  ),
+  "utf8"
+);
+const reversaoParcelas = reversao.slice(
+  reversao.indexOf("update public.orcamento_mensalidade_parcelas"),
+  reversao.indexOf("update public.cliente_contratos")
+);
+assert.match(reversaoParcelas, /set sem_vigencia_em = now\(\)/);
+assert.doesNotMatch(reversaoParcelas, /valor\s*=/);
 
 console.log("OK  alterar contratacao");

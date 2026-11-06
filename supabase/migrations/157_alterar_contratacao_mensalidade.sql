@@ -154,6 +154,9 @@ create trigger trg_bloquear_valor_mensalidade_fora_da_alteracao
   before update on public.orcamento_mensalidade_parcelas
   for each row execute function public.bloquear_valor_mensalidade_fora_da_alteracao();
 
+comment on function public.bloquear_valor_mensalidade_fora_da_alteracao() is
+  'Bloqueia somente UPDATE que mude orcamento_mensalidade_parcelas.valor fora da ação Alterar contratação. INSERT da geração inicial, da inclusão de parcelas ausentes e da nova vigência permanece livre. UPDATE de pago_em, valor_recebido, comprovante e sem_vigencia_em permanece livre quando o valor não muda.';
+
 create or replace function public.classificar_alteracao_contratacao_mensalidade(
   p_aprovacao_id uuid,
   p_quantidade integer,
