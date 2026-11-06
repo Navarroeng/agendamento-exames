@@ -111,6 +111,7 @@ export function ImplantacaoClientesPage() {
         onSubstituirFuncionarios={handleSubstituirFuncionarios}
         onRemoverFuncionarios={handleRemoverFuncionarios}
         onAprovacaoAtualizada={handleAprovacaoAtualizada}
+        permitirAlterarContratacao
         onSalvarLogo={handleSalvarLogo}
         onSubstituirLogo={handleSubstituirLogo}
         onRemoverLogo={handleRemoverLogo}

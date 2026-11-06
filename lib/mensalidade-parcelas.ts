@@ -128,6 +128,38 @@ function datasMensalidadesDaVigencia(params: {
   });
 }
 
+/**
+ * Valor que vale antes da alteração, só para parcela ainda não gravada
+ * e anterior ao número de efeito da mesma vigência.
+ * Parcela já salva continua com o valor do próprio registro.
+ */
+export type EfeitoValorMensalidade = {
+  vigenciaInicio: string;
+  numero: number;
+  valorAnterior: number;
+};
+
+function valorGradeNaoRegistrada(params: {
+  numero: number;
+  valorBase: number;
+  vigenciaInicio: string | null;
+  efeito?: EfeitoValorMensalidade | null;
+}): number {
+  const efeito = params.efeito;
+  const anterior = Number(efeito?.valorAnterior);
+  if (
+    efeito &&
+    params.vigenciaInicio &&
+    isoData(efeito.vigenciaInicio) === params.vigenciaInicio &&
+    params.numero < efeito.numero &&
+    Number.isFinite(anterior) &&
+    anterior > 0
+  ) {
+    return anterior;
+  }
+  return params.valorBase;
+}
+
 export function resolverGradeMensalidades(params: {
   vigenciaInicio?: string | null;
   vigenciaFim?: string | null;
@@ -137,6 +169,7 @@ export function resolverGradeMensalidades(params: {
   valorMensal?: number | null;
   registradas?: ParcelaMensalidadeRegistrada[];
   hojeIso?: string;
+  efeito?: EfeitoValorMensalidade | null;
 }): GradeMensalidades {
   const inicio = isoData(params.vigenciaInicio);
   const fim = isoData(params.vigenciaFim);
@@ -174,7 +207,14 @@ export function resolverGradeMensalidades(params: {
         return {
           numero,
           vencimentoIso,
-          valor: salva ? salva.valor : valor,
+          valor: salva
+            ? salva.valor
+            : valorGradeNaoRegistrada({
+                numero,
+                valorBase: valor,
+                vigenciaInicio: inicio,
+                efeito: params.efeito,
+              }),
           pagoEmIso: salva ? pagoEmIso : null,
           registrada: Boolean(salva),
           situacao: situacaoParcelaMensalidade({
@@ -213,7 +253,12 @@ export function resolverGradeMensalidades(params: {
     parcelas: datas.map((vencimentoIso, index) => ({
       numero: index + 1,
       vencimentoIso,
-      valor,
+      valor: valorGradeNaoRegistrada({
+        numero: index + 1,
+        valorBase: valor,
+        vigenciaInicio: inicio,
+        efeito: params.efeito,
+      }),
       pagoEmIso: null,
       registrada: false,
       situacao: situacaoParcelaMensalidade({
@@ -333,6 +378,7 @@ export function parcelasParaInserirDaGrade(params: {
   valorMensal?: number | null;
   valorFinal?: number | null;
   registradas?: ParcelaMensalidadeRegistrada[];
+  efeito?: EfeitoValorMensalidade | null;
 }): Array<{
   numero: number;
   vencimentoIso: string;
@@ -349,6 +395,7 @@ export function parcelasParaInserirDaGrade(params: {
       valorFinal: params.valorFinal,
     }),
     registradas: params.registradas,
+    efeito: params.efeito,
   });
   if (!grade.ok) return [];
   const plano = planejarPersistenciaParcelas({

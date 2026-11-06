@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useAuditoriaUsuario } from "@/contexts/AuthContext";
+import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import { formatDateTimeBR } from "@/lib/format-datetime";
 import { AUDITORIA_ACOES, AUDITORIA_MODULOS } from "@/lib/auditoria";
 import {
@@ -68,6 +69,10 @@ import {
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
 import type { OrcamentoContratoDocumentoRecord } from "@/lib/orcamento-contrato-documento";
 import type { OrcamentoComItens } from "@/lib/orcamento-types";
+import {
+  listarAditivosContratacaoPendentes,
+  type AditivoContratacaoPendente,
+} from "@/services/alterar-contratacao.service";
 import { registrarAuditoria } from "@/services/auditoria.service";
 import { salvarCondicaoContratoParecer } from "@/services/orcamento-aprovacao.service";
 import {
@@ -101,6 +106,9 @@ export function OrcamentoContratoGerarPanel({
   const auditContext = useAuditoriaUsuario();
   const [documentos, setDocumentos] = useState<
     OrcamentoContratoDocumentoRecord[]
+  >([]);
+  const [aditivosPendentes, setAditivosPendentes] = useState<
+    AditivoContratacaoPendente[]
   >([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [etapa, setEtapa] = useState<EtapaFluxo>("idle");
@@ -254,7 +262,12 @@ export function OrcamentoContratoGerarPanel({
       }),
     [quantidadeCronograma, valorContrato]
   );
-  const vigentes = documentos.filter((doc) => !doc.sem_validade_em);
+  const substituidos = documentos.filter(
+    (doc) => !doc.sem_validade_em && Boolean(doc.substituido_em)
+  );
+  const vigentes = documentos.filter(
+    (doc) => !doc.sem_validade_em && !doc.substituido_em
+  );
   const semValidade = documentos.filter((doc) => Boolean(doc.sem_validade_em));
   const atual = vigentes[0] ?? null;
   const modeloPdfAtual =
@@ -269,8 +282,17 @@ export function OrcamentoContratoGerarPanel({
     setLoadingDocs(true);
     try {
       const rows = await listarContratoDocumentos(aprovacao.id);
+      let pendentes: AditivoContratacaoPendente[] = [];
+      try {
+        pendentes = (
+          await listarAditivosContratacaoPendentes(aprovacao.id)
+        ).filter((item) => item.status === "pendente");
+      } catch (aditivoErr) {
+        console.error(aditivoErr);
+      }
       if (seq !== loadSeq.current) return;
       setDocumentos(rows);
+      setAditivosPendentes(pendentes);
     } catch (err) {
       if (seq !== loadSeq.current) return;
       console.error(err);
@@ -283,7 +305,7 @@ export function OrcamentoContratoGerarPanel({
     } finally {
       if (seq === loadSeq.current) setLoadingDocs(false);
     }
-  }, [aprovacao.id]);
+  }, [aprovacao.id, aprovacao.updated_at]);
 
   function aplicarDocumentoSalvo(saved: OrcamentoContratoDocumentoRecord) {
     loadSeq.current += 1;
@@ -910,9 +932,11 @@ export function OrcamentoContratoGerarPanel({
             <p className="mt-1 text-[12px] text-[#64748b]">Carregando…</p>
           ) : (
             <p className="mt-1 text-[12px] text-[#64748b]">
-              {semValidade.length > 0
-                ? "Nenhum contrato vigente. O PDF da aprovação revertida permanece no histórico, sem validade."
-                : "Nenhum contrato gerado ainda."}
+              {substituidos.length > 0
+                ? "Nenhum PDF atual. A versão anterior foi substituída e permanece no histórico. Gere a nova versão nesta tela. Ela não é enviada ao cliente."
+                : semValidade.length > 0
+                  ? "Nenhum contrato vigente. O PDF da aprovação revertida permanece no histórico, sem validade."
+                  : "Nenhum contrato gerado ainda."}
             </p>
           )}
           {atualDesatualizado ? (
@@ -1174,6 +1198,70 @@ export function OrcamentoContratoGerarPanel({
             </div>
           )}
         </div>
+      ) : null}
+
+      {aditivosPendentes.length > 0 ? (
+        <div className="mt-3 space-y-1 rounded-lg border border-[#f3d19c] bg-[#fff8eb] px-3 py-2 text-[12px] text-[#7c4a03]">
+          <p className="font-semibold">
+            O contrato assinado foi preservado. A alteração exige aditivo e
+            continua pendente de formalização. Nenhum aditivo foi gerado nem
+            assinado.
+          </p>
+          {aditivosPendentes.map((aditivo) => (
+            <p key={aditivo.id}>
+              {aditivo.quantidade_anterior} → {aditivo.quantidade_nova}{" "}
+              colaboradores · {formatCurrency(aditivo.valor_anterior)} →{" "}
+              {formatCurrency(aditivo.valor_novo)} · a partir de{" "}
+              {formatDateIsoToBR(aditivo.efeito_vencimento)} (mensalidade{" "}
+              {aditivo.efeito_numero})
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {substituidos.length > 0 ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[12px] font-semibold text-navy">
+            PDFs substituídos ({substituidos.length})
+          </summary>
+          <ul className="mt-2 space-y-1.5">
+            {substituidos.map((doc) => (
+              <li
+                key={doc.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e4ebf4] bg-white px-3 py-2 text-[12px] text-[#475569]"
+              >
+                <span>
+                  PDF v{doc.versao}
+                  {isMensalidadeDoc
+                    ? ` · ${rotuloModeloContratualGestaoSst(modeloContratualDoPdfSalvo(doc))}`
+                    : ""}
+                  {" · "}
+                  {formatDateTimeBR(doc.gerado_em)}
+                  {doc.gerado_por ? ` · ${doc.gerado_por}` : ""}
+                  {" · Substituída"}
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    className="font-semibold text-brand-blue hover:underline"
+                    disabled={busy}
+                    onClick={() => void abrirDocumento(doc)}
+                  >
+                    Visualizar
+                  </button>
+                  <button
+                    type="button"
+                    className="font-semibold text-brand-blue hover:underline"
+                    disabled={busy}
+                    onClick={() => void baixarDocumento(doc)}
+                  >
+                    Baixar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       {anteriores.length > 0 ? (

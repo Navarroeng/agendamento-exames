@@ -188,6 +188,16 @@ export interface OrcamentoAprovacaoRecord {
   motivo_reversao?: string | null;
   /** Versão das condições comerciais vigentes. Sobe só quando elas mudam. */
   condicoes_revisao?: number | null;
+  /** Vigência em que a última alteração de contratação passou a valer. */
+  contratacao_efeito_vigencia_inicio?: string | null;
+  /** Número da mensalidade a partir da qual a última alteração vale. */
+  contratacao_efeito_numero?: number | null;
+  /** Vencimento da mensalidade em que a última alteração passa a valer. */
+  contratacao_efeito_vencimento?: string | null;
+  /** Mensalidade que permanece nas parcelas anteriores a essa alteração. */
+  contratacao_valor_anterior?: number | null;
+  /** Quantidade que permanece nas parcelas anteriores a essa alteração. */
+  contratacao_quantidade_anterior?: number | null;
   created_at: string;
   updated_at: string;
   orcamento_aprovacao_itens?: OrcamentoAprovacaoItemRecord[];
