@@ -415,6 +415,40 @@ export function resolveQuantidadeColaboradoresOrcamento(
   return Number.isFinite(quantidade) && quantidade >= 1 ? quantidade : 0;
 }
 
+const QUANTIDADE_COLABORADORES_AUSENTE = "—";
+
+/**
+ * Quantidade única do histórico.
+ * A coluna do formulário e da visualização decide se a quantidade se aplica.
+ * O número é o do item de referência já usado na proposta (pacote, ou o
+ * primeiro serviço que pede colaboradores) — sem somar itens e sem usar o valor.
+ */
+export function formatQuantidadeColaboradoresHistorico(orcamento: {
+  orcamento_itens?: Array<{
+    servico_nome?: string | null;
+    quantidade?: number | null;
+    ordem?: number | null;
+  }> | null;
+}): string {
+  const itens = orcamento.orcamento_itens ?? [];
+  if (!exibeColunaQuantidadeColaboradores(itens)) {
+    return QUANTIDADE_COLABORADORES_AUSENTE;
+  }
+  const quantidade = resolveQuantidadeColaboradoresOrcamento({
+    orcamento_itens: itens.map((item, index) => ({
+      id: String(index),
+      orcamento_id: "",
+      servico_id: null,
+      servico_nome: item.servico_nome ?? "",
+      quantidade: Number(item.quantidade),
+      valor_unitario: 0,
+      valor_total: 0,
+      ordem: item.ordem ?? index,
+    })),
+  });
+  return quantidade >= 1 ? String(quantidade) : QUANTIDADE_COLABORADORES_AUSENTE;
+}
+
 export function resolveItemValorParaFormulario(
   item: OrcamentoItemRecord
 ): number {

@@ -16,12 +16,21 @@ import {
   resolveItemValorForm,
   resolveItemValorParaFormulario,
   resolveItemValorServico,
+  formatQuantidadeColaboradoresHistorico,
   resolveQuantidadeColaboradoresOrcamento,
   validateOrcamentoItensValores,
   applyValorAutomaticoPacoteCompletoSstItem,
 } from "../lib/orcamento-calculo";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { OrcamentoItemFormItem } from "../lib/orcamento-types";
+import { GESTAO_SST_MENSAL_NOME } from "../lib/orcamento-modalidade";
 import { SERVICO_AET_NOME } from "../lib/servico-aet";
+import { SERVICO_INSALUBRIDADE_NOME } from "../lib/servico-insalubridade";
+import { SERVICO_LTCAT_NOME } from "../lib/servico-ltcat";
+import { SERVICO_PARECER_TECNICO_NOME } from "../lib/servico-parecer-tecnico";
+import { SERVICO_PERICULOSIDADE_NOME } from "../lib/servico-periculosidade";
+import { SERVICO_PGR_NOME } from "../lib/servico-pgr";
 import { PACOTE_COMPLETO_SST_NOME } from "../lib/servico-sst-pacote";
 
 function itemForm(
@@ -501,5 +510,123 @@ assert.equal(
   }),
   3
 );
+
+function itemQtd(
+  servico_nome: string,
+  quantidade: number | null,
+  ordem = 0
+) {
+  return { servico_nome, quantidade, ordem };
+}
+
+const mensalRenovacao = {
+  modalidade: "mensalidade",
+  origem_cliente: "renovacao",
+  valor_total: 9600,
+  orcamento_itens: [itemQtd(GESTAO_SST_MENSAL_NOME, 18)],
+};
+assert.equal(formatQuantidadeColaboradoresHistorico(mensalRenovacao), "18");
+const pontualAnual = {
+  modalidade: "pontual",
+  valor_total: 2200,
+  orcamento_itens: [itemQtd(PACOTE_COMPLETO_SST_NOME, 18)],
+};
+assert.equal(formatQuantidadeColaboradoresHistorico(pontualAnual), "18");
+const mesmaQuantidadeEmDoisServicos = {
+  valor_total: 3000,
+  orcamento_itens: [
+    itemQtd(PACOTE_COMPLETO_SST_NOME, 8, 0),
+    itemQtd("Treinamento NR", 8, 1),
+  ],
+};
+assert.equal(
+  formatQuantidadeColaboradoresHistorico(mesmaQuantidadeEmDoisServicos),
+  "8"
+);
+assert.equal(
+  formatQuantidadeColaboradoresHistorico({
+    orcamento_itens: [
+      itemQtd(PACOTE_COMPLETO_SST_NOME, 3, 0),
+      itemQtd("Audiometria", 2, 1),
+    ],
+  }),
+  "3"
+);
+assert.equal(
+  formatQuantidadeColaboradoresHistorico({
+    orcamento_itens: [
+      itemQtd("Treinamento NR", 9, 0),
+      itemQtd("Audiometria", 4, 1),
+    ],
+  }),
+  "9"
+);
+assert.equal(
+  formatQuantidadeColaboradoresHistorico({
+    orcamento_itens: [
+      itemQtd(SERVICO_LTCAT_NOME, 20, 0),
+      itemQtd("Audiometria", 6, 1),
+    ],
+  }),
+  "6"
+);
+for (const servico of [
+  SERVICO_AET_NOME,
+  SERVICO_INSALUBRIDADE_NOME,
+  SERVICO_PERICULOSIDADE_NOME,
+  SERVICO_PARECER_TECNICO_NOME,
+  SERVICO_LTCAT_NOME,
+  SERVICO_PGR_NOME,
+]) {
+  const semColaboradores = {
+    valor_total: 4500,
+    orcamento_itens: [itemQtd(servico, servico === SERVICO_LTCAT_NOME ? 20 : 4)],
+  };
+  assert.equal(
+    formatQuantidadeColaboradoresHistorico(semColaboradores),
+    "—",
+    servico
+  );
+}
+assert.equal(
+  formatQuantidadeColaboradoresHistorico({ orcamento_itens: [] }),
+  "—"
+);
+const semQuantidadeComValor = {
+  valor_total: 1300,
+  orcamento_itens: [itemQtd(PACOTE_COMPLETO_SST_NOME, null)],
+};
+assert.equal(
+  formatQuantidadeColaboradoresHistorico(semQuantidadeComValor),
+  "—"
+);
+const quantidadeZero = {
+  valor_total: 1300,
+  orcamento_itens: [itemQtd("Audiometria", 0)],
+};
+assert.equal(formatQuantidadeColaboradoresHistorico(quantidadeZero), "—");
+
+const root = join(__dirname, "..");
+const tableSrc = readFileSync(
+  join(root, "components/orcamentos/OrcamentosTable.tsx"),
+  "utf8"
+);
+const valorHeader = tableSrc.indexOf("<th>Valor</th>");
+const qtdeHeader = tableSrc.indexOf("Qtde. Colab.");
+const statusHeader = tableSrc.indexOf("<th>Status</th>");
+assert.ok(valorHeader >= 0 && qtdeHeader > valorHeader && statusHeader > qtdeHeader);
+assert.match(tableSrc, /title="Quantidade de colaboradores"/);
+assert.match(tableSrc, /formatQuantidadeColaboradoresHistorico/);
+assert.doesNotMatch(tableSrc, /colSpan/);
+
+const listSrc = readFileSync(
+  join(root, "services/orcamento.service.ts"),
+  "utf8"
+);
+assert.match(
+  listSrc,
+  /orcamento_itens \(\s*servico_nome,\s*quantidade,\s*ordem/
+);
+assert.doesNotMatch(listSrc, /funcionarios/);
 
 console.log("test-orcamento-calculo: OK");

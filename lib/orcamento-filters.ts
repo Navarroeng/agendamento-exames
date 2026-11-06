@@ -37,18 +37,18 @@ export function compareOrcamentoNumeroDesc(a: string, b: string): number {
   return b.localeCompare(a);
 }
 
-export function sortOrcamentosByNumeroDesc(
-  orcamentos: OrcamentoRecord[]
-): OrcamentoRecord[] {
+export function sortOrcamentosByNumeroDesc<
+  T extends Pick<OrcamentoRecord, "numero">,
+>(orcamentos: T[]): T[] {
   return [...orcamentos].sort((a, b) =>
     compareOrcamentoNumeroDesc(a.numero, b.numero)
   );
 }
 
-export function filterOrcamentos(
-  orcamentos: OrcamentoRecord[],
+export function filterOrcamentos<T extends OrcamentoRecord>(
+  orcamentos: T[],
   filters: OrcamentoFilters
-): OrcamentoRecord[] {
+): T[] {
   const busca = filters.busca.trim();
 
   const filtered = orcamentos.filter((orcamento) => {
