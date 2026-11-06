@@ -42,7 +42,11 @@ import {
   ORCAMENTO_MENSALIDADE_VIGENCIA_LABEL,
   formatValorMensalidade,
   isOrcamentoMensalidade,
+  orcamentoPossuiGestaoSstMensal,
+  resolveGestaoCompletaSstServico,
 } from "@/lib/orcamento-modalidade";
+import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
+import { AlterarContratacaoButton } from "./AlterarContratacaoModal";
 import {
   ORCAMENTO_STATUS_BADGE,
   ORCAMENTO_STATUS_LABELS,
@@ -173,6 +177,8 @@ interface OrcamentoAprovarModalProps {
   onSubstituirFuncionarios: (aprovacaoId: string, file: File) => Promise<void>;
   onRemoverFuncionarios: (aprovacaoId: string) => Promise<void>;
   onAprovacaoAtualizada?: (aprovacao: OrcamentoAprovacaoRecord) => void;
+  /** Botão Alterar contratação, só na Implantação de Clientes. */
+  permitirAlterarContratacao?: boolean;
   onSalvarLogo: (
     aprovacaoId: string,
     file: File | null,
@@ -226,6 +232,7 @@ export function OrcamentoAprovarModal({
   onSubstituirFuncionarios,
   onRemoverFuncionarios,
   onAprovacaoAtualizada,
+  permitirAlterarContratacao = false,
   onSalvarLogo,
   onSubstituirLogo,
   onRemoverLogo,
@@ -283,6 +290,7 @@ export function OrcamentoAprovarModal({
   const [treinoForm, setTreinoForm] =
     useState<OrcamentoAbaTreinamentoForm>(emptyTreinamentoForm);
   const sessaoModalRef = useRef<string | null>(null);
+  const aprovacaoSyncRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -376,6 +384,19 @@ export function OrcamentoAprovarModal({
     setVisitaEndereco(aprovacao?.visita_tecnica_endereco ?? "");
     setVisitaObservacoes(aprovacao?.visita_tecnica_observacoes ?? "");
   }, [open, orcamento, aprovacao, mode, initialTab, servicos, treinamento]);
+
+  useEffect(() => {
+    if (!open || !orcamento || !aprovacao?.updated_at) {
+      aprovacaoSyncRef.current = null;
+      return;
+    }
+    if (sessaoModalRef.current == null) return;
+    if (aprovacaoSyncRef.current === aprovacao.updated_at) return;
+    const primeiraLeitura = aprovacaoSyncRef.current == null;
+    aprovacaoSyncRef.current = aprovacao.updated_at;
+    if (primeiraLeitura) return;
+    setForm(buildAprovacaoFormFromRecord(orcamento, aprovacao));
+  }, [open, orcamento, aprovacao]);
 
   useEffect(() => {
     if (!open) return;
@@ -494,6 +515,15 @@ export function OrcamentoAprovarModal({
     orcamento?.modalidade,
     aprovacao?.mensalidade_pagamento
   );
+  const podeAlterarContratacao =
+    permitirAlterarContratacao &&
+    controleMensalidades &&
+    cicloVigente &&
+    Boolean(orcamento && aprovacao) &&
+    orcamentoPossuiGestaoSstMensal(
+      orcamento?.orcamento_itens,
+      resolveGestaoCompletaSstServico(servicos)?.id ?? null
+    );
   const gradeMensalidades = useMemo(() => {
     const base = resolverGradeMensalidades({
       vigenciaInicio: vigenciaFinanceira?.inicio,
@@ -506,6 +536,10 @@ export function OrcamentoAprovarModal({
       }),
       registradas: parcelasRegistradas,
       hojeIso: todayIsoSaoPaulo(),
+      efeito: efeitoValorMensalidadeDaAprovacao(
+        aprovacao,
+        vigenciaFinanceira?.inicio
+      ),
     });
     if (!base.ok) return base;
     return {
@@ -517,10 +551,7 @@ export function OrcamentoAprovarModal({
       ),
     };
   }, [
-    aprovacao?.mensalidade_dia_vencimento,
-    aprovacao?.mensalidade_vencimento_regra,
-    aprovacao?.mensalidade_valor_mensal,
-    aprovacao?.valor_final,
+    aprovacao,
     pagamentosEditados,
     parcelasRegistradas,
     vigenciaFinanceira,
@@ -599,7 +630,14 @@ export function OrcamentoAprovarModal({
     return () => {
       cancelado = true;
     };
-  }, [aprovacao?.id, controleMensalidades, open, orcamento?.id, tab]);
+  }, [
+    aprovacao?.id,
+    aprovacao?.updated_at,
+    controleMensalidades,
+    open,
+    orcamento?.id,
+    tab,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -1125,6 +1163,14 @@ export function OrcamentoAprovarModal({
             onChange={handleTabChange}
           />
         </div>
+
+        {podeAlterarContratacao && orcamento && aprovacao ? (
+          <AlterarContratacaoButton
+            orcamento={orcamento}
+            aprovacao={aprovacao}
+            onAtualizada={onAprovacaoAtualizada}
+          />
+        ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6">
           {tab === "resumo" ? (

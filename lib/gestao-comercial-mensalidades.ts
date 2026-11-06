@@ -5,6 +5,7 @@
  * Não grava parcelas: abrir o relatório só lê o que já existe e,
  * quando a vigência contratual tem dia e valor, mostra o plano já definido.
  */
+import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
 import { formatDateIsoToBR, todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import type { GestaoComercialFilters } from "@/lib/gestao-comercial";
 import { MESES_PT } from "@/lib/gestao-comercial";
@@ -48,6 +49,9 @@ export type FonteMensalidadePrevista = {
   valorFinal?: number | null;
   vigencias?: VigenciaMensalidadePrevista[];
   parcelasRegistradas?: ParcelaMensalidadeRegistrada[];
+  contratacaoEfeitoVigenciaInicio?: string | null;
+  contratacaoEfeitoNumero?: number | null;
+  contratacaoValorAnterior?: number | null;
 };
 
 export type SituacaoMensalidadePrevista = SituacaoParcelaMensalidade | "pendencia";
@@ -382,6 +386,15 @@ export function montarMensalidadesPrevistas(
         valorMensal,
         registradas,
         hojeIso: hoje,
+        efeito: efeitoValorMensalidadeDaAprovacao(
+          {
+            contratacao_efeito_vigencia_inicio:
+              fonte.contratacaoEfeitoVigenciaInicio,
+            contratacao_efeito_numero: fonte.contratacaoEfeitoNumero,
+            contratacao_valor_anterior: fonte.contratacaoValorAnterior,
+          },
+          vigencia.inicio
+        ),
       });
       if (!grade.ok) {
         pendencias.push(...grade.pendencias);

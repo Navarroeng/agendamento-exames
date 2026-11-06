@@ -16,6 +16,7 @@ import {
   payloadAtualizacaoPagoEm,
   parcelasParaInserirDaGrade,
   planejarPersistenciaParcelas,
+  type EfeitoValorMensalidade,
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
 import {
@@ -246,6 +247,7 @@ export async function inserirParcelasMensalidadeAusentes(params: {
   vencimentoRegra: string | null;
   valorMensal: number | null;
   valorFinal: number | null;
+  efeito?: EfeitoValorMensalidade | null;
 }): Promise<number> {
   const inicio = iso(params.vigenciaInicio);
   const fim = iso(params.vigenciaFim);
@@ -259,6 +261,7 @@ export async function inserirParcelasMensalidadeAusentes(params: {
     valorMensal: params.valorMensal,
     valorFinal: params.valorFinal,
     registradas,
+    efeito: params.efeito,
   });
   if (inserir.length === 0) return 0;
 

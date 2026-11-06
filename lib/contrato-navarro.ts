@@ -260,6 +260,17 @@ export type ContratoNavarroContexto = {
   modeloVersao?: number | null;
   /** `quinto_dia_util` quando a mensalidade vence no 5º dia útil. Não é o dia 05. */
   vencimentoRegraMensalidade?: string | null;
+  /**
+   * Alteração de quantidade/mensalidade no meio da vigência já contratada.
+   * Só entra no texto quando a vigência do PDF é a mesma da alteração.
+   */
+  alteracaoContratacao?: {
+    vigenciaInicioIso: string;
+    numeroParcela: number;
+    vencimentoIso: string;
+    quantidadeAnterior: number;
+    valorAnterior: number;
+  } | null;
 };
 
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -656,10 +667,24 @@ function redigirPagamentoMensalidadeAvista(ctx: ContratoNavarroContexto): {
   return { paragrafos, bloco, depois };
 }
 
+function paragrafoAlteracaoMeioVigencia(
+  ctx: ContratoNavarroContexto
+): string | null {
+  const alt = ctx.alteracaoContratacao;
+  if (!alt || alt.numeroParcela < 2) return null;
+  const inicio = (ctx.vigenciaInicioIso ?? "").trim().slice(0, 10);
+  const efeito = (alt.vigenciaInicioIso ?? "").trim().slice(0, 10);
+  const vencimento = (alt.vencimentoIso ?? "").trim().slice(0, 10);
+  if (!inicio || inicio !== efeito || !ISO_DATA.test(vencimento)) return null;
+  return `A partir de ${formatDateIsoToBR(vencimento)} (mensalidade ${alt.numeroParcela}), o valor mensal contratado passa a ser ${formatMoedaComExtenso(ctx.valor)}, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}. As mensalidades com vencimento anterior a essa data permanecem nos valores já lançados. Esta alteração não retroage ao início da vigência.`;
+}
+
 function redigirPagamentoMensalidade(ctx: ContratoNavarroContexto): string[] {
   const meses = mesesVigenciaContexto(ctx);
+  const efeito = paragrafoAlteracaoMeioVigencia(ctx);
   return [
-    `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
+    efeito ??
+      `A CONTRATANTE pagará à CONTRATADA o valor mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
     "O pagamento mensal é a forma de pagamento de um compromisso anual correspondente à vigência contratada. Não há cobrança única do saldo nem antecipação automática das mensalidades.",
     ...FATURAMENTO_EXAMES_MENSALIDADE,
     ...redigirRenovacaoSimplificada(ctx, false),
@@ -1043,8 +1068,10 @@ function redigirPagamentoMensalidadeV2(ctx: ContratoNavarroContexto): string[] {
     ctx.vencimentoRegraMensalidade
   );
   const multa = redigirInadimplencia(ctx.modalidade)[0];
+  const efeito = paragrafoAlteracaoMeioVigencia(ctx);
   return [
-    `A CONTRATANTE pagará à CONTRATADA o valor bruto mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
+    efeito ??
+      `A CONTRATANTE pagará à CONTRATADA o valor bruto mensal de ${formatMoedaComExtenso(ctx.valor)}, mediante ${formatNumeroComExtenso(meses)} mensalidades durante a vigência contratual, considerado o quantitativo de ${fraseQuantitativoColaboradores(ctx.colaboradores)}.`,
     redigirValorExameClinicoAvulsoV2(ctx),
     ...faturamentoExamesV2(quinto),
     ...redigirVencimentoMensalidadesV2(ctx),

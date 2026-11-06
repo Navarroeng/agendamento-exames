@@ -6,6 +6,7 @@ import {
   situacaoParcelaMensalidade,
   usaControleParcelasMensalidade,
   valorMensalContratado,
+  type EfeitoValorMensalidade,
   type ParcelaMensalidadeRegistrada,
   type SituacaoParcelaMensalidade,
 } from "@/lib/mensalidade-parcelas";
@@ -128,6 +129,7 @@ export type FonteGradeCobranca = {
   valorMensal: number | null;
   valorFinal: number | null;
   registradas: ParcelaMensalidadeRegistrada[];
+  efeito?: EfeitoValorMensalidade | null;
 };
 
 export type ParcelaMensalidadeAusente = {
@@ -174,6 +176,7 @@ export function completarCobrancasComGradeFinanceiro(
         valorFinal: fonte.valorFinal,
       }),
       registradas: fonte.registradas,
+      efeito: fonte.efeito,
     });
     if (!grade.ok) continue;
     for (const parcela of grade.parcelas) {
@@ -289,6 +292,7 @@ export function decidirPersistenciaParcelaCalculada(params: {
       mensalidadeValorMensal: params.fonte.valorMensal,
       valorFinal: params.fonte.valorFinal,
     }),
+    efeito: params.fonte.efeito,
     registradas: params.fonte.registradas,
   });
   const parcela = grade.ok

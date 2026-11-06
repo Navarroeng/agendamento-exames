@@ -286,6 +286,9 @@ type AprovacaoMensalidadeQueryRow = {
   mensalidade_dia_vencimento: number | null;
   mensalidade_vencimento_regra?: string | null;
   valor_final: number | string | null;
+  contratacao_efeito_vigencia_inicio?: string | null;
+  contratacao_efeito_numero?: number | null;
+  contratacao_valor_anterior?: number | string | null;
   revertida_em?: string | null;
   orcamentos: {
     numero: string;
@@ -328,6 +331,9 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
         mensalidade_dia_vencimento,
         mensalidade_vencimento_regra,
         valor_final,
+        contratacao_efeito_vigencia_inicio,
+        contratacao_efeito_numero,
+        contratacao_valor_anterior,
         revertida_em,
         orcamentos!inner (
           numero,
@@ -344,7 +350,10 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
         `;
   const selectMensalidadesLegado = selectMensalidades
     .replace(/\n\s*revertida_em,/, "")
-    .replace(/\n\s*aprovacao_revertida_em/, "");
+    .replace(/\n\s*aprovacao_revertida_em/, "")
+    .replace(/\n\s*contratacao_efeito_vigencia_inicio,/, "")
+    .replace(/\n\s*contratacao_efeito_numero,/, "")
+    .replace(/\n\s*contratacao_valor_anterior,/, "");
   const aprovacoes: AprovacaoMensalidadeQueryRow[] = [];
   let selectMensalidadesUsado = selectMensalidades;
   for (let from = 0; ; from += SELECT_PAGE_SIZE) {
@@ -353,6 +362,22 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
       .select(selectMensalidadesUsado)
       .order("id", { ascending: true })
       .range(from, from + SELECT_PAGE_SIZE - 1);
+    if (
+      error &&
+      /contratacao_efeito_vigencia_inicio|contratacao_efeito_numero|contratacao_valor_anterior/i.test(
+        error.message ?? ""
+      )
+    ) {
+      selectMensalidadesUsado = selectMensalidadesUsado
+        .replace(/\n\s*contratacao_efeito_vigencia_inicio,/, "")
+        .replace(/\n\s*contratacao_efeito_numero,/, "")
+        .replace(/\n\s*contratacao_valor_anterior,/, "");
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectMensalidadesUsado)
+        .order("id", { ascending: true })
+        .range(from, from + SELECT_PAGE_SIZE - 1));
+    }
     if (
       error &&
       /mensalidade_vencimento_regra|schema cache|42703/i.test(error.message ?? "")
@@ -465,6 +490,13 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
       valorFinal: numeroOuNulo(raw.valor_final),
       vigencias,
       parcelasRegistradas: parcelasPorAprovacao.get(raw.id) ?? [],
+      contratacaoEfeitoVigenciaInicio:
+        raw.contratacao_efeito_vigencia_inicio ?? null,
+      contratacaoEfeitoNumero:
+        raw.contratacao_efeito_numero == null
+          ? null
+          : Number(raw.contratacao_efeito_numero),
+      contratacaoValorAnterior: numeroOuNulo(raw.contratacao_valor_anterior),
     });
   }
 

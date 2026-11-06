@@ -28,6 +28,9 @@ export interface OrcamentoContratoDocumentoRecord {
   desatualizado_em?: string | null;
   /** PDF conservado após reversão da aprovação. Não é o contrato vigente do processo. */
   sem_validade_em?: string | null;
+  /** PDF anterior à alteração de contratação. Não é a versão atual. */
+  substituido_em?: string | null;
+  substituido_motivo?: string | null;
 }
 
 export interface OrcamentoContratoDocumentoInsert {

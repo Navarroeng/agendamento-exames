@@ -10,6 +10,7 @@ import {
   MENSALIDADE_PARCELAS_MIGRATION_MSG,
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
+import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE = 1000;
@@ -252,6 +253,9 @@ type AprovacaoGradeRow = {
   mensalidade_vencimento_regra?: string | null;
   mensalidade_valor_mensal: number | string | null;
   valor_final: number | string | null;
+  contratacao_efeito_vigencia_inicio?: string | null;
+  contratacao_efeito_numero?: number | null;
+  contratacao_valor_anterior?: number | string | null;
   revertida_em?: string | null;
   orcamentos: OrcamentoGradeRow | OrcamentoGradeRow[] | null;
 };
@@ -277,6 +281,9 @@ async function listarFontesGradeCobranca(
     mensalidade_vencimento_regra,
     mensalidade_valor_mensal,
     valor_final,
+    contratacao_efeito_vigencia_inicio,
+    contratacao_efeito_numero,
+    contratacao_valor_anterior,
     revertida_em,
     orcamentos!inner (
       id,
@@ -306,6 +313,22 @@ async function listarFontesGradeCobranca(
       .select(selectUsado)
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
+    if (
+      error &&
+      /contratacao_efeito_vigencia_inicio|contratacao_efeito_numero|contratacao_valor_anterior/i.test(
+        error.message ?? ""
+      )
+    ) {
+      selectUsado = selectUsado
+        .replace(/\n\s*contratacao_efeito_vigencia_inicio,/, "")
+        .replace(/\n\s*contratacao_efeito_numero,/, "")
+        .replace(/\n\s*contratacao_valor_anterior,/, "");
+      ({ data, error } = await supabase
+        .from("orcamento_aprovacoes")
+        .select(selectUsado)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1));
+    }
     if (
       error &&
       /mensalidade_vencimento_regra|schema cache|42703/i.test(error.message ?? "")
@@ -361,6 +384,7 @@ async function listarFontesGradeCobranca(
       valorMensal: numeroOuNulo(row.mensalidade_valor_mensal),
       valorFinal: numeroOuNulo(row.valor_final),
       registradas: registradasPorAprovacao.get(row.id) ?? [],
+      efeito: efeitoValorMensalidadeDaAprovacao(row, vigencia.inicio),
     });
   }
   return fontes;

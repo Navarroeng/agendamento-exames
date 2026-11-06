@@ -228,6 +228,34 @@ function resolveValorParcela(
   return valorTotal;
 }
 
+function alteracaoContratacaoDoAprovacao(
+  aprovacao: OrcamentoAprovacaoRecord | null | undefined,
+  vigenciaInicio: string | null | undefined
+): ContratoNavarroContexto["alteracaoContratacao"] {
+  const inicio = (vigenciaInicio ?? "").trim().slice(0, 10);
+  const efeito = (aprovacao?.contratacao_efeito_vigencia_inicio ?? "")
+    .trim()
+    .slice(0, 10);
+  const vencimento = (aprovacao?.contratacao_efeito_vencimento ?? "")
+    .trim()
+    .slice(0, 10);
+  const numero = Number(aprovacao?.contratacao_efeito_numero);
+  const quantidade = Number(aprovacao?.contratacao_quantidade_anterior);
+  const valor = Number(aprovacao?.contratacao_valor_anterior);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || inicio !== efeito) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento)) return null;
+  if (!Number.isInteger(numero) || numero < 2) return null;
+  if (!Number.isFinite(quantidade) || quantidade < 0) return null;
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  return {
+    vigenciaInicioIso: efeito,
+    numeroParcela: numero,
+    vencimentoIso: vencimento,
+    quantidadeAnterior: quantidade,
+    valorAnterior: valor,
+  };
+}
+
 export function buildContratoNavarroDocumento(params: {
   orcamento: OrcamentoComItens;
   aprovacao: OrcamentoAprovacaoRecord | null;
@@ -591,6 +619,7 @@ export function buildContratoNavarroDocumento(params: {
       mensalidade && aprovacao?.mensalidade_renovacao_automatica === false
         ? false
         : true,
+    alteracaoContratacao: alteracaoContratacaoDoAprovacao(aprovacao, vigencia?.inicio),
   };
 
   const clausulas = buildClausulasContrato(ctx);

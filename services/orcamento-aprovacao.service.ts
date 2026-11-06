@@ -28,6 +28,7 @@ import {
   statusContratoAposSyncComAtivoExistente,
 } from "@/lib/cliente-contrato-orcamento-sync";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
+import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
 import { inserirParcelasMensalidadeAusentes } from "@/services/mensalidade-parcelas.service";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
@@ -139,6 +140,7 @@ async function garantirParcelasMensalidadeDaAprovacao(
     vencimentoRegra: aprovacao.mensalidade_vencimento_regra ?? null,
     valorMensal: aprovacao.mensalidade_valor_mensal ?? null,
     valorFinal: aprovacao.valor_final ?? null,
+    efeito: efeitoValorMensalidadeDaAprovacao(aprovacao, vigencia.inicio),
   });
 }
 
