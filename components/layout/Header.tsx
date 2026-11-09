@@ -10,12 +10,14 @@ interface HeaderProps {
   title: string;
   subtitle: string;
   icon?: ReactNode;
+  menu?: ReactNode;
 }
 
 export function Header({
   title,
   subtitle,
   icon = <IconCalendar size={20} />,
+  menu,
 }: HeaderProps) {
   const { profile, loading, signOut } = useAuth();
 
@@ -26,6 +28,7 @@ export function Header({
   return (
     <header className="mb-6 flex flex-col items-start justify-between gap-3.5 sidebar:flex-row sidebar:items-center">
       <div className="title-area flex items-center gap-4">
+        {menu}
         <PageIcon>{icon}</PageIcon>
         <div>
           <h2 className="text-[26px] font-semibold tracking-[-0.6px] text-navy">

@@ -1,11 +1,11 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { canAccessPath, SEM_PERMISSAO_PATH } from "@/lib/perfil-access";
 import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
+import { MobileMenu, MobileMenuButton, Sidebar } from "./Sidebar";
 
 const SIDEBAR_WIDTH = "248px";
 
@@ -26,6 +26,8 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const allowed = canAccessPath(profile?.perfil, pathname);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const fecharMenu = useCallback(() => setMenuAberto(false), []);
 
   useEffect(() => {
     if (loading) return;
@@ -41,8 +43,19 @@ export function AppShell({
   return (
     <div className="app flex min-h-screen">
       <Sidebar />
+      <MobileMenu open={menuAberto} onClose={fecharMenu} />
       <main className="w-full px-[18px] py-[18px] pb-10 sidebar:ml-[248px] sidebar:w-[calc(100%-248px)] sidebar:px-[30px] sidebar:py-[22px] sidebar:pb-10">
-        <Header title={title} subtitle={subtitle} icon={icon} />
+        <Header
+          title={title}
+          subtitle={subtitle}
+          icon={icon}
+          menu={
+            <MobileMenuButton
+              open={menuAberto}
+              onClick={() => setMenuAberto((aberto) => !aberto)}
+            />
+          }
+        />
         {children}
       </main>
     </div>
