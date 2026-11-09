@@ -43,6 +43,8 @@ export function ESocialPage() {
     closeMarcarEnviado,
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
+    handleMarcarProcuracaoPendente,
+    handleRetomarEnvio,
     openCancelarEnvio,
     closeCancelarEnvio,
     handleConfirmCancelarEnvio,
@@ -65,7 +67,7 @@ export function ESocialPage() {
   return (
     <AppShell
       title="e-Social"
-      subtitle="ASOs que precisam de ação no e-Social — pendentes, urgentes e envio."
+      subtitle="ASOs que precisam de ação no e-Social — pendentes, urgentes, procuração e envio."
       icon={<IconEsocial size={20} />}
     >
       <div className="space-y-5">
@@ -104,6 +106,8 @@ export function ESocialPage() {
           onVisualizar={handleVisualizar}
           onMarcarEnviado={openMarcarEnviado}
           onMarcarPendente={handleMarcarPendente}
+          onMarcarProcuracaoPendente={handleMarcarProcuracaoPendente}
+          onRetomarEnvio={handleRetomarEnvio}
           onCancelarEnvio={openCancelarEnvio}
           onVerCancelamento={openVerCancelamento}
         />

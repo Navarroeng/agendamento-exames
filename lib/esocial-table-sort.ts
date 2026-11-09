@@ -37,6 +37,7 @@ const STATUS_SORT_LABELS: Record<
 > = {
   enviado: "Enviado",
   urgente: "Enviar urgente",
+  procuracao_pendente: "Procuração Pendente",
   pendente: "Pendente",
   cancelado: "Cancelado",
 };

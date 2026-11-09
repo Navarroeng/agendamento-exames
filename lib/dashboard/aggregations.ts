@@ -1,6 +1,7 @@
 import {
   ESOCIAL_VISUAL_STATUS_LABELS,
   getESocialVisualStatus,
+  isEsocialAguardandoEnvio,
 } from "@/lib/esocial-filters";
 import { formatDateBR } from "@/lib/format";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
@@ -80,8 +81,7 @@ function agendaStatus(
 }
 
 function isEsocialPendente(agendamento: AgendamentoWithExames): boolean {
-  const status = getESocialVisualStatus(agendamento);
-  return status === "pendente" || status === "urgente";
+  return isEsocialAguardandoEnvio(agendamento);
 }
 
 export interface DashboardKpiLists {

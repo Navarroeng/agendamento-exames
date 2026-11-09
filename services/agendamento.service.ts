@@ -23,6 +23,11 @@ import {
 import { assertMensalidadePermiteNovoAgendamento } from "@/services/agendamento-mensalidade-bloqueio.service";
 import { CLIENTE_INADIMPLENCIA_VALIDATION_MSG } from "@/lib/fatura-inadimplencia";
 import type { AgendamentoDocumentacaoInsert } from "@/lib/agendamento-documentacao";
+import {
+  payloadEsocialProcuracaoPendente,
+  podeMarcarEsocialProcuracaoPendente,
+  podeRetomarEnvioEsocial,
+} from "@/lib/esocial-filters";
 import { lerTodosOsLotes } from "@/lib/consulta-lotes";
 import { createClient } from "@/lib/supabase/client";
 import { assertAgendamentoSemDuplicidade90Dias } from "@/services/duplicidade.service";
@@ -539,6 +544,105 @@ export async function cancelarEnvioEsocial(params: {
   }
 
   return data as CancelarEnvioEsocialUpdate;
+}
+
+const ESOCIAL_PROCURACAO_CAMPOS =
+  "id, esocial_procuracao_pendente, envio_esocial, data_envio_esocial, esocial_recibo, esocial_envio_cancelado, data_agendamento";
+
+const ESOCIAL_PROCURACAO_MIGRATION_MSG =
+  "A marcação de procuração pendente ainda não está disponível no banco. Aplique a migration antes de usar esta ação.";
+
+function isMissingEsocialProcuracaoColumn(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("esocial_procuracao_pendente") &&
+    (lower.includes("does not exist") ||
+      lower.includes("column") ||
+      lower.includes("schema cache"))
+  );
+}
+
+export type ProcuracaoPendenteEsocialUpdate = Pick<
+  AgendamentoWithExames,
+  | "id"
+  | "esocial_procuracao_pendente"
+  | "envio_esocial"
+  | "data_envio_esocial"
+  | "esocial_recibo"
+  | "data_agendamento"
+>;
+
+/**
+ * Liga ou desliga a procuração pendente de um único ASO.
+ * Não altera data do exame, envio, data de envio nem recibo.
+ */
+export async function definirEsocialProcuracaoPendente(
+  id: string,
+  ativa: boolean
+): Promise<ProcuracaoPendenteEsocialUpdate> {
+  const supabase = createClient();
+  const { data: atual, error: fetchError } = await supabase
+    .from("agendamentos")
+    .select(ESOCIAL_PROCURACAO_CAMPOS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError) {
+    if (isMissingEsocialProcuracaoColumn(fetchError.message)) {
+      throw new Error(ESOCIAL_PROCURACAO_MIGRATION_MSG);
+    }
+    throw fetchError;
+  }
+  if (!atual) throw new Error("Agendamento não encontrado.");
+
+  const registro = atual as AgendamentoWithExames;
+  if (ativa) {
+    if (!podeMarcarEsocialProcuracaoPendente(registro)) {
+      throw new Error(
+        "Só é possível marcar procuração pendente em ASO que ainda aguarda envio."
+      );
+    }
+  } else if (!podeRetomarEnvioEsocial(registro)) {
+    throw new Error(
+      "Só é possível retomar o envio de um ASO com procuração pendente."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("agendamentos")
+    .update(payloadEsocialProcuracaoPendente(ativa))
+    .eq("id", id)
+    .eq("esocial_procuracao_pendente", !ativa)
+    .select(ESOCIAL_PROCURACAO_CAMPOS)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingEsocialProcuracaoColumn(error.message)) {
+      throw new Error(ESOCIAL_PROCURACAO_MIGRATION_MSG);
+    }
+    throw error;
+  }
+  if (!data) {
+    throw new Error(
+      ativa
+        ? "Não foi possível marcar a procuração como pendente."
+        : "Não foi possível retomar o envio."
+    );
+  }
+
+  const atualizado = data as ProcuracaoPendenteEsocialUpdate;
+  if (
+    atualizado.data_agendamento !== registro.data_agendamento ||
+    atualizado.envio_esocial !== registro.envio_esocial ||
+    atualizado.data_envio_esocial !== registro.data_envio_esocial ||
+    (atualizado.esocial_recibo ?? null) !== (registro.esocial_recibo ?? null)
+  ) {
+    throw new Error(
+      "A marcação alterou dados de envio ou a data do exame. A operação foi interrompida."
+    );
+  }
+
+  return atualizado;
 }
 
 export async function cancelarAgendamento(

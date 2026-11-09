@@ -1,5 +1,5 @@
 import { addMonthsToIsoDate } from "@/lib/cliente-contrato-dates";
-import { getESocialVisualStatus } from "@/lib/esocial-filters";
+import { isEsocialAguardandoEnvio } from "@/lib/esocial-filters";
 import { formatDateBR } from "@/lib/format";
 import type {
   AgendamentoWithExames,
@@ -218,10 +218,8 @@ export function buildKpis(
     totalFaturado,
     custosClinicas,
     lucroBruto,
-    pendenciasEsocial: filtered.filter((a) => {
-      const status = getESocialVisualStatus(a);
-      return status === "pendente" || status === "urgente";
-    }).length,
+    pendenciasEsocial: filtered.filter((a) => isEsocialAguardandoEnvio(a))
+      .length,
     periodicosVencendo,
     contratosVencendo,
     contratosAtivos: contratosAtivos.length,

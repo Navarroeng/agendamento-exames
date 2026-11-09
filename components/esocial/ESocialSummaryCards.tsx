@@ -26,6 +26,11 @@ const CARDS: {
     tone: "border-[#fecaca]/80 bg-[#fef2f2] text-brand-red",
   },
   {
+    key: "procuracaoPendente",
+    label: "Procuração Pendente",
+    tone: "border-[#ddd6fe]/80 bg-[#f5f3ff] text-[#6d28d9]",
+  },
+  {
     key: "enviados",
     label: "Enviados ao e-Social",
     tone: "border-[#bbf7d0]/80 bg-[#f0fdf4] text-brand-green",
@@ -45,7 +50,7 @@ const CARDS: {
 
 export function ESocialSummaryCards({ stats }: ESocialSummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
       {CARDS.map((card) => {
         const value = stats[card.key];
         const display = card.format ? card.format(value) : String(value);

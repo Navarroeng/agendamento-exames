@@ -49,6 +49,8 @@ export interface AgendamentoInsert {
   /** Momento em que o agendamento entrou na etapa eSocial. */
   esocial_entrada_em?: string | null;
   esocial_envio_cancelado?: boolean;
+  /** Envio ao e-Social aguarda procuração. Não altera data do exame nem o recibo. */
+  esocial_procuracao_pendente?: boolean;
   esocial_cancelado_em?: string | null;
   esocial_cancelado_por?: string | null;
   esocial_motivo_cancelamento?: string | null;

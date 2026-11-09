@@ -72,6 +72,13 @@ function EsocialStatusBadge({ status }: { status: ESocialVisualStatus }) {
       </span>
     );
   }
+  if (status === "procuracao_pendente") {
+    return (
+      <span className="inline-block rounded-md bg-[#f5f3ff] px-2 py-0.5 text-[10px] font-bold text-[#6d28d9] ring-1 ring-[#ddd6fe]">
+        Procuração Pendente
+      </span>
+    );
+  }
   return (
     <span className="inline-block rounded-md bg-brand-orange-soft px-2 py-0.5 text-[10px] font-bold text-[#c96d00]">
       Pendente
@@ -94,6 +101,8 @@ interface ESocialTableProps {
   onVisualizar: (id: string) => void;
   onMarcarEnviado: (id: string) => void;
   onMarcarPendente: (id: string) => void;
+  onMarcarProcuracaoPendente: (id: string) => void;
+  onRetomarEnvio: (id: string) => void;
   onCancelarEnvio: (id: string) => void;
   onVerCancelamento: (id: string) => void;
 }
@@ -113,6 +122,8 @@ export function ESocialTable({
   onVisualizar,
   onMarcarEnviado,
   onMarcarPendente,
+  onMarcarProcuracaoPendente,
+  onRetomarEnvio,
   onCancelarEnvio,
   onVerCancelamento,
 }: ESocialTableProps) {
@@ -241,6 +252,8 @@ export function ESocialTable({
                             onVisualizar={onVisualizar}
                             onMarcarEnviado={onMarcarEnviado}
                             onMarcarPendente={onMarcarPendente}
+                            onMarcarProcuracaoPendente={onMarcarProcuracaoPendente}
+                            onRetomarEnvio={onRetomarEnvio}
                             onCancelarEnvio={onCancelarEnvio}
                             onVerCancelamento={onVerCancelamento}
                           />
