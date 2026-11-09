@@ -16,8 +16,11 @@ import {
   esocialFiltersFromSearchParams,
   extractESocialFilterOptions,
   getDefaultESocialFilters,
+  getESocialVisualStatus,
   getESocialVisualStatusSemCancelamento,
   isEsocialEnvioCancelado,
+  podeMarcarEsocialProcuracaoPendente,
+  podeRetomarEnvioEsocial,
   type ESocialFilters,
 } from "@/lib/esocial-filters";
 import {
@@ -48,6 +51,7 @@ import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
 import {
   atualizarEnvioEsocial,
   cancelarEnvioEsocial,
+  definirEsocialProcuracaoPendente,
 } from "@/services/agendamento.service";
 import {
   contarResumoEsocial,
@@ -83,6 +87,7 @@ export function useESocialPage() {
     totalElegivel: 0,
     pendentes: 0,
     enviarUrgente: 0,
+    procuracaoPendente: 0,
     enviados: 0,
     cancelados: 0,
     percentualEnviado: 0,
@@ -508,6 +513,162 @@ export function useESocialPage() {
     [getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
   );
 
+  const handleMarcarProcuracaoPendente = useCallback(
+    async (id: string) => {
+      const ag = getById(id);
+      if (!ag) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (!podeMarcarEsocialProcuracaoPendente(ag)) {
+        toast.error(
+          "Só é possível marcar procuração pendente em ASO que ainda aguarda envio."
+        );
+        return;
+      }
+
+      const ok = window.confirm(
+        `Marcar somente o ASO de ${ag.colaborador} como Procuração Pendente? A data do exame, o envio e o recibo não serão alterados.`
+      );
+      if (!ok) return;
+
+      setSaving(true);
+      try {
+        const updated = await definirEsocialProcuracaoPendente(id, true);
+        updateAgendamentoInList(id, {
+          esocial_procuracao_pendente: updated.esocial_procuracao_pendente,
+          data_agendamento: updated.data_agendamento,
+          envio_esocial: updated.envio_esocial,
+          data_envio_esocial: updated.data_envio_esocial,
+          esocial_recibo: updated.esocial_recibo,
+        });
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: usuario,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.esocial,
+          acao: AUDITORIA_ACOES.esocial_procuracao_pendente,
+          registroId: id,
+          registroNome: ag.colaborador,
+          descricao: `${usuario} marcou o ASO de ${ag.colaborador} como Procuração Pendente no e-Social.`,
+          dadosAntes: {
+            esocial_procuracao_pendente: ag.esocial_procuracao_pendente === true,
+            data_agendamento: ag.data_agendamento,
+            envio_esocial: ag.envio_esocial,
+            data_envio_esocial: ag.data_envio_esocial,
+            esocial_recibo: ag.esocial_recibo ?? null,
+          },
+          dadosDepois: {
+            esocial_procuracao_pendente: true,
+            data_agendamento: updated.data_agendamento,
+            envio_esocial: updated.envio_esocial,
+            data_envio_esocial: updated.data_envio_esocial,
+            esocial_recibo: updated.esocial_recibo ?? null,
+          },
+        });
+        await registrarHistorico(id, usuario, [
+          {
+            acao: "Alteração",
+            detalhes: `${usuario} marcou o envio ao e-Social como Procuração Pendente`,
+          },
+        ]);
+        await reloadAgendamentos();
+        toast.success("ASO marcado como Procuração Pendente.");
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Erro ao marcar procuração pendente."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
+  );
+
+  const handleRetomarEnvio = useCallback(
+    async (id: string) => {
+      const ag = getById(id);
+      if (!ag) {
+        toast.error("Agendamento não encontrado.");
+        return;
+      }
+      if (!podeRetomarEnvioEsocial(ag)) {
+        toast.error(
+          "Só é possível retomar o envio de um ASO com procuração pendente."
+        );
+        return;
+      }
+
+      const ok = window.confirm(
+        `Retomar o envio somente do ASO de ${ag.colaborador}? O status volta a ser calculado pela data original do exame.`
+      );
+      if (!ok) return;
+
+      setSaving(true);
+      try {
+        const updated = await definirEsocialProcuracaoPendente(id, false);
+        const recalculado = getESocialVisualStatus({
+          ...ag,
+          esocial_procuracao_pendente: false,
+          data_agendamento: updated.data_agendamento,
+          envio_esocial: updated.envio_esocial,
+          data_envio_esocial: updated.data_envio_esocial,
+          esocial_recibo: updated.esocial_recibo,
+        });
+        updateAgendamentoInList(id, {
+          esocial_procuracao_pendente: updated.esocial_procuracao_pendente,
+          data_agendamento: updated.data_agendamento,
+          envio_esocial: updated.envio_esocial,
+          data_envio_esocial: updated.data_envio_esocial,
+          esocial_recibo: updated.esocial_recibo,
+        });
+        await registrarAuditoria({
+          usuarioId: auditContext.usuarioId,
+          usuarioNome: usuario,
+          usuarioEmail: auditContext.usuarioEmail,
+          modulo: AUDITORIA_MODULOS.esocial,
+          acao: AUDITORIA_ACOES.esocial_procuracao_retomada,
+          registroId: id,
+          registroNome: ag.colaborador,
+          descricao: `${usuario} retomou o envio ao e-Social de ${ag.colaborador}. Status recalculado: ${ESOCIAL_VISUAL_STATUS_LABELS[recalculado]}.`,
+          dadosAntes: {
+            esocial_procuracao_pendente: true,
+            data_agendamento: ag.data_agendamento,
+          },
+          dadosDepois: {
+            esocial_procuracao_pendente: false,
+            data_agendamento: updated.data_agendamento,
+            status_visual: recalculado,
+            envio_esocial: updated.envio_esocial,
+            data_envio_esocial: updated.data_envio_esocial,
+            esocial_recibo: updated.esocial_recibo ?? null,
+          },
+        });
+        await registrarHistorico(id, usuario, [
+          {
+            acao: "Alteração",
+            detalhes: `${usuario} retomou o envio ao e-Social. Status: ${ESOCIAL_VISUAL_STATUS_LABELS[recalculado]}`,
+          },
+        ]);
+        await reloadAgendamentos();
+        toast.success(
+          `Envio retomado. Status: ${ESOCIAL_VISUAL_STATUS_LABELS[recalculado]}.`
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err instanceof Error ? err.message : "Erro ao retomar o envio."
+        );
+      } finally {
+        setSaving(false);
+      }
+    },
+    [getById, reloadAgendamentos, updateAgendamentoInList, usuario, auditContext]
+  );
+
   const openCancelarEnvio = useCallback(
     (id: string) => {
       const ag = getById(id);
@@ -675,6 +836,8 @@ export function useESocialPage() {
     closeMarcarEnviado,
     handleConfirmMarcarEnviado,
     handleMarcarPendente,
+    handleMarcarProcuracaoPendente,
+    handleRetomarEnvio,
     openCancelarEnvio,
     closeCancelarEnvio,
     handleConfirmCancelarEnvio,

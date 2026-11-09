@@ -134,7 +134,7 @@ run("cancelados não entram em pendentes/urgentes/enviados", () => {
   assert.equal(summary.totalElegivel, 0);
 });
 
-run("totalElegivel = enviados + pendentes + urgentes", () => {
+run("totalElegivel = enviados + pendentes + urgentes + procuração", () => {
   const agendamentos = [
     mockAgendamento({ id: "e1", envio_esocial: true, data_agendamento: "2026-07-10" }),
     mockAgendamento({ id: "p1", envio_esocial: false, data_agendamento: "2026-08-28" }),
@@ -143,9 +143,13 @@ run("totalElegivel = enviados + pendentes + urgentes", () => {
   ];
 
   const summary = computeESocialSummary(agendamentos);
+  assert.equal(summary.procuracaoPendente, 0);
   assert.equal(
     summary.totalElegivel,
-    summary.enviados + summary.pendentes + summary.enviarUrgente
+    summary.enviados +
+      summary.pendentes +
+      summary.enviarUrgente +
+      summary.procuracaoPendente
   );
 });
 

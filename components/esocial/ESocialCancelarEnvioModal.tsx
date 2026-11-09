@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { RequiredMark } from "@/components/ui/Field";
 import {
+  ESOCIAL_VISUAL_STATUS_LABELS,
   getESocialVisualStatusSemCancelamento,
   isEnvioEsocialConcluido,
 } from "@/lib/esocial-filters";
@@ -95,11 +96,7 @@ export function ESocialCancelarEnvioModal({
         <p className="text-[11px] text-[#64748b]">
           Status atual:{" "}
           <strong className="text-navy">
-            {statusAtual === "enviado"
-              ? "Enviado"
-              : statusAtual === "urgente"
-                ? "Enviar urgente"
-                : "Pendente"}
+            {ESOCIAL_VISUAL_STATUS_LABELS[statusAtual]}
           </strong>
           . O registro permanecerá visível com status{" "}
           <strong className="text-navy">Cancelado</strong>.

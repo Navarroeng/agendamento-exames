@@ -17,6 +17,7 @@ export type ESocialStatusFilter =
   | "acao"
   | "pendente"
   | "urgente"
+  | "procuracao_pendente"
   | "enviado"
   | "cancelado"
   | "todos";
@@ -25,6 +26,7 @@ export type ESocialVisualStatus =
   | "enviado"
   | "pendente"
   | "urgente"
+  | "procuracao_pendente"
   | "cancelado";
 
 export interface ESocialFilters {
@@ -40,9 +42,10 @@ export const ESOCIAL_STATUS_OPTIONS: ReadonlyArray<{
   value: ESocialStatusFilter;
   label: string;
 }> = [
-  { value: "acao", label: "Pendentes + Enviar urgente" },
+  { value: "acao", label: "Pendentes + urgentes + procuração" },
   { value: "pendente", label: "Pendentes" },
   { value: "urgente", label: "Enviar urgente" },
+  { value: "procuracao_pendente", label: "Procuração Pendente" },
   { value: "enviado", label: "Enviado" },
   { value: "cancelado", label: "Cancelado" },
   { value: "todos", label: "Todos" },
@@ -110,6 +113,19 @@ export function isEsocialEnvioCancelado(
   return agendamento.esocial_envio_cancelado === true;
 }
 
+export function isEsocialProcuracaoPendente(
+  agendamento: Pick<AgendamentoWithExames, "esocial_procuracao_pendente">
+): boolean {
+  return agendamento.esocial_procuracao_pendente === true;
+}
+
+/** Único campo gravado pela marcação. Não mexe em data, envio ou recibo. */
+export function payloadEsocialProcuracaoPendente(ativa: boolean): {
+  esocial_procuracao_pendente: boolean;
+} {
+  return { esocial_procuracao_pendente: ativa };
+}
+
 /** Normaliza envio_esocial (boolean ou legado Sim/Não/texto do banco). */
 export function isEnvioEsocialConcluido(
   envio: boolean | string | null | undefined
@@ -145,9 +161,38 @@ export function getESocialVisualStatusSemCancelamento(
   agora: Date = new Date()
 ): Exclude<ESocialVisualStatus, "cancelado"> {
   if (isEnvioEsocialConcluido(agendamento.envio_esocial)) return "enviado";
+  if (isEsocialProcuracaoPendente(agendamento)) return "procuracao_pendente";
   const dias = daysSinceExam(agendamento.data_agendamento, agora);
   if (dias > URGENTE_DIAS) return "urgente";
   return "pendente";
+}
+
+/** Aguardando envio: pendente, urgente ou procuração pendente. */
+export function isEsocialAguardandoEnvio(
+  agendamento: AgendamentoWithExames,
+  agora: Date = new Date()
+): boolean {
+  const status = getESocialVisualStatus(agendamento, agora);
+  return (
+    status === "pendente" ||
+    status === "urgente" ||
+    status === "procuracao_pendente"
+  );
+}
+
+export function podeMarcarEsocialProcuracaoPendente(
+  agendamento: AgendamentoWithExames,
+  agora: Date = new Date()
+): boolean {
+  const status = getESocialVisualStatus(agendamento, agora);
+  return status === "pendente" || status === "urgente";
+}
+
+export function podeRetomarEnvioEsocial(
+  agendamento: AgendamentoWithExames,
+  agora: Date = new Date()
+): boolean {
+  return getESocialVisualStatus(agendamento, agora) === "procuracao_pendente";
 }
 
 export function getESocialVisualStatus(
@@ -163,6 +208,7 @@ export const ESOCIAL_VISUAL_STATUS_LABELS: Record<ESocialVisualStatus, string> =
     enviado: "Enviado",
     pendente: "Pendente",
     urgente: "Enviar urgente",
+    procuracao_pendente: "Procuração Pendente",
     cancelado: "Cancelado",
   };
 
@@ -212,11 +258,17 @@ function matchesStatusFilter(
 
   switch (status) {
     case "acao":
-      return visual === "pendente" || visual === "urgente";
+      return (
+        visual === "pendente" ||
+        visual === "urgente" ||
+        visual === "procuracao_pendente"
+      );
     case "pendente":
       return visual === "pendente";
     case "urgente":
       return visual === "urgente";
+    case "procuracao_pendente":
+      return visual === "procuracao_pendente";
     case "enviado":
       return visual === "enviado";
     case "cancelado":
@@ -273,10 +325,11 @@ export function extractESocialFilterOptions(
 }
 
 export interface ESocialSummaryStats {
-  /** Enviados + pendentes + urgentes (exclui cancelados no e-Social). */
+  /** Enviados + pendentes + urgentes + procuração (exclui cancelados). */
   totalElegivel: number;
   pendentes: number;
   enviarUrgente: number;
+  procuracaoPendente: number;
   enviados: number;
   /** Cancelamento do controle de envio ao e-Social (informativo). */
   cancelados: number;
@@ -289,6 +342,7 @@ export function computeESocialSummary(
 ): ESocialSummaryStats {
   let pendentes = 0;
   let enviarUrgente = 0;
+  let procuracaoPendente = 0;
   let enviados = 0;
   let cancelados = 0;
 
@@ -296,11 +350,13 @@ export function computeESocialSummary(
     const visual = getESocialVisualStatus(a, agora);
     if (visual === "enviado") enviados += 1;
     else if (visual === "urgente") enviarUrgente += 1;
+    else if (visual === "procuracao_pendente") procuracaoPendente += 1;
     else if (visual === "pendente") pendentes += 1;
     else if (visual === "cancelado") cancelados += 1;
   });
 
-  const totalElegivel = enviados + pendentes + enviarUrgente;
+  const totalElegivel =
+    enviados + pendentes + enviarUrgente + procuracaoPendente;
   const percentualEnviado =
     totalElegivel > 0 ? Math.round((enviados / totalElegivel) * 100) : 0;
 
@@ -308,6 +364,7 @@ export function computeESocialSummary(
     totalElegivel,
     pendentes,
     enviarUrgente,
+    procuracaoPendente,
     enviados,
     cancelados,
     percentualEnviado,

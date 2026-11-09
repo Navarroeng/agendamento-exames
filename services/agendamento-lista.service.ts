@@ -304,17 +304,23 @@ export async function contarResumoEsocial(
   filters: ESocialFilters
 ): Promise<ESocialSummaryStats> {
   const base = consultaResumoEsocial(filters).condicoes;
-  const [enviados, pendentes, urgentes, cancelados] = await Promise.all([
-    contarAgendamentos([...base, ...condicoesStatusEsocial("enviado")]),
-    contarAgendamentos([...base, ...condicoesStatusEsocial("pendente")]),
-    contarAgendamentos([...base, ...condicoesStatusEsocial("urgente")]),
-    contarAgendamentos([...base, ...condicoesStatusEsocial("cancelado")]),
-  ]);
-  const totalElegivel = enviados + pendentes + urgentes;
+  const [enviados, pendentes, urgentes, procuracaoPendente, cancelados] =
+    await Promise.all([
+      contarAgendamentos([...base, ...condicoesStatusEsocial("enviado")]),
+      contarAgendamentos([...base, ...condicoesStatusEsocial("pendente")]),
+      contarAgendamentos([...base, ...condicoesStatusEsocial("urgente")]),
+      contarAgendamentos([
+        ...base,
+        ...condicoesStatusEsocial("procuracao_pendente"),
+      ]),
+      contarAgendamentos([...base, ...condicoesStatusEsocial("cancelado")]),
+    ]);
+  const totalElegivel = enviados + pendentes + urgentes + procuracaoPendente;
   return {
     totalElegivel,
     pendentes,
     enviarUrgente: urgentes,
+    procuracaoPendente,
     enviados,
     cancelados,
     percentualEnviado:

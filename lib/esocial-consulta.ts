@@ -63,6 +63,10 @@ function naoCanceladoEnvio(): CondicaoConsulta {
   return { op: "notEq", coluna: "esocial_envio_cancelado", valor: true };
 }
 
+function semProcuracaoPendente(): CondicaoConsulta {
+  return { op: "notEq", coluna: "esocial_procuracao_pendente", valor: true };
+}
+
 export function condicoesStatusEsocial(
   status: ESocialStatusFilter,
   hojeIso = todayIsoSaoPaulo()
@@ -80,13 +84,21 @@ export function condicoesStatusEsocial(
       return [
         naoCanceladoEnvio(),
         naoEnviado(),
+        semProcuracaoPendente(),
         { op: "lt", coluna: "data_agendamento", valor: corte },
       ];
     case "pendente":
       return [
         naoCanceladoEnvio(),
         naoEnviado(),
+        semProcuracaoPendente(),
         { op: "gte", coluna: "data_agendamento", valor: corte },
+      ];
+    case "procuracao_pendente":
+      return [
+        naoCanceladoEnvio(),
+        naoEnviado(),
+        { op: "eq", coluna: "esocial_procuracao_pendente", valor: true },
       ];
     case "acao":
       return [naoCanceladoEnvio(), naoEnviado()];
