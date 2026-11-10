@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { EditarProgramacaoFuturaModal } from "@/components/periodicos-futuros/EditarProgramacaoFuturaModal";
+import { PeriodicoProgramadoViewModal } from "@/components/periodicos-futuros/PeriodicoProgramadoViewModal";
 import { AgendamentoViewModal } from "@/components/modals/AgendamentoViewModal";
 import { DispensaAgendamentosIniciaisModal } from "@/components/orcamentos/DispensaAgendamentosIniciaisModal";
 import {
@@ -67,6 +68,11 @@ import {
   type ListaFuncionariosNomeSort,
 } from "@/lib/contrato-vagas-lista";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import {
+  PERIODICO_PROGRAMADO_CONSULTA_MSG,
+  PERIODICO_PROGRAMADO_INDISPONIVEL_MSG,
+  type VisualizacaoPeriodicoProgramado,
+} from "@/lib/periodico-programado-visualizacao";
 import type { AgendamentoWithExames, ClienteContratoRecord } from "@/lib/types";
 import {
   buscarContratoPorOrcamentoId,
@@ -91,6 +97,7 @@ import {
 } from "@/services/contrato-vagas.service";
 import {
   atualizarProgramacaoFutura,
+  carregarVisualizacaoPeriodicoProgramado,
   criarExameFuturoImplantacao,
   listarProgramacoesFuturasDoContrato,
   listarSugestoesColaboradoresContrato,
@@ -298,6 +305,15 @@ export function OrcamentoAbaAgendamentos({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewAgendamento, setViewAgendamento] =
     useState<AgendamentoWithExames | null>(null);
+  const [viewPeriodico, setViewPeriodico] = useState<{
+    vagaId: string;
+    loading: boolean;
+    error: string | null;
+    dados: VisualizacaoPeriodicoProgramado | null;
+  } | null>(null);
+  const tabelaScrollRef = useRef<{ el: HTMLElement; top: number } | null>(
+    null
+  );
   const [dispensaModalOpen, setDispensaModalOpen] = useState(false);
   const [reabrirModalOpen, setReabrirModalOpen] = useState(false);
   const [exameFuturoModalOpen, setExameFuturoModalOpen] = useState(false);
@@ -558,11 +574,12 @@ export function OrcamentoAbaAgendamentos({
           demaisVagas: vagas,
           agendamentos,
           periodicos: programacoes,
+          clienteNome,
         })
       );
     }
     return map;
-  }, [vagas, itens, programacoes]);
+  }, [vagas, itens, programacoes, clienteNome]);
 
   const vagasOrdenadas = useMemo(
     () => orderPorNomeColaborador(vagas, vagasNomeSort),
@@ -714,6 +731,69 @@ export function OrcamentoAbaAgendamentos({
       cargoNome: vaga.cargo_nome ?? null,
       cargoId: vaga.cargo_id ?? null,
     });
+  }
+
+  function lembrarPosicaoTabela(origem: HTMLElement) {
+    const scroller = origem.closest(".overflow-y-auto");
+    tabelaScrollRef.current =
+      scroller instanceof HTMLElement
+        ? { el: scroller, top: scroller.scrollTop }
+        : null;
+  }
+
+  function restaurarPosicaoTabela() {
+    const salvo = tabelaScrollRef.current;
+    if (!salvo) return;
+    const aplicar = () => {
+      salvo.el.scrollTop = salvo.top;
+    };
+    aplicar();
+    window.requestAnimationFrame(aplicar);
+  }
+
+  function fecharVisualizacaoPeriodico() {
+    setViewPeriodico(null);
+    restaurarPosicaoTabela();
+  }
+
+  async function abrirVisualizacaoPeriodico(vagaId: string) {
+    const periodicoId = (
+      dadosExibicaoPorVagaId.get(vagaId)?.periodicoIdVisualizar ?? ""
+    ).trim();
+    setViewPeriodico({
+      vagaId,
+      loading: Boolean(periodicoId),
+      error: periodicoId ? null : PERIODICO_PROGRAMADO_INDISPONIVEL_MSG,
+      dados: null,
+    });
+    if (!periodicoId) return;
+    try {
+      const visualizacao =
+        await carregarVisualizacaoPeriodicoProgramado(periodicoId);
+      setViewPeriodico((atual) => {
+        if (!atual || atual.vagaId !== vagaId) return atual;
+        if (!visualizacao) {
+          return {
+            ...atual,
+            loading: false,
+            error: PERIODICO_PROGRAMADO_INDISPONIVEL_MSG,
+            dados: null,
+          };
+        }
+        return { ...atual, loading: false, error: null, dados: visualizacao };
+      });
+    } catch (err) {
+      console.error(err);
+      setViewPeriodico((atual) => {
+        if (!atual || atual.vagaId !== vagaId) return atual;
+        return {
+          ...atual,
+          loading: false,
+          error: PERIODICO_PROGRAMADO_CONSULTA_MSG,
+          dados: null,
+        };
+      });
+    }
   }
 
   function handleAbrirEditarProgramacao(vaga: ContratoVagaRecord) {
@@ -1437,7 +1517,20 @@ export function OrcamentoAbaAgendamentos({
                         )}
                       </td>
                       <td className="border-b border-[#eef2f7] px-4 py-2.5 text-center">
-                        {agVisualizar ? (
+                        {statusClassificacao === "programada" ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe3ef] text-brand-blue hover:bg-[#eff6ff]"
+                            title="Visualizar periódico programado"
+                            aria-label={`Visualizar periódico programado de ${labelColaboradorOuVaga(vaga)}`}
+                            onClick={(event) => {
+                              lembrarPosicaoTabela(event.currentTarget);
+                              void abrirVisualizacaoPeriodico(vaga.id);
+                            }}
+                          >
+                            <IconEye size={16} />
+                          </button>
+                        ) : agVisualizar ? (
                           <button
                             type="button"
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe3ef] text-brand-blue hover:bg-[#eff6ff]"
@@ -1573,6 +1666,14 @@ export function OrcamentoAbaAgendamentos({
       <AgendamentoViewModal
         agendamento={viewAgendamento}
         onClose={() => setViewAgendamento(null)}
+      />
+
+      <PeriodicoProgramadoViewModal
+        open={Boolean(viewPeriodico)}
+        loading={Boolean(viewPeriodico?.loading)}
+        error={viewPeriodico?.error ?? null}
+        dados={viewPeriodico?.dados ?? null}
+        onClose={fecharVisualizacaoPeriodico}
       />
 
       <DispensaAgendamentosIniciaisModal

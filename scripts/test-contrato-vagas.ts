@@ -853,6 +853,152 @@ const linhaProgramada = resolverDadosExibicaoVagaContrato({
 assert.equal(linhaProgramada.dataExameIso, "2026-11-15");
 assert.equal(linhaProgramada.tipoAso, "Periódico");
 assert.equal(linhaProgramada.agendamentoIdVisualizar, null);
+assert.equal(linhaProgramada.periodicoIdVisualizar, "pf-1");
+assert.equal(linhaAgendada.periodicoIdVisualizar, null);
+
+const periodicoForaDaLista = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("programada", {
+    periodico_futuro_id: "pf-ausente",
+    colaborador: "ANA LIMA",
+  }),
+  agendamentos: [],
+  periodicos: [],
+});
+assert.equal(periodicoForaDaLista.periodicoIdVisualizar, "pf-ausente");
+assert.equal(periodicoForaDaLista.dataExameIso, null);
+assert.equal(periodicoForaDaLista.agendamentoIdVisualizar, null);
+
+const programadaSemCpf = resolverDadosExibicaoVagaContrato({
+  vaga: {
+    ...vagaCard("programada", {
+      id: "v-sem-cpf",
+      colaborador: "João da Silva",
+      periodico_futuro_id: null,
+    }),
+    cargo_id: "cargo-op",
+    cargo_nome: "Operador",
+  },
+  agendamentos: [],
+  clienteNome: "NIGHT SHIFT OPERAÇÕES",
+  periodicos: [
+    {
+      id: "pf-joao",
+      proxima_data: "2027-04-10",
+      tipo_aso: "Periódico",
+      colaborador: "JOÃO DA SILVA",
+      colaborador_cpf: null,
+      cliente_nome: "Night Shift Operações",
+      cargo_id: "cargo-op",
+      cargo_nome: "Operador",
+      status: "ativo",
+    },
+    {
+      id: "pf-maria",
+      proxima_data: "2027-04-10",
+      tipo_aso: "Periódico",
+      colaborador: "MARIA SOUZA",
+      colaborador_cpf: null,
+      cliente_nome: "Night Shift Operações",
+      cargo_id: "cargo-op",
+      cargo_nome: "Operador",
+      status: "ativo",
+    },
+  ],
+});
+assert.equal(programadaSemCpf.periodicoIdVisualizar, "pf-joao");
+assert.equal(programadaSemCpf.dataExameIso, "2027-04-10");
+assert.equal(programadaSemCpf.agendamentoIdVisualizar, null);
+
+const homonimoOutroCpf = resolverDadosExibicaoVagaContrato({
+  vaga: vagaCard("programada", {
+    id: "v-homonimo",
+    colaborador: "João da Silva",
+    colaborador_cpf: "52998224725",
+    periodico_futuro_id: null,
+  }),
+  agendamentos: [],
+  clienteNome: "NIGHT SHIFT OPERAÇÕES",
+  periodicos: [
+    {
+      id: "pf-outro-cpf",
+      proxima_data: "2027-04-10",
+      tipo_aso: "Periódico",
+      colaborador: "João da Silva",
+      colaborador_cpf: "39053344705",
+      cliente_nome: "NIGHT SHIFT OPERAÇÕES",
+      cargo_nome: "Operador",
+      status: "ativo",
+    },
+  ],
+});
+assert.equal(homonimoOutroCpf.periodicoIdVisualizar, null);
+
+const doisCiclosSemVinculo = resolverDadosExibicaoVagaContrato({
+  vaga: {
+    ...vagaCard("programada", {
+      id: "v-ambiguo",
+      colaborador: "João da Silva",
+      periodico_futuro_id: null,
+    }),
+    cargo_id: "cargo-op",
+    cargo_nome: "Operador",
+  },
+  agendamentos: [],
+  clienteNome: "NIGHT SHIFT OPERAÇÕES",
+  periodicos: [
+    {
+      id: "pf-abril",
+      proxima_data: "2027-04-10",
+      tipo_aso: "Periódico",
+      colaborador: "João da Silva",
+      cliente_nome: "NIGHT SHIFT OPERAÇÕES",
+      cargo_id: "cargo-op",
+      status: "ativo",
+    },
+    {
+      id: "pf-agosto",
+      proxima_data: "2027-08-10",
+      tipo_aso: "Periódico",
+      colaborador: "João da Silva",
+      cliente_nome: "NIGHT SHIFT OPERAÇÕES",
+      cargo_id: "cargo-op",
+      status: "ativo",
+    },
+  ],
+});
+assert.equal(doisCiclosSemVinculo.periodicoIdVisualizar, null);
+
+const periodicoDeOutraVaga = resolverDadosExibicaoVagaContrato({
+  vaga: {
+    ...vagaCard("programada", {
+      id: "v-sem-id",
+      colaborador: "João da Silva",
+      periodico_futuro_id: null,
+    }),
+    cargo_id: "cargo-op",
+  },
+  demaisVagas: [
+    vagaCard("programada", {
+      id: "v-dona",
+      indice: 2,
+      periodico_futuro_id: "pf-joao",
+    }),
+  ],
+  agendamentos: [],
+  clienteNome: "NIGHT SHIFT OPERAÇÕES",
+  periodicos: [
+    {
+      id: "pf-joao",
+      proxima_data: "2027-04-10",
+      tipo_aso: "Periódico",
+      colaborador: "João da Silva",
+      cliente_nome: "NIGHT SHIFT OPERAÇÕES",
+      cargo_id: "cargo-op",
+      status: "ativo",
+    },
+  ],
+});
+assert.equal(periodicoDeOutraVaga.periodicoIdVisualizar, null);
 
 const linhaProgramadaSemTipo = resolverDadosExibicaoVagaContrato({
   vaga: vagaCard("programada", { periodico_futuro_id: "pf-2" }),
