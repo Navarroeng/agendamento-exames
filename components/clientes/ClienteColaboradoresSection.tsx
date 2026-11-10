@@ -244,12 +244,12 @@ export function ClienteColaboradoresSection({
                   <div className="mt-4 hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[22%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[18%]" />
+                        <col className="w-[20%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[26%]" />
                       </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
@@ -604,6 +604,22 @@ function CpfCelula({
   );
 }
 
+function IconLapis() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
 function AcoesColuna({
   row,
   onEditar,
@@ -616,12 +632,13 @@ function AcoesColuna({
   onDesfazer: (row: ClienteColaboradorLinha) => void;
 }) {
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-end gap-1.5 md:flex-row md:flex-wrap md:items-center md:justify-start">
       <button
         type="button"
-        className="text-[11px] font-bold text-[#0b1f4d] underline-offset-2 hover:underline"
+        className="btn btn-compact btn-secondary-blue"
         onClick={() => onEditar(row)}
       >
+        <IconLapis />
         Editar
       </button>
       <AcoesColaborador
@@ -646,7 +663,7 @@ function AcoesColaborador({
     return (
       <button
         type="button"
-        className="text-[11px] font-bold text-[#b45309] underline-offset-2 hover:underline"
+        className="btn btn-compact btn-danger-quiet"
         onClick={() => onDemitir(row)}
       >
         Demitir
@@ -657,7 +674,7 @@ function AcoesColaborador({
     return (
       <button
         type="button"
-        className="text-[11px] font-bold text-[#0b1f4d] underline-offset-2 hover:underline"
+        className="btn btn-compact"
         onClick={() => onDesfazer(row)}
       >
         Desfazer desligamento

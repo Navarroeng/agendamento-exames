@@ -157,7 +157,8 @@ const registros: VinculoColaborador[] = [
   );
   assert.match(ui, /formatCPF\(row\.cpfDigits\)/);
   assert.match(ui, />Ações</);
-  assert.match(ui, />\s*Editar\s*</);
+  assert.match(ui, /btn-secondary-blue[\s\S]{0,120}Editar/);
+  assert.match(ui, /btn-danger-quiet[\s\S]{0,80}Demitir/);
   assert.match(ui, /Cadastrar/);
   assert.match(ui, /setEditarAlvo\(null\)/);
   assert.doesNotMatch(ui, /setBusca\(""\)/);

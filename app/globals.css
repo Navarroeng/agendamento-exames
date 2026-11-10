@@ -28,6 +28,18 @@
     @apply border-[#e2e8f0] bg-[#f8fafc] text-[#52617a] hover:border-[#cbd5e1] hover:bg-white;
   }
 
+  .btn-compact {
+    @apply gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1;
+  }
+
+  .btn-secondary-blue {
+    @apply border-brand-blue/35 bg-brand-blue-soft text-brand-blue shadow-none hover:border-brand-blue hover:bg-[#e4e9ff] hover:text-brand-blue hover:shadow-none focus-visible:ring-brand-blue/30;
+  }
+
+  .btn-danger-quiet {
+    @apply border-brand-red/45 bg-brand-red-soft text-[#b91c1c] shadow-none hover:border-brand-red hover:bg-[#ffe4e4] hover:text-[#991b1b] hover:shadow-none focus-visible:ring-brand-red/35;
+  }
+
   .field label {
     @apply text-xs font-semibold tracking-wide text-[#64748b];
   }
