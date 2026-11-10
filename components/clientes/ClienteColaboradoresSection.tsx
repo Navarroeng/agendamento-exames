@@ -9,13 +9,14 @@ import {
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
 } from "@/lib/colaborador-movimentacoes";
-import { formatCPF } from "@/lib/cpf";
+import { formatCPF, isValidCPF } from "@/lib/cpf";
 import {
   apresentarCargoColaboradorPortal,
   apresentarNomeColaboradorPortal,
   calcPortalColaboradoresResumo,
   filtrarPortalColaboradores,
   type ClienteColaboradorLinha,
+  type HistoricoExameColaborador,
   type PortalColaboradoresFiltro,
   type PortalColaboradoresResumo,
 } from "@/lib/portal-colaboradores";
@@ -38,7 +39,7 @@ type ListResponse = {
 
 const FILTROS: { key: PortalColaboradoresFiltro; label: string }[] = [
   { key: "ativos", label: "Ativos" },
-  { key: "demitidos", label: "Demitidos" },
+  { key: "demitidos", label: "Desligados" },
   { key: "todos", label: "Todos" },
 ];
 
@@ -50,11 +51,11 @@ function hojeIso(): string {
   return `${y}-${m}-${day}`;
 }
 
-function rotuloResumoCompacto(ativos: number, demitidos: number): string {
+function rotuloResumoCompacto(ativos: number, desligados: number): string {
   const ativosLabel = ativos === 1 ? "1 ativo" : `${ativos} ativos`;
-  const demitidosLabel =
-    demitidos === 1 ? "1 demitido" : `${demitidos} demitidos`;
-  return `${ativosLabel} · ${demitidosLabel}`;
+  const desligadosLabel =
+    desligados === 1 ? "1 desligado" : `${desligados} desligados`;
+  return `${ativosLabel} · ${desligadosLabel}`;
 }
 
 export function ClienteColaboradoresSection({
@@ -70,6 +71,8 @@ export function ClienteColaboradoresSection({
     null
   );
   const [desfazerAlvo, setDesfazerAlvo] =
+    useState<ClienteColaboradorLinha | null>(null);
+  const [historicoAlvo, setHistoricoAlvo] =
     useState<ClienteColaboradorLinha | null>(null);
 
   const aplicarLista = useCallback((json: ListResponse) => {
@@ -117,8 +120,6 @@ export function ClienteColaboradoresSection({
       buscaNome: busca,
     });
   }, [estado, filtro, busca]);
-
-  const exibirDesligamento = filtro !== "ativos";
 
   const resumoCompacto =
     estado.fase === "ok"
@@ -175,9 +176,16 @@ export function ClienteColaboradoresSection({
       )}
 
       {aberto && estado.fase === "erro" && (
-        <p className="border-t border-[#eef2f7] px-5 py-6 text-center text-sm text-[#dc2626]">
-          {estado.mensagem}
-        </p>
+        <div className="border-t border-[#eef2f7] px-5 py-6 text-center">
+          <p className="text-sm text-[#dc2626]">{estado.mensagem}</p>
+          <button
+            type="button"
+            className="btn mt-3"
+            onClick={() => void carregar()}
+          >
+            Tentar novamente
+          </button>
+        </div>
       )}
 
       {aberto && estado.fase === "ok" && (
@@ -185,7 +193,7 @@ export function ClienteColaboradoresSection({
           <div className="grid grid-cols-2 gap-3">
             <Kpi label="Equipe atual" valor={String(estado.resumo.totalAtivos)} />
             <Kpi
-              label="Demitidos"
+              label="Desligados"
               valor={String(estado.resumo.totalDemitidos)}
             />
           </div>
@@ -234,24 +242,11 @@ export function ClienteColaboradoresSection({
                   <div className="mt-4 hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        {exibirDesligamento ? (
-                          <>
-                            <col className="w-[24%]" />
-                            <col className="w-[13%]" />
-                            <col className="w-[18%]" />
-                            <col className="w-[18%]" />
-                            <col className="w-[12%]" />
-                            <col className="w-[15%]" />
-                          </>
-                        ) : (
-                          <>
-                            <col className="w-[28%]" />
-                            <col className="w-[15%]" />
-                            <col className="w-[22%]" />
-                            <col className="w-[20%]" />
-                            <col className="w-[15%]" />
-                          </>
-                        )}
+                        <col className="w-[28%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[22%]" />
+                        <col className="w-[18%]" />
+                        <col className="w-[16%]" />
                       </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
@@ -259,10 +254,7 @@ export function ClienteColaboradoresSection({
                           <th className="px-3 py-3">CPF</th>
                           <th className="px-3 py-3">Cargo</th>
                           <th className="px-3 py-3">Admissão</th>
-                          {exibirDesligamento ? (
-                            <th className="px-3 py-3">Desligamento</th>
-                          ) : null}
-                          <th className="px-3 py-3">Ação</th>
+                          <th className="px-3 py-3">Situação</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -271,10 +263,14 @@ export function ClienteColaboradoresSection({
                             key={row.id}
                             className="border-t border-[#eef2f7] odd:bg-white even:bg-[#fbfdff]"
                           >
-                            <td className="px-3 py-3 font-semibold text-[#0b1f4d]">
-                              <span className="line-clamp-2 break-words">
+                            <td className="px-3 py-3">
+                              <button
+                                type="button"
+                                className="line-clamp-2 break-words text-left font-semibold text-[#0b1f4d] underline-offset-2 hover:underline"
+                                onClick={() => setHistoricoAlvo(row)}
+                              >
                                 {apresentarNomeColaboradorPortal(row.nome)}
-                              </span>
+                              </button>
                             </td>
                             <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-[#475569]">
                               {row.cpfMascarado}
@@ -291,13 +287,8 @@ export function ClienteColaboradoresSection({
                                 onAtualizado={aplicarLista}
                               />
                             </td>
-                            {exibirDesligamento ? (
-                              <td className="whitespace-nowrap px-3 py-3 text-[#64748b]">
-                                {row.dataDesligamentoLabel ?? "—"}
-                              </td>
-                            ) : null}
                             <td className="px-3 py-3">
-                              <AcoesColaborador
+                              <SituacaoCelula
                                 row={row}
                                 onDemitir={setDemitirAlvo}
                                 onDesfazer={setDesfazerAlvo}
@@ -315,9 +306,13 @@ export function ClienteColaboradoresSection({
                         key={row.id}
                         className="rounded-2xl border border-[#e8edf5] bg-white px-4 py-3.5"
                       >
-                        <p className="text-[15px] font-semibold text-[#0b1f4d]">
+                        <button
+                          type="button"
+                          className="text-left text-[15px] font-semibold text-[#0b1f4d] underline-offset-2 hover:underline"
+                          onClick={() => setHistoricoAlvo(row)}
+                        >
                           {apresentarNomeColaboradorPortal(row.nome)}
-                        </p>
+                        </button>
                         <p className="mt-0.5 font-mono text-xs text-[#64748b]">
                           {row.cpfMascarado}
                         </p>
@@ -338,22 +333,17 @@ export function ClienteColaboradoresSection({
                               />
                             </dd>
                           </div>
-                          {exibirDesligamento && row.dataDesligamentoLabel ? (
-                            <div className="flex justify-between gap-2">
-                              <dt className="text-[#94a3b8]">Desligamento</dt>
-                              <dd className="text-right text-[#475569]">
-                                {row.dataDesligamentoLabel}
-                              </dd>
-                            </div>
-                          ) : null}
+                          <div className="flex items-start justify-between gap-2">
+                            <dt className="pt-1 text-[#94a3b8]">Situação</dt>
+                            <dd className="text-right text-[#475569]">
+                              <SituacaoCelula
+                                row={row}
+                                onDemitir={setDemitirAlvo}
+                                onDesfazer={setDesfazerAlvo}
+                              />
+                            </dd>
+                          </div>
                         </dl>
-                        <div className="mt-3">
-                          <AcoesColaborador
-                            row={row}
-                            onDemitir={setDemitirAlvo}
-                            onDesfazer={setDesfazerAlvo}
-                          />
-                        </div>
                       </article>
                     ))}
                   </div>
@@ -385,6 +375,14 @@ export function ClienteColaboradoresSection({
             aplicarLista(json);
             setDesfazerAlvo(null);
           }}
+        />
+      ) : null}
+
+      {historicoAlvo ? (
+        <HistoricoExamesDialog
+          clienteId={clienteId}
+          row={historicoAlvo}
+          onClose={() => setHistoricoAlvo(null)}
         />
       ) : null}
     </div>
@@ -477,6 +475,12 @@ function AdmissaoCelula({
     }
   };
 
+  if (!isValidCPF(row.cpfDigits)) {
+    return (
+      <span className="whitespace-nowrap">{row.dataAdmissaoLabel ?? "—"}</span>
+    );
+  }
+
   if (!aberto) {
     return (
       <div className="flex items-center gap-1.5">
@@ -543,6 +547,34 @@ function AdmissaoCelula({
         </button>
       </div>
     </form>
+  );
+}
+
+function SituacaoCelula({
+  row,
+  onDemitir,
+  onDesfazer,
+}: {
+  row: ClienteColaboradorLinha;
+  onDemitir: (row: ClienteColaboradorLinha) => void;
+  onDesfazer: (row: ClienteColaboradorLinha) => void;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className="font-semibold text-[#0b1f4d]">
+        {row.situacao === "demitido" ? "Desligado" : "Ativo"}
+      </span>
+      {row.dataDesligamentoLabel ? (
+        <span className="whitespace-nowrap text-xs text-[#64748b]">
+          {row.dataDesligamentoLabel}
+        </span>
+      ) : null}
+      <AcoesColaborador
+        row={row}
+        onDemitir={onDemitir}
+        onDesfazer={onDesfazer}
+      />
+    </div>
   );
 }
 
@@ -817,6 +849,135 @@ function DesfazerModal({
             disabled={saving}
           >
             {saving ? "Desfazendo..." : "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoricoExamesDialog({
+  clienteId,
+  row,
+  onClose,
+}: {
+  clienteId: string;
+  row: ClienteColaboradorLinha;
+  onClose: () => void;
+}) {
+  const [fase, setFase] = useState<"carregando" | "erro" | "ok">("carregando");
+  const [mensagem, setMensagem] = useState("");
+  const [exames, setExames] = useState<HistoricoExameColaborador[]>([]);
+
+  const carregar = useCallback(async () => {
+    setFase("carregando");
+    setMensagem("");
+    const params = new URLSearchParams();
+    if (isValidCPF(row.cpfDigits)) params.set("cpf", row.cpfDigits);
+    else if (row.historicoAgendamentoId) {
+      params.set("agendamentoId", row.historicoAgendamentoId);
+    }
+    try {
+      const res = await fetch(
+        `/api/clientes/${encodeURIComponent(clienteId)}/colaboradores/historico?${params.toString()}`,
+        { cache: "no-store" }
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        exames?: HistoricoExameColaborador[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setMensagem(json.error ?? "Não foi possível carregar o histórico.");
+        setFase("erro");
+        return;
+      }
+      setExames(json.exames ?? []);
+      setFase("ok");
+    } catch {
+      setMensagem("Não foi possível carregar o histórico.");
+      setFase("erro");
+    }
+  }, [clienteId, row.cpfDigits, row.historicoAgendamentoId]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#1a1333]/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="Fechar histórico"
+      />
+      <div
+        className="animate-modal-in relative flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_24px_48px_rgba(45,35,95,0.25)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="historico-exames-titulo"
+      >
+        <div className="border-b border-[#e8edf5] px-6 py-5">
+          <h3
+            id="historico-exames-titulo"
+            className="text-lg font-extrabold text-[#2d2a4a]"
+          >
+            Histórico de exames
+          </h3>
+          <p className="mt-1 text-sm text-[#8b95a8]">
+            {apresentarNomeColaboradorPortal(row.nome)}
+            {row.cpfMascarado !== "—" ? ` · ${row.cpfMascarado}` : ""}
+          </p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          {fase === "carregando" ? (
+            <p className="text-center text-sm text-[#64748b]">
+              Carregando histórico...
+            </p>
+          ) : null}
+          {fase === "erro" ? (
+            <div className="text-center">
+              <p className="text-sm text-[#dc2626]">{mensagem}</p>
+              <button
+                type="button"
+                className="btn mt-3"
+                onClick={() => void carregar()}
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : null}
+          {fase === "ok" && exames.length === 0 ? (
+            <p className="text-center text-sm text-[#64748b]">
+              Nenhum exame encontrado.
+            </p>
+          ) : null}
+          {fase === "ok" && exames.length > 0 ? (
+            <table className="w-full text-left text-sm">
+              <thead className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
+                <tr>
+                  <th className="pb-2 pr-3">Data</th>
+                  <th className="pb-2 pr-3">Tipo de exame</th>
+                  <th className="pb-2">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exames.map((exame) => (
+                  <tr key={exame.id} className="border-t border-[#eef2f7]">
+                    <td className="whitespace-nowrap py-2.5 pr-3 text-[#475569]">
+                      {exame.dataLabel}
+                    </td>
+                    <td className="py-2.5 pr-3 text-[#0b1f4d]">{exame.tipoExame}</td>
+                    <td className="py-2.5 text-[#475569]">{exame.situacao}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </div>
+        <div className="flex justify-end border-t border-[#e8edf5] px-6 py-4">
+          <button type="button" className="btn" onClick={onClose}>
+            Fechar
           </button>
         </div>
       </div>

@@ -1,17 +1,21 @@
 /**
- * Portal do Cliente — módulo Colaboradores.
- * Derivado de contrato_vagas + agendamentos + colaborador_movimentacoes.
- * Sem tabela mestre de pessoas. Identidade: cliente + CPF normalizado.
+ * Portal do Cliente e modal de Clientes — relação de colaboradores.
+ * Derivado das vagas de todos os contratos da empresa, dos agendamentos
+ * e de colaborador_movimentacoes. Sem tabela mestre de pessoas.
  *
- * Situações (fatos persistidos, ordem cronológica):
- * - Ativo: vaga e/ou última entrada (Admissional) posterior à última saída
- * - Demitido: última saída (Demissional ou desligamento_admin) posterior à entrada
- * Cancelados (agendamento ou movimentação) não entram na fonte.
- * Empate de chave: não considera Demitido (readmissão prevalece).
+ * Identidade dentro do mesmo cliente:
+ * - CPF válido normalizado une programação e agendamentos
+ * - registro antigo sem CPF permanece separado; nome igual não une pessoas
+ *
+ * Situação:
+ * - Desligado: movimentação de desligamento, ou Demissional já retido,
+ *   posterior à última entrada
+ * - Demissional apenas agendado não altera a situação
+ * Cancelados não entram. Empate de chave: readmissão prevalece.
  */
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
-import { vagaTemOcupanteIdentificado } from "@/lib/contrato-vagas";
+import { isNomeFuncionarioReal } from "@/lib/contrato-vagas";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { isAgendamentoCancelado } from "@/lib/contrato-agendamentos";
 import { compareByLabel } from "@/lib/sort-by-label";
@@ -46,12 +50,18 @@ export type ClienteColaboradorLinha = PortalColaboradorLinha & {
    * Nulo quando a data exibida ainda é só a do exame admissional.
    */
   admissaoMovimentacaoId: string | null;
+  /**
+   * Agendamento usado no histórico quando o registro não tem CPF.
+   * Com CPF, o histórico usa o documento e ignora este campo.
+   */
+  historicoAgendamentoId: string | null;
 };
 
 export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
   "desligamentoOrigem",
   "desligamentoMovimentacaoId",
   "admissaoMovimentacaoId",
+  "historicoAgendamentoId",
 ] as const;
 
 /** Remove metadados administrativos. Não altera a regra consolidada. */
@@ -89,6 +99,8 @@ export type PortalColaboradoresResumo = {
 };
 
 export type PortalColaboradorVagaFonte = {
+  id?: string | null;
+  agendamento_id?: string | null;
   colaborador?: string | null;
   colaborador_cpf?: string | null;
   cargo_nome?: string | null;
@@ -134,6 +146,7 @@ type Interno = {
   admissaoOficialSortKey: string;
   admissaoOficialIso: string | null;
   admissaoMovimentacaoId: string | null;
+  historicoAgendamentoId: string | null;
 };
 
 const SITUACAO_LABEL: Record<PortalColaboradorSituacao, string> = {
@@ -230,11 +243,20 @@ export function calcPortalColaboradoresResumo(
   };
 }
 
-function ensureBucket(map: Map<string, Interno>, cpfDigits: string): Interno {
-  let row = map.get(cpfDigits);
+function cpfValido(value: string | null | undefined): string | null {
+  const digits = normalizeCpfDigits(value);
+  return isValidCPF(digits) ? digits : null;
+}
+
+function ensureBucket(
+  map: Map<string, Interno>,
+  chave: string,
+  cpfDigits: string
+): Interno {
+  let row = map.get(chave);
   if (!row) {
     row = {
-      cpfDigits,
+      cpfDigits: cpfValido(cpfDigits) ?? "",
       nome: "",
       cargo: "",
       ultimoAdmissionalSortKey: "",
@@ -247,8 +269,9 @@ function ensureBucket(map: Map<string, Interno>, cpfDigits: string): Interno {
       admissaoOficialSortKey: "",
       admissaoOficialIso: null,
       admissaoMovimentacaoId: null,
+      historicoAgendamentoId: null,
     };
-    map.set(cpfDigits, row);
+    map.set(chave, row);
   }
   return row;
 }
@@ -321,17 +344,52 @@ export function consolidarPortalColaboradores(input: {
   movimentacoes?: PortalColaboradorMovimentacaoFonte[];
 }): ClienteColaboradorLinha[] {
   const map = new Map<string, Interno>();
+  const cpfPorAgendamento = new Map<string, string>();
+  const cpfPorVagaDoAgendamento = new Map<string, string>();
+
+  for (const ag of input.agendamentos) {
+    if (!isAgendamentoPortalRelevante(ag.status)) continue;
+    const id = String(ag.id ?? "").trim();
+    const cpf = cpfValido(ag.colaborador_cpf);
+    if (id && cpf) cpfPorAgendamento.set(id, cpf);
+  }
+  for (const vaga of input.vagas) {
+    const agendamentoId = String(vaga.agendamento_id ?? "").trim();
+    const cpf = cpfValido(vaga.colaborador_cpf);
+    if (agendamentoId && cpf) cpfPorVagaDoAgendamento.set(agendamentoId, cpf);
+  }
+
+  const chaveDe = (opts: {
+    cpf: string | null;
+    agendamentoId: string;
+    vagaId: string;
+  }): { chave: string; cpf: string } | null => {
+    if (opts.cpf) return { chave: opts.cpf, cpf: opts.cpf };
+    if (opts.agendamentoId) {
+      const peloExame = cpfPorAgendamento.get(opts.agendamentoId);
+      if (peloExame) return { chave: peloExame, cpf: peloExame };
+      const pelaVaga = cpfPorVagaDoAgendamento.get(opts.agendamentoId);
+      if (pelaVaga) return { chave: pelaVaga, cpf: pelaVaga };
+      return { chave: `semcpf:ag:${opts.agendamentoId}`, cpf: "" };
+    }
+    if (opts.vagaId) return { chave: `semcpf:vaga:${opts.vagaId}`, cpf: "" };
+    return null;
+  };
 
   for (const vaga of input.vagas) {
-    if (!vagaTemOcupanteIdentificado(vaga)) continue;
-    const cpf = normalizeCpfDigits(vaga.colaborador_cpf);
-    const row = ensureBucket(map, cpf);
-    aplicarIdentidade(
-      row,
-      nomeLimpo(vaga.colaborador),
-      cargoLimpo(vaga.cargo_nome),
-      "0000-01-01|vaga"
-    );
+    const nome = nomeLimpo(vaga.colaborador);
+    if (!isNomeFuncionarioReal(nome)) continue;
+    const identidade = chaveDe({
+      cpf: cpfValido(vaga.colaborador_cpf),
+      agendamentoId: String(vaga.agendamento_id ?? "").trim(),
+      vagaId: String(vaga.id ?? "").trim(),
+    });
+    if (!identidade) continue;
+    const row = ensureBucket(map, identidade.chave, identidade.cpf);
+    if (identidade.chave.startsWith("semcpf:ag:") && !row.historicoAgendamentoId) {
+      row.historicoAgendamentoId = identidade.chave.slice("semcpf:ag:".length);
+    }
+    aplicarIdentidade(row, nome, cargoLimpo(vaga.cargo_nome), "0000-01-01|vaga");
   }
 
   const ags = input.agendamentos
@@ -344,33 +402,40 @@ export function consolidarPortalColaboradores(input: {
     );
 
   for (const ag of ags) {
-    const cpf = normalizeCpfDigits(ag.colaborador_cpf);
-    if (!isValidCPF(cpf)) continue;
-
     const nome = nomeLimpo(ag.colaborador);
+    if (!isNomeFuncionarioReal(nome)) continue;
+    const agendamentoId = String(ag.id ?? "").trim();
+    const identidade = chaveDe({
+      cpf: cpfValido(ag.colaborador_cpf),
+      agendamentoId,
+      vagaId: "",
+    });
+    if (!identidade) continue;
+
     const cargo = cargoLimpo(ag.cargo_nome);
     const dataIso = toDataIso(ag.data_agendamento);
     const sortKey = eventSortKey(ag.data_agendamento, ag.aso_retido_em);
-    const admissional = isAdmissional(ag.aso);
-    const demissional = isDemissional(ag.aso);
-
-    // Periódico / Retorno / Mudança: só atualiza se já conhecido
-    if (!admissional && !demissional) {
-      const existing = map.get(cpf);
-      if (!existing) continue;
-      aplicarIdentidade(existing, nome, cargo, sortKey);
-      continue;
+    const row = ensureBucket(map, identidade.chave, identidade.cpf);
+    if (identidade.chave.startsWith("semcpf:ag:") && !row.historicoAgendamentoId) {
+      row.historicoAgendamentoId = agendamentoId;
     }
-
-    const row = ensureBucket(map, cpf);
     aplicarIdentidade(row, nome, cargo, sortKey);
 
-    if (admissional && dataIso && sortKey >= row.ultimoAdmissionalSortKey) {
+    if (
+      isAdmissional(ag.aso) &&
+      dataIso &&
+      sortKey >= row.ultimoAdmissionalSortKey
+    ) {
       row.ultimoAdmissionalSortKey = sortKey;
       row.ultimoAdmissionalIso = dataIso;
     }
 
-    if (demissional && dataIso) {
+    // Demissional apenas agendado permanece no histórico e não desliga.
+    if (
+      isDemissional(ag.aso) &&
+      dataIso &&
+      String(ag.status ?? "").trim().toLowerCase() === "aso_retido"
+    ) {
       aplicarSaida(row, sortKey, dataIso, "demissional", null);
     }
   }
@@ -432,18 +497,19 @@ export function consolidarPortalColaboradores(input: {
   }
 
   const linhas: ClienteColaboradorLinha[] = [];
-  for (const row of Array.from(map.values())) {
+  for (const [chave, row] of Array.from(map.entries())) {
     if (!row.nome) continue;
 
     const situacao = resolverSituacao(row);
     const demitido = situacao === "demitido";
     const desligamentoIso = demitido ? row.ultimoSaidaIso : null;
     const dataAdmissaoIso = row.admissaoOficialIso ?? row.ultimoAdmissionalIso;
+    const cpfDigits = cpfValido(row.cpfDigits) ?? "";
 
     linhas.push({
-      id: row.cpfDigits,
-      cpfDigits: row.cpfDigits,
-      cpfMascarado: mascararCpfPortal(row.cpfDigits),
+      id: cpfDigits || chave,
+      cpfDigits,
+      cpfMascarado: mascararCpfPortal(cpfDigits),
       nome: row.nome,
       cargo: row.cargo || "—",
       situacao,
@@ -463,6 +529,7 @@ export function consolidarPortalColaboradores(input: {
       admissaoMovimentacaoId: row.admissaoOficialIso
         ? row.admissaoMovimentacaoId
         : null,
+      historicoAgendamentoId: cpfDigits ? null : row.historicoAgendamentoId,
     });
   }
 
@@ -492,6 +559,75 @@ export function filtrarPortalColaboradores<T extends PortalColaboradorLinha>(
     );
   }
   return base.slice().sort((a, b) => compareByLabel(a.nome, b.nome));
+}
+
+export type HistoricoExameColaborador = {
+  id: string;
+  dataIso: string | null;
+  dataLabel: string;
+  tipoExame: string;
+  situacao: string;
+};
+
+const SITUACAO_EXAME: Record<string, string> = {
+  agendado: "Agendado",
+  aso_retido: "ASO retido",
+  cancelado: "Cancelado",
+  rascunho: "Rascunho",
+};
+
+export function labelSituacaoExameColaborador(
+  status: string | null | undefined
+): string {
+  const key = String(status ?? "").trim().toLowerCase();
+  if (!key) return "—";
+  return SITUACAO_EXAME[key] ?? "—";
+}
+
+export function labelTipoExameColaborador(
+  aso: string | null | undefined
+): string {
+  const raw = String(aso ?? "").replace(/\s+/g, " ").trim();
+  return raw || "—";
+}
+
+/**
+ * Exames da pessoa na empresa. Com CPF, une os exames de qualquer contrato.
+ * Sem CPF, devolve só o agendamento indicado. Nome igual não entra.
+ */
+export function montarHistoricoExamesColaborador(input: {
+  agendamentos: PortalColaboradorAgendamentoFonte[];
+  cpf?: string | null;
+  agendamentoId?: string | null;
+}): HistoricoExameColaborador[] {
+  const cpf = cpfValido(input.cpf);
+  const agendamentoId = String(input.agendamentoId ?? "").trim();
+  if (!cpf && !agendamentoId) return [];
+
+  const exames = input.agendamentos.filter((ag) => {
+    if (!isAgendamentoPortalRelevante(ag.status)) return false;
+    if (cpf) return cpfValido(ag.colaborador_cpf) === cpf;
+    return String(ag.id ?? "").trim() === agendamentoId;
+  });
+
+  exames.sort((a, b) => {
+    const porData = eventSortKey(b.data_agendamento, b.aso_retido_em).localeCompare(
+      eventSortKey(a.data_agendamento, a.aso_retido_em)
+    );
+    if (porData !== 0) return porData;
+    return String(b.id ?? "").localeCompare(String(a.id ?? ""));
+  });
+
+  return exames.map((ag) => {
+    const dataIso = toDataIso(ag.data_agendamento);
+    return {
+      id: String(ag.id ?? "").trim() || dataIso || labelTipoExameColaborador(ag.aso),
+      dataIso,
+      dataLabel: dataIso ? formatDateIsoToBR(dataIso) : "—",
+      tipoExame: labelTipoExameColaborador(ag.aso),
+      situacao: labelSituacaoExameColaborador(ag.status),
+    };
+  });
 }
 
 export function linhasResumoColaboradoresHome(

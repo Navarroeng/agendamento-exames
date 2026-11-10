@@ -125,7 +125,7 @@ export function ClienteContratoAtualCard({
           value={formatValorContratoExibicao(contrato)}
         />
         <Metric
-          label="Colaboradores"
+          label="Colaboradores contratados"
           value={
             contrato.quantidade_colaboradores != null
               ? String(contrato.quantidade_colaboradores)
