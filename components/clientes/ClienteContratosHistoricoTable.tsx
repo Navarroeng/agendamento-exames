@@ -7,6 +7,7 @@ import {
   labelClienteContratoStatusExibicao,
   labelFinanceiroContrato,
 } from "@/lib/cliente-contrato-mappers";
+import { isoAprovacaoCadastroContrato } from "@/lib/cliente-contrato-inicio";
 import { formatDateBR } from "@/lib/format";
 import type { ClienteContratoConsulta } from "@/lib/cliente-contrato-atual";
 import type { ClienteContratoRecord } from "@/lib/types";
@@ -88,9 +89,9 @@ export function ClienteContratosHistoricoTable({
                   </span>
                 </td>
                 <td>
-                  {contrato.aprovado_em
-                    ? formatDateBR(contrato.aprovado_em.split("T")[0])
-                    : formatDateBR(contrato.data_inicio)}
+                  {formatDateBR(
+                    isoAprovacaoCadastroContrato(contrato) || null
+                  )}
                 </td>
                 <td className="tabular-nums">
                   {formatValorContratoExibicao(contrato)}

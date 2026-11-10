@@ -1,4 +1,4 @@
-/** Início do contrato SST: assinatura só no fluxo de orçamento; manual usa a data cadastrada. */
+/** Início do contrato SST: assinatura só no fluxo de orçamento; manual usa a data da coluna Aprovação. */
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,6 +9,7 @@ import {
   classificarAssinaturaAba,
   INICIO_CONTRATO_AGUARDANDO_ASSINATURA,
   INICIO_CONTRATO_NAO_INFORMADO,
+  isoAprovacaoCadastroContrato,
   labelInicioContratoSst,
 } from "../lib/cliente-contrato-inicio";
 import { contratoVigenciaCobreData } from "../lib/cliente-contrato-atual";
@@ -133,44 +134,70 @@ const dataSalvaNaAba = aplicarAssinaturaAbaContrato(
 );
 assert.equal(labelInicioContratoSst(dataSalvaNaAba), "09/01/2026");
 
-const manualTm = {
+const milBolhas = {
   orcamento_id: null,
+  numero_orcamento: null,
   contrato_assinado_em: null,
-  data_inicio: "2025-11-26",
-  data_fim: "2026-11-26",
-  aprovado_em: "2026-01-15",
+  data_inicio: "2026-01-10",
+  data_fim: "2026-11-25",
+  aprovado_em: "2025-11-25T15:00:00.000Z",
 };
-assert.equal(classificarAssinaturaAba(manualTm), "sem_orcamento");
-assert.equal(labelInicioContratoSst(manualTm), "26/11/2025");
+assert.equal(classificarAssinaturaAba(milBolhas), "sem_orcamento");
+assert.equal(isoAprovacaoCadastroContrato(milBolhas), "2025-11-25");
+assert.equal(labelInicioContratoSst(milBolhas), "25/11/2025");
 
-const manualOutro = {
+const manualAntigoSoInicio = {
+  orcamento_id: null,
+  contrato_assinado_em: "2026-04-01",
+  data_inicio: "2024-03-01",
+  aprovado_em: null,
+};
+assert.equal(classificarAssinaturaAba(manualAntigoSoInicio), "sem_orcamento");
+assert.equal(labelInicioContratoSst(manualAntigoSoInicio), "01/03/2024");
+assert.notEqual(labelInicioContratoSst(manualAntigoSoInicio), "01/04/2026");
+assert.notEqual(
+  labelInicioContratoSst(manualAntigoSoInicio),
+  INICIO_CONTRATO_AGUARDANDO_ASSINATURA
+);
+
+const manualVinculoVazio = {
   orcamento_id: "   ",
   contrato_assinado_em: "2026-04-01",
   data_inicio: "2024-03-01",
-  aprovado_em: "2026-01-15",
+  aprovado_em: "2025-11-25",
 };
-assert.equal(labelInicioContratoSst(manualOutro), "01/03/2024");
+assert.equal(labelInicioContratoSst(manualVinculoVazio), "25/11/2025");
 
-const manualSemInicio = {
+const manualAprovacaoIlegivel = {
+  orcamento_id: null,
+  aprovado_em: "25/11/2025",
+  data_inicio: "2024-03-01",
+};
+assert.equal(labelInicioContratoSst(manualAprovacaoIlegivel), "01/03/2024");
+
+const manualSemDatas = {
   orcamento_id: null,
   contrato_assinado_em: null,
   data_inicio: null,
-  aprovado_em: "2026-01-15",
+  aprovado_em: null,
   created_at: "2026-10-27T12:00:00.000Z",
 };
 assert.equal(
-  labelInicioContratoSst(manualSemInicio),
+  labelInicioContratoSst(manualSemDatas),
   INICIO_CONTRATO_NAO_INFORMADO
 );
 assert.notEqual(
-  labelInicioContratoSst(manualSemInicio),
+  labelInicioContratoSst(manualSemDatas),
   INICIO_CONTRATO_AGUARDANDO_ASSINATURA
 );
 assert.equal(labelInicioContratoSst({}), INICIO_CONTRATO_NAO_INFORMADO);
 assert.equal(
-  labelInicioContratoSst({ data_inicio: "   " }),
+  labelInicioContratoSst({ data_inicio: "   ", aprovado_em: "   " }),
   INICIO_CONTRATO_NAO_INFORMADO
 );
+
+assert.notEqual(labelInicioContratoSst(assinada), "27/10/2026");
+assert.equal(labelInicioContratoSst(referenciaCjc), "Aguardando assinatura");
 
 assert.equal(
   contratoVigenciaCobreData(
@@ -251,11 +278,27 @@ assert.match(cobranca, /aplicarAssinaturaAbaContrato/);
 assert.match(cobranca, /escolherAprovacaoVigente/);
 assert.doesNotMatch(cobranca, /assinaturaAbaContratoEm: aprovacao\.contrato_assinado_em/);
 const inicioLib = readFileSync("lib/cliente-contrato-inicio.ts", "utf8");
-const labelFn = inicioLib.slice(inicioLib.indexOf("export function labelInicioContratoSst"));
-assert.match(labelFn, /data_inicio/);
-assert.doesNotMatch(labelFn, /aprovado_em/);
-assert.doesNotMatch(labelFn, /contrato_enviado_em/);
-assert.doesNotMatch(labelFn, /contrato_assinado_em/);
+const aprovacaoFn = inicioLib.slice(
+  inicioLib.indexOf("export function isoAprovacaoCadastroContrato"),
+  inicioLib.indexOf("export function labelInicioContratoSst")
+);
+assert.match(aprovacaoFn, /aprovado_em/);
+assert.match(aprovacaoFn, /data_inicio/);
+const labelFn = inicioLib.slice(
+  inicioLib.indexOf("export function labelInicioContratoSst")
+);
+assert.match(labelFn, /isoAprovacaoCadastroContrato\(contrato\)/);
+const ramoOrcamento = labelFn.slice(labelFn.indexOf('origem === "informada"'));
+assert.doesNotMatch(ramoOrcamento, /aprovado_em/);
+assert.doesNotMatch(ramoOrcamento, /data_inicio/);
+assert.doesNotMatch(ramoOrcamento, /isoAprovacaoCadastroContrato/);
+assert.doesNotMatch(ramoOrcamento, /contrato_enviado_em/);
+assert.doesNotMatch(ramoOrcamento, /contrato_assinado_em/);
+const historico = readFileSync(
+  "components/clientes/ClienteContratosHistoricoTable.tsx",
+  "utf8"
+);
+assert.match(historico, /isoAprovacaoCadastroContrato\(contrato\)/);
 const hook = readFileSync("hooks/useClienteContratos.ts", "utf8");
 assert.match(hook, /anexarAssinaturaAbaContrato/);
 assert.match(hook, /consultaConcluida: false/);
@@ -264,7 +307,7 @@ assert.doesNotMatch(hook, /setContratos\(data\)/);
 const syncSvc = readFileSync("services/orcamento-aprovacao.service.ts", "utf8");
 assert.match(syncSvc, /contrato_assinado_em: syncPayload\.contrato_assinado_em/);
 assert.match(syncSvc, /Preserva vigência já definida/);
-assert.match(syncSvc, /if \(!temVigencia\)/);
+assert.match(syncSvc, /if \(!preservarDocumental && !temVigencia\)/);
 assert.match(
   syncSvc,
   /atualizarAcompanhamentoDocumentalContrato[\s\S]*syncClienteContratoFromAprovacao/

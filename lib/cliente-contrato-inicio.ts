@@ -89,9 +89,23 @@ export function classificarAssinaturaAba(
 }
 
 /**
+ * Data da coluna Aprovação no histórico de contratos SST.
+ * Aprovação informada no cadastro quando existe; senão, a data de início.
+ */
+export function isoAprovacaoCadastroContrato(contrato: {
+  aprovado_em?: string | null;
+  data_inicio?: string | null;
+}): string {
+  const aprovacao = dataCivilRegistrada(contrato.aprovado_em);
+  if (aprovacao) return aprovacao;
+  return dataCivilRegistrada(contrato.data_inicio);
+}
+
+/**
  * Início do contrato SST no modal do cliente.
- * Manual, sem orçamento: a data de início cadastrada. Ausência de assinatura
- * digital não significa pendência.
+ * Manual, sem vínculo de orçamento: a mesma data da coluna Aprovação.
+ * Sem aprovação e sem início, "Não informado". Ausência de assinatura não
+ * classifica o contrato.
  * Com orçamento: só a data da aba Contrato. "Aguardando assinatura" apenas
  * quando a consulta concluiu e essa data está vazia. Consulta que não
  * concluiu não vira contrato manual nem pendência de assinatura.
@@ -100,11 +114,14 @@ export function labelInicioContratoSst(
   contrato: Pick<
     ClienteContratoConsulta,
     "orcamento_id" | "assinaturaAbaContratoEstado" | "assinaturaAbaContratoEm"
-  > & { data_inicio?: string | null }
+  > & {
+    data_inicio?: string | null;
+    aprovado_em?: string | null;
+  }
 ): string {
   const origem = classificarAssinaturaAba(contrato);
   if (origem === "sem_orcamento") {
-    const iso = dataCivilRegistrada(contrato.data_inicio);
+    const iso = isoAprovacaoCadastroContrato(contrato);
     return iso ? formatDateBR(iso) : INICIO_CONTRATO_NAO_INFORMADO;
   }
   if (origem === "informada") {
