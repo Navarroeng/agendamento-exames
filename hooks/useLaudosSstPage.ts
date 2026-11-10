@@ -32,22 +32,28 @@ export function useLaudosSstPage() {
   );
   const [modalTab, setModalTab] = useState<LaudosSstEtapaId>("epis");
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await listarProcessosLaudosSst();
       setProcessos(data);
+      if (silent) setError(null);
     } catch (err) {
       console.error(err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erro ao carregar processos de Laudos SST."
-      );
-      setProcessos([]);
+      if (!silent) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Erro ao carregar processos de Laudos SST."
+        );
+        setProcessos([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

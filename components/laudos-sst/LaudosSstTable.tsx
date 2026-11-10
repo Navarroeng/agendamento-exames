@@ -23,6 +23,33 @@ interface LaudosSstTableProps {
   onMesChange: (mes: YearMonth) => void;
   onYearChange: (year: number) => void;
   onVisualizar: (processo: LaudosSstProcesso) => void;
+  onAbrirOrcamento: (orcamentoId: string) => void;
+}
+
+function NumeroOrcamentoLaudo({
+  numero,
+  orcamentoId,
+  onAbrir,
+}: {
+  numero: string;
+  orcamentoId: string;
+  onAbrir: (orcamentoId: string) => void;
+}) {
+  const id = orcamentoId.trim();
+  const rotulo = numero.trim() || "—";
+  if (!id) {
+    return <span className="font-bold text-navy">{rotulo}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="font-bold text-navy hover:underline"
+      aria-label={`Abrir financeiro do orçamento ${rotulo}`}
+      onClick={() => onAbrir(id)}
+    >
+      {rotulo}
+    </button>
+  );
 }
 
 function ProgressoLaudos({ processo }: { processo: LaudosSstProcesso }) {
@@ -63,6 +90,7 @@ export function LaudosSstTable({
   onMesChange,
   onYearChange,
   onVisualizar,
+  onAbrirOrcamento,
 }: LaudosSstTableProps) {
   return (
     <Panel title="Processos de Laudos SST" icon={<IconFileText />} iconTone="blue">
@@ -111,7 +139,13 @@ export function LaudosSstTable({
                 return (
                   <tr key={orcamento.id}>
                     <td className="whitespace-nowrap">{dataEntrada}</td>
-                    <td className="font-bold text-navy">{orcamento.numero}</td>
+                    <td>
+                      <NumeroOrcamentoLaudo
+                        numero={orcamento.numero}
+                        orcamentoId={orcamento.id}
+                        onAbrir={onAbrirOrcamento}
+                      />
+                    </td>
                     <td className="max-w-[320px] truncate">
                       {formatClienteNomeDisplay(orcamento.cliente_nome)}
                     </td>
