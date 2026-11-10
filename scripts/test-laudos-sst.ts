@@ -952,4 +952,20 @@ assert.equal(
   "relógio vazio não esconde o laudo nem o joga para o mês da correção"
 );
 
+const paginaLaudos = readFileSync(
+  join(process.cwd(), "components/laudos-sst/LaudosSstPage.tsx"),
+  "utf8"
+);
+const tabelaLaudos = readFileSync(
+  join(process.cwd(), "components/laudos-sst/LaudosSstTable.tsx"),
+  "utf8"
+);
+assert.match(paginaLaudos, /useOrcamentoProcessoModal/);
+assert.match(paginaLaudos, /openProcesso\(orcamentoId,\s*"financeiro"\)/);
+assert.match(paginaLaudos, /ancorarAba="financeiro"/);
+assert.match(paginaLaudos, /refresh\(\{\s*silent:\s*true\s*\}\)/);
+assert.match(tabelaLaudos, /Abrir financeiro do orçamento/);
+assert.match(tabelaLaudos, /if \(!id\)/);
+assert.doesNotMatch(paginaLaudos, /\/orcamentos\?abrir=/);
+
 console.log("test-laudos-sst: OK");
