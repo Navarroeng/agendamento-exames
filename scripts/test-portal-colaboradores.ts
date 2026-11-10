@@ -9,9 +9,11 @@ import {
   consolidarPortalColaboradores,
   filtrarPortalColaboradores,
   mascararCpfPortal,
+  montarHistoricoExamesColaborador,
   paraColaboradoresPortalCliente,
   paraLinhaPortalCliente,
 } from "../lib/portal-colaboradores";
+import { paginaForaDoIntervalo } from "../services/portal-colaboradores.server";
 
 const CPF_A = "52998224725";
 const CPF_B = "39053344705";
@@ -88,7 +90,7 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   assert.equal(linhas[0].dataAdmissaoLabel, "01/03/2026");
 }
 
-// CPF existente não duplica + Periódico não cria sozinho
+// CPF existente não duplica; periódico com CPF entra na relação
 {
   const linhas = consolidarPortalColaboradores({
     vagas: [
@@ -117,12 +119,17 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(linhas.length, 1);
-  assert.equal(linhas[0].cargo, "Novo Cargo");
-  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas.length, 2);
+  const maria = linhas.find((l) => l.cpfDigits === CPF_A);
+  const periodico = linhas.find((l) => l.cpfDigits === CPF_B);
+  assert.equal(maria?.cargo, "Novo Cargo");
+  assert.equal(maria?.situacao, "ativo");
+  assert.equal(periodico?.nome, "SO SO PERIODICO");
+  assert.equal(periodico?.situacao, "ativo");
+  assert.equal(periodico?.dataAdmissaoIso, null);
 }
 
-// Demissional agendado (com vaga) → Demitido; Desligamento = data_agendamento
+// Demissional apenas agendado não muda a situação
 {
   const linhas = consolidarPortalColaboradores({
     vagas: [
@@ -142,9 +149,9 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(linhas[0].situacao, "demitido");
-  assert.equal(linhas[0].dataDesligamentoIso, "2026-09-05");
-  assert.equal(linhas[0].dataDesligamentoLabel, "05/09/2026");
+  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas[0].dataDesligamentoIso, null);
+  assert.equal(linhas[0].dataDesligamentoLabel, null);
 }
 
 // Demissional cancelado → continua ativo (cancelado fora da fonte)
@@ -386,7 +393,7 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   );
 }
 
-// Demissional agendado sem vaga cria a pessoa como Demitido (JOEL / NICKOLE)
+// Demissional agendado sem vaga cria a pessoa como Ativo (JOEL / NICKOLE)
 {
   const linhas = consolidarPortalColaboradores({
     vagas: [],
@@ -416,15 +423,15 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   );
   assert.ok(joel);
   assert.ok(nickole);
-  assert.equal(joel!.situacao, "demitido");
-  assert.equal(nickole!.situacao, "demitido");
-  assert.equal(joel!.dataDesligamentoLabel, "11/08/2026");
-  assert.equal(nickole!.dataDesligamentoLabel, "21/08/2026");
+  assert.equal(joel!.situacao, "ativo");
+  assert.equal(nickole!.situacao, "ativo");
+  assert.equal(joel!.dataDesligamentoLabel, null);
+  assert.equal(nickole!.dataDesligamentoLabel, null);
   assert.deepEqual(
     filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).map(
       (l) => l.nome
     ),
-    ["JOEL SIMON FERNANDES", "NICKOLE PEREIRA DOS SANTOS ARAUJO BRITO"]
+    []
   );
   assert.deepEqual(
     filtrarPortalColaboradores(linhas, { filtro: "todos" }).map((l) => l.nome),
@@ -432,14 +439,14 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   );
   assert.equal(
     filtrarPortalColaboradores(linhas, { filtro: "ativos" }).length,
-    0
+    2
   );
   const resumo = calcPortalColaboradoresResumo(linhas);
-  assert.equal(resumo.totalAtivos, 0);
-  assert.equal(resumo.totalDemitidos, 2);
+  assert.equal(resumo.totalAtivos, 2);
+  assert.equal(resumo.totalDemitidos, 0);
 }
 
-// Ativo → Demissional agendado → Demitido → cancelamento → volta a Ativo (vaga permanece)
+// Demissional agendado mantém Ativo; cancelamento também (vaga permanece)
 {
   const vagas = [
     {
@@ -460,7 +467,7 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(demitido[0].situacao, "demitido");
+  assert.equal(demitido[0].situacao, "ativo");
 
   const aposCancelamento = consolidarPortalColaboradores({
     vagas,
@@ -494,7 +501,7 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     ],
   });
   assert.equal(vigente.length, 1);
-  assert.equal(vigente[0].situacao, "demitido");
+  assert.equal(vigente[0].situacao, "ativo");
 
   const cancelado = consolidarPortalColaboradores({
     vagas: [],
@@ -560,11 +567,12 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(linhas[0].situacao, "demitido");
-  assert.equal(linhas[0].dataDesligamentoLabel, "11/08/2026");
+  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas[0].dataAdmissaoLabel, "01/03/2026");
+  assert.equal(linhas[0].dataDesligamentoLabel, null);
   const resumo = calcPortalColaboradoresResumo(linhas);
-  assert.equal(resumo.totalAtivos, 0);
-  assert.equal(resumo.totalDemitidos, 1);
+  assert.equal(resumo.totalAtivos, 1);
+  assert.equal(resumo.totalDemitidos, 0);
 }
 
 // Readmissão após Demissional agendado (não só aso_retido)
@@ -719,9 +727,9 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].situacao, "ativo");
   assert.equal(linhas[0].dataAdmissaoLabel, "20/08/2026");
-  assert.equal(linhas[0].dataDesligamentoLabel, "05/09/2026");
+  assert.equal(linhas[0].dataDesligamentoLabel, null);
 }
 
 // Desligamento administrativo: Ativo → Demitido
@@ -815,9 +823,9 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
       },
     ],
   });
-  assert.equal(linhas[0].situacao, "demitido");
-  assert.equal(linhas[0].dataDesligamentoLabel, "10/09/2026");
-  assert.equal(linhas[0].desligamentoOrigem, "demissional");
+  assert.equal(linhas[0].situacao, "ativo");
+  assert.equal(linhas[0].dataDesligamentoIso, null);
+  assert.equal(linhas[0].desligamentoOrigem, null);
   assert.equal(linhas[0].desligamentoMovimentacaoId, null);
 }
 
@@ -927,8 +935,9 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
     ],
   });
   assert.equal(linhas[0].situacao, "demitido");
-  assert.equal(linhas[0].dataDesligamentoLabel, "15/09/2026");
-  assert.equal(linhas[0].desligamentoOrigem, "demissional");
+  assert.equal(linhas[0].dataDesligamentoLabel, "10/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(linhas[0].desligamentoMovimentacaoId, "mov-1");
 }
 
 // Demissional anterior + admin posterior
@@ -1074,13 +1083,258 @@ assert.equal(mascararCpfPortal(CPF_A), "***.***.***-25");
   assert.doesNotMatch(ui, />Demitir</);
   assert.doesNotMatch(ui, /Desfazer desligamento/);
   assert.match(svc, /colaborador_movimentacoes/);
+  assert.match(svc, /lerPorIdentificadores/);
+  assert.match(svc, /PGRST103/);
+  assert.match(svc, /listarHistoricoExamesColaborador/);
+  assert.doesNotMatch(svc, /getContratoAtual/);
+  assert.doesNotMatch(
+    svc.slice(svc.indexOf("listarHistoricoExamesColaborador")),
+    /contrato_id/
+  );
   assert.doesNotMatch(svc, /\.from\("contrato_vagas"\)[\s\S]*\.(update|insert|delete)\(/);
+  const historicoApi = readFileSync(
+    join(
+      process.cwd(),
+      "app/api/clientes/[clienteId]/colaboradores/historico/route.ts"
+    ),
+    "utf8"
+  );
+  const adminUi = readFileSync(
+    join(process.cwd(), "components/clientes/ClienteColaboradoresSection.tsx"),
+    "utf8"
+  );
+  const card = readFileSync(
+    join(process.cwd(), "components/clientes/ClienteContratoAtualCard.tsx"),
+    "utf8"
+  );
+  assert.match(historicoApi, /requireClientesStaffActor/);
+  assert.match(historicoApi, /listarHistoricoExamesColaborador/);
+  assert.doesNotMatch(historicoApi, /contrato_id/);
+  assert.doesNotMatch(historicoApi, /\.update\(|\.insert\(|\.delete\(/);
+  assert.match(adminUi, /Desligados/);
+  assert.match(adminUi, /Tentar novamente/);
+  assert.match(adminUi, />Situação</);
+  assert.match(adminUi, /Histórico de exames/);
+  assert.match(adminUi, /setHistoricoAlvo\(null\)/);
+  assert.doesNotMatch(adminUi, /setBusca\(""\)/);
+  assert.doesNotMatch(adminUi, /setFiltro\("ativos"\)/);
+  assert.match(card, /label="Colaboradores contratados"/);
+  assert.equal(
+    paginaForaDoIntervalo({ code: "PGRST103", message: "range" }),
+    true
+  );
+  assert.equal(paginaForaDoIntervalo({ code: "42501", message: "negado" }), false);
+  assert.equal(paginaForaDoIntervalo(null), false);
   assert.doesNotMatch(ui, /desligamentoOrigem/);
   assert.doesNotMatch(ui, /desligamentoMovimentacaoId/);
   assert.match(portalApi, /paraColaboradoresPortalCliente/);
   assert.doesNotMatch(portalApi, /desligamentoOrigem/);
   assert.doesNotMatch(portalApi, /desligamentoMovimentacaoId/);
   assert.doesNotMatch(adminApi, /paraColaboradoresPortalCliente/);
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        id: "vaga-contrato-antigo",
+        colaborador: "ANA",
+        colaborador_cpf: "529.982.247-25",
+        cargo_nome: "Auxiliar",
+      },
+      {
+        id: "vaga-contrato-novo",
+        colaborador: "ANA COSTA",
+        colaborador_cpf: CPF_A,
+        cargo_nome: "Analista",
+      },
+    ],
+    agendamentos: [
+      {
+        id: "exame-antigo",
+        colaborador: "ANA COSTA",
+        colaborador_cpf: CPF_A,
+        aso: "Admissional",
+        status: "aso_retido",
+        data_agendamento: "2025-10-02",
+        aso_retido_em: "2025-10-03T10:00:00.000Z",
+      },
+      {
+        id: "exame-novo",
+        colaborador: "ANA COSTA",
+        colaborador_cpf: CPF_A,
+        aso: "Periódico",
+        status: "agendado",
+        data_agendamento: "2026-10-14",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].id, CPF_A);
+  assert.equal(linhas[0].situacao, "ativo");
+
+  const exames = montarHistoricoExamesColaborador({
+    cpf: "529.982.247-25",
+    agendamentos: [
+      {
+        id: "exame-antigo",
+        colaborador_cpf: CPF_A,
+        aso: "Admissional",
+        status: "aso_retido",
+        data_agendamento: "2025-10-02",
+      },
+      {
+        id: "exame-novo",
+        colaborador_cpf: CPF_A,
+        aso: "Periódico",
+        status: "agendado",
+        data_agendamento: "2026-10-14",
+      },
+      {
+        id: "de-outra-pessoa",
+        colaborador_cpf: CPF_B,
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2026-01-01",
+      },
+      {
+        id: "cancelado",
+        colaborador_cpf: CPF_A,
+        aso: "Demissional",
+        status: "cancelado",
+        data_agendamento: "2026-12-01",
+      },
+    ],
+  });
+  assert.deepEqual(
+    exames.map((exame) => exame.id),
+    ["exame-novo", "exame-antigo"]
+  );
+  assert.equal(exames[0].tipoExame, "Periódico");
+  assert.equal(exames[0].situacao, "Agendado");
+  assert.equal(exames[0].dataLabel, "14/10/2026");
+  assert.equal(exames[1].situacao, "ASO retido");
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      { id: "vaga-1", colaborador: "MESMO NOME", cargo_nome: "Ajudante" },
+      { id: "vaga-2", colaborador: "MESMO NOME", cargo_nome: "Soldador" },
+    ],
+    agendamentos: [
+      {
+        id: "ag-sem-1",
+        colaborador: "MESMO NOME",
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2024-02-01",
+      },
+      {
+        id: "ag-sem-2",
+        colaborador: "MESMO NOME",
+        aso: "Periódico",
+        status: "agendado",
+        data_agendamento: "2024-08-01",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 4);
+  assert.equal(new Set(linhas.map((linha) => linha.id)).size, 4);
+  assert.equal(
+    linhas.filter((linha) => linha.cpfDigits).length,
+    0
+  );
+
+  const historico = montarHistoricoExamesColaborador({
+    agendamentoId: "ag-sem-1",
+    agendamentos: [
+      {
+        id: "ag-sem-1",
+        colaborador: "MESMO NOME",
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2024-02-01",
+      },
+      {
+        id: "ag-sem-2",
+        colaborador: "MESMO NOME",
+        aso: "Periódico",
+        status: "agendado",
+        data_agendamento: "2024-08-01",
+      },
+    ],
+  });
+  assert.equal(historico.length, 1);
+  assert.equal(historico[0].tipoExame, "Admissional");
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        id: "vaga-ligada",
+        agendamento_id: "ag-ligado",
+        colaborador: "ANA",
+        cargo_nome: "Operadora",
+      },
+    ],
+    agendamentos: [
+      {
+        id: "ag-ligado",
+        colaborador: "ANA COSTA",
+        colaborador_cpf: CPF_A,
+        aso: "Admissional",
+        status: "agendado",
+        data_agendamento: "2026-01-02",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].cpfDigits, CPF_A);
+  assert.equal(linhas[0].historicoAgendamentoId, null);
+}
+
+{
+  const linhas = consolidarPortalColaboradores({
+    vagas: [
+      {
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        cargo_nome: "Motorista",
+      },
+    ],
+    agendamentos: [
+      {
+        id: "demissional-agendado",
+        colaborador: "JOAO SOUZA",
+        colaborador_cpf: CPF_B,
+        aso: "Demissional",
+        status: "agendado",
+        data_agendamento: "2026-09-20",
+      },
+    ],
+    movimentacoes: [
+      {
+        id: "mov-jet",
+        cpf_digits: CPF_B,
+        tipo: "desligamento_admin",
+        data_evento: "2026-09-10",
+      },
+    ],
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].situacao, "demitido");
+  assert.equal(linhas[0].dataDesligamentoLabel, "10/09/2026");
+  assert.equal(linhas[0].desligamentoOrigem, "admin");
+  assert.equal(
+    filtrarPortalColaboradores(linhas, { filtro: "ativos" }).length,
+    0
+  );
+  assert.equal(
+    filtrarPortalColaboradores(linhas, { filtro: "demitidos" }).length,
+    1
+  );
 }
 
 console.log("test-portal-colaboradores: ok");

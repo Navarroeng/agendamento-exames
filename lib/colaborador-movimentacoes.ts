@@ -83,7 +83,7 @@ export function isMovimentacaoCancelada(
 export function podeDemitirColaborador(
   linha: ClienteColaboradorLinha | null | undefined
 ): boolean {
-  return linha?.situacao === "ativo";
+  return linha?.situacao === "ativo" && isValidCPF(linha.cpfDigits);
 }
 
 export function podeDesfazerDesligamentoAdmin(

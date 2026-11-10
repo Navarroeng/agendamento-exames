@@ -81,6 +81,7 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     desligamentoOrigem: null,
     desligamentoMovimentacaoId: null,
     admissaoMovimentacaoId: null,
+    historicoAgendamentoId: null,
   };
   assert.equal(podeDemitirColaborador(ativo), true);
   assert.equal(podeDesfazerDesligamentoAdmin(ativo), false);
