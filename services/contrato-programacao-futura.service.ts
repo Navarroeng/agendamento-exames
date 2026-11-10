@@ -31,6 +31,12 @@ import {
   type PeriodicoFuturoGrupo,
 } from "@/lib/periodico-agrupamento";
 import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
+import { formatHorarioForForm } from "@/lib/agendamento-datetime";
+import {
+  montarVisualizacaoPeriodicoProgramado,
+  type RegistroVisualizacaoPeriodico,
+  type VisualizacaoPeriodicoProgramado,
+} from "@/lib/periodico-programado-visualizacao";
 import { buildPatchVinculoPeriodico } from "@/lib/periodicos-futuro";
 import {
   exigirGravacaoUnica,
@@ -47,6 +53,9 @@ export type PeriodicoProgramadoContrato = Pick<
   | "id"
   | "colaborador"
   | "colaborador_cpf"
+  | "cliente_nome"
+  | "cargo_id"
+  | "cargo_nome"
   | "tipo_aso"
   | "tipo_exame"
   | "exame_nome"
@@ -112,7 +121,7 @@ export async function listarProgramacoesFuturasDoContrato(
     const { data: page, error } = await supabase
       .from("periodicos_futuros")
       .select(
-        "id, colaborador, colaborador_cpf, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
+        "id, colaborador, colaborador_cpf, cliente_nome, cargo_id, cargo_nome, tipo_aso, tipo_exame, exame_nome, proxima_data, motivo, motivo_detalhe, observacoes, origem, status, contrato_id, consome_previsao_contrato, agendamento_vinculado_id, agendamento_id, data_prevista_original, data_realizada, cancelado_em, motivo_cancelamento"
       )
       .eq("contrato_id", contratoId)
       .eq("consome_previsao_contrato", true)
@@ -204,6 +213,76 @@ export async function listarProgramacoesFuturasDoContrato(
       agendamento_cumprido: agInfo?.cumprido ?? false,
       statusExibicao,
     };
+  });
+}
+
+/**
+ * Consulta somente leitura do periódico vinculado a uma vaga Programado.
+ * Não grava, não altera status e não cria agendamento.
+ */
+export async function carregarVisualizacaoPeriodicoProgramado(
+  periodicoId: string
+): Promise<VisualizacaoPeriodicoProgramado | null> {
+  const id = periodicoId.trim();
+  if (!id) return null;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("periodicos_futuros")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const registro = data as PeriodicoFuturoRecord;
+  let registros: PeriodicoFuturoRecord[] = [registro];
+  const contratoId = (registro.contrato_id ?? "").trim();
+  if (contratoId) {
+    const doContrato = await lerTodosOsLotes(async (from, to) => {
+      const { data: page, error: loteErr } = await supabase
+        .from("periodicos_futuros")
+        .select("*")
+        .eq("contrato_id", contratoId)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (loteErr) throw loteErr;
+      return (page ?? []) as PeriodicoFuturoRecord[];
+    });
+    const chave = chaveCicloPeriodico(registro);
+    const ciclo = doContrato.filter(
+      (row) => chaveCicloPeriodico(row) === chave
+    );
+    if (ciclo.some((row) => row.id === registro.id)) registros = ciclo;
+  }
+
+  let clinica: string | null = null;
+  let horario: string | null = null;
+  const agendamentoId = (registro.agendamento_vinculado_id ?? "").trim();
+  if (agendamentoId) {
+    const { data: agendamento, error: agErr } = await supabase
+      .from("agendamentos")
+      .select("clinica_nome, horario, status")
+      .eq("id", agendamentoId)
+      .maybeSingle();
+    if (agErr) throw agErr;
+    const cancelado =
+      String(agendamento?.status ?? "")
+        .trim()
+        .toLowerCase() === "cancelado";
+    if (agendamento && !cancelado) {
+      clinica = String(agendamento.clinica_nome ?? "").trim() || null;
+      horario = formatHorarioForForm(
+        agendamento.horario ? String(agendamento.horario) : null
+      );
+    }
+  }
+
+  return montarVisualizacaoPeriodicoProgramado({
+    registroId: registro.id,
+    registros: registros as RegistroVisualizacaoPeriodico[],
+    clinica,
+    horario,
   });
 }
 

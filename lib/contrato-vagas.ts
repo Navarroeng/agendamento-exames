@@ -5,6 +5,11 @@
  */
 
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  chaveCicloPeriodico,
+  chaveColaboradorPeriodico,
+  normalizeIdentidadeColaborador,
+} from "@/lib/periodico-agrupamento";
 import { normalizeUppercaseField } from "@/lib/text-normalize";
 
 export const CONTRATO_VAGA_STATUSES = [
@@ -712,19 +717,29 @@ export type AgendamentoExibicaoVaga = {
 export type PeriodicoExibicaoVaga = {
   id: string;
   proxima_data?: string | null;
+  data_prevista_original?: string | null;
   tipo_aso?: string | null;
+  colaborador?: string | null;
+  colaborador_cpf?: string | null;
+  cliente_nome?: string | null;
+  cargo_id?: string | null;
+  cargo_nome?: string | null;
+  status?: string | null;
 };
 
 export type DadosExibicaoVagaContrato = {
   dataExameIso: string | null;
   tipoAso: string | null;
   agendamentoIdVisualizar: string | null;
+  /** Periódico vinculado à vaga Programado. Null quando o vínculo não fecha. */
+  periodicoIdVisualizar: string | null;
 };
 
 const DADOS_EXIBICAO_VAGA_VAZIO: DadosExibicaoVagaContrato = {
   dataExameIso: null,
   tipoAso: null,
   agendamentoIdVisualizar: null,
+  periodicoIdVisualizar: null,
 };
 
 function isoDateOrNull(value: string | null | undefined): string | null {
@@ -737,9 +752,92 @@ function tipoAsoOrNull(value: string | null | undefined): string | null {
   return tipo || null;
 }
 
+function chaveIdentidadeProgramacao(pessoa: {
+  colaborador_cpf?: string | null;
+  cliente_nome?: string | null;
+  colaborador?: string | null;
+  cargo_id?: string | null;
+  cargo_nome?: string | null;
+}): string | null {
+  const chave = chaveColaboradorPeriodico({
+    colaborador_cpf: pessoa.colaborador_cpf ?? null,
+    cliente_nome: pessoa.cliente_nome ?? "",
+    colaborador: pessoa.colaborador ?? "",
+    cargo_id: pessoa.cargo_id ?? null,
+    cargo_nome: pessoa.cargo_nome ?? null,
+  });
+  if (isValidCPF(normalizeCpfDigits(pessoa.colaborador_cpf))) return chave;
+  if (!normalizeIdentidadeColaborador(pessoa.colaborador)) return null;
+  return chave;
+}
+
+/**
+ * Vaga Programado abre o periódico do vínculo gravado (`periodico_futuro_id`),
+ * com ou sem CPF. Sem esse id, usa a mesma identidade das programações antigas
+ * da página Periódicos: CPF válido ou, na falta dele, empresa + nome + cargo.
+ * Mais de um ciclo possível não escolhe registro.
+ */
+export function resolverPeriodicoIdVisualizarVaga(params: {
+  vaga: Pick<
+    ContratoVagaRecord,
+    | "id"
+    | "status"
+    | "periodico_futuro_id"
+    | "colaborador"
+    | "colaborador_cpf"
+    | "cargo_id"
+    | "cargo_nome"
+  >;
+  demaisVagas?: Array<
+    Pick<ContratoVagaRecord, "id" | "periodico_futuro_id">
+  >;
+  periodicos?: PeriodicoExibicaoVaga[];
+  clienteNome?: string | null;
+}): string | null {
+  if (params.vaga.status !== "programada") return null;
+  const explicito = (params.vaga.periodico_futuro_id ?? "").trim();
+  if (explicito) return explicito;
+
+  const chaveVaga = chaveIdentidadeProgramacao({
+    colaborador_cpf: params.vaga.colaborador_cpf,
+    cliente_nome: params.clienteNome,
+    colaborador: params.vaga.colaborador,
+    cargo_id: params.vaga.cargo_id,
+    cargo_nome: params.vaga.cargo_nome,
+  });
+  if (!chaveVaga) return null;
+
+  const ocupados = new Set(
+    (params.demaisVagas ?? [])
+      .filter((outra) => outra.id !== params.vaga.id)
+      .map((outra) => (outra.periodico_futuro_id ?? "").trim())
+      .filter(Boolean)
+  );
+  const ciclos = new Map<string, string>();
+  for (const row of params.periodicos ?? []) {
+    if (ocupados.has(row.id)) continue;
+    const chaveRow = chaveIdentidadeProgramacao(row);
+    if (!chaveRow || chaveRow !== chaveVaga) continue;
+    const ciclo = chaveCicloPeriodico({
+      colaborador_cpf: row.colaborador_cpf ?? null,
+      cliente_nome: row.cliente_nome ?? "",
+      colaborador: row.colaborador ?? "",
+      cargo_id: row.cargo_id ?? null,
+      cargo_nome: row.cargo_nome ?? null,
+      proxima_data: row.proxima_data ?? "",
+      data_prevista_original: row.data_prevista_original ?? null,
+      status: row.status === "reagendado" ? "reagendado" : "ativo",
+    });
+    if (!ciclos.has(ciclo)) ciclos.set(ciclo, row.id);
+  }
+  if (ciclos.size !== 1) return null;
+  return ciclos.values().next().value ?? null;
+}
+
 /**
  * Data, tipo de ASO e Visualizar da tabela "Vagas do contrato".
- * Fonte: vínculo explícito da vaga. Cancelado nunca preenche a linha.
+ * Agendado usa o agendamento vinculado. Programado usa o periódico vinculado.
+ * Cancelado nunca preenche a linha.
  */
 export function resolverDadosExibicaoVagaContrato(params: {
   vaga: Pick<
@@ -748,11 +846,17 @@ export function resolverDadosExibicaoVagaContrato(params: {
     | "status"
     | "agendamento_id"
     | "periodico_futuro_id"
+    | "colaborador"
     | "colaborador_cpf"
+    | "cargo_id"
+    | "cargo_nome"
   >;
-  demaisVagas?: Array<Pick<ContratoVagaRecord, "id" | "agendamento_id">>;
+  demaisVagas?: Array<
+    Pick<ContratoVagaRecord, "id" | "agendamento_id" | "periodico_futuro_id">
+  >;
   agendamentos: AgendamentoExibicaoVaga[];
   periodicos?: PeriodicoExibicaoVaga[];
+  clienteNome?: string | null;
 }): DadosExibicaoVagaContrato {
   const { vaga } = params;
 
@@ -765,14 +869,15 @@ export function resolverDadosExibicaoVagaContrato(params: {
   }
 
   if (vaga.status === "programada") {
-    const pid = (vaga.periodico_futuro_id ?? "").trim();
-    const periodico = pid
-      ? (params.periodicos ?? []).find((item) => item.id === pid)
+    const periodicoId = resolverPeriodicoIdVisualizarVaga(params);
+    const periodico = periodicoId
+      ? (params.periodicos ?? []).find((item) => item.id === periodicoId)
       : undefined;
     return {
       dataExameIso: isoDateOrNull(periodico?.proxima_data),
       tipoAso: tipoAsoOrNull(periodico?.tipo_aso),
       agendamentoIdVisualizar: null,
+      periodicoIdVisualizar: periodicoId,
     };
   }
 
@@ -810,6 +915,7 @@ export function resolverDadosExibicaoVagaContrato(params: {
     dataExameIso: isoDateOrNull(escolhido.data_agendamento),
     tipoAso: tipoAsoOrNull(escolhido.aso),
     agendamentoIdVisualizar: escolhido.id,
+    periodicoIdVisualizar: null,
   };
 }
 
