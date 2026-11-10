@@ -92,9 +92,11 @@ async function assertClienteExiste(
 
 export async function registrarDesligamentoAdmin(params: {
   clienteId: string;
-  cpf: string;
+  cpf?: string | null;
   dataEvento: string;
   motivo?: string | null;
+  agendamentoId?: string | null;
+  vagaId?: string | null;
   actor: AuditoriaUsuarioContext;
 }): Promise<
   | {
@@ -111,6 +113,8 @@ export async function registrarDesligamentoAdmin(params: {
     cpf: params.cpf,
     dataEvento: params.dataEvento,
     motivo: params.motivo,
+    agendamentoId: params.agendamentoId,
+    vagaId: params.vagaId,
   });
   if (!payload.ok) return payload;
 
@@ -120,7 +124,13 @@ export async function registrarDesligamentoAdmin(params: {
   const { colaboradores } = await listarColaboradoresPortal(
     payload.clienteId
   );
-  const linha = colaboradores.find((l) => l.cpfDigits === payload.cpfDigits);
+  const linha = colaboradores.find((l) => {
+    if (payload.cpfDigits) return l.cpfDigits === payload.cpfDigits;
+    if (payload.agendamentoId) {
+      return l.historicoAgendamentoId === payload.agendamentoId;
+    }
+    return l.vinculoVagaId === payload.vagaId;
+  });
   if (!linha) {
     return {
       ok: false,
@@ -137,23 +147,44 @@ export async function registrarDesligamentoAdmin(params: {
   }
 
   const admin = createAdminClient();
+  const registro: Record<string, unknown> = {
+    cliente_id: payload.clienteId,
+    cpf_digits: payload.cpfDigits,
+    tipo: TIPO_DESLIGAMENTO_ADMIN,
+    data_evento: payload.dataEvento,
+    motivo: payload.motivo,
+    colaborador_nome: linha.nome,
+    cargo_nome: linha.cargo === "—" ? null : linha.cargo,
+    criado_por: params.actor.usuarioId,
+    criado_por_nome: params.actor.usuarioNome,
+  };
+  if (!payload.cpfDigits) {
+    registro.vinculo_agendamento_id = payload.agendamentoId;
+    registro.vinculo_vaga_id = payload.vagaId;
+  }
   const insert = await admin
     .from("colaborador_movimentacoes")
-    .insert({
-      cliente_id: payload.clienteId,
-      cpf_digits: payload.cpfDigits,
-      tipo: TIPO_DESLIGAMENTO_ADMIN,
-      data_evento: payload.dataEvento,
-      motivo: payload.motivo,
-      colaborador_nome: linha.nome,
-      cargo_nome: linha.cargo === "—" ? null : linha.cargo,
-      criado_por: params.actor.usuarioId,
-      criado_por_nome: params.actor.usuarioNome,
-    })
+    .insert(registro)
     .select("id")
     .maybeSingle();
 
   if (insert.error) {
+    if (
+      !payload.cpfDigits &&
+      (insert.error.code === "42703" ||
+        insert.error.code === "PGRST204" ||
+        insert.error.code === "23514" ||
+        /vinculo_agendamento_id|vinculo_vaga_id|cpf_digits/i.test(
+          insert.error.message ?? ""
+        ))
+    ) {
+      return {
+        ok: false,
+        error:
+          "Não foi possível registrar o desligamento deste colaborador sem CPF.",
+        status: 503,
+      };
+    }
     if (insert.error.code === "23505") {
       return {
         ok: false,
@@ -397,7 +428,13 @@ export async function desfazerDesligamentoAdmin(params: {
   }
 
   const { colaboradores } = await listarColaboradoresPortal(payload.clienteId);
-  const linha = colaboradores.find((l) => l.cpfDigits === mov.cpf_digits);
+  const linha =
+    colaboradores.find(
+      (l) => l.desligamentoMovimentacaoId === payload.movimentacaoId
+    ) ??
+    colaboradores.find(
+      (l) => Boolean(mov.cpf_digits) && l.cpfDigits === mov.cpf_digits
+    );
   if (!podeDesfazerDesligamentoAdmin(linha)) {
     return {
       ok: false,

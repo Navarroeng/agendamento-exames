@@ -54,6 +54,22 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     assert.equal(ok.cpfDigits, CPF_A);
     assert.equal(ok.dataEvento, "2026-09-15");
     assert.equal(ok.motivo, "dispensado");
+    assert.equal(ok.agendamentoId, null);
+    assert.equal(ok.vagaId, null);
+  }
+}
+
+{
+  const semCpf = validarPayloadDesligamentoAdmin({
+    clienteId: "79369d60-7205-4e0a-baad-70d3e5f4ea9b",
+    cpf: "",
+    dataEvento: "2026-09-15",
+    vagaId: "79369d60-7205-4e0a-baad-70d3e5f4ea9b",
+  });
+  assert.equal(semCpf.ok, true);
+  if (semCpf.ok) {
+    assert.equal(semCpf.cpfDigits, "");
+    assert.equal(semCpf.vagaId, "79369d60-7205-4e0a-baad-70d3e5f4ea9b");
   }
 }
 
@@ -82,8 +98,27 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     desligamentoMovimentacaoId: null,
     admissaoMovimentacaoId: null,
     historicoAgendamentoId: null,
+    vinculoVagaId: null,
   };
   assert.equal(podeDemitirColaborador(ativo), true);
+  assert.equal(
+    podeDemitirColaborador({
+      ...ativo,
+      cpfDigits: "",
+      historicoAgendamentoId: null,
+      vinculoVagaId: "79369d60-7205-4e0a-baad-70d3e5f4ea9b",
+    }),
+    true
+  );
+  assert.equal(
+    podeDemitirColaborador({
+      ...ativo,
+      cpfDigits: "",
+      historicoAgendamentoId: null,
+      vinculoVagaId: null,
+    }),
+    false
+  );
   assert.equal(podeDesfazerDesligamentoAdmin(ativo), false);
 
   const demitidoAdmin: ClienteColaboradorLinha = {

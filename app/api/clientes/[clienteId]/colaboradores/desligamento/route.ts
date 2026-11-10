@@ -25,6 +25,8 @@ export async function POST(
       cpf?: string;
       data_evento?: string;
       motivo?: string;
+      agendamentoId?: string | null;
+      vagaId?: string | null;
       usuarioNome?: string;
       usuarioEmail?: string;
     } = {};
@@ -42,6 +44,8 @@ export async function POST(
       cpf: String(body.cpf ?? ""),
       dataEvento: String(body.data_evento ?? ""),
       motivo: body.motivo,
+      agendamentoId: body.agendamentoId,
+      vagaId: body.vagaId,
       actor: staff.actor,
     });
 

@@ -111,13 +111,14 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
     }
   );
 
-  const movimentacoes = await lerPaginas<PortalColaboradorMovimentacaoFonte>(
-    async (from, to) => {
+  const selectMovimentacao =
+    "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em";
+  const selectMovimentacaoVinculo = `${selectMovimentacao}, vinculo_agendamento_id, vinculo_vaga_id`;
+  const lerMovimentacoes = (colunas: string) =>
+    lerPaginas<PortalColaboradorMovimentacaoFonte>(async (from, to) => {
       const { data, error } = await admin
         .from("colaborador_movimentacoes")
-        .select(
-          "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em"
-        )
+        .select(colunas)
         .eq("cliente_id", id)
         .in("tipo", ["desligamento_admin", "admissao"])
         .is("cancelado_em", null)
@@ -127,8 +128,22 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
         data: (data ?? null) as PortalColaboradorMovimentacaoFonte[] | null,
         error,
       };
+    });
+  let movimentacoes: PortalColaboradorMovimentacaoFonte[];
+  try {
+    movimentacoes = await lerMovimentacoes(selectMovimentacaoVinculo);
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    const message = String(err.message ?? "");
+    if (
+      err.code !== "42703" &&
+      err.code !== "PGRST204" &&
+      !/vinculo_agendamento_id|vinculo_vaga_id/i.test(message)
+    ) {
+      throw error;
     }
-  );
+    movimentacoes = await lerMovimentacoes(selectMovimentacao);
+  }
 
   const colaboradores = consolidarPortalColaboradores({
     vagas,
