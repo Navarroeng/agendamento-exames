@@ -10,6 +10,7 @@ import {
 } from "@/lib/auditoria";
 import { filtroOrCpfExato, isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import { TIPO_DESLIGAMENTO_ADMIN, coletarCpfsDesligamentoAdminAtivo } from "@/lib/colaborador-movimentacoes";
+import { propagarCadastroColaborador } from "@/lib/colaborador-cadastro-gravacao";
 import {
   cpfVagaIguais,
   coletarCpfsDemissionalAtivo,
@@ -273,6 +274,42 @@ export async function marcarEtapaListaVagas(aprovacaoId: string): Promise<void> 
   if (error) throw error;
 }
 
+async function espelharCadastroNaEmpresa(params: {
+  clienteId: string | null;
+  vagaId: string;
+  agendamentoId: string | null;
+  antesCpf: string | null;
+  nome: string | null;
+  cpf: string | null;
+  cargo: string | null;
+  anterior: {
+    colaborador: string | null;
+    colaborador_cpf: string | null;
+    cargo_nome: string | null;
+  };
+}): Promise<void> {
+  if (!params.clienteId) return;
+  if (!params.nome && !isValidCPF(normalizeCpfDigits(params.cpf))) return;
+  try {
+    await propagarCadastroColaborador(createClient(), {
+      clienteId: params.clienteId,
+      identidade: {
+        cpf: params.antesCpf,
+        agendamentoId: params.agendamentoId,
+        vagaId: params.vagaId,
+      },
+      cadastro: {
+        nome: params.nome,
+        cpf: params.cpf,
+        cargo: params.cargo,
+      },
+    });
+  } catch (error) {
+    await atualizarVaga(params.vagaId, params.anterior);
+    throw error;
+  }
+}
+
 export async function salvarListaVagasContrato(params: {
   contratoId: string;
   orcamentoId: string;
@@ -349,6 +386,22 @@ export async function salvarListaVagasContrato(params: {
         });
         cargosCorrigidos += 1;
       }
+      if (plano || planoCargo) {
+        await espelharCadastroNaEmpresa({
+          clienteId: params.clienteId,
+          vagaId: atual.id,
+          agendamentoId: atual.agendamento_id,
+          antesCpf: atual.colaborador_cpf,
+          nome: plano?.colaborador ?? atual.colaborador,
+          cpf: atual.colaborador_cpf,
+          cargo: planoCargo?.cargoNome ?? atual.cargo_nome,
+          anterior: {
+            colaborador: atual.colaborador,
+            colaborador_cpf: atual.colaborador_cpf,
+            cargo_nome: atual.cargo_nome,
+          },
+        });
+      }
       continue;
     }
 
@@ -420,6 +473,31 @@ export async function salvarListaVagasContrato(params: {
       agendamento_id: null,
       periodico_futuro_id: null,
     });
+    const cpfDepois = isValidCPF(normalizeCpfDigits(cpf))
+      ? normalizeCpfDigits(cpf)
+      : null;
+    const mudouIdentidade =
+      normalizeNomeOcupante(atual.colaborador) !== (nome ?? "") ||
+      (isValidCPF(normalizeCpfDigits(atual.colaborador_cpf))
+        ? normalizeCpfDigits(atual.colaborador_cpf)
+        : "") !== (cpfDepois ?? "") ||
+      normalizeNomeOcupante(atual.cargo_nome) !== (cargoNome ?? "");
+    if (mudouIdentidade && (nome || cpfDepois)) {
+      await espelharCadastroNaEmpresa({
+        clienteId: params.clienteId,
+        vagaId: atual.id,
+        agendamentoId: atual.agendamento_id,
+        antesCpf: atual.colaborador_cpf,
+        nome,
+        cpf: cpfDepois,
+        cargo: cargoNome,
+        anterior: {
+          colaborador: atual.colaborador,
+          colaborador_cpf: atual.colaborador_cpf,
+          cargo_nome: atual.cargo_nome,
+        },
+      });
+    }
   }
 
   atuais = await listarVagasDoContrato(params.contratoId);

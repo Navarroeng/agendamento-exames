@@ -9,7 +9,7 @@ import {
   podeDemitirColaborador,
   podeDesfazerDesligamentoAdmin,
 } from "@/lib/colaborador-movimentacoes";
-import { formatCPF, isValidCPF } from "@/lib/cpf";
+import { formatCPF, isValidCPF, maskCPFInput } from "@/lib/cpf";
 import {
   apresentarCargoColaboradorPortal,
   apresentarNomeColaboradorPortal,
@@ -73,6 +73,8 @@ export function ClienteColaboradoresSection({
   const [desfazerAlvo, setDesfazerAlvo] =
     useState<ClienteColaboradorLinha | null>(null);
   const [historicoAlvo, setHistoricoAlvo] =
+    useState<ClienteColaboradorLinha | null>(null);
+  const [editarAlvo, setEditarAlvo] =
     useState<ClienteColaboradorLinha | null>(null);
 
   const aplicarLista = useCallback((json: ListResponse) => {
@@ -242,11 +244,12 @@ export function ClienteColaboradoresSection({
                   <div className="mt-4 hidden overflow-hidden rounded-2xl border border-[#e8edf5] bg-white md:block">
                     <table className="w-full table-fixed text-left text-sm">
                       <colgroup>
-                        <col className="w-[28%]" />
-                        <col className="w-[16%]" />
                         <col className="w-[22%]" />
-                        <col className="w-[18%]" />
                         <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[18%]" />
                       </colgroup>
                       <thead className="bg-[#f8fafc] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
                         <tr>
@@ -255,6 +258,7 @@ export function ClienteColaboradoresSection({
                           <th className="px-3 py-3">Cargo</th>
                           <th className="px-3 py-3">Admissão</th>
                           <th className="px-3 py-3">Situação</th>
+                          <th className="px-3 py-3">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -273,7 +277,10 @@ export function ClienteColaboradoresSection({
                               </button>
                             </td>
                             <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-[#475569]">
-                              {row.cpfMascarado}
+                              <CpfCelula
+                                row={row}
+                                onCadastrar={() => setEditarAlvo(row)}
+                              />
                             </td>
                             <td className="px-3 py-3 text-[#475569]">
                               <span className="line-clamp-2">
@@ -287,9 +294,13 @@ export function ClienteColaboradoresSection({
                                 onAtualizado={aplicarLista}
                               />
                             </td>
+                            <td className="px-3 py-3 font-semibold text-[#0b1f4d]">
+                              {row.situacao === "demitido" ? "Desligado" : "Ativo"}
+                            </td>
                             <td className="px-3 py-3">
-                              <SituacaoCelula
+                              <AcoesColuna
                                 row={row}
+                                onEditar={setEditarAlvo}
                                 onDemitir={setDemitirAlvo}
                                 onDesfazer={setDesfazerAlvo}
                               />
@@ -314,7 +325,10 @@ export function ClienteColaboradoresSection({
                           {apresentarNomeColaboradorPortal(row.nome)}
                         </button>
                         <p className="mt-0.5 font-mono text-xs text-[#64748b]">
-                          {row.cpfMascarado}
+                          <CpfCelula
+                            row={row}
+                            onCadastrar={() => setEditarAlvo(row)}
+                          />
                         </p>
                         <dl className="mt-3 space-y-1 text-sm">
                           <div className="flex justify-between gap-2">
@@ -335,9 +349,16 @@ export function ClienteColaboradoresSection({
                           </div>
                           <div className="flex items-start justify-between gap-2">
                             <dt className="pt-1 text-[#94a3b8]">Situação</dt>
-                            <dd className="text-right text-[#475569]">
-                              <SituacaoCelula
+                            <dd className="text-right font-semibold text-[#0b1f4d]">
+                              {row.situacao === "demitido" ? "Desligado" : "Ativo"}
+                            </dd>
+                          </div>
+                          <div className="flex items-start justify-between gap-2">
+                            <dt className="pt-1 text-[#94a3b8]">Ações</dt>
+                            <dd className="text-right">
+                              <AcoesColuna
                                 row={row}
+                                onEditar={setEditarAlvo}
                                 onDemitir={setDemitirAlvo}
                                 onDesfazer={setDesfazerAlvo}
                               />
@@ -374,6 +395,18 @@ export function ClienteColaboradoresSection({
           onDone={(json) => {
             aplicarLista(json);
             setDesfazerAlvo(null);
+          }}
+        />
+      ) : null}
+
+      {editarAlvo ? (
+        <EditarColaboradorDialog
+          clienteId={clienteId}
+          row={editarAlvo}
+          onClose={() => setEditarAlvo(null)}
+          onDone={(json) => {
+            aplicarLista(json);
+            setEditarAlvo(null);
           }}
         />
       ) : null}
@@ -550,25 +583,47 @@ function AdmissaoCelula({
   );
 }
 
-function SituacaoCelula({
+function CpfCelula({
   row,
+  onCadastrar,
+}: {
+  row: ClienteColaboradorLinha;
+  onCadastrar: () => void;
+}) {
+  if (isValidCPF(row.cpfDigits)) {
+    return <>{formatCPF(row.cpfDigits)}</>;
+  }
+  return (
+    <button
+      type="button"
+      className="text-[11px] font-bold text-brand-blue underline-offset-2 hover:underline"
+      onClick={onCadastrar}
+    >
+      Cadastrar
+    </button>
+  );
+}
+
+function AcoesColuna({
+  row,
+  onEditar,
   onDemitir,
   onDesfazer,
 }: {
   row: ClienteColaboradorLinha;
+  onEditar: (row: ClienteColaboradorLinha) => void;
   onDemitir: (row: ClienteColaboradorLinha) => void;
   onDesfazer: (row: ClienteColaboradorLinha) => void;
 }) {
   return (
     <div className="flex flex-col items-start gap-1">
-      <span className="font-semibold text-[#0b1f4d]">
-        {row.situacao === "demitido" ? "Desligado" : "Ativo"}
-      </span>
-      {row.dataDesligamentoLabel ? (
-        <span className="whitespace-nowrap text-xs text-[#64748b]">
-          {row.dataDesligamentoLabel}
-        </span>
-      ) : null}
+      <button
+        type="button"
+        className="text-[11px] font-bold text-[#0b1f4d] underline-offset-2 hover:underline"
+        onClick={() => onEditar(row)}
+      >
+        Editar
+      </button>
       <AcoesColaborador
         row={row}
         onDemitir={onDemitir}
@@ -651,6 +706,8 @@ function DemitirModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             cpf: row.cpfDigits,
+            agendamentoId: row.historicoAgendamentoId,
+            vagaId: row.vinculoVagaId,
             data_evento: dataEvento,
             motivo: motivo.trim() || undefined,
           }),
@@ -980,6 +1037,164 @@ function HistoricoExamesDialog({
             Fechar
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EditarColaboradorDialog({
+  clienteId,
+  row,
+  onClose,
+  onDone,
+}: {
+  clienteId: string;
+  row: ClienteColaboradorLinha;
+  onClose: () => void;
+  onDone: (json: ListResponse) => void;
+}) {
+  const [nome, setNome] = useState(row.nome);
+  const [cpf, setCpf] = useState(
+    isValidCPF(row.cpfDigits) ? formatCPF(row.cpfDigits) : ""
+  );
+  const [cargo, setCargo] = useState(row.cargo === "—" ? "" : row.cargo);
+  const [admissao, setAdmissao] = useState(row.dataAdmissaoIso ?? "");
+  const [desligamento, setDesligamento] = useState(row.dataDesligamentoIso ?? "");
+  const [saving, setSaving] = useState(false);
+  const desligamentoEditavel =
+    row.situacao === "demitido" && row.desligamentoOrigem === "admin";
+
+  const salvar = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/clientes/${encodeURIComponent(clienteId)}/colaboradores/cadastro`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cpfAtual: row.cpfDigits,
+            agendamentoId: row.historicoAgendamentoId,
+            vagaId: row.vinculoVagaId,
+            nome,
+            cpf,
+            cargo,
+            dataAdmissao: admissao || null,
+            dataDesligamento: desligamentoEditavel ? desligamento || null : null,
+            desligamentoMovimentacaoId: desligamentoEditavel
+              ? row.desligamentoMovimentacaoId
+              : null,
+          }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as ListResponse;
+      if (!res.ok) {
+        toast.error(json.error ?? "Não foi possível salvar o colaborador.");
+        return;
+      }
+      toast.success("Cadastro do colaborador salvo.");
+      onDone(json);
+    } catch {
+      toast.error("Não foi possível salvar o colaborador.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#1a1333]/50 backdrop-blur-sm"
+        onClick={() => {
+          if (!saving) onClose();
+        }}
+        aria-label="Fechar edição"
+      />
+      <div
+        className="animate-modal-in relative w-full max-w-md overflow-hidden rounded-[24px] bg-white shadow-[0_24px_48px_rgba(45,35,95,0.25)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="editar-colaborador-titulo"
+      >
+        <div className="border-b border-[#e8edf5] px-6 py-5">
+          <h3
+            id="editar-colaborador-titulo"
+            className="text-lg font-extrabold text-[#2d2a4a]"
+          >
+            Editar colaborador
+          </h3>
+          <p className="mt-1 text-sm text-[#8b95a8]">
+            A alteração vale para esta empresa e para as listas em que ele já está vinculado.
+          </p>
+        </div>
+        <form
+          className="flex flex-col gap-3 px-6 py-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void salvar();
+          }}
+        >
+          <Field label="Nome">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={nome}
+              onChange={(event) => setNome(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="CPF">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={cpf}
+              onChange={(event) => setCpf(maskCPFInput(event.target.value))}
+              inputMode="numeric"
+              placeholder="000.000.000-00"
+            />
+          </Field>
+          <Field label="Cargo">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={cargo}
+              onChange={(event) => setCargo(event.target.value)}
+            />
+          </Field>
+          <Field label="Data de admissão">
+            <input
+              type="date"
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={admissao}
+              onChange={(event) => setAdmissao(event.target.value)}
+            />
+          </Field>
+          {desligamentoEditavel ? (
+            <Field label="Data de desligamento">
+              <input
+                type="date"
+                className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+                value={desligamento}
+                onChange={(event) => setDesligamento(event.target.value)}
+              />
+            </Field>
+          ) : row.dataDesligamentoLabel ? (
+            <Field label="Data de desligamento">
+              <input
+                className="h-10 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 text-sm text-[#0b1f4d]"
+                value={row.dataDesligamentoLabel}
+                readOnly
+              />
+            </Field>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" className="btn" onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

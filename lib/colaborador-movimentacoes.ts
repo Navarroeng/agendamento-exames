@@ -83,7 +83,9 @@ export function isMovimentacaoCancelada(
 export function podeDemitirColaborador(
   linha: ClienteColaboradorLinha | null | undefined
 ): boolean {
-  return linha?.situacao === "ativo" && isValidCPF(linha.cpfDigits);
+  if (linha?.situacao !== "ativo") return false;
+  if (isValidCPF(linha.cpfDigits)) return true;
+  return Boolean(linha.historicoAgendamentoId || linha.vinculoVagaId);
 }
 
 export function podeDesfazerDesligamentoAdmin(
@@ -98,9 +100,11 @@ export function podeDesfazerDesligamentoAdmin(
 
 export type ValidarDesligamentoInput = {
   clienteId: string;
-  cpf: string;
+  cpf?: string | null;
   dataEvento: string;
   motivo?: string | null;
+  agendamentoId?: string | null;
+  vagaId?: string | null;
 };
 
 export type ValidarDesligamentoOk = {
@@ -109,6 +113,8 @@ export type ValidarDesligamentoOk = {
   cpfDigits: string;
   dataEvento: string;
   motivo: string | null;
+  agendamentoId: string | null;
+  vagaId: string | null;
 };
 
 export type ValidarDesligamentoErro = {
@@ -126,7 +132,19 @@ export function validarPayloadDesligamentoAdmin(
   }
 
   const cpfDigits = normalizeCpfDigits(input.cpf);
-  if (!isValidCPF(cpfDigits)) {
+  const agendamentoId = String(input.agendamentoId ?? "").trim();
+  const vagaId = String(input.vagaId ?? "").trim();
+  const temCpf = isValidCPF(cpfDigits);
+  if (!temCpf && cpfDigits) {
+    return { ok: false, error: "CPF inválido.", status: 400 };
+  }
+  if (agendamentoId && !isUuid(agendamentoId)) {
+    return { ok: false, error: "Exame inválido.", status: 400 };
+  }
+  if (vagaId && !isUuid(vagaId)) {
+    return { ok: false, error: "Vínculo inválido.", status: 400 };
+  }
+  if (!temCpf && !agendamentoId && !vagaId) {
     return { ok: false, error: "CPF inválido.", status: 400 };
   }
 
@@ -138,7 +156,15 @@ export function validarPayloadDesligamentoAdmin(
   const motivoRaw = String(input.motivo ?? "").trim();
   const motivo = motivoRaw ? motivoRaw.slice(0, 500) : null;
 
-  return { ok: true, clienteId, cpfDigits, dataEvento, motivo };
+  return {
+    ok: true,
+    clienteId,
+    cpfDigits: temCpf ? cpfDigits : "",
+    dataEvento,
+    motivo,
+    agendamentoId: temCpf ? null : agendamentoId || null,
+    vagaId: temCpf ? null : vagaId || null,
+  };
 }
 
 export type ValidarAdmissaoInput = {

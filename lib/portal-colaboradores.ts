@@ -55,6 +55,8 @@ export type ClienteColaboradorLinha = PortalColaboradorLinha & {
    * Com CPF, o histórico usa o documento e ignora este campo.
    */
   historicoAgendamentoId: string | null;
+  /** Vaga usada no desligamento quando o registro não tem CPF. */
+  vinculoVagaId: string | null;
 };
 
 export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
@@ -62,6 +64,7 @@ export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
   "desligamentoMovimentacaoId",
   "admissaoMovimentacaoId",
   "historicoAgendamentoId",
+  "vinculoVagaId",
 ] as const;
 
 /** Remove metadados administrativos. Não altera a regra consolidada. */
@@ -126,6 +129,8 @@ export type PortalColaboradorMovimentacaoFonte = {
   colaborador_nome?: string | null;
   cargo_nome?: string | null;
   criado_em?: string | null;
+  vinculo_agendamento_id?: string | null;
+  vinculo_vaga_id?: string | null;
 };
 
 const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin";
@@ -334,6 +339,19 @@ function isAdmissaoOficialValida(
   return !String(mov.cancelado_em ?? "").trim();
 }
 
+function bucketDaMovimentacao(
+  map: Map<string, Interno>,
+  mov: PortalColaboradorMovimentacaoFonte
+): Interno | null {
+  const cpf = cpfValido(mov.cpf_digits);
+  if (cpf) return map.get(cpf) ?? null;
+  const agendamentoId = String(mov.vinculo_agendamento_id ?? "").trim();
+  if (agendamentoId) return map.get(`semcpf:ag:${agendamentoId}`) ?? null;
+  const vagaId = String(mov.vinculo_vaga_id ?? "").trim();
+  if (vagaId) return map.get(`semcpf:vaga:${vagaId}`) ?? null;
+  return null;
+}
+
 /**
  * Consolida roster a partir de vagas + agendamentos + movimentações.
  * Cancelados (agendamento ou movimentação) são ignorados.
@@ -450,9 +468,7 @@ export function consolidarPortalColaboradores(input: {
     );
 
   for (const mov of movs) {
-    const cpf = normalizeCpfDigits(mov.cpf_digits);
-    if (!isValidCPF(cpf)) continue;
-    const existing = map.get(cpf);
+    const existing = bucketDaMovimentacao(map, mov);
     if (!existing) continue;
 
     const dataIso = toDataIso(mov.data_evento);
@@ -483,9 +499,7 @@ export function consolidarPortalColaboradores(input: {
     );
 
   for (const mov of admissoes) {
-    const cpf = normalizeCpfDigits(mov.cpf_digits);
-    if (!isValidCPF(cpf)) continue;
-    const existing = map.get(cpf);
+    const existing = bucketDaMovimentacao(map, mov);
     if (!existing) continue;
     const dataIso = toDataIso(mov.data_evento);
     if (!dataIso) continue;
@@ -530,6 +544,10 @@ export function consolidarPortalColaboradores(input: {
         ? row.admissaoMovimentacaoId
         : null,
       historicoAgendamentoId: cpfDigits ? null : row.historicoAgendamentoId,
+      vinculoVagaId:
+        cpfDigits || !chave.startsWith("semcpf:vaga:")
+          ? null
+          : chave.slice("semcpf:vaga:".length),
     });
   }
 
