@@ -73,6 +73,14 @@ import {
 } from "@/lib/mensalidade-parcelas";
 import { camposResumoMensalidadeAvista } from "@/lib/orcamento-mensalidade-pagamento";
 import {
+  BOLETOS_EMISSAO_DATA_OBRIGATORIA_MSG,
+  BOLETOS_EMISSAO_ORIENTACAO,
+  dataSolicitacaoEmissaoBoletosValida,
+  estadoFormularioSolicitacaoEmissaoBoletos,
+  gravacaoSolicitacaoEmissaoBoletos,
+  registroSolicitacaoOuHistoricoLiberado,
+} from "@/lib/boletos-emissao-solicitacao";
+import {
   OrcamentoAbaLogo,
   OrcamentoAbaProcuracao,
   OrcamentoAbaVisitaTecnica,
@@ -271,6 +279,10 @@ export function OrcamentoAprovarModal({
   const [parcelasLoading, setParcelasLoading] = useState(false);
   const [salvandoParcelas, setSalvandoParcelas] = useState(false);
   const [boletoPagoEm, setBoletoPagoEm] = useState("");
+  const [boletosEmissaoSolicitada, setBoletosEmissaoSolicitada] =
+    useState(false);
+  const [boletosEmissaoSolicitadaEm, setBoletosEmissaoSolicitadaEm] =
+    useState("");
   const [observacaoPagamento, setObservacaoPagamento] = useState("");
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
 
@@ -330,6 +342,10 @@ export function OrcamentoAprovarModal({
     const ctxInit: OrcamentoEtapasContexto = {
       fluxo,
       treinamento,
+      controleMensalidades: usaControleParcelasMensalidade(
+        orcamento.modalidade,
+        aprovacao?.mensalidade_pagamento
+      ),
     };
     const requestedTab = sanitizeOrcamentoEtapaTab(initialTab, fluxo);
     const tabInicial: TabId =
@@ -358,6 +374,11 @@ export function OrcamentoAprovarModal({
     setBoletoVencimento(aprovacao?.boleto_vencimento ?? "");
     setBoletoPago(Boolean(aprovacao?.boleto_pago));
     setBoletoPagoEm(aprovacao?.boleto_pago_em ?? "");
+    const solicitacaoSalva = estadoFormularioSolicitacaoEmissaoBoletos(
+      aprovacao ?? null
+    );
+    setBoletosEmissaoSolicitada(solicitacaoSalva.solicitar);
+    setBoletosEmissaoSolicitadaEm(solicitacaoSalva.data);
     setObservacaoPagamento(aprovacao?.observacao_pagamento ?? "");
     setComprovanteFile(null);
     setProcuracaoStatus(
@@ -400,6 +421,9 @@ export function OrcamentoAprovarModal({
     setContratoEnviadoEm(aprovacao.contrato_enviado_em ?? "");
     setContratoAssinado(Boolean(aprovacao.contrato_assinado));
     setContratoAssinadoEm(aprovacao.contrato_assinado_em ?? "");
+    const solicitacaoSalva = estadoFormularioSolicitacaoEmissaoBoletos(aprovacao);
+    setBoletosEmissaoSolicitada(solicitacaoSalva.solicitar);
+    setBoletosEmissaoSolicitadaEm(solicitacaoSalva.data);
   }, [open, orcamento, aprovacao]);
 
   useEffect(() => {
@@ -518,6 +542,14 @@ export function OrcamentoAprovarModal({
   const controleMensalidades = usaControleParcelasMensalidade(
     orcamento?.modalidade,
     aprovacao?.mensalidade_pagamento
+  );
+  const parcelasMensalidadeLiberadas = registroSolicitacaoOuHistoricoLiberado(
+    aprovacao ?? null,
+    {
+      treinamento,
+      agendamentosRealizados: agendamentosContagem?.realizados,
+      agendamentosDispensados: agendamentosContagem?.dispensado,
+    }
   );
   const podeAlterarContratacao =
     permitirAlterarContratacao &&
@@ -854,6 +886,28 @@ export function OrcamentoAprovarModal({
 
     if (controleMensalidades) {
       if (!orcamento) return;
+      if (
+        boletosEmissaoSolicitada &&
+        !dataSolicitacaoEmissaoBoletosValida(boletosEmissaoSolicitadaEm)
+      ) {
+        toast.error(BOLETOS_EMISSAO_DATA_OBRIGATORIA_MSG);
+        return;
+      }
+      const gravacao = gravacaoSolicitacaoEmissaoBoletos(
+        boletosEmissaoSolicitada,
+        boletosEmissaoSolicitadaEm
+      );
+      if (!parcelasMensalidadeLiberadas && !gravacao.boletos_emissao_solicitada) {
+        toast.error(BOLETOS_EMISSAO_ORIENTACAO);
+        return;
+      }
+      const formularioSalvo = estadoFormularioSolicitacaoEmissaoBoletos(aprovacao);
+      const solicitacao =
+        gravacao.boletos_emissao_solicitada ||
+        formularioSalvo.solicitar ||
+        formularioSalvo.data
+          ? gravacao
+          : undefined;
       setSalvandoParcelas(true);
       try {
         const observacao = emptyToNull(observacaoPagamento);
@@ -869,10 +923,12 @@ export function OrcamentoAprovarModal({
                 pagoEmIso: parcela.pagoEmIso,
               })),
               observacao,
+              solicitacao,
             })
           : await salvarObservacaoMensalidades({
               aprovacaoId: aprovacao.id,
               observacao,
+              solicitacao,
             });
         onAprovacaoAtualizada?.(salva);
         if (gradeMensalidades.ok) {
@@ -1884,6 +1940,11 @@ export function OrcamentoAprovarModal({
               disabled={
                 acompanhamentoBloqueado || salvandoParcelas || parcelasLoading
               }
+              solicitarEmissao={boletosEmissaoSolicitada}
+              dataSolicitacao={boletosEmissaoSolicitadaEm}
+              exibirParcelas={parcelasMensalidadeLiberadas}
+              onChangeSolicitarEmissao={setBoletosEmissaoSolicitada}
+              onChangeDataSolicitacao={setBoletosEmissaoSolicitadaEm}
               onChangePagoEm={(numero, pagoEm) =>
                 setPagamentosEditados((atual) => ({
                   ...atual,

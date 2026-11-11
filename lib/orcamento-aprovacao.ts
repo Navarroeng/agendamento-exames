@@ -120,6 +120,10 @@ export interface OrcamentoAprovacaoRecord {
   comprovante_tipo: string | null;
   comprovante_tamanho: number | null;
   observacao_pagamento: string | null;
+  /** true = a equipe já solicitou a emissão dos boletos. Null nas contratações anteriores. */
+  boletos_emissao_solicitada?: boolean | null;
+  /** Data da solicitação. Não é emissão nem pagamento. */
+  boletos_emissao_solicitada_em?: string | null;
   pagamento_confirmado_em?: string | null;
   pagamento_confirmado_por?: string | null;
   contrato_salvo_em?: string | null;

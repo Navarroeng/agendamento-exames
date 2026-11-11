@@ -251,24 +251,24 @@ const contrato = aprovacao({});
 const ctx = { controleMensalidades: true };
 assert.equal(
   isOrcamentoEtapaLiberada("procuracao", contrato, true, ctx),
-  true
+  false
 );
 assert.equal(
   isOrcamentoEtapaLiberada("procuracao", contrato, true),
   false
 );
-assert.equal(resolveOrcamentoEtapaAtual(contrato, true, null, ctx), "procuracao");
+assert.equal(resolveOrcamentoEtapaAtual(contrato, true, null, ctx), "financeiro");
 assert.equal(resolveOrcamentoEtapaAtual(contrato, true), "financeiro");
 assert.equal(
   resolveImplantacaoEtapaAtual(contrato, { controleMensalidades: true }),
-  "procuracao"
+  "financeiro"
 );
 assert.equal(
   resolveImplantacaoEtapaAtual(
     aprovacao({ boleto_pago: false, boleto_pago_em: null }),
     { controleMensalidades: true }
   ),
-  "procuracao"
+  "financeiro"
 );
 
 const vencidaNaoBloqueia = resolverGradeMensalidades({
@@ -283,7 +283,7 @@ if (vencidaNaoBloqueia.ok) {
 }
 assert.equal(
   resolveImplantacaoEtapaAtual(contrato, { controleMensalidades: true }),
-  "procuracao"
+  "financeiro"
 );
 
 function abaBloqueada(
@@ -311,7 +311,7 @@ const mensalAberto = aprovacao({
   boleto_pago: false,
   boleto_pago_em: null,
 });
-assert.equal(abaBloqueada("procuracao", mensalAberto, true), false);
+assert.equal(abaBloqueada("procuracao", mensalAberto, true), true);
 assert.equal(abaBloqueada("funcionarios", mensalAberto, true), true);
 assert.equal(abaBloqueada("logo", mensalAberto, true), true);
 assert.equal(abaBloqueada("visita", mensalAberto, true), true);
@@ -348,7 +348,7 @@ assert.equal(
     null,
     reaberto
   ) === "bloqueada",
-  false
+  true
 );
 
 console.log("test-mensalidade-parcelas: OK");
