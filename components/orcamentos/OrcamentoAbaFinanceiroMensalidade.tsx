@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import { BOLETOS_EMISSAO_ORIENTACAO } from "@/lib/boletos-emissao-solicitacao";
 import { formatCurrency } from "@/lib/money";
 import {
   MENSALIDADE_PARCELAS_QUANTIDADE,
@@ -22,6 +23,11 @@ export function OrcamentoAbaFinanceiroMensalidade({
   parcelas,
   observacao,
   disabled,
+  solicitarEmissao,
+  dataSolicitacao,
+  exibirParcelas,
+  onChangeSolicitarEmissao,
+  onChangeDataSolicitacao,
   onChangePagoEm,
   onChangeObservacao,
   onVerComprovante,
@@ -31,6 +37,11 @@ export function OrcamentoAbaFinanceiroMensalidade({
   parcelas: ParcelaMensalidadeGrade[];
   observacao: string;
   disabled: boolean;
+  solicitarEmissao: boolean;
+  dataSolicitacao: string;
+  exibirParcelas: boolean;
+  onChangeSolicitarEmissao: (value: boolean) => void;
+  onChangeDataSolicitacao: (value: string) => void;
   onChangePagoEm: (numero: number, pagoEm: string) => void;
   onChangeObservacao: (value: string) => void;
   onVerComprovante?: (path: string) => void;
@@ -45,6 +56,44 @@ export function OrcamentoAbaFinanceiroMensalidade({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-2xl border border-[#dbe4f0] bg-white p-4">
+        <p className="text-[12px] font-bold text-navy">
+          Solicitar emissão dos boletos?
+        </p>
+        <label className="mt-2 flex items-center gap-2 text-[12px] text-[#334155]">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[#1e3a5f]"
+            checked={solicitarEmissao}
+            disabled={disabled}
+            onChange={(event) => {
+              const marcado = event.target.checked;
+              onChangeSolicitarEmissao(marcado);
+              if (!marcado) onChangeDataSolicitacao("");
+            }}
+          />
+          Sim
+        </label>
+        {solicitarEmissao ? (
+          <label className="mt-3 block max-w-[220px]">
+            <span className="mb-1.5 block text-xs font-bold text-navy">
+              Data da solicitação
+              <span className="text-[#b91c1c]"> *</span>
+            </span>
+            <input
+              type="date"
+              className="field-input"
+              value={dataSolicitacao}
+              required
+              disabled={disabled}
+              onChange={(event) => onChangeDataSolicitacao(event.target.value)}
+            />
+          </label>
+        ) : null}
+      </div>
+
+      {exibirParcelas ? (
+      <>
       <div>
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-navy">
           Mensalidades da vigência
@@ -139,6 +188,12 @@ export function OrcamentoAbaFinanceiroMensalidade({
             </table>
           </div>
         </>
+      )}
+      </>
+      ) : (
+        <p className="text-[12px] font-semibold text-[#92400e]">
+          {BOLETOS_EMISSAO_ORIENTACAO}
+        </p>
       )}
 
       <label className="block">

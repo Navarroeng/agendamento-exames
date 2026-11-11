@@ -35,6 +35,7 @@ import {
   type ImplantacaoYearMonth,
 } from "@/lib/implantacao-meses";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
+import { registroSolicitacaoOuHistoricoLiberado } from "@/lib/boletos-emissao-solicitacao";
 
 /**
  * Implantação de laudo pontual exclusivo: Resumo, Aprovado, Contrato,
@@ -491,7 +492,15 @@ export function resolveImplantacaoEtapaAtual(
   if (fluxo === "somente_treinamentos") {
     if (isTreinamentoCancelado(treino)) return "treinamento_cancelado";
     if (!isContratoEtapaConcluida(aprovacao)) return "contrato";
-    if (!opts?.controleMensalidades && !isFinanceiroEtapaConcluida(aprovacao)) {
+    if (
+      opts?.controleMensalidades
+        ? !registroSolicitacaoOuHistoricoLiberado(aprovacao, {
+            treinamento: treino,
+            agendamentosRealizados: opts.agendamentosRealizados,
+            agendamentosDispensados: opts.agendamentosDispensados,
+          })
+        : !isFinanceiroEtapaConcluida(aprovacao)
+    ) {
       return "financeiro";
     }
     if (!isTreinamentoEtapaConcluida(treino)) return "agendamento_treinamento";
@@ -511,7 +520,15 @@ export function resolveImplantacaoEtapaAtual(
     return "visita_aet";
   }
 
-  if (!opts?.controleMensalidades && !isFinanceiroEtapaConcluida(aprovacao)) {
+  if (
+    opts?.controleMensalidades
+      ? !registroSolicitacaoOuHistoricoLiberado(aprovacao, {
+          treinamento: treino,
+          agendamentosRealizados: opts.agendamentosRealizados,
+          agendamentosDispensados: opts.agendamentosDispensados,
+        })
+      : !isFinanceiroEtapaConcluida(aprovacao)
+  ) {
     return "financeiro";
   }
 

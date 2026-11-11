@@ -16,6 +16,7 @@ import {
   isFluxoLaudoPontual,
 } from "@/lib/servico-laudo-pontual";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
+import { registroSolicitacaoOuHistoricoLiberado } from "@/lib/boletos-emissao-solicitacao";
 
 export type OrcamentoEtapaId =
   | "resumo"
@@ -149,9 +150,26 @@ export type OrcamentoEtapasContexto = {
   treinamento?: ImplantacaoTreinamentoRecord | null;
   aet?: ImplantacaoAetRecord | null;
   contagem?: OrcamentoEtapasContagemAgendamentos | null;
-  /** Gestão SST mensal: o recebimento não trava as etapas seguintes. */
+  /**
+   * Gestão SST mensal por boleto: o recebimento não trava as etapas.
+   * A solicitação de emissão libera as seguintes, exceto quem já avançou.
+   */
   controleMensalidades?: boolean;
 };
+
+function mensalLiberouEtapasSeguintes(
+  aprovacao: OrcamentoAprovacaoRecord | null,
+  ctx?: OrcamentoEtapasContexto
+): boolean {
+  return (
+    isContratoEtapaConcluida(aprovacao) &&
+    registroSolicitacaoOuHistoricoLiberado(aprovacao, {
+      treinamento: ctx?.treinamento,
+      agendamentosRealizados: ctx?.contagem?.agendamentosRealizados,
+      agendamentosDispensados: ctx?.contagem?.agendamentosDispensados,
+    })
+  );
+}
 
 export function isContratoEtapaConcluida(
   aprovacao: OrcamentoAprovacaoRecord | null
@@ -301,7 +319,9 @@ export function isOrcamentoEtapaLiberada(
       return isContratoEtapaConcluida(aprovacao);
     case "treinamento":
       if (isFluxoLaudoPontual(fluxo)) return false;
-      if (ctx?.controleMensalidades) return isContratoEtapaConcluida(aprovacao);
+      if (ctx?.controleMensalidades) {
+        return mensalLiberouEtapasSeguintes(aprovacao, ctx);
+      }
       return isFinanceiroEtapaConcluida(aprovacao);
     case "documentos":
       return false;
@@ -314,7 +334,9 @@ export function isOrcamentoEtapaLiberada(
     case "procuracao":
       if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
         return false;
-      if (ctx?.controleMensalidades) return isContratoEtapaConcluida(aprovacao);
+      if (ctx?.controleMensalidades) {
+        return mensalLiberouEtapasSeguintes(aprovacao, ctx);
+      }
       return isFinanceiroEtapaConcluida(aprovacao);
     case "funcionarios":
       if (fluxo === "somente_treinamentos" || isFluxoLaudoPontual(fluxo))
@@ -395,7 +417,13 @@ export function resolveOrcamentoEtapaAtual(
   const fluxo = ctx?.fluxo ?? "padrao";
   const etapas = buildOrcamentoEtapas(fluxo);
   for (const etapa of etapas) {
-    if (etapa.id === "financeiro" && ctx?.controleMensalidades) continue;
+    if (
+      etapa.id === "financeiro" &&
+      ctx?.controleMensalidades &&
+      mensalLiberouEtapasSeguintes(aprovacao, ctx)
+    ) {
+      continue;
+    }
     if (
       isOrcamentoEtapaLiberada(etapa.id, aprovacao, orcamentoAprovado, ctx) &&
       !isOrcamentoEtapaConcluida(

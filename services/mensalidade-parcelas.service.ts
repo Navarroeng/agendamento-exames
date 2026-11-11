@@ -11,6 +11,7 @@ import {
   type FonteGradeCobranca,
 } from "@/lib/cobrancas-mensalidades";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import type { GravacaoSolicitacaoEmissaoBoletos } from "@/lib/boletos-emissao-solicitacao";
 import {
   MENSALIDADE_PARCELAS_MIGRATION_MSG,
   payloadAtualizacaoPagoEm,
@@ -119,6 +120,7 @@ export async function listarParcelasMensalidade(
 async function salvarObservacao(params: {
   aprovacaoId: string;
   observacao: string | null;
+  solicitacao?: GravacaoSolicitacaoEmissaoBoletos;
 }): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -126,6 +128,14 @@ async function salvarObservacao(params: {
     .update({
       observacao_pagamento: params.observacao,
       financeiro_salvo_em: new Date().toISOString(),
+      ...(params.solicitacao
+        ? {
+            boletos_emissao_solicitada:
+              params.solicitacao.boletos_emissao_solicitada,
+            boletos_emissao_solicitada_em:
+              params.solicitacao.boletos_emissao_solicitada_em,
+          }
+        : {}),
     })
     .eq("id", params.aprovacaoId)
     .select(APROVACAO_SELECT)
@@ -152,6 +162,7 @@ export async function salvarControleMensalidades(params: {
     pagoEmIso: string | null;
   }>;
   observacao: string | null;
+  solicitacao?: GravacaoSolicitacaoEmissaoBoletos;
 }): Promise<OrcamentoAprovacaoRecord> {
   const supabase = createClient();
   const inicio = iso(params.vigenciaInicio);
@@ -232,6 +243,7 @@ export async function salvarControleMensalidades(params: {
   return salvarObservacao({
     aprovacaoId: params.aprovacaoId,
     observacao: params.observacao,
+    solicitacao: params.solicitacao,
   });
 }
 
@@ -289,6 +301,7 @@ export async function inserirParcelasMensalidadeAusentes(params: {
 export async function salvarObservacaoMensalidades(params: {
   aprovacaoId: string;
   observacao: string | null;
+  solicitacao?: GravacaoSolicitacaoEmissaoBoletos;
 }): Promise<OrcamentoAprovacaoRecord> {
   return salvarObservacao(params);
 }
