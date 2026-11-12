@@ -97,6 +97,7 @@ export async function registrarDesligamentoAdmin(params: {
   motivo?: string | null;
   agendamentoId?: string | null;
   vagaId?: string | null;
+  cadastroId?: string | null;
   actor: AuditoriaUsuarioContext;
 }): Promise<
   | {
@@ -115,6 +116,7 @@ export async function registrarDesligamentoAdmin(params: {
     motivo: params.motivo,
     agendamentoId: params.agendamentoId,
     vagaId: params.vagaId,
+    cadastroId: params.cadastroId,
   });
   if (!payload.ok) return payload;
 
@@ -126,6 +128,7 @@ export async function registrarDesligamentoAdmin(params: {
   );
   const linha = colaboradores.find((l) => {
     if (payload.cpfDigits) return l.cpfDigits === payload.cpfDigits;
+    if (payload.cadastroId) return l.cadastroId === payload.cadastroId;
     if (payload.agendamentoId) {
       return l.historicoAgendamentoId === payload.agendamentoId;
     }
@@ -161,6 +164,7 @@ export async function registrarDesligamentoAdmin(params: {
   if (!payload.cpfDigits) {
     registro.vinculo_agendamento_id = payload.agendamentoId;
     registro.vinculo_vaga_id = payload.vagaId;
+    registro.vinculo_cadastro_id = payload.cadastroId;
   }
   const insert = await admin
     .from("colaborador_movimentacoes")
@@ -174,7 +178,7 @@ export async function registrarDesligamentoAdmin(params: {
       (insert.error.code === "42703" ||
         insert.error.code === "PGRST204" ||
         insert.error.code === "23514" ||
-        /vinculo_agendamento_id|vinculo_vaga_id|cpf_digits/i.test(
+        /vinculo_agendamento_id|vinculo_vaga_id|vinculo_cadastro_id|cpf_digits/i.test(
           insert.error.message ?? ""
         ))
     ) {

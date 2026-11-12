@@ -9,7 +9,11 @@ import {
   AUDITORIA_MODULOS,
 } from "@/lib/auditoria";
 import { filtroOrCpfExato, isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
-import { TIPO_DESLIGAMENTO_ADMIN, coletarCpfsDesligamentoAdminAtivo } from "@/lib/colaborador-movimentacoes";
+import {
+  TIPO_DESLIGAMENTO_ADMIN,
+  coletarCpfsDesligamentoAdminAtivo,
+  isUuid,
+} from "@/lib/colaborador-movimentacoes";
 import { propagarCadastroColaborador } from "@/lib/colaborador-cadastro-gravacao";
 import {
   cpfVagaIguais,
@@ -45,6 +49,7 @@ const SELECT_VAGA = `
   cargo_id, cargo_nome, status, credito_aso_id, agendamento_id,
   periodico_futuro_id, created_at, updated_at
 `;
+const SELECT_VAGA_ORIGEM = `${SELECT_VAGA}, colaborador_origem`;
 
 function mapVaga(row: Record<string, unknown>): ContratoVagaRecord {
   const statusRaw = String(row.status ?? "aberta");
@@ -67,6 +72,9 @@ function mapVaga(row: Record<string, unknown>): ContratoVagaRecord {
       : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    colaborador_origem: row.colaborador_origem
+      ? String(row.colaborador_origem)
+      : null,
   };
 }
 
@@ -74,13 +82,25 @@ export async function listarVagasDoContrato(
   contratoId: string
 ): Promise<ContratoVagaRecord[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("contrato_vagas")
-    .select(SELECT_VAGA)
-    .eq("contrato_id", contratoId)
-    .order("indice", { ascending: true });
+  const consulta = async (colunas: string) =>
+    supabase
+      .from("contrato_vagas")
+      .select(colunas)
+      .eq("contrato_id", contratoId)
+      .order("indice", { ascending: true });
+  let { data, error } = await consulta(SELECT_VAGA_ORIGEM);
+  if (
+    error &&
+    (error.code === "42703" ||
+      error.code === "PGRST204" ||
+      /colaborador_origem/i.test(error.message ?? ""))
+  ) {
+    ({ data, error } = await consulta(SELECT_VAGA));
+  }
   if (error) throw error;
-  return (data ?? []).map((r) => mapVaga(r as Record<string, unknown>));
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) =>
+    mapVaga(r)
+  );
 }
 
 export async function garantirVagasDoContrato(params: {
@@ -282,6 +302,7 @@ async function espelharCadastroNaEmpresa(params: {
   nome: string | null;
   cpf: string | null;
   cargo: string | null;
+  cadastroId?: string | null;
   anterior: {
     colaborador: string | null;
     colaborador_cpf: string | null;
@@ -297,6 +318,7 @@ async function espelharCadastroNaEmpresa(params: {
         cpf: params.antesCpf,
         agendamentoId: params.agendamentoId,
         vagaId: params.vagaId,
+        cadastroId: params.cadastroId ?? null,
       },
       cadastro: {
         nome: params.nome,
@@ -447,6 +469,7 @@ export async function salvarListaVagasContrato(params: {
         credito_aso_id: creditoId,
         agendamento_id: null,
         periodico_futuro_id: null,
+        colaborador_origem: null,
       });
       continue;
     }
@@ -463,6 +486,7 @@ export async function salvarListaVagasContrato(params: {
       }
     }
 
+    const origem = String(draft.colaboradorOrigemId ?? "").trim() || null;
     await atualizarVaga(atual.id, {
       status: nextStatus,
       colaborador: nome,
@@ -472,6 +496,7 @@ export async function salvarListaVagasContrato(params: {
       credito_aso_id: null,
       agendamento_id: null,
       periodico_futuro_id: null,
+      colaborador_origem: origem,
     });
     const cpfDepois = isValidCPF(normalizeCpfDigits(cpf))
       ? normalizeCpfDigits(cpf)
@@ -482,15 +507,19 @@ export async function salvarListaVagasContrato(params: {
         ? normalizeCpfDigits(atual.colaborador_cpf)
         : "") !== (cpfDepois ?? "") ||
       normalizeNomeOcupante(atual.cargo_nome) !== (cargoNome ?? "");
+    const cpfAntesValido = isValidCPF(normalizeCpfDigits(atual.colaborador_cpf))
+      ? normalizeCpfDigits(atual.colaborador_cpf)
+      : null;
     if (mudouIdentidade && (nome || cpfDepois)) {
       await espelharCadastroNaEmpresa({
         clienteId: params.clienteId,
         vagaId: atual.id,
         agendamentoId: atual.agendamento_id,
-        antesCpf: atual.colaborador_cpf,
+        antesCpf: cpfAntesValido ?? cpfDepois,
         nome,
         cpf: cpfDepois,
         cargo: cargoNome,
+        cadastroId: isUuid(origem) ? origem : null,
         anterior: {
           colaborador: atual.colaborador,
           colaborador_cpf: atual.colaborador_cpf,
@@ -581,7 +610,17 @@ async function atualizarVaga(
   patch: Record<string, unknown>
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("contrato_vagas").update(patch).eq("id", id);
+  let { error } = await supabase.from("contrato_vagas").update(patch).eq("id", id);
+  if (
+    error &&
+    Object.prototype.hasOwnProperty.call(patch, "colaborador_origem") &&
+    (error.code === "42703" ||
+      error.code === "PGRST204" ||
+      /colaborador_origem/i.test(error.message ?? ""))
+  ) {
+    const { colaborador_origem: _origemIgnorada, ...resto } = patch;
+    ({ error } = await supabase.from("contrato_vagas").update(resto).eq("id", id));
+  }
   if (error) {
     if (String(error.message || "").includes("idx_contrato_vagas_cpf_unico")) {
       throw new Error(
@@ -789,6 +828,7 @@ export async function liberarFuncionarioDaVagaComprometida(params: {
     cargo_id: null,
     cargo_nome: null,
     credito_aso_id: null,
+    colaborador_origem: null,
   });
 
   await registrarAuditoria({

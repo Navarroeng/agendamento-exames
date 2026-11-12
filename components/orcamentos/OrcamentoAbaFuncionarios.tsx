@@ -12,6 +12,11 @@ import {
   IconTrash,
 } from "@/components/ui/icons/OutlineIcons";
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
+import {
+  avaliarUsoListaColaboradoresCliente,
+  mensagemQuantidadeListaCliente,
+  type ColaboradorListaCliente,
+} from "@/lib/lista-colaboradores-contrato";
 import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
   CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
@@ -161,6 +166,8 @@ export function OrcamentoAbaFuncionarios({
   } | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avisoListaCliente, setAvisoListaCliente] = useState<string | null>(null);
+  const [listaClienteAplicada, setListaClienteAplicada] = useState(false);
   const [nomeSort, setNomeSort] = useState<ListaFuncionariosNomeSort>("asc");
 
   const hasSavedAnexo = Boolean(savedName);
@@ -232,8 +239,37 @@ export function OrcamentoAbaFuncionarios({
 
   function patchDraft(indice: number, patch: Partial<ContratoVagaDraft>) {
     setDrafts((prev) =>
-      prev.map((row) => (row.indice === indice ? { ...row, ...patch } : row))
+      prev.map((row) => {
+        if (row.indice !== indice) return row;
+        const next = { ...row, ...patch };
+        const mudouPessoa =
+          !("colaboradorOrigemId" in patch) &&
+          (normalizeNomeOcupante(next.colaborador) !==
+            normalizeNomeOcupante(row.colaborador) ||
+            normalizeCpfDigits(next.colaboradorCpf) !==
+              normalizeCpfDigits(row.colaboradorCpf) ||
+            normalizeNomeOcupante(next.cargoNome) !==
+              normalizeNomeOcupante(row.cargoNome));
+        if (mudouPessoa) next.colaboradorOrigemId = null;
+        return next;
+      })
     );
+  }
+
+  async function lerColaboradoresDoCliente(
+    idCliente: string
+  ): Promise<ColaboradorListaCliente[]> {
+    const res = await fetch(
+      `/api/clientes/${encodeURIComponent(idCliente)}/colaboradores`
+    );
+    const json = (await res.json().catch(() => ({}))) as {
+      colaboradores?: ColaboradorListaCliente[];
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(json.error || "Não foi possível ler a lista de colaboradores.");
+    }
+    return json.colaboradores ?? [];
   }
 
   async function handleSalvar() {
@@ -246,6 +282,36 @@ export function OrcamentoAbaFuncionarios({
       Number(contrato.quantidade_colaboradores) ||
       0;
     const visiveis = drafts.slice(0, qtd);
+    const veioDaListaCliente =
+      listaClienteAplicada ||
+      visiveis.some((row) => String(row.colaboradorOrigemId ?? "").trim());
+    if (veioDaListaCliente) {
+      const idCliente = clienteId ?? contrato.cliente_id ?? "";
+      if (!idCliente) {
+        const mensagem = "Este contrato não está vinculado a um cliente.";
+        setAvisoListaCliente(mensagem);
+        toast.error(mensagem);
+        return;
+      }
+      try {
+        const colaboradores = await lerColaboradoresDoCliente(idCliente);
+        const ativos = colaboradores.filter((item) => item.situacao === "ativo").length;
+        if (ativos !== qtd) {
+          const mensagem = mensagemQuantidadeListaCliente(ativos, qtd);
+          setAvisoListaCliente(mensagem);
+          toast.error(mensagem);
+          return;
+        }
+      } catch (err) {
+        const mensagem =
+          err instanceof Error
+            ? err.message
+            : "Não foi possível conferir a lista de colaboradores.";
+        setAvisoListaCliente(mensagem);
+        toast.error(mensagem);
+        return;
+      }
+    }
     const erro = validarDraftsListaVagas(visiveis, qtd);
     if (erro) {
       toast.error(erro);
@@ -267,6 +333,7 @@ export function OrcamentoAbaFuncionarios({
         rows: visiveis,
       });
       setVagas(saved);
+      setAvisoListaCliente(null);
       setDrafts(buildVagaDraftsIniciais(qtd, saved));
       const atualizada = await buscarAprovacaoPorOrcamentoId(orcamentoId);
       if (atualizada) onEtapaSalva(atualizada);
@@ -355,18 +422,110 @@ export function OrcamentoAbaFuncionarios({
       sobrescreverPreenchidas: sobrescrever,
       cargos,
     });
+    const anterior = new Map(drafts.map((row) => [row.indice, row]));
     setDrafts(
-      result.drafts.map((row) =>
-        locked.has(row.indice)
-          ? drafts.find((d) => d.indice === row.indice) ?? row
-          : row
-      )
+      result.drafts.map((row) => {
+        const prev = anterior.get(row.indice);
+        if (locked.has(row.indice)) return prev ?? row;
+        const mudou =
+          !prev ||
+          prev.colaborador !== row.colaborador ||
+          prev.colaboradorCpf !== row.colaboradorCpf ||
+          prev.cargoNome !== row.cargoNome;
+        return {
+          ...row,
+          colaboradorOrigemId: mudou ? null : prev?.colaboradorOrigemId ?? null,
+        };
+      })
     );
+    if (result.aplicados > 0) setListaClienteAplicada(false);
     toast.success(
       result.aplicados === 1
         ? "1 funcionário importado para a tabela. Revise e clique em Salvar lista."
         : `${result.aplicados} funcionários importados para a tabela. Revise e clique em Salvar lista.`
     );
+  }
+
+  async function handleUsarListaCliente() {
+    const idCliente = clienteId ?? contrato?.cliente_id ?? "";
+    if (!idCliente) {
+      const mensagem = "Este contrato não está vinculado a um cliente.";
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
+    const qtd = quantidadePrevista;
+    setSavingLista(true);
+    setAvisoListaCliente(null);
+    try {
+      const colaboradores = await lerColaboradoresDoCliente(idCliente);
+      const resultado = avaliarUsoListaColaboradoresCliente({
+        colaboradores,
+        quantidadeContratada: qtd,
+        vagas: drafts.slice(0, qtd).map((row) => {
+          const persistida = vagaByIndice.get(row.indice);
+          const status = persistida
+            ? statusClassificacaoVaga(persistida, desligamento)
+            : "aberta";
+          const preenchida =
+            isNomeFuncionarioReal(row.colaborador) ||
+            normalizeCpfDigits(row.colaboradorCpf).length === 11 ||
+            row.manterAsoAberto;
+          return {
+            indice: row.indice,
+            status: preenchida && status === "aberta" ? "comprometida" : status,
+            colaborador: row.colaborador,
+            colaboradorCpf: row.colaboradorCpf,
+            colaboradorOrigemId: row.colaboradorOrigemId ?? null,
+          };
+        }),
+      });
+      if (!resultado.ok) {
+        setAvisoListaCliente(resultado.mensagem);
+        toast.error(resultado.mensagem);
+        return;
+      }
+      if (resultado.atribuicoes.length === 0) {
+        setListaClienteAplicada(true);
+        setAvisoListaCliente(null);
+        toast.success(
+          resultado.mensagem ??
+            "As vagas deste contrato já estão vinculadas a estes colaboradores."
+        );
+        return;
+      }
+      const porIndice = new Map(
+        resultado.atribuicoes.map((item) => [item.indice, item])
+      );
+      setDrafts((prev) =>
+        prev.map((row) => {
+          const item = porIndice.get(row.indice);
+          if (!item) return row;
+          return {
+            ...row,
+            colaborador: normalizeNomeOcupante(item.nome),
+            colaboradorCpf: item.cpfDigits,
+            cargoNome: normalizeNomeOcupante(item.cargo),
+            cargoId: null,
+            manterAsoAberto: false,
+            colaboradorOrigemId: item.origemId,
+          };
+        })
+      );
+      setListaClienteAplicada(true);
+      toast.success(
+        "Lista do cliente aplicada nas vagas livres. Revise e clique em Salvar lista."
+      );
+    } catch (err) {
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível usar a lista de colaboradores.";
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+    } finally {
+      setSavingLista(false);
+    }
   }
 
   function handleBaixarModelo() {
@@ -480,7 +639,27 @@ export function OrcamentoAbaFuncionarios({
         funcionário no agendamento.
       </div>
 
+      {avisoListaCliente ? (
+        <p className="rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#9f1239]">
+          {avisoListaCliente}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="btn btn-primary text-xs"
+          disabled={
+            busy ||
+            loading ||
+            quantidadePrevista <= 0 ||
+            (!clienteId && !contrato?.cliente_id)
+          }
+          title="Preencher as vagas com a lista de Clientes → Colaboradores"
+          onClick={() => void handleUsarListaCliente()}
+        >
+          Usar lista de colaboradores do cliente
+        </button>
         <button
           type="button"
           className="btn btn-muted inline-flex items-center gap-1.5 text-xs"

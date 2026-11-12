@@ -27,6 +27,7 @@ export async function POST(
       motivo?: string;
       agendamentoId?: string | null;
       vagaId?: string | null;
+      cadastroId?: string | null;
       usuarioNome?: string;
       usuarioEmail?: string;
     } = {};
@@ -46,6 +47,7 @@ export async function POST(
       motivo: body.motivo,
       agendamentoId: body.agendamentoId,
       vagaId: body.vagaId,
+      cadastroId: body.cadastroId,
       actor: staff.actor,
     });
 

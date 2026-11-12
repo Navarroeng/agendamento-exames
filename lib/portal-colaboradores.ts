@@ -1,7 +1,8 @@
 /**
  * Portal do Cliente e modal de Clientes — relação de colaboradores.
  * Derivado das vagas de todos os contratos da empresa, dos agendamentos
- * e de colaborador_movimentacoes. Sem tabela mestre de pessoas.
+ * e de colaborador_movimentacoes, inclusive o cadastro manual.
+ * Sem tabela mestre de pessoas. Nome igual não une quem não tem CPF.
  *
  * Identidade dentro do mesmo cliente:
  * - CPF válido normalizado une programação e agendamentos
@@ -58,6 +59,8 @@ export type ClienteColaboradorLinha = PortalColaboradorLinha & {
   historicoAgendamentoId: string | null;
   /** Vaga usada no desligamento quando o registro não tem CPF. */
   vinculoVagaId: string | null;
+  /** Cadastro manual que identifica o colaborador, com ou sem CPF. */
+  cadastroId: string | null;
 };
 
 export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
@@ -66,6 +69,7 @@ export const COLABORADOR_CAMPOS_ADMIN_PRIVADOS = [
   "admissaoMovimentacaoId",
   "historicoAgendamentoId",
   "vinculoVagaId",
+  "cadastroId",
 ] as const;
 
 /** Remove metadados administrativos. Não altera a regra consolidada. */
@@ -108,6 +112,8 @@ export type PortalColaboradorVagaFonte = {
   colaborador?: string | null;
   colaborador_cpf?: string | null;
   cargo_nome?: string | null;
+  /** CPF ou id do cadastro manual que originou o ocupante desta vaga. */
+  colaborador_origem?: string | null;
 };
 
 export type PortalColaboradorAgendamentoFonte = {
@@ -132,10 +138,12 @@ export type PortalColaboradorMovimentacaoFonte = {
   criado_em?: string | null;
   vinculo_agendamento_id?: string | null;
   vinculo_vaga_id?: string | null;
+  vinculo_cadastro_id?: string | null;
 };
 
 const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin";
 const TIPO_ADMISSAO = "admissao";
+const TIPO_CADASTRO = "cadastro";
 
 type Interno = {
   cpfDigits: string;
@@ -153,6 +161,7 @@ type Interno = {
   admissaoOficialIso: string | null;
   admissaoMovimentacaoId: string | null;
   historicoAgendamentoId: string | null;
+  cadastroId: string | null;
 };
 
 const SITUACAO_LABEL: Record<PortalColaboradorSituacao, string> = {
@@ -276,6 +285,7 @@ function ensureBucket(
       admissaoOficialIso: null,
       admissaoMovimentacaoId: null,
       historicoAgendamentoId: null,
+      cadastroId: null,
     };
     map.set(chave, row);
   }
@@ -340,12 +350,24 @@ function isAdmissaoOficialValida(
   return !String(mov.cancelado_em ?? "").trim();
 }
 
+function isCadastroValido(mov: PortalColaboradorMovimentacaoFonte): boolean {
+  if (String(mov.tipo ?? "").trim() !== TIPO_CADASTRO) return false;
+  return !String(mov.cancelado_em ?? "").trim();
+}
+
 function bucketDaMovimentacao(
   map: Map<string, Interno>,
-  mov: PortalColaboradorMovimentacaoFonte
+  mov: PortalColaboradorMovimentacaoFonte,
+  chavePorCadastro?: Map<string, string>
 ): Interno | null {
   const cpf = cpfValido(mov.cpf_digits);
   if (cpf) return map.get(cpf) ?? null;
+  const cadastroId = String(mov.vinculo_cadastro_id ?? "").trim();
+  if (cadastroId) {
+    const chave = chavePorCadastro?.get(cadastroId);
+    if (chave) return map.get(chave) ?? null;
+    return map.get(`semcpf:cadastro:${cadastroId}`) ?? null;
+  }
   const agendamentoId = String(mov.vinculo_agendamento_id ?? "").trim();
   if (agendamentoId) return map.get(`semcpf:ag:${agendamentoId}`) ?? null;
   const vagaId = String(mov.vinculo_vaga_id ?? "").trim();
@@ -365,6 +387,8 @@ export function consolidarPortalColaboradores(input: {
   const map = new Map<string, Interno>();
   const cpfPorAgendamento = new Map<string, string>();
   const cpfPorVagaDoAgendamento = new Map<string, string>();
+  const chavePorCadastro = new Map<string, string>();
+  const chavePorAgendamento = new Map<string, string>();
 
   for (const ag of input.agendamentos) {
     if (!isAgendamentoPortalRelevante(ag.status)) continue;
@@ -395,15 +419,50 @@ export function consolidarPortalColaboradores(input: {
     return null;
   };
 
+  for (const mov of input.movimentacoes ?? []) {
+    if (!isCadastroValido(mov)) continue;
+    const id = String(mov.id ?? "").trim();
+    const nome = nomeLimpo(mov.colaborador_nome);
+    if (!id || !isNomeFuncionarioReal(nome)) continue;
+    const cpf = cpfValido(mov.cpf_digits);
+    const chave = cpf ?? `semcpf:cadastro:${id}`;
+    chavePorCadastro.set(id, chave);
+    const row = ensureBucket(map, chave, cpf ?? "");
+    row.cadastroId = id;
+    const sortKey = toDataIso(mov.data_evento)
+      ? eventSortKey(mov.data_evento, mov.criado_em)
+      : "0000-01-02|cadastro";
+    aplicarIdentidade(row, nome, cargoLimpo(mov.cargo_nome), sortKey);
+    const dataIso = toDataIso(mov.data_evento);
+    if (dataIso && sortKey >= row.admissaoOficialSortKey) {
+      row.admissaoOficialSortKey = sortKey;
+      row.admissaoOficialIso = dataIso;
+    }
+  }
+
   for (const vaga of input.vagas) {
     const nome = nomeLimpo(vaga.colaborador);
     if (!isNomeFuncionarioReal(nome)) continue;
-    const identidade = chaveDe({
-      cpf: cpfValido(vaga.colaborador_cpf),
-      agendamentoId: String(vaga.agendamento_id ?? "").trim(),
-      vagaId: String(vaga.id ?? "").trim(),
-    });
+    const origem = String(vaga.colaborador_origem ?? "").trim();
+    const chaveCadastro = origem ? chavePorCadastro.get(origem) : undefined;
+    const cpfOrigem = cpfValido(origem);
+    const identidade = chaveCadastro
+      ? {
+          chave: chaveCadastro,
+          cpf: cpfValido(chaveCadastro) ?? "",
+        }
+      : cpfOrigem
+        ? { chave: cpfOrigem, cpf: cpfOrigem }
+        : chaveDe({
+            cpf: cpfValido(vaga.colaborador_cpf),
+            agendamentoId: String(vaga.agendamento_id ?? "").trim(),
+            vagaId: String(vaga.id ?? "").trim(),
+          });
     if (!identidade) continue;
+    const agendamentoDaVaga = String(vaga.agendamento_id ?? "").trim();
+    if (agendamentoDaVaga) {
+      chavePorAgendamento.set(agendamentoDaVaga, identidade.chave);
+    }
     const row = ensureBucket(map, identidade.chave, identidade.cpf);
     if (identidade.chave.startsWith("semcpf:ag:") && !row.historicoAgendamentoId) {
       row.historicoAgendamentoId = identidade.chave.slice("semcpf:ag:".length);
@@ -424,18 +483,26 @@ export function consolidarPortalColaboradores(input: {
     const nome = nomeLimpo(ag.colaborador);
     if (!isNomeFuncionarioReal(nome)) continue;
     const agendamentoId = String(ag.id ?? "").trim();
-    const identidade = chaveDe({
-      cpf: cpfValido(ag.colaborador_cpf),
-      agendamentoId,
-      vagaId: "",
-    });
+    const chaveVinculada = cpfValido(ag.colaborador_cpf)
+      ? undefined
+      : chavePorAgendamento.get(agendamentoId);
+    const identidade = chaveVinculada
+      ? {
+          chave: chaveVinculada,
+          cpf: cpfValido(chaveVinculada) ?? "",
+        }
+      : chaveDe({
+          cpf: cpfValido(ag.colaborador_cpf),
+          agendamentoId,
+          vagaId: "",
+        });
     if (!identidade) continue;
 
     const cargo = cargoLimpo(ag.cargo_nome);
     const dataIso = toDataIso(ag.data_agendamento);
     const sortKey = eventSortKey(ag.data_agendamento, ag.aso_retido_em);
     const row = ensureBucket(map, identidade.chave, identidade.cpf);
-    if (identidade.chave.startsWith("semcpf:ag:") && !row.historicoAgendamentoId) {
+    if (!identidade.cpf && !row.historicoAgendamentoId) {
       row.historicoAgendamentoId = agendamentoId;
     }
     aplicarIdentidade(row, nome, cargo, sortKey);
@@ -465,7 +532,7 @@ export function consolidarPortalColaboradores(input: {
     );
 
   for (const mov of movs) {
-    const existing = bucketDaMovimentacao(map, mov);
+    const existing = bucketDaMovimentacao(map, mov, chavePorCadastro);
     if (!existing) continue;
 
     const dataIso = toDataIso(mov.data_evento);
@@ -496,7 +563,7 @@ export function consolidarPortalColaboradores(input: {
     );
 
   for (const mov of admissoes) {
-    const existing = bucketDaMovimentacao(map, mov);
+    const existing = bucketDaMovimentacao(map, mov, chavePorCadastro);
     if (!existing) continue;
     const dataIso = toDataIso(mov.data_evento);
     if (!dataIso) continue;
@@ -545,6 +612,7 @@ export function consolidarPortalColaboradores(input: {
         cpfDigits || !chave.startsWith("semcpf:vaga:")
           ? null
           : chave.slice("semcpf:vaga:".length),
+      cadastroId: row.cadastroId,
     });
   }
 

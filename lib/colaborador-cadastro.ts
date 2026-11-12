@@ -23,12 +23,16 @@ export type VinculoColaborador = {
   cargo: string | null;
   agendamentoId: string | null;
   vagaId: string | null;
+  /** Id do cadastro manual gravado na vaga ou no próprio evento. */
+  chaveOrigem?: string | null;
 };
 
 export type IdentidadeColaborador = {
   cpf: string | null;
   agendamentoId: string | null;
   vagaId: string | null;
+  /** Id do evento de cadastro manual, quando a pessoa nasceu por ele. */
+  cadastroId?: string | null;
 };
 
 export type CadastroColaborador = {
@@ -57,6 +61,7 @@ export function registrosDoMesmoColaborador(
   const cpf = cpfOuNulo(identidade.cpf);
   const agendamentoId = String(identidade.agendamentoId ?? "").trim();
   const vagaId = String(identidade.vagaId ?? "").trim();
+  const cadastroId = String(identidade.cadastroId ?? "").trim();
   const escolhidos = new Set<string>();
 
   const chave = (registro: VinculoColaborador) =>
@@ -71,6 +76,14 @@ export function registrosDoMesmoColaborador(
   for (const registro of registros) {
     const id = registro.id.trim();
     if (vagaId && registro.origem === "vaga" && id === vagaId) {
+      escolhidos.add(chave(registro));
+      continue;
+    }
+    if (cadastroId && registro.origem === "movimentacao" && id === cadastroId) {
+      escolhidos.add(chave(registro));
+      continue;
+    }
+    if (cadastroId && registro.chaveOrigem === cadastroId) {
       escolhidos.add(chave(registro));
       continue;
     }
