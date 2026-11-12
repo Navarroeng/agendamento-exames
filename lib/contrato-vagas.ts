@@ -66,6 +66,8 @@ export type ContratoVagaRecord = {
   created_at: string;
   updated_at: string;
   contrato_numero?: string | null;
+  /** CPF ou id do cadastro em Clientes. Ausente nas vagas antigas. */
+  colaborador_origem?: string | null;
 };
 
 export type ContratoVagaDraft = {
@@ -76,6 +78,8 @@ export type ContratoVagaDraft = {
   cargoId: string | null;
   cargoNome: string;
   manterAsoAberto: boolean;
+  /** Identificador do colaborador na lista de Clientes. */
+  colaboradorOrigemId?: string | null;
 };
 
 const NOMES_NAO_REAIS = new Set([
@@ -530,6 +534,7 @@ export function emptyVagaDraft(indice: number): ContratoVagaDraft {
     cargoId: null,
     cargoNome: "",
     manterAsoAberto: false,
+    colaboradorOrigemId: null,
   };
 }
 
@@ -542,6 +547,7 @@ export function vagaToDraft(vaga: ContratoVagaRecord): ContratoVagaDraft {
     cargoId: vaga.cargo_id,
     cargoNome: vaga.cargo_nome ?? "",
     manterAsoAberto: vaga.status === "aso_aberto",
+    colaboradorOrigemId: vaga.colaborador_origem ?? null,
   };
 }
 

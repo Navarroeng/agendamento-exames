@@ -8,10 +8,12 @@ import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
 
 export const TIPO_DESLIGAMENTO_ADMIN = "desligamento_admin" as const;
 export const TIPO_ADMISSAO = "admissao" as const;
+export const TIPO_CADASTRO = "cadastro" as const;
 
 export type ColaboradorMovimentacaoTipo =
   | typeof TIPO_DESLIGAMENTO_ADMIN
-  | typeof TIPO_ADMISSAO;
+  | typeof TIPO_ADMISSAO
+  | typeof TIPO_CADASTRO;
 
 export type ColaboradorDesligamentoOrigem = "demissional" | "admin";
 
@@ -85,7 +87,9 @@ export function podeDemitirColaborador(
 ): boolean {
   if (linha?.situacao !== "ativo") return false;
   if (isValidCPF(linha.cpfDigits)) return true;
-  return Boolean(linha.historicoAgendamentoId || linha.vinculoVagaId);
+  return Boolean(
+    linha.historicoAgendamentoId || linha.vinculoVagaId || linha.cadastroId
+  );
 }
 
 export function podeDesfazerDesligamentoAdmin(
@@ -105,6 +109,7 @@ export type ValidarDesligamentoInput = {
   motivo?: string | null;
   agendamentoId?: string | null;
   vagaId?: string | null;
+  cadastroId?: string | null;
 };
 
 export type ValidarDesligamentoOk = {
@@ -115,6 +120,7 @@ export type ValidarDesligamentoOk = {
   motivo: string | null;
   agendamentoId: string | null;
   vagaId: string | null;
+  cadastroId: string | null;
 };
 
 export type ValidarDesligamentoErro = {
@@ -134,6 +140,7 @@ export function validarPayloadDesligamentoAdmin(
   const cpfDigits = normalizeCpfDigits(input.cpf);
   const agendamentoId = String(input.agendamentoId ?? "").trim();
   const vagaId = String(input.vagaId ?? "").trim();
+  const cadastroId = String(input.cadastroId ?? "").trim();
   const temCpf = isValidCPF(cpfDigits);
   if (!temCpf && cpfDigits) {
     return { ok: false, error: "CPF inválido.", status: 400 };
@@ -144,7 +151,10 @@ export function validarPayloadDesligamentoAdmin(
   if (vagaId && !isUuid(vagaId)) {
     return { ok: false, error: "Vínculo inválido.", status: 400 };
   }
-  if (!temCpf && !agendamentoId && !vagaId) {
+  if (cadastroId && !isUuid(cadastroId)) {
+    return { ok: false, error: "Cadastro inválido.", status: 400 };
+  }
+  if (!temCpf && !agendamentoId && !vagaId && !cadastroId) {
     return { ok: false, error: "CPF inválido.", status: 400 };
   }
 
@@ -164,6 +174,7 @@ export function validarPayloadDesligamentoAdmin(
     motivo,
     agendamentoId: temCpf ? null : agendamentoId || null,
     vagaId: temCpf ? null : vagaId || null,
+    cadastroId: temCpf ? null : cadastroId || null,
   };
 }
 

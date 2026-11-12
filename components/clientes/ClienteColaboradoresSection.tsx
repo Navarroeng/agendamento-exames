@@ -76,6 +76,7 @@ export function ClienteColaboradoresSection({
     useState<ClienteColaboradorLinha | null>(null);
   const [editarAlvo, setEditarAlvo] =
     useState<ClienteColaboradorLinha | null>(null);
+  const [adicionarAberto, setAdicionarAberto] = useState(false);
 
   const aplicarLista = useCallback((json: ListResponse) => {
     const colaboradores = json.colaboradores ?? [];
@@ -192,6 +193,15 @@ export function ClienteColaboradoresSection({
 
       {aberto && estado.fase === "ok" && (
         <div className="border-t border-[#eef2f7] px-5 pb-5 pt-4">
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              className="btn btn-primary text-xs"
+              onClick={() => setAdicionarAberto(true)}
+            >
+              Adicionar colaborador
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Kpi label="Equipe atual" valor={String(estado.resumo.totalAtivos)} />
             <Kpi
@@ -395,6 +405,18 @@ export function ClienteColaboradoresSection({
           onDone={(json) => {
             aplicarLista(json);
             setDesfazerAlvo(null);
+          }}
+        />
+      ) : null}
+
+      {adicionarAberto && estado.fase === "ok" ? (
+        <AdicionarColaboradorDialog
+          clienteId={clienteId}
+          onClose={() => setAdicionarAberto(false)}
+          onDone={(json) => {
+            aplicarLista(json);
+            setAdicionarAberto(false);
+            setAberto(true);
           }}
         />
       ) : null}
@@ -725,6 +747,7 @@ function DemitirModal({
             cpf: row.cpfDigits,
             agendamentoId: row.historicoAgendamentoId,
             vagaId: row.vinculoVagaId,
+            cadastroId: row.cadastroId,
             data_evento: dataEvento,
             motivo: motivo.trim() || undefined,
           }),
@@ -1059,6 +1082,132 @@ function HistoricoExamesDialog({
   );
 }
 
+function AdicionarColaboradorDialog({
+  clienteId,
+  onClose,
+  onDone,
+}: {
+  clienteId: string;
+  onClose: () => void;
+  onDone: (json: ListResponse) => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [cargo, setCargo] = useState("");
+  const [admissao, setAdmissao] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const salvar = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/clientes/${encodeURIComponent(clienteId)}/colaboradores/inclusao`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome,
+            cpf,
+            cargo,
+            dataAdmissao: admissao || null,
+          }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as ListResponse;
+      if (!res.ok) {
+        toast.error(json.error ?? "Não foi possível adicionar o colaborador.");
+        return;
+      }
+      toast.success("Colaborador adicionado à lista da empresa.");
+      onDone(json);
+    } catch {
+      toast.error("Não foi possível adicionar o colaborador.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#1a1333]/50 backdrop-blur-sm"
+        onClick={() => {
+          if (!saving) onClose();
+        }}
+        aria-label="Fechar inclusão"
+      />
+      <div
+        className="animate-modal-in relative w-full max-w-md overflow-hidden rounded-[24px] bg-white shadow-[0_24px_48px_rgba(45,35,95,0.25)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="adicionar-colaborador-titulo"
+      >
+        <div className="border-b border-[#e8edf5] px-6 py-5">
+          <h3
+            id="adicionar-colaborador-titulo"
+            className="text-lg font-extrabold text-[#2d2a4a]"
+          >
+            Adicionar colaborador
+          </h3>
+          <p className="mt-1 text-sm text-[#8b95a8]">
+            O cadastro entra na lista desta empresa. Não cria agendamento nem ocupa vaga de contrato.
+          </p>
+        </div>
+        <form
+          className="flex flex-col gap-3 px-6 py-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void salvar();
+          }}
+        >
+          <Field label="Nome">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={nome}
+              onChange={(event) => setNome(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="CPF">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={cpf}
+              onChange={(event) => setCpf(maskCPFInput(event.target.value))}
+              inputMode="numeric"
+              placeholder="000.000.000-00"
+            />
+          </Field>
+          <Field label="Cargo">
+            <input
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={cargo}
+              onChange={(event) => setCargo(event.target.value)}
+            />
+          </Field>
+          <Field label="Data de admissão">
+            <input
+              type="date"
+              className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
+              value={admissao}
+              onChange={(event) => setAdmissao(event.target.value)}
+            />
+          </Field>
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" className="btn" onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Salvando..." : "Adicionar colaborador"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function EditarColaboradorDialog({
   clienteId,
   row,
@@ -1094,6 +1243,7 @@ function EditarColaboradorDialog({
             cpfAtual: row.cpfDigits,
             agendamentoId: row.historicoAgendamentoId,
             vagaId: row.vinculoVagaId,
+            cadastroId: row.cadastroId,
             nome,
             cpf,
             cargo,

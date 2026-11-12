@@ -6,6 +6,7 @@
 import { isNomeFuncionarioReal, normalizeNomeOcupante } from "@/lib/contrato-vagas";
 import { MENSAGEM_CPF_DUPLICADO } from "@/lib/colaborador-cadastro";
 import type { IdentidadeColaborador } from "@/lib/colaborador-cadastro";
+import { TIPO_CADASTRO, isUuid } from "@/lib/colaborador-movimentacoes";
 import { propagarCadastroColaborador } from "@/lib/colaborador-cadastro-gravacao";
 import { isDataCalendarioIso } from "@/lib/colaborador-movimentacoes";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
@@ -60,7 +61,8 @@ export async function salvarCadastroColaborador(params: {
   if (dataAdmissao && !isDataCalendarioIso(dataAdmissao)) {
     return { ok: false, error: "Data de admissão inválida.", status: 400 };
   }
-  if (dataAdmissao && !cpf) {
+  const cadastroId = String(params.identidade.cadastroId ?? "").trim();
+  if (dataAdmissao && !cpf && !cadastroId) {
     return {
       ok: false,
       error: "Informe um CPF válido para registrar a data de admissão.",
@@ -80,6 +82,7 @@ export async function salvarCadastroColaborador(params: {
         cpf: cpfAtual,
         agendamentoId: params.identidade.agendamentoId,
         vagaId: params.identidade.vagaId,
+        cadastroId: cadastroId || null,
       },
       cadastro: { nome, cpf, cargo: texto(params.cargo) },
     });
@@ -95,6 +98,18 @@ export async function salvarCadastroColaborador(params: {
       return { ok: false, error: message, status: 409 };
     }
     throw error;
+  }
+
+  if (cadastroId) {
+    const dataGravada = dataAdmissao || null;
+    const { error } = await admin
+      .from("colaborador_movimentacoes")
+      .update({ data_evento: dataGravada })
+      .eq("id", cadastroId)
+      .eq("cliente_id", clienteId)
+      .eq("tipo", TIPO_CADASTRO)
+      .is("cancelado_em", null);
+    if (error) throw error;
   }
 
   if (dataAdmissao && cpf) {
@@ -126,6 +141,98 @@ export async function salvarCadastroColaborador(params: {
       }
       throw error;
     }
+  }
+
+  return { ok: true, ...(await listarColaboradoresPortal(clienteId)) };
+}
+
+/**
+ * Inclui o colaborador só na lista da empresa.
+ * Não cria agendamento, vaga, fatura nem consome vaga contratual.
+ */
+export async function criarColaboradorManual(params: {
+  clienteId: string;
+  nome: string;
+  cpf: string | null;
+  cargo: string | null;
+  dataAdmissao: string | null;
+  actor: AuditoriaUsuarioContext;
+}): Promise<
+  | {
+      ok: true;
+      colaboradores: Awaited<ReturnType<typeof listarColaboradoresPortal>>["colaboradores"];
+      resumo: Awaited<ReturnType<typeof listarColaboradoresPortal>>["resumo"];
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const clienteId = params.clienteId.trim();
+  if (!isUuid(clienteId)) {
+    return { ok: false, error: "Cliente inválido.", status: 400 };
+  }
+  const nome = texto(params.nome);
+  if (!isNomeFuncionarioReal(nome)) {
+    return { ok: false, error: "Informe o nome do colaborador.", status: 400 };
+  }
+  const cpfInformado = normalizeCpfDigits(params.cpf);
+  if (cpfInformado && !isValidCPF(cpfInformado)) {
+    return { ok: false, error: "CPF inválido.", status: 400 };
+  }
+  const cpf = cpfGravado(cpfInformado);
+  const dataAdmissao = String(params.dataAdmissao ?? "").trim();
+  if (dataAdmissao && !isDataCalendarioIso(dataAdmissao)) {
+    return { ok: false, error: "Data de admissão inválida.", status: 400 };
+  }
+
+  const atual = await listarColaboradoresPortal(clienteId);
+  if (
+    cpf &&
+    atual.colaboradores.some((linha) => linha.cpfDigits === cpf)
+  ) {
+    return { ok: false, error: MENSAGEM_CPF_DUPLICADO, status: 409 };
+  }
+
+  const admin = createAdminClient();
+  const insert = await admin
+    .from("colaborador_movimentacoes")
+    .insert({
+      cliente_id: clienteId,
+      cpf_digits: cpf ?? "",
+      tipo: TIPO_CADASTRO,
+      data_evento: dataAdmissao || null,
+      colaborador_nome: nome,
+      cargo_nome: texto(params.cargo),
+      criado_por: params.actor.usuarioId,
+      criado_por_nome: params.actor.usuarioNome,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insert.error) {
+    if (insert.error.code === "23505") {
+      return { ok: false, error: MENSAGEM_CPF_DUPLICADO, status: 409 };
+    }
+    if (
+      insert.error.code === "23514" ||
+      insert.error.code === "42703" ||
+      insert.error.code === "PGRST204"
+    ) {
+      return {
+        ok: false,
+        error: "O cadastro manual de colaborador ainda não está disponível.",
+        status: 503,
+      };
+    }
+    throw insert.error;
+  }
+
+  if (dataAdmissao && cpf) {
+    const admissao = await salvarAdmissaoColaborador({
+      clienteId,
+      cpf,
+      dataAdmissao,
+      actor: params.actor,
+    });
+    if (!admissao.ok) return admissao;
   }
 
   return { ok: true, ...(await listarColaboradoresPortal(clienteId)) };

@@ -23,6 +23,7 @@ import {
 
 const VAGA_SELECT =
   "id, colaborador, colaborador_cpf, cargo_nome, status, agendamento_id";
+const VAGA_SELECT_ORIGEM = `${VAGA_SELECT}, colaborador_origem`;
 
 const AGENDAMENTO_SELECT = `
   id, colaborador, colaborador_cpf, cargo_nome, aso, status,
@@ -79,20 +80,36 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
     return { data, error };
   });
 
-  const vagas = await lerPorIdentificadores(
-    contratos.map((contrato) => contrato.id),
-    async (ids, from, to) => {
-      const { data, error } = await admin
-        .from("contrato_vagas")
-        .select(VAGA_SELECT)
-        .in("contrato_id", ids)
-        .order("id", { ascending: true })
-        .range(from, to);
-      if (paginaForaDoIntervalo(error)) return [];
-      if (error) throw error;
-      return (data ?? []) as PortalColaboradorVagaFonte[];
+  const lerVagas = (colunas: string) =>
+    lerPorIdentificadores(
+      contratos.map((contrato) => contrato.id),
+      async (ids, from, to) => {
+        const { data, error } = await admin
+          .from("contrato_vagas")
+          .select(colunas)
+          .in("contrato_id", ids)
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (paginaForaDoIntervalo(error)) return [];
+        if (error) throw error;
+        return (data ?? []) as PortalColaboradorVagaFonte[];
+      }
+    );
+  let vagas: PortalColaboradorVagaFonte[];
+  try {
+    vagas = await lerVagas(VAGA_SELECT_ORIGEM);
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    const message = String(err.message ?? "");
+    if (
+      err.code !== "42703" &&
+      err.code !== "PGRST204" &&
+      !/colaborador_origem/i.test(message)
+    ) {
+      throw error;
     }
-  );
+    vagas = await lerVagas(VAGA_SELECT);
+  }
 
   const agendamentos = await lerPaginas<PortalColaboradorAgendamentoFonte>(
     async (from, to) => {
@@ -114,13 +131,14 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
   const selectMovimentacao =
     "id, cpf_digits, tipo, data_evento, cancelado_em, colaborador_nome, cargo_nome, criado_em";
   const selectMovimentacaoVinculo = `${selectMovimentacao}, vinculo_agendamento_id, vinculo_vaga_id`;
+  const selectMovimentacaoCadastro = `${selectMovimentacaoVinculo}, vinculo_cadastro_id`;
   const lerMovimentacoes = (colunas: string) =>
     lerPaginas<PortalColaboradorMovimentacaoFonte>(async (from, to) => {
       const { data, error } = await admin
         .from("colaborador_movimentacoes")
         .select(colunas)
         .eq("cliente_id", id)
-        .in("tipo", ["desligamento_admin", "admissao"])
+        .in("tipo", ["desligamento_admin", "admissao", "cadastro"])
         .is("cancelado_em", null)
         .order("id", { ascending: true })
         .range(from, to);
@@ -131,18 +149,31 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
     });
   let movimentacoes: PortalColaboradorMovimentacaoFonte[];
   try {
-    movimentacoes = await lerMovimentacoes(selectMovimentacaoVinculo);
+    movimentacoes = await lerMovimentacoes(selectMovimentacaoCadastro);
   } catch (error) {
     const err = error as { code?: string; message?: string };
     const message = String(err.message ?? "");
     if (
       err.code !== "42703" &&
       err.code !== "PGRST204" &&
-      !/vinculo_agendamento_id|vinculo_vaga_id/i.test(message)
+      !/vinculo_cadastro_id|vinculo_agendamento_id|vinculo_vaga_id/i.test(message)
     ) {
       throw error;
     }
-    movimentacoes = await lerMovimentacoes(selectMovimentacao);
+    try {
+      movimentacoes = await lerMovimentacoes(selectMovimentacaoVinculo);
+    } catch (semCadastro) {
+      const falha = semCadastro as { code?: string; message?: string };
+      const detalhe = String(falha.message ?? "");
+      if (
+        falha.code !== "42703" &&
+        falha.code !== "PGRST204" &&
+        !/vinculo_agendamento_id|vinculo_vaga_id/i.test(detalhe)
+      ) {
+        throw semCadastro;
+      }
+      movimentacoes = await lerMovimentacoes(selectMovimentacao);
+    }
   }
 
   const colaboradores = consolidarPortalColaboradores({

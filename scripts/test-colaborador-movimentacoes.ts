@@ -99,6 +99,7 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
     admissaoMovimentacaoId: null,
     historicoAgendamentoId: null,
     vinculoVagaId: null,
+    cadastroId: null,
   };
   assert.equal(podeDemitirColaborador(ativo), true);
   assert.equal(
@@ -116,8 +117,19 @@ assert.equal(isUuid("79369d60-7205-4e0a-baad-70d3e5f4ea9b"), true);
       cpfDigits: "",
       historicoAgendamentoId: null,
       vinculoVagaId: null,
+      cadastroId: null,
     }),
     false
+  );
+  assert.equal(
+    podeDemitirColaborador({
+      ...ativo,
+      cpfDigits: "",
+      historicoAgendamentoId: null,
+      vinculoVagaId: null,
+      cadastroId: "22222222-2222-4222-8222-222222222222",
+    }),
+    true
   );
   assert.equal(podeDesfazerDesligamentoAdmin(ativo), false);
 

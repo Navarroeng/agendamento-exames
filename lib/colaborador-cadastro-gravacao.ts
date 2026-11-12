@@ -84,17 +84,37 @@ async function carregarVinculos(
   });
   const contratoIds = contratos.map((contrato) => contrato.id);
 
-  const vagas = await lerPorIdentificadores(contratoIds, async (ids, from, to) => {
-    const { data, error } = await supabase
-      .from("contrato_vagas")
-      .select("id, colaborador, colaborador_cpf, cargo_nome, agendamento_id")
-      .in("contrato_id", ids)
-      .order("id", { ascending: true })
-      .range(from, to);
-    if (paginaForaDoIntervalo(error)) return [];
-    if (error) throw error;
-    return data ?? [];
-  });
+  const lerVagas = (colunas: string) =>
+    lerPorIdentificadores(contratoIds, async (ids, from, to) => {
+      const { data, error } = await supabase
+        .from("contrato_vagas")
+        .select(colunas)
+        .in("contrato_id", ids)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (paginaForaDoIntervalo(error)) return [];
+      if (error) throw error;
+      return (data ?? []) as Record<string, unknown>[];
+    });
+  let vagas: Record<string, unknown>[];
+  try {
+    vagas = await lerVagas(
+      "id, colaborador, colaborador_cpf, cargo_nome, agendamento_id, colaborador_origem"
+    );
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    const message = String(err.message ?? "");
+    if (
+      err.code !== "42703" &&
+      err.code !== "PGRST204" &&
+      !/colaborador_origem/i.test(message)
+    ) {
+      throw error;
+    }
+    vagas = await lerVagas(
+      "id, colaborador, colaborador_cpf, cargo_nome, agendamento_id"
+    );
+  }
 
   const periodicos = await lerPorIdentificadores(
     contratoIds,
@@ -167,6 +187,7 @@ async function carregarVinculos(
       cargo: texto(row.cargo_nome as string | null),
       agendamentoId: String(row.agendamento_id ?? "").trim() || null,
       vagaId: null,
+      chaveOrigem: String(row.colaborador_origem ?? "").trim() || null,
     });
   }
   for (const row of agendamentos) {

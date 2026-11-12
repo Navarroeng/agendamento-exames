@@ -29,6 +29,7 @@ export async function POST(
       cpfAtual?: string | null;
       agendamentoId?: string | null;
       vagaId?: string | null;
+      cadastroId?: string | null;
       nome?: string;
       cpf?: string | null;
       cargo?: string | null;
@@ -52,6 +53,7 @@ export async function POST(
         cpf: body.cpfAtual ?? null,
         agendamentoId: body.agendamentoId ?? null,
         vagaId: body.vagaId ?? null,
+        cadastroId: body.cadastroId ?? null,
       },
       nome: String(body.nome ?? ""),
       cpf: body.cpf ?? null,
