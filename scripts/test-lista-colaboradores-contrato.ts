@@ -50,6 +50,10 @@ assert.equal(
   mensagemQuantidadeListaCliente(5, 3),
   "A lista do cliente tem 5 colaboradores ativos e este contrato prevê 3. Revise a lista em Clientes → Colaboradores e tente novamente."
 );
+assert.equal(
+  mensagemQuantidadeListaCliente(1, 3),
+  "A lista do cliente tem 1 colaborador ativo e este contrato prevê 3. Revise a lista em Clientes → Colaboradores e tente novamente."
+);
 
 {
   const resultado = avaliarUsoListaColaboradoresCliente({

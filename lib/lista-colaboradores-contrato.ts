@@ -44,7 +44,9 @@ export function mensagemQuantidadeListaCliente(
   ativos: number,
   contratada: number
 ): string {
-  return `A lista do cliente tem ${ativos} colaboradores ativos e este contrato prevê ${contratada}. Revise a lista em Clientes → Colaboradores e tente novamente.`;
+  const lista =
+    ativos === 1 ? "1 colaborador ativo" : `${ativos} colaboradores ativos`;
+  return `A lista do cliente tem ${lista} e este contrato prevê ${contratada}. Revise a lista em Clientes → Colaboradores e tente novamente.`;
 }
 
 export const MENSAGEM_LISTA_SEM_CPF =
