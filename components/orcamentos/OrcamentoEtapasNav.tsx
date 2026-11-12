@@ -12,6 +12,8 @@ import {
   resolveOrcamentoEtapaEstado,
 } from "@/lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "@/lib/orcamento-aprovacao";
+import { registroSolicitacaoOuHistoricoLiberado } from "@/lib/boletos-emissao-solicitacao";
+import { AGUARDANDO_EMISSAO_BOLETOS_LABEL } from "@/lib/implantacao-clientes";
 import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 import type { ImplantacaoTreinamentoRecord } from "@/lib/implantacao-treinamento";
 import type { ImplantacaoAetRecord } from "@/lib/implantacao-aet";
@@ -71,6 +73,16 @@ export function OrcamentoEtapasNav({
         );
         const bloqueada = estado === "bloqueada";
         const ativa = tab === item.id;
+        const emissaoPendente =
+          item.id === "financeiro" &&
+          controleMensalidades &&
+          !registroSolicitacaoOuHistoricoLiberado(aprovacao, {
+            treinamento,
+            agendamentosRealizados:
+              contagemAgendamentos?.agendamentosRealizados,
+            agendamentosDispensados:
+              contagemAgendamentos?.agendamentosDispensados,
+          });
 
         return (
           <button
@@ -80,9 +92,11 @@ export function OrcamentoEtapasNav({
             title={
               bloqueada
                 ? "Etapa bloqueada"
-                : estado === "pendente"
-                  ? "Aguardando pagamento"
-                  : item.label
+                : emissaoPendente
+                  ? AGUARDANDO_EMISSAO_BOLETOS_LABEL
+                  : estado === "pendente" && !controleMensalidades
+                    ? "Aguardando pagamento"
+                    : item.label
             }
             onClick={() => {
               if (!bloqueada) onChange(item.id);

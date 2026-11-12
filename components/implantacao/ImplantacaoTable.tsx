@@ -6,6 +6,7 @@ import { IconChecklist, IconEye } from "@/components/ui/icons/OutlineIcons";
 import { formatCNPJ } from "@/lib/cnpj";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import {
+  AGUARDANDO_EMISSAO_BOLETOS_LABEL,
   IMPLANTACAO_AGENDAMENTO_BADGE,
   resolveImplantacaoEtapaVisual,
   type ImplantacaoProcesso,
@@ -38,6 +39,10 @@ const ORCAMENTO_MARCA_BASE =
   "inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-extrabold leading-none";
 
 function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
+  const mensalBoleto = usaControleParcelasMensalidade(
+    processo.orcamento.modalidade,
+    processo.aprovacao?.mensalidade_pagamento
+  );
   return (
     <div className="min-w-[140px]">
       <p className="mb-1 text-[11px] font-semibold text-navy">
@@ -58,10 +63,7 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
               treinamento: processo.treinamento,
               aet: processo.aet ?? null,
               fluxo: processo.fluxoImplantacao,
-              controleMensalidades: usaControleParcelasMensalidade(
-                processo.orcamento.modalidade,
-                processo.aprovacao?.mensalidade_pagamento
-              ),
+              controleMensalidades: mensalBoleto,
             }
           );
           const tone =
@@ -72,10 +74,16 @@ function ProgressoEtapas({ processo }: { processo: ImplantacaoProcesso }) {
                 : estado === "pendente"
                   ? "bg-[#f59e0b]"
                   : "bg-[#e2e8f0]";
+          const rotulo =
+            etapa.id === "financeiro" && processo.aguardandoEmissaoBoletos
+              ? AGUARDANDO_EMISSAO_BOLETOS_LABEL
+              : etapa.id === "financeiro" && mensalBoleto
+                ? "Financeiro"
+                : etapa.label;
           return (
             <span
               key={etapa.id}
-              title={`${etapa.label}: ${estado}`}
+              title={`${rotulo}: ${estado}`}
               className={`h-1.5 flex-1 rounded-full ${tone}`}
             />
           );
@@ -191,6 +199,9 @@ export function ImplantacaoTable({
                       <EtapaAtualBadge
                         etapa={processo.etapaAtual}
                         fluxo={processo.fluxoImplantacao}
+                        aguardandoEmissaoBoletos={
+                          processo.aguardandoEmissaoBoletos
+                        }
                         alertaExamesFuturos={
                           processo.concluidoComExamesFuturos
                         }

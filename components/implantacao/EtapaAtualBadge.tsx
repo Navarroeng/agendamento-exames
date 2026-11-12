@@ -11,6 +11,7 @@ import type { OrcamentoFluxoImplantacao } from "@/lib/servico-treinamentos";
 interface EtapaAtualBadgeProps {
   etapa: ImplantacaoEtapaId;
   fluxo?: OrcamentoFluxoImplantacao;
+  aguardandoEmissaoBoletos?: boolean;
   /** Observação secundária (ex.: dispensa) — não substitui o badge. */
   observacao?: string | null;
   /** Alerta quando concluído com exames programados para o futuro. */
@@ -25,11 +26,16 @@ interface EtapaAtualBadgeProps {
 export function EtapaAtualBadge({
   etapa,
   fluxo = "padrao",
+  aguardandoEmissaoBoletos = false,
   observacao,
   alertaExamesFuturos = false,
   className = "",
 }: EtapaAtualBadgeProps) {
-  const label = labelImplantacaoEtapa(etapa, fluxo);
+  const label = labelImplantacaoEtapa(
+    etapa,
+    fluxo,
+    aguardandoEmissaoBoletos
+  );
   const tone =
     IMPLANTACAO_ETAPA_BADGE[etapa] ?? IMPLANTACAO_ETAPA_BADGE.contrato;
 

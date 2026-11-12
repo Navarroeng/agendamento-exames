@@ -37,6 +37,12 @@ import {
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 import { registroSolicitacaoOuHistoricoLiberado } from "@/lib/boletos-emissao-solicitacao";
 
+export const AGUARDANDO_EMISSAO_BOLETOS_LABEL =
+  "Aguardando emissão dos boletos";
+
+/** Valor do filtro da coluna Etapa atual. Não é uma etapa operacional. */
+export const FILTRO_ETAPA_EMISSAO_BOLETOS = "emissao_boletos";
+
 /**
  * Implantação de laudo pontual exclusivo: Resumo, Aprovado, Contrato,
  * Financeiro e Visita. Elaboração/envio pertencem a Laudos SST.
@@ -184,8 +190,12 @@ export const IMPLANTACAO_ETAPA_LABELS: Record<ImplantacaoEtapaId, string> = {
 
 export function labelImplantacaoEtapa(
   etapa: ImplantacaoEtapaId,
-  fluxo: OrcamentoFluxoImplantacao = "padrao"
+  fluxo: OrcamentoFluxoImplantacao = "padrao",
+  aguardandoEmissaoBoletos = false
 ): string {
+  if (aguardandoEmissaoBoletos && etapa === "financeiro") {
+    return AGUARDANDO_EMISSAO_BOLETOS_LABEL;
+  }
   const kind = fluxoToLaudoPontualKind(fluxo);
   if (kind) {
     const copy = copyLaudoPontual(kind);
@@ -198,6 +208,25 @@ export function labelImplantacaoEtapa(
     }
   }
   return IMPLANTACAO_ETAPA_LABELS[etapa] ?? etapa;
+}
+
+/** Mesma pendência da aba Financeiro: mensalidade por boleto sem a solicitação salva. */
+export function aguardaRegistroEmissaoBoletos(params: {
+  controleMensalidades: boolean;
+  etapaAtual: ImplantacaoEtapaId;
+  aprovacao: OrcamentoAprovacaoRecord | null;
+  treinamento?: ImplantacaoTreinamentoRecord | null;
+  agendamentosRealizados?: number;
+  agendamentosDispensados?: boolean;
+}): boolean {
+  if (!params.controleMensalidades || params.etapaAtual !== "financeiro") {
+    return false;
+  }
+  return !registroSolicitacaoOuHistoricoLiberado(params.aprovacao, {
+    treinamento: params.treinamento,
+    agendamentosRealizados: params.agendamentosRealizados,
+    agendamentosDispensados: params.agendamentosDispensados,
+  });
 }
 
 /** Classe base compartilhada — só a cor muda por etapa. */
@@ -325,10 +354,15 @@ export type ImplantacaoSortKey =
   | "etapa"
   | "responsavel";
 
+export type ImplantacaoFiltroEtapa =
+  | ""
+  | ImplantacaoEtapaId
+  | typeof FILTRO_ETAPA_EMISSAO_BOLETOS;
+
 export interface ImplantacaoFilters {
   busca: string;
   responsavel: string;
-  etapa: "" | ImplantacaoEtapaId;
+  etapa: ImplantacaoFiltroEtapa;
   status: "" | OrcamentoStatus;
   origem: "" | OrcamentoOrigemCliente;
   aprovadoDe: string;
@@ -401,6 +435,11 @@ export interface ImplantacaoProcesso {
    * No AET coexiste com a etapa operacional atual.
    */
   pagamentoPendente?: boolean;
+  /**
+   * Mensalidade por boleto ainda sem o registro da solicitação de emissão.
+   * A etapa operacional continua sendo financeiro.
+   */
+  aguardandoEmissaoBoletos?: boolean;
 }
 
 export function resolveQuantidadeContratadaImplantacao(
@@ -727,6 +766,14 @@ export function buildImplantacaoProcesso(params: {
       orcamento.status === "aprovado" && !aprovacao?.revertida_em,
   };
   const etapaAtual = resolveImplantacaoEtapaAtual(aprovacao, contagemOpts);
+  const aguardandoEmissaoBoletos = aguardaRegistroEmissaoBoletos({
+    controleMensalidades: contagemOpts.controleMensalidades,
+    etapaAtual,
+    aprovacao,
+    treinamento,
+    agendamentosRealizados,
+    agendamentosDispensados: agendamentosIniciaisDispensados,
+  });
   const etapasConcluidas =
     etapaAtual === "contrato_encerrado"
       ? 0
@@ -802,6 +849,7 @@ export function buildImplantacaoProcesso(params: {
     pagamentoPendente: contagemOpts.controleMensalidades
       ? false
       : isOrcamentoPagamentoPendente(aprovacao),
+    aguardandoEmissaoBoletos,
   };
 }
 
@@ -832,9 +880,10 @@ export function computeImplantacaoSummary(
     ).length,
     aguardandoContrato: ativos.filter((p) => p.etapaAtual === "contrato")
       .length,
-    aguardandoPagamento: ativos.filter((p) =>
-      Boolean(p.pagamentoPendente ?? p.etapaAtual === "financeiro")
-    ).length,
+    aguardandoPagamento: ativos.filter((p) => {
+      if (p.aguardandoEmissaoBoletos) return false;
+      return Boolean(p.pagamentoPendente ?? p.etapaAtual === "financeiro");
+    }).length,
     aguardandoDocumentos: ativos.filter((p) =>
       ["procuracao", "funcionarios", "logo"].includes(p.etapaAtual)
     ).length,
@@ -890,7 +939,10 @@ export function filterImplantacaoProcessos(
     }
 
     if (filters.etapa) {
-      if (filters.etapa === "financeiro") {
+      if (filters.etapa === FILTRO_ETAPA_EMISSAO_BOLETOS) {
+        if (!p.aguardandoEmissaoBoletos) return false;
+      } else if (filters.etapa === "financeiro") {
+        if (p.aguardandoEmissaoBoletos) return false;
         const pendente =
           p.pagamentoPendente ?? etapaAtual === "financeiro";
         if (!pendente) return false;
