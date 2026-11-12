@@ -12,13 +12,25 @@ import {
   registroSolicitacaoOuHistoricoLiberado,
   solicitacaoEmissaoBoletosConfirmada,
 } from "../lib/boletos-emissao-solicitacao";
-import { resolveImplantacaoEtapaAtual } from "../lib/implantacao-clientes";
+import {
+  AGUARDANDO_EMISSAO_BOLETOS_LABEL,
+  EMPTY_IMPLANTACAO_FILTERS,
+  FILTRO_ETAPA_EMISSAO_BOLETOS,
+  aguardaRegistroEmissaoBoletos,
+  buildImplantacaoProcesso,
+  computeImplantacaoSummary,
+  filterImplantacaoProcessos,
+  labelImplantacaoEtapa,
+  resolveImplantacaoEtapaAtual,
+} from "../lib/implantacao-clientes";
 import {
   isOrcamentoEtapaLiberada,
   resolveOrcamentoEtapaAtual,
   resolveOrcamentoEtapaEstado,
 } from "../lib/orcamento-etapas";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
+import type { OrcamentoRecord } from "../lib/orcamento-types";
+import type { ClienteContratoRecord } from "../lib/types";
 import { usaControleParcelasMensalidade } from "../lib/mensalidade-parcelas";
 
 function aprovacao(
@@ -256,5 +268,106 @@ assert.ok(
 assert.ok(salvarFinanceiro.includes("toast.error"));
 assert.ok(servico.includes("boletos_emissao_solicitada_em"));
 assert.ok(servico.includes("planejarPersistenciaParcelas"));
+
+function processoDe(parcial: Partial<OrcamentoAprovacaoRecord>, modalidade: "mensalidade" | "pontual") {
+  return buildImplantacaoProcesso({
+    orcamento: {
+      id: "o1",
+      numero: "ORC-2026-0072",
+      status: "aprovado",
+      cliente_nome: "ACERLOG",
+      modalidade,
+    } as OrcamentoRecord,
+    aprovacao: aprovacao(parcial),
+    contrato: {
+      id: "c1",
+      numero: "CTR-1",
+      status: "ativo",
+    } as ClienteContratoRecord,
+  });
+}
+
+const pendenteEmissao = processoDe(
+  { mensalidade_pagamento: "mensal" },
+  "mensalidade"
+);
+assert.equal(pendenteEmissao.etapaAtual, "financeiro");
+assert.equal(pendenteEmissao.aguardandoEmissaoBoletos, true);
+assert.equal(
+  labelImplantacaoEtapa(
+    pendenteEmissao.etapaAtual,
+    pendenteEmissao.fluxoImplantacao,
+    pendenteEmissao.aguardandoEmissaoBoletos
+  ),
+  AGUARDANDO_EMISSAO_BOLETOS_LABEL
+);
+assert.equal(
+  aguardaRegistroEmissaoBoletos({
+    controleMensalidades: true,
+    etapaAtual: pendenteEmissao.etapaAtual,
+    aprovacao: pendenteEmissao.aprovacao,
+  }),
+  true
+);
+
+const solicitacaoSalva = processoDe(
+  {
+    mensalidade_pagamento: "mensal",
+    boletos_emissao_solicitada: true,
+    boletos_emissao_solicitada_em: "2026-11-11",
+  },
+  "mensalidade"
+);
+assert.equal(solicitacaoSalva.etapaAtual, "procuracao");
+assert.equal(solicitacaoSalva.aguardandoEmissaoBoletos, false);
+assert.equal(
+  labelImplantacaoEtapa(
+    solicitacaoSalva.etapaAtual,
+    solicitacaoSalva.fluxoImplantacao,
+    solicitacaoSalva.aguardandoEmissaoBoletos
+  ),
+  "Aguardando procuração"
+);
+
+const aguardaPagamento = processoDe(
+  { mensalidade_pagamento: null, boleto_pago: false },
+  "pontual"
+);
+assert.equal(aguardaPagamento.etapaAtual, "financeiro");
+assert.equal(aguardaPagamento.aguardandoEmissaoBoletos, false);
+assert.equal(
+  labelImplantacaoEtapa(
+    aguardaPagamento.etapaAtual,
+    aguardaPagamento.fluxoImplantacao,
+    false
+  ),
+  "Aguardando pagamento"
+);
+
+const lista = [pendenteEmissao, solicitacaoSalva, aguardaPagamento];
+assert.equal(computeImplantacaoSummary(lista).aguardandoPagamento, 1);
+assert.equal(
+  filterImplantacaoProcessos(lista, {
+    ...EMPTY_IMPLANTACAO_FILTERS,
+    etapa: FILTRO_ETAPA_EMISSAO_BOLETOS,
+    status: "",
+  }).length,
+  1
+);
+assert.equal(
+  filterImplantacaoProcessos(lista, {
+    ...EMPTY_IMPLANTACAO_FILTERS,
+    etapa: "financeiro",
+    status: "",
+  }).map((item) => item.orcamento.modalidade)[0],
+  "pontual"
+);
+
+const tabela = readFileSync(
+  resolve("components/implantacao/ImplantacaoTable.tsx"),
+  "utf8"
+);
+assert.ok(tabela.includes("aguardandoEmissaoBoletos"));
+assert.ok(tabela.includes("AGUARDANDO_EMISSAO_BOLETOS_LABEL"));
 
 console.log("test-boletos-emissao-solicitacao: OK");

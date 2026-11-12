@@ -5,6 +5,8 @@ import { PanelIcon } from "@/components/ui/IconBox";
 import { IconFilter } from "@/components/ui/icons/OutlineIcons";
 import {
   EMPTY_IMPLANTACAO_FILTERS,
+  AGUARDANDO_EMISSAO_BOLETOS_LABEL,
+  FILTRO_ETAPA_EMISSAO_BOLETOS,
   IMPLANTACAO_ETAPA_OPTIONS,
   type ImplantacaoFilters,
 } from "@/lib/implantacao-clientes";
@@ -196,11 +198,23 @@ export function ImplantacaoSearchPanel({
                   }
                 >
                   <option value="">Todas</option>
-                  {IMPLANTACAO_ETAPA_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
+                  {IMPLANTACAO_ETAPA_OPTIONS.flatMap((option) => {
+                    const item = (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    );
+                    if (option.value !== "financeiro") return [item];
+                    return [
+                      item,
+                      <option
+                        key={FILTRO_ETAPA_EMISSAO_BOLETOS}
+                        value={FILTRO_ETAPA_EMISSAO_BOLETOS}
+                      >
+                        {AGUARDANDO_EMISSAO_BOLETOS_LABEL}
+                      </option>,
+                    ];
+                  })}
                 </select>
               </div>
 
