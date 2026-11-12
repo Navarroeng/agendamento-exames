@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Field, RequiredMark } from "@/components/ui/Field";
 import { IconUsers } from "@/components/ui/icons/OutlineIcons";
@@ -10,6 +10,14 @@ import {
   podeDesfazerDesligamentoAdmin,
 } from "@/lib/colaborador-movimentacoes";
 import { formatCPF, isValidCPF, maskCPFInput } from "@/lib/cpf";
+import {
+  MENSAGEM_IMPORT_CORRIGIR,
+  avaliarImportacaoColaboradores,
+  downloadModeloColaboradoresXlsx,
+  lerPlanilhaColaboradores,
+  type LinhaImportacaoColaborador,
+  type PreviaImportacaoColaborador,
+} from "@/lib/colaborador-importacao";
 import {
   apresentarCargoColaboradorPortal,
   apresentarNomeColaboradorPortal,
@@ -77,6 +85,12 @@ export function ClienteColaboradoresSection({
   const [editarAlvo, setEditarAlvo] =
     useState<ClienteColaboradorLinha | null>(null);
   const [adicionarAberto, setAdicionarAberto] = useState(false);
+  const arquivoImportacaoRef = useRef<HTMLInputElement>(null);
+  const [importacao, setImportacao] = useState<{
+    confirmacaoId: string;
+    linhas: LinhaImportacaoColaborador[];
+    previa: PreviaImportacaoColaborador;
+  } | null>(null);
 
   const aplicarLista = useCallback((json: ListResponse) => {
     const colaboradores = json.colaboradores ?? [];
@@ -193,7 +207,21 @@ export function ClienteColaboradoresSection({
 
       {aberto && estado.fase === "ok" && (
         <div className="border-t border-[#eef2f7] px-5 pb-5 pt-4">
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="btn text-xs"
+              onClick={() => downloadModeloColaboradoresXlsx()}
+            >
+              Baixar planilha modelo
+            </button>
+            <button
+              type="button"
+              className="btn text-xs"
+              onClick={() => arquivoImportacaoRef.current?.click()}
+            >
+              Importar colaboradores
+            </button>
             <button
               type="button"
               className="btn btn-primary text-xs"
@@ -201,6 +229,35 @@ export function ClienteColaboradoresSection({
             >
               Adicionar colaborador
             </button>
+            <input
+              ref={arquivoImportacaoRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(event) => {
+                const arquivo = event.target.files?.[0] ?? null;
+                event.target.value = "";
+                if (!arquivo) return;
+                void arquivo.arrayBuffer().then((buffer) => {
+                  const lido = lerPlanilhaColaboradores(buffer);
+                  if (!lido.ok) {
+                    toast.error(lido.error);
+                    return;
+                  }
+                  const previa = avaliarImportacaoColaboradores({
+                    linhas: lido.linhas,
+                    cpfsDaEmpresa: estado.colaboradores.map((linha) => linha.cpfDigits),
+                  });
+                  setImportacao({
+                    confirmacaoId: crypto.randomUUID(),
+                    linhas: lido.linhas,
+                    previa,
+                  });
+                }).catch(() => {
+                  toast.error("Não foi possível ler a planilha.");
+                });
+              }}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Kpi label="Equipe atual" valor={String(estado.resumo.totalAtivos)} />
@@ -405,6 +462,21 @@ export function ClienteColaboradoresSection({
           onDone={(json) => {
             aplicarLista(json);
             setDesfazerAlvo(null);
+          }}
+        />
+      ) : null}
+
+      {importacao && estado.fase === "ok" ? (
+        <ImportarColaboradoresDialog
+          clienteId={clienteId}
+          confirmacaoId={importacao.confirmacaoId}
+          linhas={importacao.linhas}
+          previa={importacao.previa}
+          onClose={() => setImportacao(null)}
+          onDone={(json) => {
+            aplicarLista(json);
+            setImportacao(null);
+            setAberto(true);
           }}
         />
       ) : null}
@@ -1075,6 +1147,150 @@ function HistoricoExamesDialog({
         <div className="flex justify-end border-t border-[#e8edf5] px-6 py-4">
           <button type="button" className="btn" onClick={onClose}>
             Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function mensagemImportacao(adicionados: number, jaCadastrados: number): string {
+  const novos =
+    adicionados === 1
+      ? "1 colaborador foi adicionado"
+      : `${adicionados} colaboradores foram adicionados`;
+  const existentes =
+    jaCadastrados === 1
+      ? "1 já estava cadastrado"
+      : `${jaCadastrados} já estavam cadastrados`;
+  return `${novos}. ${existentes}.`;
+}
+
+function ImportarColaboradoresDialog({
+  clienteId,
+  confirmacaoId,
+  linhas,
+  previa,
+  onClose,
+  onDone,
+}: {
+  clienteId: string;
+  confirmacaoId: string;
+  linhas: LinhaImportacaoColaborador[];
+  previa: PreviaImportacaoColaborador;
+  onClose: () => void;
+  onDone: (json: ListResponse) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const enviando = useRef(false);
+
+  const confirmar = async () => {
+    if (enviando.current || !previa.podeConfirmar) return;
+    enviando.current = true;
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/clientes/${encodeURIComponent(clienteId)}/colaboradores/importacao`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmacaoId, linhas }),
+        }
+      );
+      const json = (await res.json().catch(() => ({}))) as ListResponse & {
+        adicionados?: number;
+        jaCadastrados?: number;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Não foi possível importar os colaboradores.");
+        return;
+      }
+      toast.success(
+        mensagemImportacao(json.adicionados ?? 0, json.jaCadastrados ?? 0)
+      );
+      onDone(json);
+    } catch {
+      toast.error("Não foi possível importar os colaboradores.");
+    } finally {
+      enviando.current = false;
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#1a1333]/50 backdrop-blur-sm"
+        onClick={() => {
+          if (!saving) onClose();
+        }}
+        aria-label="Fechar importação"
+      />
+      <div
+        className="animate-modal-in relative w-full max-w-lg overflow-hidden rounded-[24px] bg-white shadow-[0_24px_48px_rgba(45,35,95,0.25)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="importar-colaboradores-titulo"
+      >
+        <div className="border-b border-[#e8edf5] px-6 py-5">
+          <h3
+            id="importar-colaboradores-titulo"
+            className="text-lg font-extrabold text-[#2d2a4a]"
+          >
+            Importar colaboradores
+          </h3>
+          <p className="mt-1 text-sm text-[#8b95a8]">
+            A confirmação cadastra só os colaboradores novos desta empresa.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 px-6 py-5 text-sm text-[#334155]">
+          <p>
+            Novos cadastros:{" "}
+            <strong className="text-[#0b1f4d]">{previa.novos.length}</strong>
+          </p>
+          <p>
+            CPFs já existentes neste cliente:{" "}
+            <strong className="text-[#0b1f4d]">{previa.existentes.length}</strong>
+          </p>
+          <p>
+            Linhas com erro:{" "}
+            <strong className="text-[#0b1f4d]">
+              {new Set(previa.erros.map((erro) => erro.linha)).size}
+            </strong>
+          </p>
+          {previa.erros.length > 0 ? (
+            <ul className="max-h-48 overflow-auto rounded-xl border border-[#fecaca] bg-[#fff5f5] px-3 py-2 text-[#9f1239]">
+              {previa.erros.map((erro) => (
+                <li key={`${erro.linha}-${erro.motivo}`}>
+                  Linha {erro.linha}: {erro.motivo}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {!previa.podeConfirmar ? (
+            <p className="text-[#9f1239]">
+              {previa.erros.length > 0
+                ? MENSAGEM_IMPORT_CORRIGIR
+                : "Nenhum colaborador para importar."}
+            </p>
+          ) : (
+            <p className="text-[#64748b]">
+              CPFs já cadastrados permanecem como estão. Quem não tem CPF entra como cadastro próprio.
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-[#e8edf5] px-6 py-4">
+          <button type="button" className="btn" onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving || !previa.podeConfirmar}
+            onClick={() => void confirmar()}
+          >
+            {saving ? "Importando..." : "Confirmar importação"}
           </button>
         </div>
       </div>
