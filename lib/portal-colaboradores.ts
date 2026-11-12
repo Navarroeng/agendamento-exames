@@ -8,10 +8,11 @@
  * - registro antigo sem CPF permanece separado; nome igual não une pessoas
  *
  * Situação:
- * - Desligado: movimentação de desligamento, ou Demissional já retido,
+ * - Desligado: Demissional agendado ou já retido, ou desligamento manual,
  *   posterior à última entrada
- * - Demissional apenas agendado não altera a situação
- * Cancelados não entram. Empate de chave: readmissão prevalece.
+ * - Cancelar o Demissional recalcula a situação. Volta a Ativo se não
+ *   restar outro Demissional não cancelado nem desligamento manual válido
+ * Cancelados não entram na situação. Empate de chave: readmissão prevalece.
  */
 
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
@@ -448,12 +449,8 @@ export function consolidarPortalColaboradores(input: {
       row.ultimoAdmissionalIso = dataIso;
     }
 
-    // Demissional apenas agendado permanece no histórico e não desliga.
-    if (
-      isDemissional(ag.aso) &&
-      dataIso &&
-      String(ag.status ?? "").trim().toLowerCase() === "aso_retido"
-    ) {
+    // Agendado e ASO retido desligam. Cancelado já ficou de fora da fonte.
+    if (isDemissional(ag.aso) && dataIso) {
       aplicarSaida(row, sortKey, dataIso, "demissional", null);
     }
   }
