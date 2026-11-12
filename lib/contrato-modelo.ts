@@ -38,6 +38,11 @@ import {
 } from "@/lib/contrato-pagamento";
 import { reaisParaCentavos, resolverMesesVigenciaMensalidade } from "@/lib/orcamento-mensalidade-pagamento";
 import { resolverModeloContratualParaGeracao } from "@/lib/contrato-modelo-rotulo";
+import {
+  CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO_LINHAS,
+  orcamentoUsaContratoGestaoSstPlataformas,
+  textosPropostaDoOrcamento,
+} from "@/lib/contrato-gestao-sst-plataformas";
 import { resolveQuantidadeColaboradoresOrcamento } from "@/lib/orcamento-calculo";
 import { formatCondicaoParcelasCentavos } from "@/lib/servico-parecer-tecnico";
 import {
@@ -570,6 +575,10 @@ export function buildContratoNavarroDocumento(params: {
   const renovacaoIncremento = mensalidade
     ? centavosSalvosParaReais(aprovacao?.mensalidade_renovacao_incremento_centavos)
     : null;
+  const administracaoPlataformas = orcamentoUsaContratoGestaoSstPlataformas({
+    numero: orcamento.numero,
+    itens,
+  });
   const ctx: ContratoNavarroContexto = {
     modalidade,
     numeroOrcamento: orcamento.numero.trim(),
@@ -620,6 +629,14 @@ export function buildContratoNavarroDocumento(params: {
         ? false
         : true,
     alteracaoContratacao: alteracaoContratacaoDoAprovacao(aprovacao, vigencia?.inicio),
+    administracaoPlataformas,
+    textosProposta: administracaoPlataformas
+      ? textosPropostaDoOrcamento({
+          numero: orcamento.numero,
+          observacoesOrcamento: orcamento.observacoes,
+          observacoesAprovacao: aprovacao?.observacoes,
+        })
+      : null,
   };
 
   const clausulas = buildClausulasContrato(ctx);
@@ -628,7 +645,9 @@ export function buildContratoNavarroDocumento(params: {
     tipoDocumento,
     clausulas,
     texto: textoPlanoContrato(clausulas, "sst"),
-    tituloLinhas: [...SST_TITULO_LINHAS],
+    tituloLinhas: administracaoPlataformas
+      ? [...CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO_LINHAS]
+      : [...SST_TITULO_LINHAS],
   };
 }
 

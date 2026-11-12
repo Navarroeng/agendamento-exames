@@ -14,6 +14,11 @@ import {
   type OrcamentoModalidade,
 } from "@/lib/orcamento-modalidade";
 import type { ContratoParcela } from "@/lib/contrato-pagamento";
+import {
+  CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO,
+  fraseMensalidadeUnicaPlataformas,
+  paragrafosEscopoPlataformas,
+} from "@/lib/contrato-gestao-sst-plataformas";
 
 /** Dados institucionais oficiais da CONTRATADA — fonte única do contrato. */
 export const NAVARRO_CONTRATO_INSTITUCIONAL = {
@@ -271,6 +276,13 @@ export type ContratoNavarroContexto = {
     quantidadeAnterior: number;
     valorAnterior: number;
   } | null;
+  /**
+   * Gestão SST com administração de plataformas.
+   * Ausente ou false mantém o Anexo I da Gestão SST comum.
+   */
+  administracaoPlataformas?: boolean;
+  /** Textos da proposta usados só para decidir obrigações condicionais do anexo. */
+  textosProposta?: readonly string[] | null;
 };
 
 const ISO_DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -1006,6 +1018,15 @@ function clausulaAnexoI(ctx: ContratoNavarroContexto): ContratoClausula {
       "Metodologia: aplicação do questionário COPSOQ II, análise das respostas e apresentação consolidada dos resultados, preservando a confidencialidade dos participantes."
     );
   }
+  if (ctx.administracaoPlataformas) {
+    paragrafos.push(
+      ...paragrafosEscopoPlataformas({
+        colaboradores: ctx.colaboradores,
+        valorMensal: ctx.valor,
+        textosProposta: ctx.textosProposta ?? [],
+      })
+    );
+  }
   return {
     numero: "I",
     titulo: "DOS SERVIÇOS CONTRATADOS",
@@ -1088,7 +1109,20 @@ function aplicarModeloGestaoSstV2(
   const quinto = vencimentoMensalidadeQuintoDiaUtil(
     ctx.vencimentoRegraMensalidade
   );
+  const mensalidadeUnica = ctx.administracaoPlataformas
+    ? fraseMensalidadeUnicaPlataformas(ctx.valor)
+    : null;
   const ajustadas = clausulas.map((clause) => {
+    if (clause.numero === "1" && ctx.administracaoPlataformas) {
+      return {
+        ...clause,
+        paragrafos: clause.paragrafos.map((paragrafo) =>
+          paragrafo.startsWith("As partes acima qualificadas")
+            ? `As partes acima qualificadas resolvem celebrar o presente ${CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO}, que se regerá pelas cláusulas seguintes.`
+            : paragrafo
+        ),
+      };
+    }
     if (clause.numero === "2") {
       return {
         ...clause,
@@ -1114,6 +1148,7 @@ function aplicarModeloGestaoSstV2(
             ),
             redigirValorExameClinicoAvulsoV2(ctx),
             ...redigirCompromissoERenovacaoPagamentoV2(ctx, true),
+            ...(mensalidadeUnica ? [mensalidadeUnica] : []),
             multa,
           ],
         };
@@ -1121,7 +1156,10 @@ function aplicarModeloGestaoSstV2(
       return {
         ...clause,
         titulo: "DOS VALORES, PAGAMENTOS E VENCIMENTOS",
-        paragrafos: redigirPagamentoMensalidadeV2(ctx),
+        paragrafos: [
+          ...redigirPagamentoMensalidadeV2(ctx),
+          ...(mensalidadeUnica ? [mensalidadeUnica] : []),
+        ],
       };
     }
     if (clause.numero === "5") {
