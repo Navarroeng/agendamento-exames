@@ -646,7 +646,17 @@ export function GestaoPlataformasPage() {
           eventos={eventos}
           colaboradores={colaboradores}
           salvando={salvando}
-          onFechar={() => setSelecionado(null)}
+          escBloqueado={incluirColaborador || editarColaborador}
+          onFechar={() => {
+            const id = selecionado?.tipo === "colaborador" ? selecionado.id : null;
+            setSelecionado(null);
+            if (!id) return;
+            requestAnimationFrame(() => {
+              document
+                .querySelector<HTMLElement>(`[data-ficha-colaborador="${CSS.escape(id)}"]`)
+                ?.focus();
+            });
+          }}
           onEnviar={(acao) => void enviar(acao)}
           onRecarregar={(json) => {
             if (json.escopo) setPainel(json as Painel);
@@ -1138,6 +1148,7 @@ function ListaColaboradores({
                   <li key={liberacao.id}>
                     <button
                       type="button"
+                      data-ficha-colaborador={liberacao.colaboradorId}
                       className="w-full px-4 py-3 text-left hover:bg-[#f8f6f1]"
                       onClick={() => onPessoa(liberacao.colaboradorId)}
                     >
@@ -1166,6 +1177,7 @@ function ListaColaboradores({
                   <li key={pessoa.id}>
                     <button
                       type="button"
+                      data-ficha-colaborador={pessoa.id}
                       className="w-full px-4 py-3 text-left hover:bg-[#f8f6f1]"
                       onClick={() => onPessoa(pessoa.id)}
                     >

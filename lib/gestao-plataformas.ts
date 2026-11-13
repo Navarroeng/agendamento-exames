@@ -684,13 +684,29 @@ export function estadoListaColaboradores(params: {
   return "lista";
 }
 
+function exameCancelado(situacao: string): boolean {
+  return situacao.toLocaleLowerCase("pt-BR") === "cancelado";
+}
+
 export function examesRealizadosDoColaborador<
   T extends { dataIso: string | null; situacao: string },
 >(params: { exames: readonly T[]; hoje: string }): T[] {
   return params.exames.filter((exame) => {
     if (!exame.dataIso || exame.dataIso > params.hoje) return false;
-    return exame.situacao.toLocaleLowerCase("pt-BR") !== "cancelado";
+    return !exameCancelado(exame.situacao);
   });
+}
+
+export function examesProximosDoColaborador<
+  T extends { dataIso: string | null; situacao: string },
+>(params: { exames: readonly T[]; hoje: string }): T[] {
+  return params.exames
+    .filter((exame) => {
+      if (!exame.dataIso || exame.dataIso <= params.hoje) return false;
+      return !exameCancelado(exame.situacao);
+    })
+    .slice()
+    .sort((a, b) => String(a.dataIso).localeCompare(String(b.dataIso)));
 }
 
 export function obrasEmAtencao(params: {

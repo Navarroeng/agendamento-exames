@@ -16,7 +16,11 @@ export async function GET(request: Request) {
     if (!resultado.ok) {
       return NextResponse.json({ error: resultado.error }, { status: resultado.status });
     }
-    return NextResponse.json({ ok: true, exames: resultado.exames });
+    return NextResponse.json({
+      ok: true,
+      realizados: resultado.realizados,
+      proximos: resultado.proximos,
+    });
   } catch (err) {
     console.error("[api/gestao-plataformas/exames] GET", err);
     return NextResponse.json(
