@@ -48,6 +48,8 @@ interface ClienteViewModalProps {
   onUpdated?: (cliente: ClienteRecord) => void;
   /** Rola até a seção Contrato SST depois que os contratos carregam. */
   scrollToContratoSst?: boolean;
+  /** Abre a seção Colaboradores já expandida. */
+  secaoInicial?: "colaboradores" | null;
 }
 
 const VALIDATION_MESSAGE =
@@ -79,6 +81,7 @@ export function ClienteViewModal({
   onClose,
   onUpdated,
   scrollToContratoSst = false,
+  secaoInicial = null,
 }: ClienteViewModalProps) {
   const auditContext = useAuditoriaUsuario();
   const [incluirRiscosOpen, setIncluirRiscosOpen] = useState(false);
@@ -156,6 +159,46 @@ export function ClienteViewModal({
       setIncluirRiscosOpen(false);
     }
   }, [podeIncluirRiscos, incluirRiscosOpen]);
+
+  useEffect(() => {
+    if (!cliente) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (formOpen) {
+        closeForm();
+        return;
+      }
+      if (encerrarTarget) {
+        if (!encerrarSaving) closeEncerrar();
+        return;
+      }
+      if (incluirRiscosOpen) {
+        setIncluirRiscosOpen(false);
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    cliente,
+    closeEncerrar,
+    closeForm,
+    encerrarSaving,
+    encerrarTarget,
+    formOpen,
+    incluirRiscosOpen,
+    onClose,
+  ]);
+
+  useEffect(() => {
+    if (!cliente || secaoInicial !== "colaboradores" || loading) return;
+    document
+      .getElementById("cliente-colaboradores")
+      ?.scrollIntoView({ block: "start" });
+  }, [cliente, loading, secaoInicial]);
 
   useEffect(() => {
     if (!cliente || !scrollToContratoSst) {
@@ -279,6 +322,7 @@ export function ClienteViewModal({
                 type="button"
                 onClick={onClose}
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#e8edf5] text-xl text-[#8b95a8] transition-colors hover:bg-[#f4f6fb]"
+                aria-label="Fechar"
               >
                 ×
               </button>
@@ -455,12 +499,20 @@ export function ClienteViewModal({
               </div>
             </div>
 
-            <ClienteColaboradoresSection clienteId={cliente.id} />
+            <ClienteColaboradoresSection
+              clienteId={cliente.id}
+              abertoInicial={secaoInicial === "colaboradores"}
+            />
 
             <ClienteServicosPontuaisSection
               itens={servicosPontuais}
               loading={loadingPontuais}
             />
+          </div>
+          <div className="flex justify-end border-t border-[#e8edf5] bg-white px-6 py-4">
+            <button type="button" className="btn" onClick={onClose}>
+              Fechar
+            </button>
           </div>
         </div>
       </div>

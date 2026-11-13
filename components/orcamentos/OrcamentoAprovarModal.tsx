@@ -46,6 +46,15 @@ import {
   resolveGestaoCompletaSstServico,
 } from "@/lib/orcamento-modalidade";
 import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
+import {
+  podeAbrirClienteDaImplantacao,
+  secaoInicialAoAbrirCliente,
+} from "@/lib/abrir-cliente-implantacao";
+import { isPerfilAdmin } from "@/lib/permissions";
+import { useAuth } from "@/contexts/AuthContext";
+import { ClienteViewModal } from "@/components/modals/ClienteViewModal";
+import { buscarClientePorId } from "@/services/cliente.service";
+import type { ClienteRecord } from "@/lib/types";
 import { AlterarContratacaoButton } from "./AlterarContratacaoModal";
 import {
   ORCAMENTO_STATUS_BADGE,
@@ -250,6 +259,7 @@ export function OrcamentoAprovarModal({
   onSalvarTreinamento,
   onVerComprovante,
 }: OrcamentoAprovarModalProps) {
+  const { profile } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<TabId>("resumo");
   const [form, setForm] = useState<OrcamentoAprovacaoFormValues | null>(null);
@@ -303,6 +313,17 @@ export function OrcamentoAprovarModal({
     useState<OrcamentoAbaTreinamentoForm>(emptyTreinamentoForm);
   const sessaoModalRef = useRef<string | null>(null);
   const aprovacaoSyncRef = useRef<string | null>(null);
+  const abrirClienteRef = useRef<HTMLButtonElement>(null);
+  const corpoModalRef = useRef<HTMLDivElement>(null);
+  const clienteCadastroAbertoRef = useRef(false);
+  const orcamentoAbertoRef = useRef<string | null>(null);
+  const [clienteCadastro, setClienteCadastro] = useState<ClienteRecord | null>(
+    null
+  );
+  const [focoCadastroCliente, setFocoCadastroCliente] = useState<
+    "colaboradores" | null
+  >(null);
+  const [abrindoCliente, setAbrindoCliente] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -472,10 +493,16 @@ export function OrcamentoAprovarModal({
   }, [open, aprovacao?.id, onListarHistoricoCondicoes]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      clienteCadastroAbertoRef.current = false;
+      setClienteCadastro(null);
+      setFocoCadastroCliente(null);
+      return;
+    }
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
+      if (clienteCadastroAbertoRef.current) return;
       if (event.key === "Escape" && !saving) {
         event.preventDefault();
         onClose();
@@ -560,6 +587,14 @@ export function OrcamentoAprovarModal({
       orcamento?.orcamento_itens,
       resolveGestaoCompletaSstServico(servicos)?.id ?? null
     );
+  const podeAbrirCliente = podeAbrirClienteDaImplantacao({
+    contextoImplantacao: permitirAlterarContratacao,
+    clienteId: orcamento?.cliente_id,
+    perfil: profile?.perfil,
+  });
+  const mostrarAlterarContratacao =
+    podeAlterarContratacao && isPerfilAdmin(profile?.perfil);
+  orcamentoAbertoRef.current = open && orcamento ? orcamento.id : null;
   const gradeMensalidades = useMemo(() => {
     const base = resolverGradeMensalidades({
       vigenciaInicio: vigenciaFinanceira?.inicio,
@@ -1115,6 +1150,43 @@ export function OrcamentoAprovarModal({
   }
 
   if (!open || !orcamento || !mounted || !form) return null;
+  const orcamentoAberto = orcamento;
+
+  async function handleAbrirCliente() {
+    const clienteId = String(orcamentoAberto.cliente_id ?? "").trim();
+    if (!clienteId || abrindoCliente || clienteCadastroAbertoRef.current) return;
+    const orcamentoId = orcamentoAberto.id;
+    setAbrindoCliente(true);
+    try {
+      const cliente = await buscarClientePorId(clienteId);
+      if (orcamentoAbertoRef.current !== orcamentoId) return;
+      if (!cliente) {
+        toast.error("Cliente não encontrado.");
+        return;
+      }
+      clienteCadastroAbertoRef.current = true;
+      setFocoCadastroCliente(secaoInicialAoAbrirCliente(tab));
+      setClienteCadastro(cliente);
+    } catch (err) {
+      console.error(err);
+      if (orcamentoAbertoRef.current === orcamentoId) {
+        toast.error("Erro ao carregar cliente.");
+      }
+    } finally {
+      setAbrindoCliente(false);
+    }
+  }
+
+  function fecharClienteCadastro() {
+    const scrollTop = corpoModalRef.current?.scrollTop ?? 0;
+    clienteCadastroAbertoRef.current = false;
+    setClienteCadastro(null);
+    setFocoCadastroCliente(null);
+    requestAnimationFrame(() => {
+      if (corpoModalRef.current) corpoModalRef.current.scrollTop = scrollTop;
+      abrirClienteRef.current?.focus();
+    });
+  }
 
   const badge = ORCAMENTO_STATUS_BADGE[orcamento.status];
   const isMensalidade = isOrcamentoMensalidade(orcamento.modalidade);
@@ -1224,15 +1296,33 @@ export function OrcamentoAprovarModal({
           />
         </div>
 
-        {podeAlterarContratacao && orcamento && aprovacao ? (
-          <AlterarContratacaoButton
-            orcamento={orcamento}
-            aprovacao={aprovacao}
-            onAtualizada={onAprovacaoAtualizada}
-          />
+        {podeAbrirCliente || mostrarAlterarContratacao ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#e4ebf4] bg-white px-4 py-2 sm:px-6">
+            {podeAbrirCliente ? (
+              <button
+                ref={abrirClienteRef}
+                type="button"
+                className="btn justify-center text-[12px] sm:w-auto"
+                disabled={abrindoCliente}
+                onClick={() => void handleAbrirCliente()}
+              >
+                Abrir Cliente
+              </button>
+            ) : null}
+            {mostrarAlterarContratacao && aprovacao ? (
+              <AlterarContratacaoButton
+                orcamento={orcamento}
+                aprovacao={aprovacao}
+                onAtualizada={onAprovacaoAtualizada}
+              />
+            ) : null}
+          </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6">
+        <div
+          ref={corpoModalRef}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f7f9fc] p-4 sm:p-6"
+        >
           {tab === "resumo" ? (
             <div className="space-y-4">
               {isLaudoPontual ? (
@@ -2343,6 +2433,14 @@ export function OrcamentoAprovarModal({
           ) : null}
         </div>
       </div>
+      {clienteCadastro ? (
+        <ClienteViewModal
+          cliente={clienteCadastro}
+          secaoInicial={focoCadastroCliente}
+          onClose={fecharClienteCadastro}
+          onUpdated={setClienteCadastro}
+        />
+      ) : null}
     </div>,
     document.body
   );

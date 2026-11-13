@@ -55,15 +55,13 @@ export function AlterarContratacaoButton({
 
   return (
     <>
-      <div className="flex justify-end border-b border-[#e4ebf4] bg-white px-4 py-2 sm:px-6">
-        <button
-          type="button"
-          className="btn justify-center text-[12px] sm:w-auto"
-          onClick={() => setOpen(true)}
-        >
-          Alterar contratação
-        </button>
-      </div>
+      <button
+        type="button"
+        className="btn justify-center text-[12px] sm:w-auto"
+        onClick={() => setOpen(true)}
+      >
+        Alterar contratação
+      </button>
       {open ? (
         <AlterarContratacaoDialog
           orcamento={orcamento}
