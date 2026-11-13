@@ -37,7 +37,12 @@ assert.deepEqual(
   NAV_SECTIONS.find((s) => s.title === "Gestão Comercial")?.items.map(
     (i) => i.label
   ),
-  ["Orçamentos", "Implantação de Clientes", "Portal do Cliente"]
+  [
+    "Orçamentos",
+    "Implantação de Clientes",
+    "Portal do Cliente",
+    "Gestão de Plataformas",
+  ]
 );
 
 assert.deepEqual(
@@ -89,6 +94,8 @@ assert.equal(canAccessPath("admin", "/cobrancas"), true);
 assert.equal(canAccessPath("operacional", "/dashboard"), true);
 assert.equal(canAccessPath("operacional", "/e-social"), true);
 assert.equal(canAccessPath("operacional", "/portal"), true);
+assert.equal(canAccessPath("operacional", "/gestao-plataformas"), true);
+assert.equal(canAccessPath("admin", "/gestao-plataformas"), true);
 
 assert.equal(canAccessPath("admin", "/gestao-comercial"), true);
 assert.equal(canAccessPath("admin", "/usuarios"), true);

@@ -71,6 +71,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Portal do Cliente",
         href: "/portal",
       },
+      {
+        iconKey: "checklist",
+        label: "Gestão de Plataformas",
+        href: "/gestao-plataformas",
+      },
     ],
   },
   {
