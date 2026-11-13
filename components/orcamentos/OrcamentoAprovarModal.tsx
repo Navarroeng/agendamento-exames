@@ -47,6 +47,7 @@ import {
 } from "@/lib/orcamento-modalidade";
 import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
 import {
+  clienteIdVinculadoAContratacao,
   podeAbrirClienteDaImplantacao,
   secaoInicialAoAbrirCliente,
 } from "@/lib/abrir-cliente-implantacao";
@@ -54,6 +55,7 @@ import { isPerfilAdmin } from "@/lib/permissions";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClienteViewModal } from "@/components/modals/ClienteViewModal";
 import { buscarClientePorId } from "@/services/cliente.service";
+import { buscarContratoPorOrcamentoId } from "@/services/contrato-agendamentos.service";
 import type { ClienteRecord } from "@/lib/types";
 import { AlterarContratacaoButton } from "./AlterarContratacaoModal";
 import {
@@ -324,10 +326,46 @@ export function OrcamentoAprovarModal({
     "colaboradores" | null
   >(null);
   const [abrindoCliente, setAbrindoCliente] = useState(false);
+  const [clienteIdDoContrato, setClienteIdDoContrato] = useState("");
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const orcamentoIdParaCliente = orcamento?.id ?? null;
+  const orcamentoClienteIdParaCliente = orcamento?.cliente_id ?? null;
+
+  useEffect(() => {
+    const direto = String(orcamentoClienteIdParaCliente ?? "").trim();
+    if (
+      !open ||
+      !permitirAlterarContratacao ||
+      !orcamentoIdParaCliente ||
+      direto
+    ) {
+      setClienteIdDoContrato("");
+      return;
+    }
+    let cancelled = false;
+    setClienteIdDoContrato("");
+    void buscarContratoPorOrcamentoId(orcamentoIdParaCliente)
+      .then((contrato) => {
+        if (cancelled) return;
+        setClienteIdDoContrato(String(contrato?.cliente_id ?? "").trim());
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) setClienteIdDoContrato("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    permitirAlterarContratacao,
+    orcamentoIdParaCliente,
+    orcamentoClienteIdParaCliente,
+  ]);
 
   useEffect(() => {
     if (!open || !orcamento) {
@@ -587,9 +625,13 @@ export function OrcamentoAprovarModal({
       orcamento?.orcamento_itens,
       resolveGestaoCompletaSstServico(servicos)?.id ?? null
     );
+  const clienteIdVinculado = clienteIdVinculadoAContratacao(
+    orcamento?.cliente_id,
+    clienteIdDoContrato
+  );
   const podeAbrirCliente = podeAbrirClienteDaImplantacao({
     contextoImplantacao: permitirAlterarContratacao,
-    clienteId: orcamento?.cliente_id,
+    clienteId: clienteIdVinculado,
     perfil: profile?.perfil,
   });
   const mostrarAlterarContratacao =
@@ -1153,7 +1195,10 @@ export function OrcamentoAprovarModal({
   const orcamentoAberto = orcamento;
 
   async function handleAbrirCliente() {
-    const clienteId = String(orcamentoAberto.cliente_id ?? "").trim();
+    const clienteId = clienteIdVinculadoAContratacao(
+      orcamentoAberto.cliente_id,
+      clienteIdDoContrato
+    );
     if (!clienteId || abrindoCliente || clienteCadastroAbertoRef.current) return;
     const orcamentoId = orcamentoAberto.id;
     setAbrindoCliente(true);

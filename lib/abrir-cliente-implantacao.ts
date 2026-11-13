@@ -13,6 +13,20 @@ export function secaoInicialAoAbrirCliente(
 }
 
 /**
+ * ID do cliente da contratação. O orçamento guarda o vínculo quando a
+ * aprovação o gravou; se esse campo estiver vazio, vale o cliente do contrato.
+ * Não usa o nome digitado na proposta.
+ */
+export function clienteIdVinculadoAContratacao(
+  orcamentoClienteId: string | null | undefined,
+  contratoClienteId: string | null | undefined
+): string {
+  const doOrcamento = String(orcamentoClienteId ?? "").trim();
+  if (doOrcamento) return doOrcamento;
+  return String(contratoClienteId ?? "").trim();
+}
+
+/**
  * O botão existe na Implantação quando a contratação tem cliente
  * e o perfil alcança o cadastro de Clientes.
  */
