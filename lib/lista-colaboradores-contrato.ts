@@ -4,7 +4,11 @@
  * Ativos a mais bloqueiam. Não duplica ocupante nem mexe em vaga já usada.
  */
 
-import { isNomeFuncionarioReal } from "@/lib/contrato-vagas";
+import {
+  vagaComprometidaResidual,
+  vagaTemColaboradorVinculado,
+  vagaTemReservaValida,
+} from "@/lib/contrato-vagas";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 
 export type ColaboradorListaCliente = {
@@ -22,6 +26,9 @@ export type VagaListaCliente = {
   colaborador: string | null;
   colaboradorCpf: string | null;
   colaboradorOrigemId: string | null;
+  agendamentoId?: string | null;
+  periodicoFuturoId?: string | null;
+  creditoAsoId?: string | null;
 };
 
 export type AtribuicaoListaCliente = {
@@ -92,10 +99,17 @@ function origemDoColaborador(colaborador: ColaboradorListaCliente): string {
 }
 
 function vagaOcupada(vaga: VagaListaCliente): boolean {
-  if (
-    isNomeFuncionarioReal(vaga.colaborador) ||
-    isValidCPF(normalizeCpfDigits(vaga.colaboradorCpf))
-  ) {
+  const sinais = {
+    status: vaga.status,
+    colaborador: vaga.colaborador,
+    colaboradorCpf: vaga.colaboradorCpf,
+    colaboradorOrigemId: vaga.colaboradorOrigemId,
+    agendamentoId: vaga.agendamentoId,
+    periodicoFuturoId: vaga.periodicoFuturoId,
+    creditoAsoId: vaga.creditoAsoId,
+  };
+  if (vagaComprometidaResidual(sinais)) return false;
+  if (vagaTemColaboradorVinculado(sinais) || vagaTemReservaValida(sinais)) {
     return true;
   }
   return vaga.status !== "aberta";

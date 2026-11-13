@@ -37,6 +37,10 @@ import {
   vagaPermiteCorrigirNomeOcupante,
   vagaPermiteRemoverFuncionario,
   statusClassificacaoVaga,
+  textoConfirmacaoLiberarVaga,
+  textoVinculoOuReservaVaga,
+  vagaComprometidaResidual,
+  vagaTemColaboradorVinculado,
   type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -170,6 +174,7 @@ export function OrcamentoAbaFuncionarios({
     vagaId: string;
     indice: number;
     nome: string;
+    temColaborador: boolean;
   } | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -554,6 +559,16 @@ export function OrcamentoAbaFuncionarios({
         quantidadeContratada: qtd,
         vagas: drafts.slice(0, qtd).map((row) => {
           const persistida = vagaByIndice.get(row.indice);
+          const sinais = {
+            status: persistida?.status ?? "aberta",
+            colaborador: persistida?.colaborador,
+            colaboradorCpf: persistida?.colaborador_cpf,
+            colaboradorOrigemId: persistida?.colaborador_origem,
+            agendamentoId: persistida?.agendamento_id,
+            periodicoFuturoId: persistida?.periodico_futuro_id,
+            creditoAsoId: persistida?.credito_aso_id,
+          };
+          const residual = persistida ? vagaComprometidaResidual(sinais) : false;
           const status = persistida
             ? statusClassificacaoVaga(persistida, desligamento)
             : "aberta";
@@ -561,12 +576,21 @@ export function OrcamentoAbaFuncionarios({
             isNomeFuncionarioReal(row.colaborador) ||
             normalizeCpfDigits(row.colaboradorCpf).length === 11 ||
             row.manterAsoAberto;
+          const statusLista =
+            residual && !preenchida
+              ? "aberta"
+              : preenchida && (status === "aberta" || residual)
+                ? "comprometida"
+                : status;
           return {
             indice: row.indice,
-            status: preenchida && status === "aberta" ? "comprometida" : status,
+            status: statusLista,
             colaborador: row.colaborador,
             colaboradorCpf: row.colaboradorCpf,
             colaboradorOrigemId: row.colaboradorOrigemId ?? null,
+            agendamentoId: persistida?.agendamento_id ?? null,
+            periodicoFuturoId: persistida?.periodico_futuro_id ?? null,
+            creditoAsoId: persistida?.credito_aso_id ?? null,
           };
         }),
       });
@@ -677,8 +701,12 @@ export function OrcamentoAbaFuncionarios({
             : row
         )
       );
+      const confirmacao = textoConfirmacaoLiberarVaga({
+        temColaborador: removerFuncionario.temColaborador,
+        nome: removerFuncionario.nome,
+      });
       setRemoverFuncionario(null);
-      toast.success("Funcionário desvinculado. A vaga continua disponível.");
+      toast.success(confirmacao.sucesso);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -889,6 +917,36 @@ export function OrcamentoAbaFuncionarios({
                 const podeRemoverFuncionario = persistida
                   ? vagaPermiteRemoverFuncionario(persistida, desligamento)
                   : false;
+                const sinaisLinha = {
+                  status: persistida?.status ?? statusPreview,
+                  colaborador: row.colaborador || persistida?.colaborador,
+                  colaboradorCpf:
+                    row.colaboradorCpf || persistida?.colaborador_cpf,
+                  colaboradorOrigemId:
+                    row.colaboradorOrigemId || persistida?.colaborador_origem,
+                  agendamentoId: persistida?.agendamento_id,
+                  periodicoFuturoId: persistida?.periodico_futuro_id,
+                  creditoAsoId: persistida?.credito_aso_id,
+                };
+                const residual = persistida
+                  ? vagaComprometidaResidual({
+                      status: persistida.status,
+                      colaborador: persistida.colaborador,
+                      colaboradorCpf: persistida.colaborador_cpf,
+                      colaboradorOrigemId: persistida.colaborador_origem,
+                      agendamentoId: persistida.agendamento_id,
+                      periodicoFuturoId: persistida.periodico_futuro_id,
+                      creditoAsoId: persistida.credito_aso_id,
+                    })
+                  : false;
+                const temColaborador = vagaTemColaboradorVinculado(sinaisLinha);
+                const confirmacaoLinha = textoConfirmacaoLiberarVaga({
+                  temColaborador,
+                  nome:
+                    normalizeNomeOcupante(row.colaborador) ||
+                    normalizeNomeOcupante(persistida?.colaborador),
+                });
+                const motivoReserva = textoVinculoOuReservaVaga(sinaisLinha);
                 const vazia =
                   !isNomeFuncionarioReal(row.colaborador) &&
                   normalizeCpfDigits(row.colaboradorCpf).length === 0;
@@ -1005,12 +1063,17 @@ export function OrcamentoAbaFuncionarios({
                     <td className="border-b border-[#eef2f7] px-2 py-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={statusPreview} />
-                        {persistida && podeRemoverFuncionario ? (
+                        {motivoReserva ? (
+                          <span className="text-[11px] font-medium text-[#64748b]">
+                            {motivoReserva}
+                          </span>
+                        ) : null}
+                        {persistida && podeRemoverFuncionario && !residual ? (
                           <button
                             type="button"
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red hover:underline disabled:opacity-50"
                             disabled={busy}
-                            title="Desvincular funcionário e manter a vaga disponível"
+                            title={confirmacaoLinha.botao}
                             onClick={() =>
                               setRemoverFuncionario({
                                 vagaId: persistida.id,
@@ -1019,11 +1082,12 @@ export function OrcamentoAbaFuncionarios({
                                   normalizeNomeOcupante(row.colaborador) ||
                                   normalizeNomeOcupante(persistida.colaborador) ||
                                   `Vaga ${row.indice}`,
+                                temColaborador,
                               })
                             }
                           >
                             <IconTrash size={12} />
-                            Remover
+                            {confirmacaoLinha.botao}
                           </button>
                         ) : null}
                         {!locked && vazia ? (
@@ -1129,11 +1193,26 @@ export function OrcamentoAbaFuncionarios({
       />
       <OrcamentoAnexoRemoverModal
         open={Boolean(removerFuncionario)}
-        titulo="Remover funcionário da vaga?"
-        mensagem={`${removerFuncionario?.nome ?? "O funcionário"} será desvinculado(a) deste contrato. A vaga continuará disponível para outro funcionário.`}
+        titulo={
+          textoConfirmacaoLiberarVaga({
+            temColaborador: removerFuncionario?.temColaborador === true,
+            nome: removerFuncionario?.nome,
+          }).titulo
+        }
+        mensagem={
+          textoConfirmacaoLiberarVaga({
+            temColaborador: removerFuncionario?.temColaborador === true,
+            nome: removerFuncionario?.nome,
+          }).mensagem
+        }
         saving={actionSaving}
         cancelLabel="Cancelar"
-        confirmLabel="Remover funcionário"
+        confirmLabel={
+          textoConfirmacaoLiberarVaga({
+            temColaborador: removerFuncionario?.temColaborador === true,
+            nome: removerFuncionario?.nome,
+          }).confirmLabel
+        }
         onClose={() => {
           if (actionSaving) return;
           setRemoverFuncionario(null);
