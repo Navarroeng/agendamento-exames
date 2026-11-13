@@ -1311,12 +1311,14 @@ function ImportarColaboradoresDialog({
   );
 }
 
-function AdicionarColaboradorDialog({
+export function AdicionarColaboradorDialog({
   clienteId,
+  empresaNome,
   onClose,
   onDone,
 }: {
   clienteId: string;
+  empresaNome?: string;
   onClose: () => void;
   onDone: (json: ListResponse) => void;
 }) {
@@ -1391,6 +1393,15 @@ function AdicionarColaboradorDialog({
             void salvar();
           }}
         >
+          {empresaNome ? (
+            <Field label="Empresa">
+              <input
+                className="h-10 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 text-sm text-[#0b1f4d]"
+                value={empresaNome}
+                readOnly
+              />
+            </Field>
+          ) : null}
           <Field label="Nome">
             <input
               className="h-10 rounded-lg border border-[#e2e8f0] px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#0b1f4d]"
@@ -1437,13 +1448,15 @@ function AdicionarColaboradorDialog({
   );
 }
 
-function EditarColaboradorDialog({
+export function EditarColaboradorDialog({
   clienteId,
+  empresaNome,
   row,
   onClose,
   onDone,
 }: {
   clienteId: string;
+  empresaNome?: string;
   row: ClienteColaboradorLinha;
   onClose: () => void;
   onDone: (json: ListResponse) => void;
@@ -1522,7 +1535,9 @@ function EditarColaboradorDialog({
             Editar colaborador
           </h3>
           <p className="mt-1 text-sm text-[#8b95a8]">
-            A alteração vale para esta empresa e para as listas em que ele já está vinculado.
+            {empresaNome
+              ? `${empresaNome}. A alteração vale para esta empresa e para as listas em que ele já está vinculado.`
+              : "A alteração vale para esta empresa e para as listas em que ele já está vinculado."}
           </p>
         </div>
         <form
