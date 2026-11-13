@@ -17,6 +17,11 @@ import {
   mensagemBloqueioSalvarListaCliente,
   type ColaboradorListaCliente,
 } from "@/lib/lista-colaboradores-contrato";
+import {
+  MENSAGEM_CADASTRE_COLABORADOR,
+  mensagemOcupacaoForaDaEmpresa,
+  planilhaTemPessoaForaDaEmpresa,
+} from "@/lib/colaborador-vaga-ocupacao";
 import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
   CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
@@ -82,6 +87,7 @@ interface OrcamentoAbaFuncionariosProps {
   onEtapaSalva: (aprovacao: OrcamentoAprovacaoRecord) => void;
   onSubstituir: (file: File) => Promise<void>;
   onRemover: () => Promise<void>;
+  onAbrirCliente?: () => void;
 }
 
 function mensagemFalhaLista(err: unknown): string {
@@ -140,6 +146,7 @@ export function OrcamentoAbaFuncionarios({
   onEtapaSalva,
   onSubstituir,
   onRemover,
+  onAbrirCliente,
 }: OrcamentoAbaFuncionariosProps) {
   const quantidadePrevista = Math.max(
     0,
@@ -322,6 +329,47 @@ export function OrcamentoAbaFuncionarios({
       toast.error(erro);
       return;
     }
+    const idClienteOcupacao = clienteId ?? contrato.cliente_id ?? "";
+    if (!idClienteOcupacao) {
+      const mensagem = "Este contrato não está vinculado a um cliente.";
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
+    try {
+      const colaboradores = await lerColaboradoresDoCliente(idClienteOcupacao);
+      const fora = mensagemOcupacaoForaDaEmpresa({
+        atuais: visiveis.map((row) => {
+          const persistida = vagaByIndice.get(row.indice);
+          return {
+            indice: row.indice,
+            colaborador: persistida?.colaborador ?? null,
+            colaboradorCpf: persistida?.colaborador_cpf ?? null,
+            colaboradorOrigemId: persistida?.colaborador_origem ?? null,
+          };
+        }),
+        propostas: visiveis.map((row) => ({
+          indice: row.indice,
+          colaborador: row.colaborador,
+          colaboradorCpf: row.colaboradorCpf,
+          colaboradorOrigemId: row.colaboradorOrigemId ?? null,
+        })),
+        ativos: colaboradores,
+      });
+      if (fora) {
+        setAvisoListaTipo("erro");
+        setAvisoListaCliente(fora);
+        toast.error(fora);
+        return;
+      }
+    } catch (err) {
+      const mensagem = mensagemFalhaLista(err);
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
     setError(null);
     setSavingLista(true);
     try {
@@ -347,6 +395,10 @@ export function OrcamentoAbaFuncionarios({
       console.error(err);
       const message = mensagemFalhaLista(err);
       setError(message);
+      if (message === MENSAGEM_CADASTRE_COLABORADOR) {
+        setAvisoListaTipo("erro");
+        setAvisoListaCliente(message);
+      }
       toast.error(message);
     } finally {
       setSavingLista(false);
@@ -395,6 +447,32 @@ export function OrcamentoAbaFuncionarios({
       }
     }
 
+    const idClienteImportacao = clienteId ?? contrato?.cliente_id ?? "";
+    if (!idClienteImportacao) {
+      const mensagem = "Este contrato não está vinculado a um cliente.";
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
+    let ativosImportacao: ColaboradorListaCliente[] = [];
+    try {
+      const colaboradores = await lerColaboradoresDoCliente(idClienteImportacao);
+      ativosImportacao = colaboradores.filter((item) => item.situacao === "ativo");
+    } catch (err) {
+      const mensagem = mensagemFalhaLista(err);
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
+    if (planilhaTemPessoaForaDaEmpresa(parsed.rows, ativosImportacao)) {
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(MENSAGEM_CADASTRE_COLABORADOR);
+      toast.error(MENSAGEM_CADASTRE_COLABORADOR);
+      return;
+    }
+
     const locked = new Set(
       vagas
         .filter((v) =>
@@ -437,9 +515,15 @@ export function OrcamentoAbaFuncionarios({
           prev.colaborador !== row.colaborador ||
           prev.colaboradorCpf !== row.colaboradorCpf ||
           prev.cargoNome !== row.cargoNome;
+        const cpf = normalizeCpfDigits(row.colaboradorCpf);
+        const ativo = ativosImportacao.find((item) => item.cpfDigits === cpf);
         return {
           ...row,
-          colaboradorOrigemId: mudou ? null : prev?.colaboradorOrigemId ?? null,
+          colaboradorOrigemId: ativo
+            ? ativo.cadastroId || ativo.id
+            : mudou
+              ? null
+              : prev?.colaboradorOrigemId ?? null,
         };
       })
     );
@@ -646,12 +730,12 @@ export function OrcamentoAbaFuncionarios({
         ) : (
           "."
         )}{" "}
-        Preencha nome, CPF e cargo diretamente na tabela. O CPF identifica o
-        funcionário no agendamento.
+        Preencha a vaga com um colaborador que já está ativo em Clientes →
+        Colaboradores. Para incluir alguém novo, cadastre primeiro na empresa.
       </div>
 
       {avisoListaCliente ? (
-        <p
+        <div
           className={
             avisoListaTipo === "info"
               ? "rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]"
@@ -659,7 +743,16 @@ export function OrcamentoAbaFuncionarios({
           }
         >
           {avisoListaCliente}
-        </p>
+          {avisoListaCliente === MENSAGEM_CADASTRE_COLABORADOR && onAbrirCliente ? (
+            <button
+              type="button"
+              className="btn mt-3 text-xs"
+              onClick={onAbrirCliente}
+            >
+              Abrir Cliente
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">

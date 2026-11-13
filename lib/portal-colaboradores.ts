@@ -425,10 +425,27 @@ export function consolidarPortalColaboradores(input: {
     const nome = nomeLimpo(mov.colaborador_nome);
     if (!id || !isNomeFuncionarioReal(nome)) continue;
     const cpf = cpfValido(mov.cpf_digits);
-    const chave = cpf ?? `semcpf:cadastro:${id}`;
+    const vagaId = String(mov.vinculo_vaga_id ?? "").trim();
+    const agendamentoId = String(mov.vinculo_agendamento_id ?? "").trim();
+    // Sem CPF, o cadastro ocupa a mesma identidade da vaga ou do exame
+    // que já existia. Assim, liberar a vaga não cria outra pessoa
+    // nem perde um desligamento vinculado a essa vaga.
+    const chave = cpf
+      ? cpf
+      : vagaId
+        ? `semcpf:vaga:${vagaId}`
+        : agendamentoId
+          ? `semcpf:ag:${agendamentoId}`
+          : `semcpf:cadastro:${id}`;
     chavePorCadastro.set(id, chave);
+    if (!cpf && agendamentoId && !vagaId) {
+      chavePorAgendamento.set(agendamentoId, chave);
+    }
     const row = ensureBucket(map, chave, cpf ?? "");
     row.cadastroId = id;
+    if (!cpf && chave.startsWith("semcpf:ag:") && !row.historicoAgendamentoId) {
+      row.historicoAgendamentoId = chave.slice("semcpf:ag:".length);
+    }
     const sortKey = toDataIso(mov.data_evento)
       ? eventSortKey(mov.data_evento, mov.criado_em)
       : "0000-01-02|cadastro";
