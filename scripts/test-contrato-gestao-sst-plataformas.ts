@@ -222,9 +222,25 @@ assert.match(
   texto,
   /finalidades da prestação de serviços de Gestão SST, administração das plataformas e acompanhamento da mobilização das equipes/
 );
-assert.match(texto, /R\$ 2\.612,00/);
-assert.match(texto, /R\$ 2\.622,00/);
-assert.match(texto, /mesmo que apenas 8 plataformas estejam em uso/);
+assert.match(texto, /\*\*Gestão SST\*\*/);
+assert.match(texto, /\*\*Adequação de laudos\*\*/);
+assert.match(texto, /\*\*Administração de plataformas\*\*/);
+assert.match(
+  texto,
+  /A mensalidade da nova vigência é a soma de três componentes, apurados no início dessa vigência\./
+);
+assert.match(
+  texto,
+  /\*\*Exemplo de renovação\.\*\* Com 60 colaboradores ativos e cobertura de até 10 plataformas, a mensalidade da nova vigência será de \*\*R\$ 2\.632,00\*\*/,
+);
+assert.match(texto, /composta por R\$ 720,00 de Gestão SST, R\$ 912,00 de adequação de laudos e R\$ 1\.000,00 de administração de plataformas/);
+assert.match(
+  texto,
+  /Movimentações posteriores de colaboradores ou de plataformas entram no cálculo do ciclo seguinte/
+);
+assert.doesNotMatch(texto, /59 colaboradores/);
+assert.doesNotMatch(texto, /R\$ 2\.612,00/);
+assert.doesNotMatch(texto, /R\$ 2\.622,00/);
 assert.doesNotMatch(texto, /é única e remunera/);
 assert.doesNotMatch(texto, /Não há segunda mensalidade/);
 assert.doesNotMatch(texto, /Para zero ou um colaborador, a mensalidade será de/);
@@ -242,7 +258,8 @@ const semRenovacao = gerar({
 });
 assert.match(semRenovacao.texto, /Não há renovação automática desta cobertura/);
 assert.match(semRenovacao.texto, /Não há renovação automática nem cobrança automática de novo período/);
-assert.match(semRenovacao.texto, /R\$ 2\.612,00/);
+assert.match(semRenovacao.texto, /\*\*R\$ 2\.632,00\*\*/);
+assert.match(semRenovacao.texto, /60 colaboradores ativos/);
 assert.doesNotMatch(semRenovacao.texto, /inclusive nas renovações automáticas/);
 assert.doesNotMatch(semRenovacao.texto, /Para zero ou um colaborador, a mensalidade será de/);
 
@@ -352,8 +369,12 @@ assert.match(pdf, /PLATAFORMAS/);
 assert.match(pdf, /ORC-2026-0087/);
 assert.match(pdf, /2\.520,00/);
 assert.match(pdf, /30\.240,00/);
-assert.match(pdf, /2\.612,00/);
-assert.match(pdf, /2\.622,00/);
+assert.match(pdf, /2\.632,00/);
+assert.match(pdf, /720,00/);
+assert.match(pdf, /1\.000,00/);
+assert.doesNotMatch(pdf, /\*\*/);
+assert.doesNotMatch(pdf, /2\.612,00/);
+assert.doesNotMatch(pdf, /2\.622,00/);
 assert.match(pdf, /cinquenta e oito/);
 assert.match(pdf, /at. 10 plataformas/);
 assert.doesNotMatch(pdf, /Documentos de RH/);
