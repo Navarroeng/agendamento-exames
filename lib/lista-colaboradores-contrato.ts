@@ -1,7 +1,7 @@
 /**
  * Preenchimento da Lista de funcionários a partir da relação de Clientes.
- * Só grava vaga livre quando a quantidade ativa é igual à contratada.
- * Não cria colaborador, não duplica ocupante e não mexe em vaga já usada.
+ * Ativos a menos preenchem as vagas livres e deixam o restante em aberto.
+ * Ativos a mais bloqueiam. Não duplica ocupante nem mexe em vaga já usada.
  */
 
 import { isNomeFuncionarioReal } from "@/lib/contrato-vagas";
@@ -37,6 +37,8 @@ export type ResultadoUsoListaCliente =
       ok: true;
       atribuicoes: AtribuicaoListaCliente[];
       mensagem: string | null;
+      /** Colaboradores da lista que não couberam nas vagas livres. */
+      omitidos: number;
     }
   | { ok: false; mensagem: string };
 
@@ -57,6 +59,31 @@ export const MENSAGEM_LISTA_NAO_APLICADA =
 
 export const MENSAGEM_LISTA_JA_VINCULADA =
   "As vagas deste contrato já estão vinculadas a estes colaboradores. Nenhum colaborador foi duplicado.";
+
+export function mensagemBloqueioSalvarListaCliente(
+  ativos: number,
+  contratada: number
+): string | null {
+  if (ativos > contratada) {
+    return mensagemQuantidadeListaCliente(ativos, contratada);
+  }
+  return null;
+}
+
+export function mensagemListaIncompleta(
+  incluidos: number,
+  omitidos: number
+): string {
+  const incluidosTxt =
+    incluidos === 0
+      ? "Nenhum colaborador da lista pôde ser incluído"
+      : incluidos === 1
+        ? "1 colaborador da lista pôde ser incluído"
+        : `${incluidos} colaboradores da lista puderam ser incluídos`;
+  const omitidosTxt =
+    omitidos === 1 ? "1 não coube" : `${omitidos} não couberam`;
+  return `${incluidosTxt}. ${omitidosTxt} porque as vagas já preenchidas, comprometidas, programadas ou agendadas foram mantidas.`;
+}
 
 function origemDoColaborador(colaborador: ColaboradorListaCliente): string {
   const cadastroId = String(colaborador.cadastroId ?? "").trim();
@@ -89,7 +116,8 @@ function vagaCorresponde(
 
 /**
  * Compara a lista ativa com as vagas do contrato.
- * Quantidade diferente bloqueia. Vaga ocupada permanece como está.
+ * Ativos acima da quantidade contratada bloqueiam.
+ * Vaga ocupada, programada, agendada ou reservada permanece como está.
  */
 export function avaliarUsoListaColaboradoresCliente(input: {
   colaboradores: ColaboradorListaCliente[];
@@ -98,7 +126,7 @@ export function avaliarUsoListaColaboradoresCliente(input: {
 }): ResultadoUsoListaCliente {
   const contratada = Math.max(0, Math.floor(Number(input.quantidadeContratada) || 0));
   const ativos = input.colaboradores.filter((item) => item.situacao === "ativo");
-  if (ativos.length !== contratada) {
+  if (ativos.length > contratada) {
     return {
       ok: false,
       mensagem: mensagemQuantidadeListaCliente(ativos.length, contratada),
@@ -120,30 +148,33 @@ export function avaliarUsoListaColaboradoresCliente(input: {
     const pessoa = ativos.find(
       (item) => !usados.has(origemDoColaborador(item)) && vagaCorresponde(vaga, item)
     );
-    if (!pessoa) {
-      return { ok: false, mensagem: MENSAGEM_LISTA_NAO_APLICADA };
-    }
+    if (!pessoa) continue;
     usados.add(origemDoColaborador(pessoa));
   }
 
   const restantes = ativos.filter(
     (item) => !usados.has(origemDoColaborador(item))
   );
-  if (restantes.length !== livres.length) {
-    return { ok: false, mensagem: MENSAGEM_LISTA_NAO_APLICADA };
-  }
   if (restantes.length === 0) {
     return {
       ok: true,
       atribuicoes: [],
-      mensagem: MENSAGEM_LISTA_JA_VINCULADA,
+      omitidos: 0,
+      mensagem: usados.size > 0 ? MENSAGEM_LISTA_JA_VINCULADA : null,
     };
   }
 
+  const cabem = Math.min(restantes.length, livres.length);
+  const escolhidos = restantes.slice(0, cabem);
+  const omitidos = restantes.length - cabem;
   return {
     ok: true,
-    mensagem: null,
-    atribuicoes: restantes.map((pessoa, index) => ({
+    omitidos,
+    mensagem:
+      omitidos > 0
+        ? mensagemListaIncompleta(usados.size + cabem, omitidos)
+        : null,
+    atribuicoes: escolhidos.map((pessoa, index) => ({
       indice: livres[index].indice,
       nome: pessoa.nome,
       cpfDigits: normalizeCpfDigits(pessoa.cpfDigits),

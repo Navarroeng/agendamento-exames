@@ -14,7 +14,7 @@ import {
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
   avaliarUsoListaColaboradoresCliente,
-  mensagemQuantidadeListaCliente,
+  mensagemBloqueioSalvarListaCliente,
   type ColaboradorListaCliente,
 } from "@/lib/lista-colaboradores-contrato";
 import { formatUppercaseInput } from "@/lib/text-normalize";
@@ -167,6 +167,7 @@ export function OrcamentoAbaFuncionarios({
   const [actionSaving, setActionSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avisoListaCliente, setAvisoListaCliente] = useState<string | null>(null);
+  const [avisoListaTipo, setAvisoListaTipo] = useState<"erro" | "info">("erro");
   const [listaClienteAplicada, setListaClienteAplicada] = useState(false);
   const [nomeSort, setNomeSort] = useState<ListaFuncionariosNomeSort>("asc");
 
@@ -290,6 +291,7 @@ export function OrcamentoAbaFuncionarios({
       const idCliente = clienteId ?? contrato.cliente_id ?? "";
       if (!idCliente) {
         const mensagem = "Este contrato não está vinculado a um cliente.";
+        setAvisoListaTipo("erro");
         setAvisoListaCliente(mensagem);
         toast.error(mensagem);
         return;
@@ -297,10 +299,11 @@ export function OrcamentoAbaFuncionarios({
       try {
         const colaboradores = await lerColaboradoresDoCliente(idCliente);
         const ativos = colaboradores.filter((item) => item.situacao === "ativo").length;
-        if (ativos !== qtd) {
-          const mensagem = mensagemQuantidadeListaCliente(ativos, qtd);
-          setAvisoListaCliente(mensagem);
-          toast.error(mensagem);
+        const bloqueio = mensagemBloqueioSalvarListaCliente(ativos, qtd);
+        if (bloqueio) {
+          setAvisoListaTipo("erro");
+          setAvisoListaCliente(bloqueio);
+          toast.error(bloqueio);
           return;
         }
       } catch (err) {
@@ -308,6 +311,7 @@ export function OrcamentoAbaFuncionarios({
           err instanceof Error
             ? err.message
             : "Não foi possível conferir a lista de colaboradores.";
+        setAvisoListaTipo("erro");
         setAvisoListaCliente(mensagem);
         toast.error(mensagem);
         return;
@@ -451,6 +455,7 @@ export function OrcamentoAbaFuncionarios({
     const idCliente = clienteId ?? contrato?.cliente_id ?? "";
     if (!idCliente) {
       const mensagem = "Este contrato não está vinculado a um cliente.";
+      setAvisoListaTipo("erro");
       setAvisoListaCliente(mensagem);
       toast.error(mensagem);
       return;
@@ -482,46 +487,51 @@ export function OrcamentoAbaFuncionarios({
         }),
       });
       if (!resultado.ok) {
+        setAvisoListaTipo("erro");
         setAvisoListaCliente(resultado.mensagem);
         toast.error(resultado.mensagem);
         return;
       }
-      if (resultado.atribuicoes.length === 0) {
-        setListaClienteAplicada(true);
-        setAvisoListaCliente(null);
-        toast.success(
-          resultado.mensagem ??
-            "As vagas deste contrato já estão vinculadas a estes colaboradores."
+      if (resultado.atribuicoes.length > 0) {
+        const porIndice = new Map(
+          resultado.atribuicoes.map((item) => [item.indice, item])
         );
+        setDrafts((prev) =>
+          prev.map((row) => {
+            const item = porIndice.get(row.indice);
+            if (!item) return row;
+            return {
+              ...row,
+              colaborador: normalizeNomeOcupante(item.nome),
+              colaboradorCpf: item.cpfDigits,
+              cargoNome: normalizeNomeOcupante(item.cargo),
+              cargoId: null,
+              manterAsoAberto: false,
+              colaboradorOrigemId: item.origemId,
+            };
+          })
+        );
+      }
+      setListaClienteAplicada(true);
+      if (resultado.omitidos > 0 && resultado.mensagem) {
+        setAvisoListaTipo("info");
+        setAvisoListaCliente(resultado.mensagem);
+        toast.success(resultado.mensagem);
         return;
       }
-      const porIndice = new Map(
-        resultado.atribuicoes.map((item) => [item.indice, item])
-      );
-      setDrafts((prev) =>
-        prev.map((row) => {
-          const item = porIndice.get(row.indice);
-          if (!item) return row;
-          return {
-            ...row,
-            colaborador: normalizeNomeOcupante(item.nome),
-            colaboradorCpf: item.cpfDigits,
-            cargoNome: normalizeNomeOcupante(item.cargo),
-            cargoId: null,
-            manterAsoAberto: false,
-            colaboradorOrigemId: item.origemId,
-          };
-        })
-      );
-      setListaClienteAplicada(true);
+      setAvisoListaCliente(null);
       toast.success(
-        "Lista do cliente aplicada nas vagas livres. Revise e clique em Salvar lista."
+        resultado.atribuicoes.length === 0
+          ? resultado.mensagem ??
+              "As vagas deste contrato já estão vinculadas a estes colaboradores."
+          : "Lista do cliente aplicada nas vagas livres. Revise e clique em Salvar lista."
       );
     } catch (err) {
       const mensagem =
         err instanceof Error
           ? err.message
           : "Não foi possível usar a lista de colaboradores.";
+      setAvisoListaTipo("erro");
       setAvisoListaCliente(mensagem);
       toast.error(mensagem);
     } finally {
@@ -641,7 +651,13 @@ export function OrcamentoAbaFuncionarios({
       </div>
 
       {avisoListaCliente ? (
-        <p className="rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#9f1239]">
+        <p
+          className={
+            avisoListaTipo === "info"
+              ? "rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]"
+              : "rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#9f1239]"
+          }
+        >
           {avisoListaCliente}
         </p>
       ) : null}
