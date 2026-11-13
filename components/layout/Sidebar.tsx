@@ -28,11 +28,14 @@ function NavLink({
 }) {
   const isActive = isNavItemActive(pathname, item);
 
+  const portal = item.href === "/portal-agrovias";
   const className = [
     "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-[-0.1px] transition-all duration-200 ease-out",
-    isActive
-      ? "bg-[rgba(99,102,241,0.15)] font-semibold text-[#E5E7EB] shadow-[0_0_24px_rgba(99,102,241,0.07)]"
-      : "text-[#94A3B8] hover:bg-white/[0.04] hover:text-[#E5E7EB]",
+    portal && isActive
+      ? "bg-[#C4A15A] font-semibold text-white shadow-sm"
+      : isActive
+        ? "bg-[rgba(99,102,241,0.15)] font-semibold text-[#E5E7EB] shadow-[0_0_24px_rgba(99,102,241,0.07)]"
+        : "text-[#94A3B8] hover:bg-white/[0.04] hover:text-[#E5E7EB]",
     item.href
       ? ""
       : "cursor-default opacity-40 hover:bg-transparent hover:text-[#94A3B8]",
@@ -40,13 +43,16 @@ function NavLink({
     .filter(Boolean)
     .join(" ");
 
-  const iconClass = isActive
-    ? "text-[#818cf8]"
-    : "text-[#64748b] group-hover:text-[#94A3B8]";
+  const iconClass =
+    portal && isActive
+      ? "text-white"
+      : isActive
+        ? "text-[#818cf8]"
+        : "text-[#64748b] group-hover:text-[#94A3B8]";
 
   const content = (
     <>
-      {isActive ? (
+      {isActive && !portal ? (
         <span
           className="absolute left-0 top-1/2 h-[18px] w-[2px] -translate-y-1/2 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.35)]"
           aria-hidden
@@ -83,7 +89,7 @@ function useNavSections() {
     if (profile?.perfil === "portal_agrovias") {
       return [
         {
-          title: "AGROVIAS",
+          title: "",
           items: [{ iconKey: "users" as const, label: "Colaboradores", href: "/portal-agrovias" }],
         },
       ];
@@ -143,8 +149,12 @@ function SidebarPanel({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function Sidebar() {
+  const { profile } = useAuth();
+  const portal = profile?.perfil === "portal_agrovias";
   return (
-    <aside className="fixed inset-y-0 left-0 z-[5] hidden w-[248px] flex-col border-r border-white/[0.08] bg-[#384393] px-3 py-5 shadow-[4px_0_24px_rgba(56,67,147,0.18)] sidebar:flex">
+    <aside
+      className={`fixed inset-y-0 left-0 z-[5] hidden w-[248px] flex-col border-r border-white/[0.08] px-3 py-5 shadow-[4px_0_24px_rgba(56,67,147,0.18)] sidebar:flex ${portal ? "bg-[#101D4A]" : "bg-[#384393]"}`}
+    >
       <SidebarPanel />
     </aside>
   );
@@ -261,7 +271,7 @@ export function MobileMenu({
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
-        className="absolute inset-y-0 left-0 flex w-[248px] max-w-[85vw] flex-col border-r border-white/[0.08] bg-[#384393] px-3 py-5 shadow-[4px_0_24px_rgba(56,67,147,0.18)]"
+        className={`absolute inset-y-0 left-0 flex w-[248px] max-w-[85vw] flex-col border-r border-white/[0.08] px-3 py-5 shadow-[4px_0_24px_rgba(56,67,147,0.18)] ${pathname === "/portal-agrovias" || pathname.startsWith("/portal-agrovias/") ? "bg-[#101D4A]" : "bg-[#384393]"}`}
       >
         <div className="mb-3 flex justify-end">
           <button
