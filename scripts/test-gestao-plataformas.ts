@@ -7,22 +7,30 @@ import {
   ORCAMENTO_GESTAO_PLATAFORMAS_NUMERO,
   alocacaoAberta,
   atualizarSituacaoRequisito,
+  caminhoAnexoGestaoPermitido,
   clientePermitidoGestaoPlataformas,
   colaboradoresSemObra,
   contarPlataformasAtivas,
+  cursoAtivo,
+  estadoListaColaboradores,
+  examesRealizadosDoColaborador,
   filtrarObras,
   filtrarRequisitos,
+  idsParaVincular,
   liberacoesVigentes,
+  obrasEmAtencao,
   plataformaDaObra,
   podeAtivarPlataforma,
   resumoVisao,
   type AlocacaoRegistro,
+  type CertificadoRegistro,
   type ColaboradorGestao,
   type LiberacaoRegistro,
   type ObraRegistro,
   type PlataformaRegistro,
   type RequisitoRegistro,
 } from "../lib/gestao-plataformas";
+import { montarHistoricoExamesColaborador } from "../lib/portal-colaboradores";
 import { canAccessPath } from "../lib/permissions";
 
 const hoje = "2026-11-13";
@@ -135,6 +143,7 @@ const requisitos: RequisitoRegistro[] = [
     situacao: "pendente",
     motivoRecusa: null,
     agendamentoId: null,
+    certificadoId: null,
   },
   {
     id: "req-b",
@@ -153,6 +162,7 @@ const requisitos: RequisitoRegistro[] = [
     situacao: "pendente",
     motivoRecusa: null,
     agendamentoId: "ag-1",
+    certificadoId: null,
   },
   {
     id: "req-c",
@@ -171,6 +181,7 @@ const requisitos: RequisitoRegistro[] = [
     situacao: "recusado",
     motivoRecusa: "Arquivo ilegível",
     agendamentoId: null,
+    certificadoId: null,
   },
 ];
 
@@ -250,5 +261,106 @@ assert.equal(
   ),
   true
 );
+
+assert.deepEqual(idsParaVincular({
+  alocacoes,
+  obraId: "obra-a",
+  colaboradorIds: ["col-1", "col-1", "col-2"],
+}), ["col-2"]);
+assert.equal(obrasEmAtencao({ obras, requisitos, hoje }).some((obra) => obra.id === "obra-a"), true);
+
+const historico = montarHistoricoExamesColaborador({
+  cpf: "52998224725",
+  agendamentos: [
+    {
+      id: "ex-1",
+      colaborador: "Marina Souza",
+      colaborador_cpf: "52998224725",
+      aso: "Periódico",
+      status: "agendado",
+      data_agendamento: "2026-10-01",
+    },
+    {
+      id: "ex-futuro",
+      colaborador: "Marina Souza",
+      colaborador_cpf: "52998224725",
+      aso: "Periódico",
+      status: "agendado",
+      data_agendamento: "2026-12-01",
+    },
+    {
+      id: "ex-cancelado",
+      colaborador: "Marina Souza",
+      colaborador_cpf: "52998224725",
+      aso: "Admissional",
+      status: "cancelado",
+      data_agendamento: "2026-09-01",
+    },
+    {
+      id: "ex-homonimo",
+      colaborador: "Marina Souza",
+      colaborador_cpf: "39053344705",
+      aso: "Admissional",
+      status: "aso_retido",
+      data_agendamento: "2026-08-01",
+    },
+  ],
+});
+assert.deepEqual(
+  examesRealizadosDoColaborador({ exames: historico, hoje }).map((exame) => exame.id),
+  ["ex-1"]
+);
+
+const curso = { id: "curso-1", nome: "NR-35", valorCentavos: 18000, inativadoEm: "2026-11-01T00:00:00.000Z" };
+const certificado: CertificadoRegistro = {
+  id: "cert-1",
+  colaboradorId: "col-1",
+  cursoId: curso.id,
+  realizadoEm: "2026-10-10",
+  validade: "2027-10-10",
+  arquivoNome: "certificado.pdf",
+  arquivoPath: `${cliente}/certificados/cert-1/certificado.pdf`,
+};
+assert.equal(cursoAtivo(curso), false);
+assert.equal(certificado.cursoId, curso.id);
+assert.equal("valorCentavos" in certificado, false);
+assert.equal(caminhoAnexoGestaoPermitido({
+  path: certificado.arquivoPath ?? "",
+  clienteId: cliente,
+}), true);
+assert.equal(caminhoAnexoGestaoPermitido({
+  path: `${outroCliente}/rh/doc/arquivo.pdf`,
+  clienteId: cliente,
+}), false);
+assert.equal(estadoListaColaboradores({
+  carregando: false,
+  falha: false,
+  totalCadastro: 0,
+  totalFiltrado: 0,
+}), "vazio");
+assert.equal(estadoListaColaboradores({
+  carregando: false,
+  falha: false,
+  totalCadastro: 2,
+  totalFiltrado: 0,
+}), "sem_resultado");
+assert.equal(estadoListaColaboradores({
+  carregando: false,
+  falha: true,
+  totalCadastro: 0,
+  totalFiltrado: 0,
+}), "falha");
+
+const comCertificado = atualizarSituacaoRequisito(
+  requisitos.map((requisito) =>
+    requisito.id === "req-a" ? { ...requisito, certificadoId: certificado.id } : requisito
+  ),
+  "req-a",
+  "aprovado"
+);
+assert.equal(comCertificado.find((item) => item.id === "req-a")?.situacao, "aprovado");
+assert.equal(comCertificado.find((item) => item.id === "req-b")?.situacao, "pendente");
+assert.equal(comCertificado.find((item) => item.id === "req-a")?.certificadoId, certificado.id);
+assert.equal(comCertificado.find((item) => item.id === "req-b")?.certificadoId, null);
 
 console.log("test-gestao-plataformas: OK");

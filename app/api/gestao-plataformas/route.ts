@@ -19,6 +19,10 @@ const ACOES = new Set<AcaoGestaoPlataformas["acao"]>([
   "salvar_requisito",
   "situacao_requisito",
   "liberar",
+  "salvar_curso",
+  "inativar_curso",
+  "reativar_curso",
+  "vincular_lote",
 ]);
 
 export async function GET() {

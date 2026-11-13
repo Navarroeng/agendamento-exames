@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AdicionarColaboradorDialog,
+  EditarColaboradorDialog,
+} from "@/components/clientes/ClienteColaboradoresSection";
+import { GestaoCursosAba } from "@/components/gestao-plataformas/GestaoCursosAba";
+import { GestaoFichaPainel } from "@/components/gestao-plataformas/GestaoFichaPainel";
 import { AppShell } from "@/components/layout/AppShell";
 import { IconChecklist } from "@/components/ui/icons/OutlineIcons";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
@@ -16,6 +22,8 @@ import {
   colaboradoresSemObra,
   contagemEquipeObra,
   contarPlataformasAtivas,
+  estadoListaColaboradores,
+  obrasEmAtencao,
   filtrarObras,
   filtrarRequisitos,
   liberacoesVigentes,
@@ -29,7 +37,10 @@ import {
   type AcaoGestaoPlataformas,
   type AbrangenciaRequisito,
   type AlocacaoRegistro,
+  type CertificadoRegistro,
   type ColaboradorGestao,
+  type CursoCatalogo,
+  type DocumentoRhRegistro,
   type FiltroGestaoPlataformas,
   type LiberacaoRegistro,
   type ObraRegistro,
@@ -38,8 +49,9 @@ import {
   type SituacaoRequisito,
   type TipoRequisito,
 } from "@/lib/gestao-plataformas";
+import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
 
-type Aba = "visao" | "plataformas" | "colaboradores" | "documentos";
+type Aba = "visao" | "plataformas" | "colaboradores" | "cursos";
 type CardAtivo = "mobilizacao" | "recusados" | "vencimentos" | "liberados" | null;
 
 type EventoRequisito = {
@@ -74,7 +86,10 @@ type Painel = {
   requisitos: RequisitoRegistro[];
   eventos: EventoRequisito[];
   liberacoes: LiberacaoRegistro[];
-  colaboradores: ColaboradorGestao[];
+  colaboradores: ClienteColaboradorLinha[];
+  cursos: CursoCatalogo[];
+  certificados: CertificadoRegistro[];
+  documentosRh: DocumentoRhRegistro[];
   agendamentos: AgendamentoVinculavel[];
 };
 
@@ -115,6 +130,7 @@ type Formulario =
       situacao: SituacaoRequisito;
       motivoRecusa: string;
       agendamentoId: string;
+      certificadoId: string;
     }
   | {
       tipo: "liberar";
@@ -129,7 +145,7 @@ const SEM_OBRAS: ObraRegistro[] = [];
 const SEM_ALOCACOES: AlocacaoRegistro[] = [];
 const SEM_REQUISITOS: RequisitoRegistro[] = [];
 const SEM_LIBERACOES: LiberacaoRegistro[] = [];
-const SEM_COLABORADORES: ColaboradorGestao[] = [];
+const SEM_COLABORADORES: ClienteColaboradorLinha[] = [];
 const SEM_EVENTOS: EventoRequisito[] = [];
 
 const INPUT =
@@ -139,7 +155,7 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: "visao", label: "Visão geral" },
   { id: "plataformas", label: "Plataformas e obras" },
   { id: "colaboradores", label: "Colaboradores" },
-  { id: "documentos", label: "Cursos, exames e documentos" },
+  { id: "cursos", label: "Cursos" },
 ];
 
 function classeSituacao(situacao: SituacaoRequisito, vencido: boolean): string {
@@ -195,8 +211,11 @@ export function GestaoPlataformasPage() {
   const [card, setCard] = useState<CardAtivo>(null);
   const [selecionado, setSelecionado] = useState<Selecao>(null);
   const [formulario, setFormulario] = useState<Formulario | null>(null);
+  const [incluirColaborador, setIncluirColaborador] = useState(false);
+  const [editarColaborador, setEditarColaborador] = useState(false);
 
   const carregar = useCallback(async () => {
+    const posicao = window.scrollY;
     setCarregando(true);
     setErro("");
     try {
@@ -214,6 +233,7 @@ export function GestaoPlataformasPage() {
       setErro("Não foi possível carregar a página.");
     } finally {
       setCarregando(false);
+      requestAnimationFrame(() => window.scrollTo(0, posicao));
     }
   }, []);
 
@@ -365,12 +385,12 @@ export function GestaoPlataformasPage() {
       return;
     }
     if (proximo === "recusados") {
-      setAba("documentos");
+      setAba("plataformas");
       setFiltro({ ...FILTRO_GESTAO_VAZIO, situacao: "recusado" });
       return;
     }
     if (proximo === "vencimentos") {
-      setAba("documentos");
+      setAba("plataformas");
       setFiltro({ ...FILTRO_GESTAO_VAZIO, vencimento: "30" });
       return;
     }
@@ -450,7 +470,7 @@ export function GestaoPlataformasPage() {
           />
         ) : null}
 
-        {painel && aba !== "visao" ? (
+        {painel && aba !== "visao" && aba !== "cursos" ? (
           <Filtros
             filtro={filtro}
             card={card}
@@ -546,6 +566,16 @@ export function GestaoPlataformasPage() {
             alocacoes={alocacoes}
             semObra={semObra}
             onPessoa={(id) => setSelecionado({ tipo: "colaborador", id })}
+            onNovo={() => setIncluirColaborador(true)}
+            estadoLista={estadoListaColaboradores({
+              carregando: carregando && !painel,
+              falha: Boolean(erro) && !painel,
+              totalCadastro: colaboradores.length,
+              totalFiltrado:
+                filtro.situacao === "liberado"
+                  ? liberadosLista.length
+                  : colaboradoresLista.length,
+            })}
             onVincular={() =>
               setFormulario({
                 tipo: "vincular",
@@ -556,7 +586,7 @@ export function GestaoPlataformasPage() {
           />
         ) : null}
 
-        {painel && aba === "documentos" ? (
+        {painel && aba === "plataformas" && (card === "recusados" || card === "vencimentos") ? (
           <ListaDocumentos
             requisitos={requisitosLista}
             obras={obras}
@@ -581,44 +611,91 @@ export function GestaoPlataformasPage() {
                 situacao: "pendente",
                 motivoRecusa: "",
                 agendamentoId: "",
+                certificadoId: "",
               })
             }
+          />
+        ) : null}
+
+        {painel && aba === "cursos" ? (
+          <GestaoCursosAba
+            cursos={painel.cursos}
+            salvando={salvando}
+            onEnviar={(acao) => void enviar(acao)}
           />
         ) : null}
       </div>
 
       {painel && (obraSelecionada || colaboradorSelecionado) ? (
-        <PainelLateral
-          painel={painel}
+        <GestaoFichaPainel
+          hoje={hoje}
+          responsavelSessao={painel.responsavelSessao}
           obra={obraSelecionada}
           colaborador={colaboradorSelecionado}
+          plataformas={plataformas}
+          obras={obras}
+          alocacoes={alocacoes}
+          requisitos={requisitos}
+          liberacoesAbertas={liberados.map((item) => ({
+            obraId: item.obraId,
+            colaboradorId: item.colaboradorId,
+          }))}
+          cursos={painel.cursos}
+          certificados={painel.certificados}
+          documentosRh={painel.documentosRh}
           eventos={eventos}
-          onFechar={() => setSelecionado(null)}
-          onLiberar={(obraId, colaboradorId) =>
-            setFormulario({
-              tipo: "liberar",
-              obraId,
-              colaboradorId,
-              liberadoEm: hoje,
-              responsavel: painel.responsavelSessao,
-            })
-          }
-          onEncerrar={(id) => {
-            if (window.confirm("Encerrar esta alocação? O histórico permanece.")) {
-              void enviar({ acao: "encerrar_alocacao", id });
-            }
-          }}
-          onSituacao={(id, situacao, motivoRecusa) =>
-            void enviar({
-              acao: "situacao_requisito",
-              id,
-              situacao,
-              motivoRecusa,
-              postadoEm:
-                situacao === "enviado" || situacao === "aprovado" ? hoje : null,
-            })
-          }
+          colaboradores={colaboradores}
           salvando={salvando}
+          onFechar={() => setSelecionado(null)}
+          onEnviar={(acao) => void enviar(acao)}
+          onRecarregar={(json) => {
+            if (json.escopo) setPainel(json as Painel);
+          }}
+          onEditarCadastro={() => setEditarColaborador(true)}
+          onNovoRequisito={(obraId) =>
+            setFormulario({
+              tipo: "requisito",
+              obraId,
+              abrangencia: "equipe",
+              cargo: "",
+              colaboradorId: "",
+              tipoItem: "documento_sst",
+              titulo: "",
+              recorrente: false,
+              competencia: hoje.slice(0, 7),
+              responsavel: painel.responsavelSessao,
+              prazo: "",
+              validade: "",
+              postadoEm: "",
+              situacao: "pendente",
+              motivoRecusa: "",
+              agendamentoId: "",
+              certificadoId: "",
+            })
+          }
+        />
+      ) : null}
+      {painel && incluirColaborador ? (
+        <AdicionarColaboradorDialog
+          clienteId={painel.escopo.clienteId}
+          empresaNome={painel.escopo.clienteNome}
+          onClose={() => setIncluirColaborador(false)}
+          onDone={() => {
+            setIncluirColaborador(false);
+            void carregar();
+          }}
+        />
+      ) : null}
+      {painel && editarColaborador && colaboradorSelecionado ? (
+        <EditarColaboradorDialog
+          clienteId={painel.escopo.clienteId}
+          empresaNome={painel.escopo.clienteNome}
+          row={colaboradorSelecionado}
+          onClose={() => setEditarColaborador(false)}
+          onDone={() => {
+            setEditarColaborador(false);
+            void carregar();
+          }}
         />
       ) : null}
     </AppShell>
@@ -654,14 +731,7 @@ function Visao({
   onCard: (card: Exclude<CardAtivo, null>) => void;
   onObra: (id: string) => void;
 }) {
-  const ordenadas = [...obras].sort((a, b) => {
-    const da = a.inicioPrevisto ?? "9999-99-99";
-    const db = b.inicioPrevisto ?? "9999-99-99";
-    const aFutura = da >= hoje;
-    const bFutura = db >= hoje;
-    if (aFutura !== bFutura) return aFutura ? -1 : 1;
-    return da.localeCompare(db);
-  });
+  const ordenadas = obrasEmAtencao({ obras, requisitos, hoje });
   const cards: {
     id: Exclude<CardAtivo, null>;
     titulo: string;
@@ -689,7 +759,7 @@ function Visao({
           {ativas} de {LIMITE_PLATAFORMAS_ATIVAS}
         </p>
       </section>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {cards.map((item) => (
           <button
             key={item.id}
@@ -698,7 +768,7 @@ function Visao({
             className="rounded-2xl border border-[#e8edf5] bg-white p-4 text-left shadow-sm transition hover:border-[#c9972b]"
           >
             <p className="text-sm text-slate-500">{item.titulo}</p>
-            <p className="mt-1 text-2xl font-semibold text-[#0b1f4d]">
+            <p className="mt-1 text-xl font-semibold text-[#0b1f4d]">
               {item.valor}
             </p>
           </button>
@@ -707,13 +777,13 @@ function Visao({
       <section className="overflow-hidden rounded-2xl border border-[#e8edf5] bg-white">
         <header className="border-b border-[#e8edf5] px-4 py-3">
           <h2 className="text-sm font-semibold text-[#0b1f4d]">
-            Obras por início previsto
+            Obras que precisam de atenção
           </h2>
         </header>
         <ul className="divide-y divide-[#e8edf5]">
           {ordenadas.length === 0 ? (
             <li className="px-4 py-6 text-sm text-slate-500">
-              Nenhuma obra cadastrada.
+              Nenhuma obra com mobilização próxima ou pendência.
             </li>
           ) : (
             ordenadas.map((obra) => {
@@ -736,8 +806,7 @@ function Visao({
                       </span>
                     </span>
                     <span className="text-xs text-slate-600">
-                      {equipe.vinculados} vinculados · {equipe.liberados} liberados ·{" "}
-                      {pendencias} pendências
+                      {equipe.liberados}/{equipe.vinculados} liberados · {pendencias} pendências
                     </span>
                   </button>
                 </li>
@@ -840,7 +909,7 @@ function Filtros({
             <option value="liberado">Liberados</option>
           </select>
         ) : null}
-        {aba === "documentos" ? (
+        {aba === "plataformas" ? (
           <>
             <select
               className={INPUT}
@@ -1027,6 +1096,8 @@ function ListaColaboradores({
   alocacoes,
   semObra,
   onPessoa,
+  onNovo,
+  estadoLista,
   onVincular,
 }: {
   pessoas: ColaboradorGestao[];
@@ -1038,6 +1109,8 @@ function ListaColaboradores({
   alocacoes: AlocacaoRegistro[];
   semObra: ColaboradorGestao[];
   onPessoa: (id: string) => void;
+  onNovo: () => void;
+  estadoLista: ReturnType<typeof estadoListaColaboradores>;
   onVincular: () => void;
 }) {
   const semObraIds = new Set(semObra.map((item) => item.id));
@@ -1045,12 +1118,16 @@ function ListaColaboradores({
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-600">
-          A lista vem de Clientes → Colaboradores. Inclusão e edição dos dados
-          pessoais continuam naquele cadastro.
+          A lista usa o mesmo cadastro de Clientes → Colaboradores.
         </p>
-        <button type="button" className="btn btn-primary shrink-0" onClick={onVincular}>
-          Vincular a obras
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button type="button" className="btn btn-primary" onClick={onNovo}>
+            Novo colaborador
+          </button>
+          <button type="button" className="btn" onClick={onVincular}>
+            Vincular a obras
+          </button>
+        </div>
       </div>
       <section className="overflow-hidden rounded-2xl border border-[#e8edf5] bg-white">
         <ul className="divide-y divide-[#e8edf5]">
@@ -1121,9 +1198,19 @@ function ListaColaboradores({
                   </li>
                 );
               })}
-          {(modoLiberados ? liberacoes.length : pessoas.length) === 0 ? (
+          {estadoLista === "vazio" ? (
+            <li className="px-4 py-6 text-sm text-slate-500">
+              Nenhum colaborador cadastrado para a AGROVIAS.
+            </li>
+          ) : null}
+          {estadoLista === "sem_resultado" ? (
             <li className="px-4 py-6 text-sm text-slate-500">
               Nenhum colaborador neste filtro.
+            </li>
+          ) : null}
+          {estadoLista === "falha" ? (
+            <li className="px-4 py-6 text-sm text-rose-700">
+              Não foi possível carregar os colaboradores.
             </li>
           ) : null}
         </ul>
@@ -1260,6 +1347,7 @@ function FormularioPainel({
             situacao: formulario.situacao,
             motivoRecusa: formulario.motivoRecusa || null,
             agendamentoId: formulario.agendamentoId || null,
+            certificadoId: formulario.certificadoId || null,
           });
         } else {
           onEnviar({
@@ -1642,252 +1730,5 @@ function RequisitoCampos({
         ))}
       </select>
     </div>
-  );
-}
-
-function PainelLateral({
-  painel,
-  obra,
-  colaborador,
-  eventos,
-  onFechar,
-  onLiberar,
-  onEncerrar,
-  onSituacao,
-  salvando,
-}: {
-  painel: Painel;
-  obra: ObraRegistro | null;
-  colaborador: ColaboradorGestao | null;
-  eventos: EventoRequisito[];
-  onFechar: () => void;
-  onLiberar: (obraId: string, colaboradorId: string) => void;
-  onEncerrar: (alocacaoId: string) => void;
-  onSituacao: (
-    id: string,
-    situacao: SituacaoRequisito,
-    motivoRecusa: string | null
-  ) => void;
-  salvando: boolean;
-}) {
-  const alvoObraId = obra?.id ?? "";
-  const alocacoesDaObra = painel.alocacoes.filter(
-    (alocacao) => obra && alocacao.obraId === obra.id
-  );
-  const alocacoesDaPessoa = painel.alocacoes.filter(
-    (alocacao) => colaborador && alocacao.colaboradorId === colaborador.id
-  );
-  const requisitosVisiveis = painel.requisitos.filter((requisito) => {
-    if (obra) return requisito.obraId === obra.id;
-    if (!colaborador) return false;
-    const obrasDaPessoa = new Set(alocacoesDaPessoa.map((item) => item.obraId));
-    return (
-      obrasDaPessoa.has(requisito.obraId) &&
-      (requisito.abrangencia === "equipe" ||
-        requisito.abrangencia === "empresa" ||
-        requisito.abrangencia === "funcao" ||
-        requisito.colaboradorId === colaborador.id)
-    );
-  });
-  const eventosVisiveis = eventos.filter((evento) =>
-    requisitosVisiveis.some((requisito) => requisito.id === evento.requisitoId)
-  );
-  const [motivo, setMotivo] = useState("");
-
-  return (
-    <aside className="fixed inset-0 z-40 flex flex-col bg-white sidebar:inset-y-4 sidebar:left-auto sidebar:right-4 sidebar:w-[440px] sidebar:rounded-2xl sidebar:border sidebar:border-[#e8edf5] sidebar:shadow-xl">
-      <header className="flex items-start justify-between gap-3 border-b border-[#e8edf5] px-4 py-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-[#c9972b]">
-            {obra ? "Obra" : "Colaborador"}
-          </p>
-          <h2 className="text-lg font-semibold text-[#0b1f4d]">
-            {obra?.nome ?? colaborador?.nome}
-          </h2>
-          {obra ? (
-            <p className="text-xs text-slate-500">
-              {nomePlataforma(painel.plataformas, obra.plataformaId)} ·{" "}
-              {obra.empresaResponsavel}
-            </p>
-          ) : colaborador ? (
-            <p className="text-xs text-slate-500">
-              {colaborador.cargo || "Sem função"} · {colaborador.situacaoLabel}
-            </p>
-          ) : null}
-        </div>
-        <button type="button" className="btn" onClick={onFechar}>
-          Fechar
-        </button>
-      </header>
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <section>
-          <h3 className="text-sm font-semibold text-[#0b1f4d]">Equipe</h3>
-          <ul className="mt-2 space-y-2">
-            {(obra ? alocacoesDaObra : alocacoesDaPessoa).map((alocacao) => {
-              const aberta = alocacaoAberta(alocacao);
-              const pessoa = painel.colaboradores.find(
-                (item) => item.id === alocacao.colaboradorId
-              );
-              const obraAlocacao = painel.obras.find(
-                (item) => item.id === alocacao.obraId
-              );
-              const liberado = liberacoesVigentes({
-                liberacoes: painel.liberacoes,
-                alocacoes: painel.alocacoes,
-              }).some(
-                (item) =>
-                  item.obraId === alocacao.obraId &&
-                  item.colaboradorId === alocacao.colaboradorId
-              );
-              return (
-                <li
-                  key={alocacao.id}
-                  className="rounded-xl border border-[#e8edf5] px-3 py-2 text-sm"
-                >
-                  <p className="font-medium text-[#0b1f4d]">
-                    {obra ? pessoa?.nome : obraAlocacao?.nome}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {obraAlocacao
-                      ? nomePlataforma(
-                          painel.plataformas,
-                          plataformaDaObra(painel.obras, alocacao.obraId) ?? ""
-                        )
-                      : ""}
-                    {aberta ? " · em aberto" : " · encerrada"}
-                    {liberado ? " · liberado" : ""}
-                  </p>
-                  {aberta ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() =>
-                          onLiberar(alocacao.obraId, alocacao.colaboradorId)
-                        }
-                      >
-                        Registrar liberação
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={salvando}
-                        onClick={() => onEncerrar(alocacao.id)}
-                      >
-                        Encerrar alocação
-                      </button>
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-            {(obra ? alocacoesDaObra : alocacoesDaPessoa).length === 0 ? (
-              <li className="text-sm text-slate-500">Sem obra vinculada.</li>
-            ) : null}
-          </ul>
-        </section>
-        <section>
-          <h3 className="text-sm font-semibold text-[#0b1f4d]">
-            Checklist e andamento
-          </h3>
-          <ul className="mt-2 space-y-2">
-            {requisitosVisiveis.map((requisito) => {
-              const vencido = requisitoVencido(requisito, painel.hoje);
-              return (
-                <li
-                  key={requisito.id}
-                  className="rounded-xl border border-[#e8edf5] px-3 py-2"
-                >
-                  <p className="text-sm font-medium text-[#0b1f4d]">
-                    {requisito.titulo}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {nomeObra(painel.obras, requisito.obraId)} ·{" "}
-                    {TIPO_REQUISITO_LABEL[requisito.tipo]} ·{" "}
-                    {requisito.responsavel || "Sem responsável"}
-                    {requisito.validade
-                      ? ` · validade ${formatDateIsoToBR(requisito.validade)}`
-                      : ""}
-                    {requisito.prazo
-                      ? ` · prazo ${formatDateIsoToBR(requisito.prazo)}`
-                      : ""}
-                  </p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    <Selo className={classeSituacao(requisito.situacao, false)}>
-                      {SITUACAO_REQUISITO_LABEL[requisito.situacao]}
-                    </Selo>
-                    {vencido ? (
-                      <Selo className="bg-orange-50 text-orange-800 ring-orange-200">
-                        Vencido
-                      </Selo>
-                    ) : null}
-                  </div>
-                  {requisito.motivoRecusa ? (
-                    <p className="mt-1 text-xs text-rose-700">
-                      {requisito.motivoRecusa}
-                    </p>
-                  ) : null}
-                  {alvoObraId || colaborador ? (
-                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                      <select
-                        className={INPUT}
-                        defaultValue={requisito.situacao}
-                        onChange={(event) => {
-                          const situacao = event.target.value as SituacaoRequisito;
-                          if (situacao === "recusado" && !motivo.trim()) {
-                            window.alert("Informe o motivo da recusa antes de registrar.");
-                            event.target.value = requisito.situacao;
-                            return;
-                          }
-                          onSituacao(
-                            requisito.id,
-                            situacao,
-                            situacao === "recusado" ? motivo : null
-                          );
-                        }}
-                      >
-                        {SITUACOES_REQUISITO.map((situacao) => (
-                          <option key={situacao} value={situacao}>
-                            {SITUACAO_REQUISITO_LABEL[situacao]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-            {requisitosVisiveis.length === 0 ? (
-              <li className="text-sm text-slate-500">
-                Nenhum requisito nesta seleção.
-              </li>
-            ) : null}
-          </ul>
-          <input
-            className={`${INPUT} mt-2`}
-            placeholder="Motivo da recusa, quando for registrar essa situação"
-            value={motivo}
-            onChange={(event) => setMotivo(event.target.value)}
-          />
-        </section>
-        <section>
-          <h3 className="text-sm font-semibold text-[#0b1f4d]">Histórico</h3>
-          <ul className="mt-2 space-y-2">
-            {eventosVisiveis.map((evento) => (
-              <li key={evento.id} className="text-xs text-slate-600">
-                {formatDateIsoToBR(evento.registradoEm.slice(0, 10))} ·{" "}
-                {SITUACAO_REQUISITO_LABEL[evento.situacao]}
-                {evento.observacao ? ` · ${evento.observacao}` : ""}
-                {evento.motivoRecusa ? ` · ${evento.motivoRecusa}` : ""}
-                {evento.responsavel ? ` · ${evento.responsavel}` : ""}
-              </li>
-            ))}
-            {eventosVisiveis.length === 0 ? (
-              <li className="text-sm text-slate-500">Sem eventos registrados.</li>
-            ) : null}
-          </ul>
-        </section>
-      </div>
-    </aside>
   );
 }

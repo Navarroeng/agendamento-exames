@@ -99,6 +99,7 @@ export type RequisitoRegistro = {
   situacao: SituacaoRequisito;
   motivoRecusa: string | null;
   agendamentoId: string | null;
+  certificadoId: string | null;
 };
 
 export type LiberacaoRegistro = {
@@ -253,10 +254,10 @@ export function liberacoesVigentes(params: {
   return Array.from(porChave.values());
 }
 
-export function colaboradoresSemObra(params: {
-  colaboradores: readonly ColaboradorGestao[];
+export function colaboradoresSemObra<T extends { id: string }>(params: {
+  colaboradores: readonly T[];
   alocacoes: readonly AlocacaoRegistro[];
-}): ColaboradorGestao[] {
+}): T[] {
   const vinculados = new Set(
     params.alocacoes.filter(alocacaoAberta).map((alocacao) => alocacao.colaboradorId)
   );
@@ -557,6 +558,7 @@ export type AcaoGestaoPlataformas =
       situacao: SituacaoRequisito;
       motivoRecusa: string | null;
       agendamentoId: string | null;
+      certificadoId: string | null;
     }
   | {
       acao: "situacao_requisito";
@@ -571,4 +573,177 @@ export type AcaoGestaoPlataformas =
       colaboradorId: string;
       liberadoEm: string;
       responsavel: string;
-    };
+    }
+  | { acao: "salvar_curso"; id?: string; nome: string; valorCentavos: number }
+  | { acao: "inativar_curso"; id: string }
+  | { acao: "reativar_curso"; id: string }
+  | { acao: "vincular_lote"; obraId: string; colaboradorIds: string[] };
+
+export type CursoCatalogo = {
+  id: string;
+  nome: string;
+  valorCentavos: number;
+  inativadoEm: string | null;
+};
+
+export type CertificadoRegistro = {
+  id: string;
+  colaboradorId: string;
+  cursoId: string;
+  realizadoEm: string;
+  validade: string | null;
+  arquivoNome: string | null;
+  arquivoPath: string | null;
+};
+
+export type DocumentoRhRegistro = {
+  id: string;
+  colaboradorId: string;
+  identificacao: string;
+  incluidoEm: string;
+  arquivoNome: string;
+  arquivoPath: string;
+};
+
+export const ANEXO_GESTAO_MAX_BYTES = 10 * 1024 * 1024;
+export const ANEXO_GESTAO_MIMES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
+export function centavosDeReais(
+  valor: number
+): { ok: true; centavos: number } | { ok: false; erro: string } {
+  if (!Number.isFinite(valor) || valor < 0) {
+    return { ok: false, erro: "Informe o valor do curso em reais." };
+  }
+  const centavos = Math.round(valor * 100);
+  if (centavos > 100_000_000) {
+    return { ok: false, erro: "Informe um valor de curso válido." };
+  }
+  return { ok: true, centavos };
+}
+
+export function validarCursoEntrada(input: {
+  nome: string;
+  valorCentavos: number;
+}): string | null {
+  if (input.nome.trim().length < 2) return "Informe o nome do curso.";
+  if (!Number.isInteger(input.valorCentavos) || input.valorCentavos < 0) {
+    return "Informe o valor do curso em reais.";
+  }
+  return null;
+}
+
+export function cursoAtivo(curso: Pick<CursoCatalogo, "inativadoEm">): boolean {
+  return !curso.inativadoEm;
+}
+
+export function idsParaVincular(params: {
+  alocacoes: readonly AlocacaoRegistro[];
+  obraId: string;
+  colaboradorIds: readonly string[];
+}): string[] {
+  const abertos = new Set(
+    params.alocacoes
+      .filter(
+        (alocacao) => alocacao.obraId === params.obraId && alocacaoAberta(alocacao)
+      )
+      .map((alocacao) => alocacao.colaboradorId)
+  );
+  const vistos = new Set<string>();
+  const novos: string[] = [];
+  for (const bruto of params.colaboradorIds) {
+    const id = bruto.trim();
+    if (!id || vistos.has(id) || abertos.has(id)) continue;
+    vistos.add(id);
+    novos.push(id);
+  }
+  return novos;
+}
+
+export type EstadoListaColaboradores =
+  | "carregando"
+  | "falha"
+  | "vazio"
+  | "sem_resultado"
+  | "lista";
+
+export function estadoListaColaboradores(params: {
+  carregando: boolean;
+  falha: boolean;
+  totalCadastro: number;
+  totalFiltrado: number;
+}): EstadoListaColaboradores {
+  if (params.carregando) return "carregando";
+  if (params.falha) return "falha";
+  if (params.totalCadastro === 0) return "vazio";
+  if (params.totalFiltrado === 0) return "sem_resultado";
+  return "lista";
+}
+
+export function examesRealizadosDoColaborador<
+  T extends { dataIso: string | null; situacao: string },
+>(params: { exames: readonly T[]; hoje: string }): T[] {
+  return params.exames.filter((exame) => {
+    if (!exame.dataIso || exame.dataIso > params.hoje) return false;
+    return exame.situacao.toLocaleLowerCase("pt-BR") !== "cancelado";
+  });
+}
+
+export function obrasEmAtencao(params: {
+  obras: readonly ObraRegistro[];
+  requisitos: readonly RequisitoRegistro[];
+  hoje: string;
+}): ObraRegistro[] {
+  const proximas = new Set(
+    obrasMobilizacaoProxima(params.obras, params.hoje).map((obra) => obra.id)
+  );
+  return params.obras
+    .filter(
+      (obra) =>
+        proximas.has(obra.id) ||
+        pendenciasAbertasDaObra(params.requisitos, obra.id, params.hoje) > 0
+    )
+    .sort((a, b) =>
+      String(a.inicioPrevisto ?? "9999-99-99").localeCompare(
+        String(b.inicioPrevisto ?? "9999-99-99")
+      )
+    );
+}
+
+export function validarAnexoGestao(params: {
+  nome: string;
+  tipo: string;
+  tamanho: number;
+}): string | null {
+  if (!params.nome.trim()) return "Selecione o arquivo.";
+  if (params.tamanho <= 0 || params.tamanho > ANEXO_GESTAO_MAX_BYTES) {
+    return "O arquivo precisa ter até 10 MB.";
+  }
+  const tipo = params.tipo.trim().toLowerCase();
+  const nome = params.nome.trim().toLowerCase();
+  const extensaoOk = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].some((ext) =>
+    nome.endsWith(ext)
+  );
+  const mimeOk = ANEXO_GESTAO_MIMES.some((mime) => mime === tipo);
+  if (!mimeOk && !extensaoOk) {
+    return "Envie um PDF ou uma imagem (JPG, PNG ou WEBP).";
+  }
+  return null;
+}
+
+export function caminhoAnexoGestaoPermitido(params: {
+  path: string;
+  clienteId: string;
+}): boolean {
+  const caminho = params.path.replace(/\\/g, "/").trim();
+  const cliente = params.clienteId.trim();
+  if (!caminho || !cliente || caminho.includes("..")) return false;
+  return (
+    caminho.startsWith(`${cliente}/certificados/`) ||
+    caminho.startsWith(`${cliente}/rh/`)
+  );
+}

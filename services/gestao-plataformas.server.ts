@@ -10,18 +10,23 @@ import {
   type AcaoGestaoPlataformas,
   type AbrangenciaRequisito,
   type AlocacaoRegistro,
-  type ColaboradorGestao,
+  type CertificadoRegistro,
+  type CursoCatalogo,
+  type DocumentoRhRegistro,
   type LiberacaoRegistro,
   type ObraRegistro,
   type PlataformaRegistro,
   type RequisitoRegistro,
   type SituacaoRequisito,
   type TipoRequisito,
+  idsParaVincular,
+  validarCursoEntrada,
   validarObraEntrada,
   validarPlataformaEntrada,
   validarRequisitoEntrada,
   podeAtivarPlataforma,
 } from "@/lib/gestao-plataformas";
+import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarColaboradoresPortal } from "@/services/portal-colaboradores.server";
 
@@ -63,7 +68,10 @@ export type PainelGestaoPlataformas = {
   requisitos: RequisitoRegistro[];
   eventos: EventoRequisito[];
   liberacoes: LiberacaoRegistro[];
-  colaboradores: ColaboradorGestao[];
+  colaboradores: ClienteColaboradorLinha[];
+  cursos: CursoCatalogo[];
+  certificados: CertificadoRegistro[];
+  documentosRh: DocumentoRhRegistro[];
   agendamentos: AgendamentoVinculavel[];
 };
 
@@ -85,7 +93,9 @@ function mensagemBanco(error: ErroPostgrest, fallback: string): string {
     message.includes("alocação") ||
     message.includes("requisito") ||
     message.includes("liberação") ||
-    message.includes("exame vinculado");
+    message.includes("exame vinculado") ||
+    message.includes("certificado") ||
+    message.includes("curso");
   if (!util) return fallback;
   return message.replace(/^.*ERROR:\s*/i, "").split("\n")[0] || fallback;
 }
@@ -93,6 +103,7 @@ function mensagemBanco(error: ErroPostgrest, fallback: string): string {
 function tabelaAusente(error: ErroPostgrest): boolean {
   return (
     error?.code === "42P01" ||
+    error?.code === "42703" ||
     /does not exist|schema cache|não existe/i.test(error?.message ?? "")
   );
 }
@@ -182,6 +193,7 @@ function mapRequisito(row: Record<string, unknown>): RequisitoRegistro {
     situacao: texto(row.situacao) as SituacaoRequisito,
     motivoRecusa: row.motivo_recusa ? texto(row.motivo_recusa) : null,
     agendamentoId: row.agendamento_id ? String(row.agendamento_id) : null,
+    certificadoId: row.certificado_id ? String(row.certificado_id) : null,
   };
 }
 
@@ -227,6 +239,9 @@ export async function carregarGestaoPlataformas(params: {
     requisitosRes,
     eventosRes,
     liberacoesRes,
+    cursosRes,
+    certificadosRes,
+    documentosRes,
     colaboradoresRes,
     agendamentosRes,
   ] = await Promise.all([
@@ -250,7 +265,7 @@ export async function carregarGestaoPlataformas(params: {
     admin
       .from("gestao_plataforma_requisitos")
       .select(
-        "id, obra_id, abrangencia, cargo, colaborador_id, tipo, titulo, recorrente, competencia, responsavel, prazo, validade, postado_em, situacao, motivo_recusa, agendamento_id"
+        "id, obra_id, abrangencia, cargo, colaborador_id, tipo, titulo, recorrente, competencia, responsavel, prazo, validade, postado_em, situacao, motivo_recusa, agendamento_id, certificado_id"
       )
       .eq("cliente_id", clienteId)
       .order("titulo"),
@@ -267,6 +282,23 @@ export async function carregarGestaoPlataformas(params: {
       .select("id, obra_id, colaborador_id, liberado_em, responsavel")
       .eq("cliente_id", clienteId)
       .order("liberado_em", { ascending: false }),
+    admin
+      .from("gestao_plataforma_cursos")
+      .select("id, nome, valor_centavos, inativado_em")
+      .eq("cliente_id", clienteId)
+      .order("nome"),
+    admin
+      .from("gestao_plataforma_certificados")
+      .select(
+        "id, colaborador_id, curso_id, realizado_em, validade, arquivo_nome, arquivo_path"
+      )
+      .eq("cliente_id", clienteId)
+      .order("realizado_em", { ascending: false }),
+    admin
+      .from("gestao_plataforma_documentos_rh")
+      .select("id, colaborador_id, identificacao, incluido_em, arquivo_nome, arquivo_path")
+      .eq("cliente_id", clienteId)
+      .order("incluido_em", { ascending: false }),
     listarColaboradoresPortal(clienteId),
     admin
       .from("agendamentos")
@@ -283,6 +315,9 @@ export async function carregarGestaoPlataformas(params: {
     requisitosRes.error,
     eventosRes.error,
     liberacoesRes.error,
+    cursosRes.error,
+    certificadosRes.error,
+    documentosRes.error,
   ].find(Boolean);
   if (consulta) {
     if (tabelaAusente(consulta)) {
@@ -322,13 +357,34 @@ export async function carregarGestaoPlataformas(params: {
       liberacoes: ((liberacoesRes.data ?? []) as Record<string, unknown>[]).map(
         mapLiberacao
       ),
-      colaboradores: colaboradoresRes.colaboradores.map((linha) => ({
-        id: linha.id,
-        nome: linha.nome,
-        cargo: linha.cargo,
-        situacao: linha.situacao,
-        situacaoLabel: linha.situacaoLabel,
+      colaboradores: colaboradoresRes.colaboradores,
+      cursos: ((cursosRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
+        id: String(row.id),
+        nome: texto(row.nome),
+        valorCentavos: Number(row.valor_centavos) || 0,
+        inativadoEm: row.inativado_em ? String(row.inativado_em) : null,
       })),
+      certificados: ((certificadosRes.data ?? []) as Record<string, unknown>[]).map(
+        (row) => ({
+          id: String(row.id),
+          colaboradorId: texto(row.colaborador_id),
+          cursoId: String(row.curso_id),
+          realizadoEm: dataOuNull(row.realizado_em) ?? "",
+          validade: dataOuNull(row.validade),
+          arquivoNome: row.arquivo_nome ? texto(row.arquivo_nome) : null,
+          arquivoPath: row.arquivo_path ? texto(row.arquivo_path) : null,
+        })
+      ),
+      documentosRh: ((documentosRes.data ?? []) as Record<string, unknown>[]).map(
+        (row) => ({
+          id: String(row.id),
+          colaboradorId: texto(row.colaborador_id),
+          identificacao: texto(row.identificacao),
+          incluidoEm: String(row.incluido_em),
+          arquivoNome: texto(row.arquivo_nome),
+          arquivoPath: texto(row.arquivo_path),
+        })
+      ),
       agendamentos: agendamentosRes.error
         ? []
         : ((agendamentosRes.data ?? []) as Record<string, unknown>[]).map(
@@ -569,6 +625,114 @@ export async function executarGestaoPlataformas(params: {
     return { ok: true };
   }
 
+  if (acao.acao === "vincular_lote") {
+    const obraId = texto(acao.obraId);
+    const { colaboradores } = await listarColaboradoresPortal(escopo.clienteId);
+    const conhecidos = new Set(colaboradores.map((linha) => linha.id));
+    const pedidos = acao.colaboradorIds.map((id) => texto(id)).filter(Boolean);
+    if (!obraId || pedidos.length === 0) {
+      return { ok: false, status: 400, error: "Selecione a obra e ao menos um colaborador." };
+    }
+    if (pedidos.some((id) => !conhecidos.has(id))) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Um dos colaboradores não está no cadastro da AGROVIAS.",
+      };
+    }
+    const { data: obra, error: obraErro } = await admin
+      .from("gestao_plataforma_obras")
+      .select("id")
+      .eq("id", obraId)
+      .eq("cliente_id", escopo.clienteId)
+      .maybeSingle();
+    if (obraErro || !obra) {
+      return { ok: false, status: 400, error: "A obra não pertence à AGROVIAS." };
+    }
+    const { data: abertas, error: abertasErro } = await admin
+      .from("gestao_plataforma_alocacoes")
+      .select("id, obra_id, colaborador_id, encerrada_em")
+      .eq("cliente_id", escopo.clienteId)
+      .eq("obra_id", obraId)
+      .is("encerrada_em", null);
+    if (abertasErro) {
+      return { ok: false, status: 500, error: "Não foi possível consultar as alocações." };
+    }
+    const novas = idsParaVincular({
+      alocacoes: ((abertas ?? []) as Record<string, unknown>[]).map(mapAlocacao),
+      obraId,
+      colaboradorIds: pedidos,
+    });
+    if (novas.length === 0) {
+      return {
+        ok: false,
+        status: 409,
+        error: "Esses colaboradores já possuem um vínculo ativo nesta obra.",
+      };
+    }
+    const { error } = await admin.from("gestao_plataforma_alocacoes").insert(
+      novas.map((colaboradorId) => ({
+        cliente_id: escopo.clienteId,
+        obra_id: obraId,
+        colaborador_id: colaboradorId,
+      }))
+    );
+    if (error) {
+      return {
+        ok: false,
+        status: 409,
+        error: mensagemBanco(error, "Não foi possível vincular os colaboradores."),
+      };
+    }
+    return { ok: true };
+  }
+
+  if (acao.acao === "salvar_curso" || acao.acao === "inativar_curso" || acao.acao === "reativar_curso") {
+    if (acao.acao === "inativar_curso" || acao.acao === "reativar_curso") {
+      const { error } = await admin
+        .from("gestao_plataforma_cursos")
+        .update({
+          inativado_em: acao.acao === "inativar_curso" ? agora : null,
+          atualizado_em: agora,
+        })
+        .eq("id", acao.id)
+        .eq("cliente_id", escopo.clienteId);
+      if (error) {
+        return {
+          ok: false,
+          status: 409,
+          error: mensagemBanco(error, "Não foi possível atualizar o curso."),
+        };
+      }
+      return { ok: true };
+    }
+    const erroCurso = validarCursoEntrada(acao);
+    if (erroCurso) return { ok: false, status: 400, error: erroCurso };
+    const payload = {
+      nome: acao.nome.trim(),
+      valor_centavos: acao.valorCentavos,
+      atualizado_em: agora,
+    };
+    const { error } = acao.id
+      ? await admin
+          .from("gestao_plataforma_cursos")
+          .update(payload)
+          .eq("id", acao.id)
+          .eq("cliente_id", escopo.clienteId)
+      : await admin.from("gestao_plataforma_cursos").insert({
+          ...payload,
+          cliente_id: escopo.clienteId,
+        });
+    if (error) {
+      return {
+        ok: false,
+        status: 409,
+        error: mensagemBanco(error, "Não foi possível salvar o curso."),
+      };
+    }
+    return { ok: true };
+  }
+
   if (acao.acao === "encerrar_alocacao") {
     const { error } = await admin
       .from("gestao_plataforma_alocacoes")
@@ -593,7 +757,7 @@ export async function executarGestaoPlataformas(params: {
       const { data, error } = await adminAtual
         .from("gestao_plataforma_requisitos")
         .select(
-          "id, obra_id, abrangencia, cargo, colaborador_id, tipo, titulo, recorrente, competencia, responsavel, prazo, validade, postado_em, situacao, motivo_recusa, agendamento_id"
+          "id, obra_id, abrangencia, cargo, colaborador_id, tipo, titulo, recorrente, competencia, responsavel, prazo, validade, postado_em, situacao, motivo_recusa, agendamento_id, certificado_id"
         )
         .eq("id", acao.id)
         .eq("cliente_id", escopo.clienteId)
@@ -685,6 +849,7 @@ export async function executarGestaoPlataformas(params: {
       situacao: acao.situacao,
       motivo_recusa: acao.situacao === "recusado" ? texto(acao.motivoRecusa) : null,
       agendamento_id: texto(acao.agendamentoId) || null,
+      certificado_id: texto(acao.certificadoId) || null,
       atualizado_em: agora,
     };
     if (acao.id) {
