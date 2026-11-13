@@ -68,11 +68,15 @@ function rotuloResumoCompacto(ativos: number, desligados: number): string {
 
 export function ClienteColaboradoresSection({
   clienteId,
+  abertoInicial = false,
 }: {
   clienteId: string;
+  /** Abre a seção já expandida, como na entrada pela Lista de funcionários. */
+  abertoInicial?: boolean;
 }) {
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(abertoInicial);
+  const secaoRef = useRef<HTMLDivElement>(null);
   const [filtro, setFiltro] = useState<PortalColaboradoresFiltro>("ativos");
   const [busca, setBusca] = useState("");
   const [demitirAlvo, setDemitirAlvo] = useState<ClienteColaboradorLinha | null>(
@@ -123,8 +127,13 @@ export function ClienteColaboradoresSection({
   }, [aplicarLista, clienteId]);
 
   useEffect(() => {
-    setAberto(false);
-  }, [clienteId]);
+    setAberto(abertoInicial);
+  }, [clienteId, abertoInicial]);
+
+  useEffect(() => {
+    if (!abertoInicial) return;
+    secaoRef.current?.scrollIntoView({ block: "start" });
+  }, [abertoInicial, clienteId]);
 
   useEffect(() => {
     void carregar();
@@ -149,7 +158,11 @@ export function ClienteColaboradoresSection({
         : "Carregando...";
 
   return (
-    <div className="mt-5 overflow-hidden rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] shadow-[0_6px_22px_rgba(15,23,42,0.04)]">
+    <div
+      id="cliente-colaboradores"
+      ref={secaoRef}
+      className="mt-5 scroll-mt-4 overflow-hidden rounded-[20px] border border-[#e8edf5] bg-gradient-to-b from-white to-[#fbfdff] shadow-[0_6px_22px_rgba(15,23,42,0.04)]"
+    >
       <button
         type="button"
         className="flex min-h-[72px] w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-[#f8fafc]/80"

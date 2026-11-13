@@ -260,7 +260,8 @@ export function OrcamentoAbaFuncionarios({
     idCliente: string
   ): Promise<ColaboradorListaCliente[]> {
     const res = await fetch(
-      `/api/clientes/${encodeURIComponent(idCliente)}/colaboradores`
+      `/api/clientes/${encodeURIComponent(idCliente)}/colaboradores`,
+      { cache: "no-store" }
     );
     const json = (await res.json().catch(() => ({}))) as {
       colaboradores?: ColaboradorListaCliente[];
