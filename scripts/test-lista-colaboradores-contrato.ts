@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
-import { emptyVagaDraft } from "../lib/contrato-vagas";
+import {
+  CONTRATO_VAGA_STATUS_LABELS,
+  emptyVagaDraft,
+  resolveStatusVagaRascunho,
+} from "../lib/contrato-vagas";
 import { aplicarImportacaoNasVagas } from "../lib/contrato-vagas-import";
+import { isValidCPF } from "../lib/cpf";
 import {
   MENSAGEM_LISTA_JA_VINCULADA,
-  MENSAGEM_LISTA_NAO_APLICADA,
   MENSAGEM_LISTA_SEM_CPF,
   avaliarUsoListaColaboradoresCliente,
+  mensagemBloqueioSalvarListaCliente,
+  mensagemListaIncompleta,
   mensagemQuantidadeListaCliente,
   type ColaboradorListaCliente,
   type VagaListaCliente,
@@ -15,6 +21,22 @@ import { consolidarPortalColaboradores } from "../lib/portal-colaboradores";
 const CPF_A = "52998224725";
 const CPF_B = "39053344705";
 const CPF_C = "11144477735";
+function cpfDeNove(nove: string): string {
+  const nums = nove.split("").map(Number);
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += nums[i] * (10 - i);
+  let d1 = (sum * 10) % 11;
+  if (d1 === 10) d1 = 0;
+  sum = 0;
+  for (let i = 0; i < 9; i += 1) sum += nums[i] * (11 - i);
+  sum += d1 * 2;
+  let d2 = (sum * 10) % 11;
+  if (d2 === 10) d2 = 0;
+  return `${nove}${d1}${d2}`;
+}
+
+const CPF_D = cpfDeNove("453178287");
+assert.equal(isValidCPF(CPF_D), true);
 const CADASTRO = "11111111-1111-4111-8111-111111111111";
 const CADASTRO_SEM = "22222222-2222-4222-8222-222222222222";
 const AGENDAMENTO = "33333333-3333-4333-8333-333333333333";
@@ -93,12 +115,16 @@ assert.equal(
 {
   const menor = avaliarUsoListaColaboradoresCliente({
     quantidadeContratada: 3,
-    colaboradores: [pessoa(CPF_A, "MARIA", CPF_A)],
+    colaboradores: [pessoa(CPF_A, "MARIA", CPF_A, CADASTRO)],
     vagas: [vagaLivre(1), vagaLivre(2), vagaLivre(3)],
   });
-  assert.equal(menor.ok, false);
-  if (menor.ok) throw new Error("menor");
-  assert.equal(menor.mensagem, mensagemQuantidadeListaCliente(1, 3));
+  assert.equal(menor.ok, true);
+  if (!menor.ok) throw new Error("menor");
+  assert.equal(menor.omitidos, 0);
+  assert.equal(menor.atribuicoes.length, 1);
+  assert.equal(menor.atribuicoes[0].indice, 1);
+  assert.equal(menor.atribuicoes[0].origemId, CADASTRO);
+  assert.equal(mensagemBloqueioSalvarListaCliente(1, 3), null);
 }
 
 {
@@ -158,9 +184,11 @@ assert.equal(
     colaboradores: [pessoa(CPF_A, "MARIA", CPF_A, CADASTRO)],
     vagas: [ocupada],
   });
-  assert.equal(bloqueado.ok, false);
-  if (bloqueado.ok) throw new Error("ocupada");
-  assert.equal(bloqueado.mensagem, MENSAGEM_LISTA_NAO_APLICADA);
+  assert.equal(bloqueado.ok, true);
+  if (!bloqueado.ok) throw new Error("ocupada");
+  assert.equal(bloqueado.atribuicoes.length, 0);
+  assert.equal(bloqueado.omitidos, 1);
+  assert.equal(bloqueado.mensagem, mensagemListaIncompleta(0, 1));
   assert.equal(ocupada.colaborador, "OUTRA PESSOA");
 }
 
@@ -187,6 +215,117 @@ assert.equal(
   assert.equal(parcial.atribuicoes.length, 1);
   assert.equal(parcial.atribuicoes[0].indice, 2);
   assert.equal(parcial.atribuicoes[0].cpfDigits, CPF_B);
+}
+
+{
+  const by = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 5,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+      pessoa(CPF_D, "RITA", CPF_D),
+    ],
+    vagas: [vagaLivre(1), vagaLivre(2), vagaLivre(3), vagaLivre(4), vagaLivre(5)],
+  });
+  assert.equal(by.ok, true);
+  if (!by.ok) throw new Error("by");
+  assert.equal(by.omitidos, 0);
+  assert.deepEqual(
+    by.atribuicoes.map((item) => item.indice),
+    [1, 2, 3, 4]
+  );
+  assert.equal(by.atribuicoes[0].origemId, CADASTRO);
+  const sobra = resolveStatusVagaRascunho({
+    colaborador: "",
+    colaboradorCpf: "",
+    manterAsoAberto: false,
+  });
+  assert.equal(sobra, "aberta");
+  assert.equal(CONTRATO_VAGA_STATUS_LABELS[sobra], "Em aberto");
+  assert.equal(mensagemBloqueioSalvarListaCliente(4, 5), null);
+}
+
+{
+  const cincoParaTres = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 3,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+      pessoa(CPF_D, "RITA", CPF_D),
+      pessoa("EXTRA", "LIA", cpfDeNove("286255878")),
+    ],
+    vagas: [vagaLivre(1), vagaLivre(2), vagaLivre(3)],
+  });
+  assert.equal(cincoParaTres.ok, false);
+  if (cincoParaTres.ok) throw new Error("cinco");
+  assert.equal(cincoParaTres.mensagem, mensagemQuantidadeListaCliente(5, 3));
+  assert.equal(
+    mensagemBloqueioSalvarListaCliente(5, 3),
+    mensagemQuantidadeListaCliente(5, 3)
+  );
+}
+
+{
+  const reserva: VagaListaCliente = {
+    indice: 1,
+    status: "comprometida",
+    colaborador: null,
+    colaboradorCpf: null,
+    colaboradorOrigemId: null,
+  };
+  const comReserva = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 3,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+    ],
+    vagas: [reserva, vagaLivre(2), vagaLivre(3)],
+  });
+  assert.equal(comReserva.ok, true);
+  if (!comReserva.ok) throw new Error("reserva");
+  assert.deepEqual(
+    comReserva.atribuicoes.map((item) => item.indice),
+    [2, 3]
+  );
+  assert.equal(reserva.colaborador, null);
+  assert.equal(comReserva.omitidos, 0);
+}
+
+{
+  const protegida1: VagaListaCliente = {
+    indice: 1,
+    status: "programada",
+    colaborador: "OUTRA",
+    colaboradorCpf: cpfDeNove("286255878"),
+    colaboradorOrigemId: null,
+  };
+  const protegida2: VagaListaCliente = {
+    indice: 2,
+    status: "comprometida",
+    colaborador: "",
+    colaboradorCpf: "",
+    colaboradorOrigemId: null,
+  };
+  const incompleta = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 3,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+    ],
+    vagas: [protegida1, protegida2, vagaLivre(3)],
+  });
+  assert.equal(incompleta.ok, true);
+  if (!incompleta.ok) throw new Error("incompleta");
+  assert.equal(incompleta.atribuicoes.length, 1);
+  assert.equal(incompleta.atribuicoes[0].indice, 3);
+  assert.equal(incompleta.atribuicoes[0].origemId, CADASTRO);
+  assert.equal(incompleta.omitidos, 2);
+  assert.equal(incompleta.mensagem, mensagemListaIncompleta(1, 2));
+  assert.equal(protegida1.colaborador, "OUTRA");
+  assert.equal(protegida2.status, "comprometida");
 }
 
 {
