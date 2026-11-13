@@ -4,7 +4,6 @@ import {
   type ClienteContratoConsulta,
 } from "@/lib/cliente-contrato-atual";
 import { labelClienteContratoStatusExibicao } from "@/lib/cliente-contrato-mappers";
-import { vigenciaContratualConfiavel } from "@/lib/contrato-navarro";
 import { formatMesLabel } from "@/lib/listagem-meses";
 
 /**
@@ -128,9 +127,51 @@ function origemDoContrato(
   return origemPorOrcamentoId.get(orcamentoId) ?? null;
 }
 
+function inicioVigenciaIso(
+  contrato: Pick<ClienteContratoConsulta, "data_inicio">
+): string | null {
+  return fimPrevistoIso(contrato.data_inicio);
+}
+
 /**
- * Renovação só quando o orçamento sucessor está marcado como renovação
- * e a vigência dele começa no Fim previsto deste contrato ou depois.
+ * Contrato sucessor já gravado, de orçamento com origem renovação.
+ * O fim pode ainda não existir enquanto a implantação não conclui a vigência.
+ * Orçamento sem este contrato, ou só a opção de renovação automática, não entra.
+ */
+function renovacaoEfetivada(
+  contrato: ClienteContratoConsulta,
+  origemPorOrcamentoId: ReadonlyMap<string, string | null>
+): string | null {
+  if (origemDoContrato(contrato, origemPorOrcamentoId) !== "renovacao") {
+    return null;
+  }
+  if (contrato.status === "cancelado") return null;
+  if (contrato.tipo_contrato === "sem_contrato") return null;
+  const inicio = inicioVigenciaIso(contrato);
+  if (!inicio) return null;
+  const fim = fimPrevistoIso(contrato.data_fim);
+  if (fim && fim <= inicio) return null;
+  return inicio;
+}
+
+/**
+ * O sucessor pode começar no fim previsto ou durante a vigência anterior,
+ * quando a renovação é assinada antes do término.
+ */
+function antecedidoPelaVigencia(
+  contrato: ClienteContratoConsulta,
+  inicioSucessor: string
+): boolean {
+  const fim = contratoSstComFimPrevisto(contrato);
+  if (!fim) return false;
+  if (fim <= inicioSucessor) return true;
+  const inicio = inicioVigenciaIso(contrato);
+  return Boolean(inicio && inicio < inicioSucessor && inicioSucessor <= fim);
+}
+
+/**
+ * Renovação efetivada: contrato sucessor do mesmo cliente, ligado a orçamento
+ * de origem renovação. O fim desse sucessor pode cair fora do mês filtrado.
  * Dois predecessores com o mesmo fim não recebem o vínculo.
  */
 export function mapearRenovacoesVinculadas(
@@ -146,27 +187,18 @@ export function mapearRenovacoesVinculadas(
 
   const renovacoes = new Map<string, RenovacaoVinculada>();
   for (const lista of Array.from(porCliente.values())) {
-    const sucessores = lista.filter((contrato) => {
-      if (origemDoContrato(contrato, origemPorOrcamentoId) !== "renovacao") {
-        return false;
-      }
-      if (contrato.status === "cancelado") return false;
-      if (contrato.tipo_contrato === "sem_contrato") return false;
-      return Boolean(
-        vigenciaContratualConfiavel(contrato.data_inicio, contrato.data_fim)
-      );
+    const sucessores = lista.flatMap((contrato) => {
+      const inicio = renovacaoEfetivada(contrato, origemPorOrcamentoId);
+      return inicio ? [{ contrato, inicio }] : [];
     });
 
-    for (const sucessor of sucessores) {
-      const inicio = fimPrevistoIso(sucessor.data_inicio);
-      if (!inicio) continue;
+    for (const { contrato: sucessor, inicio } of sucessores) {
       const orcamentoSucessor = sucessor.orcamento_id?.trim() ?? "";
       const candidatos = lista.filter((contrato) => {
         if (contrato.id === sucessor.id) return false;
         const orcamento = contrato.orcamento_id?.trim() ?? "";
         if (orcamento && orcamento === orcamentoSucessor) return false;
-        const fim = contratoSstComFimPrevisto(contrato);
-        return Boolean(fim && fim <= inicio);
+        return antecedidoPelaVigencia(contrato, inicio);
       });
       if (candidatos.length === 0) continue;
       let maiorFim = "";
