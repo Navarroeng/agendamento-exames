@@ -177,6 +177,12 @@ export interface OrcamentoAprovacaoRecord {
   mensalidade_renovacao_base_centavos?: number | null;
   /** Acréscimo por colaborador a partir do segundo, em centavos. */
   mensalidade_renovacao_incremento_centavos?: number | null;
+  /** Mensalidade gravada para a vigência renovada de Gestão SST com plataformas, em centavos. */
+  mensalidade_renovacao_valor_centavos?: number | null;
+  /** Início da vigência à qual a mensalidade de renovação gravada se refere. */
+  mensalidade_renovacao_vigencia_inicio?: string | null;
+  /** Limite de plataformas acordado para a renovação. A quantidade em uso não reduz o valor. */
+  mensalidade_plataformas_limite?: number | null;
   /** Exame clínico avulso admissional acordado nesta contratação, em centavos. */
   mensalidade_exame_avulso_centavos?: number | null;
   /** Exame clínico avulso demissional acordado nesta contratação, em centavos. */

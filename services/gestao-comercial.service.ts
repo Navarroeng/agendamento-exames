@@ -13,6 +13,7 @@ import {
   MENSALIDADE_PARCELAS_MIGRATION_MSG,
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
+import { mapaValorRenovacaoPlataformas } from "@/services/mensalidade-renovacao-plataformas.service";
 import { isOrcamentoOrigemCliente } from "@/lib/orcamento-origem";
 import { isPerfilAdmin } from "@/lib/permissions";
 import { normalizePerfilUsuario } from "@/lib/contrato-permissoes";
@@ -498,6 +499,24 @@ export async function listarFontesMensalidadesPrevistas(): Promise<CargaFontesMe
           : Number(raw.contratacao_efeito_numero),
       contratacaoValorAnterior: numeroOuNulo(raw.contratacao_valor_anterior),
     });
+  }
+
+  const renovacao = await mapaValorRenovacaoPlataformas(
+    fontes.map((fonte) => ({
+      aprovacaoId: fonte.aprovacaoId,
+      numeroOrcamento: fonte.numeroOrcamento,
+      vigencias: (fonte.vigencias ?? []).map((vigencia) => vigencia.inicio),
+      valorMensal: fonte.valorMensal ?? null,
+      valorFinal: fonte.valorFinal ?? null,
+      parcelas: (fonte.parcelasRegistradas ?? []).map((parcela) => ({
+        vigenciaInicio: parcela.vigenciaInicio,
+        valor: parcela.valor,
+      })),
+    }))
+  );
+  for (const fonte of fontes) {
+    const porVigencia = renovacao.get(fonte.aprovacaoId);
+    if (porVigencia) fonte.valorMensalPorVigencia = porVigencia;
   }
 
   return {

@@ -16,7 +16,8 @@ import {
 import type { ContratoParcela } from "@/lib/contrato-pagamento";
 import {
   CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO,
-  fraseMensalidadeUnicaPlataformas,
+  frasePagamentoVigenciaInicialPlataformas,
+  paragrafosCalculoRenovacaoPlataformas,
   paragrafosEscopoPlataformas,
 } from "@/lib/contrato-gestao-sst-plataformas";
 
@@ -579,6 +580,9 @@ function semRenovacaoAutomatica(ctx: ContratoNavarroContexto): boolean {
 }
 
 function redigirCalculoRenovacao(ctx: ContratoNavarroContexto): string[] {
+  if (ctx.administracaoPlataformas) {
+    return paragrafosCalculoRenovacaoPlataformas(!semRenovacaoAutomatica(ctx));
+  }
   const params = parametrosRenovacao(ctx);
   const base = formatCurrency(params.baseReais);
   const incremento = formatCurrency(params.incrementoReais);
@@ -992,8 +996,14 @@ function redigirAtendimentoV2(ctx: ContratoNavarroContexto): string[] {
   return paragrafos;
 }
 
-function redigirObjetoV2(numeroOrcamento: string): string {
-  return `Prestação de serviços técnicos de Saúde e Segurança do Trabalho (SST), compreendendo exclusivamente os serviços contratados e discriminados no Anexo I deste instrumento e na Proposta Comercial nº ${numeroOrcamento}, que passam a integrar o presente contrato para todos os fins.`;
+function redigirObjetoV2(
+  numeroOrcamento: string,
+  administracaoPlataformas: boolean
+): string {
+  const objeto = administracaoPlataformas
+    ? "Prestação de serviços de Gestão SST, administração das plataformas e acompanhamento da mobilização das equipes"
+    : "Prestação de serviços técnicos de Saúde e Segurança do Trabalho (SST)";
+  return `${objeto}, compreendendo exclusivamente os serviços contratados e discriminados no Anexo I deste instrumento e na Proposta Comercial nº ${numeroOrcamento}, que passam a integrar o presente contrato para todos os fins.`;
 }
 
 function clausulaAnexoI(ctx: ContratoNavarroContexto): ContratoClausula {
@@ -1022,8 +1032,6 @@ function clausulaAnexoI(ctx: ContratoNavarroContexto): ContratoClausula {
     paragrafos.push(
       ...paragrafosEscopoPlataformas({
         colaboradores: ctx.colaboradores,
-        valorMensal: ctx.valor,
-        textosProposta: ctx.textosProposta ?? [],
       })
     );
   }
@@ -1109,9 +1117,14 @@ function aplicarModeloGestaoSstV2(
   const quinto = vencimentoMensalidadeQuintoDiaUtil(
     ctx.vencimentoRegraMensalidade
   );
-  const mensalidadeUnica = ctx.administracaoPlataformas
-    ? fraseMensalidadeUnicaPlataformas(ctx.valor)
-    : null;
+  const pagamentoPlataformas =
+    ctx.administracaoPlataformas && !avista
+      ? frasePagamentoVigenciaInicialPlataformas({
+          valorMensal: ctx.valor,
+          meses: mesesVigenciaContexto(ctx),
+          colaboradores: ctx.colaboradores,
+        })
+      : null;
   const ajustadas = clausulas.map((clause) => {
     if (clause.numero === "1" && ctx.administracaoPlataformas) {
       return {
@@ -1126,7 +1139,12 @@ function aplicarModeloGestaoSstV2(
     if (clause.numero === "2") {
       return {
         ...clause,
-        paragrafos: [redigirObjetoV2(ctx.numeroOrcamento)],
+        paragrafos: [
+          redigirObjetoV2(
+            ctx.numeroOrcamento,
+            Boolean(ctx.administracaoPlataformas)
+          ),
+        ],
       };
     }
     if (clause.numero === "3") {
@@ -1148,7 +1166,7 @@ function aplicarModeloGestaoSstV2(
             ),
             redigirValorExameClinicoAvulsoV2(ctx),
             ...redigirCompromissoERenovacaoPagamentoV2(ctx, true),
-            ...(mensalidadeUnica ? [mensalidadeUnica] : []),
+            ...(pagamentoPlataformas ? [pagamentoPlataformas] : []),
             multa,
           ],
         };
@@ -1158,7 +1176,7 @@ function aplicarModeloGestaoSstV2(
         titulo: "DOS VALORES, PAGAMENTOS E VENCIMENTOS",
         paragrafos: [
           ...redigirPagamentoMensalidadeV2(ctx),
-          ...(mensalidadeUnica ? [mensalidadeUnica] : []),
+          ...(pagamentoPlataformas ? [pagamentoPlataformas] : []),
         ],
       };
     }
@@ -1177,11 +1195,18 @@ function aplicarModeloGestaoSstV2(
     if (clause.numero === "6") {
       return {
         ...clause,
-        paragrafos: clause.paragrafos.map((paragrafo) =>
-          paragrafo.startsWith("Cada parte informará a outra")
-            ? "A comunicação entre as partes sobre incidente de segurança que possa afetar dados pessoais tratados no âmbito deste contrato observa a obrigação prevista na cláusula das obrigações das partes."
-            : paragrafo
-        ),
+        paragrafos: clause.paragrafos.map((paragrafo) => {
+          if (
+            ctx.administracaoPlataformas &&
+            paragrafo.startsWith("Os dados pessoais eventualmente tratados")
+          ) {
+            return "Os dados pessoais eventualmente tratados em razão deste instrumento serão utilizados apenas para as finalidades da prestação de serviços de Gestão SST, administração das plataformas e acompanhamento da mobilização das equipes, com medidas razoáveis de segurança da informação, vedado o uso para finalidade incompatível.";
+          }
+          if (paragrafo.startsWith("Cada parte informará a outra")) {
+            return "A comunicação entre as partes sobre incidente de segurança que possa afetar dados pessoais tratados no âmbito deste contrato observa a obrigação prevista na cláusula das obrigações das partes.";
+          }
+          return paragrafo;
+        }),
       };
     }
     if (clause.numero === "7") {

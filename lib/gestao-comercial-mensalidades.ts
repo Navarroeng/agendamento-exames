@@ -52,6 +52,11 @@ export type FonteMensalidadePrevista = {
   contratacaoEfeitoVigenciaInicio?: string | null;
   contratacaoEfeitoNumero?: number | null;
   contratacaoValorAnterior?: number | null;
+  /**
+   * Valor da renovação de Gestão SST com plataformas, por início de vigência.
+   * A vigência inicial continua em valorMensal. Null impede usar o valor inicial na renovação.
+   */
+  valorMensalPorVigencia?: Record<string, number | null>;
 };
 
 export type SituacaoMensalidadePrevista = SituacaoParcelaMensalidade | "pendencia";
@@ -223,6 +228,12 @@ function mesclarFontes(
     if (atual.valorFinal == null && fonte.valorFinal != null) {
       atual.valorFinal = fonte.valorFinal;
     }
+    if (fonte.valorMensalPorVigencia) {
+      atual.valorMensalPorVigencia = {
+        ...(atual.valorMensalPorVigencia ?? {}),
+        ...fonte.valorMensalPorVigencia,
+      };
+    }
   }
   return Array.from(porAprovacao.values());
 }
@@ -378,12 +389,18 @@ export function montarMensalidadesPrevistas(
         continue;
       }
 
+      const valorDestaVigencia = Object.prototype.hasOwnProperty.call(
+        fonte.valorMensalPorVigencia ?? {},
+        vigencia.inicio
+      )
+        ? fonte.valorMensalPorVigencia?.[vigencia.inicio]
+        : valorMensal;
       const grade = resolverGradeMensalidades({
         vigenciaInicio: vigencia.inicio,
         vigenciaFim: vigencia.fim,
         dia: fonte.diaVencimento,
         vencimentoRegra: fonte.vencimentoRegra,
-        valorMensal,
+        valorMensal: valorDestaVigencia,
         registradas,
         hojeIso: hoje,
         efeito: efeitoValorMensalidadeDaAprovacao(
