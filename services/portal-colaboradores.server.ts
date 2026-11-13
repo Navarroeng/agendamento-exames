@@ -56,16 +56,14 @@ async function lerPaginas<T>(
   });
 }
 
-export async function listarColaboradoresPortal(clienteId: string): Promise<{
-  colaboradores: ClienteColaboradorLinha[];
-  resumo: PortalColaboradoresResumo;
+export async function carregarFontesColaboradoresEmpresa(clienteId: string): Promise<{
+  vagas: PortalColaboradorVagaFonte[];
+  agendamentos: PortalColaboradorAgendamentoFonte[];
+  movimentacoes: PortalColaboradorMovimentacaoFonte[];
 }> {
   const id = clienteId.trim();
   if (!id) {
-    return {
-      colaboradores: [],
-      resumo: calcPortalColaboradoresResumo([]),
-    };
+    return { vagas: [], agendamentos: [], movimentacoes: [] };
   }
 
   const admin = createAdminClient();
@@ -176,12 +174,22 @@ export async function listarColaboradoresPortal(clienteId: string): Promise<{
     }
   }
 
-  const colaboradores = consolidarPortalColaboradores({
-    vagas,
-    agendamentos,
-    movimentacoes,
-  });
+  return { vagas, agendamentos, movimentacoes };
+}
 
+export async function listarColaboradoresPortal(clienteId: string): Promise<{
+  colaboradores: ClienteColaboradorLinha[];
+  resumo: PortalColaboradoresResumo;
+}> {
+  const id = clienteId.trim();
+  if (!id) {
+    return {
+      colaboradores: [],
+      resumo: calcPortalColaboradoresResumo([]),
+    };
+  }
+  const fontes = await carregarFontesColaboradoresEmpresa(id);
+  const colaboradores = consolidarPortalColaboradores(fontes);
   return {
     colaboradores,
     resumo: calcPortalColaboradoresResumo(colaboradores),

@@ -2254,6 +2254,7 @@ export function OrcamentoAprovarModal({
                 await onRemoverFuncionarios(aprovacao.id);
                 setFuncionariosFile(null);
               }}
+              onAbrirCliente={() => void handleAbrirCliente()}
             />
           ) : null}
 

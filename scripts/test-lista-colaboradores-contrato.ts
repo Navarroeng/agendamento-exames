@@ -244,6 +244,32 @@ assert.equal(
   assert.equal(sobra, "aberta");
   assert.equal(CONTRATO_VAGA_STATUS_LABELS[sobra], "Em aberto");
   assert.equal(mensagemBloqueioSalvarListaCliente(4, 5), null);
+  const quinta = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 5,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+      pessoa(CPF_D, "RITA", CPF_D),
+      pessoa("QUINTA", "CARLA", cpfDeNove("286255878")),
+    ],
+    vagas: [
+      ...by.atribuicoes.map((item) => ({
+        indice: item.indice,
+        status: "comprometida",
+        colaborador: item.nome,
+        colaboradorCpf: item.cpfDigits,
+        colaboradorOrigemId: item.origemId,
+      })),
+      vagaLivre(5),
+    ],
+  });
+  assert.equal(quinta.ok, true);
+  if (!quinta.ok) throw new Error("quinta");
+  assert.equal(quinta.omitidos, 0);
+  assert.equal(quinta.atribuicoes.length, 1);
+  assert.equal(quinta.atribuicoes[0].indice, 5);
+  assert.equal(quinta.atribuicoes[0].nome, "CARLA");
 }
 
 {

@@ -354,6 +354,22 @@ export async function salvarListaVagasContrato(params: {
     orcamentoId: params.orcamentoId,
     quantidadePrevista: n,
   });
+  const clienteIdOcupacao = String(params.clienteId ?? "").trim();
+  if (!clienteIdOcupacao) {
+    throw new Error("Este contrato não está vinculado a um cliente.");
+  }
+  await confirmarOcupacaoNoServidor({
+    clienteId: clienteIdOcupacao,
+    contratoId: params.contratoId,
+    propostas: drafts.map((draft) => ({
+      indice: draft.indice,
+      colaborador: draft.manterAsoAberto ? null : draft.colaborador,
+      colaboradorCpf: draft.manterAsoAberto ? null : draft.colaboradorCpf,
+      colaboradorOrigemId: draft.manterAsoAberto
+        ? null
+        : draft.colaboradorOrigemId ?? null,
+    })),
+  });
   const ctx = params.clienteId
     ? await carregarContextoDesligamentoVagasDoCliente(params.clienteId).catch(
         () => null
@@ -605,6 +621,36 @@ async function sincronizarCopiaNomeProgramacao(params: {
   if (updErr) throw updErr;
 }
 
+async function confirmarOcupacaoNoServidor(params: {
+  clienteId: string;
+  contratoId: string;
+  propostas: Array<{
+    indice: number;
+    colaborador: string | null;
+    colaboradorCpf: string | null;
+    colaboradorOrigemId: string | null;
+  }>;
+}): Promise<void> {
+  const res = await fetch(
+    `/api/clientes/${encodeURIComponent(params.clienteId)}/colaboradores/ocupacao-vaga`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contratoId: params.contratoId,
+        propostas: params.propostas,
+      }),
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    throw new Error(
+      json.error || "Não foi possível validar a ocupação das vagas."
+    );
+  }
+}
+
 async function atualizarVaga(
   id: string,
   patch: Record<string, unknown>
@@ -819,6 +865,21 @@ export async function liberarFuncionarioDaVagaComprometida(params: {
       "Só é possível remover o funcionário de uma vaga comprometida, ainda sem agendamento."
     );
   }
+  if (!clienteId) {
+    throw new Error("Este contrato não está vinculado a um cliente.");
+  }
+  await confirmarOcupacaoNoServidor({
+    clienteId,
+    contratoId: vaga.contrato_id,
+    propostas: [
+      {
+        indice: vaga.indice,
+        colaborador: null,
+        colaboradorCpf: null,
+        colaboradorOrigemId: null,
+      },
+    ],
+  });
 
   const nome = normalizeNomeOcupante(vaga.colaborador) || "funcionário";
   await atualizarVaga(vaga.id, {
