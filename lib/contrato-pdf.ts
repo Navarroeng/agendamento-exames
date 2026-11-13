@@ -323,14 +323,95 @@ function paintFooters(doc: JsPDFDoc, totalPages: number): void {
   }
 }
 
+type TrechoPdf = { texto: string; negrito: boolean };
+
+function temMarcacaoNegrito(texto: string): boolean {
+  return /\*\*[^*]+\*\*/.test(texto);
+}
+
+function trechosNegrito(texto: string): TrechoPdf[] {
+  const partes = texto.split(/(\*\*[^*]+\*\*)/);
+  const trechos: TrechoPdf[] = [];
+  for (const parte of partes) {
+    if (!parte) continue;
+    if (parte.startsWith("**") && parte.endsWith("**") && parte.length > 4) {
+      trechos.push({ texto: parte.slice(2, -2), negrito: true });
+    } else {
+      trechos.push({ texto: parte, negrito: false });
+    }
+  }
+  return trechos;
+}
+
+function medirTrecho(doc: JsPDFDoc, trecho: TrechoPdf): number {
+  doc.setFont("helvetica", trecho.negrito ? "bold" : "normal");
+  doc.setFontSize(9.5);
+  return doc.getTextWidth(trecho.texto);
+}
+
+/** Quebra o parágrafo marcado com `**negrito**`, medindo cada trecho na fonte real. */
+function linhasComNegrito(doc: JsPDFDoc, texto: string): TrechoPdf[][] {
+  const tokens: TrechoPdf[] = [];
+  for (const trecho of trechosNegrito(texto)) {
+    for (const parte of trecho.texto.split(/(\s+)/)) {
+      if (parte) tokens.push({ texto: parte, negrito: trecho.negrito });
+    }
+  }
+  const linhas: TrechoPdf[][] = [];
+  let atual: TrechoPdf[] = [];
+  let largura = 0;
+  for (const token of tokens) {
+    const espaco = !token.texto.trim();
+    if (espaco && atual.length === 0) continue;
+    const medida = medirTrecho(doc, token);
+    if (
+      !espaco &&
+      largura + medida > CONTENT_W &&
+      atual.some((item) => item.texto.trim())
+    ) {
+      linhas.push(atual);
+      atual = [token];
+      largura = medida;
+      continue;
+    }
+    atual.push(token);
+    largura += medida;
+  }
+  if (atual.some((item) => item.texto.trim())) linhas.push(atual);
+  return linhas;
+}
+
 function paragraphLines(doc: JsPDFDoc, text: string): string[] {
   return doc.splitTextToSize(text, CONTENT_W) as string[];
+}
+
+function quantidadeLinhasParagrafo(doc: JsPDFDoc, texto: string): number {
+  if (!temMarcacaoNegrito(texto)) return paragraphLines(doc, texto).length;
+  return linhasComNegrito(doc, texto).length;
 }
 
 function drawLeftLine(doc: JsPDFDoc, line: string, x: number, y: number): void {
   const writer = doc as JsPDFDoc & { setCharSpace?: (space: number) => void };
   writer.setCharSpace?.(0);
   doc.text(line, x, y, { align: "left" });
+}
+
+function drawLinhaNegrito(
+  doc: JsPDFDoc,
+  linha: TrechoPdf[],
+  x: number,
+  y: number
+): void {
+  let cursor = x;
+  doc.setFontSize(9.5);
+  doc.setTextColor(...SLATE_700);
+  for (const trecho of linha) {
+    doc.setFont("helvetica", trecho.negrito ? "bold" : "normal");
+    const writer = doc as JsPDFDoc & { setCharSpace?: (space: number) => void };
+    writer.setCharSpace?.(0);
+    doc.text(trecho.texto, cursor, y, { align: "left" });
+    cursor += doc.getTextWidth(trecho.texto);
+  }
 }
 
 function itemLines(doc: JsPDFDoc, text: string): string[] {
@@ -352,8 +433,7 @@ function clauseBlockHeight(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   for (const p of clause.paragrafos) {
-    const lines = paragraphLines(doc, p);
-    h += lines.length * PARA_LINE_H + 2.2;
+    h += quantidadeLinhasParagrafo(doc, p) * PARA_LINE_H + 2.2;
   }
   for (const item of clause.itens ?? []) {
     const lines = itemLines(doc, item);
@@ -648,6 +728,23 @@ export function drawContratoPdfDocument(
     doc.setFontSize(9.5);
     doc.setTextColor(...SLATE_700);
     for (const paragrafo of clause.paragrafos) {
+      if (temMarcacaoNegrito(paragrafo)) {
+        const linhas = linhasComNegrito(doc, paragrafo);
+        for (let li = 0; li < linhas.length; li += 1) {
+          const tailH = (linhas.length - li) * PARA_LINE_H;
+          const tailFits = y + tailH <= contentBottom;
+          const nearEnd = linhas.length - li <= 3;
+          if (y + PARA_LINE_H > contentBottom) {
+            y = addPage();
+          } else if (nearEnd && !tailFits && y > BODY_START + 8) {
+            y = addPage();
+          }
+          drawLinhaNegrito(doc, linhas[li], MARGIN, y);
+          y += PARA_LINE_H;
+        }
+        y += 2.2;
+        continue;
+      }
       const lines = paragraphLines(doc, paragrafo);
       const remainingInPara = (start: number) =>
         (lines.length - start) * PARA_LINE_H;

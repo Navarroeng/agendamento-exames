@@ -256,33 +256,46 @@ export function frasePagamentoVigenciaInicialPlataformas(params: {
   return `O valor total da vigência inicial de ${meses} meses é de ${formatCurrency(total)}, pago em ${meses} mensalidades de ${formatCurrency(mensal)}. Cada mensalidade remunera os serviços de Gestão SST para ${quantitativo} e de administração de até ${LIMITE_PLATAFORMAS_CONTRATO} plataformas.`;
 }
 
+/** Marcação só da Cláusula 7 deste modelo. O PDF desenha o trecho em negrito. */
+function negrito(texto: string): string {
+  return `**${texto}**`;
+}
+
+function paragrafosComponentesRenovacaoPlataformas(): string[] {
+  const limite = LIMITE_PLATAFORMAS_CONTRATO;
+  const colaboradoresExemplo = 60;
+  const gestaoExemplo = valorGestaoSstRenovacaoPlataformas(colaboradoresExemplo);
+  const laudosExemplo = RENOVACAO_PLATAFORMAS_LAUDOS_REAIS;
+  const plataformasExemplo = RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS * limite;
+  const totalExemplo = valorMensalidadeRenovacaoPlataformas({
+    colaboradoresAtivos: colaboradoresExemplo,
+    limitePlataformas: limite,
+  });
+  return [
+    "A mensalidade da nova vigência é a soma de três componentes, apurados no início dessa vigência.",
+    `${negrito("Gestão SST")} — ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_BASE_REAIS)} de valor mínimo, mais ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_INCREMENTO_REAIS)} por colaborador ativo a partir do segundo. A quantidade considerada é a de colaboradores ativos no início da nova vigência.`,
+    `${negrito("Adequação de laudos")} — ${formatCurrency(RENOVACAO_PLATAFORMAS_LAUDOS_REAIS)} fixos por mês.`,
+    `${negrito("Administração de plataformas")} — ${formatCurrency(RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS)} por plataforma coberta pelo limite contratado para a nova vigência, ainda que haja menos plataformas em uso. Qualquer alteração desse limite depende de acordo entre as partes.`,
+    `${negrito("Exemplo de renovação.")} Com ${colaboradoresExemplo} colaboradores ativos e cobertura de até ${limite} plataformas, a mensalidade da nova vigência será de ${negrito(formatCurrency(totalExemplo))}, composta por ${formatCurrency(gestaoExemplo)} de Gestão SST, ${formatCurrency(laudosExemplo)} de adequação de laudos e ${formatCurrency(plataformasExemplo)} de administração de plataformas.`,
+    "O valor apurado é gravado na nova vigência. Movimentações posteriores de colaboradores ou de plataformas entram no cálculo do ciclo seguinte e não alteram as parcelas já geradas.",
+  ];
+}
+
 export function paragrafosCalculoRenovacaoPlataformas(
   renovacaoAutomatica: boolean
 ): string[] {
-  const limite = LIMITE_PLATAFORMAS_CONTRATO;
-  const exemplo = (colaboradores: number) =>
-    formatCurrency(
-      valorMensalidadeRenovacaoPlataformas({
-        colaboradoresAtivos: colaboradores,
-        limitePlataformas: limite,
-      })
-    );
-  const criterio = [
-    `A mensalidade da nova vigência é a soma de três componentes, apurados no início dessa vigência: Gestão SST, no valor mínimo de ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_BASE_REAIS)}, mais ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_INCREMENTO_REAIS)} por colaborador ativo a partir do segundo, considerada a quantidade de colaboradores ativos no cadastro da CONTRATANTE; adequação de laudos, no valor fixo de ${formatCurrency(RENOVACAO_PLATAFORMAS_LAUDOS_REAIS)}; e administração de plataformas, no valor de ${formatCurrency(RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS)} por plataforma coberta pelo limite contratado para a nova vigência, ainda que a quantidade em uso seja menor.`,
-    `A cobertura de até ${limite} plataformas corresponde a ${formatCurrency(RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS * limite)} por mês. Qualquer alteração desse limite passa a valer conforme o acordo entre as partes.`,
-    `Por exemplo, 58 colaboradores ativos e cobertura de até ${limite} plataformas resultam em ${exemplo(58)} mensais, mesmo que apenas 8 plataformas estejam em uso; 59 colaboradores ativos e a mesma cobertura resultam em ${exemplo(59)} mensais.`,
-    "O valor apurado é gravado na nova vigência. Movimentações posteriores de colaboradores ou de plataformas são consideradas somente no ciclo seguinte e não alteram as parcelas já geradas.",
-  ].join(" ");
+  const componentes = paragrafosComponentesRenovacaoPlataformas();
   if (!renovacaoAutomatica) {
     return [
       "A continuidade dos serviços após o término desta vigência depende de novo acordo escrito entre as partes. Não há renovação automática nem cobrança automática de novo período.",
-      `Se as partes ajustarem uma nova contratação por escrito, o valor mensal seguirá esta regra e não a tabela comum da Gestão SST. ${criterio}`,
+      "Se as partes ajustarem uma nova contratação por escrito, o valor mensal seguirá esta regra e não a tabela comum da Gestão SST.",
+      ...componentes,
       "O pagamento antecipado e o desconto são válidos somente para o período contratado. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de pagamento antecipado.",
     ];
   }
   return [
     "Na renovação, o valor mensal será calculado no início da nova vigência. Essa regra substitui a tabela comum da Gestão SST como preço integral da renovação e não altera as cobranças do período em andamento.",
-    criterio,
+    ...componentes,
     "O pagamento antecipado e o desconto são válidos somente para o período contratado. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito para pagamento antecipado.",
   ];
 }
