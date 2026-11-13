@@ -14,6 +14,7 @@ import {
   type AcaoGestaoPlataformas,
   type CertificadoRegistro,
   type CursoCatalogo,
+  type DocumentoRhEvento,
   type DocumentoRhRegistro,
   type ObraRegistro,
   type PlataformaRegistro,
@@ -85,6 +86,7 @@ function PainelObra({
   cursos: CursoCatalogo[];
   certificados: CertificadoRegistro[];
   documentosRh: DocumentoRhRegistro[];
+  documentosRhEventos?: DocumentoRhEvento[];
   eventos: Evento[];
   colaboradores: ClienteColaboradorLinha[];
   salvando: boolean;
@@ -546,6 +548,7 @@ export function GestaoFichaPainel(
         cursos={props.cursos}
         certificados={props.certificados}
         documentosRh={props.documentosRh}
+        documentosRhEventos={props.documentosRhEventos}
         salvando={props.salvando}
         escBloqueado={props.escBloqueado}
         onFechar={props.onFechar}

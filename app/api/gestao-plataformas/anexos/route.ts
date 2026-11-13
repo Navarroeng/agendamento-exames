@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       realizadoEm: String(form.get("realizadoEm") ?? ""),
       validade: String(form.get("validade") ?? ""),
       identificacao: String(form.get("identificacao") ?? ""),
+      responsavel: staff.actor.usuarioNome,
       arquivo: { nome: arquivo.name, tipo: arquivo.type, bytes },
     });
     if (!resultado.ok) {

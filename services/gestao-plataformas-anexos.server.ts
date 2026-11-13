@@ -66,6 +66,7 @@ export async function gravarAnexoGestao(params: {
   realizadoEm?: string | null;
   validade?: string | null;
   identificacao?: string | null;
+  responsavel?: string | null;
   arquivo: { nome: string; tipo: string; bytes: Uint8Array };
 }): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const escopo = await resolverEscopoGestaoPlataformas();
@@ -142,6 +143,7 @@ export async function gravarAnexoGestao(params: {
   if (uploadErro) {
     return { ok: false, status: 500, error: "Não foi possível guardar o documento de RH." };
   }
+  const responsavel = String(params.responsavel ?? "").trim() || "Navarro";
   const { error } = await admin.from("gestao_plataforma_documentos_rh").insert({
     id,
     cliente_id: clienteId,
@@ -151,10 +153,19 @@ export async function gravarAnexoGestao(params: {
     arquivo_nome: params.arquivo.nome,
     arquivo_tipo: params.arquivo.tipo || null,
     arquivo_tamanho: params.arquivo.bytes.byteLength,
+    situacao: "recebido",
+    enviado_em: new Date().toISOString(),
+    enviado_por: responsavel,
   });
   if (error) {
     return { ok: false, status: 409, error: "Não foi possível registrar o documento de RH." };
   }
+  await admin.from("gestao_plataforma_documento_rh_eventos").insert({
+    cliente_id: clienteId,
+    documento_id: id,
+    situacao: "recebido",
+    responsavel,
+  });
   return { ok: true };
 }
 

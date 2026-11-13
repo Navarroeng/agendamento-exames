@@ -577,7 +577,12 @@ export type AcaoGestaoPlataformas =
   | { acao: "salvar_curso"; id?: string; nome: string; valorCentavos: number }
   | { acao: "inativar_curso"; id: string }
   | { acao: "reativar_curso"; id: string }
-  | { acao: "vincular_lote"; obraId: string; colaboradorIds: string[] };
+  | { acao: "vincular_lote"; obraId: string; colaboradorIds: string[] }
+  | { acao: "solicitar_documento"; colaboradorId: string; identificacao: string }
+  | { acao: "conferir_documento"; id: string }
+  | { acao: "solicitar_reenvio"; id: string; observacao: string }
+  | { acao: "conceder_acesso"; email: string; nome: string }
+  | { acao: "revogar_acesso"; id: string };
 
 export type CursoCatalogo = {
   id: string;
@@ -596,6 +601,31 @@ export type CertificadoRegistro = {
   arquivoPath: string | null;
 };
 
+export const SITUACOES_DOCUMENTO_RH = [
+  "aguardando_envio",
+  "recebido",
+  "conferido",
+  "reenvio_solicitado",
+] as const;
+
+export type SituacaoDocumentoRh = (typeof SITUACOES_DOCUMENTO_RH)[number];
+
+export const SITUACAO_DOCUMENTO_RH_LABEL: Record<SituacaoDocumentoRh, string> = {
+  aguardando_envio: "Aguardando envio",
+  recebido: "Recebido",
+  conferido: "Conferido",
+  reenvio_solicitado: "Reenvio solicitado",
+};
+
+export type DocumentoRhEvento = {
+  id: string;
+  documentoId: string;
+  situacao: SituacaoDocumentoRh;
+  observacao: string | null;
+  responsavel: string | null;
+  registradoEm: string;
+};
+
 export type DocumentoRhRegistro = {
   id: string;
   colaboradorId: string;
@@ -603,6 +633,16 @@ export type DocumentoRhRegistro = {
   incluidoEm: string;
   arquivoNome: string;
   arquivoPath: string;
+  situacao: SituacaoDocumentoRh;
+  observacao: string | null;
+};
+
+export type AcessoExternoRegistro = {
+  id: string;
+  email: string;
+  nome: string;
+  concedidoEm: string;
+  revogadoEm: string | null;
 };
 
 export const ANEXO_GESTAO_MAX_BYTES = 10 * 1024 * 1024;
