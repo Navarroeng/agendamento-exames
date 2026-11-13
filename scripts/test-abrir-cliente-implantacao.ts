@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  clienteIdVinculadoAContratacao,
   podeAbrirClienteDaImplantacao,
   secaoInicialAoAbrirCliente,
 } from "../lib/abrir-cliente-implantacao";
@@ -44,12 +45,53 @@ assert.equal(
   false
 );
 
+assert.equal(
+  clienteIdVinculadoAContratacao(
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222"
+  ),
+  "11111111-1111-4111-8111-111111111111"
+);
+assert.equal(
+  clienteIdVinculadoAContratacao(
+    "  ",
+    "22222222-2222-4222-8222-222222222222"
+  ),
+  "22222222-2222-4222-8222-222222222222"
+);
+assert.equal(
+  clienteIdVinculadoAContratacao(null, "  22222222-2222-4222-8222-222222222222  "),
+  "22222222-2222-4222-8222-222222222222"
+);
+assert.equal(clienteIdVinculadoAContratacao(null, " "), "");
+assert.equal(
+  podeAbrirClienteDaImplantacao({
+    contextoImplantacao: true,
+    clienteId: clienteIdVinculadoAContratacao(
+      null,
+      "22222222-2222-4222-8222-222222222222"
+    ),
+    perfil: "admin",
+  }),
+  true
+);
+assert.equal(
+  podeAbrirClienteDaImplantacao({
+    contextoImplantacao: true,
+    clienteId: clienteIdVinculadoAContratacao(null, null),
+    perfil: "admin",
+  }),
+  false
+);
+
 const modal = readFileSync(
   join(process.cwd(), "components/orcamentos/OrcamentoAprovarModal.tsx"),
   "utf8"
 );
 assert.match(modal, /Abrir Cliente/);
 assert.match(modal, /buscarClientePorId\(clienteId\)/);
+assert.match(modal, /buscarContratoPorOrcamentoId/);
+assert.match(modal, /clienteIdVinculadoAContratacao/);
 assert.match(modal, /secaoInicialAoAbrirCliente\(tab\)/);
 assert.doesNotMatch(modal, /buscarClientePorId\(\s*orcamento\.cliente_nome/);
 
