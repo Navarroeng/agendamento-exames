@@ -21,6 +21,7 @@ import {
   type SituacaoRequisito,
 } from "@/lib/gestao-plataformas";
 import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
+import { GestaoFichaColaborador } from "@/components/gestao-plataformas/GestaoFichaColaborador";
 
 const INPUT =
   "h-10 w-full rounded-xl border border-[#e8edf5] bg-white px-3 text-sm text-[#0b1f4d] outline-none focus:border-[#c9972b]";
@@ -50,7 +51,7 @@ function Selo({ children, className }: { children: string; className: string }) 
   );
 }
 
-export function GestaoFichaPainel({
+function PainelObra({
   hoje,
   responsavelSessao,
   obra,
@@ -529,4 +530,31 @@ export function GestaoFichaPainel({
       </div>
     </aside>
   );
+}
+
+export function GestaoFichaPainel(
+  props: Parameters<typeof PainelObra>[0] & { escBloqueado?: boolean }
+) {
+  if (props.colaborador && !props.obra) {
+    return (
+      <GestaoFichaColaborador
+        colaborador={props.colaborador}
+        plataformas={props.plataformas}
+        obras={props.obras}
+        alocacoes={props.alocacoes}
+        liberacoesAbertas={props.liberacoesAbertas}
+        cursos={props.cursos}
+        certificados={props.certificados}
+        documentosRh={props.documentosRh}
+        salvando={props.salvando}
+        escBloqueado={props.escBloqueado}
+        onFechar={props.onFechar}
+        onEnviar={props.onEnviar}
+        onRecarregar={props.onRecarregar}
+        onEditarCadastro={props.onEditarCadastro}
+      />
+    );
+  }
+  const { escBloqueado: _escBloqueado, ...obra } = props;
+  return <PainelObra {...obra} />;
 }

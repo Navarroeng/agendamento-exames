@@ -13,6 +13,7 @@ import {
   contarPlataformasAtivas,
   cursoAtivo,
   estadoListaColaboradores,
+  examesProximosDoColaborador,
   examesRealizadosDoColaborador,
   filtrarObras,
   filtrarRequisitos,
@@ -309,6 +310,21 @@ const historico = montarHistoricoExamesColaborador({
 assert.deepEqual(
   examesRealizadosDoColaborador({ exames: historico, hoje }).map((exame) => exame.id),
   ["ex-1"]
+);
+assert.deepEqual(
+  examesProximosDoColaborador({ exames: historico, hoje }).map((exame) => exame.id),
+  ["ex-futuro"]
+);
+assert.deepEqual(
+  examesProximosDoColaborador({
+    exames: [
+      { id: "fut", dataIso: "2026-12-01", situacao: "Agendado" },
+      { id: "can", dataIso: "2026-12-02", situacao: "Cancelado" },
+      { id: "pas", dataIso: "2026-10-01", situacao: "Agendado" },
+    ],
+    hoje,
+  }).map((exame) => exame.id),
+  ["fut"]
 );
 
 const curso = { id: "curso-1", nome: "NR-35", valorCentavos: 18000, inativadoEm: "2026-11-01T00:00:00.000Z" };

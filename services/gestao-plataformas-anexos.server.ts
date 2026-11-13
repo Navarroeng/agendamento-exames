@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
 import {
   caminhoAnexoGestaoPermitido,
+  examesProximosDoColaborador,
   examesRealizadosDoColaborador,
   validarAnexoGestao,
 } from "@/lib/gestao-plataformas";
@@ -26,8 +27,16 @@ function nomeSeguro(nome: string): string {
   return base || "arquivo";
 }
 
+type ExameFicha = {
+  id: string;
+  dataIso: string | null;
+  dataLabel: string;
+  tipoExame: string;
+  situacao: string;
+};
+
 export async function listarExamesRealizadosGestao(colaboradorId: string): Promise<
-  | { ok: true; exames: { id: string; dataIso: string | null; dataLabel: string; tipoExame: string; situacao: string }[] }
+  | { ok: true; realizados: ExameFicha[]; proximos: ExameFicha[] }
   | { ok: false; status: number; error: string }
 > {
   const escopo = await resolverEscopoGestaoPlataformas();
@@ -42,12 +51,11 @@ export async function listarExamesRealizadosGestao(colaboradorId: string): Promi
     cpf: linha.cpfDigits,
     agendamentoId: linha.historicoAgendamentoId,
   });
+  const hoje = todayIsoSaoPaulo();
   return {
     ok: true,
-    exames: examesRealizadosDoColaborador({
-      exames: historico,
-      hoje: todayIsoSaoPaulo(),
-    }),
+    realizados: examesRealizadosDoColaborador({ exames: historico, hoje }),
+    proximos: examesProximosDoColaborador({ exames: historico, hoje }),
   };
 }
 
