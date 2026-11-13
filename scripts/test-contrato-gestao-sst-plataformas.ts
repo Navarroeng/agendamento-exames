@@ -16,8 +16,12 @@ import {
   orcamentoUsaContratoGestaoSstPlataformas,
   propostaIncluiJanelaOperacionalUmaSemana,
   propostaIncluiPostagemRhAdministrativoFinanceiro,
+  valorMensalCobrancaPlataformas,
+  valorMensalidadeRenovacaoPlataformas,
 } from "../lib/contrato-gestao-sst-plataformas";
 import { buildContratoNavarroDocumento } from "../lib/contrato-modelo";
+import { montarMensalidadesPrevistas } from "../lib/gestao-comercial-mensalidades";
+import { parcelasParaInserirDaGrade } from "../lib/mensalidade-parcelas";
 import { GESTAO_SST_MENSAL_NOME, ORCAMENTO_MODALIDADE_MENSALIDADE } from "../lib/orcamento-modalidade";
 import type { OrcamentoAprovacaoRecord } from "../lib/orcamento-aprovacao";
 import type { OrcamentoComItens } from "../lib/orcamento-types";
@@ -194,13 +198,36 @@ assert.match(texto, /A quantidade de plataformas e a relação de obras são inf
 assert.match(texto, /adequação dos laudos sob responsabilidade da CONTRATADA/);
 assert.match(texto, /controle de vencimentos de exames ocupacionais, treinamentos e documentos de SST/);
 assert.match(texto, /Cadastro, atualização, substituição e retirada de colaboradores por obra/);
-assert.match(texto, /postagens recorrentes/);
+assert.match(texto, /documentos de SST exigidos pelas plataformas/);
+assert.match(texto, /controle de vencimentos, o acompanhamento de validações e pendências/);
 assert.match(texto, /reapresentação de documentos corrigidos/);
-assert.match(texto, /Mobilização das equipes/);
+assert.match(texto, /A CONTRATANTE indica as equipes por obra e fornece os acessos/);
+assert.match(texto, /A CONTRATADA executa as etapas contratadas e acompanha a mobilização/);
 assert.match(texto, /A validação documental e a liberação final cabem à plataforma/);
-assert.match(texto, /acima do limite de 10 depende de aprovação prévia/);
-assert.match(texto, /é única e remunera, em conjunto/);
-assert.match(texto, /Não há segunda mensalidade/);
+assert.match(texto, /depende de acordo entre as partes e de ajuste comercial/);
+assert.match(
+  texto,
+  /O valor total da vigência inicial de 12 meses é de R\$ 30\.240,00, pago em 12 mensalidades de R\$ 2\.520,00/
+);
+assert.match(
+  texto,
+  /Cada mensalidade remunera os serviços de Gestão SST para 58 colaboradores e de administração de até 10 plataformas/
+);
+assert.match(texto, /As condições de pagamento estão na Cláusula 4/);
+assert.match(
+  texto,
+  /Prestação de serviços de Gestão SST, administração das plataformas e acompanhamento da mobilização das equipes/
+);
+assert.match(
+  texto,
+  /finalidades da prestação de serviços de Gestão SST, administração das plataformas e acompanhamento da mobilização das equipes/
+);
+assert.match(texto, /R\$ 2\.612,00/);
+assert.match(texto, /R\$ 2\.622,00/);
+assert.match(texto, /mesmo que apenas 8 plataformas estejam em uso/);
+assert.doesNotMatch(texto, /é única e remunera/);
+assert.doesNotMatch(texto, /Não há segunda mensalidade/);
+assert.doesNotMatch(texto, /Para zero ou um colaborador, a mensalidade será de/);
 assert.match(texto, /inclusive nas renovações automáticas/);
 assert.match(texto, /no dia 10 de cada mês/);
 assert.doesNotMatch(texto, /Documentos de RH, administrativos e financeiros/);
@@ -214,7 +241,10 @@ const semRenovacao = gerar({
   aprovacao: aprovacao({ mensalidade_renovacao_automatica: false }),
 });
 assert.match(semRenovacao.texto, /Não há renovação automática desta cobertura/);
+assert.match(semRenovacao.texto, /Não há renovação automática nem cobrança automática de novo período/);
+assert.match(semRenovacao.texto, /R\$ 2\.612,00/);
 assert.doesNotMatch(semRenovacao.texto, /inclusive nas renovações automáticas/);
+assert.doesNotMatch(semRenovacao.texto, /Para zero ou um colaborador, a mensalidade será de/);
 
 const dia20 = gerar({
   dia: 20,
@@ -252,18 +282,18 @@ const comRh = gerar({
       "Inclui a postagem de documentos de SST, RH, administrativos e financeiros. O cliente fornece os documentos de RH, administrativos e financeiros para postagem.",
   }),
 });
-assert.match(
+assert.doesNotMatch(
   comRh.texto,
   /A CONTRATANTE fornece os arquivos prontos e as correções desses documentos/
 );
-assert.match(comRh.texto, /A CONTRATADA confere, posta e acompanha as pendências nas plataformas/);
+assert.doesNotMatch(comRh.texto, /documentos de RH, administrativos e financeiros/i);
 
 const comSemana = gerar({
   orcamento: orcamento({
     observacoes: "A janela operacional de uma semana está prevista na proposta.",
   }),
 });
-assert.match(comSemana.texto, /no prazo de uma semana/);
+assert.doesNotMatch(comSemana.texto, /no prazo de uma semana/);
 
 const comum = gerar({
   orcamento: orcamento({
@@ -303,6 +333,8 @@ assert.match(comum.texto, /Proposta Comercial nº ORC-2026-0100/);
 assert.doesNotMatch(comum.texto, /Administração de até 10 plataformas/);
 assert.doesNotMatch(comum.texto, /ADMINISTRAÇÃO DE PLATAFORMAS/);
 assert.doesNotMatch(comum.texto, /Não há segunda mensalidade/);
+assert.match(comum.texto, /Para zero ou um colaborador, a mensalidade será de/);
+assert.doesNotMatch(comum.texto, /adequação de laudos, no valor fixo de/);
 assert.equal(comum.valor, 200);
 assert.equal(comum.colaboradores, 8);
 
@@ -319,10 +351,164 @@ assert.match(pdf, /ADMINISTRA/);
 assert.match(pdf, /PLATAFORMAS/);
 assert.match(pdf, /ORC-2026-0087/);
 assert.match(pdf, /2\.520,00/);
+assert.match(pdf, /30\.240,00/);
+assert.match(pdf, /2\.612,00/);
+assert.match(pdf, /2\.622,00/);
 assert.match(pdf, /cinquenta e oito/);
 assert.match(pdf, /at. 10 plataformas/);
 assert.doesNotMatch(pdf, /Documentos de RH/);
 assert.doesNotMatch(pdf, /uma semana/);
+
+assert.equal(
+  valorMensalidadeRenovacaoPlataformas({
+    colaboradoresAtivos: 58,
+    limitePlataformas: 10,
+  }),
+  2612
+);
+assert.equal(
+  valorMensalidadeRenovacaoPlataformas({
+    colaboradoresAtivos: 59,
+    limitePlataformas: 10,
+  }),
+  2622
+);
+assert.equal(
+  valorMensalidadeRenovacaoPlataformas({
+    colaboradoresAtivos: 58,
+    limitePlataformas: 10,
+    plataformasEmUso: 8,
+  }),
+  2612
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: true,
+    vigenciaInicio: "2026-11-12",
+    iniciosConhecidos: ["2026-11-12"],
+    valorContratado: 2520,
+    colaboradoresAtivos: 58,
+    limitePlataformas: 10,
+  }),
+  2520
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: true,
+    vigenciaInicio: "2027-11-12",
+    iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+    valorContratado: 2520,
+    colaboradoresAtivos: 58,
+    limitePlataformas: 10,
+  }),
+  2612
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: true,
+    vigenciaInicio: "2027-11-12",
+    iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+    valorContratado: 2520,
+    colaboradoresAtivos: 59,
+    limitePlataformas: 10,
+  }),
+  2622
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: true,
+    vigenciaInicio: "2027-11-12",
+    iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+    valorContratado: 2520,
+    colaboradoresAtivos: 80,
+    limitePlataformas: 10,
+    valorRenovacaoGravado: 2612,
+    vigenciaRenovacaoGravada: "2027-11-12",
+  }),
+  2612
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: true,
+    vigenciaInicio: "2027-11-12",
+    iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+    valorContratado: 2520,
+    colaboradoresAtivos: 80,
+    valoresParcelasDaVigencia: [2612],
+  }),
+  2612
+);
+assert.equal(
+  valorMensalCobrancaPlataformas({
+    plataformas: false,
+    vigenciaInicio: "2027-11-12",
+    iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+    valorContratado: 200,
+    colaboradoresAtivos: 58,
+    limitePlataformas: 10,
+  }),
+  200
+);
+
+const parcelasIniciais = parcelasParaInserirDaGrade({
+  vigenciaInicio: "2026-11-12",
+  vigenciaFim: "2027-11-11",
+  dia: 10,
+  valorMensal: 2520,
+});
+assert.equal(parcelasIniciais.length, 12);
+assert.ok(parcelasIniciais.every((parcela) => parcela.valor === 2520));
+
+const valorRenovacao = valorMensalCobrancaPlataformas({
+  plataformas: true,
+  vigenciaInicio: "2027-11-12",
+  iniciosConhecidos: ["2026-11-12", "2027-11-12"],
+  valorContratado: 2520,
+  colaboradoresAtivos: 58,
+  limitePlataformas: 10,
+});
+const parcelasRenovacao = parcelasParaInserirDaGrade({
+  vigenciaInicio: "2027-11-12",
+  vigenciaFim: "2028-11-11",
+  dia: 10,
+  valorMensal: valorRenovacao,
+  registradas: parcelasIniciais.map((parcela) => ({
+    vigenciaInicio: "2026-11-12",
+    vigenciaFim: "2027-11-11",
+    numero: parcela.numero,
+    vencimentoIso: parcela.vencimentoIso,
+    valor: parcela.valor,
+    pagoEmIso: null,
+  })),
+});
+assert.equal(parcelasRenovacao.length, 12);
+assert.ok(parcelasRenovacao.every((parcela) => parcela.valor === 2612));
+assert.ok(parcelasIniciais.every((parcela) => parcela.valor === 2520));
+
+const previstas = montarMensalidadesPrevistas(
+  [
+    {
+      aprovacaoId: "ap-agro",
+      clienteNome: "AGROVIAS MEIO AMBIENTE E PAISAGEM LTDA",
+      numeroOrcamento: ORCAMENTO_GESTAO_SST_PLATAFORMAS_NUMERO,
+      modalidade: ORCAMENTO_MODALIDADE_MENSALIDADE,
+      mensalidadePagamento: "mensal",
+      diaVencimento: 10,
+      valorMensal: 2520,
+      valorFinal: 2520,
+      vigencias: [
+        { inicio: "2026-11-12", fim: "2027-11-11" },
+        { inicio: "2027-11-12", fim: "2028-11-11" },
+      ],
+      valorMensalPorVigencia: { "2027-11-12": valorRenovacao },
+    },
+  ],
+  { tipo: "intervalo", inicio: "2026-11-01", fim: "2028-12-31" },
+  "2026-11-01"
+);
+const linhasValor = previstas.linhas.filter((linha) => linha.compoeTotal);
+assert.equal(linhasValor.filter((linha) => linha.valor === 2520).length, 12);
+assert.equal(linhasValor.filter((linha) => linha.valor === 2612).length, 12);
 
 console.log("ok contrato gestao sst plataformas");
 console.log("pdf", arquivo, "paginas", doc.getNumberOfPages());

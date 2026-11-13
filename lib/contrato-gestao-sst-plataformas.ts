@@ -9,7 +9,8 @@
  * Os demais orçamentos de Gestão SST permanecem no modelo padrão.
  */
 
-import { formatMoedaComExtenso, formatNumeroComExtenso } from "@/lib/extenso";
+import { formatNumeroComExtenso } from "@/lib/extenso";
+import { formatCurrency } from "@/lib/money";
 import { normalizeServicoNome, type ServicoItemRef } from "@/lib/servico-treinamentos";
 
 export const CONTRATO_GESTAO_SST_PLATAFORMAS_IDENTIFICADOR =
@@ -26,6 +27,14 @@ export const CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO_LINHAS = [
 ] as const;
 
 export const LIMITE_PLATAFORMAS_CONTRATO = 10;
+
+/** Gestão SST na renovação deste modelo: mínimo de R$ 130,00 e R$ 10,00 a partir do segundo colaborador ativo. */
+export const RENOVACAO_PLATAFORMAS_GESTAO_BASE_REAIS = 130;
+export const RENOVACAO_PLATAFORMAS_GESTAO_INCREMENTO_REAIS = 10;
+/** Adequação de laudos, componente fixo da mensalidade renovada. */
+export const RENOVACAO_PLATAFORMAS_LAUDOS_REAIS = 912;
+/** Administração de cada plataforma coberta pelo limite contratado, mesmo que menos estejam em uso. */
+export const RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS = 100;
 
 /**
  * Observação da proposta comercial aprovada nº ORC-2026-0087,
@@ -107,36 +116,186 @@ function quantitativoColaboradores(quantidade: number): string {
   return `${formatNumeroComExtenso(n)} ${label}`;
 }
 
-export function fraseMensalidadeUnicaPlataformas(valor: number): string {
-  return `A mensalidade de ${formatMoedaComExtenso(valor)} é única e remunera, em conjunto, a Gestão SST e a administração de até ${LIMITE_PLATAFORMAS_CONTRATO} plataformas. Não há segunda mensalidade por esses serviços.`;
+function reais(valor: number): number {
+  return Math.round((Number(valor) || 0) * 100) / 100;
+}
+
+function inteiroNaoNegativo(valor: number): number {
+  const numero = Math.floor(Number(valor));
+  if (!Number.isFinite(numero) || numero < 0) return 0;
+  return numero;
+}
+
+/**
+ * Gestão SST da renovação, igual à regra dos contratos comuns:
+ * R$ 130,00 para zero ou um colaborador ativo e R$ 10,00 a partir do segundo.
+ */
+export function valorGestaoSstRenovacaoPlataformas(
+  colaboradoresAtivos: number
+): number {
+  const quantidade = inteiroNaoNegativo(colaboradoresAtivos);
+  const extras = Math.max(quantidade - 1, 0);
+  return reais(
+    RENOVACAO_PLATAFORMAS_GESTAO_BASE_REAIS +
+      RENOVACAO_PLATAFORMAS_GESTAO_INCREMENTO_REAIS * extras
+  );
+}
+
+/**
+ * Mensalidade da nova vigência.
+ * Soma Gestão SST, adequação de laudos e o limite de plataformas contratado.
+ * A quantidade em uso não reduz o componente das plataformas.
+ */
+export function valorMensalidadeRenovacaoPlataformas(params: {
+  colaboradoresAtivos: number;
+  limitePlataformas?: number | null;
+  plataformasEmUso?: number | null;
+}): number {
+  const limite =
+    params.limitePlataformas == null
+      ? LIMITE_PLATAFORMAS_CONTRATO
+      : inteiroNaoNegativo(params.limitePlataformas);
+  return reais(
+    valorGestaoSstRenovacaoPlataformas(params.colaboradoresAtivos) +
+      RENOVACAO_PLATAFORMAS_LAUDOS_REAIS +
+      RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS * limite
+  );
+}
+
+function dataIso(value: string | null | undefined): string | null {
+  const texto = (value ?? "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
+}
+
+/** Primeiro início conhecido. A vigência inicial não usa a fórmula da renovação. */
+export function inicioVigenciaInicial(
+  inicios: readonly (string | null | undefined)[]
+): string | null {
+  const validos = inicios
+    .map((inicio) => dataIso(inicio))
+    .filter((inicio): inicio is string => Boolean(inicio))
+    .sort();
+  return validos[0] ?? null;
+}
+
+export function vigenciaEhRenovacaoPlataformas(
+  vigenciaInicio: string | null | undefined,
+  iniciosConhecidos: readonly (string | null | undefined)[]
+): boolean {
+  const inicio = dataIso(vigenciaInicio);
+  const inicial = inicioVigenciaInicial(iniciosConhecidos);
+  if (!inicio || !inicial) return false;
+  return inicio > inicial;
+}
+
+function valorPositivo(valor: number | null | undefined): number | null {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero) || numero <= 0) return null;
+  return reais(numero);
+}
+
+/**
+ * Valor que a geração de cobranças usa neste modelo.
+ * A vigência inicial permanece no valor contratado.
+ * Na renovação, usa o valor já gravado naquela vigência ou nas parcelas dela.
+ * Sem esse registro, calcula pela quantidade de colaboradores ativos e pelo limite contratado.
+ * Não aplica a tabela comum de Gestão SST como preço integral.
+ */
+export function valorMensalCobrancaPlataformas(params: {
+  plataformas: boolean;
+  vigenciaInicio: string | null;
+  iniciosConhecidos: readonly (string | null | undefined)[];
+  valorContratado: number | null;
+  colaboradoresAtivos: number | null;
+  limitePlataformas?: number | null;
+  valorRenovacaoGravado?: number | null;
+  vigenciaRenovacaoGravada?: string | null;
+  valoresParcelasDaVigencia?: readonly number[];
+}): number | null {
+  const contratado = valorPositivo(params.valorContratado);
+  if (!params.plataformas) return contratado;
+  if (
+    !vigenciaEhRenovacaoPlataformas(
+      params.vigenciaInicio,
+      params.iniciosConhecidos
+    )
+  ) {
+    return contratado;
+  }
+
+  const inicio = dataIso(params.vigenciaInicio);
+  const vigenciaGravada = dataIso(params.vigenciaRenovacaoGravada);
+  const valorGravado = valorPositivo(params.valorRenovacaoGravado);
+  if (inicio && vigenciaGravada === inicio && valorGravado) return valorGravado;
+
+  const parcelas = (params.valoresParcelasDaVigencia ?? [])
+    .map((valor) => valorPositivo(valor))
+    .filter((valor): valor is number => valor != null);
+  if (parcelas.length > 0) return parcelas[0];
+
+  if (params.colaboradoresAtivos == null) return null;
+  return valorMensalidadeRenovacaoPlataformas({
+    colaboradoresAtivos: params.colaboradoresAtivos,
+    limitePlataformas: params.limitePlataformas,
+  });
+}
+
+export function frasePagamentoVigenciaInicialPlataformas(params: {
+  valorMensal: number;
+  meses: number;
+  colaboradores: number;
+}): string {
+  const meses = Math.max(1, Math.floor(Number(params.meses) || 0));
+  const mensal = reais(params.valorMensal);
+  const total = reais(mensal * meses);
+  const colaboradores = Math.round(Number(params.colaboradores));
+  const quantitativo =
+    Number.isFinite(colaboradores) && colaboradores >= 1
+      ? `${colaboradores} ${colaboradores === 1 ? "colaborador" : "colaboradores"}`
+      : "os colaboradores contratados";
+  return `O valor total da vigência inicial de ${meses} meses é de ${formatCurrency(total)}, pago em ${meses} mensalidades de ${formatCurrency(mensal)}. Cada mensalidade remunera os serviços de Gestão SST para ${quantitativo} e de administração de até ${LIMITE_PLATAFORMAS_CONTRATO} plataformas.`;
+}
+
+export function paragrafosCalculoRenovacaoPlataformas(
+  renovacaoAutomatica: boolean
+): string[] {
+  const limite = LIMITE_PLATAFORMAS_CONTRATO;
+  const exemplo = (colaboradores: number) =>
+    formatCurrency(
+      valorMensalidadeRenovacaoPlataformas({
+        colaboradoresAtivos: colaboradores,
+        limitePlataformas: limite,
+      })
+    );
+  const criterio = [
+    `A mensalidade da nova vigência é a soma de três componentes, apurados no início dessa vigência: Gestão SST, no valor mínimo de ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_BASE_REAIS)}, mais ${formatCurrency(RENOVACAO_PLATAFORMAS_GESTAO_INCREMENTO_REAIS)} por colaborador ativo a partir do segundo, considerada a quantidade de colaboradores ativos no cadastro da CONTRATANTE; adequação de laudos, no valor fixo de ${formatCurrency(RENOVACAO_PLATAFORMAS_LAUDOS_REAIS)}; e administração de plataformas, no valor de ${formatCurrency(RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS)} por plataforma coberta pelo limite contratado para a nova vigência, ainda que a quantidade em uso seja menor.`,
+    `A cobertura de até ${limite} plataformas corresponde a ${formatCurrency(RENOVACAO_PLATAFORMAS_POR_PLATAFORMA_REAIS * limite)} por mês. Qualquer alteração desse limite passa a valer conforme o acordo entre as partes.`,
+    `Por exemplo, 58 colaboradores ativos e cobertura de até ${limite} plataformas resultam em ${exemplo(58)} mensais, mesmo que apenas 8 plataformas estejam em uso; 59 colaboradores ativos e a mesma cobertura resultam em ${exemplo(59)} mensais.`,
+    "O valor apurado é gravado na nova vigência. Movimentações posteriores de colaboradores ou de plataformas são consideradas somente no ciclo seguinte e não alteram as parcelas já geradas.",
+  ].join(" ");
+  if (!renovacaoAutomatica) {
+    return [
+      "A continuidade dos serviços após o término desta vigência depende de novo acordo escrito entre as partes. Não há renovação automática nem cobrança automática de novo período.",
+      `Se as partes ajustarem uma nova contratação por escrito, o valor mensal seguirá esta regra e não a tabela comum da Gestão SST. ${criterio}`,
+      "O pagamento antecipado e o desconto são válidos somente para o período contratado. Em uma nova contratação ajustada por escrito, o pagamento será mensal por boleto bancário, salvo acordo escrito de pagamento antecipado.",
+    ];
+  }
+  return [
+    "Na renovação, o valor mensal será calculado no início da nova vigência. Essa regra substitui a tabela comum da Gestão SST como preço integral da renovação e não altera as cobranças do período em andamento.",
+    criterio,
+    "O pagamento antecipado e o desconto são válidos somente para o período contratado. Na renovação, o pagamento será mensal por boleto bancário, salvo novo acordo escrito para pagamento antecipado.",
+  ];
 }
 
 export function paragrafosEscopoPlataformas(params: {
   colaboradores: number;
-  valorMensal: number;
-  textosProposta: readonly string[];
 }): string[] {
   const quantitativo = quantitativoColaboradores(params.colaboradores);
-  const paragrafos = [
+  return [
     `Gestão SST. Gestão da documentação de SST para ${quantitativo}, adequação dos laudos sob responsabilidade da CONTRATADA às exigências das obras e das plataformas, controle de vencimentos de exames ocupacionais, treinamentos e documentos de SST e acompanhamento das renovações.`,
-    `Administração de até ${LIMITE_PLATAFORMAS_CONTRATO} plataformas. Cadastro, atualização, substituição e retirada de colaboradores por obra, conforme as equipes indicadas pela CONTRATANTE. Conferência, postagem e atualização dos documentos exigidos, incluindo postagens recorrentes, acompanhamento de validações e vencimentos, comunicação de pendências e reapresentação de documentos corrigidos. A quantidade de plataformas e a relação de obras são informações distintas.`,
+    `Administração de até ${LIMITE_PLATAFORMAS_CONTRATO} plataformas. Cadastro, atualização, substituição e retirada de colaboradores por obra, conforme as equipes indicadas pela CONTRATANTE. Conferência, postagem e atualização dos documentos de SST exigidos pelas plataformas, incluindo o controle de vencimentos, o acompanhamento de validações e pendências e a reapresentação de documentos corrigidos. A quantidade de plataformas e a relação de obras são informações distintas.`,
+    "Mobilização das equipes. A CONTRATANTE indica as equipes por obra e fornece os acessos, os dados cadastrais e os documentos necessários. A CONTRATADA executa as etapas contratadas e acompanha a mobilização. A validação documental e a liberação final cabem à plataforma ou à empresa responsável pela obra.",
+    `Ampliação do escopo. A inclusão de plataformas acima do limite de ${LIMITE_PLATAFORMAS_CONTRATO} depende de acordo entre as partes e de ajuste comercial.`,
+    "Os serviços cobertos por esta contratação são os descritos neste anexo. As condições de pagamento estão na Cláusula 4.",
   ];
-  if (propostaIncluiPostagemRhAdministrativoFinanceiro(params.textosProposta)) {
-    paragrafos.push(
-      "Documentos de RH, administrativos e financeiros. A CONTRATANTE fornece os arquivos prontos e as correções desses documentos. A CONTRATADA confere, posta e acompanha as pendências nas plataformas."
-    );
-  }
-  paragrafos.push(
-    "Mobilização das equipes. A CONTRATANTE indica os colaboradores por obra e disponibiliza os acessos, dados e documentos necessários. A CONTRATADA acompanha as etapas sob sua responsabilidade após o recebimento dessas informações. A validação documental e a liberação final cabem à plataforma ou à empresa responsável pela obra."
-  );
-  if (propostaIncluiJanelaOperacionalUmaSemana(params.textosProposta)) {
-    paragrafos.push(
-      "Prazo operacional. Após o recebimento dos acessos, dados e documentos necessários, a CONTRATADA cumpre as etapas sob sua responsabilidade no prazo de uma semana, conforme a proposta aprovada."
-    );
-  }
-  paragrafos.push(
-    `Ampliação do escopo. A inclusão de plataformas acima do limite de ${LIMITE_PLATAFORMAS_CONTRATO} depende de aprovação prévia e ajuste comercial entre as partes.`,
-    fraseMensalidadeUnicaPlataformas(params.valorMensal)
-  );
-  return paragrafos;
 }

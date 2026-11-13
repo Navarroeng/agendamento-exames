@@ -11,6 +11,7 @@ import {
   type ParcelaMensalidadeRegistrada,
 } from "@/lib/mensalidade-parcelas";
 import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
+import { mapaValorRenovacaoPlataformas } from "@/services/mensalidade-renovacao-plataformas.service";
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE = 1000;
@@ -386,6 +387,28 @@ async function listarFontesGradeCobranca(
       registradas: registradasPorAprovacao.get(row.id) ?? [],
       efeito: efeitoValorMensalidadeDaAprovacao(row, vigencia.inicio),
     });
+  }
+  const renovacao = await mapaValorRenovacaoPlataformas(
+    fontes.map((fonte) => ({
+      aprovacaoId: fonte.aprovacaoId,
+      numeroOrcamento: fonte.numeroOrcamento,
+      vigencias: fonte.vigenciaInicio ? [fonte.vigenciaInicio] : [],
+      valorMensal: fonte.valorMensal,
+      valorFinal: fonte.valorFinal,
+      parcelas: fonte.registradas.map((parcela) => ({
+        vigenciaInicio: parcela.vigenciaInicio,
+        valor: parcela.valor,
+      })),
+    }))
+  );
+  for (const fonte of fontes) {
+    const inicio = (fonte.vigenciaInicio ?? "").slice(0, 10);
+    const porVigencia = renovacao.get(fonte.aprovacaoId);
+    if (!porVigencia || !Object.prototype.hasOwnProperty.call(porVigencia, inicio)) {
+      continue;
+    }
+    fonte.valorMensal = porVigencia[inicio];
+    fonte.valorFinal = porVigencia[inicio];
   }
   return fontes;
 }

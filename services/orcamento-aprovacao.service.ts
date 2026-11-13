@@ -30,7 +30,11 @@ import {
 } from "@/lib/cliente-contrato-orcamento-sync";
 import { usaControleParcelasMensalidade } from "@/lib/mensalidade-parcelas";
 import { efeitoValorMensalidadeDaAprovacao } from "@/lib/alterar-contratacao";
-import { inserirParcelasMensalidadeAusentes } from "@/services/mensalidade-parcelas.service";
+import {
+  inserirParcelasMensalidadeAusentes,
+  listarParcelasMensalidade,
+} from "@/services/mensalidade-parcelas.service";
+import { mapaValorRenovacaoPlataformas } from "@/services/mensalidade-renovacao-plataformas.service";
 import {
   CONTRATO_ADICIONAL_MENSALIDADE,
   DIA_VENCIMENTO_MENSALIDADE_PENDENTE_MSG,
@@ -133,14 +137,40 @@ async function garantirParcelasMensalidadeDaAprovacao(
   }
   const vigencia = await obterVigenciaContratualOrcamento(aprovacao.orcamento_id);
   if (!vigencia) return;
+  const registradas = await listarParcelasMensalidade(aprovacao.id);
+  const renovacao = await mapaValorRenovacaoPlataformas([
+    {
+      aprovacaoId: aprovacao.id,
+      numeroOrcamento: "",
+      vigencias: [vigencia.inicio],
+      valorMensal: aprovacao.mensalidade_valor_mensal ?? null,
+      valorFinal: aprovacao.valor_final ?? null,
+      parcelas: registradas.map((parcela) => ({
+        vigenciaInicio: parcela.vigenciaInicio,
+        valor: parcela.valor,
+      })),
+    },
+  ]);
+  const inicio = vigencia.inicio.slice(0, 10);
+  const porVigencia = renovacao.get(aprovacao.id);
+  const renovacaoDestaVigencia = Boolean(
+    porVigencia && Object.prototype.hasOwnProperty.call(porVigencia, inicio)
+  );
+  const valorRenovacao = renovacaoDestaVigencia
+    ? (porVigencia?.[inicio] ?? null)
+    : null;
   await inserirParcelasMensalidadeAusentes({
     aprovacaoId: aprovacao.id,
     vigenciaInicio: vigencia.inicio,
     vigenciaFim: vigencia.fim,
     dia: aprovacao.mensalidade_dia_vencimento ?? null,
     vencimentoRegra: aprovacao.mensalidade_vencimento_regra ?? null,
-    valorMensal: aprovacao.mensalidade_valor_mensal ?? null,
-    valorFinal: aprovacao.valor_final ?? null,
+    valorMensal: renovacaoDestaVigencia
+      ? valorRenovacao
+      : (aprovacao.mensalidade_valor_mensal ?? null),
+    valorFinal: renovacaoDestaVigencia
+      ? valorRenovacao
+      : (aprovacao.valor_final ?? null),
     efeito: efeitoValorMensalidadeDaAprovacao(aprovacao, vigencia.inicio),
   });
 }
