@@ -176,9 +176,10 @@ export async function listarVencimentosDoAno(params: {
     )
   );
   const clienteIds = Array.from(new Set(doAno.map((contrato) => contrato.cliente_id)));
+  // Sucessor pode terminar no ano seguinte ou ainda não ter fim, na implantação.
   const [irmaos, sucessores] = await Promise.all([
     listarPorColuna("orcamento_id", orcamentoIds),
-    listarPorColuna("cliente_id", clienteIds, inicio),
+    listarPorColuna("cliente_id", clienteIds),
   ]);
   const contratos = unirPorId([doAno, irmaos, sucessores]);
   const origemIds = Array.from(

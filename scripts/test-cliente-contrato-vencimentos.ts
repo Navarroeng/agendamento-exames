@@ -417,6 +417,115 @@ run("renovação vinculada só com origem confiável", () => {
   );
 });
 
+run("renovação antecipada em novembro liga o contrato anterior", () => {
+  const anterior = contrato({
+    id: "tm-anterior",
+    cliente_id: "c-tm",
+    status: "encerrado",
+    orcamento_id: "orc-tm-antigo",
+    numero: "CTR-TM-ANTIGO",
+    data_inicio: "2025-11-28",
+    data_fim: "2026-11-28",
+    valor_contrato: 1300,
+    quantidade_colaboradores: 4,
+  });
+  const sucessor = contrato({
+    id: "tm-novo",
+    cliente_id: "c-tm",
+    status: "ativo",
+    orcamento_id: "orc-2026-0093",
+    numero: "CTR-2026-0093",
+    data_inicio: "2026-11-11",
+    data_fim: "2027-11-11",
+    valor_contrato: 1920,
+    quantidade_colaboradores: 4,
+  });
+  const linhas = montarVencimentosDoMes({
+    ano: 2026,
+    mes: 11,
+    hojeIso: "2026-11-13",
+    contratos: [anterior, sucessor],
+    origemPorOrcamentoId: new Map([
+      ["orc-tm-antigo", "indicacao"],
+      ["orc-2026-0093", "renovacao"],
+    ]),
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].contrato.id, "tm-anterior");
+  assert.equal(linhas[0].situacao, "Encerrado");
+  assert.equal(linhas[0].renovacao?.contratoId, "tm-novo");
+  assert.equal(linhas[0].renovacao?.dataInicio, "2026-11-11");
+  assert.equal(linhas[0].fimPrevisto, "2026-11-28");
+  assert.equal(linhas[0].contrato.valor_contrato, 1300);
+});
+
+run("sucessor ainda em implantação também renova o anterior", () => {
+  const anterior = contrato({
+    id: "by-anterior",
+    cliente_id: "c-by",
+    status: "encerrado",
+    orcamento_id: "orc-by-antigo",
+    numero: "CTR-BY-ANTIGO",
+    data_inicio: "2025-11-28",
+    data_fim: "2026-11-28",
+  });
+  const implantacao = contrato({
+    id: "by-novo",
+    cliente_id: "c-by",
+    status: "aguardando_envio",
+    orcamento_id: "orc-2026-0094",
+    numero: "CTR-2026-0094",
+    data_inicio: "2026-11-11",
+    data_fim: null,
+  });
+  const linhas = montarVencimentosDoMes({
+    ano: 2026,
+    mes: 11,
+    hojeIso: "2026-11-13",
+    contratos: [anterior, implantacao],
+    origemPorOrcamentoId: new Map([["orc-2026-0094", "renovacao"]]),
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].renovacao?.numero, "CTR-2026-0094");
+
+  const cancelado = contrato({
+    ...implantacao,
+    id: "by-cancelado",
+    status: "cancelado",
+  });
+  const semSelo = montarVencimentosDoMes({
+    ano: 2026,
+    mes: 11,
+    hojeIso: "2026-11-13",
+    contratos: [anterior, cancelado],
+    origemPorOrcamentoId: new Map([["orc-2026-0094", "renovacao"]]),
+  });
+  assert.equal(semSelo[0].renovacao, null);
+});
+
+run("encerrado sem renovação efetivada fica só com o selo de encerrado", () => {
+  const anterior = contrato({
+    id: "sem-renovacao",
+    cliente_id: "c-sem",
+    status: "encerrado",
+    orcamento_id: "orc-sem",
+    numero: "CTR-SEM",
+    data_inicio: "2025-11-01",
+    data_fim: "2026-11-01",
+    renovacaoAutomatica: true,
+  });
+  const linhas = montarVencimentosDoMes({
+    ano: 2026,
+    mes: 11,
+    hojeIso: "2026-11-13",
+    contratos: [anterior],
+    origemPorOrcamentoId: new Map([["orc-inexistente", "renovacao"]]),
+  });
+  assert.equal(linhas.length, 1);
+  assert.equal(linhas[0].situacao, "Encerrado");
+  assert.equal(linhas[0].renovacao, null);
+});
+
 run("a contagem usa a lista inteira do mês", () => {
   const contratos = Array.from({ length: 25 }, (_, index) =>
     contrato({
@@ -607,6 +716,11 @@ run("a tela preserva o mês e abre o contrato SST", () => {
   assert.match(servico, /\.lte\("data_fim", fim\)/);
   assert.match(servico, /limitesDoMes\(params\.ano, 1\)/);
   assert.match(servico, /limitesDoMes\(params\.ano, 12\)/);
+  assert.match(servico, /listarPorColuna\("cliente_id", clienteIds\)/);
+  assert.doesNotMatch(
+    servico,
+    /listarPorColuna\("cliente_id", clienteIds, inicio\)/
+  );
   assert.match(servico, /while \(true\)/);
   assert.doesNotMatch(servico, /\.eq\("status", "ativo"\)/);
   assert.doesNotMatch(servico, /aprovado_em/);
