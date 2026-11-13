@@ -40,6 +40,8 @@ import {
   type CertificadoRegistro,
   type ColaboradorGestao,
   type CursoCatalogo,
+  type AcessoExternoRegistro,
+  type DocumentoRhEvento,
   type DocumentoRhRegistro,
   type FiltroGestaoPlataformas,
   type LiberacaoRegistro,
@@ -90,6 +92,9 @@ type Painel = {
   cursos: CursoCatalogo[];
   certificados: CertificadoRegistro[];
   documentosRh: DocumentoRhRegistro[];
+  documentosRhEventos: DocumentoRhEvento[];
+  acessosExternos: AcessoExternoRegistro[];
+  podeConcederAcesso: boolean;
   agendamentos: AgendamentoVinculavel[];
 };
 
@@ -452,6 +457,14 @@ export function GestaoPlataformasPage() {
           <p className="text-sm text-slate-500">Carregando a AGROVIAS…</p>
         ) : null}
 
+        {painel?.podeConcederAcesso ? (
+          <AcessoExternoCard
+            acessos={painel.acessosExternos}
+            salvando={salvando}
+            onEnviar={(acao) => void enviar(acao)}
+          />
+        ) : null}
+
         {painel && aba === "visao" ? (
           <Visao
             ativas={ativas}
@@ -643,6 +656,7 @@ export function GestaoPlataformasPage() {
           cursos={painel.cursos}
           certificados={painel.certificados}
           documentosRh={painel.documentosRh}
+          documentosRhEventos={painel.documentosRhEventos}
           eventos={eventos}
           colaboradores={colaboradores}
           salvando={salvando}
@@ -1742,5 +1756,66 @@ function RequisitoCampos({
         ))}
       </select>
     </div>
+  );
+}
+
+function AcessoExternoCard({
+  acessos,
+  salvando,
+  onEnviar,
+}: {
+  acessos: AcessoExternoRegistro[];
+  salvando: boolean;
+  onEnviar: (acao: AcaoGestaoPlataformas) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [nome, setNome] = useState("");
+  return (
+    <section className="mb-4 rounded-2xl border border-[#DCE5F4] border-t-[3px] border-t-[#C89219] bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-[#101D4A]">Acesso externo da AGROVIAS</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        O administrador cria o usuário no Auth e depois concede o acesso aqui. Revogar encerra a consulta e o envio.
+      </p>
+      <form
+        className="mt-3 grid gap-2 sidebar:grid-cols-[1fr_1fr_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onEnviar({ acao: "conceder_acesso", email, nome });
+          setEmail("");
+          setNome("");
+        }}
+      >
+        <input className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm" type="email" placeholder="E-mail" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        <input className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm" placeholder="Nome" value={nome} onChange={(event) => setNome(event.target.value)} required />
+        <button type="submit" className="rounded-xl bg-[#4945FF] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={salvando}>
+          Conceder
+        </button>
+      </form>
+      <ul className="mt-3 space-y-2">
+        {acessos.map((acesso) => (
+          <li key={acesso.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>
+              <span className="font-medium text-[#101D4A]">{acesso.nome}</span>
+              <span className="text-slate-500"> · {acesso.email}</span>
+              <span className="text-slate-500">
+                {" "}
+                · {acesso.revogadoEm ? `revogado em ${formatDateIsoToBR(acesso.revogadoEm.slice(0, 10))}` : "ativo"}
+              </span>
+            </span>
+            {!acesso.revogadoEm ? (
+              <button
+                type="button"
+                className="rounded-xl border border-[#DCE5F4] px-3 py-1 text-xs font-semibold text-[#101D4A]"
+                disabled={salvando}
+                onClick={() => onEnviar({ acao: "revogar_acesso", id: acesso.id })}
+              >
+                Revogar
+              </button>
+            ) : null}
+          </li>
+        ))}
+        {acessos.length === 0 ? <li className="text-sm text-slate-500">Nenhum acesso concedido.</li> : null}
+      </ul>
+    </section>
   );
 }

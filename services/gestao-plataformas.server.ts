@@ -1,6 +1,8 @@
 import "server-only";
 
+import { erroConferenciaDocumento } from "@/lib/acesso-externo-agrovias";
 import { todayIsoSaoPaulo } from "@/lib/agendamento-datetime";
+import { isPerfilAdmin } from "@/lib/permissions";
 import type { AuditoriaUsuarioContext } from "@/lib/auditoria";
 import {
   ABRANGENCIAS_REQUISITO,
@@ -12,11 +14,14 @@ import {
   type AlocacaoRegistro,
   type CertificadoRegistro,
   type CursoCatalogo,
+  type AcessoExternoRegistro,
+  type DocumentoRhEvento,
   type DocumentoRhRegistro,
   type LiberacaoRegistro,
   type ObraRegistro,
   type PlataformaRegistro,
   type RequisitoRegistro,
+  type SituacaoDocumentoRh,
   type SituacaoRequisito,
   type TipoRequisito,
   idsParaVincular,
@@ -72,6 +77,9 @@ export type PainelGestaoPlataformas = {
   cursos: CursoCatalogo[];
   certificados: CertificadoRegistro[];
   documentosRh: DocumentoRhRegistro[];
+  documentosRhEventos: DocumentoRhEvento[];
+  acessosExternos: AcessoExternoRegistro[];
+  podeConcederAcesso: boolean;
   agendamentos: AgendamentoVinculavel[];
 };
 
@@ -242,6 +250,9 @@ export async function carregarGestaoPlataformas(params: {
     cursosRes,
     certificadosRes,
     documentosRes,
+    documentosEventosRes,
+    acessosRes,
+    adminPerfilRes,
     colaboradoresRes,
     agendamentosRes,
   ] = await Promise.all([
@@ -296,9 +307,27 @@ export async function carregarGestaoPlataformas(params: {
       .order("realizado_em", { ascending: false }),
     admin
       .from("gestao_plataforma_documentos_rh")
-      .select("id, colaborador_id, identificacao, incluido_em, arquivo_nome, arquivo_path")
+      .select(
+        "id, colaborador_id, identificacao, incluido_em, arquivo_nome, arquivo_path, situacao, observacao"
+      )
       .eq("cliente_id", clienteId)
       .order("incluido_em", { ascending: false }),
+    admin
+      .from("gestao_plataforma_documento_rh_eventos")
+      .select("id, documento_id, situacao, observacao, responsavel, registrado_em")
+      .eq("cliente_id", clienteId)
+      .order("registrado_em", { ascending: false })
+      .limit(400),
+    admin
+      .from("gestao_plataforma_acessos_externos")
+      .select("id, email, nome, concedido_em, revogado_em")
+      .eq("cliente_id", clienteId)
+      .order("concedido_em", { ascending: false }),
+    admin
+      .from("perfis_usuarios")
+      .select("perfil, ativo")
+      .eq("user_id", params.actor.usuarioId ?? "")
+      .maybeSingle(),
     listarColaboradoresPortal(clienteId),
     admin
       .from("agendamentos")
@@ -307,6 +336,28 @@ export async function carregarGestaoPlataformas(params: {
       .order("data_agendamento", { ascending: false })
       .limit(120),
   ]);
+
+  let documentosData = documentosRes.data as Record<string, unknown>[] | null;
+  let documentosErro = documentosRes.error;
+  if (documentosErro && tabelaAusente(documentosErro)) {
+    const legado = await admin
+      .from("gestao_plataforma_documentos_rh")
+      .select("id, colaborador_id, identificacao, incluido_em, arquivo_nome, arquivo_path")
+      .eq("cliente_id", clienteId)
+      .order("incluido_em", { ascending: false });
+    documentosData = (legado.data ?? null) as Record<string, unknown>[] | null;
+    documentosErro = legado.error;
+  }
+  const eventosDocumento = documentosEventosRes.error
+    ? tabelaAusente(documentosEventosRes.error)
+      ? []
+      : null
+    : ((documentosEventosRes.data ?? []) as Record<string, unknown>[]);
+  const acessos = acessosRes.error
+    ? tabelaAusente(acessosRes.error)
+      ? []
+      : null
+    : ((acessosRes.data ?? []) as Record<string, unknown>[]);
 
   const consulta = [
     plataformasRes.error,
@@ -317,7 +368,9 @@ export async function carregarGestaoPlataformas(params: {
     liberacoesRes.error,
     cursosRes.error,
     certificadosRes.error,
-    documentosRes.error,
+    documentosErro,
+    eventosDocumento === null ? documentosEventosRes.error : null,
+    acessos === null ? acessosRes.error : null,
   ].find(Boolean);
   if (consulta) {
     if (tabelaAusente(consulta)) {
@@ -375,16 +428,40 @@ export async function carregarGestaoPlataformas(params: {
           arquivoPath: row.arquivo_path ? texto(row.arquivo_path) : null,
         })
       ),
-      documentosRh: ((documentosRes.data ?? []) as Record<string, unknown>[]).map(
+      documentosRh: ((documentosData ?? []) as Record<string, unknown>[]).map(
         (row) => ({
           id: String(row.id),
           colaboradorId: texto(row.colaborador_id),
           identificacao: texto(row.identificacao),
-          incluidoEm: String(row.incluido_em),
+          incluidoEm: String(row.incluido_em ?? ""),
           arquivoNome: texto(row.arquivo_nome),
           arquivoPath: texto(row.arquivo_path),
+          situacao: (texto(row.situacao) || "recebido") as SituacaoDocumentoRh,
+          observacao: row.observacao ? texto(row.observacao) : null,
         })
       ),
+      documentosRhEventos: (eventosDocumento ?? []).map(
+        (row) => ({
+          id: String(row.id),
+          documentoId: String(row.documento_id),
+          situacao: texto(row.situacao) as SituacaoDocumentoRh,
+          observacao: row.observacao ? texto(row.observacao) : null,
+          responsavel: row.responsavel ? texto(row.responsavel) : null,
+          registradoEm: String(row.registrado_em),
+        })
+      ),
+      acessosExternos: (acessos ?? []).map(
+        (row) => ({
+          id: String(row.id),
+          email: texto(row.email),
+          nome: texto(row.nome),
+          concedidoEm: String(row.concedido_em),
+          revogadoEm: row.revogado_em ? String(row.revogado_em) : null,
+        })
+      ),
+      podeConcederAcesso:
+        adminPerfilRes.data?.ativo !== false &&
+        isPerfilAdmin(adminPerfilRes.data?.perfil),
       agendamentos: agendamentosRes.error
         ? []
         : ((agendamentosRes.data ?? []) as Record<string, unknown>[]).map(
@@ -446,6 +523,18 @@ export async function executarGestaoPlataformas(params: {
   const admin = createAdminClient();
   const agora = new Date().toISOString();
   const acao = params.acao;
+
+  if (
+    acao.acao === "solicitar_documento" ||
+    acao.acao === "conferir_documento" ||
+    acao.acao === "solicitar_reenvio"
+  ) {
+    return tratarDocumentoRh({ admin, escopoClienteId: escopo.clienteId, acao, responsavel: params.actor.usuarioNome, agora });
+  }
+
+  if (acao.acao === "conceder_acesso" || acao.acao === "revogar_acesso") {
+    return tratarAcessoExterno({ admin, escopoClienteId: escopo.clienteId, acao, actor: params.actor, agora });
+  }
 
   if (acao.acao === "salvar_plataforma") {
     const erroEntrada = validarPlataformaEntrada(acao);
@@ -940,6 +1029,254 @@ export async function executarGestaoPlataformas(params: {
       status: 409,
       error: mensagemBanco(error, "Não foi possível registrar a liberação."),
     };
+  }
+  return { ok: true };
+}
+
+type AdminGestao = ReturnType<typeof createAdminClient>;
+
+async function registrarEventoDocumento(params: {
+  admin: AdminGestao;
+  clienteId: string;
+  documentoId: string;
+  situacao: SituacaoDocumentoRh;
+  observacao?: string | null;
+  responsavel: string;
+}): Promise<void> {
+  await params.admin.from("gestao_plataforma_documento_rh_eventos").insert({
+    cliente_id: params.clienteId,
+    documento_id: params.documentoId,
+    situacao: params.situacao,
+    observacao: params.observacao?.trim() || null,
+    responsavel: params.responsavel,
+  });
+}
+
+async function tratarDocumentoRh(params: {
+  admin: AdminGestao;
+  escopoClienteId: string;
+  acao: Extract<
+    AcaoGestaoPlataformas,
+    { acao: "solicitar_documento" | "conferir_documento" | "solicitar_reenvio" }
+  >;
+  responsavel: string;
+  agora: string;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const { admin, escopoClienteId, acao, responsavel } = params;
+  if (acao.acao === "solicitar_documento") {
+    const identificacao = acao.identificacao.trim();
+    if (identificacao.length < 2) {
+      return { ok: false, status: 400, error: "Informe o documento solicitado." };
+    }
+    const { colaboradores } = await listarColaboradoresPortal(escopoClienteId);
+    if (!colaboradores.some((linha) => linha.id === acao.colaboradorId.trim())) {
+      return { ok: false, status: 404, error: "Colaborador não encontrado." };
+    }
+    const { data, error } = await admin
+      .from("gestao_plataforma_documentos_rh")
+      .insert({
+        cliente_id: escopoClienteId,
+        colaborador_id: acao.colaboradorId.trim(),
+        identificacao,
+        situacao: "aguardando_envio",
+        arquivo_path: null,
+        arquivo_nome: null,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      return { ok: false, status: 409, error: "Não foi possível solicitar o documento." };
+    }
+    await registrarEventoDocumento({
+      admin,
+      clienteId: escopoClienteId,
+      documentoId: String(data.id),
+      situacao: "aguardando_envio",
+      responsavel,
+    });
+    return { ok: true };
+  }
+
+  const { data: documento, error } = await admin
+    .from("gestao_plataforma_documentos_rh")
+    .select("id, situacao")
+    .eq("id", acao.id)
+    .eq("cliente_id", escopoClienteId)
+    .maybeSingle();
+  if (error || !documento) {
+    return { ok: false, status: 404, error: "Documento não encontrado." };
+  }
+  const situacao = String(documento.situacao) as SituacaoDocumentoRh;
+  const erroRegra = erroConferenciaDocumento({
+    situacao,
+    acao: acao.acao === "conferir_documento" ? "conferir" : "reenvio",
+    observacao: acao.acao === "solicitar_reenvio" ? acao.observacao : null,
+  });
+  if (erroRegra) return { ok: false, status: 409, error: erroRegra };
+
+  if (acao.acao === "conferir_documento") {
+    const { error: updateErro } = await admin
+      .from("gestao_plataforma_documentos_rh")
+      .update({
+        situacao: "conferido",
+        conferido_em: params.agora,
+        conferido_por: responsavel,
+        observacao: null,
+      })
+      .eq("id", acao.id)
+      .eq("cliente_id", escopoClienteId);
+    if (updateErro) {
+      return { ok: false, status: 409, error: "Não foi possível conferir o documento." };
+    }
+    await registrarEventoDocumento({
+      admin,
+      clienteId: escopoClienteId,
+      documentoId: acao.id,
+      situacao: "conferido",
+      responsavel,
+    });
+    return { ok: true };
+  }
+
+  const observacao = acao.observacao.trim();
+  const { error: updateErro } = await admin
+    .from("gestao_plataforma_documentos_rh")
+    .update({
+      situacao: "reenvio_solicitado",
+      observacao,
+    })
+    .eq("id", acao.id)
+    .eq("cliente_id", escopoClienteId);
+  if (updateErro) {
+    return { ok: false, status: 409, error: "Não foi possível pedir o reenvio." };
+  }
+  await registrarEventoDocumento({
+    admin,
+    clienteId: escopoClienteId,
+    documentoId: acao.id,
+    situacao: "reenvio_solicitado",
+    observacao,
+    responsavel,
+  });
+  return { ok: true };
+}
+
+async function usuarioAuthPorEmail(
+  admin: AdminGestao,
+  email: string
+): Promise<{ id: string; email: string } | null> {
+  const direto = await admin.schema("auth").from("users").select("id, email").ilike("email", email).maybeSingle();
+  if (!direto.error && direto.data?.id) {
+    return { id: String(direto.data.id), email: String(direto.data.email ?? email) };
+  }
+  for (let pagina = 1; pagina <= 5; pagina += 1) {
+    const lista = await admin.auth.admin.listUsers({ page: pagina, perPage: 200 });
+    const encontrado = lista.data.users.find(
+      (usuario) => String(usuario.email ?? "").toLowerCase() === email
+    );
+    if (encontrado) return { id: encontrado.id, email: encontrado.email ?? email };
+    if (lista.data.users.length < 200) break;
+  }
+  return null;
+}
+
+async function tratarAcessoExterno(params: {
+  admin: AdminGestao;
+  escopoClienteId: string;
+  acao: Extract<AcaoGestaoPlataformas, { acao: "conceder_acesso" | "revogar_acesso" }>;
+  actor: AuditoriaUsuarioContext;
+  agora: string;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const { data: perfilAtor } = await params.admin
+    .from("perfis_usuarios")
+    .select("perfil, ativo")
+    .eq("user_id", params.actor.usuarioId ?? "")
+    .maybeSingle();
+  if (perfilAtor?.ativo === false || !isPerfilAdmin(perfilAtor?.perfil)) {
+    return { ok: false, status: 403, error: "Somente um administrador Navarro concede ou revoga este acesso." };
+  }
+
+  if (params.acao.acao === "revogar_acesso") {
+    const { data: acesso } = await params.admin
+      .from("gestao_plataforma_acessos_externos")
+      .select("id, user_id")
+      .eq("id", params.acao.id)
+      .eq("cliente_id", params.escopoClienteId)
+      .is("revogado_em", null)
+      .maybeSingle();
+    if (!acesso) return { ok: false, status: 404, error: "Acesso ativo não encontrado." };
+    const { error } = await params.admin
+      .from("gestao_plataforma_acessos_externos")
+      .update({ revogado_em: params.agora, revogado_por: params.actor.usuarioId })
+      .eq("id", acesso.id);
+    if (error) return { ok: false, status: 409, error: "Não foi possível revogar o acesso." };
+    await params.admin
+      .from("perfis_usuarios")
+      .update({ ativo: false })
+      .eq("user_id", acesso.user_id)
+      .eq("perfil", "portal_agrovias");
+    return { ok: true };
+  }
+
+  const email = params.acao.email.trim().toLowerCase();
+  const nome = params.acao.nome.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, status: 400, error: "Informe um e-mail válido." };
+  }
+  if (nome.length < 2) {
+    return { ok: false, status: 400, error: "Informe o nome de quem vai acessar." };
+  }
+  const usuario = await usuarioAuthPorEmail(params.admin, email);
+  if (!usuario) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Crie o usuário no Auth do Supabase antes de conceder o acesso. O convite real fica para depois da revisão.",
+    };
+  }
+  const { data: perfilAlvo } = await params.admin
+    .from("perfis_usuarios")
+    .select("perfil, ativo")
+    .eq("user_id", usuario.id)
+    .maybeSingle();
+  if (
+    perfilAlvo &&
+    perfilAlvo.ativo !== false &&
+    (perfilAlvo.perfil === "admin" || perfilAlvo.perfil === "operacional")
+  ) {
+    return { ok: false, status: 409, error: "Esta conta já é da equipe Navarro e não pode virar acesso externo." };
+  }
+  const { data: aberto } = await params.admin
+    .from("gestao_plataforma_acessos_externos")
+    .select("id")
+    .eq("user_id", usuario.id)
+    .is("revogado_em", null)
+    .maybeSingle();
+  if (aberto) {
+    return { ok: false, status: 409, error: "Este usuário já tem um acesso externo ativo." };
+  }
+  const { error: perfilErro } = await params.admin.from("perfis_usuarios").upsert(
+    {
+      user_id: usuario.id,
+      nome,
+      email: usuario.email,
+      perfil: "portal_agrovias",
+      ativo: true,
+    },
+    { onConflict: "user_id" }
+  );
+  if (perfilErro) {
+    return { ok: false, status: 409, error: "Não foi possível gravar o perfil externo." };
+  }
+  const { error: acessoErro } = await params.admin.from("gestao_plataforma_acessos_externos").insert({
+    user_id: usuario.id,
+    email: usuario.email,
+    nome,
+    cliente_id: params.escopoClienteId,
+    concedido_por: params.actor.usuarioId,
+  });
+  if (acessoErro) {
+    return { ok: false, status: 409, error: "Não foi possível conceder o acesso." };
   }
   return { ok: true };
 }

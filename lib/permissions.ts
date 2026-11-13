@@ -5,6 +5,8 @@ export type PerfilUsuarioTipo = "admin" | "operacional" | string;
 export type ProfilePermissionConfig = {
   fullAccess?: boolean;
   deniedPaths?: readonly string[];
+  /** Quando presente, só estes prefixos são permitidos. */
+  allowPaths?: readonly string[];
 };
 
 /**
@@ -25,6 +27,9 @@ export const PROFILE_PERMISSIONS: Record<string, ProfilePermissionConfig> = {
       "/gestao-comercial",
       "/usuarios",
     ],
+  },
+  portal_agrovias: {
+    allowPaths: ["/portal-agrovias"],
   },
 };
 
@@ -76,7 +81,18 @@ export function canAccessPath(
 
   const permissions = getPermissionsForPerfil(perfil);
   if (permissions.fullAccess) return true;
+  if (permissions.allowPaths) {
+    return permissions.allowPaths.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
+  }
 
   const denied = permissions.deniedPaths ?? [];
   return !isDeniedPath(pathname, denied);
+}
+
+export function isPerfilPortalAgrovias(
+  perfil: PerfilUsuarioTipo | null | undefined
+): boolean {
+  return String(perfil ?? "") === "portal_agrovias";
 }

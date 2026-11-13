@@ -9,7 +9,9 @@ import {
   type AcaoGestaoPlataformas,
   type CertificadoRegistro,
   type CursoCatalogo,
+  type DocumentoRhEvento,
   type DocumentoRhRegistro,
+  SITUACAO_DOCUMENTO_RH_LABEL,
   type ObraRegistro,
   type PlataformaRegistro,
 } from "@/lib/gestao-plataformas";
@@ -114,6 +116,7 @@ export function GestaoFichaColaborador({
   cursos,
   certificados,
   documentosRh,
+  documentosRhEventos = [],
   salvando,
   escBloqueado = false,
   onFechar,
@@ -130,6 +133,7 @@ export function GestaoFichaColaborador({
   cursos: CursoCatalogo[];
   certificados: CertificadoRegistro[];
   documentosRh: DocumentoRhRegistro[];
+  documentosRhEventos?: DocumentoRhEvento[];
   salvando: boolean;
   escBloqueado?: boolean;
   onFechar: () => void;
@@ -150,6 +154,9 @@ export function GestaoFichaColaborador({
   const [realizadoEm, setRealizadoEm] = useState("");
   const [validade, setValidade] = useState("");
   const [identificacao, setIdentificacao] = useState("");
+  const [pedido, setPedido] = useState("");
+  const [reenvioId, setReenvioId] = useState<string | null>(null);
+  const [reenvioTexto, setReenvioTexto] = useState("");
   const [proximos, setProximos] = useState<ExameLinha[]>(examesIniciais?.proximos ?? []);
   const [realizados, setRealizados] = useState<ExameLinha[]>(examesIniciais?.realizados ?? []);
   const [examesEstado, setExamesEstado] = useState<"carregando" | "ok" | "falha">(
@@ -579,19 +586,108 @@ export function GestaoFichaColaborador({
                   Anexar
                 </button>
               </form>
-              <ul className="space-y-2">
-                {documentosPessoa.map((item) => (
-                  <li key={item.id} className="text-sm">
-                    <button type="button" className="text-left font-medium text-[#101D4A] underline" onClick={() => void abrirArquivo("rh", item.id)}>
-                      {item.identificacao}
-                    </button>
-                    <p className="text-xs text-slate-500">
-                      {formatDateIsoToBR(item.incluidoEm.slice(0, 10))} · {item.arquivoNome}
-                    </p>
-                  </li>
-                ))}
+              <form
+                className="grid gap-2 border-t border-[#DCE5F4] pt-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const identificacaoPedido = pedido.trim();
+                  if (identificacaoPedido.length < 2) return;
+                  onEnviar({
+                    acao: "solicitar_documento",
+                    colaboradorId: colaborador.id,
+                    identificacao: identificacaoPedido,
+                  });
+                  setPedido("");
+                }}
+              >
+                <input className={INPUT} placeholder="Documento a solicitar" value={pedido} onChange={(event) => setPedido(event.target.value)} required />
+                <button type="submit" className="rounded-xl border border-[#DCE5F4] px-4 py-2 text-sm font-semibold text-[#101D4A] disabled:opacity-60" disabled={salvando}>
+                  Solicitar documento
+                </button>
+              </form>
+              <ul className="space-y-3">
+                {documentosPessoa.map((item) => {
+                  const historico = documentosRhEventos.filter((evento) => evento.documentoId === item.id);
+                  const situacao = item.situacao || "recebido";
+                  return (
+                    <li key={item.id} className="rounded-xl border border-[#DCE5F4] px-3 py-2 text-sm">
+                      <p className="font-semibold text-[#101D4A]">{item.identificacao}</p>
+                      <p className="text-xs text-slate-500">
+                        {SITUACAO_DOCUMENTO_RH_LABEL[situacao]}
+                        {item.arquivoNome ? ` · ${item.arquivoNome}` : ""}
+                      </p>
+                      {item.observacao ? (
+                        <p className="mt-1 text-xs text-amber-800">{item.observacao}</p>
+                      ) : null}
+                      {item.arquivoPath ? (
+                        <button type="button" className="btn mt-2" onClick={() => void abrirArquivo("rh", item.id)}>
+                          Abrir arquivo
+                        </button>
+                      ) : null}
+                      {situacao === "recebido" ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="rounded-xl bg-[#101D4A] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                            disabled={salvando}
+                            onClick={() => onEnviar({ acao: "conferir_documento", id: item.id })}
+                          >
+                            Conferir
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-xl border border-[#DCE5F4] px-3 py-1.5 text-xs font-semibold text-[#101D4A]"
+                            onClick={() => {
+                              setReenvioId(item.id);
+                              setReenvioTexto("");
+                            }}
+                          >
+                            Pedir reenvio
+                          </button>
+                        </div>
+                      ) : null}
+                      {reenvioId === item.id ? (
+                        <form
+                          className="mt-2 grid gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            onEnviar({
+                              acao: "solicitar_reenvio",
+                              id: item.id,
+                              observacao: reenvioTexto,
+                            });
+                            setReenvioId(null);
+                            setReenvioTexto("");
+                          }}
+                        >
+                          <textarea
+                            className="min-h-16 w-full rounded-xl border border-[#DCE5F4] px-3 py-2 text-sm"
+                            value={reenvioTexto}
+                            onChange={(event) => setReenvioTexto(event.target.value)}
+                            placeholder="Observação visível para a AGROVIAS"
+                            required
+                          />
+                          <button type="submit" className="rounded-xl bg-[#4945FF] px-3 py-1.5 text-xs font-semibold text-white" disabled={salvando}>
+                            Enviar pedido de reenvio
+                          </button>
+                        </form>
+                      ) : null}
+                      {historico.length > 0 ? (
+                        <ul className="mt-2 space-y-1 text-xs text-slate-500">
+                          {historico.map((evento) => (
+                            <li key={evento.id}>
+                              {formatDateIsoToBR(evento.registradoEm.slice(0, 10))} · {SITUACAO_DOCUMENTO_RH_LABEL[evento.situacao]}
+                              {evento.responsavel ? ` · ${evento.responsavel}` : ""}
+                              {evento.observacao ? ` · ${evento.observacao}` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  );
+                })}
                 {documentosPessoa.length === 0 ? (
-                  <li className="text-sm text-slate-500">Nenhum documento de RH anexado.</li>
+                  <li className="text-sm text-slate-500">Nenhum documento de RH nesta ficha.</li>
                 ) : null}
               </ul>
             </section>

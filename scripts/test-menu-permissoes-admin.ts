@@ -101,4 +101,15 @@ assert.equal(canAccessPath("admin", "/gestao-comercial"), true);
 assert.equal(canAccessPath("admin", "/usuarios"), true);
 assert.equal(canAccessPath("admin", "/portal"), true);
 
+assert.equal(canAccessPath("portal_agrovias", "/portal-agrovias"), true);
+assert.equal(canAccessPath("portal_agrovias", "/portal-agrovias/ficha"), true);
+assert.equal(canAccessPath("portal_agrovias", "/"), false);
+assert.equal(canAccessPath("portal_agrovias", "/dashboard"), false);
+assert.equal(canAccessPath("portal_agrovias", "/gestao-plataformas"), false);
+assert.equal(canAccessPath("portal_agrovias", "/portal"), false);
+assert.equal(canAccessPath("portal_agrovias", "/faturas-clientes"), false);
+assert.equal(canAccessPath("portal_agrovias", "/cobrancas"), false);
+assert.equal(canAccessPath("portal_agrovias", "/gestao-comercial"), false);
+assert.equal(filterNavSectionsByPerfil(NAV_SECTIONS, "portal_agrovias").length, 0);
+
 console.log("test-menu-permissoes-admin: OK");

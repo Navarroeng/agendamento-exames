@@ -23,6 +23,11 @@ const ACOES = new Set<AcaoGestaoPlataformas["acao"]>([
   "inativar_curso",
   "reativar_curso",
   "vincular_lote",
+  "solicitar_documento",
+  "conferir_documento",
+  "solicitar_reenvio",
+  "conceder_acesso",
+  "revogar_acesso",
 ]);
 
 export async function GET() {

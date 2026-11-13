@@ -79,10 +79,17 @@ function NavLink({
 function useNavSections() {
   const { profile } = useAuth();
 
-  return useMemo(
-    () => filterNavSectionsByPerfil(NAV_SECTIONS, profile?.perfil),
-    [profile?.perfil]
-  );
+  return useMemo(() => {
+    if (profile?.perfil === "portal_agrovias") {
+      return [
+        {
+          title: "AGROVIAS",
+          items: [{ iconKey: "users" as const, label: "Colaboradores", href: "/portal-agrovias" }],
+        },
+      ];
+    }
+    return filterNavSectionsByPerfil(NAV_SECTIONS, profile?.perfil);
+  }, [profile?.perfil]);
 }
 
 function SidebarPanel({ onNavigate }: { onNavigate?: () => void }) {

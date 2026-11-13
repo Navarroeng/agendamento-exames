@@ -3,7 +3,9 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { PORTAL_AGROVIAS_PATH } from "@/lib/acesso-externo-agrovias";
 import { canAccessPath, SEM_PERMISSAO_PATH } from "@/lib/perfil-access";
+import { isPerfilPortalAgrovias } from "@/lib/permissions";
 import { Header } from "./Header";
 import { MobileMenu, MobileMenuButton, Sidebar } from "./Sidebar";
 
@@ -35,7 +37,11 @@ export function AppShell({
       router.replace("/login");
       return;
     }
-    if (!allowed) router.replace(SEM_PERMISSAO_PATH);
+    if (!allowed) {
+      router.replace(
+        isPerfilPortalAgrovias(profile.perfil) ? PORTAL_AGROVIAS_PATH : SEM_PERMISSAO_PATH
+      );
+    }
   }, [loading, profile, allowed, router]);
 
   if (loading || !profile || !allowed) return null;
