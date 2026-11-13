@@ -468,6 +468,115 @@ export function vagaStatusBloqueiaEdicao(status: ContratoVagaStatus): boolean {
  * Só vaga comprometida, sem agendamento nem periódico futuro.
  * Não apaga a linha: o ocupante é limpo e o status volta para aberta.
  */
+export type SinaisOcupacaoVaga = {
+  status?: string | null;
+  colaborador?: string | null;
+  colaboradorCpf?: string | null;
+  colaboradorOrigemId?: string | null;
+  agendamentoId?: string | null;
+  periodicoFuturoId?: string | null;
+  creditoAsoId?: string | null;
+};
+
+function sinalPreenchido(value: string | null | undefined): boolean {
+  return String(value ?? "").trim().length > 0;
+}
+
+/** Nome, CPF válido ou cadastro de origem identificam o colaborador da vaga. */
+export function vagaTemColaboradorVinculado(vaga: SinaisOcupacaoVaga): boolean {
+  return (
+    isNomeFuncionarioReal(vaga.colaborador) ||
+    isValidCPF(normalizeCpfDigits(vaga.colaboradorCpf)) ||
+    sinalPreenchido(vaga.colaboradorOrigemId)
+  );
+}
+
+/**
+ * Reserva que não pode ser sobrescrita: exame, agendamento, ASO em aberto
+ * ou o status operacional correspondente. O status Comprometido sozinho não reserva.
+ */
+export function vagaTemReservaValida(vaga: SinaisOcupacaoVaga): boolean {
+  const status = String(vaga.status ?? "").trim();
+  if (
+    status === "programada" ||
+    status === "agendada" ||
+    status === "aso_aberto" ||
+    status === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
+  ) {
+    return true;
+  }
+  return (
+    sinalPreenchido(vaga.agendamentoId) ||
+    sinalPreenchido(vaga.periodicoFuturoId) ||
+    sinalPreenchido(vaga.creditoAsoId)
+  );
+}
+
+/**
+ * Comprometido gravado sem ocupante, reserva ou vínculo.
+ * Ao reabrir a lista, a vaga volta a ser livre.
+ */
+export function vagaComprometidaResidual(vaga: SinaisOcupacaoVaga): boolean {
+  return (
+    String(vaga.status ?? "").trim() === "comprometida" &&
+    !vagaTemColaboradorVinculado(vaga) &&
+    !vagaTemReservaValida(vaga)
+  );
+}
+
+/** Linha vazia com vínculo ou reserva: mostra quem está ligado ou o motivo. */
+export function textoVinculoOuReservaVaga(
+  vaga: SinaisOcupacaoVaga
+): string | null {
+  if (vagaComprometidaResidual(vaga)) return null;
+  if (isNomeFuncionarioReal(vaga.colaborador)) return null;
+  if (isValidCPF(normalizeCpfDigits(vaga.colaboradorCpf))) return null;
+  if (sinalPreenchido(vaga.colaboradorOrigemId)) {
+    return "Cadastro da empresa vinculado";
+  }
+  if (sinalPreenchido(vaga.agendamentoId) || vaga.status === "agendada") {
+    return "Agendamento vinculado";
+  }
+  if (sinalPreenchido(vaga.periodicoFuturoId) || vaga.status === "programada") {
+    return "Exame futuro programado";
+  }
+  if (sinalPreenchido(vaga.creditoAsoId) || vaga.status === "aso_aberto") {
+    return "ASO em aberto reservado";
+  }
+  return null;
+}
+
+export function textoConfirmacaoLiberarVaga(input: {
+  temColaborador: boolean;
+  nome?: string | null;
+}): {
+  botao: string;
+  titulo: string;
+  confirmLabel: string;
+  mensagem: string;
+  sucesso: string;
+} {
+  if (input.temColaborador) {
+    const nome = normalizeNomeOcupante(input.nome) || "O colaborador";
+    return {
+      botao: "Desvincular colaborador da vaga",
+      titulo: "Desvincular colaborador da vaga",
+      confirmLabel: "Desvincular colaborador da vaga",
+      mensagem: `${nome} será desvinculado desta vaga. O cadastro em Clientes → Colaboradores será preservado. A vaga continuará disponível.`,
+      sucesso:
+        "Colaborador desvinculado da vaga. O cadastro em Clientes foi preservado.",
+    };
+  }
+  return {
+    botao: "Liberar vaga",
+    titulo: "Liberar vaga",
+    confirmLabel: "Liberar vaga",
+    mensagem:
+      "Esta ação só libera a reserva da vaga. Nenhum colaborador está vinculado. A vaga voltará para Em aberto.",
+    sucesso: "Vaga liberada. Ela voltou para Em aberto.",
+  };
+}
+
 export function vagaPermiteRemoverFuncionario(
   vaga: {
     status?: ContratoVagaStatus | null;

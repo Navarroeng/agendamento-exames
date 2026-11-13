@@ -9,6 +9,7 @@ import {
   normalizeNomeOcupante,
   resolveStatusVagaRascunho,
   statusClassificacaoVaga,
+  vagaComprometidaResidual,
   type ContextoClassificacaoDesligamentoVaga,
   type ContratoVagaDraft,
   type ContratoVagaRecord,
@@ -87,15 +88,44 @@ export function numerarLinhasListaFuncionarios<T extends ContratoVagaDraft>(
 
 export function resolveStatusListaFuncionarioPreview(params: {
   persistida?: (Pick<ContratoVagaRecord, "status"> &
-    Partial<Pick<ContratoVagaRecord, "colaborador_cpf">>) | null;
+    Partial<
+      Pick<
+        ContratoVagaRecord,
+        | "colaborador"
+        | "colaborador_cpf"
+        | "colaborador_origem"
+        | "agendamento_id"
+        | "periodico_futuro_id"
+        | "credito_aso_id"
+      >
+    >) | null;
   draft: Pick<
     ContratoVagaDraft,
     "colaborador" | "colaboradorCpf" | "manterAsoAberto"
   >;
   desligamento?: ContextoClassificacaoDesligamentoVaga | null;
 }): ContratoVagaStatusClassificacao {
-  if (params.persistida) {
-    return statusClassificacaoVaga(params.persistida, params.desligamento);
+  const persistida = params.persistida;
+  if (
+    persistida &&
+    vagaComprometidaResidual({
+      status: persistida.status,
+      colaborador: persistida.colaborador,
+      colaboradorCpf: persistida.colaborador_cpf,
+      colaboradorOrigemId: persistida.colaborador_origem,
+      agendamentoId: persistida.agendamento_id,
+      periodicoFuturoId: persistida.periodico_futuro_id,
+      creditoAsoId: persistida.credito_aso_id,
+    })
+  ) {
+    return resolveStatusVagaRascunho({
+      colaborador: params.draft.colaborador,
+      colaboradorCpf: params.draft.colaboradorCpf,
+      manterAsoAberto: params.draft.manterAsoAberto,
+    });
+  }
+  if (persistida) {
+    return statusClassificacaoVaga(persistida, params.desligamento);
   }
   return resolveStatusVagaRascunho({
     colaborador: params.draft.colaborador,

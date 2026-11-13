@@ -3,8 +3,15 @@ import {
   CONTRATO_VAGA_STATUS_LABELS,
   emptyVagaDraft,
   resolveStatusVagaRascunho,
+  textoConfirmacaoLiberarVaga,
+  textoVinculoOuReservaVaga,
+  vagaComprometidaResidual,
 } from "../lib/contrato-vagas";
 import { aplicarImportacaoNasVagas } from "../lib/contrato-vagas-import";
+import {
+  labelStatusListaFuncionario,
+  resolveStatusListaFuncionarioPreview,
+} from "../lib/contrato-vagas-lista";
 import { isValidCPF } from "../lib/cpf";
 import {
   MENSAGEM_LISTA_JA_VINCULADA,
@@ -294,29 +301,90 @@ assert.equal(
 }
 
 {
-  const reserva: VagaListaCliente = {
+  const residual: VagaListaCliente = {
     indice: 1,
     status: "comprometida",
     colaborador: null,
     colaboradorCpf: null,
     colaboradorOrigemId: null,
   };
-  const comReserva = avaliarUsoListaColaboradoresCliente({
+  const comResidual = avaliarUsoListaColaboradoresCliente({
     quantidadeContratada: 3,
     colaboradores: [
       pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
       pessoa(CPF_B, "JOAO", CPF_B),
     ],
-    vagas: [reserva, vagaLivre(2), vagaLivre(3)],
+    vagas: [residual, vagaLivre(2), vagaLivre(3)],
+  });
+  assert.equal(comResidual.ok, true);
+  if (!comResidual.ok) throw new Error("residual");
+  assert.deepEqual(
+    comResidual.atribuicoes.map((item) => item.indice),
+    [1, 2]
+  );
+  assert.equal(residual.colaborador, null);
+  assert.equal(comResidual.omitidos, 0);
+}
+
+{
+  const quatroLivres = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 4,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+      pessoa(CPF_D, "RITA", CPF_D),
+    ],
+    vagas: [
+      {
+        indice: 1,
+        status: "comprometida",
+        colaborador: null,
+        colaboradorCpf: null,
+        colaboradorOrigemId: null,
+      },
+      vagaLivre(2),
+      vagaLivre(3),
+      vagaLivre(4),
+    ],
+  });
+  assert.equal(quatroLivres.ok, true);
+  if (!quatroLivres.ok) throw new Error("quatro");
+  assert.equal(quatroLivres.omitidos, 0);
+  assert.deepEqual(
+    quatroLivres.atribuicoes.map((item) => item.indice),
+    [1, 2, 3, 4]
+  );
+}
+
+{
+  const reservaValida: VagaListaCliente = {
+    indice: 1,
+    status: "comprometida",
+    colaborador: null,
+    colaboradorCpf: null,
+    colaboradorOrigemId: null,
+    periodicoFuturoId: "periodico-reserva",
+  };
+  const comReserva = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 4,
+    colaboradores: [
+      pessoa(CPF_A, "MARIA", CPF_A, CADASTRO),
+      pessoa(CPF_B, "JOAO", CPF_B),
+      pessoa(CPF_C, "ANA", CPF_C),
+      pessoa(CPF_D, "RITA", CPF_D),
+    ],
+    vagas: [reservaValida, vagaLivre(2), vagaLivre(3), vagaLivre(4)],
   });
   assert.equal(comReserva.ok, true);
   if (!comReserva.ok) throw new Error("reserva");
   assert.deepEqual(
     comReserva.atribuicoes.map((item) => item.indice),
-    [2, 3]
+    [2, 3, 4]
   );
-  assert.equal(reserva.colaborador, null);
-  assert.equal(comReserva.omitidos, 0);
+  assert.equal(comReserva.omitidos, 1);
+  assert.equal(reservaValida.periodicoFuturoId, "periodico-reserva");
+  assert.equal(reservaValida.colaborador, null);
 }
 
 {
@@ -333,6 +401,7 @@ assert.equal(
     colaborador: "",
     colaboradorCpf: "",
     colaboradorOrigemId: null,
+    creditoAsoId: "credito-reserva",
   };
   const incompleta = avaliarUsoListaColaboradoresCliente({
     quantidadeContratada: 3,
@@ -352,6 +421,81 @@ assert.equal(
   assert.equal(incompleta.mensagem, mensagemListaIncompleta(1, 2));
   assert.equal(protegida1.colaborador, "OUTRA");
   assert.equal(protegida2.status, "comprometida");
+  assert.equal(protegida2.creditoAsoId, "credito-reserva");
+}
+
+{
+  const persistida = {
+    status: "comprometida" as const,
+    colaborador: null,
+    colaborador_cpf: null,
+    colaborador_origem: null,
+    agendamento_id: null,
+    periodico_futuro_id: null,
+    credito_aso_id: null,
+  };
+  const draft = emptyVagaDraft(1);
+  assert.equal(vagaComprometidaResidual({ status: persistida.status }), true);
+  assert.equal(
+    resolveStatusListaFuncionarioPreview({ persistida, draft }),
+    "aberta"
+  );
+  assert.equal(
+    labelStatusListaFuncionario({ persistida, draft }),
+    "Em aberto"
+  );
+  assert.equal(
+    resolveStatusVagaRascunho({
+      statusAtual: "comprometida",
+      colaborador: "",
+      colaboradorCpf: "",
+      manterAsoAberto: false,
+    }),
+    "aberta"
+  );
+  assert.equal(textoVinculoOuReservaVaga({ status: "comprometida" }), null);
+
+  const comExame = {
+    ...persistida,
+    periodico_futuro_id: "periodico-reserva",
+  };
+  assert.equal(
+    vagaComprometidaResidual({
+      status: comExame.status,
+      periodicoFuturoId: comExame.periodico_futuro_id,
+    }),
+    false
+  );
+  assert.equal(
+    resolveStatusListaFuncionarioPreview({ persistida: comExame, draft }),
+    "comprometida"
+  );
+  assert.equal(
+    textoVinculoOuReservaVaga({
+      status: "comprometida",
+      periodicoFuturoId: "periodico-reserva",
+    }),
+    "Exame futuro programado"
+  );
+  assert.equal(
+    textoVinculoOuReservaVaga({
+      status: "comprometida",
+      colaboradorOrigemId: CADASTRO,
+    }),
+    "Cadastro da empresa vinculado"
+  );
+
+  const desvincular = textoConfirmacaoLiberarVaga({
+    temColaborador: true,
+    nome: "MARIA",
+  });
+  assert.equal(desvincular.botao, "Desvincular colaborador da vaga");
+  assert.equal(desvincular.titulo, "Desvincular colaborador da vaga");
+  assert.match(desvincular.mensagem, /cadastro em Clientes → Colaboradores será preservado/);
+  const liberar = textoConfirmacaoLiberarVaga({ temColaborador: false });
+  assert.equal(liberar.botao, "Liberar vaga");
+  assert.equal(liberar.titulo, "Liberar vaga");
+  assert.match(liberar.mensagem, /libera a reserva da vaga/);
 }
 
 {
