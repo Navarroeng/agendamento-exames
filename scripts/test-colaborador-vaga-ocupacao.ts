@@ -286,8 +286,11 @@ assert.match(aba, /Abrir Cliente/);
 assert.match(aba, /textoConfirmacaoLiberarVaga/);
 assert.match(aba, /vagaComprometidaResidual/);
 const regras = readFileSync(join(process.cwd(), "lib/contrato-vagas.ts"), "utf8");
-assert.match(regras, /Desvincular colaborador da vaga/);
+assert.match(regras, /Desvincular da vaga/);
 assert.match(regras, /Liberar vaga/);
-assert.match(regras, /cadastro em Clientes → Colaboradores será preservado/);
+assert.match(
+  regras,
+  /A vaga ficará em aberto\. O colaborador continuará cadastrado em Clientes → Colaboradores\./
+);
 
 console.log("test-colaborador-vaga-ocupacao: ok");

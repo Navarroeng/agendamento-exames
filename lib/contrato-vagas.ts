@@ -557,14 +557,14 @@ export function textoConfirmacaoLiberarVaga(input: {
   sucesso: string;
 } {
   if (input.temColaborador) {
-    const nome = normalizeNomeOcupante(input.nome) || "O colaborador";
     return {
-      botao: "Desvincular colaborador da vaga",
-      titulo: "Desvincular colaborador da vaga",
-      confirmLabel: "Desvincular colaborador da vaga",
-      mensagem: `${nome} será desvinculado desta vaga. O cadastro em Clientes → Colaboradores será preservado. A vaga continuará disponível.`,
+      botao: "Desvincular da vaga",
+      titulo: "Desvincular da vaga",
+      confirmLabel: "Desvincular da vaga",
+      mensagem:
+        "A vaga ficará em aberto. O colaborador continuará cadastrado em Clientes → Colaboradores.",
       sucesso:
-        "Colaborador desvinculado da vaga. O cadastro em Clientes foi preservado.",
+        "A vaga ficou em aberto. O colaborador continua cadastrado em Clientes → Colaboradores.",
     };
   }
   return {

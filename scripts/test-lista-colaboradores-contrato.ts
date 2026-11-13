@@ -489,9 +489,12 @@ assert.equal(
     temColaborador: true,
     nome: "MARIA",
   });
-  assert.equal(desvincular.botao, "Desvincular colaborador da vaga");
-  assert.equal(desvincular.titulo, "Desvincular colaborador da vaga");
-  assert.match(desvincular.mensagem, /cadastro em Clientes → Colaboradores será preservado/);
+  assert.equal(desvincular.botao, "Desvincular da vaga");
+  assert.equal(desvincular.titulo, "Desvincular da vaga");
+  assert.equal(
+    desvincular.mensagem,
+    "A vaga ficará em aberto. O colaborador continuará cadastrado em Clientes → Colaboradores."
+  );
   const liberar = textoConfirmacaoLiberarVaga({ temColaborador: false });
   assert.equal(liberar.botao, "Liberar vaga");
   assert.equal(liberar.titulo, "Liberar vaga");
