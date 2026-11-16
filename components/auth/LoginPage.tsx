@@ -5,8 +5,24 @@ import { NavarroLogo } from "@/components/layout/NavarroLogo";
 import { LoginBackground } from "./LoginBackground";
 
 export function LoginPage() {
-  const { email, setEmail, password, setPassword, loading, handleSubmit } =
-    useLoginForm();
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    loading,
+    handleSubmit,
+    linkInvalido,
+    senhaRedefinida,
+    mensagemSenhaRedefinida,
+    mensagemLinkInvalido,
+    recuperacaoAberta,
+    recuperacaoEnviada,
+    recuperacaoMensagem,
+    abrirRecuperacao,
+    voltarAoLogin,
+    solicitarRecuperacao,
+  } = useLoginForm();
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:py-16">
@@ -25,57 +41,151 @@ export function LoginPage() {
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-[26px] border border-white/20 bg-white/[0.97] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)] backdrop-blur-md sm:p-9"
-        >
-          <div className="space-y-5">
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-app-muted"
-              >
-                E-mail
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="field-input border-[#dfe5f0] bg-[#fafcff] transition focus:border-brand-blue focus:bg-white"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-app-muted"
-              >
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className="field-input border-[#dfe5f0] bg-[#fafcff] transition focus:border-brand-blue focus:bg-white"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-          </div>
+        <div className="rounded-[26px] border border-white/20 bg-white/[0.97] p-8 shadow-[0_32px_80px_rgba(0,0,0,0.35)] backdrop-blur-md sm:p-9">
+          {senhaRedefinida && (
+            <p
+              role="status"
+              className="mb-5 rounded-xl border border-[#d7e4ff] bg-[#f4f7ff] px-4 py-3 text-sm leading-relaxed text-[#243056]"
+            >
+              {mensagemSenhaRedefinida}
+            </p>
+          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary mt-7 w-full justify-center py-3.5 text-[15px] shadow-btn-primary disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+          {linkInvalido && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-[#f3c7c7] bg-[#fff6f6] px-4 py-3 text-sm text-[#9f2d2d]"
+            >
+              <p className="font-medium leading-relaxed">{mensagemLinkInvalido}</p>
+              {!recuperacaoAberta && (
+                <button
+                  type="button"
+                  onClick={abrirRecuperacao}
+                  className="mt-2 font-bold text-[#9f2d2d] underline decoration-[#e7b0b0] underline-offset-2"
+                >
+                  Solicitar novo link
+                </button>
+              )}
+            </div>
+          )}
+
+          {recuperacaoAberta ? (
+            recuperacaoEnviada ? (
+              <div className="space-y-5">
+                <p
+                  role="status"
+                  className="rounded-xl border border-[#d7e4ff] bg-[#f4f7ff] px-4 py-3 text-sm leading-relaxed text-[#243056]"
+                >
+                  {recuperacaoMensagem}
+                </p>
+                <button
+                  type="button"
+                  onClick={voltarAoLogin}
+                  className="btn btn-primary w-full justify-center py-3.5 text-[15px]"
+                >
+                  Voltar ao login
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={solicitarRecuperacao} className="space-y-5">
+                <p className="text-sm leading-relaxed text-[#52617a]">
+                  Informe o e-mail da conta para receber o link de redefinição.
+                </p>
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-app-muted"
+                  >
+                    E-mail
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    className="field-input border-[#dfe5f0] bg-[#fafcff] transition focus:border-brand-blue focus:bg-white"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary w-full justify-center py-3.5 text-[15px] shadow-btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {loading ? "Enviando..." : "Enviar link de recuperação"}
+                </button>
+                <button
+                  type="button"
+                  onClick={voltarAoLogin}
+                  disabled={loading}
+                  className="w-full text-center text-sm font-semibold text-brand-blue hover:underline"
+                >
+                  Voltar ao login
+                </button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-5">
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-app-muted"
+                  >
+                    E-mail
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    className="field-input border-[#dfe5f0] bg-[#fafcff] transition focus:border-brand-blue focus:bg-white"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-app-muted"
+                  >
+                    Senha
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    className="field-input border-[#dfe5f0] bg-[#fafcff] transition focus:border-brand-blue focus:bg-white"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                  />
+                  <div className="mt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={abrirRecuperacao}
+                      className="text-sm font-semibold text-brand-blue hover:underline"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary mt-7 w-full justify-center py-3.5 text-[15px] shadow-btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? "Entrando..." : "Entrar"}
+              </button>
+            </form>
+          )}
+        </div>
 
         <p className="mt-7 text-center text-xs font-medium text-white/40">
           Navarro Engenharia — uso interno autorizado

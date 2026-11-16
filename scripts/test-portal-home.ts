@@ -954,7 +954,11 @@ run("somente staff Navarro no preview", () => {
 
 run("middleware não deixa /portal público", () => {
   const mw = readFileSync(join(root, "middleware.ts"), "utf8");
-  assert.match(mw, /PUBLIC_PATHS = new Set\(\["\/login", "\/sem-permissao"\]\)/);
+  assert.match(
+    mw,
+    /PUBLIC_PATHS = new Set\(\["\/login", REDEFINIR_SENHA_PATH, "\/sem-permissao"\]\)/
+  );
+  assert.match(mw, /destinoVisitanteComParametrosAuth/);
   assert.doesNotMatch(mw, /pathname === "\/portal"/);
   assert.doesNotMatch(mw, /pathname.startsWith\("\/api\/portal/);
   assert.doesNotMatch(mw, /pathname.startsWith\("\/portal/);
