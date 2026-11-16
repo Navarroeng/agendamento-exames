@@ -117,6 +117,34 @@ assert.equal(
   resultadoSolicitacaoRecuperacao({
     code: "over_email_send_rate_limit",
     message: "Email rate limit exceeded",
+  }).mensagem,
+  "O limite de envio de e-mails de recuperação foi atingido. Tente novamente mais tarde."
+);
+assert.equal(
+  resultadoSolicitacaoRecuperacao({
+    code: "over_email_send_rate_limit",
+    message: "For security purposes, you can only request this after 57 seconds.",
+  }).mensagem,
+  "Aguarde 57 segundos antes de solicitar outro link."
+);
+assert.equal(
+  resultadoSolicitacaoRecuperacao({
+    code: "over_email_send_rate_limit",
+    message: "For security purposes, you can only request this once every 60 seconds.",
+  }).mensagem,
+  "Aguarde 60 segundos antes de solicitar outro link."
+);
+assert.equal(
+  resultadoSolicitacaoRecuperacao({
+    code: "unexpected_failure",
+    message: "Error sending recovery email: 550 Too many emails",
+  }).mensagem.includes("alguns instantes"),
+  false
+);
+assert.equal(
+  resultadoSolicitacaoRecuperacao({
+    code: "unexpected_failure",
+    message: "Error sending recovery email: 550 Too many emails",
   }).confirmacaoGenerica,
   false
 );

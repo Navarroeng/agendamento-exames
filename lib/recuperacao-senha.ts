@@ -157,6 +157,14 @@ export function destinoVisitanteComParametrosAuth(
   return null;
 }
 
+function segundosInformadosPeloSupabase(message: string): number | null {
+  const encontrado = message.match(/(?:after|every) (\d+) seconds?/);
+  if (!encontrado) return null;
+  const segundos = Number(encontrado[1]);
+  if (!Number.isFinite(segundos) || segundos <= 0) return null;
+  return segundos;
+}
+
 export function resultadoSolicitacaoRecuperacao(
   error: { code?: string | null; message?: string | null } | null
 ): { confirmacaoGenerica: boolean; mensagem: string } {
@@ -169,14 +177,46 @@ export function resultadoSolicitacaoRecuperacao(
 
   const code = (error.code ?? "").toLowerCase();
   const message = (error.message ?? "").toLowerCase();
+  const segundos = segundosInformadosPeloSupabase(message);
+  if (segundos) {
+    const unidade = segundos === 1 ? "segundo" : "segundos";
+    return {
+      confirmacaoGenerica: false,
+      mensagem: `Aguarde ${segundos} ${unidade} antes de solicitar outro link.`,
+    };
+  }
+
+  // O mesmo código cobre a cota horária. "Email rate limit exceeded" não passa
+  // em alguns instantes; esperar pouco e tentar de novo continua recusado.
   if (
-    code.includes("rate_limit") ||
-    message.includes("rate limit") ||
+    code === "over_email_send_rate_limit" ||
+    message.includes("email rate limit")
+  ) {
+    return {
+      confirmacaoGenerica: false,
+      mensagem:
+        "O limite de envio de e-mails de recuperação foi atingido. Tente novamente mais tarde.",
+    };
+  }
+
+  if (
+    code === "over_request_rate_limit" ||
+    message.includes("request rate limit")
+  ) {
+    return {
+      confirmacaoGenerica: false,
+      mensagem: "Muitas tentativas em sequência. Aguarde um minuto e tente novamente.",
+    };
+  }
+
+  if (
+    message.includes("error sending") ||
     message.includes("too many")
   ) {
     return {
       confirmacaoGenerica: false,
-      mensagem: "Aguarde alguns instantes antes de solicitar outro link.",
+      mensagem:
+        "Não foi possível enviar o link de recuperação agora. Tente novamente mais tarde.",
     };
   }
 
