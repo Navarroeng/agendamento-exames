@@ -200,10 +200,13 @@ const recuperacao = readFileSync(
   "utf8"
 );
 
-assert.match(cabecalho, /src="\/portal-agrovias\/faixa-mata\.png"/);
+assert.match(cabecalho, /src="\/portal-agrovias\/vegetacao\.jpg"/);
 assert.match(cabecalho, /src="\/portal-agrovias\/logo-agrovias\.png"/);
+assert.match(cabecalho, /from-white\/60/);
+assert.doesNotMatch(cabecalho, /faixa-mata/);
+assert.doesNotMatch(cabecalho, /shadow|border|bg-white/);
 assert.match(cabecalho, /h-\[100px\][\s\S]*sidebar:h-\[140px\]/);
-assert.match(cabecalho, /h-\[86px\][\s\S]*sidebar:h-\[122px\]/);
+assert.match(cabecalho, /h-\[82px\][\s\S]*sidebar:h-\[116px\]/);
 assert.match(portal, /<CabecalhoPortalAgrovias \/>/);
 assert.match(portal, /semTitulo/);
 assert.doesNotMatch(portal, /function CabecalhoPortalAgrovias/);
