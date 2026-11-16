@@ -1883,7 +1883,7 @@ function AcessoExternoModal({
       <ul className="mt-4 space-y-2">
         {acessos.map((acesso) => (
           <li key={acesso.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span>
+            <span className="min-w-0 break-words">
               <span className="font-medium text-[#101D4A]">{acesso.nome}</span>
               <span className="text-slate-500"> · {acesso.email}</span>
               <span className="text-slate-500">

@@ -202,11 +202,18 @@ const recuperacao = readFileSync(
 
 assert.match(cabecalho, /src="\/portal-agrovias\/vegetacao\.jpg"/);
 assert.match(cabecalho, /src="\/portal-agrovias\/logo-agrovias\.png"/);
-assert.match(cabecalho, /from-white\/60/);
+assert.match(cabecalho, /from-white\/80/);
+assert.match(cabecalho, /object-left-top/);
 assert.doesNotMatch(cabecalho, /faixa-mata/);
 assert.doesNotMatch(cabecalho, /shadow|border|bg-white/);
 assert.match(cabecalho, /h-\[100px\][\s\S]*sidebar:h-\[140px\]/);
-assert.match(cabecalho, /h-\[82px\][\s\S]*sidebar:h-\[116px\]/);
+assert.match(cabecalho, /h-\[90px\][\s\S]*sidebar:h-\[116px\]/);
+assert.match(portal, /content-type/);
+assert.match(portal, /function lerJson/);
+const middleware = readFileSync(join(process.cwd(), "middleware.ts"), "utf8");
+assert.match(middleware, /pathname\.startsWith\("\/api\/"\)/);
+assert.match(middleware, /Não autenticado\./);
+assert.match(middleware, /status: 401/);
 assert.match(portal, /<CabecalhoPortalAgrovias \/>/);
 assert.match(portal, /semTitulo/);
 assert.doesNotMatch(portal, /function CabecalhoPortalAgrovias/);
