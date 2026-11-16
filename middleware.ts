@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  cookieIndicaSessaoSupabase,
+  destinoVisitanteComParametrosAuth,
+  REDEFINIR_SENHA_PATH,
+} from "@/lib/recuperacao-senha";
 
-const PUBLIC_PATHS = new Set(["/login", "/sem-permissao"]);
+const PUBLIC_PATHS = new Set(["/login", REDEFINIR_SENHA_PATH, "/sem-permissao"]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -23,11 +28,9 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function hasSupabaseSession(request: NextRequest): boolean {
-  return request.cookies.getAll().some((cookie) => {
-    if (!cookie.name.includes("auth-token")) return false;
-    const value = cookie.value?.trim();
-    return Boolean(value && value !== "null" && value !== "{}" && value !== "[]");
-  });
+  return request.cookies.getAll().some((cookie) =>
+    cookieIndicaSessaoSupabase(cookie.name, cookie.value)
+  );
 }
 
 export function middleware(request: NextRequest) {
@@ -42,6 +45,13 @@ export function middleware(request: NextRequest) {
   }
 
   if (!hasSession) {
+    const destinoAuth = destinoVisitanteComParametrosAuth(
+      pathname,
+      request.nextUrl.searchParams
+    );
+    if (destinoAuth) {
+      return NextResponse.redirect(new URL(destinoAuth, request.url));
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
