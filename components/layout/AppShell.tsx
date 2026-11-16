@@ -18,6 +18,10 @@ interface AppShellProps {
   icon?: ReactNode;
   /** O portal da AGROVIAS usa a faixa da marca no lugar do título interno. */
   semTitulo?: boolean;
+  /** Faixa no topo da área interna, sem esconder o menu de perfil. */
+  faixa?: ReactNode;
+  /** Omite o título grande quando a faixa já identifica a tela. */
+  ocultarTitulo?: boolean;
 }
 
 export function AppShell({
@@ -26,6 +30,8 @@ export function AppShell({
   subtitle = "Cadastre e acompanhe exames ocupacionais, ASO, custos e faturamento.",
   icon,
   semTitulo = false,
+  faixa,
+  ocultarTitulo = false,
 }: AppShellProps) {
   const { profile, loading } = useAuth();
   const pathname = usePathname();
@@ -49,6 +55,14 @@ export function AppShell({
 
   if (loading || !profile || !allowed) return null;
 
+  const faixaInterna = Boolean(faixa) && !semTitulo;
+  const menuMovel = (
+    <MobileMenuButton
+      open={menuAberto}
+      onClick={() => setMenuAberto((aberto) => !aberto)}
+    />
+  );
+
   return (
     <div className="app flex min-h-screen">
       <Sidebar />
@@ -57,30 +71,43 @@ export function AppShell({
         className={
           semTitulo
             ? "relative w-full pb-8 sidebar:ml-[248px] sidebar:w-[calc(100%-248px)]"
-            : "w-full px-[18px] py-[18px] pb-10 sidebar:ml-[248px] sidebar:w-[calc(100%-248px)] sidebar:px-[30px] sidebar:py-[22px] sidebar:pb-10"
+            : faixaInterna
+              ? "relative w-full sidebar:ml-[248px] sidebar:w-[calc(100%-248px)]"
+              : "w-full px-[18px] py-[18px] pb-10 sidebar:ml-[248px] sidebar:w-[calc(100%-248px)] sidebar:px-[30px] sidebar:py-[22px] sidebar:pb-10"
         }
       >
         {semTitulo ? (
           <div className="absolute right-3 top-3 z-20 sidebar:hidden">
-            <MobileMenuButton
-              open={menuAberto}
-              onClick={() => setMenuAberto((aberto) => !aberto)}
-            />
+            {menuMovel}
           </div>
-        ) : (
-          <Header
-            title={title}
-            subtitle={subtitle}
-            icon={icon}
-            menu={
-              <MobileMenuButton
-                open={menuAberto}
-                onClick={() => setMenuAberto((aberto) => !aberto)}
+        ) : null}
+        {semTitulo ? (
+          children
+        ) : faixaInterna ? (
+          <>
+            {faixa}
+            <div className="px-[18px] py-[18px] pb-10 sidebar:px-[30px] sidebar:py-[22px]">
+              <Header
+                title={title}
+                subtitle={subtitle}
+                icon={icon}
+                ocultarTitulo={ocultarTitulo}
+                menu={menuMovel}
               />
-            }
-          />
+              {children}
+            </div>
+          </>
+        ) : (
+          <>
+            <Header
+              title={title}
+              subtitle={subtitle}
+              icon={icon}
+              menu={menuMovel}
+            />
+            {children}
+          </>
         )}
-        {children}
       </main>
     </div>
   );

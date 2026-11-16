@@ -11,6 +11,8 @@ interface HeaderProps {
   subtitle: string;
   icon?: ReactNode;
   menu?: ReactNode;
+  /** A faixa da marca já identifica a tela. Mantém o subtítulo e o menu de perfil. */
+  ocultarTitulo?: boolean;
 }
 
 export function Header({
@@ -18,6 +20,7 @@ export function Header({
   subtitle,
   icon = <IconCalendar size={20} />,
   menu,
+  ocultarTitulo = false,
 }: HeaderProps) {
   const { profile, loading, signOut } = useAuth();
 
@@ -27,15 +30,21 @@ export function Header({
 
   return (
     <header className="mb-6 flex flex-col items-start justify-between gap-3.5 sidebar:flex-row sidebar:items-center">
-      <div className="title-area flex items-center gap-4">
+      <div className="title-area flex min-w-0 items-center gap-4">
         {menu}
-        <PageIcon>{icon}</PageIcon>
-        <div>
-          <h2 className="text-[26px] font-semibold tracking-[-0.6px] text-navy">
-            {title}
-          </h2>
-          <p className="mt-1 text-sm text-[#64748b]">{subtitle}</p>
-        </div>
+        {ocultarTitulo ? (
+          <p className="min-w-0 text-sm text-[#64748b]">{subtitle}</p>
+        ) : (
+          <>
+            <PageIcon>{icon}</PageIcon>
+            <div>
+              <h2 className="text-[26px] font-semibold tracking-[-0.6px] text-navy">
+                {title}
+              </h2>
+              <p className="mt-1 text-sm text-[#64748b]">{subtitle}</p>
+            </div>
+          </>
+        )}
       </div>
       <div className="user flex items-center gap-3 rounded-xl border border-[#e8edf5] bg-white/90 px-3.5 py-2.5 shadow-[0_4px_20px_rgba(15,23,42,0.05)] backdrop-blur-sm">
         <div className="avatar grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#5668ff] to-[#7c8cff] text-sm font-bold text-white shadow-[0_4px_12px_rgba(79,99,255,0.25)]">

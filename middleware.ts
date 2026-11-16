@@ -45,6 +45,9 @@ export function middleware(request: NextRequest) {
   }
 
   if (!hasSession) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
     const destinoAuth = destinoVisitanteComParametrosAuth(
       pathname,
       request.nextUrl.searchParams

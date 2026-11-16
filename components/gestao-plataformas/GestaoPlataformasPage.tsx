@@ -8,7 +8,8 @@ import {
 import { GestaoCursosAba } from "@/components/gestao-plataformas/GestaoCursosAba";
 import { GestaoFichaPainel } from "@/components/gestao-plataformas/GestaoFichaPainel";
 import { AppShell } from "@/components/layout/AppShell";
-import { IconChecklist } from "@/components/ui/icons/OutlineIcons";
+import { CabecalhoPortalAgrovias } from "@/components/portal-agrovias/CabecalhoPortalAgrovias";
+import { Modal } from "@/components/ui/Modal";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
   ABRANGENCIA_REQUISITO_LABEL,
@@ -218,6 +219,8 @@ export function GestaoPlataformasPage() {
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [incluirColaborador, setIncluirColaborador] = useState(false);
   const [editarColaborador, setEditarColaborador] = useState(false);
+  const [acessoAberto, setAcessoAberto] = useState(false);
+  const [erroAcesso, setErroAcesso] = useState("");
 
   const carregar = useCallback(async () => {
     const posicao = window.scrollY;
@@ -246,9 +249,13 @@ export function GestaoPlataformasPage() {
     void carregar();
   }, [carregar]);
 
-  async function enviar(acao: AcaoGestaoPlataformas) {
+  async function enviar(
+    acao: AcaoGestaoPlataformas,
+    destinoErro: "pagina" | "acesso" = "pagina"
+  ): Promise<boolean> {
     setSalvando(true);
-    setErro("");
+    if (destinoErro === "acesso") setErroAcesso("");
+    else setErro("");
     try {
       const resposta = await fetch("/api/gestao-plataformas", {
         method: "POST",
@@ -257,13 +264,19 @@ export function GestaoPlataformasPage() {
       });
       const json = (await resposta.json()) as Painel & { error?: string };
       if (!resposta.ok) {
-        setErro(json.error || "Não foi possível concluir a operação.");
-        return;
+        const mensagem = json.error || "Não foi possível concluir a operação.";
+        if (destinoErro === "acesso") setErroAcesso(mensagem);
+        else setErro(mensagem);
+        return false;
       }
       if (json.escopo) setPainel(json);
       setFormulario(null);
+      return true;
     } catch {
-      setErro("Não foi possível concluir a operação.");
+      const mensagem = "Não foi possível concluir a operação.";
+      if (destinoErro === "acesso") setErroAcesso(mensagem);
+      else setErro(mensagem);
+      return false;
     } finally {
       setSalvando(false);
     }
@@ -427,7 +440,8 @@ export function GestaoPlataformasPage() {
           ? `${painel.escopo.clienteNome} · ${painel.escopo.orcamentoNumero}`
           : "Mobilização, documentos de SST e liberações por obra."
       }
-      icon={<IconChecklist size={20} />}
+      faixa={<CabecalhoPortalAgrovias />}
+      ocultarTitulo
     >
       <div className="space-y-4">
         {erro ? (
@@ -436,33 +450,39 @@ export function GestaoPlataformasPage() {
           </p>
         ) : null}
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {ABAS.map((item) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 max-w-full basis-full gap-2 overflow-x-auto pb-1 sidebar:basis-auto sidebar:flex-none">
+            {ABAS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium ${
+                  aba === item.id
+                    ? "bg-[#0b1f4d] text-white"
+                    : "bg-white text-[#0b1f4d] ring-1 ring-[#e8edf5]"
+                }`}
+                onClick={() => setAba(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {painel?.podeConcederAcesso ? (
             <button
-              key={item.id}
               type="button"
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium ${
-                aba === item.id
-                  ? "bg-[#0b1f4d] text-white"
-                  : "bg-white text-[#0b1f4d] ring-1 ring-[#e8edf5]"
-              }`}
-              onClick={() => setAba(item.id)}
+              className="shrink-0 rounded-full border border-[#c5cedd] bg-white px-4 py-2 text-sm font-semibold text-[#0b1f4d] hover:bg-[#f8fafc] sidebar:ml-auto"
+              onClick={() => {
+                setErroAcesso("");
+                setAcessoAberto(true);
+              }}
             >
-              {item.label}
+              Gerenciar acesso externo
             </button>
-          ))}
+          ) : null}
         </div>
 
         {carregando && !painel ? (
           <p className="text-sm text-slate-500">Carregando a AGROVIAS…</p>
-        ) : null}
-
-        {painel?.podeConcederAcesso ? (
-          <AcessoExternoCard
-            acessos={painel.acessosExternos}
-            salvando={salvando}
-            onEnviar={(acao) => void enviar(acao)}
-          />
         ) : null}
 
         {painel && aba === "visao" ? (
@@ -720,6 +740,19 @@ export function GestaoPlataformasPage() {
             setEditarColaborador(false);
             void carregar();
           }}
+        />
+      ) : null}
+      {painel?.podeConcederAcesso ? (
+        <AcessoExternoModal
+          aberto={acessoAberto}
+          acessos={painel.acessosExternos}
+          salvando={salvando}
+          erro={erroAcesso}
+          onFechar={() => {
+            setAcessoAberto(false);
+            setErroAcesso("");
+          }}
+          onEnviar={(acao) => enviar(acao, "acesso")}
         />
       ) : null}
     </AppShell>
@@ -1759,42 +1792,98 @@ function RequisitoCampos({
   );
 }
 
-function AcessoExternoCard({
+function AcessoExternoModal({
+  aberto,
   acessos,
   salvando,
+  erro,
+  onFechar,
   onEnviar,
 }: {
+  aberto: boolean;
   acessos: AcessoExternoRegistro[];
   salvando: boolean;
-  onEnviar: (acao: AcaoGestaoPlataformas) => void;
+  erro: string;
+  onFechar: () => void;
+  onEnviar: (acao: AcaoGestaoPlataformas) => Promise<boolean>;
 }) {
+  const [revelar, setRevelar] = useState(false);
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
+
+  useEffect(() => {
+    if (aberto) return;
+    setRevelar(false);
+    setEmail("");
+    setNome("");
+  }, [aberto]);
+
   return (
-    <section className="mb-4 rounded-2xl border border-[#DCE5F4] border-t-[3px] border-t-[#C89219] bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-[#101D4A]">Acesso externo da AGROVIAS</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        O administrador cria o usuário no Auth e depois concede o acesso aqui. Revogar encerra a consulta e o envio.
-      </p>
-      <form
-        className="mt-3 grid gap-2 sidebar:grid-cols-[1fr_1fr_auto]"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onEnviar({ acao: "conceder_acesso", email, nome });
-          setEmail("");
-          setNome("");
-        }}
-      >
-        <input className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm" type="email" placeholder="E-mail" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        <input className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm" placeholder="Nome" value={nome} onChange={(event) => setNome(event.target.value)} required />
-        <button type="submit" className="rounded-xl bg-[#4945FF] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={salvando}>
-          Conceder
+    <Modal open={aberto} onClose={onFechar} title="Acesso externo da AGROVIAS">
+      {erro ? (
+        <p
+          className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+          role="alert"
+        >
+          {erro}
+        </p>
+      ) : null}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="rounded-xl border border-[#c5cedd] bg-white px-4 py-2 text-sm font-semibold text-[#101D4A] hover:bg-[#f8fafc]"
+          aria-expanded={revelar}
+          onClick={() => setRevelar(true)}
+        >
+          Conceder acesso
         </button>
-      </form>
-      <ul className="mt-3 space-y-2">
+      </div>
+      {revelar ? (
+        <>
+          <p className="mt-3 text-sm text-slate-500">
+            O administrador cria o usuário no Auth e depois concede o acesso aqui. Revogar encerra a consulta e o envio.
+          </p>
+          <form
+            className="mt-3 grid gap-2 sidebar:grid-cols-[1fr_1fr_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onEnviar({ acao: "conceder_acesso", email, nome }).then((ok) => {
+                if (!ok) return;
+                setEmail("");
+                setNome("");
+                setRevelar(false);
+              });
+            }}
+          >
+            <input
+              className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm"
+              type="email"
+              placeholder="E-mail"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+            <input
+              className="h-10 rounded-xl border border-[#DCE5F4] px-3 text-sm"
+              placeholder="Nome"
+              value={nome}
+              onChange={(event) => setNome(event.target.value)}
+              required
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-[#4945FF] px-4 text-sm font-semibold text-white disabled:opacity-60"
+              disabled={salvando}
+            >
+              Conceder
+            </button>
+          </form>
+        </>
+      ) : null}
+      <ul className="mt-4 space-y-2">
         {acessos.map((acesso) => (
           <li key={acesso.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span>
+            <span className="min-w-0 break-words">
               <span className="font-medium text-[#101D4A]">{acesso.nome}</span>
               <span className="text-slate-500"> · {acesso.email}</span>
               <span className="text-slate-500">
@@ -1807,7 +1896,7 @@ function AcessoExternoCard({
                 type="button"
                 className="rounded-xl border border-[#DCE5F4] px-3 py-1 text-xs font-semibold text-[#101D4A]"
                 disabled={salvando}
-                onClick={() => onEnviar({ acao: "revogar_acesso", id: acesso.id })}
+                onClick={() => void onEnviar({ acao: "revogar_acesso", id: acesso.id })}
               >
                 Revogar
               </button>
@@ -1816,6 +1905,6 @@ function AcessoExternoCard({
         ))}
         {acessos.length === 0 ? <li className="text-sm text-slate-500">Nenhum acesso concedido.</li> : null}
       </ul>
-    </section>
+    </Modal>
   );
 }

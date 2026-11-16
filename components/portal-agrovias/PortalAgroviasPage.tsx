@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { CabecalhoPortalAgrovias } from "@/components/portal-agrovias/CabecalhoPortalAgrovias";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+
+async function lerJson<T extends { error?: string }>(resposta: Response, fallback: string): Promise<T> {
+  const tipo = (resposta.headers.get("content-type") ?? "").toLowerCase();
+  if (!tipo.includes("json")) throw new Error(fallback);
+  return (await resposta.json()) as T;
+}
 
 type Colaborador = {
   id: string;
@@ -48,23 +55,6 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: "rh", label: "Documentos de RH" },
 ];
 
-function CabecalhoPortalAgrovias() {
-  return (
-    <div className="relative h-[100px] w-full overflow-hidden bg-[#eef5ff] sidebar:h-[140px]">
-      <img
-        src="/portal-agrovias/faixa-mata.png"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover object-center"
-      />
-      <img
-        src="/portal-agrovias/logo-agrovias.png"
-        alt="AGROVIAS Meio Ambiente e Paisagem"
-        className="absolute left-3 top-1/2 h-[86px] w-auto -translate-y-1/2 object-contain sidebar:left-5 sidebar:h-[122px]"
-      />
-    </div>
-  );
-}
-
 function RostoPadrao() {
   return (
     <svg viewBox="0 0 120 120" aria-hidden="true" className="h-full w-full">
@@ -104,7 +94,10 @@ export function PortalAgroviasPage() {
 
   async function carregarLista() {
     const resposta = await fetch("/api/portal-agrovias", { cache: "no-store" });
-    const json = (await resposta.json()) as { colaboradores?: Colaborador[]; error?: string };
+    const json = await lerJson<{ colaboradores?: Colaborador[]; error?: string }>(
+      resposta,
+      "Não foi possível abrir os colaboradores."
+    );
     if (!resposta.ok) throw new Error(json.error || "Não foi possível abrir os colaboradores.");
     setColaboradores(json.colaboradores ?? []);
   }
@@ -167,7 +160,10 @@ export function PortalAgroviasPage() {
     const resposta = await fetch(`/api/portal-agrovias/ficha?colaboradorId=${encodeURIComponent(id)}`, {
       cache: "no-store",
     });
-    const json = (await resposta.json()) as { ficha?: Ficha; error?: string };
+    const json = await lerJson<{ ficha?: Ficha; error?: string }>(
+      resposta,
+      "Não foi possível abrir a ficha."
+    );
     if (!resposta.ok || !json.ficha) {
       setErro(json.error || "Não foi possível abrir a ficha.");
       setFichaId(null);
@@ -183,7 +179,7 @@ export function PortalAgroviasPage() {
     dados.set("documentoId", documentoId);
     dados.set("arquivo", arquivo);
     const resposta = await fetch("/api/portal-agrovias/documento", { method: "POST", body: dados });
-    const json = (await resposta.json()) as { error?: string };
+    const json = await lerJson<{ error?: string }>(resposta, "Não foi possível enviar o documento.");
     setEnviando(false);
     if (!resposta.ok) {
       setErro(json.error || "Não foi possível enviar o documento.");
@@ -194,7 +190,10 @@ export function PortalAgroviasPage() {
 
   async function abrirArquivo(id: string) {
     const resposta = await fetch(`/api/portal-agrovias/arquivo?id=${encodeURIComponent(id)}`);
-    const json = (await resposta.json()) as { url?: string; error?: string };
+    const json = await lerJson<{ url?: string; error?: string }>(
+      resposta,
+      "Não foi possível abrir o arquivo."
+    );
     if (!resposta.ok || !json.url) {
       setErro(json.error || "Não foi possível abrir o arquivo.");
       return;
@@ -255,7 +254,7 @@ export function PortalAgroviasPage() {
                   </button>
                 );
               })}
-              {!carregando && visiveis.length === 0 ? (
+              {!carregando && !erro && visiveis.length === 0 ? (
                 <p className="px-4 py-6 text-sm text-slate-500">Nenhum colaborador encontrado.</p>
               ) : null}
             </div>
