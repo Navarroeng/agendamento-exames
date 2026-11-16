@@ -48,6 +48,23 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: "rh", label: "Documentos de RH" },
 ];
 
+function CabecalhoPortalAgrovias() {
+  return (
+    <div className="relative h-[100px] w-full overflow-hidden bg-[#eef5ff] sidebar:h-[140px]">
+      <img
+        src="/portal-agrovias/faixa-mata.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+      <img
+        src="/portal-agrovias/logo-agrovias.png"
+        alt="AGROVIAS Meio Ambiente e Paisagem"
+        className="absolute left-3 top-1/2 h-[86px] w-auto -translate-y-1/2 object-contain sidebar:left-5 sidebar:h-[122px]"
+      />
+    </div>
+  );
+}
+
 function RostoPadrao() {
   return (
     <svg viewBox="0 0 120 120" aria-hidden="true" className="h-full w-full">
@@ -193,11 +210,7 @@ export function PortalAgroviasPage() {
 
   const conteudo = (
     <>
-      <img
-        src="/portal-agrovias/cabecalho-agrovias.png"
-        alt="AGROVIAS Meio Ambiente e Paisagem"
-        className="block h-[140px] w-full object-cover object-left sidebar:h-auto sidebar:object-fill"
-      />
+      <CabecalhoPortalAgrovias />
       <div className="px-4 pb-8 pt-4 sidebar:px-6">
         {erro ? <p className="mb-3 text-sm text-rose-700">{erro}</p> : null}
         <div className={fichaId ? "sidebar:grid sidebar:grid-cols-[320px_minmax(0,1fr)] sidebar:items-start sidebar:gap-4" : ""}>
