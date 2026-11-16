@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   acessoExternoVigente,
   agendamentosVisiveisExternos,
@@ -180,5 +182,46 @@ assert.equal("arquivoPath" in (cursos[0] ?? {}), false);
 
 assert.equal(canAccessPath("portal_agrovias", "/portal-agrovias"), true);
 assert.equal(canAccessPath("portal_agrovias", "/gestao-plataformas"), false);
+
+const cabecalho = readFileSync(
+  join(process.cwd(), "components/portal-agrovias/CabecalhoPortalAgrovias.tsx"),
+  "utf8"
+);
+const portal = readFileSync(
+  join(process.cwd(), "components/portal-agrovias/PortalAgroviasPage.tsx"),
+  "utf8"
+);
+const gestao = readFileSync(
+  join(process.cwd(), "components/gestao-plataformas/GestaoPlataformasPage.tsx"),
+  "utf8"
+);
+const recuperacao = readFileSync(
+  join(process.cwd(), "components/auth/LoginPage.tsx"),
+  "utf8"
+);
+
+assert.match(cabecalho, /src="\/portal-agrovias\/faixa-mata\.png"/);
+assert.match(cabecalho, /src="\/portal-agrovias\/logo-agrovias\.png"/);
+assert.match(cabecalho, /h-\[100px\][\s\S]*sidebar:h-\[140px\]/);
+assert.match(cabecalho, /h-\[86px\][\s\S]*sidebar:h-\[122px\]/);
+assert.match(portal, /<CabecalhoPortalAgrovias \/>/);
+assert.match(portal, /semTitulo/);
+assert.doesNotMatch(portal, /function CabecalhoPortalAgrovias/);
+assert.match(gestao, /<CabecalhoPortalAgrovias \/>/);
+assert.match(gestao, /ocultarTitulo/);
+assert.match(gestao, /painel\.escopo\.clienteNome\} · \$\{painel\.escopo\.orcamentoNumero\}/);
+assert.match(gestao, /Gerenciar acesso externo/);
+assert.match(gestao, /painel\?\.podeConcederAcesso/);
+assert.doesNotMatch(gestao, /AcessoExternoCard/);
+assert.match(gestao, /Conceder acesso/);
+assert.match(gestao, /acao: "conceder_acesso"/);
+assert.match(gestao, /acao: "revogar_acesso"/);
+assert.match(gestao, /destinoErro === "acesso"/);
+assert.match(gestao, /setAcessoAberto\(false\)/);
+assert.doesNotMatch(
+  gestao.slice(gestao.indexOf("onFechar={() => {"), gestao.indexOf("onFechar={() => {") + 180),
+  /setAba\(/
+);
+assert.match(recuperacao, /Esqueci minha senha/);
 
 console.log("test-acesso-externo-agrovias: OK");
