@@ -22,6 +22,7 @@ import {
   isContratoVagaStatus,
   isNomeFuncionarioReal,
   normalizeNomeOcupante,
+  devePreservarVagaAoSalvarLista,
   resolveStatusVagaRascunho,
   statusClassificacaoVaga,
   validarDraftsListaVagas,
@@ -366,6 +367,7 @@ export async function salvarListaVagasContrato(params: {
         : draft.colaboradorOrigemId ?? null,
       cargoNome: draft.manterAsoAberto ? null : draft.cargoNome,
       manterAsoAberto: draft.manterAsoAberto,
+      vagaId: draft.id,
     })),
   });
   const ctx = params.clienteId
@@ -382,6 +384,29 @@ export async function salvarListaVagasContrato(params: {
     if (!atual) continue;
     const classificacao = statusClassificacaoVaga(atual, ctx);
     if (vagaClassificacaoBloqueiaEdicaoOcupante(classificacao)) {
+      continue;
+    }
+    if (
+      devePreservarVagaAoSalvarLista({
+        atual: {
+          status: atual.status,
+          colaborador: atual.colaborador,
+          colaboradorCpf: atual.colaborador_cpf,
+          colaboradorOrigemId: atual.colaborador_origem,
+          agendamentoId: atual.agendamento_id,
+          periodicoFuturoId: atual.periodico_futuro_id,
+          creditoAsoId: atual.credito_aso_id,
+        },
+        proposta: {
+          colaborador: draft.manterAsoAberto ? null : draft.colaborador,
+          colaboradorCpf: draft.manterAsoAberto ? null : draft.colaboradorCpf,
+          colaboradorOrigemId: draft.manterAsoAberto
+            ? null
+            : draft.colaboradorOrigemId,
+          manterAsoAberto: draft.manterAsoAberto,
+        },
+      })
+    ) {
       continue;
     }
 
@@ -452,8 +477,6 @@ export async function salvarListaVagasContrato(params: {
       cargo_id: cargoId,
       cargo_nome: cargoNome,
       credito_aso_id: null,
-      agendamento_id: null,
-      periodico_futuro_id: null,
       colaborador_origem: origem,
     });
     const cpfDepois = isValidCPF(normalizeCpfDigits(cpf))
@@ -518,6 +541,7 @@ async function confirmarOcupacaoNoServidor(params: {
     colaboradorOrigemId: string | null;
     cargoNome?: string | null;
     manterAsoAberto?: boolean;
+    vagaId?: string | null;
   }>;
 }): Promise<void> {
   const res = await fetch(

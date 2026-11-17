@@ -1,7 +1,8 @@
 /**
  * Preenchimento da Lista de funcionários a partir da relação de Clientes.
- * Ativos a menos preenchem as vagas livres e deixam o restante em aberto.
- * Ativos a mais bloqueiam. Não duplica ocupante nem mexe em vaga já usada.
+ * Só vaga realmente livre recebe colaborador ainda não vinculado.
+ * Se houver mais candidatos do que vagas livres, ninguém é escolhido automaticamente.
+ * Vaga ocupada, programada, agendada, reservada ou em revisão permanece no mesmo ID.
  */
 
 import {
@@ -22,6 +23,7 @@ export type ColaboradorListaCliente = {
 
 export type VagaListaCliente = {
   indice: number;
+  vagaId?: string | null;
   status: string;
   colaborador: string | null;
   colaboradorCpf: string | null;
@@ -33,6 +35,7 @@ export type VagaListaCliente = {
 
 export type AtribuicaoListaCliente = {
   indice: number;
+  vagaId: string | null;
   nome: string;
   cpfDigits: string;
   cargo: string;
@@ -67,6 +70,28 @@ export const MENSAGEM_LISTA_NAO_APLICADA =
 export const MENSAGEM_LISTA_JA_VINCULADA =
   "As vagas deste contrato já estão vinculadas a estes colaboradores. Nenhum colaborador foi duplicado.";
 
+export function mensagemCandidatosAcimaDasVagasLivres(
+  candidatos: number,
+  livres: number
+): string {
+  const pessoas =
+    candidatos === 1
+      ? "1 colaborador ativo ainda sem vaga"
+      : `${candidatos} colaboradores ativos ainda sem vaga`;
+  const vagas = livres === 1 ? "1 vaga livre" : `${livres} vagas livres`;
+  return `Há ${pessoas} e ${vagas}. Escolha cada colaborador em Definir colaborador. Nenhuma pessoa foi escolhida automaticamente.`;
+}
+
+export function mensagemPreviaPreenchimentoLista(
+  atribuicoes: AtribuicaoListaCliente[]
+): string {
+  const linhas = atribuicoes
+    .slice()
+    .sort((a, b) => a.indice - b.indice)
+    .map((item) => `Vaga ${item.indice}: ${item.nome}`);
+  return `${linhas.join(". ")}. A seleção só é gravada ao clicar em Salvar lista.`;
+}
+
 export function mensagemBloqueioSalvarListaCliente(
   ativos: number,
   contratada: number
@@ -92,10 +117,20 @@ export function mensagemListaIncompleta(
   return `${incluidosTxt}. ${omitidosTxt} porque as vagas já preenchidas, comprometidas, programadas ou agendadas foram mantidas.`;
 }
 
+export function origemDoColaboradorLista(
+  colaborador: ColaboradorListaCliente
+): string {
+  return origemDoColaborador(colaborador);
+}
+
 function origemDoColaborador(colaborador: ColaboradorListaCliente): string {
   const cadastroId = String(colaborador.cadastroId ?? "").trim();
   if (cadastroId) return cadastroId;
   return colaborador.id;
+}
+
+export function vagaListaRealmenteLivre(vaga: VagaListaCliente): boolean {
+  return !vagaOcupada(vaga);
 }
 
 function vagaOcupada(vaga: VagaListaCliente): boolean {
@@ -128,10 +163,55 @@ function vagaCorresponde(
   return isValidCPF(cpf) && cpfVaga === cpf;
 }
 
+function marcarOcupantes(
+  vagas: VagaListaCliente[],
+  ativos: ColaboradorListaCliente[]
+): Set<string> {
+  const usados = new Set<string>();
+  for (const vaga of vagas.filter(vagaOcupada)) {
+    const pessoa = ativos.find(
+      (item) => !usados.has(origemDoColaborador(item)) && vagaCorresponde(vaga, item)
+    );
+    if (!pessoa) continue;
+    usados.add(origemDoColaborador(pessoa));
+  }
+  return usados;
+}
+
+function atribuirPessoa(
+  vaga: VagaListaCliente,
+  pessoa: ColaboradorListaCliente
+): AtribuicaoListaCliente {
+  return {
+    indice: vaga.indice,
+    vagaId: vaga.vagaId ?? null,
+    nome: pessoa.nome,
+    cpfDigits: normalizeCpfDigits(pessoa.cpfDigits),
+    cargo: pessoa.cargo === "—" ? "" : pessoa.cargo,
+    origemId: origemDoColaborador(pessoa),
+  };
+}
+
+/**
+ * Colaboradores ativos que ainda não ocupam outra vaga deste contrato.
+ * A vaga alvo continua podendo mostrar a seleção que já está em revisão nela.
+ */
+export function colaboradoresParaDefinirVaga(input: {
+  colaboradores: ColaboradorListaCliente[];
+  vagas: VagaListaCliente[];
+  indice: number;
+}): ColaboradorListaCliente[] {
+  const ativos = input.colaboradores.filter((item) => item.situacao === "ativo");
+  const outras = input.vagas.filter((vaga) => vaga.indice !== input.indice);
+  const usados = marcarOcupantes(outras, ativos);
+  return ativos.filter((item) => !usados.has(origemDoColaborador(item)));
+}
+
 /**
  * Compara a lista ativa com as vagas do contrato.
- * Ativos acima da quantidade contratada bloqueiam.
- * Vaga ocupada, programada, agendada ou reservada permanece como está.
+ * Preenche todas as vagas livres só quando cada candidato ainda sem vaga cabe.
+ * Mais candidatos do que vagas livres não escolhe ninguém.
+ * Ocupante já gravado ou em revisão permanece na própria vaga.
  */
 export function avaliarUsoListaColaboradoresCliente(input: {
   colaboradores: ColaboradorListaCliente[];
@@ -140,35 +220,16 @@ export function avaliarUsoListaColaboradoresCliente(input: {
 }): ResultadoUsoListaCliente {
   const contratada = Math.max(0, Math.floor(Number(input.quantidadeContratada) || 0));
   const ativos = input.colaboradores.filter((item) => item.situacao === "ativo");
-  if (ativos.length > contratada) {
-    return {
-      ok: false,
-      mensagem: mensagemQuantidadeListaCliente(ativos.length, contratada),
-    };
-  }
-  if (ativos.some((item) => !isValidCPF(normalizeCpfDigits(item.cpfDigits)))) {
-    return { ok: false, mensagem: MENSAGEM_LISTA_SEM_CPF };
-  }
-
   const porIndice = input.vagas
     .filter((vaga) => vaga.indice >= 1 && vaga.indice <= contratada)
     .slice()
     .sort((a, b) => a.indice - b.indice);
-  const ocupadas = porIndice.filter(vagaOcupada);
   const livres = porIndice.filter((vaga) => !vagaOcupada(vaga));
-  const usados = new Set<string>();
-
-  for (const vaga of ocupadas) {
-    const pessoa = ativos.find(
-      (item) => !usados.has(origemDoColaborador(item)) && vagaCorresponde(vaga, item)
-    );
-    if (!pessoa) continue;
-    usados.add(origemDoColaborador(pessoa));
-  }
-
+  const usados = marcarOcupantes(porIndice, ativos);
   const restantes = ativos.filter(
     (item) => !usados.has(origemDoColaborador(item))
   );
+
   if (restantes.length === 0) {
     return {
       ok: true,
@@ -177,23 +238,28 @@ export function avaliarUsoListaColaboradoresCliente(input: {
       mensagem: usados.size > 0 ? MENSAGEM_LISTA_JA_VINCULADA : null,
     };
   }
+  if (restantes.length > livres.length) {
+    return {
+      ok: true,
+      atribuicoes: [],
+      omitidos: restantes.length,
+      mensagem: mensagemCandidatosAcimaDasVagasLivres(
+        restantes.length,
+        livres.length
+      ),
+    };
+  }
+  if (restantes.some((item) => !isValidCPF(normalizeCpfDigits(item.cpfDigits)))) {
+    return { ok: false, mensagem: MENSAGEM_LISTA_SEM_CPF };
+  }
 
-  const cabem = Math.min(restantes.length, livres.length);
-  const escolhidos = restantes.slice(0, cabem);
-  const omitidos = restantes.length - cabem;
+  const atribuicoes = restantes.map((pessoa, index) =>
+    atribuirPessoa(livres[index], pessoa)
+  );
   return {
     ok: true,
-    omitidos,
-    mensagem:
-      omitidos > 0
-        ? mensagemListaIncompleta(usados.size + cabem, omitidos)
-        : null,
-    atribuicoes: escolhidos.map((pessoa, index) => ({
-      indice: livres[index].indice,
-      nome: pessoa.nome,
-      cpfDigits: normalizeCpfDigits(pessoa.cpfDigits),
-      cargo: pessoa.cargo === "—" ? "" : pessoa.cargo,
-      origemId: origemDoColaborador(pessoa),
-    })),
+    omitidos: 0,
+    mensagem: mensagemPreviaPreenchimentoLista(atribuicoes),
+    atribuicoes,
   };
 }

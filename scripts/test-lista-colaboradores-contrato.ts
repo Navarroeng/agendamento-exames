@@ -17,8 +17,11 @@ import {
   MENSAGEM_LISTA_JA_VINCULADA,
   MENSAGEM_LISTA_SEM_CPF,
   avaliarUsoListaColaboradoresCliente,
+  colaboradoresParaDefinirVaga,
   mensagemBloqueioSalvarListaCliente,
+  mensagemCandidatosAcimaDasVagasLivres,
   mensagemListaIncompleta,
+  mensagemPreviaPreenchimentoLista,
   mensagemQuantidadeListaCliente,
   type ColaboradorListaCliente,
   type VagaListaCliente,
@@ -114,9 +117,10 @@ assert.equal(
     ],
     vagas: [vagaLivre(1), vagaLivre(2)],
   });
-  assert.equal(maior.ok, false);
-  if (maior.ok) throw new Error("maior");
-  assert.equal(maior.mensagem, mensagemQuantidadeListaCliente(3, 2));
+  assert.equal(maior.ok, true);
+  if (!maior.ok) throw new Error("maior");
+  assert.equal(maior.atribuicoes.length, 0);
+  assert.equal(maior.mensagem, mensagemCandidatosAcimaDasVagasLivres(3, 2));
 }
 
 {
@@ -194,8 +198,7 @@ assert.equal(
   assert.equal(bloqueado.ok, true);
   if (!bloqueado.ok) throw new Error("ocupada");
   assert.equal(bloqueado.atribuicoes.length, 0);
-  assert.equal(bloqueado.omitidos, 1);
-  assert.equal(bloqueado.mensagem, mensagemListaIncompleta(0, 1));
+  assert.equal(bloqueado.mensagem, mensagemCandidatosAcimaDasVagasLivres(1, 0));
   assert.equal(ocupada.colaborador, "OUTRA PESSOA");
 }
 
@@ -291,12 +294,12 @@ assert.equal(
     ],
     vagas: [vagaLivre(1), vagaLivre(2), vagaLivre(3)],
   });
-  assert.equal(cincoParaTres.ok, false);
-  if (cincoParaTres.ok) throw new Error("cinco");
-  assert.equal(cincoParaTres.mensagem, mensagemQuantidadeListaCliente(5, 3));
+  assert.equal(cincoParaTres.ok, true);
+  if (!cincoParaTres.ok) throw new Error("cinco");
+  assert.equal(cincoParaTres.atribuicoes.length, 0);
   assert.equal(
-    mensagemBloqueioSalvarListaCliente(5, 3),
-    mensagemQuantidadeListaCliente(5, 3)
+    cincoParaTres.mensagem,
+    mensagemCandidatosAcimaDasVagasLivres(5, 3)
   );
 }
 
@@ -378,11 +381,8 @@ assert.equal(
   });
   assert.equal(comReserva.ok, true);
   if (!comReserva.ok) throw new Error("reserva");
-  assert.deepEqual(
-    comReserva.atribuicoes.map((item) => item.indice),
-    [2, 3, 4]
-  );
-  assert.equal(comReserva.omitidos, 1);
+  assert.equal(comReserva.atribuicoes.length, 0);
+  assert.equal(comReserva.mensagem, mensagemCandidatosAcimaDasVagasLivres(4, 3));
   assert.equal(reservaValida.periodicoFuturoId, "periodico-reserva");
   assert.equal(reservaValida.colaborador, null);
 }
@@ -414,11 +414,8 @@ assert.equal(
   });
   assert.equal(incompleta.ok, true);
   if (!incompleta.ok) throw new Error("incompleta");
-  assert.equal(incompleta.atribuicoes.length, 1);
-  assert.equal(incompleta.atribuicoes[0].indice, 3);
-  assert.equal(incompleta.atribuicoes[0].origemId, CADASTRO);
-  assert.equal(incompleta.omitidos, 2);
-  assert.equal(incompleta.mensagem, mensagemListaIncompleta(1, 2));
+  assert.equal(incompleta.atribuicoes.length, 0);
+  assert.equal(incompleta.mensagem, mensagemCandidatosAcimaDasVagasLivres(3, 1));
   assert.equal(protegida1.colaborador, "OUTRA");
   assert.equal(protegida2.status, "comprometida");
   assert.equal(protegida2.creditoAsoId, "credito-reserva");
@@ -679,9 +676,11 @@ assert.equal(
       },
     ],
   });
-  assert.equal(uso.ok, false);
-  if (uso.ok) throw new Error("renovacao");
-  assert.equal(uso.mensagem, mensagemQuantidadeListaCliente(2, 1));
+  assert.equal(uso.ok, true);
+  if (!uso.ok) throw new Error("renovacao");
+  assert.equal(uso.atribuicoes.length, 0);
+  assert.equal(uso.mensagem, mensagemCandidatosAcimaDasVagasLivres(1, 0));
+  assert.equal(vagasAntigas[0].colaborador, "MARIA SILVA");
 }
 
 {
@@ -711,6 +710,123 @@ assert.equal(
   manual.cargoNome = "TECNICO";
   assert.equal(manual.colaboradorOrigemId, null);
   assert.equal(manual.indice, 1);
+}
+assert.match(mensagemListaIncompleta(1, 2), /1 colaborador da lista pôde ser incluído/);
+
+{
+  const pessoas = Array.from({ length: 21 }, (_, index) =>
+    pessoa(
+      `pessoa-${index + 1}`,
+      `COLABORADOR ${String(index + 1).padStart(2, "0")}`,
+      cpfDeNove(String(200000000 + index)),
+      `cadastro-${index + 1}`
+    )
+  );
+  const gabriel = pessoa(
+    "gabriel",
+    "GABRIEL FERNANDES FERREIRA",
+    cpfDeNove("153509460"),
+    "cadastro-gabriel"
+  );
+  const bruno = pessoa(
+    "bruno",
+    "BRUNO LIMA",
+    cpfDeNove("286255870"),
+    "cadastro-bruno"
+  );
+  const vagasOcupadas: VagaListaCliente[] = pessoas.map((item, index) => ({
+    indice: index + 1,
+    vagaId: `vaga-${index + 1}`,
+    status: "comprometida",
+    colaborador: item.nome,
+    colaboradorCpf: item.cpfDigits,
+    colaboradorOrigemId: item.cadastroId ?? null,
+  }));
+  const vaga22: VagaListaCliente = {
+    ...vagaLivre(22),
+    vagaId: "vaga-22",
+  };
+  const excedente = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 22,
+    colaboradores: [bruno, gabriel, ...pessoas.slice().reverse()],
+    vagas: [...vagasOcupadas, vaga22],
+  });
+  assert.equal(excedente.ok, true);
+  if (!excedente.ok) throw new Error("excedente");
+  assert.equal(excedente.atribuicoes.length, 0);
+  assert.equal(excedente.mensagem, mensagemCandidatosAcimaDasVagasLivres(2, 1));
+  assert.equal(vagasOcupadas[0].colaborador, pessoas[0].nome);
+  assert.equal(vagasOcupadas[0].vagaId, "vaga-1");
+
+  const soGabriel = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 22,
+    colaboradores: [gabriel, ...pessoas.slice().reverse()],
+    vagas: [...vagasOcupadas, vaga22],
+  });
+  assert.equal(soGabriel.ok, true);
+  if (!soGabriel.ok) throw new Error("gabriel");
+  assert.equal(soGabriel.atribuicoes.length, 1);
+  assert.equal(soGabriel.atribuicoes[0].indice, 22);
+  assert.equal(soGabriel.atribuicoes[0].vagaId, "vaga-22");
+  assert.equal(soGabriel.atribuicoes[0].nome, "GABRIEL FERNANDES FERREIRA");
+  assert.equal(soGabriel.atribuicoes[0].origemId, "cadastro-gabriel");
+  assert.equal(
+    soGabriel.mensagem,
+    mensagemPreviaPreenchimentoLista(soGabriel.atribuicoes)
+  );
+  assert.equal(vagasOcupadas[0].colaboradorOrigemId, "cadastro-1");
+
+  const repetidoGabriel = avaliarUsoListaColaboradoresCliente({
+    quantidadeContratada: 22,
+    colaboradores: [...pessoas.slice().reverse(), gabriel],
+    vagas: [
+      ...vagasOcupadas,
+      {
+        ...vaga22,
+        status: "comprometida",
+        colaborador: gabriel.nome,
+        colaboradorCpf: gabriel.cpfDigits,
+        colaboradorOrigemId: gabriel.cadastroId ?? null,
+      },
+    ],
+  });
+  assert.equal(repetidoGabriel.ok, true);
+  if (!repetidoGabriel.ok) throw new Error("repetido gabriel");
+  assert.equal(repetidoGabriel.atribuicoes.length, 0);
+  assert.equal(repetidoGabriel.mensagem, MENSAGEM_LISTA_JA_VINCULADA);
+
+  const opcoes = colaboradoresParaDefinirVaga({
+    colaboradores: [bruno, gabriel, ...pessoas],
+    vagas: [...vagasOcupadas, vaga22],
+    indice: 22,
+  });
+  assert.deepEqual(
+    opcoes.map((item) => item.nome),
+    ["BRUNO LIMA", "GABRIEL FERNANDES FERREIRA"]
+  );
+  const escolhido = opcoes.find(
+    (item) => item.nome === "GABRIEL FERNANDES FERREIRA"
+  );
+  assert.ok(escolhido);
+  const depoisDaEscolha = colaboradoresParaDefinirVaga({
+    colaboradores: [bruno, gabriel, ...pessoas],
+    vagas: [
+      ...vagasOcupadas,
+      {
+        ...vaga22,
+        status: "comprometida",
+        colaborador: escolhido.nome,
+        colaboradorCpf: escolhido.cpfDigits,
+        colaboradorOrigemId: escolhido.cadastroId ?? null,
+      },
+    ],
+    indice: 3,
+  });
+  assert.equal(
+    depoisDaEscolha.some((item) => item.nome === "GABRIEL FERNANDES FERREIRA"),
+    false
+  );
+  assert.equal(vagasOcupadas[2].colaborador, pessoas[2].nome);
 }
 
 console.log("test-lista-colaboradores-contrato: ok");

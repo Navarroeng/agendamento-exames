@@ -6,10 +6,12 @@
 import { isUuid } from "@/lib/colaborador-movimentacoes";
 import {
   mensagemAlteracaoDiretaImplantacao,
+  mensagemConflitoVinculoLista,
   mensagemOcupacaoForaDaEmpresa,
   snapshotAoLiberarVagaLegada,
   type FontesColaboradorEmpresa,
   type PropostaOcupacaoVaga,
+  type VagaAtualParaVinculo,
 } from "@/lib/colaborador-vaga-ocupacao";
 import { isNomeFuncionarioReal, normalizeNomeOcupante } from "@/lib/contrato-vagas";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
@@ -43,24 +45,35 @@ export async function validarEPreservarOcupacaoVagas(params: {
 
   const fontes = await carregarFontesColaboradoresEmpresa(clienteId);
   const vagasContrato = await vagasDoContrato(admin, contratoId);
-  const atuais: PropostaOcupacaoVaga[] = vagasContrato.map((vaga) => ({
+  const atuais: VagaAtualParaVinculo[] = vagasContrato.map((vaga) => ({
     indice: vaga.indice,
+    id: vaga.id,
     colaborador: vaga.colaborador,
     colaboradorCpf: vaga.colaborador_cpf,
     colaboradorOrigemId: vaga.colaborador_origem,
     cargoNome: vaga.cargo_nome,
+    status: vaga.status,
+    agendamentoId: vaga.agendamento_id,
+    periodicoFuturoId: vaga.periodico_futuro_id,
+    creditoAsoId: vaga.credito_aso_id,
   }));
-  const ativos = consolidarPortalColaboradores(fontes);
+  const pessoas = consolidarPortalColaboradores(fontes);
+  const conflito = mensagemConflitoVinculoLista({
+    atuais,
+    propostas: params.propostas,
+    pessoas,
+  });
+  if (conflito) return { ok: false, error: conflito, status: 400 };
   const alteracaoDireta = mensagemAlteracaoDiretaImplantacao({
     atuais,
     propostas: params.propostas,
-    ativos,
+    ativos: pessoas,
   });
   if (alteracaoDireta) return { ok: false, error: alteracaoDireta, status: 400 };
   const bloqueio = mensagemOcupacaoForaDaEmpresa({
     atuais,
     propostas: params.propostas,
-    ativos,
+    ativos: pessoas,
   });
   if (bloqueio) return { ok: false, error: bloqueio, status: 400 };
 
@@ -140,12 +153,16 @@ async function vagasDoContrato(
     colaborador_cpf: string | null;
     colaborador_origem: string | null;
     cargo_nome: string | null;
+    status: string | null;
+    agendamento_id: string | null;
+    periodico_futuro_id: string | null;
+    credito_aso_id: string | null;
   }>
 > {
   const { data, error } = await admin
     .from("contrato_vagas")
     .select(
-      "id, indice, colaborador, colaborador_cpf, cargo_nome, agendamento_id, colaborador_origem"
+      "id, indice, status, colaborador, colaborador_cpf, cargo_nome, agendamento_id, periodico_futuro_id, credito_aso_id, colaborador_origem"
     )
     .eq("contrato_id", contratoId);
   if (error) throw error;
@@ -158,6 +175,12 @@ async function vagasDoContrato(
       ? String(row.colaborador_origem)
       : null,
     cargo_nome: row.cargo_nome ? String(row.cargo_nome) : null,
+    status: row.status ? String(row.status) : null,
+    agendamento_id: row.agendamento_id ? String(row.agendamento_id) : null,
+    periodico_futuro_id: row.periodico_futuro_id
+      ? String(row.periodico_futuro_id)
+      : null,
+    credito_aso_id: row.credito_aso_id ? String(row.credito_aso_id) : null,
   }));
 }
 

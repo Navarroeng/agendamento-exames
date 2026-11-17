@@ -4,7 +4,7 @@
  * o cadastro da empresa é gravado antes, sem data de admissão.
  */
 
-import { isNomeFuncionarioReal, normalizeNomeOcupante } from "@/lib/contrato-vagas";
+import { isNomeFuncionarioReal, normalizeNomeOcupante, vagaTemReservaValida } from "@/lib/contrato-vagas";
 import { isValidCPF, normalizeCpfDigits } from "@/lib/cpf";
 import {
   consolidarPortalColaboradores,
@@ -20,6 +20,9 @@ export const MENSAGEM_CADASTRE_COLABORADOR =
 export const MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO =
   "Nome, CPF e cargo não podem ser alterados na Implantação. Corrija em Clientes → Colaboradores.";
 
+export const MENSAGEM_CONFLITO_LISTA_VAGAS =
+  "A vaga ou o cadastro mudou depois que esta lista foi aberta. Atualize a lista e tente novamente.";
+
 export type PropostaOcupacaoVaga = {
   indice: number;
   colaborador: string | null;
@@ -27,6 +30,15 @@ export type PropostaOcupacaoVaga = {
   colaboradorOrigemId: string | null;
   cargoNome?: string | null;
   manterAsoAberto?: boolean;
+  vagaId?: string | null;
+};
+
+export type VagaAtualParaVinculo = PropostaOcupacaoVaga & {
+  id?: string | null;
+  status?: string | null;
+  agendamentoId?: string | null;
+  periodicoFuturoId?: string | null;
+  creditoAsoId?: string | null;
 };
 
 export type AtivoParaOcuparVaga = {
@@ -168,6 +180,108 @@ export function mensagemAlteracaoDiretaImplantacao(input: {
       return MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO;
     }
     return MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO;
+  }
+  return null;
+}
+
+function vagaLivreNoContrato(atual: VagaAtualParaVinculo): boolean {
+  if (
+    vagaTemReservaValida({
+      status: atual.status,
+      colaborador: atual.colaborador,
+      colaboradorCpf: atual.colaboradorCpf,
+      colaboradorOrigemId: atual.colaboradorOrigemId,
+      agendamentoId: atual.agendamentoId,
+      periodicoFuturoId: atual.periodicoFuturoId,
+      creditoAsoId: atual.creditoAsoId,
+    })
+  ) {
+    return false;
+  }
+  return !temPessoa(atual) && !origem(atual.colaboradorOrigemId);
+}
+
+function pessoaNaEmpresa(
+  pessoas: AtivoParaOcuparVaga[],
+  proposta: PropostaOcupacaoVaga
+): AtivoParaOcuparVaga | null {
+  const cpf = cpfValido(proposta.colaboradorCpf);
+  const origemId = origem(proposta.colaboradorOrigemId);
+  return (
+    pessoas.find((pessoa) => {
+      if (cpf && pessoa.cpfDigits === cpf) return true;
+      if (!origemId) return false;
+      return (
+        origemId === String(pessoa.cadastroId ?? "").trim() || origemId === pessoa.id
+      );
+    }) ?? null
+  );
+}
+
+function chavesPessoa(pessoa: {
+  colaboradorCpf?: string | null;
+  colaboradorOrigemId?: string | null;
+  cpfDigits?: string | null;
+}): string[] {
+  const chaves: string[] = [];
+  const cpf = cpfValido(pessoa.colaboradorCpf ?? pessoa.cpfDigits);
+  if (cpf) chaves.push(`cpf:${cpf}`);
+  const origemId = origem(pessoa.colaboradorOrigemId);
+  if (origemId) chaves.push(`origem:${origemId}`);
+  return chaves;
+}
+
+function chavesConflitam(esquerda: string[], direita: string[]): boolean {
+  return esquerda.some((chave) => direita.includes(chave));
+}
+
+/**
+ * Novo vínculo só entra se a vaga continua livre, o colaborador continua ativo
+ * e ele ainda não ocupa outra vaga deste contrato.
+ * Mudança de vaga ou de cadastro depois da abertura pede atualização da lista.
+ * Limpar, desvincular e manter ASO em aberto não passam por esta trava.
+ */
+export function mensagemConflitoVinculoLista(input: {
+  atuais: VagaAtualParaVinculo[];
+  propostas: PropostaOcupacaoVaga[];
+  pessoas: AtivoParaOcuparVaga[];
+}): string | null {
+  const porIndice = new Map(input.atuais.map((atual) => [atual.indice, atual]));
+  for (const proposta of input.propostas) {
+    if (proposta.manterAsoAberto || !temPessoa(proposta)) continue;
+    const atual = porIndice.get(proposta.indice) ?? {
+      indice: proposta.indice,
+      colaborador: null,
+      colaboradorCpf: null,
+      colaboradorOrigemId: null,
+      cargoNome: null,
+      status: "aberta",
+    };
+    if (camposIdentidadeInalterados(atual, proposta)) continue;
+    const idAtual = origem(atual.id);
+    const idProposta = origem(proposta.vagaId);
+    if (idAtual && idProposta && idAtual !== idProposta) {
+      return MENSAGEM_CONFLITO_LISTA_VAGAS;
+    }
+    if (!vagaLivreNoContrato(atual)) return MENSAGEM_CONFLITO_LISTA_VAGAS;
+    const pessoa = pessoaNaEmpresa(input.pessoas, proposta);
+    if (!pessoa) return MENSAGEM_CADASTRE_COLABORADOR;
+    if (pessoa.situacao !== "ativo" || !vinculoConfereComCadastro(proposta, pessoa)) {
+      return MENSAGEM_CONFLITO_LISTA_VAGAS;
+    }
+    const chaves = chavesPessoa(proposta);
+    const duplicadaNoContrato = input.atuais.some((outra) => {
+      if (outra.indice === proposta.indice) return false;
+      if (!temPessoa(outra) && !origem(outra.colaboradorOrigemId)) return false;
+      return chavesConflitam(chaves, chavesPessoa(outra));
+    });
+    const duplicadaNaSelecao = input.propostas.some((outra) => {
+      if (outra.indice === proposta.indice || !temPessoa(outra)) return false;
+      return chavesConflitam(chaves, chavesPessoa(outra));
+    });
+    if (duplicadaNoContrato || duplicadaNaSelecao) {
+      return MENSAGEM_CONFLITO_LISTA_VAGAS;
+    }
   }
   return null;
 }

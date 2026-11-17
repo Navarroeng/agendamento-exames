@@ -524,6 +524,44 @@ export function vagaComprometidaResidual(vaga: SinaisOcupacaoVaga): boolean {
   );
 }
 
+function textoIdentidadeVaga(value: string | null | undefined): string {
+  return isNomeFuncionarioReal(value) ? normalizeNomeOcupante(value) : "";
+}
+
+function cpfIdentidadeVaga(value: string | null | undefined): string {
+  const digits = normalizeCpfDigits(value);
+  return isValidCPF(digits) ? digits : "";
+}
+
+/**
+ * A gravação da lista não reescreve vaga ocupada, reservada ou já igual ao rascunho.
+ * Vaga livre pode receber um colaborador novo. Desfazer ASO em aberto continua explícito.
+ */
+export function devePreservarVagaAoSalvarLista(params: {
+  atual: SinaisOcupacaoVaga;
+  proposta: {
+    colaborador?: string | null;
+    colaboradorCpf?: string | null;
+    colaboradorOrigemId?: string | null;
+    manterAsoAberto?: boolean;
+  };
+}): boolean {
+  if (params.proposta.manterAsoAberto) {
+    return params.atual.status === "aso_aberto";
+  }
+  const propostaVazia =
+    !textoIdentidadeVaga(params.proposta.colaborador) &&
+    !cpfIdentidadeVaga(params.proposta.colaboradorCpf) &&
+    !sinalPreenchido(params.proposta.colaboradorOrigemId);
+  if (params.atual.status === "aso_aberto" && propostaVazia) return false;
+  if (vagaTemReservaValida(params.atual)) return true;
+  const residual = vagaComprometidaResidual(params.atual);
+  const ocupada = vagaTemColaboradorVinculado(params.atual) && !residual;
+  if (!ocupada && propostaVazia) return true;
+  if (ocupada) return true;
+  return false;
+}
+
 /** Linha vazia com vínculo ou reserva: mostra quem está ligado ou o motivo. */
 export function textoVinculoOuReservaVaga(
   vaga: SinaisOcupacaoVaga

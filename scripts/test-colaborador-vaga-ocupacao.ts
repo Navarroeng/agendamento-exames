@@ -4,7 +4,9 @@ import { join } from "node:path";
 import {
   MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO,
   MENSAGEM_CADASTRE_COLABORADOR,
+  MENSAGEM_CONFLITO_LISTA_VAGAS,
   mensagemAlteracaoDiretaImplantacao,
+  mensagemConflitoVinculoLista,
   mensagemOcupacaoForaDaEmpresa,
   planilhaTemPessoaForaDaEmpresa,
   snapshotAoLiberarVagaLegada,
@@ -385,6 +387,7 @@ const ocupacao = readFileSync(
   "utf8"
 );
 assert.match(ocupacao, /mensagemAlteracaoDiretaImplantacao/);
+assert.match(ocupacao, /mensagemConflitoVinculoLista/);
 assert.match(ocupacao, /tipo: "cadastro"/);
 assert.match(ocupacao, /data_evento: null/);
 assert.doesNotMatch(ocupacao, /tipo: "admissao"/);
@@ -394,6 +397,7 @@ const aba = readFileSync(
 );
 assert.match(aba, /MENSAGEM_CADASTRE_COLABORADOR/);
 assert.match(aba, /MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO/);
+assert.match(aba, /Definir colaborador/);
 assert.match(aba, /data-vaga-texto="nome"/);
 assert.doesNotMatch(aba, /data-vaga-cell=/);
 assert.match(aba, /Usar lista de colaboradores do cliente/);
@@ -410,5 +414,109 @@ assert.match(
   regras,
   /A vaga ficará em aberto\. O colaborador continuará cadastrado em Clientes → Colaboradores\./
 );
+
+{
+  const livre = {
+    indice: 22,
+    id: "vaga-22",
+    colaborador: null,
+    colaboradorCpf: null,
+    colaboradorOrigemId: null,
+    cargoNome: null,
+    status: "aberta",
+  };
+  const ocupada = {
+    indice: 1,
+    id: "vaga-1",
+    colaborador: "BRUNO",
+    colaboradorCpf: CPF_BRUNO,
+    colaboradorOrigemId: CADASTRO,
+    cargoNome: "TECNICO",
+    status: "comprometida",
+  };
+  const gabriel = {
+    indice: 22,
+    vagaId: "vaga-22",
+    colaborador: "GABRIEL FERNANDES FERREIRA",
+    colaboradorCpf: CPF_CARLA,
+    colaboradorOrigemId: "cadastro-gabriel",
+    cargoNome: "ANALISTA",
+  };
+  const gabrielAtivo = {
+    id: "cadastro-gabriel",
+    cadastroId: "cadastro-gabriel",
+    cpfDigits: CPF_CARLA,
+    situacao: "ativo" as const,
+    nome: "GABRIEL FERNANDES FERREIRA",
+    cargo: "ANALISTA",
+  };
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [ocupada, livre],
+      propostas: [ocupada, gabriel],
+      pessoas: [brunoAtivo, gabrielAtivo],
+    }),
+    null
+  );
+  assert.equal(ocupada.colaborador, "BRUNO");
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [
+        ocupada,
+        {
+          ...livre,
+          colaborador: "OUTRA PESSOA",
+          colaboradorCpf: CPF_BRUNO,
+          colaboradorOrigemId: "outra",
+          status: "comprometida",
+        },
+      ],
+      propostas: [gabriel],
+      pessoas: [brunoAtivo, gabrielAtivo],
+    }),
+    MENSAGEM_CONFLITO_LISTA_VAGAS
+  );
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [
+        {
+          ...ocupada,
+          colaborador: "GABRIEL FERNANDES FERREIRA",
+          colaboradorCpf: CPF_CARLA,
+          colaboradorOrigemId: "cadastro-gabriel",
+          cargoNome: "ANALISTA",
+        },
+        livre,
+      ],
+      propostas: [gabriel],
+      pessoas: [gabrielAtivo],
+    }),
+    MENSAGEM_CONFLITO_LISTA_VAGAS
+  );
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [livre],
+      propostas: [gabriel],
+      pessoas: [{ ...gabrielAtivo, situacao: "demitido" }],
+    }),
+    MENSAGEM_CONFLITO_LISTA_VAGAS
+  );
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [livre],
+      propostas: [{ ...gabriel, cargoNome: "AUXILIAR" }],
+      pessoas: [gabrielAtivo],
+    }),
+    MENSAGEM_CONFLITO_LISTA_VAGAS
+  );
+  assert.equal(
+    mensagemConflitoVinculoLista({
+      atuais: [livre],
+      propostas: [{ ...gabriel, manterAsoAberto: true, colaborador: null }],
+      pessoas: [gabrielAtivo],
+    }),
+    null
+  );
+}
 
 console.log("test-colaborador-vaga-ocupacao: ok");
