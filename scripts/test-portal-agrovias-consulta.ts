@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { acessoExternoVigente } from "../lib/acesso-externo-agrovias";
 import {
+  montarPlataformasPortal,
   asosDoColaborador,
   caminhoPublicacaoAgroviasPermitido,
   csvControlesAgrovias,
@@ -256,5 +257,23 @@ assert.match(csv, /2026-11-16/);
 assert.match(csv, /Plataforma Norte/);
 assert.match(csv, /Periódico/);
 assert.match(csv, /Pendente/);
+
+const consultaPlataformas = montarPlataformasPortal({
+  hoje: "2026-11-16",
+  plataformas: [
+    plataforma,
+    { id: "arquivada", nome: "Antiga", linkAcesso: "https://exemplo.test", arquivadaEm: "2026-01-01" },
+  ],
+  obras: [obra],
+  requisitos: [requisito],
+  nomeColaborador: () => "Ana",
+});
+assert.equal(consultaPlataformas.length, 1);
+assert.equal(consultaPlataformas[0]?.nome, "Plataforma Norte");
+assert.equal(consultaPlataformas[0]?.obras[0]?.pendencias, 1);
+assert.equal(consultaPlataformas[0]?.obras[0]?.documentos[0]?.situacao, "Pendente");
+assert.equal(consultaPlataformas[0]?.obras[0]?.vencimentos[0]?.validade, "2026-12-15");
+assert.equal(consultaPlataformas[0]?.obras[0]?.documentos[0]?.colaborador, "Ana");
+assert.equal("linkAcesso" in (consultaPlataformas[0] ?? {}), false);
 
 console.log("test-portal-agrovias-consulta: OK");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { CabecalhoPortalAgrovias } from "@/components/portal-agrovias/CabecalhoPortalAgrovias";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
@@ -8,6 +9,7 @@ import {
   filtrarPeriodicosPortal,
   labelDataPortal,
   type PeriodicoPortal,
+  type PlataformaPortalConsulta,
 } from "@/lib/portal-agrovias-consulta";
 
 async function lerJson<T extends { error?: string }>(resposta: Response, fallback: string): Promise<T> {
@@ -83,7 +85,7 @@ type Ficha = {
 };
 
 type Aba = "obras" | "agendamentos" | "cursos" | "rh" | "asos" | "esocial";
-type Secao = "colaboradores" | "documentos" | "periodicos";
+type Secao = "colaboradores" | "documentos" | "periodicos" | "plataformas";
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: "obras", label: "Obras e plataformas" },
@@ -94,11 +96,12 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: "rh", label: "Documentos de RH" },
 ];
 
-const SECOES: { id: Secao; label: string }[] = [
-  { id: "colaboradores", label: "Colaboradores" },
-  { id: "documentos", label: "Documentos SST" },
-  { id: "periodicos", label: "Periódicos futuros" },
-];
+function secaoDoCaminho(pathname: string): Secao {
+  if (pathname.startsWith("/portal-agrovias/documentos")) return "documentos";
+  if (pathname.startsWith("/portal-agrovias/periodicos")) return "periodicos";
+  if (pathname.startsWith("/portal-agrovias/plataformas")) return "plataformas";
+  return "colaboradores";
+}
 
 function RostoPadrao() {
   return (
@@ -127,7 +130,9 @@ export function PortalAgroviasPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [documentosSst, setDocumentosSst] = useState<DocumentoSst[]>([]);
   const [periodicos, setPeriodicos] = useState<PeriodicoPortal[]>([]);
-  const [secao, setSecao] = useState<Secao>("colaboradores");
+  const [plataformas, setPlataformas] = useState<PlataformaPortalConsulta[] | null>(null);
+  const pathname = usePathname();
+  const secao = secaoDoCaminho(pathname);
   const [buscaPeriodico, setBuscaPeriodico] = useState("");
   const [mesPeriodico, setMesPeriodico] = useState("");
   const [situacaoPeriodico, setSituacaoPeriodico] = useState<"" | "Programado" | "Agendado">("");
@@ -149,12 +154,14 @@ export function PortalAgroviasPage() {
       colaboradores?: Colaborador[];
       documentosSst?: DocumentoSst[];
       periodicos?: PeriodicoPortal[];
+      plataformas?: PlataformaPortalConsulta[] | null;
       error?: string;
     }>(resposta, "Não foi possível abrir os colaboradores.");
     if (!resposta.ok) throw new Error(json.error || "Não foi possível abrir os colaboradores.");
     setColaboradores(json.colaboradores ?? []);
     setDocumentosSst(json.documentosSst ?? []);
     setPeriodicos(json.periodicos ?? []);
+    setPlataformas(json.plataformas === undefined ? null : json.plataformas);
   }
 
   useEffect(() => {
@@ -287,27 +294,6 @@ export function PortalAgroviasPage() {
       <CabecalhoPortalAgrovias />
       <div className="px-4 pb-8 pt-4 sidebar:px-6">
         {erro ? <p className="mb-3 text-sm text-rose-700">{erro}</p> : null}
-        <div role="tablist" aria-label="Consulta da AGROVIAS" className="mb-4 flex gap-2 overflow-x-auto pb-1">
-          {SECOES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={secao === item.id}
-              className={
-                secao === item.id
-                  ? "shrink-0 rounded-full bg-[#101D4A] px-4 py-2 text-sm font-bold text-white"
-                  : "shrink-0 rounded-full border border-[#E6EAF2] bg-white px-4 py-2 text-sm font-medium text-[#101D4A]"
-              }
-              onClick={() => {
-                setSecao(item.id);
-                if (item.id !== "colaboradores") fechar();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
         {secao === "documentos" ? (
           <PainelDocumentos documentos={documentosSst} onBaixar={(id) => void baixarPublicacao(`/api/portal-agrovias/sst?id=${encodeURIComponent(id)}`)} />
         ) : null}
@@ -321,6 +307,9 @@ export function PortalAgroviasPage() {
             onMes={setMesPeriodico}
             onSituacao={setSituacaoPeriodico}
           />
+        ) : null}
+        {secao === "plataformas" ? (
+          <PainelPlataformas carregando={carregando} plataformas={plataformas} falhou={Boolean(erro) || plataformas === null} />
         ) : null}
         {secao === "colaboradores" ? (
         <div className={fichaId ? "sidebar:grid sidebar:grid-cols-[320px_minmax(0,1fr)] sidebar:items-start sidebar:gap-4" : ""}>
@@ -626,6 +615,92 @@ function PainelEsocial({ ficha }: { ficha: Ficha }) {
         {eventos.length === 0 ? <li className="text-sm text-slate-500">Nenhum evento transmitido com sucesso.</li> : null}
       </ul>
     </section>
+  );
+}
+
+function PainelPlataformas({
+  carregando,
+  plataformas,
+  falhou,
+}: {
+  carregando: boolean;
+  plataformas: PlataformaPortalConsulta[] | null;
+  falhou: boolean;
+}) {
+  if (carregando && plataformas === null) {
+    return <p className="text-sm text-slate-500">Carregando plataformas…</p>;
+  }
+  if (falhou || plataformas === null) {
+    return <p className="text-sm text-rose-700">Não foi possível carregar as plataformas.</p>;
+  }
+  if (plataformas.length === 0) {
+    return (
+      <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+        <h1 className="text-lg font-bold text-[#101D4A]">Plataformas</h1>
+        <p className="mt-3 text-sm text-slate-500">Nenhuma plataforma cadastrada</p>
+      </section>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <h1 className="text-lg font-bold text-[#101D4A]">Plataformas</h1>
+      {plataformas.map((plataforma) => (
+        <section key={plataforma.id} className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+          <h2 className="text-base font-bold text-[#101D4A]">{plataforma.nome}</h2>
+          {plataforma.obras.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">Nenhuma obra vinculada.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {plataforma.obras.map((obra) => (
+                <li key={obra.id} className="rounded-xl border border-[#E6EAF2] p-3">
+                  <p className="font-semibold text-[#101D4A]">{obra.nome}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {obra.pendencias === 0 ? "Nenhuma pendência." : `${obra.pendencias} pendência${obra.pendencias === 1 ? "" : "s"}`}
+                  </p>
+                  {obra.itensPendentes.length > 0 ? (
+                    <ul className="mt-1 list-disc pl-5 text-sm text-[#101D4A]">
+                      {obra.itensPendentes.map((item) => (
+                        <li key={item.id}>{item.titulo}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <h3 className="mt-3 text-sm font-semibold text-[#101D4A]">Situação dos documentos</h3>
+                  {obra.documentos.length === 0 ? (
+                    <p className="mt-1 text-sm text-slate-500">Nenhum documento registrado.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1 text-sm text-[#101D4A]">
+                      {obra.documentos.map((documento) => (
+                        <li key={documento.id}>
+                          <span className="font-medium">{documento.titulo}</span>
+                          <span className="text-slate-500">
+                            {" "}· {documento.tipo} · {documento.situacao}
+                            {documento.colaborador ? ` · ${documento.colaborador}` : ""}
+                            {documento.validade ? ` · validade ${labelDataPortal(documento.validade)}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <h3 className="mt-3 text-sm font-semibold text-[#101D4A]">Vencimentos</h3>
+                  {obra.vencimentos.length === 0 ? (
+                    <p className="mt-1 text-sm text-slate-500">Nenhum vencimento registrado.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1 text-sm text-[#101D4A]">
+                      {obra.vencimentos.map((vencimento) => (
+                        <li key={vencimento.id}>
+                          {vencimento.titulo} · {labelDataPortal(vencimento.validade)}
+                          {vencimento.vencido ? " · Vencido" : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+    </div>
   );
 }
 

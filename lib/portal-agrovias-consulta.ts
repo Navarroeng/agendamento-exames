@@ -6,6 +6,8 @@ import { isPeriodicoCanceladoManualmente } from "@/lib/periodico-cancelamento";
 import { normalizeCpfDigits } from "@/lib/cpf";
 import { formatHorarioDisplay } from "@/lib/format-datetime";
 import {
+  pendenciasAbertasDaObra,
+  requisitoVencido,
   SITUACAO_REQUISITO_LABEL,
   TIPO_REQUISITO_LABEL,
   type ObraRegistro,
@@ -337,6 +339,91 @@ export function examesDaFichaPortal(params: {
 
 export function labelDataPortal(isoData: string | null): string {
   return isoData ? formatDateIsoToBR(isoData) : "Não informado";
+}
+
+export type DocumentoPlataformaPortal = {
+  id: string;
+  titulo: string;
+  tipo: string;
+  situacao: string;
+  validade: string | null;
+  colaborador: string | null;
+};
+
+export type VencimentoPlataformaPortal = {
+  id: string;
+  titulo: string;
+  validade: string;
+  vencido: boolean;
+};
+
+export type ObraPlataformaPortal = {
+  id: string;
+  nome: string;
+  pendencias: number;
+  itensPendentes: { id: string; titulo: string }[];
+  documentos: DocumentoPlataformaPortal[];
+  vencimentos: VencimentoPlataformaPortal[];
+};
+
+export type PlataformaPortalConsulta = {
+  id: string;
+  nome: string;
+  obras: ObraPlataformaPortal[];
+};
+
+export function montarPlataformasPortal(params: {
+  plataformas: readonly PlataformaRegistro[];
+  obras: readonly ObraRegistro[];
+  requisitos: readonly RequisitoRegistro[];
+  hoje: string;
+  nomeColaborador?: (id: string) => string;
+}): PlataformaPortalConsulta[] {
+  const nome = params.nomeColaborador ?? (() => "");
+  return params.plataformas
+    .filter((plataforma) => !plataforma.arquivadaEm)
+    .map((plataforma) => ({
+      id: plataforma.id,
+      nome: plataforma.nome,
+      obras: params.obras
+        .filter((obra) => obra.plataformaId === plataforma.id)
+        .map((obra) => {
+          const daObra = params.requisitos.filter((requisito) => requisito.obraId === obra.id);
+          const pendentes = daObra.filter(
+            (requisito) =>
+              requisito.situacao === "pendente" ||
+              requisito.situacao === "pronto_para_postar" ||
+              requisito.situacao === "recusado" ||
+              requisitoVencido(requisito, params.hoje)
+          );
+          return {
+            id: obra.id,
+            nome: obra.nome,
+            pendencias: pendenciasAbertasDaObra(params.requisitos, obra.id, params.hoje),
+            itensPendentes: pendentes.map((requisito) => ({
+              id: requisito.id,
+              titulo: requisito.titulo,
+            })),
+            documentos: daObra.map((requisito) => ({
+              id: requisito.id,
+              titulo: requisito.titulo,
+              tipo: TIPO_REQUISITO_LABEL[requisito.tipo],
+              situacao: SITUACAO_REQUISITO_LABEL[requisito.situacao],
+              validade: requisito.validade,
+              colaborador: requisito.colaboradorId ? nome(requisito.colaboradorId) || null : null,
+            })),
+            vencimentos: daObra
+              .filter((requisito) => Boolean(requisito.validade))
+              .map((requisito) => ({
+                id: requisito.id,
+                titulo: requisito.titulo,
+                validade: requisito.validade as string,
+                vencido: requisitoVencido(requisito, params.hoje),
+              }))
+              .sort((a, b) => a.validade.localeCompare(b.validade)),
+          };
+        }),
+    }));
 }
 
 function csvCampo(valor: string): string {

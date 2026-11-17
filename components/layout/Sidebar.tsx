@@ -14,6 +14,7 @@ function isNavItemActive(pathname: string, item: NavItem): boolean {
   if (item.href === null) return false;
   if (item.label === "Agendamentos") return pathname === "/";
   if (item.label === "Dashboard") return pathname === "/dashboard";
+  if (item.href === "/portal-agrovias") return pathname === "/portal-agrovias";
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
@@ -28,7 +29,7 @@ function NavLink({
 }) {
   const isActive = isNavItemActive(pathname, item);
 
-  const portal = item.href === "/portal-agrovias";
+  const portal = item.href === "/portal-agrovias" || item.href?.startsWith("/portal-agrovias/") === true;
   const className = [
     "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium tracking-[-0.1px] transition-all duration-200 ease-out",
     portal && isActive
@@ -90,7 +91,12 @@ function useNavSections() {
       return [
         {
           title: "",
-          items: [{ iconKey: "users" as const, label: "Colaboradores", href: "/portal-agrovias" }],
+          items: [
+            { iconKey: "users" as const, label: "Colaboradores", href: "/portal-agrovias" },
+            { iconKey: "document" as const, label: "Documentos SST", href: "/portal-agrovias/documentos" },
+            { iconKey: "clock" as const, label: "Periódicos futuros", href: "/portal-agrovias/periodicos" },
+            { iconKey: "building" as const, label: "Plataformas", href: "/portal-agrovias/plataformas" },
+          ],
         },
       ];
     }
