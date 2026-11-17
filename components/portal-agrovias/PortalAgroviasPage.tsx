@@ -4,6 +4,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { CabecalhoPortalAgrovias } from "@/components/portal-agrovias/CabecalhoPortalAgrovias";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
+import {
+  filtrarPeriodicosPortal,
+  labelDataPortal,
+  type PeriodicoPortal,
+} from "@/lib/portal-agrovias-consulta";
 
 async function lerJson<T extends { error?: string }>(resposta: Response, fallback: string): Promise<T> {
   const tipo = (resposta.headers.get("content-type") ?? "").toLowerCase();
@@ -37,22 +42,62 @@ type Documento = {
   }[];
 };
 
+type DocumentoSst = {
+  id: string;
+  tipo: string;
+  tipoLabel: string;
+  publicadoEm: string;
+};
+
+type ExameFicha = {
+  id: string;
+  tipoExame: string;
+  situacao: string;
+  quando: string;
+};
+
+type AsoFicha = {
+  id: string;
+  tipoExame: string;
+  data: string;
+  arquivoNome: string;
+};
+
+type EsocialFicha = {
+  id: string;
+  tipoEvento: string;
+  dataTransmissao: string;
+  recibo: string;
+};
+
 type Ficha = {
   colaborador: { id: string; nome: string; cargo: string };
   obras: { id: string; nome: string; plataforma: string; liberado: boolean }[];
   proximos: { id: string; dataLabel: string; horarioLabel: string; localLabel: string; tipoExame: string; situacao: string }[];
   realizados: { id: string; dataLabel: string; horarioLabel: string; localLabel: string; tipoExame: string; situacao: string }[];
+  exames?: ExameFicha[];
+  asos?: AsoFicha[];
+  esocial?: EsocialFicha[];
   cursos: { id: string; nome: string; realizadoEm: string; validade: string | null }[];
   documentos: Documento[];
 };
 
-type Aba = "obras" | "agendamentos" | "cursos" | "rh";
+type Aba = "obras" | "agendamentos" | "cursos" | "rh" | "asos" | "esocial";
+type Secao = "colaboradores" | "documentos" | "periodicos";
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: "obras", label: "Obras e plataformas" },
   { id: "agendamentos", label: "Agendamentos" },
+  { id: "asos", label: "ASOs" },
+  { id: "esocial", label: "eSocial" },
   { id: "cursos", label: "Cursos e certificados" },
   { id: "rh", label: "Documentos de RH" },
+];
+
+const SECOES: { id: Secao; label: string }[] = [
+  { id: "colaboradores", label: "Colaboradores" },
+  { id: "documentos", label: "Documentos SST" },
+  { id: "periodicos", label: "Periódicos futuros" },
 ];
 
 function RostoPadrao() {
@@ -80,6 +125,12 @@ function IconePessoa() {
 
 export function PortalAgroviasPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [documentosSst, setDocumentosSst] = useState<DocumentoSst[]>([]);
+  const [periodicos, setPeriodicos] = useState<PeriodicoPortal[]>([]);
+  const [secao, setSecao] = useState<Secao>("colaboradores");
+  const [buscaPeriodico, setBuscaPeriodico] = useState("");
+  const [mesPeriodico, setMesPeriodico] = useState("");
+  const [situacaoPeriodico, setSituacaoPeriodico] = useState<"" | "Programado" | "Agendado">("");
   const [busca, setBusca] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -94,12 +145,16 @@ export function PortalAgroviasPage() {
 
   async function carregarLista() {
     const resposta = await fetch("/api/portal-agrovias", { cache: "no-store" });
-    const json = await lerJson<{ colaboradores?: Colaborador[]; error?: string }>(
-      resposta,
-      "Não foi possível abrir os colaboradores."
-    );
+    const json = await lerJson<{
+      colaboradores?: Colaborador[];
+      documentosSst?: DocumentoSst[];
+      periodicos?: PeriodicoPortal[];
+      error?: string;
+    }>(resposta, "Não foi possível abrir os colaboradores.");
     if (!resposta.ok) throw new Error(json.error || "Não foi possível abrir os colaboradores.");
     setColaboradores(json.colaboradores ?? []);
+    setDocumentosSst(json.documentosSst ?? []);
+    setPeriodicos(json.periodicos ?? []);
   }
 
   useEffect(() => {
@@ -201,7 +256,27 @@ export function PortalAgroviasPage() {
     window.open(json.url, "_blank", "noopener");
   }
 
+  async function baixarPublicacao(caminho: string) {
+    const resposta = await fetch(caminho);
+    const json = await lerJson<{ url?: string; error?: string }>(
+      resposta,
+      "Não foi possível baixar o arquivo."
+    );
+    if (!resposta.ok || !json.url) {
+      setErro(json.error || "Não foi possível baixar o arquivo.");
+      return;
+    }
+    window.open(json.url, "_blank", "noopener");
+  }
+
   const termo = busca.trim().toLowerCase();
+  const periodicosVisiveis = filtrarPeriodicosPortal({
+    linhas: periodicos,
+    busca: buscaPeriodico,
+    mes: mesPeriodico,
+    situacao: situacaoPeriodico,
+  });
+
   const visiveis = colaboradores.filter((linha) => {
     if (!termo) return true;
     return `${linha.nome} ${linha.cargo}`.toLowerCase().includes(termo);
@@ -212,6 +287,42 @@ export function PortalAgroviasPage() {
       <CabecalhoPortalAgrovias />
       <div className="px-4 pb-8 pt-4 sidebar:px-6">
         {erro ? <p className="mb-3 text-sm text-rose-700">{erro}</p> : null}
+        <div role="tablist" aria-label="Consulta da AGROVIAS" className="mb-4 flex gap-2 overflow-x-auto pb-1">
+          {SECOES.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={secao === item.id}
+              className={
+                secao === item.id
+                  ? "shrink-0 rounded-full bg-[#101D4A] px-4 py-2 text-sm font-bold text-white"
+                  : "shrink-0 rounded-full border border-[#E6EAF2] bg-white px-4 py-2 text-sm font-medium text-[#101D4A]"
+              }
+              onClick={() => {
+                setSecao(item.id);
+                if (item.id !== "colaboradores") fechar();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {secao === "documentos" ? (
+          <PainelDocumentos documentos={documentosSst} onBaixar={(id) => void baixarPublicacao(`/api/portal-agrovias/sst?id=${encodeURIComponent(id)}`)} />
+        ) : null}
+        {secao === "periodicos" ? (
+          <PainelPeriodicos
+            linhas={periodicosVisiveis}
+            busca={buscaPeriodico}
+            mes={mesPeriodico}
+            situacao={situacaoPeriodico}
+            onBusca={setBuscaPeriodico}
+            onMes={setMesPeriodico}
+            onSituacao={setSituacaoPeriodico}
+          />
+        ) : null}
+        {secao === "colaboradores" ? (
         <div className={fichaId ? "sidebar:grid sidebar:grid-cols-[320px_minmax(0,1fr)] sidebar:items-start sidebar:gap-4" : ""}>
           <section className="rounded-2xl border border-[#E6EAF2] bg-white shadow-sm">
             <div className="border-b border-[#E6EAF2] px-4 py-4">
@@ -315,12 +426,11 @@ export function PortalAgroviasPage() {
                       ))}
                     </div>
                     {aba === "obras" ? <PainelObras ficha={ficha} /> : null}
-                    {aba === "agendamentos" ? (
-                      <div className="space-y-3">
-                        <ListaExames titulo="Próximos agendamentos" linhas={ficha.proximos} vazio="Nenhum agendamento futuro." />
-                        <ListaExames titulo="Exames realizados" linhas={ficha.realizados} vazio="Nenhum exame realizado." />
-                      </div>
+                    {aba === "agendamentos" ? <PainelExames ficha={ficha} /> : null}
+                    {aba === "asos" ? (
+                      <PainelAsos ficha={ficha} onBaixar={(id) => void baixarPublicacao(`/api/portal-agrovias/aso?id=${encodeURIComponent(id)}`)} />
                     ) : null}
+                    {aba === "esocial" ? <PainelEsocial ficha={ficha} /> : null}
                     {aba === "cursos" ? <PainelCursos ficha={ficha} /> : null}
                     {aba === "rh" ? (
                       <PainelRh
@@ -336,6 +446,7 @@ export function PortalAgroviasPage() {
             </section>
           ) : null}
         </div>
+        ) : null}
       </div>
     </>
   );
@@ -344,6 +455,177 @@ export function PortalAgroviasPage() {
     <AppShell semTitulo title="Colaboradores" subtitle="Consulta e envio de documentos da AGROVIAS.">
       {conteudo}
     </AppShell>
+  );
+}
+
+function PainelDocumentos({
+  documentos,
+  onBaixar,
+}: {
+  documentos: DocumentoSst[];
+  onBaixar: (id: string) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+      <h1 className="text-lg font-bold text-[#101D4A]">Documentos SST</h1>
+      <ul className="mt-3 divide-y divide-[#E6EAF2]">
+        {documentos.map((documento) => (
+          <li key={documento.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <span>
+              <span className="block font-semibold text-[#101D4A]">{documento.tipoLabel}</span>
+              <span className="block text-sm text-slate-500">Versão de {labelDataPortal(documento.publicadoEm.slice(0, 10))}</span>
+            </span>
+            <button
+              type="button"
+              className="rounded-full bg-[#101D4A] px-4 py-2 text-sm font-semibold text-white"
+              onClick={() => onBaixar(documento.id)}
+            >
+              Baixar PDF
+            </button>
+          </li>
+        ))}
+        {documentos.length === 0 ? (
+          <li className="py-4 text-sm text-slate-500">Nenhum documento publicado.</li>
+        ) : null}
+      </ul>
+    </section>
+  );
+}
+
+function PainelPeriodicos({
+  linhas,
+  busca,
+  mes,
+  situacao,
+  onBusca,
+  onMes,
+  onSituacao,
+}: {
+  linhas: PeriodicoPortal[];
+  busca: string;
+  mes: string;
+  situacao: "" | "Programado" | "Agendado";
+  onBusca: (valor: string) => void;
+  onMes: (valor: string) => void;
+  onSituacao: (valor: "" | "Programado" | "Agendado") => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+      <h1 className="text-lg font-bold text-[#101D4A]">Periódicos futuros</h1>
+      <div className="mt-3 grid gap-2 sidebar:grid-cols-[minmax(0,1fr)_10rem_10rem]">
+        <input
+          value={busca}
+          onChange={(event) => onBusca(event.target.value)}
+          placeholder="Buscar por nome"
+          aria-label="Buscar por nome"
+          className="h-10 rounded-xl border border-[#E6EAF2] px-3 text-sm"
+        />
+        <input
+          type="month"
+          value={mes}
+          onChange={(event) => onMes(event.target.value)}
+          aria-label="Filtrar por mês"
+          className="h-10 rounded-xl border border-[#E6EAF2] px-3 text-sm"
+        />
+        <select
+          value={situacao}
+          onChange={(event) => onSituacao(event.target.value as "" | "Programado" | "Agendado")}
+          aria-label="Filtrar por situação"
+          className="h-10 rounded-xl border border-[#E6EAF2] px-3 text-sm"
+        >
+          <option value="">Todas as situações</option>
+          <option value="Programado">Programado</option>
+          <option value="Agendado">Agendado</option>
+        </select>
+      </div>
+      <ul className="mt-3 divide-y divide-[#E6EAF2]">
+        {linhas.map((linha) => (
+          <li key={linha.id} className="py-3 text-sm text-[#101D4A]">
+            <span className="block font-semibold">{linha.colaborador}</span>
+            <span className="block text-slate-500">{linha.cargo} · {linha.tipoExame}</span>
+            <span className="mt-1 block">
+              {linha.situacao}
+              {linha.situacao === "Programado"
+                ? ` · previsão ${labelDataPortal(linha.previsao)}`
+                : ` · ${labelDataPortal(linha.data)}${linha.horario ? ` · ${linha.horario}` : ""}`}
+            </span>
+          </li>
+        ))}
+        {linhas.length === 0 ? <li className="py-4 text-sm text-slate-500">Nenhum periódico encontrado.</li> : null}
+      </ul>
+    </section>
+  );
+}
+
+function PainelExames({ ficha }: { ficha: Ficha }) {
+  const exames = ficha.exames ?? [];
+  if (ficha.exames) {
+    return (
+      <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+        <h3 className="font-semibold text-[#101D4A]">Exames programados e agendamentos</h3>
+        <ul className="mt-2 space-y-2">
+          {exames.map((linha) => (
+            <li key={linha.id} className="text-sm text-[#101D4A]">
+              <span className="font-medium">{linha.tipoExame}</span>
+              <span className="text-slate-500"> · {linha.situacao} · {linha.quando}</span>
+            </li>
+          ))}
+          {exames.length === 0 ? <li className="text-sm text-slate-500">Nenhum exame programado ou agendado.</li> : null}
+        </ul>
+      </section>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <ListaExames titulo="Próximos agendamentos" linhas={ficha.proximos} vazio="Nenhum agendamento futuro." />
+      <ListaExames titulo="Exames realizados" linhas={ficha.realizados} vazio="Nenhum exame realizado." />
+    </div>
+  );
+}
+
+function PainelAsos({ ficha, onBaixar }: { ficha: Ficha; onBaixar: (id: string) => void }) {
+  const asos = ficha.asos ?? [];
+  return (
+    <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+      <h3 className="font-semibold text-[#101D4A]">ASOs disponibilizados</h3>
+      <ul className="mt-3 space-y-3">
+        {asos.map((aso) => (
+          <li key={aso.id} className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span>
+              <span className="block font-medium text-[#101D4A]">{aso.tipoExame}</span>
+              <span className="block text-slate-500">{aso.data ? labelDataPortal(aso.data) : "Data não informada"}</span>
+            </span>
+            <button type="button" className="rounded-full bg-[#101D4A] px-4 py-2 text-sm font-semibold text-white" onClick={() => onBaixar(aso.id)}>
+              Baixar PDF
+            </button>
+          </li>
+        ))}
+        {asos.length === 0 ? <li className="text-sm text-slate-500">Nenhum ASO disponibilizado.</li> : null}
+      </ul>
+    </section>
+  );
+}
+
+function PainelEsocial({ ficha }: { ficha: Ficha }) {
+  const eventos = ficha.esocial ?? [];
+  return (
+    <section className="rounded-2xl border border-[#E6EAF2] bg-white p-4">
+      <h3 className="font-semibold text-[#101D4A]">Eventos de SST transmitidos</h3>
+      <ul className="mt-3 space-y-3">
+        {eventos.map((evento) => (
+          <li key={evento.id} className="text-sm text-[#101D4A]">
+            <span className="block font-medium">{evento.tipoEvento}</span>
+            <span className="block text-slate-500">
+              Transmissão em {labelDataPortal(evento.dataTransmissao)} · recibo {evento.recibo}
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">
+              O comprovante em arquivo não está gravado nesta transmissão. A consulta mostra a data efetiva e o número do recibo.
+            </span>
+          </li>
+        ))}
+        {eventos.length === 0 ? <li className="text-sm text-slate-500">Nenhum evento transmitido com sucesso.</li> : null}
+      </ul>
+    </section>
   );
 }
 

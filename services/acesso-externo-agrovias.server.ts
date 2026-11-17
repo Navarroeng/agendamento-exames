@@ -24,6 +24,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { resolverEscopoGestaoPlataformas } from "@/services/gestao-plataformas.server";
 import { listarColaboradoresPortal } from "@/services/portal-colaboradores.server";
+import {
+  complementosFichaPortal,
+  consultaPortalAgrovias,
+} from "@/services/portal-agrovias-publicacoes.server";
 
 const BUCKET = "gestao-plataformas-anexos";
 
@@ -117,6 +121,7 @@ export async function listarPortalAgrovias() {
       .filter((linha) => !linha.encerrada_em)
       .map((linha) => String(linha.colaborador_id))
   );
+  const consulta = await consultaPortalAgrovias(acesso.acesso.clienteId, acesso.acesso.clienteNome);
   return {
     ok: true as const,
     clienteNome: acesso.acesso.clienteNome,
@@ -127,6 +132,8 @@ export async function listarPortalAgrovias() {
       situacao: linha.situacaoLabel,
       semObra: !comObra.has(linha.id),
     })),
+    documentosSst: consulta.documentos,
+    periodicos: consulta.periodicos,
   };
 }
 
@@ -155,7 +162,7 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
         .eq("colaborador_id", colaborador.id),
       admin
         .from("agendamentos")
-        .select("id, colaborador, colaborador_cpf, aso, status, data_agendamento, horario, clinica_nome")
+        .select("id, colaborador, colaborador_cpf, aso, status, data_agendamento, horario, clinica_nome, envio_esocial, data_envio_esocial, esocial_recibo, esocial_envio_cancelado")
         .eq("cliente_id", clienteId)
         .order("data_agendamento", { ascending: false })
         .limit(200),
@@ -217,6 +224,13 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
     })),
   });
   const eventos = eventosRes.data ?? [];
+  const complementos = await complementosFichaPortal({
+    clienteId,
+    clienteNome: acesso.acesso.clienteNome,
+    cpf: colaborador.cpfDigits,
+    nome: colaborador.nome,
+    agendamentosVisiveis: [...exames.proximos, ...exames.realizados],
+  });
   return {
     ok: true as const,
     ficha: {
@@ -232,6 +246,9 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
       }),
       proximos: exames.proximos,
       realizados: exames.realizados,
+      exames: complementos.exames,
+      asos: complementos.asos,
+      esocial: complementos.esocial,
       cursos,
       documentos: (documentosRes.data ?? []).map((row) => {
         const situacao = (String(row.situacao || "recebido") as SituacaoDocumentoRh);
