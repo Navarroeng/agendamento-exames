@@ -281,7 +281,10 @@ const aba = readFileSync(
   "utf8"
 );
 assert.match(aba, /MENSAGEM_CADASTRE_COLABORADOR/);
-assert.match(aba, /planilhaTemPessoaForaDaEmpresa/);
+assert.match(aba, /Usar lista de colaboradores do cliente/);
+assert.doesNotMatch(aba, /Baixar modelo Excel/);
+assert.doesNotMatch(aba, /Importar lista/);
+assert.doesNotMatch(aba, /Exportar lista/);
 assert.match(aba, /Abrir Cliente/);
 assert.match(aba, /textoConfirmacaoLiberarVaga/);
 assert.match(aba, /vagaComprometidaResidual/);
