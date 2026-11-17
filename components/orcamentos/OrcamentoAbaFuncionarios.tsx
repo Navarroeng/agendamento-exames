@@ -17,12 +17,12 @@ import {
   type ColaboradorListaCliente,
 } from "@/lib/lista-colaboradores-contrato";
 import {
+  MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO,
   MENSAGEM_CADASTRE_COLABORADOR,
+  mensagemAlteracaoDiretaImplantacao,
   mensagemOcupacaoForaDaEmpresa,
 } from "@/lib/colaborador-vaga-ocupacao";
-import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
-  CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN,
   CONTRATO_VAGA_STATUS_LABELS_CLASSIFICACAO,
   buildVagaDraftsIniciais,
   draftAposRemoverFuncionario,
@@ -31,8 +31,6 @@ import {
   normalizeNomeOcupante,
   validarDraftsListaVagas,
   vagaClassificacaoBloqueiaEdicaoOcupante,
-  vagaPermiteCorrigirCargoOcupante,
-  vagaPermiteCorrigirNomeOcupante,
   vagaPermiteRemoverFuncionario,
   statusClassificacaoVaga,
   textoConfirmacaoLiberarVaga,
@@ -59,9 +57,8 @@ import {
   listarVagasDoContrato,
   salvarListaVagasContrato,
 } from "@/services/contrato-vagas.service";
-import { listarCargosAtivos } from "@/services/cargo.service";
 import { buscarAprovacaoPorOrcamentoId } from "@/services/orcamento-aprovacao.service";
-import type { CargoRecord, ClienteContratoRecord } from "@/lib/types";
+import type { ClienteContratoRecord } from "@/lib/types";
 
 interface OrcamentoAbaFuncionariosProps {
   orcamentoId: string;
@@ -115,11 +112,9 @@ function StatusBadge({ status }: { status: ContratoVagaStatusClassificacao }) {
   );
 }
 
-function focusCell(row: number, col: number) {
-  const el = document.querySelector<HTMLElement>(
-    `[data-vaga-cell="${row}-${col}"]`
-  );
-  el?.focus();
+function textoSomenteLeitura(value: string | null | undefined): string {
+  const texto = normalizeNomeOcupante(value);
+  return texto || "—";
 }
 
 export function OrcamentoAbaFuncionarios({
@@ -154,7 +149,6 @@ export function OrcamentoAbaFuncionarios({
       cpfsComDemissionalAtivo: new Set(),
     });
   const [drafts, setDrafts] = useState<ContratoVagaDraft[]>([]);
-  const [cargos, setCargos] = useState<CargoRecord[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [removerFuncionario, setRemoverFuncionario] = useState<{
     vagaId: string;
@@ -182,12 +176,8 @@ export function OrcamentoAbaFuncionarios({
     setLoading(true);
     setError(null);
     try {
-      const [contratoRow, cargosAtivos] = await Promise.all([
-        buscarContratoPorOrcamentoId(orcamentoId),
-        listarCargosAtivos().catch(() => [] as CargoRecord[]),
-      ]);
+      const contratoRow = await buscarContratoPorOrcamentoId(orcamentoId);
       setContrato(contratoRow);
-      setCargos(cargosAtivos);
       const qtd =
         Number(aprovacao.quantidade_colaboradores) ||
         Number(contratoRow?.quantidade_colaboradores) ||
@@ -330,24 +320,36 @@ export function OrcamentoAbaFuncionarios({
     }
     try {
       const colaboradores = await lerColaboradoresDoCliente(idClienteOcupacao);
-      const fora = mensagemOcupacaoForaDaEmpresa({
-        atuais: visiveis.map((row) => {
-          const persistida = vagaByIndice.get(row.indice);
-          return {
-            indice: row.indice,
-            colaborador: persistida?.colaborador ?? null,
-            colaboradorCpf: persistida?.colaborador_cpf ?? null,
-            colaboradorOrigemId: persistida?.colaborador_origem ?? null,
-          };
-        }),
-        propostas: visiveis.map((row) => ({
+      const atuais = visiveis.map((row) => {
+        const persistida = vagaByIndice.get(row.indice);
+        return {
           indice: row.indice,
-          colaborador: row.colaborador,
-          colaboradorCpf: row.colaboradorCpf,
-          colaboradorOrigemId: row.colaboradorOrigemId ?? null,
-        })),
+          colaborador: persistida?.colaborador ?? null,
+          colaboradorCpf: persistida?.colaborador_cpf ?? null,
+          colaboradorOrigemId: persistida?.colaborador_origem ?? null,
+          cargoNome: persistida?.cargo_nome ?? null,
+        };
+      });
+      const propostas = visiveis.map((row) => ({
+        indice: row.indice,
+        colaborador: row.colaborador,
+        colaboradorCpf: row.colaboradorCpf,
+        colaboradorOrigemId: row.colaboradorOrigemId ?? null,
+        cargoNome: row.cargoNome,
+        manterAsoAberto: row.manterAsoAberto,
+      }));
+      const alteracaoDireta = mensagemAlteracaoDiretaImplantacao({
+        atuais,
+        propostas,
         ativos: colaboradores,
       });
+      const fora =
+        alteracaoDireta ??
+        mensagemOcupacaoForaDaEmpresa({
+          atuais,
+          propostas,
+          ativos: colaboradores,
+        });
       if (fora) {
         setAvisoListaTipo("erro");
         setAvisoListaCliente(fora);
@@ -386,7 +388,10 @@ export function OrcamentoAbaFuncionarios({
       console.error(err);
       const message = mensagemFalhaLista(err);
       setError(message);
-      if (message === MENSAGEM_CADASTRE_COLABORADOR) {
+      if (
+        message === MENSAGEM_CADASTRE_COLABORADOR ||
+        message === MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+      ) {
         setAvisoListaTipo("erro");
         setAvisoListaCliente(message);
       }
@@ -585,8 +590,9 @@ export function OrcamentoAbaFuncionarios({
         ) : (
           "."
         )}{" "}
-        Preencha a vaga com um colaborador que já está ativo em Clientes →
-        Colaboradores. Para incluir alguém novo, cadastre primeiro na empresa.
+        Nome, CPF e cargo são somente leitura. Cadastros e correções ficam em
+        Clientes → Colaboradores, pelo botão Abrir Cliente. Para preencher as
+        vagas, use Usar lista de colaboradores do cliente e depois Salvar lista.
       </div>
 
       {avisoListaCliente ? (
@@ -598,7 +604,9 @@ export function OrcamentoAbaFuncionarios({
           }
         >
           {avisoListaCliente}
-          {avisoListaCliente === MENSAGEM_CADASTRE_COLABORADOR && onAbrirCliente ? (
+          {(avisoListaCliente === MENSAGEM_CADASTRE_COLABORADOR ||
+            avisoListaCliente === MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO) &&
+          onAbrirCliente ? (
             <button
               type="button"
               className="btn mt-3 text-xs"
@@ -687,7 +695,7 @@ export function OrcamentoAbaFuncionarios({
               </tr>
             </thead>
             <tbody>
-              {linhasVisuais.map(({ numeroVisual, draft: row }, rowIdx) => {
+              {linhasVisuais.map(({ numeroVisual, draft: row }) => {
                 const persistida = vagaByIndice.get(row.indice);
                 const statusPreview = resolveStatusListaFuncionarioPreview({
                   persistida,
@@ -697,10 +705,6 @@ export function OrcamentoAbaFuncionarios({
                 const locked = vagaClassificacaoBloqueiaEdicaoOcupante(
                   statusPreview
                 );
-                const nomeBloqueado =
-                  !vagaPermiteCorrigirNomeOcupante(statusPreview);
-                const cargoBloqueado =
-                  locked && !vagaPermiteCorrigirCargoOcupante(statusPreview);
                 const podeRemoverFuncionario = persistida
                   ? vagaPermiteRemoverFuncionario(persistida, desligamento)
                   : false;
@@ -743,109 +747,42 @@ export function OrcamentoAbaFuncionarios({
                       {numeroVisual}
                     </td>
                     <td className="border-b border-[#eef2f7] px-2 py-1">
-                      <input
-                        data-vaga-cell={`${rowIdx}-0`}
-                        className="field-input h-8 px-2 text-xs"
-                        value={formatUppercaseInput(row.colaborador)}
-                        disabled={busy || nomeBloqueado}
-                        placeholder={nomeBloqueado ? undefined : "Nome"}
-                        title={
-                          nomeBloqueado
-                            ? statusPreview === "desligado_admin"
-                              ? "Vaga consumida por desligamento administrativo. Não é possível atribuir outro funcionário."
-                              : "Não é possível editar após o agendamento vinculado. Altere pelo agendamento, se necessário."
-                            : undefined
-                        }
-                        onChange={(e) =>
-                          patchDraft(row.indice, {
-                            colaborador: formatUppercaseInput(e.target.value),
-                            manterAsoAberto: false,
-                          })
-                        }
-                        onBlur={() =>
-                          patchDraft(row.indice, {
-                            colaborador: normalizeNomeOcupante(row.colaborador),
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            focusCell(rowIdx + 1, 0);
-                          }
-                        }}
-                      />
+                      <span
+                        data-vaga-texto="nome"
+                        className={`block min-h-8 px-2 py-1.5 text-xs ${
+                          textoSomenteLeitura(row.colaborador) === "—"
+                            ? "text-[#94a3b8]"
+                            : "text-navy"
+                        }`}
+                      >
+                        {textoSomenteLeitura(row.colaborador)}
+                      </span>
                     </td>
                     <td className="border-b border-[#eef2f7] px-2 py-1">
-                      <input
-                        data-vaga-cell={`${rowIdx}-1`}
-                        className="field-input h-8 px-2 text-xs"
-                        value={maskCPFInput(row.colaboradorCpf)}
-                        disabled={busy || locked}
-                        inputMode="numeric"
-                        placeholder="000.000.000-00"
-                        title={
-                          locked
-                            ? "CPF bloqueado: vaga já agendada ou programada."
-                            : undefined
-                        }
-                        onChange={(e) =>
-                          patchDraft(row.indice, {
-                            colaboradorCpf: maskCPFInput(e.target.value),
-                            manterAsoAberto: false,
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            focusCell(rowIdx + 1, 1);
-                          }
-                        }}
-                      />
+                      <span
+                        data-vaga-texto="cpf"
+                        className={`block min-h-8 px-2 py-1.5 text-xs ${
+                          normalizeCpfDigits(row.colaboradorCpf).length === 0
+                            ? "text-[#94a3b8]"
+                            : "text-navy"
+                        }`}
+                      >
+                        {normalizeCpfDigits(row.colaboradorCpf).length === 0
+                          ? "—"
+                          : maskCPFInput(row.colaboradorCpf)}
+                      </span>
                     </td>
                     <td className="border-b border-[#eef2f7] px-2 py-1">
-                      <input
-                        data-vaga-cell={`${rowIdx}-2`}
-                        className="field-input h-8 px-2 text-xs"
-                        list="contrato-vagas-cargos"
-                        value={formatUppercaseInput(row.cargoNome)}
-                        disabled={busy || cargoBloqueado}
-                        placeholder="Cargo"
-                        title={
-                          statusPreview === CONTRATO_VAGA_STATUS_DESLIGADO_ADMIN
-                            ? "Desligamento administrativo não permite alterar o cargo por aqui."
-                            : vagaPermiteCorrigirCargoOcupante(statusPreview)
-                              ? "Corrige só o cargo. CPF, ocupante, exames e status permanecem."
-                              : undefined
-                        }
-                        onChange={(e) => {
-                          const nome = formatUppercaseInput(e.target.value);
-                          const found = cargos.find(
-                            (c) =>
-                              normalizeNomeOcupante(c.nome) ===
-                              normalizeNomeOcupante(nome)
-                          );
-                          patchDraft(row.indice, {
-                            cargoNome: nome,
-                            cargoId: found?.id ?? null,
-                          });
-                        }}
-                        onBlur={() => {
-                          const cargoNome = normalizeNomeOcupante(row.cargoNome);
-                          const found = cargos.find(
-                            (c) => normalizeNomeOcupante(c.nome) === cargoNome
-                          );
-                          patchDraft(row.indice, {
-                            cargoNome,
-                            cargoId: found?.id ?? null,
-                          });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            focusCell(rowIdx + 1, 2);
-                          }
-                        }}
-                      />
+                      <span
+                        data-vaga-texto="cargo"
+                        className={`block min-h-8 px-2 py-1.5 text-xs ${
+                          textoSomenteLeitura(row.cargoNome) === "—"
+                            ? "text-[#94a3b8]"
+                            : "text-navy"
+                        }`}
+                      >
+                        {textoSomenteLeitura(row.cargoNome)}
+                      </span>
                     </td>
                     <td className="border-b border-[#eef2f7] px-2 py-1.5">
                       <div className="flex flex-wrap items-center gap-2">
@@ -904,11 +841,6 @@ export function OrcamentoAbaFuncionarios({
               })}
             </tbody>
           </table>
-          <datalist id="contrato-vagas-cargos">
-            {cargos.map((c) => (
-              <option key={c.id} value={c.nome} />
-            ))}
-          </datalist>
         </div>
       ) : null}
 
