@@ -13,13 +13,18 @@ import {
 import { maskCPFInput, normalizeCpfDigits } from "@/lib/cpf";
 import {
   avaliarUsoListaColaboradoresCliente,
-  mensagemBloqueioSalvarListaCliente,
+  colaboradoresParaDefinirVaga,
+  origemDoColaboradorLista,
+  vagaListaRealmenteLivre,
   type ColaboradorListaCliente,
+  type VagaListaCliente,
 } from "@/lib/lista-colaboradores-contrato";
 import {
   MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO,
   MENSAGEM_CADASTRE_COLABORADOR,
+  MENSAGEM_CONFLITO_LISTA_VAGAS,
   mensagemAlteracaoDiretaImplantacao,
+  mensagemConflitoVinculoLista,
   mensagemOcupacaoForaDaEmpresa,
 } from "@/lib/colaborador-vaga-ocupacao";
 import {
@@ -160,8 +165,11 @@ export function OrcamentoAbaFuncionarios({
   const [error, setError] = useState<string | null>(null);
   const [avisoListaCliente, setAvisoListaCliente] = useState<string | null>(null);
   const [avisoListaTipo, setAvisoListaTipo] = useState<"erro" | "info">("erro");
-  const [listaClienteAplicada, setListaClienteAplicada] = useState(false);
   const [nomeSort, setNomeSort] = useState<ListaFuncionariosNomeSort>("asc");
+  const [definirIndice, setDefinirIndice] = useState<number | null>(null);
+  const [buscaDefinir, setBuscaDefinir] = useState("");
+  const [opcoesDefinir, setOpcoesDefinir] = useState<ColaboradorListaCliente[]>([]);
+  const [carregandoDefinir, setCarregandoDefinir] = useState(false);
 
   const hasSavedAnexo = Boolean(savedName);
   const hasPreview = Boolean(file || savedName);
@@ -272,39 +280,6 @@ export function OrcamentoAbaFuncionarios({
       Number(contrato.quantidade_colaboradores) ||
       0;
     const visiveis = drafts.slice(0, qtd);
-    const veioDaListaCliente =
-      listaClienteAplicada ||
-      visiveis.some((row) => String(row.colaboradorOrigemId ?? "").trim());
-    if (veioDaListaCliente) {
-      const idCliente = clienteId ?? contrato.cliente_id ?? "";
-      if (!idCliente) {
-        const mensagem = "Este contrato não está vinculado a um cliente.";
-        setAvisoListaTipo("erro");
-        setAvisoListaCliente(mensagem);
-        toast.error(mensagem);
-        return;
-      }
-      try {
-        const colaboradores = await lerColaboradoresDoCliente(idCliente);
-        const ativos = colaboradores.filter((item) => item.situacao === "ativo").length;
-        const bloqueio = mensagemBloqueioSalvarListaCliente(ativos, qtd);
-        if (bloqueio) {
-          setAvisoListaTipo("erro");
-          setAvisoListaCliente(bloqueio);
-          toast.error(bloqueio);
-          return;
-        }
-      } catch (err) {
-        const mensagem =
-          err instanceof Error
-            ? err.message
-            : "Não foi possível conferir a lista de colaboradores.";
-        setAvisoListaTipo("erro");
-        setAvisoListaCliente(mensagem);
-        toast.error(mensagem);
-        return;
-      }
-    }
     const erro = validarDraftsListaVagas(visiveis, qtd);
     if (erro) {
       toast.error(erro);
@@ -324,25 +299,38 @@ export function OrcamentoAbaFuncionarios({
         const persistida = vagaByIndice.get(row.indice);
         return {
           indice: row.indice,
+          id: persistida?.id ?? row.id,
           colaborador: persistida?.colaborador ?? null,
           colaboradorCpf: persistida?.colaborador_cpf ?? null,
           colaboradorOrigemId: persistida?.colaborador_origem ?? null,
           cargoNome: persistida?.cargo_nome ?? null,
+          status: persistida?.status ?? "aberta",
+          agendamentoId: persistida?.agendamento_id ?? null,
+          periodicoFuturoId: persistida?.periodico_futuro_id ?? null,
+          creditoAsoId: persistida?.credito_aso_id ?? null,
         };
       });
       const propostas = visiveis.map((row) => ({
         indice: row.indice,
+        vagaId: row.id,
         colaborador: row.colaborador,
         colaboradorCpf: row.colaboradorCpf,
         colaboradorOrigemId: row.colaboradorOrigemId ?? null,
         cargoNome: row.cargoNome,
         manterAsoAberto: row.manterAsoAberto,
       }));
-      const alteracaoDireta = mensagemAlteracaoDiretaImplantacao({
+      const conflito = mensagemConflitoVinculoLista({
         atuais,
         propostas,
-        ativos: colaboradores,
+        pessoas: colaboradores,
       });
+      const alteracaoDireta =
+        conflito ??
+        mensagemAlteracaoDiretaImplantacao({
+          atuais,
+          propostas,
+          ativos: colaboradores,
+        });
       const fora =
         alteracaoDireta ??
         mensagemOcupacaoForaDaEmpresa({
@@ -390,7 +378,8 @@ export function OrcamentoAbaFuncionarios({
       setError(message);
       if (
         message === MENSAGEM_CADASTRE_COLABORADOR ||
-        message === MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+        message === MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO ||
+        message === MENSAGEM_CONFLITO_LISTA_VAGAS
       ) {
         setAvisoListaTipo("erro");
         setAvisoListaCliente(message);
@@ -399,6 +388,47 @@ export function OrcamentoAbaFuncionarios({
     } finally {
       setSavingLista(false);
     }
+  }
+
+  function montarVagasLista(qtd: number): VagaListaCliente[] {
+    return drafts.slice(0, qtd).map((row) => {
+      const persistida = vagaByIndice.get(row.indice);
+      const sinais = {
+        status: persistida?.status ?? "aberta",
+        colaborador: persistida?.colaborador,
+        colaboradorCpf: persistida?.colaborador_cpf,
+        colaboradorOrigemId: persistida?.colaborador_origem,
+        agendamentoId: persistida?.agendamento_id,
+        periodicoFuturoId: persistida?.periodico_futuro_id,
+        creditoAsoId: persistida?.credito_aso_id,
+      };
+      const residual = persistida ? vagaComprometidaResidual(sinais) : false;
+      const status = persistida
+        ? statusClassificacaoVaga(persistida, desligamento)
+        : "aberta";
+      const preenchida =
+        isNomeFuncionarioReal(row.colaborador) ||
+        normalizeCpfDigits(row.colaboradorCpf).length === 11 ||
+        Boolean(String(row.colaboradorOrigemId ?? "").trim()) ||
+        row.manterAsoAberto;
+      const statusLista =
+        residual && !preenchida
+          ? "aberta"
+          : preenchida && (status === "aberta" || residual)
+            ? "comprometida"
+            : status;
+      return {
+        indice: row.indice,
+        vagaId: row.id ?? persistida?.id ?? null,
+        status: statusLista,
+        colaborador: row.colaborador,
+        colaboradorCpf: row.colaboradorCpf,
+        colaboradorOrigemId: row.colaboradorOrigemId ?? null,
+        agendamentoId: persistida?.agendamento_id ?? null,
+        periodicoFuturoId: persistida?.periodico_futuro_id ?? null,
+        creditoAsoId: persistida?.credito_aso_id ?? null,
+      };
+    });
   }
 
   async function handleUsarListaCliente() {
@@ -418,42 +448,7 @@ export function OrcamentoAbaFuncionarios({
       const resultado = avaliarUsoListaColaboradoresCliente({
         colaboradores,
         quantidadeContratada: qtd,
-        vagas: drafts.slice(0, qtd).map((row) => {
-          const persistida = vagaByIndice.get(row.indice);
-          const sinais = {
-            status: persistida?.status ?? "aberta",
-            colaborador: persistida?.colaborador,
-            colaboradorCpf: persistida?.colaborador_cpf,
-            colaboradorOrigemId: persistida?.colaborador_origem,
-            agendamentoId: persistida?.agendamento_id,
-            periodicoFuturoId: persistida?.periodico_futuro_id,
-            creditoAsoId: persistida?.credito_aso_id,
-          };
-          const residual = persistida ? vagaComprometidaResidual(sinais) : false;
-          const status = persistida
-            ? statusClassificacaoVaga(persistida, desligamento)
-            : "aberta";
-          const preenchida =
-            isNomeFuncionarioReal(row.colaborador) ||
-            normalizeCpfDigits(row.colaboradorCpf).length === 11 ||
-            row.manterAsoAberto;
-          const statusLista =
-            residual && !preenchida
-              ? "aberta"
-              : preenchida && (status === "aberta" || residual)
-                ? "comprometida"
-                : status;
-          return {
-            indice: row.indice,
-            status: statusLista,
-            colaborador: row.colaborador,
-            colaboradorCpf: row.colaboradorCpf,
-            colaboradorOrigemId: row.colaboradorOrigemId ?? null,
-            agendamentoId: persistida?.agendamento_id ?? null,
-            periodicoFuturoId: persistida?.periodico_futuro_id ?? null,
-            creditoAsoId: persistida?.credito_aso_id ?? null,
-          };
-        }),
+        vagas: montarVagasLista(qtd),
       });
       if (!resultado.ok) {
         setAvisoListaTipo("erro");
@@ -462,12 +457,13 @@ export function OrcamentoAbaFuncionarios({
         return;
       }
       if (resultado.atribuicoes.length > 0) {
-        const porIndice = new Map(
-          resultado.atribuicoes.map((item) => [item.indice, item])
-        );
         setDrafts((prev) =>
           prev.map((row) => {
-            const item = porIndice.get(row.indice);
+            const item = resultado.atribuicoes.find((atribuicao) =>
+              atribuicao.vagaId && row.id
+                ? atribuicao.vagaId === row.id
+                : atribuicao.indice === row.indice
+            );
             if (!item) return row;
             return {
               ...row,
@@ -481,8 +477,7 @@ export function OrcamentoAbaFuncionarios({
           })
         );
       }
-      setListaClienteAplicada(true);
-      if (resultado.omitidos > 0 && resultado.mensagem) {
+      if (resultado.mensagem) {
         setAvisoListaTipo("info");
         setAvisoListaCliente(resultado.mensagem);
         toast.success(resultado.mensagem);
@@ -490,10 +485,7 @@ export function OrcamentoAbaFuncionarios({
       }
       setAvisoListaCliente(null);
       toast.success(
-        resultado.atribuicoes.length === 0
-          ? resultado.mensagem ??
-              "As vagas deste contrato já estão vinculadas a estes colaboradores."
-          : "Lista do cliente aplicada nas vagas livres. Revise e clique em Salvar lista."
+        "As vagas deste contrato já estão vinculadas a estes colaboradores."
       );
     } catch (err) {
       const mensagem =
@@ -506,6 +498,60 @@ export function OrcamentoAbaFuncionarios({
     } finally {
       setSavingLista(false);
     }
+  }
+
+  async function handleAbrirDefinir(indice: number) {
+    const idCliente = clienteId ?? contrato?.cliente_id ?? "";
+    if (!idCliente) {
+      const mensagem = "Este contrato não está vinculado a um cliente.";
+      setAvisoListaTipo("erro");
+      setAvisoListaCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
+    setCarregandoDefinir(true);
+    setDefinirIndice(indice);
+    setBuscaDefinir("");
+    try {
+      const colaboradores = await lerColaboradoresDoCliente(idCliente);
+      setOpcoesDefinir(
+        colaboradoresParaDefinirVaga({
+          colaboradores,
+          vagas: montarVagasLista(quantidadePrevista),
+          indice,
+        })
+      );
+    } catch (err) {
+      setDefinirIndice(null);
+      const mensagem =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível ler os colaboradores da empresa.";
+      toast.error(mensagem);
+    } finally {
+      setCarregandoDefinir(false);
+    }
+  }
+
+  function handleEscolherDefinir(pessoa: ColaboradorListaCliente) {
+    if (definirIndice == null) return;
+    const indice = definirIndice;
+    patchDraft(indice, {
+      colaborador: normalizeNomeOcupante(pessoa.nome),
+      colaboradorCpf: pessoa.cpfDigits,
+      cargoNome: normalizeNomeOcupante(
+        pessoa.cargo === "—" ? "" : pessoa.cargo
+      ),
+      cargoId: null,
+      manterAsoAberto: false,
+      colaboradorOrigemId: origemDoColaboradorLista(pessoa),
+    });
+    setDefinirIndice(null);
+    setBuscaDefinir("");
+    const mensagem = `Vaga ${indice}: ${normalizeNomeOcupante(pessoa.nome)}. A seleção só é gravada ao clicar em Salvar lista.`;
+    setAvisoListaTipo("info");
+    setAvisoListaCliente(mensagem);
+    toast.success(mensagem);
   }
 
   async function handleReplaceSelected(selected: File | null) {
@@ -576,6 +622,19 @@ export function OrcamentoAbaFuncionarios({
       ),
     [drafts, quantidadePrevista, nomeSort]
   );
+  const termoDefinir = buscaDefinir.trim().toLocaleUpperCase("pt-BR");
+  const termoCpfDefinir = buscaDefinir.replace(/\D/g, "");
+  const opcoesFiltradas = opcoesDefinir.filter((pessoa) => {
+    if (!termoDefinir) return true;
+    const nome = pessoa.nome.toLocaleUpperCase("pt-BR");
+    const cargo = (pessoa.cargo || "").toLocaleUpperCase("pt-BR");
+    const cpf = pessoa.cpfDigits.replace(/\D/g, "");
+    return (
+      nome.includes(termoDefinir) ||
+      cargo.includes(termoDefinir) ||
+      (termoCpfDefinir.length > 0 && cpf.includes(termoCpfDefinir))
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -590,9 +649,10 @@ export function OrcamentoAbaFuncionarios({
         ) : (
           "."
         )}{" "}
-        Nome, CPF e cargo são somente leitura. Cadastros e correções ficam em
-        Clientes → Colaboradores, pelo botão Abrir Cliente. Para preencher as
-        vagas, use Usar lista de colaboradores do cliente e depois Salvar lista.
+        Nome, CPF e cargo são somente leitura. Em uma vaga livre, use Definir
+        colaborador ou Usar lista de colaboradores do cliente. A seleção só é
+        gravada em Salvar lista. Cadastros e correções ficam em Clientes →
+        Colaboradores, pelo botão Abrir Cliente.
       </div>
 
       {avisoListaCliente ? (
@@ -613,6 +673,15 @@ export function OrcamentoAbaFuncionarios({
               onClick={onAbrirCliente}
             >
               Abrir Cliente
+            </button>
+          ) : null}
+          {avisoListaCliente === MENSAGEM_CONFLITO_LISTA_VAGAS ? (
+            <button
+              type="button"
+              className="btn mt-3 text-xs"
+              onClick={() => void load()}
+            >
+              Atualizar lista
             </button>
           ) : null}
         </div>
@@ -826,12 +895,32 @@ export function OrcamentoAbaFuncionarios({
                                 colaboradorCpf: "",
                                 cargoNome: "",
                                 cargoId: null,
+                                colaboradorOrigemId: null,
                               })
                             }
                           >
                             {row.manterAsoAberto
                               ? "Desfazer ASO em aberto"
                               : "Manter ASO em aberto"}
+                          </button>
+                        ) : null}
+                        {vagaListaRealmenteLivre({
+                          indice: row.indice,
+                          status: persistida?.status ?? "aberta",
+                          colaborador: persistida?.colaborador ?? null,
+                          colaboradorCpf: persistida?.colaborador_cpf ?? null,
+                          colaboradorOrigemId: persistida?.colaborador_origem ?? null,
+                          agendamentoId: persistida?.agendamento_id ?? null,
+                          periodicoFuturoId: persistida?.periodico_futuro_id ?? null,
+                          creditoAsoId: persistida?.credito_aso_id ?? null,
+                        }) && !row.manterAsoAberto ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-brand-blue hover:underline disabled:opacity-50"
+                            disabled={busy || (!clienteId && !contrato?.cliente_id)}
+                            onClick={() => void handleAbrirDefinir(row.indice)}
+                          >
+                            Definir colaborador
                           </button>
                         ) : null}
                       </div>
@@ -901,6 +990,79 @@ export function OrcamentoAbaFuncionarios({
           {savingLista ? "Salvando..." : "Salvar lista"}
         </button>
       </div>
+
+      {definirIndice != null ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl"
+            role="dialog"
+            aria-labelledby="definir-colaborador-titulo"
+          >
+            <div className="border-b border-[#e4ebf4] px-4 py-3">
+              <h3 id="definir-colaborador-titulo" className="text-sm font-bold text-navy">
+                Definir colaborador da vaga {definirIndice}
+              </h3>
+              <p className="mt-1 text-xs text-[#64748b]">
+                A seleção preenche só esta vaga e só é gravada ao clicar em Salvar lista.
+              </p>
+              <input
+                className="field-input mt-3 h-9 px-3 text-sm"
+                value={buscaDefinir}
+                placeholder="Pesquisar nome, cargo ou CPF"
+                onChange={(event) => setBuscaDefinir(event.target.value)}
+              />
+            </div>
+            <div className="overflow-y-auto p-2">
+              {carregandoDefinir ? (
+                <p className="px-2 py-4 text-sm text-app-muted">
+                  Carregando colaboradores ativos...
+                </p>
+              ) : null}
+              {!carregandoDefinir && opcoesFiltradas.length === 0 ? (
+                <p className="px-2 py-4 text-sm text-app-muted">
+                  Nenhum colaborador ativo disponível.
+                </p>
+              ) : null}
+              {!carregandoDefinir
+                ? opcoesFiltradas.map((pessoa) => {
+                    const cpf = normalizeCpfDigits(pessoa.cpfDigits);
+                    return (
+                      <button
+                        key={origemDoColaboradorLista(pessoa)}
+                        type="button"
+                        className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left hover:bg-[#f8fafc]"
+                        onClick={() => handleEscolherDefinir(pessoa)}
+                      >
+                        <span className="text-sm font-semibold text-navy">
+                          {normalizeNomeOcupante(pessoa.nome)}
+                        </span>
+                        <span className="text-xs text-[#64748b]">
+                          {normalizeNomeOcupante(
+                            pessoa.cargo === "—" ? "" : pessoa.cargo
+                          ) || "—"}
+                          {" · "}
+                          {cpf ? maskCPFInput(cpf) : "—"}
+                        </span>
+                      </button>
+                    );
+                  })
+                : null}
+            </div>
+            <div className="border-t border-[#e4ebf4] px-4 py-3 text-right">
+              <button
+                type="button"
+                className="btn text-xs"
+                onClick={() => {
+                  setDefinirIndice(null);
+                  setBuscaDefinir("");
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <OrcamentoAnexoRemoverModal
         open={confirmOpen}
