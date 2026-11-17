@@ -1096,21 +1096,21 @@ const abaFuncionariosSrc = readFileSync(
   join(process.cwd(), "components/orcamentos/OrcamentoAbaFuncionarios.tsx"),
   "utf8"
 );
-assert.match(abaFuncionariosSrc, /Importar lista/);
-assert.match(abaFuncionariosSrc, /Baixar modelo Excel/);
-assert.match(abaFuncionariosSrc, /Exportar lista/);
-assert.match(abaFuncionariosSrc, /downloadListaFuncionariosXlsx/);
-assert.match(abaFuncionariosSrc, /gerarModeloListaFuncionariosXlsx|downloadModeloListaFuncionariosXlsx/);
-assert.match(abaFuncionariosSrc, /handleBaixarModelo/);
-assert.match(abaFuncionariosSrc, /mensagemExcessoVagasListaFuncionarios/);
+assert.doesNotMatch(abaFuncionariosSrc, /Importar lista/);
+assert.doesNotMatch(abaFuncionariosSrc, /Baixar modelo Excel/);
+assert.doesNotMatch(abaFuncionariosSrc, /Exportar lista/);
+assert.doesNotMatch(abaFuncionariosSrc, /downloadListaFuncionariosXlsx/);
+assert.doesNotMatch(abaFuncionariosSrc, /downloadModeloListaFuncionariosXlsx/);
+assert.doesNotMatch(abaFuncionariosSrc, /handleBaixarModelo/);
+assert.doesNotMatch(abaFuncionariosSrc, /handleImportar/);
+assert.match(abaFuncionariosSrc, /Usar lista de colaboradores do cliente/);
 assert.match(abaFuncionariosSrc, /Salvar lista/);
-assert.doesNotMatch(
-  abaFuncionariosSrc.slice(
-    abaFuncionariosSrc.indexOf("handleImportar"),
-    abaFuncionariosSrc.indexOf("handleReplaceSelected")
-  ),
-  /salvarListaVagasContrato/
+const clientesColaboradoresSrc = readFileSync(
+  join(process.cwd(), "components/clientes/ClienteColaboradoresSection.tsx"),
+  "utf8"
 );
+assert.match(clientesColaboradoresSrc, /Baixar planilha modelo/);
+assert.match(clientesColaboradoresSrc, /Importar colaboradores/);
 
 const importLibSrc = readFileSync(
   join(process.cwd(), "lib/contrato-vagas-import.ts"),

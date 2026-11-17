@@ -7,7 +7,6 @@ import {
   OrcamentoArquivoPreview,
 } from "@/components/orcamentos/OrcamentoEtapasExtras";
 import {
-  IconDownload,
   IconRefresh,
   IconTrash,
 } from "@/components/ui/icons/OutlineIcons";
@@ -20,7 +19,6 @@ import {
 import {
   MENSAGEM_CADASTRE_COLABORADOR,
   mensagemOcupacaoForaDaEmpresa,
-  planilhaTemPessoaForaDaEmpresa,
 } from "@/lib/colaborador-vaga-ocupacao";
 import { formatUppercaseInput } from "@/lib/text-normalize";
 import {
@@ -47,16 +45,7 @@ import {
   type ContratoVagaStatusClassificacao,
 } from "@/lib/contrato-vagas";
 import {
-  aplicarImportacaoNasVagas,
-  downloadListaFuncionariosXlsx,
-  downloadModeloListaFuncionariosXlsx,
-  lerArquivoListaFuncionarios,
-  mensagemExcessoVagasListaFuncionarios,
-  resumirErrosImportacaoListaFuncionarios,
-} from "@/lib/contrato-vagas-import";
-import {
   buildLinhasVisuaisListaFuncionarios,
-  buildListaFuncionariosExportRows,
   cycleListaFuncionariosNomeSort,
   resolveStatusListaFuncionarioPreview,
   type ListaFuncionariosNomeSort,
@@ -135,10 +124,8 @@ function focusCell(row: number, col: number) {
 
 export function OrcamentoAbaFuncionarios({
   orcamentoId,
-  orcamentoNumero,
   aprovacao,
   usuarioNome,
-  clienteNome,
   clienteCnpj,
   clienteId,
   file,
@@ -156,7 +143,6 @@ export function OrcamentoAbaFuncionarios({
     0,
     Number(aprovacao.quantidade_colaboradores) || 0
   );
-  const importInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [savingLista, setSavingLista] = useState(false);
@@ -410,136 +396,6 @@ export function OrcamentoAbaFuncionarios({
     }
   }
 
-  async function handleImportar(selected: File | null) {
-    if (!selected) return;
-    const parsed = await lerArquivoListaFuncionarios(selected);
-    if (!parsed.ok) {
-      const detalhe =
-        parsed.errosLinha.length > 0
-          ? resumirErrosImportacaoListaFuncionarios(parsed.errosLinha)
-          : parsed.error || "Não foi possível importar a lista.";
-      toast.error(detalhe);
-      return;
-    }
-
-    const qtd = quantidadePrevista;
-    if (parsed.rows.length > qtd) {
-      toast.error(
-        mensagemExcessoVagasListaFuncionarios(qtd, parsed.rows.length)
-      );
-      return;
-    }
-
-    const temPreenchido = drafts.slice(0, qtd).some(
-      (row) =>
-        isNomeFuncionarioReal(row.colaborador) ||
-        normalizeCpfDigits(row.colaboradorCpf).length === 11 ||
-        row.manterAsoAberto
-    );
-    let sobrescrever = false;
-    if (temPreenchido) {
-      const ok = window.confirm(
-        "Já existem vagas preenchidas. Deseja substituir os dados atuais pelos da planilha? As vagas já agendadas ou programadas não serão alteradas."
-      );
-      if (!ok) {
-        const onlyEmpty = window.confirm(
-          "Importar apenas para as vagas ainda em aberto, sem sobrescrever o que já foi preenchido?"
-        );
-        if (!onlyEmpty) return;
-        sobrescrever = false;
-      } else {
-        sobrescrever = true;
-      }
-    }
-
-    const idClienteImportacao = clienteId ?? contrato?.cliente_id ?? "";
-    if (!idClienteImportacao) {
-      const mensagem = "Este contrato não está vinculado a um cliente.";
-      setAvisoListaTipo("erro");
-      setAvisoListaCliente(mensagem);
-      toast.error(mensagem);
-      return;
-    }
-    let ativosImportacao: ColaboradorListaCliente[] = [];
-    try {
-      const colaboradores = await lerColaboradoresDoCliente(idClienteImportacao);
-      ativosImportacao = colaboradores.filter((item) => item.situacao === "ativo");
-    } catch (err) {
-      const mensagem = mensagemFalhaLista(err);
-      setAvisoListaTipo("erro");
-      setAvisoListaCliente(mensagem);
-      toast.error(mensagem);
-      return;
-    }
-    if (planilhaTemPessoaForaDaEmpresa(parsed.rows, ativosImportacao)) {
-      setAvisoListaTipo("erro");
-      setAvisoListaCliente(MENSAGEM_CADASTRE_COLABORADOR);
-      toast.error(MENSAGEM_CADASTRE_COLABORADOR);
-      return;
-    }
-
-    const locked = new Set(
-      vagas
-        .filter((v) =>
-          vagaClassificacaoBloqueiaEdicaoOcupante(
-            statusClassificacaoVaga(v, desligamento)
-          )
-        )
-        .map((v) => v.indice)
-    );
-    const atuaisEditaveis = drafts.map((row) =>
-      locked.has(row.indice) ? row : row
-    );
-    const result = aplicarImportacaoNasVagas({
-      atuais: atuaisEditaveis.map((row) =>
-        locked.has(row.indice)
-          ? row
-          : sobrescrever
-            ? {
-                ...row,
-                colaborador: "",
-                colaboradorCpf: "",
-                cargoNome: "",
-                cargoId: null,
-                manterAsoAberto: false,
-              }
-            : row
-      ),
-      importados: parsed.rows,
-      quantidadePrevista: qtd,
-      sobrescreverPreenchidas: sobrescrever,
-      cargos,
-    });
-    const anterior = new Map(drafts.map((row) => [row.indice, row]));
-    setDrafts(
-      result.drafts.map((row) => {
-        const prev = anterior.get(row.indice);
-        if (locked.has(row.indice)) return prev ?? row;
-        const mudou =
-          !prev ||
-          prev.colaborador !== row.colaborador ||
-          prev.colaboradorCpf !== row.colaboradorCpf ||
-          prev.cargoNome !== row.cargoNome;
-        const cpf = normalizeCpfDigits(row.colaboradorCpf);
-        const ativo = ativosImportacao.find((item) => item.cpfDigits === cpf);
-        return {
-          ...row,
-          colaboradorOrigemId: ativo
-            ? ativo.cadastroId || ativo.id
-            : mudou
-              ? null
-              : prev?.colaboradorOrigemId ?? null,
-        };
-      })
-    );
-    if (result.aplicados > 0) setListaClienteAplicada(false);
-    toast.success(
-      result.aplicados === 1
-        ? "1 funcionário importado para a tabela. Revise e clique em Salvar lista."
-        : `${result.aplicados} funcionários importados para a tabela. Revise e clique em Salvar lista.`
-    );
-  }
-
   async function handleUsarListaCliente() {
     const idCliente = clienteId ?? contrato?.cliente_id ?? "";
     if (!idCliente) {
@@ -647,18 +503,6 @@ export function OrcamentoAbaFuncionarios({
     }
   }
 
-  function handleBaixarModelo() {
-    try {
-      downloadModeloListaFuncionariosXlsx({
-        quantidadePrevista,
-        numeroOrcamento: orcamentoNumero ?? contrato?.numero ?? null,
-      });
-    } catch (err) {
-      console.error(err);
-      toast.error("Não foi possível baixar o modelo Excel.");
-    }
-  }
-
   async function handleReplaceSelected(selected: File | null) {
     if (!selected) return;
     setActionSaving(true);
@@ -728,23 +572,6 @@ export function OrcamentoAbaFuncionarios({
     [drafts, quantidadePrevista, nomeSort]
   );
 
-  function handleExportarLista() {
-    try {
-      const rows = buildListaFuncionariosExportRows({
-        linhas: linhasVisuais,
-        vagaByIndice,
-        desligamento,
-      });
-      downloadListaFuncionariosXlsx({
-        rows,
-        clienteNome,
-      });
-    } catch (err) {
-      console.error(err);
-      toast.error("Não foi possível exportar a lista.");
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-[#e4ebf4] bg-white px-4 py-3 text-[12px] text-[#475569]">
@@ -798,46 +625,6 @@ export function OrcamentoAbaFuncionarios({
         >
           Usar lista de colaboradores do cliente
         </button>
-        <button
-          type="button"
-          className="btn btn-muted inline-flex items-center gap-1.5 text-xs"
-          disabled={busy || loading || quantidadePrevista <= 0}
-          title="Baixar planilha modelo para preencher e importar"
-          onClick={handleBaixarModelo}
-        >
-          <IconDownload size={14} />
-          Baixar modelo Excel
-        </button>
-        <button
-          type="button"
-          className="btn btn-muted text-xs"
-          disabled={busy || loading}
-          onClick={() => importInputRef.current?.click()}
-        >
-          Importar lista
-        </button>
-        <button
-          type="button"
-          className="btn btn-muted inline-flex items-center gap-1.5 text-xs"
-          disabled={busy || loading || quantidadePrevista <= 0}
-          title="Exportar a lista de funcionários atualmente exibida"
-          onClick={handleExportarLista}
-        >
-          <IconDownload size={14} />
-          Exportar lista
-        </button>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          className="hidden"
-          disabled={busy}
-          onChange={(e) => {
-            const selected = e.target.files?.[0] ?? null;
-            e.target.value = "";
-            void handleImportar(selected);
-          }}
-        />
       </div>
 
       {loading ? (
