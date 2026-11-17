@@ -1105,12 +1105,20 @@ assert.doesNotMatch(abaFuncionariosSrc, /handleBaixarModelo/);
 assert.doesNotMatch(abaFuncionariosSrc, /handleImportar/);
 assert.match(abaFuncionariosSrc, /Usar lista de colaboradores do cliente/);
 assert.match(abaFuncionariosSrc, /Salvar lista/);
+assert.match(abaFuncionariosSrc, /data-vaga-texto="nome"/);
+assert.match(abaFuncionariosSrc, /data-vaga-texto="cpf"/);
+assert.match(abaFuncionariosSrc, /data-vaga-texto="cargo"/);
+assert.match(abaFuncionariosSrc, /Nome, CPF e cargo são somente leitura/);
+assert.match(abaFuncionariosSrc, /Abrir Cliente/);
+assert.doesNotMatch(abaFuncionariosSrc, /data-vaga-cell=/);
 const clientesColaboradoresSrc = readFileSync(
   join(process.cwd(), "components/clientes/ClienteColaboradoresSection.tsx"),
   "utf8"
 );
 assert.match(clientesColaboradoresSrc, /Baixar planilha modelo/);
 assert.match(clientesColaboradoresSrc, /Importar colaboradores/);
+assert.match(clientesColaboradoresSrc, /Adicionar colaborador/);
+assert.match(clientesColaboradoresSrc, /<Field label="Cargo">/);
 
 const importLibSrc = readFileSync(
   join(process.cwd(), "lib/contrato-vagas-import.ts"),
@@ -1484,20 +1492,21 @@ assert.equal(
   "programada"
 );
 
-const nomeInputSrc = abaFuncionariosSrc.slice(
-  abaFuncionariosSrc.indexOf("Nome do funcionário"),
-  abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-1`}")
+const nomeTextoSrc = abaFuncionariosSrc.slice(
+  abaFuncionariosSrc.indexOf('data-vaga-texto="nome"'),
+  abaFuncionariosSrc.indexOf('data-vaga-texto="cpf"')
 );
-assert.match(nomeInputSrc, /disabled=\{busy \|\| nomeBloqueado\}/);
-assert.match(nomeInputSrc, /vagaPermiteCorrigirNomeOcupante/);
-assert.doesNotMatch(nomeInputSrc, /disabled=\{busy \|\| locked\}/);
-assert.match(
-  abaFuncionariosSrc.slice(
-    abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-1`}"),
-    abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-2`}")
-  ),
-  /disabled=\{busy \|\| locked\}/
+assert.match(nomeTextoSrc, /textoSomenteLeitura\(row\.colaborador\)/);
+assert.match(nomeTextoSrc, /—/);
+assert.doesNotMatch(nomeTextoSrc, /<input/);
+assert.doesNotMatch(nomeTextoSrc, /onChange/);
+const cpfTextoSrc = abaFuncionariosSrc.slice(
+  abaFuncionariosSrc.indexOf('data-vaga-texto="cpf"'),
+  abaFuncionariosSrc.indexOf('data-vaga-texto="cargo"')
 );
+assert.match(cpfTextoSrc, /—/);
+assert.doesNotMatch(cpfTextoSrc, /<input/);
+assert.doesNotMatch(cpfTextoSrc, /onChange/);
 
 assert.equal(vagaPermiteCorrigirCargoOcupante("programada"), true);
 assert.equal(vagaPermiteCorrigirCargoOcupante("agendada"), true);
@@ -1757,53 +1766,30 @@ assert.equal(vagaCargoCorrigida.status, "agendada");
 assert.equal(vagaCargoCorrigida.agendamento_id, "ag-coconut");
 assert.equal(vagaCargoCorrigida.periodico_futuro_id, "pf-coconut");
 
-const cargoInputSrc = abaFuncionariosSrc.slice(
-  abaFuncionariosSrc.indexOf("data-vaga-cell={`${rowIdx}-2`}"),
+const cargoTextoSrc = abaFuncionariosSrc.slice(
+  abaFuncionariosSrc.indexOf('data-vaga-texto="cargo"'),
   abaFuncionariosSrc.indexOf("<StatusBadge")
 );
-assert.match(cargoInputSrc, /disabled=\{busy \|\| cargoBloqueado\}/);
-assert.match(cargoInputSrc, /vagaPermiteCorrigirCargoOcupante/);
-assert.doesNotMatch(cargoInputSrc, /disabled=\{busy \|\| locked\}/);
+assert.match(cargoTextoSrc, /textoSomenteLeitura\(row\.cargoNome\)/);
+assert.match(cargoTextoSrc, /—/);
+assert.doesNotMatch(cargoTextoSrc, /<input/);
+assert.doesNotMatch(cargoTextoSrc, /onChange/);
 
 const vagasServiceSrc = readFileSync(
   join(process.cwd(), "services/contrato-vagas.service.ts"),
   "utf8"
 );
-const syncSrc = vagasServiceSrc.slice(
-  vagasServiceSrc.indexOf("async function sincronizarCopiaNomeProgramacao"),
-  vagasServiceSrc.indexOf("async function atualizarVaga")
+assert.doesNotMatch(vagasServiceSrc, /planoCorrecaoNomeVagaProgramada/);
+assert.doesNotMatch(vagasServiceSrc, /planoCorrecaoCargoVagaOcupada/);
+assert.doesNotMatch(vagasServiceSrc, /sincronizarCopiaNomeProgramacao/);
+assert.doesNotMatch(vagasServiceSrc, /sincronizarCopiaCargoOperacional/);
+assert.match(vagasServiceSrc, /cargoNome: draft\.manterAsoAberto \? null : draft\.cargoNome/);
+assert.match(vagasServiceSrc, /manterAsoAberto: draft\.manterAsoAberto/);
+const salvarSrc = vagasServiceSrc.slice(
+  vagasServiceSrc.indexOf("export async function salvarListaVagasContrato"),
+  vagasServiceSrc.indexOf("async function confirmarOcupacaoNoServidor")
 );
-assert.match(vagasServiceSrc, /planoCorrecaoNomeVagaProgramada/);
-assert.match(vagasServiceSrc, /planoCorrecaoCargoVagaOcupada/);
-assert.match(
-  vagasServiceSrc,
-  /atualizarVaga\(plano\.vagaId, \{\s*colaborador: plano\.colaborador,\s*\}\)/
-);
-assert.match(
-  vagasServiceSrc,
-  /atualizarVaga\(planoCargo\.vagaId, \{\s*cargo_id: planoCargo\.cargoId,\s*cargo_nome: planoCargo\.cargoNome,\s*\}\)/
-);
-assert.match(syncSrc, /\.update\(\{ colaborador: nomeNovo \}\)/);
-assert.match(syncSrc, /exigirGravacaoUnica\(ids\)/);
-assert.match(syncSrc, /\.in\("id", lista\)/);
-assert.doesNotMatch(syncSrc, /\.insert\(/);
-assert.doesNotMatch(syncSrc, /from\("agendamentos"\)/);
-assert.doesNotMatch(syncSrc, /\.update\(\{[^}]*status/);
-
-const cargoSyncSrc = vagasServiceSrc.slice(
-  vagasServiceSrc.indexOf("async function sincronizarCopiaCargoOperacional"),
-  vagasServiceSrc.indexOf("export async function liberarFuncionarioDaVagaComprometida")
-);
-assert.match(cargoSyncSrc, /lerTodosOsLotes/);
-assert.match(cargoSyncSrc, /exigirGravacaoUnica/);
-assert.match(cargoSyncSrc, /cargo_id: params\.cargoId/);
-assert.match(cargoSyncSrc, /cargo_nome: params\.cargoNome/);
-assert.match(cargoSyncSrc, /\.update\(patch\)/);
-assert.doesNotMatch(cargoSyncSrc, /\.insert\(/);
-assert.doesNotMatch(cargoSyncSrc, /\.delete\(/);
-assert.doesNotMatch(cargoSyncSrc, /listarExamesObrigatoriosPorCargo/);
-assert.doesNotMatch(cargoSyncSrc, /agendamento_exames/);
-assert.doesNotMatch(cargoSyncSrc, /\.update\(\{[^}]*status/);
-assert.doesNotMatch(cargoSyncSrc, /\.update\(\{[^}]*aso_/);
+assert.match(salvarSrc, /vagaClassificacaoBloqueiaEdicaoOcupante\(classificacao\)/);
+assert.match(salvarSrc, /continue;/);
 
 console.log("test-contrato-vagas: OK");

@@ -17,11 +17,16 @@ import {
 export const MENSAGEM_CADASTRE_COLABORADOR =
   "Cadastre o colaborador em Clientes → Colaboradores para preencher esta vaga";
 
+export const MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO =
+  "Nome, CPF e cargo não podem ser alterados na Implantação. Corrija em Clientes → Colaboradores.";
+
 export type PropostaOcupacaoVaga = {
   indice: number;
   colaborador: string | null;
   colaboradorCpf: string | null;
   colaboradorOrigemId: string | null;
+  cargoNome?: string | null;
+  manterAsoAberto?: boolean;
 };
 
 export type AtivoParaOcuparVaga = {
@@ -29,6 +34,8 @@ export type AtivoParaOcuparVaga = {
   cadastroId?: string | null;
   cpfDigits: string;
   situacao: "ativo" | "demitido";
+  nome?: string | null;
+  cargo?: string | null;
 };
 
 export type FontesColaboradorEmpresa = {
@@ -62,6 +69,107 @@ function temPessoa(ocupante: {
 
 function origem(value: string | null | undefined): string {
   return String(value ?? "").trim();
+}
+
+function textoNome(value: string | null | undefined): string {
+  return isNomeFuncionarioReal(value) ? normalizeNomeOcupante(value) : "";
+}
+
+function textoCargo(value: string | null | undefined): string {
+  const nome = normalizeNomeOcupante(value);
+  if (!nome || nome === "—") return "";
+  return nome;
+}
+
+function camposIdentidadeInalterados(
+  atual: PropostaOcupacaoVaga,
+  proposta: PropostaOcupacaoVaga
+): boolean {
+  const cargoOk =
+    proposta.cargoNome === undefined ||
+    textoCargo(atual.cargoNome) === textoCargo(proposta.cargoNome);
+  return (
+    textoNome(atual.colaborador) === textoNome(proposta.colaborador) &&
+    (cpfValido(atual.colaboradorCpf) ?? "") ===
+      (cpfValido(proposta.colaboradorCpf) ?? "") &&
+    cargoOk
+  );
+}
+
+function vagaSemOcupante(vaga: PropostaOcupacaoVaga): boolean {
+  return !temPessoa(vaga) && !origem(vaga.colaboradorOrigemId);
+}
+
+function ativoDoVinculo(
+  ativos: AtivoParaOcuparVaga[],
+  proposta: PropostaOcupacaoVaga
+): AtivoParaOcuparVaga | null {
+  const cpf = cpfValido(proposta.colaboradorCpf);
+  const origemId = origem(proposta.colaboradorOrigemId);
+  return (
+    ativos.find((ativo) => {
+      if (ativo.situacao !== "ativo") return false;
+      if (cpf && ativo.cpfDigits === cpf) return true;
+      if (!origemId) return false;
+      return (
+        origemId === String(ativo.cadastroId ?? "").trim() || origemId === ativo.id
+      );
+    }) ?? null
+  );
+}
+
+function vinculoConfereComCadastro(
+  proposta: PropostaOcupacaoVaga,
+  ativo: AtivoParaOcuparVaga
+): boolean {
+  if (textoNome(proposta.colaborador) !== textoNome(ativo.nome)) return false;
+  if ((cpfValido(proposta.colaboradorCpf) ?? "") !== (cpfValido(ativo.cpfDigits) ?? "")) {
+    return false;
+  }
+  if (proposta.cargoNome === undefined) return true;
+  return textoCargo(proposta.cargoNome) === textoCargo(ativo.cargo);
+}
+
+/**
+ * A Implantação não corrige nome, CPF nem cargo.
+ * Vaga vazia pode receber o vínculo de um colaborador já ativo, com os dados do cadastro.
+ * Limpar a vaga ou manter ASO em aberto não é alteração desses campos.
+ */
+export function mensagemAlteracaoDiretaImplantacao(input: {
+  atuais: PropostaOcupacaoVaga[];
+  propostas: PropostaOcupacaoVaga[];
+  ativos: AtivoParaOcuparVaga[];
+}): string | null {
+  const porIndice = new Map(input.atuais.map((atual) => [atual.indice, atual]));
+  for (const proposta of input.propostas) {
+    if (proposta.manterAsoAberto) continue;
+    const atual = porIndice.get(proposta.indice) ?? {
+      indice: proposta.indice,
+      colaborador: null,
+      colaboradorCpf: null,
+      colaboradorOrigemId: null,
+      cargoNome: null,
+    };
+    if (camposIdentidadeInalterados(atual, proposta)) continue;
+    if (!temPessoa(proposta)) {
+      if (
+        proposta.cargoNome !== undefined &&
+        textoCargo(proposta.cargoNome) &&
+        textoCargo(proposta.cargoNome) !== textoCargo(atual.cargoNome)
+      ) {
+        return MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO;
+      }
+      continue;
+    }
+    if (vagaSemOcupante(atual)) {
+      const ativo = ativoDoVinculo(input.ativos, proposta);
+      if (ativo && vinculoConfereComCadastro(proposta, ativo)) continue;
+      if (!ativo) return MENSAGEM_CADASTRE_COLABORADOR;
+      return MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO;
+    }
+    return MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO;
+  }
+  return null;
 }
 
 /** Mesma pessoa já ocupava a vaga. Correção de nome ou cargo não é inclusão. */

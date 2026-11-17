@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO,
   MENSAGEM_CADASTRE_COLABORADOR,
+  mensagemAlteracaoDiretaImplantacao,
   mensagemOcupacaoForaDaEmpresa,
   planilhaTemPessoaForaDaEmpresa,
   snapshotAoLiberarVagaLegada,
@@ -19,6 +21,8 @@ const brunoAtivo = {
   cadastroId: CADASTRO,
   cpfDigits: CPF_BRUNO,
   situacao: "ativo" as const,
+  nome: "BRUNO",
+  cargo: "TECNICO",
 };
 
 {
@@ -250,6 +254,113 @@ const brunoAtivo = {
     }),
     null
   );
+  const vagaVazia = {
+    indice: 1,
+    colaborador: null,
+    colaboradorCpf: null,
+    colaboradorOrigemId: null,
+    cargoNome: null,
+  };
+  const brunoNaVaga = {
+    indice: 1,
+    colaborador: "BRUNO",
+    colaboradorCpf: CPF_BRUNO,
+    colaboradorOrigemId: CADASTRO,
+    cargoNome: "TECNICO",
+  };
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [vagaVazia],
+      propostas: [vagaVazia],
+      ativos: [brunoAtivo],
+    }),
+    null
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [vagaVazia],
+      propostas: [
+        {
+          ...brunoNaVaga,
+          colaboradorOrigemId: CADASTRO,
+        },
+      ],
+      ativos: [brunoAtivo],
+    }),
+    null
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [brunoNaVaga],
+      propostas: [{ ...brunoNaVaga, colaborador: "BRUNO LIMA" }],
+      ativos: [brunoAtivo],
+    }),
+    MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [brunoNaVaga],
+      propostas: [{ ...brunoNaVaga, cargoNome: "ANALISTA" }],
+      ativos: [brunoAtivo],
+    }),
+    MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [brunoNaVaga],
+      propostas: [{ ...brunoNaVaga, colaboradorCpf: CPF_CARLA }],
+      ativos: [brunoAtivo],
+    }),
+    MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [vagaVazia],
+      propostas: [{ ...brunoNaVaga, cargoNome: "ANALISTA" }],
+      ativos: [brunoAtivo],
+    }),
+    MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [vagaVazia],
+      propostas: [
+        {
+          indice: 1,
+          colaborador: "CARLA",
+          colaboradorCpf: CPF_CARLA,
+          colaboradorOrigemId: null,
+          cargoNome: "AUXILIAR",
+        },
+      ],
+      ativos: [brunoAtivo],
+    }),
+    MENSAGEM_CADASTRE_COLABORADOR
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [brunoNaVaga],
+      propostas: [
+        {
+          indice: 1,
+          colaborador: null,
+          colaboradorCpf: null,
+          colaboradorOrigemId: null,
+          cargoNome: "",
+        },
+      ],
+      ativos: [brunoAtivo],
+    }),
+    null
+  );
+  assert.equal(
+    mensagemAlteracaoDiretaImplantacao({
+      atuais: [brunoNaVaga],
+      propostas: [{ ...brunoNaVaga, manterAsoAberto: true, colaborador: null }],
+      ativos: [brunoAtivo],
+    }),
+    null
+  );
   assert.equal(
     planilhaTemPessoaForaDaEmpresa(
       [{ cpfDigits: CPF_CARLA }],
@@ -273,6 +384,7 @@ const ocupacao = readFileSync(
   join(process.cwd(), "services/colaborador-vaga-ocupacao.server.ts"),
   "utf8"
 );
+assert.match(ocupacao, /mensagemAlteracaoDiretaImplantacao/);
 assert.match(ocupacao, /tipo: "cadastro"/);
 assert.match(ocupacao, /data_evento: null/);
 assert.doesNotMatch(ocupacao, /tipo: "admissao"/);
@@ -281,6 +393,9 @@ const aba = readFileSync(
   "utf8"
 );
 assert.match(aba, /MENSAGEM_CADASTRE_COLABORADOR/);
+assert.match(aba, /MENSAGEM_ALTERACAO_DIRETA_IMPLANTACAO/);
+assert.match(aba, /data-vaga-texto="nome"/);
+assert.doesNotMatch(aba, /data-vaga-cell=/);
 assert.match(aba, /Usar lista de colaboradores do cliente/);
 assert.doesNotMatch(aba, /Baixar modelo Excel/);
 assert.doesNotMatch(aba, /Importar lista/);

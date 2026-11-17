@@ -5,6 +5,7 @@
 
 import { isUuid } from "@/lib/colaborador-movimentacoes";
 import {
+  mensagemAlteracaoDiretaImplantacao,
   mensagemOcupacaoForaDaEmpresa,
   snapshotAoLiberarVagaLegada,
   type FontesColaboradorEmpresa,
@@ -47,8 +48,15 @@ export async function validarEPreservarOcupacaoVagas(params: {
     colaborador: vaga.colaborador,
     colaboradorCpf: vaga.colaborador_cpf,
     colaboradorOrigemId: vaga.colaborador_origem,
+    cargoNome: vaga.cargo_nome,
   }));
   const ativos = consolidarPortalColaboradores(fontes);
+  const alteracaoDireta = mensagemAlteracaoDiretaImplantacao({
+    atuais,
+    propostas: params.propostas,
+    ativos,
+  });
+  if (alteracaoDireta) return { ok: false, error: alteracaoDireta, status: 400 };
   const bloqueio = mensagemOcupacaoForaDaEmpresa({
     atuais,
     propostas: params.propostas,
@@ -131,6 +139,7 @@ async function vagasDoContrato(
     colaborador: string | null;
     colaborador_cpf: string | null;
     colaborador_origem: string | null;
+    cargo_nome: string | null;
   }>
 > {
   const { data, error } = await admin
@@ -148,6 +157,7 @@ async function vagasDoContrato(
     colaborador_origem: row.colaborador_origem
       ? String(row.colaborador_origem)
       : null,
+    cargo_nome: row.cargo_nome ? String(row.cargo_nome) : null,
   }));
 }
 
