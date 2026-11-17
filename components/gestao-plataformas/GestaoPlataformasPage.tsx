@@ -9,6 +9,7 @@ import { GestaoCursosAba } from "@/components/gestao-plataformas/GestaoCursosAba
 import { GestaoFichaPainel } from "@/components/gestao-plataformas/GestaoFichaPainel";
 import { AppShell } from "@/components/layout/AppShell";
 import { CabecalhoPortalAgrovias } from "@/components/portal-agrovias/CabecalhoPortalAgrovias";
+import { GestaoEntregaControles } from "@/components/gestao-plataformas/GestaoEntregaControles";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateIsoToBR } from "@/lib/agendamento-datetime";
 import {
@@ -97,6 +98,20 @@ type Painel = {
   acessosExternos: AcessoExternoRegistro[];
   podeConcederAcesso: boolean;
   agendamentos: AgendamentoVinculavel[];
+  documentosSst?: {
+    id: string;
+    tipo: string;
+    tipoLabel: string;
+    arquivoNome: string;
+    publicadoEm: string;
+    vigente: boolean;
+  }[];
+  asosPublicados?: {
+    id: string;
+    agendamentoId: string;
+    arquivoNome: string;
+    publicadoEm: string;
+  }[];
 };
 
 type Selecao = { tipo: "obra" | "colaborador"; id: string } | null;
@@ -500,6 +515,22 @@ export function GestaoPlataformasPage() {
             hoje={hoje}
             onCard={abrirCard}
             onObra={(id) => setSelecionado({ tipo: "obra", id })}
+          />
+        ) : null}
+
+        {painel && aba === "visao" ? (
+          <GestaoEntregaControles
+            podePublicar={painel.podeConcederAcesso}
+            hoje={hoje}
+            plataformas={plataformas}
+            obras={obras}
+            requisitos={requisitos}
+            colaboradores={colaboradores}
+            agendamentos={painel.agendamentos}
+            documentosSst={painel.documentosSst ?? []}
+            asosPublicados={painel.asosPublicados ?? []}
+            onPainel={(json) => setPainel(json as Painel)}
+            onErro={setErro}
           />
         ) : null}
 

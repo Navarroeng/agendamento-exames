@@ -34,6 +34,7 @@ import {
 import type { ClienteColaboradorLinha } from "@/lib/portal-colaboradores";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarColaboradoresPortal } from "@/services/portal-colaboradores.server";
+import { listarPublicacoesInternas } from "@/services/portal-agrovias-publicacoes.server";
 
 type ErroPostgrest = { code?: string; message?: string } | null;
 
@@ -81,6 +82,20 @@ export type PainelGestaoPlataformas = {
   acessosExternos: AcessoExternoRegistro[];
   podeConcederAcesso: boolean;
   agendamentos: AgendamentoVinculavel[];
+  documentosSst: {
+    id: string;
+    tipo: string;
+    tipoLabel: string;
+    arquivoNome: string;
+    publicadoEm: string;
+    vigente: boolean;
+  }[];
+  asosPublicados: {
+    id: string;
+    agendamentoId: string;
+    arquivoNome: string;
+    publicadoEm: string;
+  }[];
 };
 
 function texto(valor: unknown): string {
@@ -473,6 +488,7 @@ export async function carregarGestaoPlataformas(params: {
               aso: texto(row.aso),
             })
           ),
+      ...(await listarPublicacoesInternas(clienteId)),
     },
   };
 }

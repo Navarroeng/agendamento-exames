@@ -24,6 +24,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { resolverEscopoGestaoPlataformas } from "@/services/gestao-plataformas.server";
 import { listarColaboradoresPortal } from "@/services/portal-colaboradores.server";
+import { montarPlataformasPortal } from "@/lib/portal-agrovias-consulta";
+import type { ObraRegistro, PlataformaRegistro, RequisitoRegistro } from "@/lib/gestao-plataformas";
+import {
+  complementosFichaPortal,
+  consultaPortalAgrovias,
+} from "@/services/portal-agrovias-publicacoes.server";
 
 const BUCKET = "gestao-plataformas-anexos";
 
@@ -117,6 +123,87 @@ export async function listarPortalAgrovias() {
       .filter((linha) => !linha.encerrada_em)
       .map((linha) => String(linha.colaborador_id))
   );
+  const consulta = await consultaPortalAgrovias(acesso.acesso.clienteId, acesso.acesso.clienteNome);
+  const clienteId = acesso.acesso.clienteId;
+  const [plataformasRes, obrasRes, requisitosRes] = await Promise.all([
+    admin.from("gestao_plataformas").select("id, nome, link_acesso, arquivada_em").eq("cliente_id", clienteId).order("nome"),
+    admin
+      .from("gestao_plataforma_obras")
+      .select("id, plataforma_id, nome, empresa_responsavel, inicio_previsto, responsavel_acompanhamento")
+      .eq("cliente_id", clienteId)
+      .order("nome"),
+    admin
+      .from("gestao_plataforma_requisitos")
+      .select("id, obra_id, abrangencia, cargo, colaborador_id, tipo, titulo, recorrente, competencia, responsavel, prazo, validade, postado_em, situacao, motivo_recusa, agendamento_id, certificado_id")
+      .eq("cliente_id", clienteId),
+  ]);
+  const falhaPlataformas = [plataformasRes.error, obrasRes.error, requisitosRes.error].find(Boolean);
+  const nomes = new Map(colaboradores.map((linha) => [linha.id, linha.nome]));
+  const plataformas = falhaPlataformas
+    ? null
+    : montarPlataformasPortal({
+        hoje: todayIsoSaoPaulo(),
+        nomeColaborador: (id) => nomes.get(id) ?? "",
+        plataformas: ((plataformasRes.data ?? []) as Record<string, unknown>[]).map(
+          (row): PlataformaRegistro => ({
+            id: String(row.id),
+            nome: String(row.nome ?? "Plataforma"),
+            linkAcesso: String(row.link_acesso ?? ""),
+            arquivadaEm: row.arquivada_em ? String(row.arquivada_em) : null,
+          })
+        ),
+        obras: ((obrasRes.data ?? []) as Record<string, unknown>[]).map(
+          (row): ObraRegistro => ({
+            id: String(row.id),
+            plataformaId: String(row.plataforma_id),
+            nome: String(row.nome ?? "Obra"),
+            empresaResponsavel: String(row.empresa_responsavel ?? ""),
+            inicioPrevisto: row.inicio_previsto ? String(row.inicio_previsto).slice(0, 10) : null,
+            responsavelAcompanhamento: String(row.responsavel_acompanhamento ?? ""),
+          })
+        ),
+        requisitos: ((requisitosRes.data ?? []) as Record<string, unknown>[]).flatMap((row) => {
+          const tipo = String(row.tipo ?? "");
+          const situacao = String(row.situacao ?? "");
+          const abrangencia = String(row.abrangencia ?? "");
+          if (
+            tipo !== "curso" && tipo !== "exame" && tipo !== "documento_sst"
+          ) return [];
+          if (
+            situacao !== "pendente" &&
+            situacao !== "pronto_para_postar" &&
+            situacao !== "enviado" &&
+            situacao !== "aprovado" &&
+            situacao !== "recusado"
+          ) return [];
+          if (
+            abrangencia !== "equipe" &&
+            abrangencia !== "funcao" &&
+            abrangencia !== "colaborador" &&
+            abrangencia !== "empresa"
+          ) return [];
+          const registro: RequisitoRegistro = {
+            id: String(row.id),
+            obraId: String(row.obra_id),
+            abrangencia,
+            cargo: row.cargo ? String(row.cargo) : null,
+            colaboradorId: row.colaborador_id ? String(row.colaborador_id) : null,
+            tipo,
+            titulo: String(row.titulo ?? "Documento"),
+            recorrente: row.recorrente === true,
+            competencia: row.competencia ? String(row.competencia) : null,
+            responsavel: row.responsavel ? String(row.responsavel) : null,
+            prazo: row.prazo ? String(row.prazo).slice(0, 10) : null,
+            validade: row.validade ? String(row.validade).slice(0, 10) : null,
+            postadoEm: row.postado_em ? String(row.postado_em).slice(0, 10) : null,
+            situacao,
+            motivoRecusa: row.motivo_recusa ? String(row.motivo_recusa) : null,
+            agendamentoId: row.agendamento_id ? String(row.agendamento_id) : null,
+            certificadoId: row.certificado_id ? String(row.certificado_id) : null,
+          };
+          return [registro];
+        }),
+      });
   return {
     ok: true as const,
     clienteNome: acesso.acesso.clienteNome,
@@ -127,6 +214,9 @@ export async function listarPortalAgrovias() {
       situacao: linha.situacaoLabel,
       semObra: !comObra.has(linha.id),
     })),
+    documentosSst: consulta.documentos,
+    periodicos: consulta.periodicos,
+    plataformas,
   };
 }
 
@@ -155,7 +245,7 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
         .eq("colaborador_id", colaborador.id),
       admin
         .from("agendamentos")
-        .select("id, colaborador, colaborador_cpf, aso, status, data_agendamento, horario, clinica_nome")
+        .select("id, colaborador, colaborador_cpf, aso, status, data_agendamento, horario, clinica_nome, envio_esocial, data_envio_esocial, esocial_recibo, esocial_envio_cancelado")
         .eq("cliente_id", clienteId)
         .order("data_agendamento", { ascending: false })
         .limit(200),
@@ -217,6 +307,13 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
     })),
   });
   const eventos = eventosRes.data ?? [];
+  const complementos = await complementosFichaPortal({
+    clienteId,
+    clienteNome: acesso.acesso.clienteNome,
+    cpf: colaborador.cpfDigits,
+    nome: colaborador.nome,
+    agendamentosVisiveis: [...exames.proximos, ...exames.realizados],
+  });
   return {
     ok: true as const,
     ficha: {
@@ -232,6 +329,9 @@ export async function fichaPortalAgrovias(colaboradorId: string) {
       }),
       proximos: exames.proximos,
       realizados: exames.realizados,
+      exames: complementos.exames,
+      asos: complementos.asos,
+      esocial: complementos.esocial,
       cursos,
       documentos: (documentosRes.data ?? []).map((row) => {
         const situacao = (String(row.situacao || "recebido") as SituacaoDocumentoRh);
