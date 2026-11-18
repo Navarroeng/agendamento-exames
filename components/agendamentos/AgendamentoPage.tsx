@@ -38,6 +38,7 @@ export function AgendamentoPage() {
   const {
     showForm,
     editingId,
+    condicaoPagamentoRegistrada,
     editingSomenteDocumentacao,
     viewAgendamento,
     setViewAgendamento,
@@ -193,6 +194,7 @@ export function AgendamentoPage() {
             onChange={setField}
             onClose={closeForm}
             isEditing={!!editingId}
+            condicaoPagamentoRegistrada={condicaoPagamentoRegistrada}
             readOnly={editingSomenteDocumentacao}
             contratoVigencia={contratoVigencia}
             mensalidadeAgendamento={mensalidadeAgendamento}

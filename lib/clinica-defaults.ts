@@ -26,6 +26,7 @@ export function getEmptyClinicaForm(): ClinicaFormValues {
     observacoes: "",
     status: "Ativa",
     dia_vencimento_fatura: "",
+    condicao_pagamento: "fechamento_mensal",
     fechamento_apuracao: "mes_completo",
     dia_fechamento: "",
     vencimento_mes: "mesmo_mes",

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SeloPagamentoAvista } from "@/components/agendamentos/SeloPagamentoAvista";
 import { formatCargoVisualizacao } from "@/lib/agendamento-cargo";
+import { pagamentoClinicaAvista } from "@/lib/clinica-condicao-pagamento";
 import { formatClienteNomeDisplay } from "@/lib/cliente-display";
 import { formatCPF } from "@/lib/cpf";
 import { formatDateBR } from "@/lib/format";
@@ -114,7 +116,18 @@ export function ViewModalGeneralSection({
             <DataRow
               icon={<IconHospital />}
               label="Clínica"
-              value={agendamento.clinica_nome}
+              valueNode={
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <p className="text-[14px] font-bold text-[#1f2937]">
+                    {agendamento.clinica_nome}
+                  </p>
+                  {pagamentoClinicaAvista(
+                    agendamento.condicao_pagamento_clinica
+                  ) ? (
+                    <SeloPagamentoAvista />
+                  ) : null}
+                </div>
+              }
             />
             <DataRow
               icon={<IconId />}
