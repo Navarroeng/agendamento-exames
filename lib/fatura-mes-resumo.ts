@@ -41,6 +41,7 @@ import {
   type ClinicaCicloConfig,
   type PeriodoRegistradoClinica,
 } from "@/lib/clinica-fechamento";
+import { filtrarAgendamentosFechamentoMensalClinica } from "@/lib/clinica-condicao-pagamento";
 import {
   custosClinicaConferido,
   custosClinicaEmAberto,
@@ -1098,9 +1099,14 @@ export function buildResumoClinicasMes(
   clinicaFilter = "",
   opcoes?: OpcoesResumoClinicas
 ): { rows: FaturaMesRow[]; resumo: FaturaMesResumoGeral } | null {
+  // À vista sai antes do cálculo e do agrupamento. Fatura já registrada
+  // continua pelo próprio registro, inclusive aberta, conferida ou paga.
+  const agendamentosFechamento =
+    filtrarAgendamentosFechamentoMensalClinica(agendamentos);
+
   if (!mesReferencia.trim()) {
     return buildResumoPeriodoCompleto(
-      agendamentos,
+      agendamentosFechamento,
       faturas,
       "clinica",
       clinicaFilter,
@@ -1110,7 +1116,7 @@ export function buildResumoClinicasMes(
 
   if (opcoes?.porVencimento) {
     return buildResumoPorVencimento(
-      agendamentos,
+      agendamentosFechamento,
       faturas,
       mesReferencia,
       clinicaFilter,
@@ -1120,7 +1126,7 @@ export function buildResumoClinicasMes(
 
   if (opcoes?.porFechamento) {
     return buildResumoPorFechamento(
-      agendamentos,
+      agendamentosFechamento,
       faturas,
       mesReferencia,
       clinicaFilter,
@@ -1129,7 +1135,7 @@ export function buildResumoClinicasMes(
   }
 
   return buildResumoMesInterno(
-    agendamentos,
+    agendamentosFechamento,
     faturas,
     mesReferencia,
     "clinica",

@@ -5,6 +5,7 @@ import { useAuditoriaUsuario } from "@/contexts/AuthContext";
 import { ClinicaExamesTab } from "@/components/clinicas/ClinicaExamesTab";
 import { ClinicaRegrasAtendimentoViewSection } from "@/components/clinicas/ClinicaRegrasAtendimentoViewSection";
 import { IconBuilding } from "@/components/ui/icons/OutlineIcons";
+import { rotuloCondicaoPagamentoClinica } from "@/lib/clinica-condicao-pagamento";
 import {
   rotuloApuracao,
   rotuloVencimentoMes,
@@ -100,7 +101,7 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-[#8b95a8]">
-                  Clínica credenciada
+                  Clínica
                 </p>
                 <h2 className="truncate text-xl font-extrabold text-[#2d2a4a] sm:text-2xl">
                   {clinica.nome_fantasia}
@@ -197,6 +198,12 @@ export function ClinicaViewModal({ clinica, onClose }: ClinicaViewModalProps) {
 
             <SectionBlock title="Fechamento e pagamento">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <InfoCard
+                  label="Condição de pagamento"
+                  value={rotuloCondicaoPagamentoClinica(
+                    clinica.condicao_pagamento
+                  )}
+                />
                 <InfoCard
                   label="Período de apuração"
                   value={rotuloApuracao(clinica.fechamento_apuracao)}

@@ -13,6 +13,7 @@ import {
   apuracaoEfetiva,
   vencimentoMesEfetivo,
 } from "@/lib/clinica-fechamento";
+import { condicaoPagamentoClinicaEfetiva } from "@/lib/clinica-condicao-pagamento";
 import type { ClinicaFormValues, ClinicaRecord } from "@/lib/types";
 
 function boolToSimNao(value: boolean): string {
@@ -60,6 +61,9 @@ export function clinicaToFormValues(clinica: ClinicaRecord): ClinicaFormValues {
       clinica.dia_vencimento_fatura != null
         ? formatDiaVencimentoFatura(clinica.dia_vencimento_fatura)
         : "",
+    condicao_pagamento: condicaoPagamentoClinicaEfetiva(
+      clinica.condicao_pagamento
+    ),
     fechamento_apuracao: apuracaoEfetiva(clinica.fechamento_apuracao),
     dia_fechamento:
       clinica.dia_fechamento != null
@@ -108,6 +112,9 @@ export function formValuesToClinicaInsert(
     observacoes: form.observacoes.trim() || null,
     status: statusFromForm(form.status),
     dia_vencimento_fatura: parseDiaVencimentoFatura(form.dia_vencimento_fatura),
+    condicao_pagamento: condicaoPagamentoClinicaEfetiva(
+      form.condicao_pagamento
+    ),
     fechamento_apuracao:
       form.fechamento_apuracao === "dia_especifico" ? "dia_especifico" : null,
     dia_fechamento:

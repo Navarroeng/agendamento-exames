@@ -72,6 +72,11 @@ export interface AgendamentoInsert {
   vinculado_contrato_por?: string | null;
   /** Cliente do cadastro (preferencial para faturamento). */
   cliente_id?: string | null;
+  /**
+   * Condição da clínica no momento da criação.
+   * Null em registro legado = fechamento mensal. Não é recalculada na edição.
+   */
+  condicao_pagamento_clinica?: "fechamento_mensal" | "a_vista" | null;
 }
 
 export interface ExameFormItem {
@@ -485,6 +490,7 @@ export interface ClinicaFormValues {
   observacoes: string;
   status: string;
   dia_vencimento_fatura: string;
+  condicao_pagamento: string;
   fechamento_apuracao: string;
   dia_fechamento: string;
   vencimento_mes: string;
@@ -526,6 +532,7 @@ export interface ClinicaInsert {
   observacoes: string | null;
   status: ClinicaStatus;
   dia_vencimento_fatura: number | null;
+  condicao_pagamento: "fechamento_mensal" | "a_vista";
   /** Null = mês completo. Não gravar regra nova só por ausência. */
   fechamento_apuracao: "mes_completo" | "dia_especifico" | null;
   dia_fechamento: number | null;

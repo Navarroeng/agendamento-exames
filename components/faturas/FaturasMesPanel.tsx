@@ -100,10 +100,11 @@ const PANEL_CONFIG: Record<
         As faturas são agrupadas pelo mês de vencimento. O período dos exames e
         o fechamento seguem a configuração de cada clínica. Apenas agendamentos
         com status{" "}
-        <strong className="font-semibold text-navy">agendado</strong> entram no
-        cálculo. Enquanto o fechamento está aberto, os valores acompanham os
-        agendamentos; depois da conferência ou do pagamento, ficam os dados
-        salvos.
+        <strong className="font-semibold text-navy">agendado</strong> e
+        condição de fechamento mensal entram no cálculo. Pagamento à vista fica
+        de fora. Enquanto o fechamento está aberto, os valores acompanham os
+        agendamentos elegíveis; depois da conferência ou do pagamento, ficam os
+        dados salvos.
       </>
     ),
     resumoEntidadeLabel: "Clínicas com custo",

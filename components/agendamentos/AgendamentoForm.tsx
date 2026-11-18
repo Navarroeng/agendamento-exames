@@ -1,3 +1,4 @@
+import { SeloPagamentoAvista } from "@/components/agendamentos/SeloPagamentoAvista";
 import { ContratoVigenciaAlert } from "@/components/agendamentos/ContratoVigenciaAlert";
 import { MensalidadeAtrasoAlert } from "@/components/agendamentos/MensalidadeAtrasoAlert";
 import { ClienteProcuracaoAlert } from "@/components/agendamentos/ClienteProcuracaoAlert";
@@ -12,6 +13,7 @@ import { RESPONSAVEIS, TIPOS_ASO } from "@/lib/constants";
 import type { ContratoVigenciaCheckState } from "@/hooks/useContratoVigenciaCheck";
 import type { MensalidadeAgendamentoUiState } from "@/hooks/useMensalidadeAgendamentoBloqueio";
 import { maskDateBR, maskTime24 } from "@/lib/agendamento-datetime";
+import { pagamentoClinicaAvista } from "@/lib/clinica-condicao-pagamento";
 import { formatClienteSelectLabel } from "@/lib/cliente-display";
 import type { FormField } from "@/hooks/useAgendamentoForm";
 import type { ClienteRecord, ClinicaRecord, ExameFormItem } from "@/lib/types";
@@ -31,6 +33,8 @@ interface AgendamentoFormProps {
   onChange: (field: FormField, value: string) => void;
   onClose: () => void;
   isEditing?: boolean;
+  /** Condição gravada no agendamento. Na edição o selo segue este valor. */
+  condicaoPagamentoRegistrada?: string | null;
   readOnly?: boolean;
   contratoVigencia: ContratoVigenciaCheckState;
   mensalidadeAgendamento?: MensalidadeAgendamentoUiState;
@@ -62,6 +66,7 @@ export function AgendamentoForm({
   onChange,
   onClose,
   isEditing = false,
+  condicaoPagamentoRegistrada = null,
   readOnly = false,
   contratoVigencia,
   mensalidadeAgendamento = { status: "idle" },
@@ -77,6 +82,9 @@ export function AgendamentoForm({
 }: AgendamentoFormProps) {
   const selectedClinica =
     clinicas.find((item) => item.nome_fantasia === form.clinica_nome) ?? null;
+  const mostrarSeloPagamentoAvista = isEditing
+    ? pagamentoClinicaAvista(condicaoPagamentoRegistrada)
+    : pagamentoClinicaAvista(selectedClinica?.condicao_pagamento);
   const horarioHint = getHorarioFieldHint(selectedClinica, exams);
   const camposDependentesClienteDesabilitados =
     readOnly || !formularioClienteLiberado;
@@ -246,6 +254,9 @@ export function AgendamentoForm({
                 </option>
               ))}
             </select>
+            {mostrarSeloPagamentoAvista ? (
+              <SeloPagamentoAvista className="mt-2" />
+            ) : null}
           </Field>
           <Field label={<>Responsável <RequiredMark /></>}>
             <select

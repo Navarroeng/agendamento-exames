@@ -14,6 +14,7 @@ import {
   agendamentoToExams,
   agendamentoToFormValues,
 } from "@/lib/agendamento-mappers";
+import { condicaoPagamentoClinicaEfetiva } from "@/lib/clinica-condicao-pagamento";
 import {
   getAgendamentoValidationMessage,
   getDocumentacaoValidationMessage,
@@ -3001,12 +3002,19 @@ export function useAgendamentosPage() {
         if (editingId) {
           const atual = getById(editingId);
           // Preserva campos legados; a seleção de previsão fica em contrato_agendamentos.
+          // A condição gravada não acompanha mudança posterior no cadastro da clínica.
+          const condicaoGravada = atual?.condicao_pagamento_clinica;
           payload = {
             ...payload,
             contrato_id: atual?.contrato_id ?? null,
             consome_saldo_contrato: atual?.consome_saldo_contrato ?? null,
             vinculado_contrato_em: atual?.vinculado_contrato_em ?? null,
             vinculado_contrato_por: atual?.vinculado_contrato_por ?? null,
+            condicao_pagamento_clinica:
+              condicaoGravada === "a_vista" ||
+              condicaoGravada === "fechamento_mensal"
+                ? condicaoGravada
+                : null,
           };
         } else {
           payload = {
@@ -3015,6 +3023,9 @@ export function useAgendamentosPage() {
             consome_saldo_contrato: false,
             vinculado_contrato_em: null,
             vinculado_contrato_por: null,
+            condicao_pagamento_clinica: condicaoPagamentoClinicaEfetiva(
+              selectedClinica?.condicao_pagamento
+            ),
           };
         }
 
@@ -3623,9 +3634,14 @@ export function useAgendamentosPage() {
 
   const bloquearCamposAsoDocumentacao = isAgendamentoAsoRetido(editingStatus);
 
+  const condicaoPagamentoRegistrada = editingId
+    ? (getById(editingId)?.condicao_pagamento_clinica ?? null)
+    : null;
+
   return {
     showForm,
     editingId,
+    condicaoPagamentoRegistrada,
     editingSomenteDocumentacao,
     viewAgendamento,
     setViewAgendamento,

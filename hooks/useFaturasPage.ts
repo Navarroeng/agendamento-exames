@@ -105,6 +105,7 @@ import {
   listarFaturasClinicaSemVencimento,
   listarFaturasDaCompetencia,
 } from "@/services/fatura-competencia.service";
+import { filtrarAgendamentosFechamentoMensalClinica } from "@/lib/clinica-condicao-pagamento";
 import { listarAgendamentosParaFatura } from "@/services/fatura.service";
 import { useClientesList } from "@/hooks/useClientesList";
 import { buildClienteFilterOptionsHistorico } from "@/lib/cliente-display";
@@ -855,8 +856,9 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
         resumoMesBase?.rows.find(
           (item) => item.referenciaNome.trim().toLowerCase() === key
         );
+      const base = filtrarAgendamentosFechamentoMensalClinica(agendamentos);
       if (!row?.periodoInicio || !row.periodoFim) {
-        return filterAgendamentosDaReferenciaFatura(agendamentos, {
+        return filterAgendamentosDaReferenciaFatura(base, {
           mesReferencia: filters.mesReferencia,
           tipo: "clinica",
           referenciaNome,
@@ -876,7 +878,7 @@ export function useFaturasPage(pageTipo: FaturaTipo) {
       const salvo = Boolean(
         row.fatura?.periodo_inicio && row.fatura.periodo_fim
       );
-      return agendamentos.flatMap((ag) => {
+      return base.flatMap((ag) => {
         if (!isAgendamentoDaClinica(ag.clinica_nome, referenciaNome)) return [];
         if (!dataNoPeriodo(ag.data_agendamento, row.periodoInicio!, row.periodoFim!)) {
           return [];

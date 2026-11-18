@@ -2,6 +2,7 @@ import {
   rotuloApuracao,
   rotuloVencimentoMes,
 } from "@/lib/clinica-fechamento";
+import { rotuloCondicaoPagamentoClinica } from "@/lib/clinica-condicao-pagamento";
 import type { ClinicaInsert, ClinicaRecord } from "@/lib/types";
 import {
   formatDiasAtendimentoLabel,
@@ -247,6 +248,13 @@ export function buildHistoricoAlteracoesClinica(
     novo.observacao_operacional
   );
 
+  compareField(
+    changes,
+    usuario,
+    "condição de pagamento",
+    rotuloCondicaoPagamentoClinica(anterior.condicao_pagamento),
+    rotuloCondicaoPagamentoClinica(novo.condicao_pagamento)
+  );
   compareField(
     changes,
     usuario,

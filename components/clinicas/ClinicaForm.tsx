@@ -88,6 +88,16 @@ export function ClinicaForm({ form, isEditing, onChange }: ClinicaFormProps) {
           iconTone="purple"
         >
           <div className={gridClass}>
+            <Field label={<>Condição de pagamento <RequiredMark /></>}>
+              <select
+                className="field-input"
+                value={form.condicao_pagamento}
+                onChange={(e) => onChange("condicao_pagamento", e.target.value)}
+              >
+                <option value="fechamento_mensal">Fechamento mensal</option>
+                <option value="a_vista">À vista</option>
+              </select>
+            </Field>
             <Field label="Período de apuração">
               <select
                 className="field-input"
