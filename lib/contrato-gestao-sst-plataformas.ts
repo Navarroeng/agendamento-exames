@@ -18,6 +18,39 @@ export const CONTRATO_GESTAO_SST_PLATAFORMAS_IDENTIFICADOR =
 
 export const ORCAMENTO_GESTAO_SST_PLATAFORMAS_NUMERO = "ORC-2026-0087" as const;
 
+/**
+ * Cláusula 9 aprovada para a contratação da AGROVIAS vinculada ao
+ * ORC-2026-0087. O número do orçamento é único. A inclusão também exige
+ * os identificadores persistidos do orçamento, do cliente e da aprovação.
+ * O nome da empresa não decide a inclusão.
+ */
+export const CLAUSULA_GUARDA_AGROVIAS_NUMERO = "9" as const;
+
+export const CLAUSULA_GUARDA_AGROVIAS_TITULO =
+  "DA GUARDA, ENTREGA E TRANSIÇÃO DOS DOCUMENTOS" as const;
+
+export const CLAUSULA_GUARDA_AGROVIAS_PARAGRAFOS = [
+  "9.1. Os documentos finais e os registros operacionais produzidos para a CONTRATANTE no âmbito dos serviços previstos no Anexo I pertencem à CONTRATANTE, observados os deveres de guarda, a proteção de dados pessoais e o sigilo médico. Os prontuários médicos seguem seu procedimento próprio de guarda e transferência, quando aplicável. O relatório de riscos psicossociais será entregue de forma consolidada, preservada a confidencialidade das respostas individuais.",
+  "9.2. Durante a vigência, a CONTRATADA disponibilizará via portal eletrônico seguro, cópia atualizada de: (i) PGR, LTCAT, PCMSO e relatório de riscos psicossociais em PDF; (ii) ASOs emitidos; (iii) planilha de controle de vencimentos de exames, treinamentos e documentos; (iv) situação documental por plataforma e por obra; (v) data de envio e números dos recibos dos eventos de eSocial transmitidos.",
+  "9.3. No término ou na rescisão, por qualquer motivo, a CONTRATADA entregará em até 15 (quinze) dias corridos o conjunto completo e atualizado dos itens do subitem 9.2, sem custo adicional e independentemente de eventual discussão sobre valores. A entrega não implica quitação.",
+  "9.4. A CONTRATADA prestará apoio razoável à transição por 30 (trinta) dias corridos após o encerramento do contrato, sem custo adicional, para esclarecer dúvidas sobre os documentos entregues, as pendências registradas e a situação dos cadastros por plataforma e por obra. Novos cadastros, postagens, revisões de documentos e mobilizações após o encerramento dependem de contratação específica.",
+] as const;
+
+export function incluiClausulaGuardaAgrovias(params: {
+  numeroOrcamento?: string | null;
+  orcamentoId?: string | null;
+  clienteId?: string | null;
+  aprovacaoId?: string | null;
+}): boolean {
+  return (
+    (params.numeroOrcamento ?? "").trim() ===
+      ORCAMENTO_GESTAO_SST_PLATAFORMAS_NUMERO &&
+    Boolean((params.orcamentoId ?? "").trim()) &&
+    Boolean((params.clienteId ?? "").trim()) &&
+    Boolean((params.aprovacaoId ?? "").trim())
+  );
+}
+
 export const CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO =
   "Contrato de Prestação de Serviços de Gestão SST e Administração de Plataformas";
 

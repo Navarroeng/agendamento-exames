@@ -582,6 +582,9 @@ export function buildContratoNavarroDocumento(params: {
   const ctx: ContratoNavarroContexto = {
     modalidade,
     numeroOrcamento: orcamento.numero.trim(),
+    orcamentoId: orcamento.id,
+    clienteId: orcamento.cliente_id,
+    aprovacaoId: aprovacao?.id,
     dataContrato,
     contratante,
     colaboradores,

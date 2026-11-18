@@ -9,10 +9,13 @@ import path from "node:path";
 import { jsPDF } from "jspdf";
 import { drawContratoPdfDocument } from "../lib/contrato-pdf";
 import {
+  CLAUSULA_GUARDA_AGROVIAS_PARAGRAFOS,
+  CLAUSULA_GUARDA_AGROVIAS_TITULO,
   CONTRATO_GESTAO_SST_PLATAFORMAS_IDENTIFICADOR,
   CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO,
   ORCAMENTO_GESTAO_SST_PLATAFORMAS_NUMERO,
   PROPOSTA_APROVADA_ORC_2026_0087_OBSERVACAO,
+  incluiClausulaGuardaAgrovias,
   orcamentoUsaContratoGestaoSstPlataformas,
   propostaIncluiJanelaOperacionalUmaSemana,
   propostaIncluiPostagemRhAdministrativoFinanceiro,
@@ -189,6 +192,19 @@ assert.equal(
   "CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE GESTÃO SST E ADMINISTRAÇÃO DE PLATAFORMAS"
 );
 assert.match(texto, new RegExp(CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO));
+const clausulaGuarda = `CLÁUSULA 9 — ${CLAUSULA_GUARDA_AGROVIAS_TITULO}\n${CLAUSULA_GUARDA_AGROVIAS_PARAGRAFOS.join("\n")}`;
+const compacto = (valor: string) => valor.replace(/\s+/g, " ").trim();
+const textoCompacto = compacto(texto);
+const guardaCompacta = compacto(clausulaGuarda);
+assert.equal(textoCompacto.split(guardaCompacta).length - 1, 1);
+assert.ok(
+  texto.indexOf("CLÁUSULA 8 — DO FORO") <
+    texto.indexOf(`CLÁUSULA 9 — ${CLAUSULA_GUARDA_AGROVIAS_TITULO}`)
+);
+assert.ok(
+  texto.indexOf(`CLÁUSULA 9 — ${CLAUSULA_GUARDA_AGROVIAS_TITULO}`) <
+    texto.indexOf("ANEXO I — DOS SERVIÇOS CONTRATADOS")
+);
 assert.match(texto, /ANEXO I — DOS SERVIÇOS CONTRATADOS/);
 assert.match(texto, /Proposta Comercial nº ORC-2026-0087/);
 assert.match(texto, /58 \(cinquenta e oito\) colaboradores/);
@@ -292,6 +308,16 @@ const porServico = gerar({
 assert.match(porServico.tituloLinhas.join(" "), /ADMINISTRAÇÃO DE PLATAFORMAS/);
 assert.match(porServico.texto, /Administração de até 10 plataformas/);
 assert.doesNotMatch(porServico.texto, /Documentos de RH/);
+assert.doesNotMatch(porServico.texto, /CLÁUSULA 9 — DA GUARDA, ENTREGA E TRANSIÇÃO DOS DOCUMENTOS/);
+assert.equal(
+  incluiClausulaGuardaAgrovias({
+    numeroOrcamento: ORCAMENTO_GESTAO_SST_PLATAFORMAS_NUMERO,
+    orcamentoId: "",
+    clienteId: "c-agro",
+    aprovacaoId: "ap-agro",
+  }),
+  false
+);
 
 const comRh = gerar({
   orcamento: orcamento({
@@ -347,6 +373,7 @@ assert.deepEqual(comum.tituloLinhas, [
 ]);
 assert.match(comum.texto, /ANEXO I — DOS SERVIÇOS CONTRATADOS/);
 assert.match(comum.texto, /Proposta Comercial nº ORC-2026-0100/);
+assert.doesNotMatch(comum.texto, /CLÁUSULA 9 — DA GUARDA, ENTREGA E TRANSIÇÃO DOS DOCUMENTOS/);
 assert.doesNotMatch(comum.texto, /Administração de até 10 plataformas/);
 assert.doesNotMatch(comum.texto, /ADMINISTRAÇÃO DE PLATAFORMAS/);
 assert.doesNotMatch(comum.texto, /Não há segunda mensalidade/);
@@ -355,14 +382,55 @@ assert.doesNotMatch(comum.texto, /adequação de laudos, no valor fixo de/);
 assert.equal(comum.valor, 200);
 assert.equal(comum.colaboradores, 8);
 
+function textoExtraidoDoPdf(buffer: Buffer): string {
+  const fonte = buffer.toString("latin1");
+  const linhas: string[] = [];
+  const re = /\((?:\\.|[^\\)])*\)\s*Tj/g;
+  for (const item of fonte.match(re) ?? []) {
+    const literal = item.slice(1, item.lastIndexOf(")"));
+    linhas.push(
+      literal
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t")
+        .replace(/\\\(/g, "(")
+        .replace(/\\\)/g, ")")
+        .replace(/\\\\/g, "\\")
+        .replace(/\\([0-7]{1,3})/g, (_, octal) =>
+          String.fromCharCode(parseInt(octal, 8))
+        )
+        .replace(/\u0097/g, "—")
+    );
+  }
+  return linhas.join("\n");
+}
+
 const doc = new jsPDF({ unit: "mm", format: "a4" });
 drawContratoPdfDocument(doc, agro, null);
 const bruto = Buffer.from(doc.output("arraybuffer"));
 const pasta = path.join(process.cwd(), "tmp", "gestao-sst-plataformas");
 fs.mkdirSync(pasta, { recursive: true });
-const arquivo = path.join(pasta, "contrato-validacao.pdf");
+const arquivo = path.join(pasta, "contrato-agrovias-orc-2026-0087.pdf");
 fs.writeFileSync(arquivo, Buffer.from(bruto));
 const pdf = bruto.toString("latin1");
+const extraido = textoExtraidoDoPdf(bruto);
+const extraidoCompacto = compacto(extraido);
+assert.equal(extraidoCompacto.split(guardaCompacta).length - 1, 1);
+assert.ok(
+  extraido.indexOf("CLÁUSULA 8 — DO FORO") <
+    extraido.indexOf(`CLÁUSULA 9 — ${CLAUSULA_GUARDA_AGROVIAS_TITULO}`)
+);
+assert.ok(
+  extraido.indexOf(`CLÁUSULA 9 — ${CLAUSULA_GUARDA_AGROVIAS_TITULO}`) <
+    extraido.indexOf("ANEXO I — DOS SERVIÇOS CONTRATADOS")
+);
+assert.equal(
+  (extraido.match(/Proposta nº ORC-2026-0087/g) ?? []).length,
+  doc.getNumberOfPages()
+);
+for (let pagina = 1; pagina <= doc.getNumberOfPages(); pagina += 1) {
+  assert.match(extraido, new RegExp(`Página ${pagina} de ${doc.getNumberOfPages()}`));
+}
 assert.ok(doc.getNumberOfPages() >= 2);
 assert.match(pdf, /ADMINISTRA/);
 assert.match(pdf, /PLATAFORMAS/);
@@ -379,6 +447,35 @@ assert.match(pdf, /cinquenta e oito/);
 assert.match(pdf, /at. 10 plataformas/);
 assert.doesNotMatch(pdf, /Documentos de RH/);
 assert.doesNotMatch(pdf, /uma semana/);
+
+const docComum = new jsPDF({ unit: "mm", format: "a4" });
+drawContratoPdfDocument(docComum, comum, null);
+const brutoComum = Buffer.from(docComum.output("arraybuffer"));
+const arquivoComum = path.join(pasta, "contrato-outro-cliente.pdf");
+fs.writeFileSync(arquivoComum, Buffer.from(brutoComum));
+const extraidoComum = textoExtraidoDoPdf(brutoComum);
+assert.doesNotMatch(
+  extraidoComum,
+  /CLÁUSULA 9 — DA GUARDA, ENTREGA E TRANSIÇÃO DOS DOCUMENTOS/
+);
+assert.doesNotMatch(extraidoComum, /portal eletrônico seguro/);
+assert.match(extraidoComum, /ANEXO I — DOS SERVIÇOS CONTRATADOS/);
+assert.match(extraidoComum, /Proposta nº ORC-2026-0100/);
+
+const docPlataformas = new jsPDF({ unit: "mm", format: "a4" });
+drawContratoPdfDocument(docPlataformas, porServico, null);
+const extraidoPlataformas = textoExtraidoDoPdf(
+  Buffer.from(docPlataformas.output("arraybuffer"))
+);
+assert.match(extraidoPlataformas, /ADMINISTRAÇÃO DE PLATAFORMAS/);
+assert.doesNotMatch(
+  extraidoPlataformas,
+  /CLÁUSULA 9 — DA GUARDA, ENTREGA E TRANSIÇÃO DOS DOCUMENTOS/
+);
+fs.writeFileSync(
+  path.join(pasta, "contrato-outro-cliente-plataformas.pdf"),
+  Buffer.from(docPlataformas.output("arraybuffer"))
+);
 
 assert.equal(
   valorMensalidadeRenovacaoPlataformas({
