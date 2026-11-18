@@ -15,8 +15,12 @@ import {
 } from "@/lib/orcamento-modalidade";
 import type { ContratoParcela } from "@/lib/contrato-pagamento";
 import {
+  CLAUSULA_GUARDA_AGROVIAS_NUMERO,
+  CLAUSULA_GUARDA_AGROVIAS_PARAGRAFOS,
+  CLAUSULA_GUARDA_AGROVIAS_TITULO,
   CONTRATO_GESTAO_SST_PLATAFORMAS_TITULO,
   frasePagamentoVigenciaInicialPlataformas,
+  incluiClausulaGuardaAgrovias,
   paragrafosCalculoRenovacaoPlataformas,
   paragrafosEscopoPlataformas,
 } from "@/lib/contrato-gestao-sst-plataformas";
@@ -235,6 +239,12 @@ export type ContratoPagamentoMensalidade = {
 export type ContratoNavarroContexto = {
   modalidade: OrcamentoModalidade;
   numeroOrcamento: string;
+  /** Identificador persistido do orçamento. Não usa o nome da empresa. */
+  orcamentoId?: string | null;
+  /** Identificador persistido do cliente vinculado ao orçamento. */
+  clienteId?: string | null;
+  /** Identificador persistido da aprovação desta contratação. */
+  aprovacaoId?: string | null;
   dataContrato: string;
   contratante: ContratoParteContratante;
   colaboradores: number;
@@ -1247,7 +1257,21 @@ function aplicarModeloGestaoSstV2(
     }
     return clause;
   });
-  return [...ajustadas, clausulaAnexoI(ctx)];
+  const clausulaGuarda = incluiClausulaGuardaAgrovias({
+    numeroOrcamento: ctx.numeroOrcamento,
+    orcamentoId: ctx.orcamentoId,
+    clienteId: ctx.clienteId,
+    aprovacaoId: ctx.aprovacaoId,
+  })
+    ? [
+        {
+          numero: CLAUSULA_GUARDA_AGROVIAS_NUMERO,
+          titulo: CLAUSULA_GUARDA_AGROVIAS_TITULO,
+          paragrafos: [...CLAUSULA_GUARDA_AGROVIAS_PARAGRAFOS],
+        },
+      ]
+    : [];
+  return [...ajustadas, ...clausulaGuarda, clausulaAnexoI(ctx)];
 }
 
 export function buildClausulasContrato(
